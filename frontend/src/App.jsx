@@ -6,8 +6,9 @@ import MySchedule from './components/MySchedule'
 import VenueInfo from './components/VenueInfo'
 import { validateBandsData } from './utils/validation'
 
-// Cache-busting version - increment when bands.json changes
-const DATA_VERSION = '5'
+// Cache-busting version - updates with each build
+const DATA_VERSION = '6'
+const BUILD_TIMESTAMP = Date.now()
 
 function App() {
   const [bands, setBands] = useState([])
@@ -27,8 +28,8 @@ function App() {
   const [currentTime, setCurrentTime] = useState(() => new Date())
 
   useEffect(() => {
-    // Load bands data with cache-busting version parameter
-    fetch(`/bands.json?v=${DATA_VERSION}`)
+    // Load bands data with cache-busting version and timestamp
+    fetch(`/bands.json?v=${DATA_VERSION}&t=${BUILD_TIMESTAMP}`)
       .then(res => {
         if (!res.ok) {
           throw new Error(`Failed to load schedule (HTTP ${res.status})`)

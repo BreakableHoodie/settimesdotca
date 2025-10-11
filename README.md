@@ -9,8 +9,16 @@ A mobile-first web app that lets attendees build and view their personalized sch
 - Persistent storage via localStorage
 - "Coming up in X minutes" countdown bar
 - Conflict detection for overlapping times
-- Mobile-first responsive design
+- Quick copy buttons for either your picks or the entire lineup (clipboard-friendly)
+- Mobile-first responsive design with a compact sticky header that adapts on scroll
 - Deep navy/purple background with neon orange accents (faithful to event poster)
+
+### Recent Polishes
+
+- App-style shrinking header that keeps Tickets visible while freeing vertical space.
+- Inline clipboard helpers: `Copy Schedule` (selected bands) and `Copy Full Schedule` with live success feedback.
+- Improved accessibility: consistent focus states, touch-friendly controls, and semantic labelling.
+- Clipboard fallback for older Safari/iOS so copy still works without prompts.
 
 ## Project Structure
 
@@ -135,14 +143,39 @@ Modern browsers with ES2020+ support:
 - Safari 14+
 - Edge 90+
 
-## Future Enhancements
+## Deploying to Cloudflare Pages
 
-- Backend persistence with user accounts
-- Social sharing of schedules
-- Push notifications for upcoming shows
-- Multi-year/volume support
-- Map integration for venues
-- Real-time updates
+You can ship straight from your Gitea repo.
+
+1. **Push the latest code**  
+   ```bash
+   git status
+   git add .
+   git commit -m "Prepare Cloudflare Pages release"
+   git push origin main
+   ```
+
+2. **Create a Pages project**
+   - In the Cloudflare dashboard go to **Pages → Create a project → Connect to Git**.
+   - Authorise Cloudflare to read from your Gitea instance (you may need to add it as a custom git provider).
+   - Select the `longweekendbandcrawl` repo and branch (e.g. `main`).
+
+3. **Configure build settings**
+   - **Project root**: `frontend`
+   - **Build command**: `npm run build`
+   - **Output directory**: `dist`
+   - (Optional) set `NODE_VERSION=18` under environment variables to match the local toolchain.
+
+4. **Deploy**
+   - Cloudflare installs dependencies and runs the build.
+   - When the build finishes, the site is live on the auto-generated `*.pages.dev` domain.
+   - Add a custom domain via the Pages dashboard if required.
+
+5. **Smoke test**
+   - Visit the production URL on desktop and mobile. Confirm the shrinking header, copy buttons, and schedule loading behave as expected.
+   - You can rerun the build locally with `cd frontend && npm run preview` to double-check before pushing.
+
+Once Pages is connected, every push to the selected branch triggers a fresh deployment.
 
 ## Credits
 

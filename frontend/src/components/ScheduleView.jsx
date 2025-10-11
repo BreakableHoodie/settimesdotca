@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import BandCard from './BandCard'
+import { formatTime, formatTimeRange } from '../utils/timeFormat'
 
 function ScheduleView({
   bands,
@@ -25,14 +26,6 @@ function ScheduleView({
         const bandEnd = new Date(`${band.date}T${band.endTime}:00`)
         return bandEnd > now
       })
-
-  // Format 24-hour time to 12-hour format
-  const formatTime = (time24) => {
-    const [hours, minutes] = time24.split(':').map(Number)
-    const period = hours >= 12 ? 'PM' : 'AM'
-    const hours12 = hours % 12 || 12
-    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
-  }
 
   // Sort bands by date + time, then group by start time
   const sortedBands = [...visibleBands].sort((a, b) => {
@@ -62,20 +55,11 @@ function ScheduleView({
   const allSelected = bands.length > 0 && selectedBands.length === bands.length
   const hiddenFinished = !showPast ? finishedCount : 0
   const noVisibleBands = sortedBands.length === 0
-  const formatRange = (start, end) => {
-    const to12Hour = (time24) => {
-      const [hours, minutes] = time24.split(':').map(Number)
-      const period = hours >= 12 ? 'PM' : 'AM'
-      const hours12 = hours % 12 || 12
-      return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
-    }
-    return `${to12Hour(start)} - ${to12Hour(end)}`
-  }
 
   const copyBands = async (bandsToCopy) => {
     if (bandsToCopy.length === 0) return false
     const text = bandsToCopy
-      .map(band => `${band.name} — ${formatRange(band.startTime, band.endTime)} @ ${band.venue}`)
+      .map(band => `${band.name} — ${formatTimeRange(band.startTime, band.endTime)} @ ${band.venue}`)
       .join('\n')
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {

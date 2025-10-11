@@ -1,3 +1,5 @@
+import { formatTime } from '../utils/timeFormat'
+
 function BandCard({
   band,
   isSelected,
@@ -16,13 +18,6 @@ function BandCard({
     e.stopPropagation()
     const handler = onRemove || onToggle
     handler?.(band.id)
-  }
-
-  const formatTime = (time24) => {
-    const [hours, minutes] = time24.split(':').map(Number)
-    const period = hours >= 12 ? 'PM' : 'AM'
-    const hours12 = hours % 12 || 12
-    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
   }
 
   const baseClasses = `w-full p-4 rounded-xl transition-transform duration-150 hover:brightness-110 active:scale-95 ${

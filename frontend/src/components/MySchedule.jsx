@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import BandCard from "./BandCard";
+import { formatTimeRange } from "../utils/timeFormat";
+import { HIGHLIGHTED_BANDS, HIGHLIGHT_MESSAGE } from "../config/highlights";
 
 function MySchedule({
   bands,
@@ -21,7 +23,7 @@ function MySchedule({
 
   const effectiveNow = useMemo(() => currentTime, [currentTime]);
   const highlightedBandIds = useMemo(
-    () => new Set(["ba-johnston", "blackout", "handheld"]),
+    () => new Set(HIGHLIGHTED_BANDS),
     []
   );
 
@@ -251,16 +253,6 @@ function MySchedule({
   const [copyButtonLabel, setCopyButtonLabel] = useState("Copy Schedule");
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false);
 
-  const formatRange = (start, end) => {
-    const to12Hour = (time24) => {
-      const [hours, minutes] = time24.split(":").map(Number);
-      const period = hours >= 12 ? "PM" : "AM";
-      const hours12 = hours % 12 || 12;
-      return `${hours12}:${minutes.toString().padStart(2, "0")} ${period}`;
-    };
-    return `${to12Hour(start)} - ${to12Hour(end)}`;
-  };
-
   const copyBands = async (bandsToCopy) => {
     if (bandsToCopy.length === 0) {
       return false;
@@ -269,7 +261,7 @@ function MySchedule({
     const text = bandsToCopy
       .map(
         (band) =>
-          `${band.name} — ${formatRange(band.startTime, band.endTime)} @ ${band.venue}`
+          `${band.name} — ${formatTimeRange(band.startTime, band.endTime)} @ ${band.venue}`
       )
       .join("\n");
 
@@ -503,10 +495,7 @@ function MySchedule({
                     className="fa-solid fa-face-laugh-beam text-yellow-300"
                     aria-hidden="true"
                   ></i>
-                  <span>
-                    If you spot Dre tonight (short guy with red glasses), say hi,
-                    tell him a joke, or even maybe grab him a drink.
-                  </span>
+                  <span>{HIGHLIGHT_MESSAGE}</span>
                 </div>
               )}
               <div className="flex gap-3 items-start">

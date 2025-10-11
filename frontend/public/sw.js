@@ -1,12 +1,12 @@
 // Service Worker for offline support
-const CACHE_NAME = 'bandcrawl-v2'
+// IMPORTANT: Increment version number with each deployment to force cache refresh
+const CACHE_NAME = 'bandcrawl-v3'
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
   '/bands.json',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/favicon.svg'
 ]
 
 // Install event - cache assets

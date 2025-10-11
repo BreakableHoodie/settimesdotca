@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:dev": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch dev",
+    "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch main"
   },
   "dependencies": {
     "react": "^18.2.0",

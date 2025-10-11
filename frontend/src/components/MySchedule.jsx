@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import BandCard from "./BandCard";
 import { formatTimeRange } from "../utils/timeFormat";
-import { HIGHLIGHTED_BANDS, HIGHLIGHT_MESSAGE } from "../config/highlights";
+import { HIGHLIGHTED_BANDS, getHighlightMessage } from "../config/highlights.jsx";
 
 function MySchedule({
   bands,
@@ -495,7 +495,7 @@ function MySchedule({
                     className="fa-solid fa-face-laugh-beam text-yellow-300"
                     aria-hidden="true"
                   ></i>
-                  <span>{HIGHLIGHT_MESSAGE}</span>
+                  <span>{getHighlightMessage()}</span>
                 </div>
               )}
               <div className="flex gap-3 items-start">

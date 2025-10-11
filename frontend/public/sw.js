@@ -1,6 +1,6 @@
 // Service Worker for offline support
 // IMPORTANT: Increment version number with each deployment to force cache refresh
-const CACHE_NAME = 'bandcrawl-v3'
+const CACHE_NAME = 'bandcrawl-v4'
 const urlsToCache = [
   '/',
   '/index.html',

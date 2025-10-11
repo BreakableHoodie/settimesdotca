@@ -7,7 +7,7 @@ import VenueInfo from './components/VenueInfo'
 import { validateBandsData } from './utils/validation'
 
 // Cache-busting version - updates with each build
-const DATA_VERSION = '7'
+const DATA_VERSION = '8'
 const BUILD_TIMESTAMP = Date.now()
 
 function App() {

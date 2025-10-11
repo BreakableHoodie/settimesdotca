@@ -1,11 +1,9 @@
 // Service Worker for offline support
 // IMPORTANT: Increment version number with each deployment to force cache refresh
-const CACHE_NAME = 'bandcrawl-v6'
+const CACHE_NAME = 'bandcrawl-v7'
+// Only cache static assets, NOT HTML files (to preserve CSP headers)
 const urlsToCache = [
-  '/',
-  '/index.html',
   '/manifest.json',
-  '/bands.json',
   '/favicon.svg'
 ]
 
@@ -49,63 +47,54 @@ self.addEventListener('activate', event => {
   )
 })
 
-// Fetch event - network-first for HTML and data, cache-first for assets
+// Fetch event - NEVER cache HTML, always fetch from network
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url)
 
-  // Always use network-first for HTML files (Safari caching fix)
-  if (event.request.destination === 'document' || url.pathname.endsWith('.html')) {
+  // NEVER cache HTML files - always fetch from network to preserve CSP headers
+  if (event.request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/') {
+    console.log('[SW] Fetching HTML from network:', url.pathname)
     event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache)
-          })
-          return response
-        })
-        .catch(() => caches.match(event.request))
+      fetch(event.request).catch(() => {
+        // Only use cache as last resort for offline support
+        return caches.match(event.request)
+      })
     )
     return
   }
 
-  // Network-first strategy for bands.json to always get fresh data
+  // NEVER cache data files - always fetch fresh
   if (url.pathname.includes('bands.json')) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache)
-          })
-          return response
-        })
-        .catch(() => caches.match(event.request))
-    )
+    console.log('[SW] Fetching data from network:', url.pathname)
+    event.respondWith(fetch(event.request))
     return
   }
 
-  // Cache-first strategy for static assets
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
+  // Cache-first ONLY for static assets (JS, CSS, fonts, images)
+  if (url.pathname.startsWith('/assets/') || url.pathname.endsWith('.css') || url.pathname.endsWith('.js')) {
+    event.respondWith(
+      caches.match(event.request).then(response => {
         if (response) {
+          console.log('[SW] Serving from cache:', url.pathname)
           return response
         }
 
+        console.log('[SW] Fetching and caching:', url.pathname)
         return fetch(event.request).then(response => {
-          // Check if valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response
+          // Only cache successful responses
+          if (response && response.status === 200) {
+            const responseToCache = response.clone()
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache)
+            })
           }
-
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache)
-          })
-
           return response
         })
       })
-  )
+    )
+    return
+  }
+
+  // For everything else, just fetch from network
+  event.respondWith(fetch(event.request))
 })

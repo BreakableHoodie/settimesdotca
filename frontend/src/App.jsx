@@ -59,6 +59,7 @@ function App() {
   const clearSchedule = () => {
     if (window.confirm('Are you sure you want to clear your entire schedule?')) {
       setSelectedBands([])
+      setView('all')
     }
   }
 

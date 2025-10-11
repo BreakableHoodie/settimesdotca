@@ -558,7 +558,9 @@ function MySchedule({
                         band={band}
                         isSelected={true}
                         onToggle={onToggleBand}
+                        onRemove={onToggleBand}
                         showVenue={true}
+                        clickable={false}
                       />
                     </div>
 

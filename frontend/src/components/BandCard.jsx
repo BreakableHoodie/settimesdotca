@@ -1,10 +1,23 @@
-function BandCard({ band, isSelected, onToggle, showVenue = true }) {
-  const handleClick = (e) => {
+function BandCard({
+  band,
+  isSelected,
+  onToggle,
+  showVenue = true,
+  clickable = true,
+  onRemove
+}) {
+  const handleToggle = (e) => {
     e.stopPropagation()
-    onToggle(band.id)
+    if (!clickable) return
+    onToggle?.(band.id)
   }
 
-  // Format 24-hour time to 12-hour format
+  const handleRemove = (e) => {
+    e.stopPropagation()
+    const handler = onRemove || onToggle
+    handler?.(band.id)
+  }
+
   const formatTime = (time24) => {
     const [hours, minutes] = time24.split(':').map(Number)
     const period = hours >= 12 ? 'PM' : 'AM'
@@ -12,37 +25,35 @@ function BandCard({ band, isSelected, onToggle, showVenue = true }) {
     return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
   }
 
-  return (
+  const baseClasses = `w-full p-4 rounded-xl transition-transform duration-150 hover:brightness-110 active:scale-95 ${
+    isSelected
+      ? 'bg-band-orange text-band-navy shadow-lg scale-105 border-2 border-yellow-400'
+      : 'bg-band-orange/90 text-band-navy hover:bg-band-orange hover:scale-102 shadow-md'
+  } relative`
+
+  const labelBase = isSelected
+    ? `Remove ${band.name} from my schedule`
+    : `Add ${band.name} to my schedule`
+
+  const iconButton = (
     <button
-      onClick={handleClick}
       type="button"
-      aria-pressed={isSelected}
-      aria-label={
-        isSelected
-          ? `Remove ${band.name} from my schedule`
-          : `Add ${band.name} to my schedule`
-      }
-      title={
-        isSelected
-          ? `Remove ${band.name} from my schedule`
-          : `Add ${band.name} to my schedule`
-      }
-      className={`w-full p-4 rounded-xl transition-transform duration-150 hover:brightness-110 active:scale-95 ${
-        isSelected
-          ? 'bg-band-orange text-band-navy shadow-lg scale-105 border-2 border-yellow-400'
-          : 'bg-band-orange/90 text-band-navy hover:bg-band-orange hover:scale-102 shadow-md'
-      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300 relative`}
+      onClick={handleRemove}
+      className="absolute top-3 right-3 text-xl font-bold rounded-full px-1 py-0.5 bg-black/10 hover:bg-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300 transition-colors"
+      aria-label={labelBase}
+      title={labelBase}
     >
-      <span
-        className="absolute top-3 right-3 text-xl font-bold"
-        aria-hidden="true"
-      >
-        {isSelected ? (
-          <i className="fa-solid fa-xmark text-lg align-middle" aria-hidden="true" title="Remove from schedule"></i>
-        ) : (
-          <i className="fa-solid fa-plus text-lg align-middle" aria-hidden="true" title="Add to schedule"></i>
-        )}
-      </span>
+      {isSelected ? (
+        <i className="fa-solid fa-xmark text-lg align-middle" aria-hidden="true"></i>
+      ) : (
+        <i className="fa-solid fa-plus text-lg align-middle" aria-hidden="true"></i>
+      )}
+    </button>
+  )
+
+  const content = (
+    <>
+      {iconButton}
       <div className="flex flex-col items-center gap-2">
         <div className="inline-block bg-black px-3 py-1.5 rounded mb-1">
           {band.url ? (
@@ -70,7 +81,32 @@ function BandCard({ band, isSelected, onToggle, showVenue = true }) {
           </p>
         )}
       </div>
-    </button>
+    </>
+  )
+
+  if (clickable) {
+    return (
+      <button
+        onClick={handleToggle}
+        type="button"
+        aria-pressed={isSelected}
+        aria-label={labelBase}
+        title={labelBase}
+        className={`${baseClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300`}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className={`${baseClasses} cursor-default`}
+      role="group"
+      aria-label={`${band.name} in my schedule`}
+    >
+      {content}
+    </div>
   )
 }
 

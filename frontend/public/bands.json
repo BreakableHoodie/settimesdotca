@@ -1,0 +1,164 @@
+[
+  {
+    "id": "real-sickies",
+    "name": "Real Sickies",
+    "venue": "Room 47",
+    "date": "2025-10-12",
+    "startTime": "20:00",
+    "endTime": "20:30",
+    "url": null
+  },
+  {
+    "id": "doghouse-rose",
+    "name": "Doghouse Rose",
+    "venue": "Room 47",
+    "date": "2025-10-12",
+    "startTime": "21:00",
+    "endTime": "21:30",
+    "url": null
+  },
+  {
+    "id": "ba-johnston",
+    "name": "BA Johnston",
+    "venue": "Room 47",
+    "date": "2025-10-12",
+    "startTime": "22:30",
+    "endTime": "23:10",
+    "url": null
+  },
+  {
+    "id": "ripcordz",
+    "name": "Ripcordz",
+    "venue": "Room 47",
+    "date": "2025-10-13",
+    "startTime": "00:10",
+    "endTime": "00:50",
+    "url": null
+  },
+  {
+    "id": "mr-hands",
+    "name": "Mr Hands",
+    "venue": "Prohibition Warehouse",
+    "date": "2025-10-12",
+    "startTime": "18:45",
+    "endTime": "19:15",
+    "url": null
+  },
+  {
+    "id": "uppercut",
+    "name": "Uppercut",
+    "venue": "Prohibition Warehouse",
+    "date": "2025-10-12",
+    "startTime": "19:30",
+    "endTime": "20:00",
+    "url": null
+  },
+  {
+    "id": "heartland-province",
+    "name": "Heartland Province",
+    "venue": "Prohibition Warehouse",
+    "date": "2025-10-12",
+    "startTime": "20:30",
+    "endTime": "21:00",
+    "url": null
+  },
+  {
+    "id": "chris-murray",
+    "name": "Chris Murray",
+    "venue": "Prohibition Warehouse",
+    "date": "2025-10-12",
+    "startTime": "22:00",
+    "endTime": "22:30",
+    "url": null
+  },
+  {
+    "id": "handheld",
+    "name": "Handheld",
+    "venue": "Prohibition Warehouse",
+    "date": "2025-10-12",
+    "startTime": "23:10",
+    "endTime": "23:40",
+    "url": null
+  },
+  {
+    "id": "petrochemicals",
+    "name": "Petrochemicals",
+    "venue": "AristoCanine",
+    "date": "2025-10-12",
+    "startTime": "19:15",
+    "endTime": "19:45",
+    "url": null
+  },
+  {
+    "id": "harm-school",
+    "name": "Harm School",
+    "venue": "AristoCanine",
+    "date": "2025-10-12",
+    "startTime": "20:30",
+    "endTime": "21:00",
+    "url": null
+  },
+  {
+    "id": "lee-reed",
+    "name": "Lee Reed",
+    "venue": "AristoCanine",
+    "date": "2025-10-12",
+    "startTime": "21:30",
+    "endTime": "22:00",
+    "url": null
+  },
+  {
+    "id": "blackout",
+    "name": "Blackout!",
+    "venue": "AristoCanine",
+    "date": "2025-10-12",
+    "startTime": "23:40",
+    "endTime": "23:59",
+    "url": null
+  },
+  {
+    "id": "dj-chives",
+    "name": "Afterparty with DJ Chives",
+    "venue": "AristoCanine",
+    "date": "2025-10-13",
+    "startTime": "01:00",
+    "endTime": "02:00",
+    "url": null
+  },
+  {
+    "id": "kate-and-friends",
+    "name": "Kate & Friends",
+    "venue": "Princess Cafe",
+    "date": "2025-10-12",
+    "startTime": "18:45",
+    "endTime": "19:15",
+    "url": null
+  },
+  {
+    "id": "making-woman",
+    "name": "Making Woman",
+    "venue": "Princess Cafe",
+    "date": "2025-10-12",
+    "startTime": "19:30",
+    "endTime": "20:00",
+    "url": null
+  },
+  {
+    "id": "ej-fleming",
+    "name": "EJ Fleming",
+    "venue": "Princess Cafe",
+    "date": "2025-10-12",
+    "startTime": "20:30",
+    "endTime": "21:00",
+    "url": null
+  },
+  {
+    "id": "ben-stager",
+    "name": "Ben Stager",
+    "venue": "Princess Cafe",
+    "date": "2025-10-12",
+    "startTime": "21:45",
+    "endTime": "22:15",
+    "url": null
+  }
+]

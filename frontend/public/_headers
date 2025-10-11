@@ -1,0 +1,7 @@
+/assets/*
+  Cache-Control: public, max-age=604800, immutable
+
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

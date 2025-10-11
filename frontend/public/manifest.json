@@ -1,0 +1,24 @@
+{
+  "name": "Long Weekend Band Crawl Vol. 14",
+  "short_name": "Band Crawl",
+  "description": "Build your personalized schedule for Long Weekend Band Crawl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1845",
+  "theme_color": "#2d2554",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

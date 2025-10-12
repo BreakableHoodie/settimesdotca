@@ -174,7 +174,7 @@ function ScheduleView({ bands, selectedBands, onToggleBand, onSelectAll, current
               </div>
 
               {/* Bands at this time - responsive grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 ml-0 sm:ml-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
                 {timeBands.map(band => (
                   <BandCard
                     key={band.id}

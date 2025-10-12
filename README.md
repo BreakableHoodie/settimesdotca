@@ -102,6 +102,18 @@ docker-compose up --build    # Build and start
 docker-compose down          # Stop containers
 ```
 
+### Performance Checks
+
+Use the bundled PageSpeed Insights helper after each deploy:
+
+```bash
+cd frontend
+PSI_API_KEY=<your-google-api-key> npm run psi:dev     # dev.longweekend-bandcrawl.pages.dev
+PSI_API_KEY=<your-google-api-key> npm run psi:prod    # lwbc.dredre.net
+```
+
+Without an API key Google enforces a very small anonymous quota; create an API key in the Google Cloud console (`pagespeedonline.googleapis.com`) and export it as `PSI_API_KEY` for reliable runs.
+
 ## Data Structure
 
 See `frontend/public/bands.json` for the schedule format:

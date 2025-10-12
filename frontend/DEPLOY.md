@@ -53,6 +53,15 @@ npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch dev
 
 **Dev URL:** Will be at a subdomain like `dev.longweekend-bandcrawl.pages.dev`
 
+After the deployment finishes, capture a quick PageSpeed snapshot:
+
+```bash
+cd frontend
+PSI_API_KEY=<your-google-api-key> npm run psi:dev
+```
+
+The helper script defaults to both mobile and desktop runs; anonymous usage is heavily rate limited, so pass your own `PSI_API_KEY` to avoid quota errors.
+
 ### Enable the dev preview in Cloudflare Pages
 
 1. Sign in to the Cloudflare dashboard and open **Workers & Pages**.

@@ -13,44 +13,45 @@ function ScheduleView({
 }) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
-  const now = currentTime instanceof Date ? currentTime : new Date(currentTime)
+  const nowDate = currentTime instanceof Date ? currentTime : new Date(currentTime)
+  const nowMs = nowDate.getTime()
 
   const finishedCount = bands.reduce((count, band) => {
-    const bandEnd = new Date(`${band.date}T${band.endTime}:00`)
-    return bandEnd <= now ? count + 1 : count
+    const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+    return bandEndMs <= nowMs ? count + 1 : count
   }, 0)
 
   const visibleBands = showPast
     ? bands
     : bands.filter(band => {
-        const bandEnd = new Date(`${band.date}T${band.endTime}:00`)
-        return bandEnd > now
+        const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+        return bandEndMs > nowMs
       })
 
-  // Sort bands by date + time, then group by start time
   const sortedBands = [...visibleBands].sort((a, b) => {
-    const aTime = new Date(`${a.date}T${a.startTime}:00`)
-    const bTime = new Date(`${b.date}T${b.startTime}:00`)
+    const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
+    const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
+    if (aTime === bTime) {
+      return a.venue.localeCompare(b.venue)
+    }
     return aTime - bTime
   })
 
-  // Get unique time slots from sorted bands (preserving chronological order)
-  const timeSlots = []
-  const seenTimes = new Set()
+  const timeGroups = new Map()
+  const bandsByTime = []
   sortedBands.forEach(band => {
-    if (!seenTimes.has(band.startTime)) {
-      timeSlots.push(band.startTime)
-      seenTimes.add(band.startTime)
+    const slot = band.startTime
+    if (!timeGroups.has(slot)) {
+      const group = { time: slot, bands: [] }
+      timeGroups.set(slot, group)
+      bandsByTime.push(group)
     }
+    timeGroups.get(slot).bands.push(band)
   })
 
-  // Group bands by start time
-  const bandsByTime = timeSlots.map(time => ({
-    time,
-    bands: sortedBands.filter(b => b.startTime === time).sort((a, b) =>
-      a.venue.localeCompare(b.venue)
-    )
-  }))
+  bandsByTime.forEach(group => {
+    group.bands.sort((a, b) => a.venue.localeCompare(b.venue))
+  })
 
   const allSelected = bands.length > 0 && selectedBands.length === bands.length
   const hiddenFinished = !showPast ? finishedCount : 0
@@ -143,10 +144,9 @@ function ScheduleView({
             aria-label="Copy the full schedule"
             disabled={isCopyingAll}
           >
-            <i
-              className={copyAllLabel === 'Copied!' ? 'fa-solid fa-check' : 'fa-regular fa-copy'}
-              aria-hidden="true"
-            ></i>
+            <span aria-hidden="true" className="text-base leading-none">
+              {copyAllLabel === 'Copied!' ? '✔️' : '📋'}
+            </span>
             <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
           </button>
           <button

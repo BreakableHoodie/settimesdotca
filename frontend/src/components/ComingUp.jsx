@@ -6,14 +6,16 @@ function ComingUp({ bands }) {
 
   useEffect(() => {
     const updateNextBand = () => {
-      const now = new Date()
+      const nowMs = Date.now()
 
-      // Parse band times and find next one
       const upcomingBands = bands
         .map(band => {
-          const bandTime = new Date(`${band.date}T${band.startTime}:00`)
-          const diff = bandTime - now
-          return { ...band, diff, bandTime }
+          const startMs = typeof band.startMs === 'number' ? band.startMs : Date.parse(`${band.date}T${band.startTime}:00`)
+          return {
+            ...band,
+            startMs,
+            diff: startMs - nowMs,
+          }
         })
         .filter(band => band.diff > 0)
         .sort((a, b) => a.diff - b.diff)
@@ -21,7 +23,7 @@ function ComingUp({ bands }) {
       if (upcomingBands.length > 0) {
         const next = upcomingBands[0]
         setNextBand(next)
-        setMinutesUntil(Math.floor(next.diff / 1000 / 60))
+        setMinutesUntil(Math.floor(next.diff / 60000))
       } else {
         setNextBand(null)
         setMinutesUntil(null)

@@ -34,7 +34,7 @@ function BandCard({
     <button
       type="button"
       onClick={handleRemove}
-      className="absolute top-3 right-3 text-xl font-bold rounded-full px-1 py-0.5 bg-black/10 hover:bg-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300 transition-colors"
+      className="absolute top-2 right-2 h-12 w-12 flex items-center justify-center text-xl font-bold rounded-full bg-black/10 hover:bg-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300 transition-colors"
       aria-label={labelBase}
       title={labelBase}
     >

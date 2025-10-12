@@ -46,7 +46,7 @@ export function validateBandsData(data) {
     if (!dateRegex.test(band.date)) {
       return {
         valid: false,
-        error: `Band ${bandNum} (${band.id}): Date must be in YYYY-MM-DD format, got '${band.date}'`
+        error: `Band ${bandNum} (${band.id}): Date must be in YYYY-MM-DD format, got '${band.date}'`,
       }
     }
 
@@ -55,14 +55,14 @@ export function validateBandsData(data) {
     if (!timeRegex.test(band.startTime)) {
       return {
         valid: false,
-        error: `Band ${bandNum} (${band.id}): Start time must be in HH:MM format, got '${band.startTime}'`
+        error: `Band ${bandNum} (${band.id}): Start time must be in HH:MM format, got '${band.startTime}'`,
       }
     }
 
     if (!timeRegex.test(band.endTime)) {
       return {
         valid: false,
-        error: `Band ${bandNum} (${band.id}): End time must be in HH:MM format, got '${band.endTime}'`
+        error: `Band ${bandNum} (${band.id}): End time must be in HH:MM format, got '${band.endTime}'`,
       }
     }
 
@@ -71,7 +71,7 @@ export function validateBandsData(data) {
     if (isNaN(bandDate.getTime())) {
       return {
         valid: false,
-        error: `Band ${bandNum} (${band.id}): Invalid date '${band.date}'`
+        error: `Band ${bandNum} (${band.id}): Invalid date '${band.date}'`,
       }
     }
 
@@ -82,14 +82,14 @@ export function validateBandsData(data) {
     if (isNaN(startDateTime.getTime())) {
       return {
         valid: false,
-        error: `Band ${bandNum} (${band.id}): Invalid start time '${band.startTime}'`
+        error: `Band ${bandNum} (${band.id}): Invalid start time '${band.startTime}'`,
       }
     }
 
     if (isNaN(endDateTime.getTime())) {
       return {
         valid: false,
-        error: `Band ${bandNum} (${band.id}): Invalid end time '${band.endTime}'`
+        error: `Band ${bandNum} (${band.id}): Invalid end time '${band.endTime}'`,
       }
     }
 

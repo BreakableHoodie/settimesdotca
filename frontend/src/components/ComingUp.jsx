@@ -10,7 +10,8 @@ function ComingUp({ bands }) {
 
       const upcomingBands = bands
         .map(band => {
-          const startMs = typeof band.startMs === 'number' ? band.startMs : Date.parse(`${band.date}T${band.startTime}:00`)
+          const startMs =
+            typeof band.startMs === 'number' ? band.startMs : Date.parse(`${band.date}T${band.startTime}:00`)
           return {
             ...band,
             startMs,
@@ -41,7 +42,7 @@ function ComingUp({ bands }) {
   }
 
   // Format time until next band
-  const formatTimeUntil = (minutes) => {
+  const formatTimeUntil = minutes => {
     if (minutes < 60) {
       return `${minutes}m`
     }
@@ -65,16 +66,16 @@ function ComingUp({ bands }) {
   const message = `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name} at ${nextBand.venue}`
 
   return (
-    <div className="bg-gradient-to-r from-band-orange to-yellow-500 text-band-navy py-3 px-4 shadow-lg" role="status" aria-live="polite">
+    <div
+      className="bg-gradient-to-r from-band-orange to-yellow-500 text-band-navy py-3 px-4 shadow-lg"
+      role="status"
+      aria-live="polite"
+    >
       <div className="container mx-auto max-w-6xl text-center" title={message}>
         <p className="font-bold text-sm md:text-base leading-normal">
-          <span className="block">
-            Coming up in {formatTimeUntil(minutesUntil)}:
-          </span>
+          <span className="block">Coming up in {formatTimeUntil(minutesUntil)}:</span>
           <span className="text-lg md:text-xl">{nextBand.name}</span>
-          <span className="block text-sm md:text-base">
-            {nextBand.venue}
-          </span>
+          <span className="block text-sm md:text-base">{nextBand.venue}</span>
         </p>
       </div>
     </div>

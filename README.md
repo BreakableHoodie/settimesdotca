@@ -102,6 +102,48 @@ docker-compose up --build    # Build and start
 docker-compose down          # Stop containers
 ```
 
+## Quality Assurance
+
+### Code Quality
+
+```bash
+cd frontend
+
+# Linting
+npm run lint           # Run ESLint
+npm run lint:fix       # Auto-fix linting issues
+
+# Formatting
+npm run format         # Format code with Prettier
+npm run format:check   # Check code formatting
+
+# Combined quality check
+npm run quality        # Run lint, format check, tests, and build
+```
+
+### Testing
+
+```bash
+cd frontend
+
+# Unit & Accessibility Tests
+npm run test           # Run all tests once
+npm run test:watch     # Run tests in watch mode
+npm run test:ui        # Run tests with UI
+npm run test:a11y      # Run accessibility tests only
+npm run test:coverage  # Run tests with coverage report
+```
+
+### Automated Quality Checks
+
+All quality checks run automatically in CI/CD:
+- **Linting** - ESLint with React, accessibility, and hooks rules
+- **Accessibility** - axe-core automated testing for WCAG compliance
+- **Performance** - Lighthouse CI for automated performance audits
+- **Build** - Bundle size reporting and build verification
+
+See `.github/workflows/quality.yml` for the complete CI configuration.
+
 ### Performance Checks
 
 Use the bundled PageSpeed Insights helper after each deploy:

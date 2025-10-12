@@ -4,15 +4,7 @@ import { faCopy, faCheck } from '@fortawesome/free-solid-svg-icons'
 import BandCard from './BandCard'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 
-function ScheduleView({
-  bands,
-  selectedBands,
-  onToggleBand,
-  onSelectAll,
-  currentTime,
-  showPast,
-  onToggleShowPast
-}) {
+function ScheduleView({ bands, selectedBands, onToggleBand, onSelectAll, currentTime, showPast, onToggleShowPast }) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
   const nowDate = currentTime instanceof Date ? currentTime : new Date(currentTime)
@@ -59,7 +51,7 @@ function ScheduleView({
   const hiddenFinished = !showPast ? finishedCount : 0
   const noVisibleBands = sortedBands.length === 0
 
-  const copyBands = async (bandsToCopy) => {
+  const copyBands = async bandsToCopy => {
     if (bandsToCopy.length === 0) return false
     const text = bandsToCopy
       .map(band => `${band.name} — ${formatTimeRange(band.startTime, band.endTime)} @ ${band.venue}`)
@@ -69,7 +61,7 @@ function ScheduleView({
         await navigator.clipboard.writeText(text)
         return true
       }
-    } catch (_) {
+    } catch {
       /* fallback below */
     }
 
@@ -81,8 +73,7 @@ function ScheduleView({
       textarea.style.left = '-9999px'
       document.body.appendChild(textarea)
       const selection = document.getSelection()
-      const originalRange =
-        selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+      const originalRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
       textarea.select()
       const successful = document.execCommand('copy')
       document.body.removeChild(textarea)
@@ -91,7 +82,7 @@ function ScheduleView({
         selection.addRange(originalRange)
       }
       return successful
-    } catch (_) {
+    } catch {
       return false
     }
   }
@@ -115,9 +106,7 @@ function ScheduleView({
     <div className="py-6 space-y-6 sm:space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex-1 text-center sm:text-left">
-          <h2 className="text-2xl font-bold text-white text-center">
-            Full Lineup
-          </h2>
+          <h2 className="text-2xl font-bold text-white text-center">Full Lineup</h2>
           {!showPast && hiddenFinished > 0 && (
             <p className="text-xs text-band-orange/80 mt-1 text-center sm:text-left">
               {hiddenFinished} finished {hiddenFinished === 1 ? 'set hidden' : 'sets hidden'}

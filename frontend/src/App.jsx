@@ -102,12 +102,8 @@ function App() {
     localStorage.setItem('selectedBands', JSON.stringify(selectedBands))
   }, [selectedBands])
 
-  const toggleBand = (bandId) => {
-    setSelectedBands(prev =>
-      prev.includes(bandId)
-        ? prev.filter(id => id !== bandId)
-        : [...prev, bandId]
-    )
+  const toggleBand = bandId => {
+    setSelectedBands(prev => (prev.includes(bandId) ? prev.filter(id => id !== bandId) : [...prev, bandId]))
   }
 
   const clearSchedule = () => {

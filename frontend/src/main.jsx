@@ -22,7 +22,7 @@ if ('serviceWorker' in navigator) {
       registrations.forEach(registration => {
         registration.unregister().then(success => {
           if (success) {
-            console.log('[App] Service worker unregistered:', registration.scope)
+            console.warn('[App] Service worker unregistered:', registration.scope)
           }
         })
       })
@@ -33,5 +33,5 @@ if ('serviceWorker' in navigator) {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
+  </React.StrictMode>
 )

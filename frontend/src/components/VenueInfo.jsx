@@ -7,32 +7,30 @@ const venues = [
     name: 'Room 47',
     address: '47 King St N, Waterloo, ON N2J 2W9',
     googleMaps: 'https://maps.google.com/?q=47+King+St+N+Waterloo+ON+N2J+2W9',
-    note: 'Across the street from other venues'
+    note: 'Across the street from other venues',
   },
   {
     name: 'Prohibition Warehouse',
     address: '56 King St N, Waterloo, ON N2J 2X1',
-    googleMaps: 'https://maps.google.com/?q=56+King+St+N+Waterloo+ON+N2J+2X1'
+    googleMaps: 'https://maps.google.com/?q=56+King+St+N+Waterloo+ON+N2J+2X1',
   },
   {
     name: 'AristoCanine',
     address: '28 King St N, Waterloo, ON N2J 2W7',
-    googleMaps: 'https://maps.google.com/?q=28+King+St+N+Waterloo+ON+N2J+2W7'
+    googleMaps: 'https://maps.google.com/?q=28+King+St+N+Waterloo+ON+N2J+2W7',
   },
   {
     name: 'Princess Cafe',
     address: '46 King St N, Waterloo, ON N2J 2W8',
-    googleMaps: 'https://maps.google.com/?q=46+King+St+N+Waterloo+ON+N2J+2W8'
-  }
+    googleMaps: 'https://maps.google.com/?q=46+King+St+N+Waterloo+ON+N2J+2W8',
+  },
 ]
 
 function VenueInfo() {
   return (
     <footer className="py-10 sm:py-12 mt-12 sm:mt-16 border-t border-band-orange/20 bg-band-navy/30">
       <div className="container mx-auto px-4 max-w-6xl space-y-6 sm:space-y-8">
-        <h3 className="text-xl font-bold text-white mb-4 text-center">
-          Venue Locations
-        </h3>
+        <h3 className="text-xl font-bold text-white mb-4 text-center">Venue Locations</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-4xl mx-auto mb-8">
           {venues.map(venue => (
             <a
@@ -48,9 +46,7 @@ function VenueInfo() {
                 <FontAwesomeIcon icon={faLocationDot} aria-hidden="true" />
                 <span>{venue.address}</span>
               </p>
-              {venue.note && (
-                <p className="text-white/60 text-xs italic">{venue.note}</p>
-              )}
+              {venue.note && <p className="text-white/60 text-xs italic">{venue.note}</p>}
             </a>
           ))}
         </div>
@@ -99,8 +95,8 @@ function VenueInfo() {
               title="Fat Scheid Instagram"
             >
               Fat Scheid
-            </a>
-            {' '}&{' '}
+            </a>{' '}
+            &{' '}
             <a
               href="https://www.instagram.com/pink.lemonade.records"
               target="_blank"
@@ -111,9 +107,7 @@ function VenueInfo() {
               Pink Lemonade Records
             </a>
           </p>
-          <p className="text-white/50 text-xs italic">
-            Times are subject to change - late starts happen!
-          </p>
+          <p className="text-white/50 text-xs italic">Times are subject to change - late starts happen!</p>
           <p className="text-white/50 text-xs flex items-center justify-center gap-2">
             Website by{' '}
             <a

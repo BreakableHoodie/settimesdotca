@@ -145,7 +145,7 @@ Modern browsers with ES2020+ support:
 
 ## Deploying to Cloudflare Pages
 
-You can ship straight from your Gitea repo.
+This repository is hosted on GitHub at [`BreakableHoodie/longweekend-bandcrawl`](https://github.com/BreakableHoodie/longweekend-bandcrawl).
 
 1. **Push the latest code**  
    ```bash
@@ -155,27 +155,26 @@ You can ship straight from your Gitea repo.
    git push origin main
    ```
 
-2. **Create a Pages project**
+2. **Connect the repo to Cloudflare Pages**
    - In the Cloudflare dashboard go to **Pages → Create a project → Connect to Git**.
-   - Authorise Cloudflare to read from your Gitea instance (you may need to add it as a custom git provider).
-   - Select the `longweekendbandcrawl` repo and branch (e.g. `main`).
+   - Authorise the Cloudflare Pages GitHub app and grant it access to `BreakableHoodie/longweekend-bandcrawl`.
+   - Pick `main` as the production branch and add `dev` as a preview branch so staging deploys happen automatically.
 
 3. **Configure build settings**
-   - **Project root**: `frontend`
-   - **Build command**: `npm run build`
-   - **Output directory**: `dist`
-   - (Optional) set `NODE_VERSION=18` under environment variables to match the local toolchain.
+   - **Project root:** `frontend`
+   - **Build command:** `npm run build`
+   - **Output directory:** `dist`
+   - Set `NODE_VERSION=18` (Build settings → Environment variables) to match the local toolchain.
 
 4. **Deploy**
-   - Cloudflare installs dependencies and runs the build.
-   - When the build finishes, the site is live on the auto-generated `*.pages.dev` domain.
-   - Add a custom domain via the Pages dashboard if required.
+   - Cloudflare installs dependencies, runs the Vite build, and publishes to the `*.pages.dev` domain.
+   - Add your custom domain in **Pages → Custom domains** when ready.
 
 5. **Smoke test**
-   - Visit the production URL on desktop and mobile. Confirm the shrinking header, copy buttons, and schedule loading behave as expected.
-   - You can rerun the build locally with `cd frontend && npm run preview` to double-check before pushing.
+   - Visit the preview/production URLs on desktop and mobile. Confirm the shrinking header, copy buttons, and schedule loading behave as expected.
+   - Rerun the build locally with `cd frontend && npm run preview` if you need to debug before pushing.
 
-Once Pages is connected, every push to the selected branch triggers a fresh deployment.
+Once Pages is connected, every push to `main` (and `dev` for previews) triggers a fresh deployment.
 
 ## Credits
 
@@ -183,4 +182,4 @@ Event presented by Fat Scheid & Pink Lemonade Records
 
 ## License
 
-MIT
+MIT — see [`LICENSE`](LICENSE)

@@ -43,7 +43,7 @@ function MySchedule({
       const minutesLeft = Math.ceil(diffToEnd / 1000 / 60);
       return {
         status: "now",
-        icon: "fa-solid fa-guitar",
+        symbol: "🎸",
         text: `Playing now - ${minutesLeft} min left`,
         color: "bg-green-500/20 border-green-500/50 text-green-200",
       };
@@ -53,7 +53,7 @@ function MySchedule({
     if (diffToEnd <= 0) {
       return {
         status: "past",
-        icon: "fa-solid fa-check",
+        symbol: "✔️",
         text: "Finished",
         color: "bg-gray-500/20 border-gray-500/50 text-gray-400",
       };
@@ -64,14 +64,14 @@ function MySchedule({
     if (minutesUntil <= 15) {
       return {
         status: "soon",
-        icon: "fa-solid fa-bell",
+        symbol: "🔔",
         text: "Starting soon!",
         color: "bg-yellow-500/20 border-yellow-500/50 text-yellow-200",
       };
     } else if (minutesUntil <= 60) {
       return {
         status: "upcoming",
-        icon: "fa-regular fa-clock",
+        symbol: "🕒",
         text: `In ${minutesUntil} min`,
         color: "bg-blue-500/20 border-blue-500/50 text-blue-200",
       };
@@ -85,7 +85,7 @@ function MySchedule({
       if (mins > 0) parts.push(`${mins}m`);
       return {
         status: "later",
-        icon: "fa-solid fa-hourglass-half",
+        symbol: "⏳",
         text: `In ${parts.join(" ")}`,
         color: "bg-blue-500/20 border-blue-500/50 text-blue-200",
       };
@@ -95,7 +95,7 @@ function MySchedule({
       const timeLabel = mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
       return {
         status: "later",
-        icon: "fa-solid fa-hourglass-half",
+        symbol: "⏳",
         text: `In ${timeLabel}`,
         color: "bg-blue-500/20 border-blue-500/50 text-blue-200",
       };
@@ -215,32 +215,32 @@ function MySchedule({
     // Show different messages based on context
     if (longestBreak >= 60) {
       return {
-        icon: "fa-solid fa-pizza-slice",
+        symbol: "🍕",
         text: "You've got some longer breaks - perfect time to grab food or hang with friends!",
       };
     } else if (currentHour >= 21 && currentHour < 22) {
       return {
-        icon: "fa-solid fa-droplet",
+        symbol: "💧",
         text: "Stay hydrated! Grab some water and maybe a snack",
       };
     } else if (currentHour >= 22 && currentHour < 23) {
       return {
-        icon: "fa-solid fa-camera",
+        symbol: "📷",
         text: "Don't forget to take some pictures and videos!",
       };
     } else if (currentHour >= 23 || currentHour < 1) {
       return {
-        icon: "fa-solid fa-camera-retro",
+        symbol: "📸",
         text: "Capture the memories - snap some selfies with your friends!",
       };
     } else if (currentHour >= 1 && currentHour < 3) {
       return {
-        icon: "fa-solid fa-music",
+        symbol: "🎶",
         text: "Late night energy! Have fun and enjoy the music!",
       };
     } else if (visibleBands.length >= 5) {
       return {
-        icon: "fa-solid fa-star",
+        symbol: "⭐",
         text: "Stacked lineup! Keep the fun rolling all night.",
       };
     }
@@ -359,10 +359,9 @@ function MySchedule({
                 title={copyButtonLabel === "Copied!" ? "Schedule copied to clipboard" : "Copy your schedule"}
                 disabled={isCopyingSchedule}
               >
-                <i
-                  className={copyButtonLabel === "Copied!" ? "fa-solid fa-check" : "fa-regular fa-copy"}
-                  aria-hidden="true"
-                ></i>
+                <span aria-hidden="true" className="text-base leading-none">
+                  {copyButtonLabel === "Copied!" ? "✔️" : "📋"}
+                </span>
                 <span className="transition-opacity duration-200 ease-in-out">
                   {copyButtonLabel}
                 </span>
@@ -372,7 +371,9 @@ function MySchedule({
                 className="text-xs px-3 py-1.5 rounded bg-red-500/20 border border-red-500/50 text-red-200 flex items-center gap-2 transition-transform duration-150 hover:bg-red-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300"
                 title="Clear all selected bands"
               >
-                <i className="fa-solid fa-trash-can" aria-hidden="true"></i>
+                <span aria-hidden="true" className="leading-none">
+                  🗑️
+                </span>
                 <span>Clear All</span>
               </button>
             </div>
@@ -384,7 +385,9 @@ function MySchedule({
       {reminder && (
         <div className="max-w-2xl mx-auto">
           <div className="text-xs text-green-300 bg-green-900/20 px-4 py-2 rounded border border-green-500/30 text-center flex items-center justify-center gap-2 leading-normal">
-            <i className={`${reminder.icon}`} aria-hidden="true"></i>
+            <span aria-hidden="true" className="leading-none text-base">
+              {reminder.symbol}
+            </span>
             <span>{reminder.text}</span>
           </div>
         </div>
@@ -402,7 +405,7 @@ function MySchedule({
                     aria-label="Simultaneous sets"
                     title="Simultaneous sets"
                   >
-                    <i className="fa-solid fa-bolt" aria-hidden="true"></i>
+                    ⚡
                   </span>
                   <span className="text-sm sm:text-base text-center">
                     <span className="block">
@@ -424,7 +427,7 @@ function MySchedule({
                     aria-label="Overlapping sets"
                     title="Overlapping sets"
                   >
-                    <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    ⚠️
                   </span>
                   <span className="text-sm sm:text-base text-center">
                     <span className="block">
@@ -491,10 +494,9 @@ function MySchedule({
               )}
               {showDreReminder && (
                 <div className="text-center text-white/80 text-xs italic pb-2 flex items-center justify-center gap-2">
-                  <i
-                    className="fa-solid fa-face-laugh-beam text-yellow-300"
-                    aria-hidden="true"
-                  ></i>
+                  <span aria-hidden="true" className="text-yellow-300 leading-none">
+                    😄
+                  </span>
                   <span>{getHighlightMessage()}</span>
                 </div>
               )}
@@ -508,12 +510,7 @@ function MySchedule({
                       title={hasOverlap ? "Happening at the same time" : "Overlapping times"}
                       className={`${hasOverlap ? "text-yellow-300" : "text-red-300"} text-xl align-middle`}
                     >
-                      <i
-                        className={`fa-solid ${
-                          hasOverlap ? "fa-bolt" : "fa-triangle-exclamation"
-                        }`}
-                        aria-hidden="true"
-                      ></i>
+                      {hasOverlap ? "⚡" : "⚠️"}
                     </span>
                   </div>
                 )}
@@ -527,10 +524,7 @@ function MySchedule({
                           aria-label="Travel time alert"
                           title="Travel time alert"
                         >
-                          <i
-                            className="fa-solid fa-person-walking"
-                            aria-hidden="true"
-                          ></i>
+                          🚶
                         </span>
                         <span>Heads up, the next show at {travelWarning}</span>
                       </div>
@@ -560,7 +554,9 @@ function MySchedule({
                         <div
                           className={`text-xs font-semibold px-3 py-1.5 rounded border ${timeStatus.color} flex items-center gap-2 leading-normal`}
                         >
-                          <i className={timeStatus.icon} aria-hidden="true"></i>
+                          <span aria-hidden="true" className="leading-none">
+                            {timeStatus.symbol}
+                          </span>
                           <span>{timeStatus.text}</span>
                         </div>
                       );
@@ -574,7 +570,9 @@ function MySchedule({
       </div>
 
       <div className="max-w-2xl mx-auto mt-8 text-center text-xs text-white/60">
-        <i className="fa-solid fa-taxi mr-2" aria-hidden="true"></i>
+        <span aria-hidden="true" className="mr-2 leading-none">
+          🚕
+        </span>
         Home safe plan: grab a rideshare, call a friend, or line up a sober
         ride—no drinking and driving.
       </div>

@@ -1,4 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faBell,
+  faBolt,
+  faCamera,
+  faCameraRetro,
+  faCheck,
+  faClock,
+  faCopy,
+  faDroplet,
+  faFaceSmile,
+  faGuitar,
+  faHourglassHalf,
+  faMusic,
+  faPersonWalking,
+  faPizzaSlice,
+  faStar,
+  faTaxi,
+  faTrashCan,
+  faTriangleExclamation,
+} from "@fortawesome/free-solid-svg-icons";
 import BandCard from "./BandCard";
 import { formatTimeRange } from "../utils/timeFormat";
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from "../config/highlights.jsx";
@@ -43,7 +64,7 @@ function MySchedule({
       const minutesLeft = Math.ceil(diffToEnd / 1000 / 60);
       return {
         status: "now",
-        symbol: "🎸",
+        icon: faGuitar,
         text: `Playing now - ${minutesLeft} min left`,
         color: "bg-green-500/20 border-green-500/50 text-green-200",
       };
@@ -53,7 +74,7 @@ function MySchedule({
     if (diffToEnd <= 0) {
       return {
         status: "past",
-        symbol: "✔️",
+        icon: faCheck,
         text: "Finished",
         color: "bg-gray-500/20 border-gray-500/50 text-gray-400",
       };
@@ -64,14 +85,14 @@ function MySchedule({
     if (minutesUntil <= 15) {
       return {
         status: "soon",
-        symbol: "🔔",
+        icon: faBell,
         text: "Starting soon!",
         color: "bg-yellow-500/20 border-yellow-500/50 text-yellow-200",
       };
     } else if (minutesUntil <= 60) {
       return {
         status: "upcoming",
-        symbol: "🕒",
+        icon: faClock,
         text: `In ${minutesUntil} min`,
         color: "bg-blue-500/20 border-blue-500/50 text-blue-200",
       };
@@ -85,7 +106,7 @@ function MySchedule({
       if (mins > 0) parts.push(`${mins}m`);
       return {
         status: "later",
-        symbol: "⏳",
+        icon: faHourglassHalf,
         text: `In ${parts.join(" ")}`,
         color: "bg-blue-500/20 border-blue-500/50 text-blue-200",
       };
@@ -95,7 +116,7 @@ function MySchedule({
       const timeLabel = mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
       return {
         status: "later",
-        symbol: "⏳",
+        icon: faHourglassHalf,
         text: `In ${timeLabel}`,
         color: "bg-blue-500/20 border-blue-500/50 text-blue-200",
       };
@@ -215,32 +236,32 @@ function MySchedule({
     // Show different messages based on context
     if (longestBreak >= 60) {
       return {
-        symbol: "🍕",
+        icon: faPizzaSlice,
         text: "You've got some longer breaks - perfect time to grab food or hang with friends!",
       };
     } else if (currentHour >= 21 && currentHour < 22) {
       return {
-        symbol: "💧",
+        icon: faDroplet,
         text: "Stay hydrated! Grab some water and maybe a snack",
       };
     } else if (currentHour >= 22 && currentHour < 23) {
       return {
-        symbol: "📷",
+        icon: faCamera,
         text: "Don't forget to take some pictures and videos!",
       };
     } else if (currentHour >= 23 || currentHour < 1) {
       return {
-        symbol: "📸",
+        icon: faCameraRetro,
         text: "Capture the memories - snap some selfies with your friends!",
       };
     } else if (currentHour >= 1 && currentHour < 3) {
       return {
-        symbol: "🎶",
+        icon: faMusic,
         text: "Late night energy! Have fun and enjoy the music!",
       };
     } else if (visibleBands.length >= 5) {
       return {
-        symbol: "⭐",
+        icon: faStar,
         text: "Stacked lineup! Keep the fun rolling all night.",
       };
     }
@@ -359,9 +380,10 @@ function MySchedule({
                 title={copyButtonLabel === "Copied!" ? "Schedule copied to clipboard" : "Copy your schedule"}
                 disabled={isCopyingSchedule}
               >
-                <span aria-hidden="true" className="text-base leading-none">
-                  {copyButtonLabel === "Copied!" ? "✔️" : "📋"}
-                </span>
+                <FontAwesomeIcon
+                  icon={copyButtonLabel === "Copied!" ? faCheck : faCopy}
+                  aria-hidden="true"
+                />
                 <span className="transition-opacity duration-200 ease-in-out">
                   {copyButtonLabel}
                 </span>
@@ -371,9 +393,7 @@ function MySchedule({
                 className="text-xs px-3 py-1.5 rounded bg-red-500/20 border border-red-500/50 text-red-200 flex items-center gap-2 transition-transform duration-150 hover:bg-red-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300"
                 title="Clear all selected bands"
               >
-                <span aria-hidden="true" className="leading-none">
-                  🗑️
-                </span>
+                <FontAwesomeIcon icon={faTrashCan} aria-hidden="true" />
                 <span>Clear All</span>
               </button>
             </div>
@@ -385,9 +405,7 @@ function MySchedule({
       {reminder && (
         <div className="max-w-2xl mx-auto">
           <div className="text-xs text-green-300 bg-green-900/20 px-4 py-2 rounded border border-green-500/30 text-center flex items-center justify-center gap-2 leading-normal">
-            <span aria-hidden="true" className="leading-none text-base">
-              {reminder.symbol}
-            </span>
+            <FontAwesomeIcon icon={reminder.icon} aria-hidden="true" />
             <span>{reminder.text}</span>
           </div>
         </div>
@@ -399,13 +417,8 @@ function MySchedule({
             <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
               <p className="text-yellow-200 font-semibold text-center leading-normal">
                 <span className="inline-flex items-center gap-2 justify-center">
-                  <span
-                    className="text-yellow-300 text-xl align-middle"
-                    role="img"
-                    aria-label="Simultaneous sets"
-                    title="Simultaneous sets"
-                  >
-                    ⚡
+                  <span className="text-yellow-300 text-xl align-middle">
+                    <FontAwesomeIcon icon={faBolt} aria-hidden="true" title="Simultaneous sets" />
                   </span>
                   <span className="text-sm sm:text-base text-center">
                     <span className="block">
@@ -421,13 +434,8 @@ function MySchedule({
             <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 leading-normal">
               <p className="text-red-200 font-semibold text-center leading-normal">
                 <span className="inline-flex items-center gap-2 justify-center">
-                  <span
-                    className="text-red-300 text-xl align-middle"
-                    role="img"
-                    aria-label="Overlapping sets"
-                    title="Overlapping sets"
-                  >
-                    ⚠️
+                  <span className="text-red-300 text-xl align-middle">
+                    <FontAwesomeIcon icon={faTriangleExclamation} aria-hidden="true" title="Overlapping sets" />
                   </span>
                   <span className="text-sm sm:text-base text-center">
                     <span className="block">
@@ -494,9 +502,7 @@ function MySchedule({
               )}
               {showDreReminder && (
                 <div className="text-center text-white/80 text-xs italic pb-2 flex items-center justify-center gap-2">
-                  <span aria-hidden="true" className="text-yellow-300 leading-none">
-                    😄
-                  </span>
+                  <FontAwesomeIcon icon={faFaceSmile} className="text-yellow-300" aria-hidden="true" />
                   <span>{getHighlightMessage()}</span>
                 </div>
               )}
@@ -519,13 +525,11 @@ function MySchedule({
                     {/* Travel warning - appears ABOVE the band card */}
                     {travelWarning && (
                       <div className="text-xs text-blue-300 bg-blue-900/30 px-3 py-1.5 rounded border border-blue-500/30 flex items-center gap-2">
-                        <span
-                          role="img"
-                          aria-label="Travel time alert"
+                        <FontAwesomeIcon
+                          icon={faPersonWalking}
+                          aria-hidden="true"
                           title="Travel time alert"
-                        >
-                          🚶
-                        </span>
+                        />
                         <span>Heads up, the next show at {travelWarning}</span>
                       </div>
                     )}
@@ -554,9 +558,7 @@ function MySchedule({
                         <div
                           className={`text-xs font-semibold px-3 py-1.5 rounded border ${timeStatus.color} flex items-center gap-2 leading-normal`}
                         >
-                          <span aria-hidden="true" className="leading-none">
-                            {timeStatus.symbol}
-                          </span>
+                          <FontAwesomeIcon icon={timeStatus.icon} aria-hidden="true" />
                           <span>{timeStatus.text}</span>
                         </div>
                       );
@@ -570,9 +572,7 @@ function MySchedule({
       </div>
 
       <div className="max-w-2xl mx-auto mt-8 text-center text-xs text-white/60">
-        <span aria-hidden="true" className="mr-2 leading-none">
-          🚕
-        </span>
+        <FontAwesomeIcon icon={faTaxi} aria-hidden="true" className="mr-2" />
         Home safe plan: grab a rideshare, call a friend, or line up a sober
         ride—no drinking and driving.
       </div>

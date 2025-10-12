@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Long Weekend Band Crawl Mobile Schedule - Build your personalized lineup">
     <meta name="theme-color" content="#2d2554">
+    <meta name="robots" content="index,follow">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -21,6 +22,24 @@
     <meta name="twitter:title" content="Long Weekend Band Crawl Mobile Schedule">
     <meta name="twitter:description" content="Plan your Long Weekend Band Crawl night — pick bands, avoid conflicts, and get venue tips.">
     <meta name="twitter:image" content="https://lwbc.dredre.net/favicon.svg">
+    <script>
+      (function () {
+        var host = window.location.hostname || '';
+        var isPreview = host.startsWith('dev.') || host.endsWith('.pages.dev');
+        if (!isPreview) {
+          return;
+        }
+        var robotsMeta = document.querySelector("meta[name='robots']");
+        if (robotsMeta) {
+          robotsMeta.setAttribute('content', 'noindex, nofollow');
+        } else {
+          robotsMeta = document.createElement('meta');
+          robotsMeta.name = 'robots';
+          robotsMeta.content = 'noindex, nofollow';
+          document.head.appendChild(robotsMeta);
+        }
+      })();
+    </script>
     <title>Long Weekend Band Crawl Mobile Schedule</title>
   </head>
   <body>

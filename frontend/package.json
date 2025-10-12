@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy:dev": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch dev",
-    "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch main"
+    "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch main",
+    "psi": "node scripts/run-psi.mjs",
+    "psi:dev": "npm run psi -- --url https://dev.longweekend-bandcrawl.pages.dev",
+    "psi:prod": "npm run psi -- --url https://lwbc.dredre.net"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -20,6 +23,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
+    "psi": "^4.1.0",
     "tailwindcss": "^3.4.0",
     "vite": "^5.0.8",
     "wrangler": "^4.42.2"

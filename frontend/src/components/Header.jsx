@@ -60,7 +60,7 @@ function Header({ view, setView }) {
               : "opacity-100 translate-y-0 text-center"
           }`}
         >
-          Sunday October 12th 2025 - Vol. 14
+          Sunday October 12th 2025 · Mobile Schedule
         </p>
         <div
           className={`flex justify-center items-center gap-6 sm:gap-8 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${

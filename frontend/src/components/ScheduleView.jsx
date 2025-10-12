@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faCopy, faCheck } from '@fortawesome/free-solid-svg-icons'
 import BandCard from './BandCard'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 
@@ -144,9 +146,7 @@ function ScheduleView({
             aria-label="Copy the full schedule"
             disabled={isCopyingAll}
           >
-            <span aria-hidden="true" className="text-base leading-none">
-              {copyAllLabel === 'Copied!' ? '✔️' : '📋'}
-            </span>
+            <FontAwesomeIcon icon={copyAllLabel === 'Copied!' ? faCheck : faCopy} aria-hidden="true" />
             <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
           </button>
           <button

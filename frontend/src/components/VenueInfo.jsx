@@ -1,3 +1,7 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faLocationDot, faTicket } from '@fortawesome/free-solid-svg-icons'
+import { faInstagram, faFacebook } from '@fortawesome/free-brands-svg-icons'
+
 const venues = [
   {
     name: 'Room 47',
@@ -41,7 +45,7 @@ function VenueInfo() {
             >
               <h4 className="font-bold text-white text-sm mb-1">{venue.name}</h4>
               <p className="text-band-orange text-xs mb-1 flex items-center justify-center gap-2">
-                <span aria-hidden="true">📍</span>
+                <FontAwesomeIcon icon={faLocationDot} aria-hidden="true" />
                 <span>{venue.address}</span>
               </p>
               {venue.note && (
@@ -61,7 +65,7 @@ function VenueInfo() {
               className="text-band-orange hover:text-yellow-400 transition-colors font-semibold flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-band-orange"
               title="Buy tickets"
             >
-              <span aria-hidden="true">🎟️</span>
+              <FontAwesomeIcon icon={faTicket} aria-hidden="true" />
               <span>Get Tickets</span>
             </a>
             <a
@@ -71,7 +75,7 @@ function VenueInfo() {
               className="text-band-orange hover:text-yellow-400 transition-colors font-semibold flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-band-orange"
               title="Follow on Instagram"
             >
-              <span aria-hidden="true">📸</span>
+              <FontAwesomeIcon icon={faInstagram} aria-hidden="true" />
               <span>Instagram</span>
             </a>
             <a
@@ -81,7 +85,7 @@ function VenueInfo() {
               className="text-band-orange hover:text-yellow-400 transition-colors font-semibold flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-band-orange"
               title="View event on Facebook"
             >
-              <span aria-hidden="true">📘</span>
+              <FontAwesomeIcon icon={faFacebook} aria-hidden="true" />
               <span>Facebook</span>
             </a>
           </div>
@@ -118,7 +122,7 @@ function VenueInfo() {
               rel="noopener noreferrer"
               className="text-band-orange/70 hover:text-band-orange transition-colors inline-flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-band-orange"
             >
-              <span aria-hidden="true">📸</span>
+              <FontAwesomeIcon icon={faInstagram} aria-hidden="true" />
               <span>Dre</span>
             </a>
           </p>

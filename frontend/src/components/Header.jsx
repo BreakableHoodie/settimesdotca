@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTicket } from "@fortawesome/free-solid-svg-icons";
+import { faInstagram, faFacebook } from "@fortawesome/free-brands-svg-icons";
 
 function Header({ view, setView }) {
   const [scrolled, setScrolled] = useState(false);
@@ -48,9 +51,7 @@ function Header({ view, setView }) {
             }`}
             aria-label="Buy tickets for Long Weekend Band Crawl"
           >
-            <span aria-hidden="true" className="leading-none">
-              🎟️
-            </span>
+            <FontAwesomeIcon icon={faTicket} aria-hidden="true" />
             <span>Tickets</span>
           </a>
         </div>
@@ -79,9 +80,7 @@ function Header({ view, setView }) {
             aria-label="Visit our Instagram"
             title="Visit our Instagram"
           >
-            <span aria-hidden="true" className="text-xl leading-none">
-              📸
-            </span>
+            <FontAwesomeIcon icon={faInstagram} aria-hidden="true" />
           </a>
           <a
             href="https://www.facebook.com/events/2539604946400304"
@@ -91,9 +90,7 @@ function Header({ view, setView }) {
             aria-label="Visit our Facebook"
             title="Visit our Facebook"
           >
-            <span aria-hidden="true" className="text-xl leading-none">
-              📘
-            </span>
+            <FontAwesomeIcon icon={faFacebook} aria-hidden="true" />
           </a>
         </div>
 

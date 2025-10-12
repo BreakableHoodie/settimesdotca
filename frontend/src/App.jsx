@@ -1,4 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
 import Header from './components/Header'
 import ComingUp from './components/ComingUp'
 import ScheduleView from './components/ScheduleView'
@@ -137,7 +139,7 @@ function App() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md text-center">
           <div className="text-red-400 text-6xl mb-4" aria-hidden="true">
-            ⚠️
+            <FontAwesomeIcon icon={faCircleExclamation} />
           </div>
           <h2 className="text-white text-2xl font-bold mb-2">Oops! Something went wrong</h2>
           <p className="text-band-orange mb-6">{error}</p>

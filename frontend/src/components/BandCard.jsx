@@ -1,3 +1,5 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { formatTime } from '../utils/timeFormat'
 
 function BandCard({
@@ -38,9 +40,7 @@ function BandCard({
       aria-label={labelBase}
       title={labelBase}
     >
-      <span aria-hidden="true" className="align-middle leading-none">
-        {isSelected ? '×' : '+'}
-      </span>
+      <FontAwesomeIcon icon={isSelected ? faXmark : faPlus} aria-hidden="true" />
     </button>
   )
 

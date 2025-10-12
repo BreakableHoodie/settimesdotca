@@ -69,7 +69,7 @@ Proxy status: Proxied (orange cloud)
 **Build fails:**
 
 - Ensure build command includes `cd frontend` since the Vite project is in a subdirectory
-- Check that Node version is 18+ in Cloudflare settings
+- Check that Node version is 20+ in Cloudflare settings
 
 **404 errors on routes:**
 

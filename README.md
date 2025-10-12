@@ -137,6 +137,7 @@ npm run test:coverage  # Run tests with coverage report
 ### Automated Quality Checks
 
 All quality checks run automatically in CI/CD:
+
 - **Linting** - ESLint with React, accessibility, and hooks rules
 - **Accessibility** - axe-core automated testing for WCAG compliance
 - **Performance** - Lighthouse CI for automated performance audits

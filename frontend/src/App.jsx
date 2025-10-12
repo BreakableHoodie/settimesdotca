@@ -154,7 +154,7 @@ function App() {
     <div className="min-h-screen pb-20">
       <Header view={view} setView={setView} />
       <ComingUp bands={myBands} />
-      <main className="container mx-auto px-4 max-w-6xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
+      <main className="container mx-auto px-4 max-w-7xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
         {view === 'all' ? (
           <ScheduleView
             bands={bands}

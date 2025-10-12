@@ -302,7 +302,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
 
   return (
     <div className="py-6 space-y-6 sm:space-y-8">
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white text-center">My Schedule</h2>
@@ -371,7 +371,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
 
       {/* Contextual reminder */}
       {reminder && (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="text-xs text-green-300 bg-green-900/20 px-4 py-2 rounded border border-green-500/30 text-center flex items-center justify-center gap-2 leading-normal">
             <FontAwesomeIcon icon={reminder.icon} aria-hidden="true" />
             <span>{reminder.text}</span>
@@ -380,7 +380,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       )}
 
       {(conflicts.length > 0 || overlaps.length > 0) && (
-        <div className="space-y-4 max-w-2xl mx-auto">
+        <div className="space-y-4 max-w-4xl mx-auto">
           {overlaps.length > 0 && (
             <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
               <p className="text-yellow-200 font-semibold text-center leading-normal">
@@ -418,7 +418,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
         </div>
       )}
 
-      <div className="space-y-4 max-w-2xl mx-auto">
+      <div className="space-y-4 max-w-4xl mx-auto">
         {visibleBands.map((band, idx) => {
           const hasConflict = conflicts.some(c => c.band1 === band.id || c.band2 === band.id)
           const hasOverlap = overlaps.some(c => c.band1 === band.id || c.band2 === band.id)
@@ -515,7 +515,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
         })}
       </div>
 
-      <div className="max-w-2xl mx-auto mt-8 text-center text-xs text-white/60">
+      <div className="max-w-4xl mx-auto mt-8 text-center text-xs text-white/60">
         <FontAwesomeIcon icon={faTaxi} aria-hidden="true" className="mr-2" />
         Home safe plan: grab a rideshare, call a friend, or line up a sober ride—no drinking and driving.
       </div>

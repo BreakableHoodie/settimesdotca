@@ -167,7 +167,7 @@ This repository is hosted on GitHub at [`BreakableHoodie/longweekend-bandcrawl`]
    - **Project root:** `frontend`
    - **Build command:** `npm run build`
    - **Output directory:** `dist`
-   - Set `NODE_VERSION=18` (Build settings → Environment variables) to match the local toolchain.
+   - Set `NODE_VERSION=20` (Build settings → Environment variables) to match the Cloudflare build image requirement.
 
 4. **Deploy**
 

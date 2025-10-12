@@ -1,17 +1,41 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import Header from './components/Header'
 import ComingUp from './components/ComingUp'
 import ScheduleView from './components/ScheduleView'
-import MySchedule from './components/MySchedule'
-import VenueInfo from './components/VenueInfo'
 import { validateBandsData } from './utils/validation'
+import bandsFallbackRaw from '../public/bands.json?raw'
+
+const MySchedule = lazy(() => import('./components/MySchedule'))
+const VenueInfo = lazy(() => import('./components/VenueInfo'))
 
 // Cache-busting version - updates with each build
 const DATA_VERSION = '8'
-const BUILD_TIMESTAMP = Date.now()
+
+function prepareBands(list) {
+  return list.map(band => {
+    const startMs = Date.parse(`${band.date}T${band.startTime}:00`)
+    const endMs = Date.parse(`${band.date}T${band.endTime}:00`)
+    return {
+      ...band,
+      startMs: Number.isNaN(startMs) ? 0 : startMs,
+      endMs: Number.isNaN(endMs) ? 0 : endMs,
+    }
+  })
+}
+
+const FALLBACK_BANDS = (() => {
+  try {
+    const parsed = JSON.parse(bandsFallbackRaw)
+    return Array.isArray(parsed) ? prepareBands(parsed) : []
+  } catch (error) {
+    console.warn('[App] Failed to parse embedded bands fallback', error)
+    return []
+  }
+})()
+const HAS_FALLBACK = FALLBACK_BANDS.length > 0
 
 function App() {
-  const [bands, setBands] = useState([])
+  const [bands, setBands] = useState(FALLBACK_BANDS)
   const [selectedBands, setSelectedBands] = useState(() => {
     const saved = localStorage.getItem('selectedBands')
     return saved ? JSON.parse(saved) : []
@@ -22,14 +46,18 @@ function App() {
     const hasBands = saved && JSON.parse(saved).length > 0
     return hasBands ? 'mine' : 'all'
   })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!HAS_FALLBACK)
   const [error, setError] = useState(null)
   const [showPast, setShowPast] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => new Date())
 
   useEffect(() => {
+    const controller = new AbortController()
+
     // Load bands data with cache-busting version and timestamp
-    fetch(`/bands.json?v=${DATA_VERSION}&t=${BUILD_TIMESTAMP}`)
+    fetch(`/bands.json?v=${DATA_VERSION}`, {
+      signal: controller.signal,
+    })
       .then(res => {
         if (!res.ok) {
           throw new Error(`Failed to load schedule (HTTP ${res.status})`)
@@ -42,14 +70,21 @@ function App() {
         if (!validation.valid) {
           throw new Error(validation.error)
         }
-        setBands(data)
+        setError(null)
+        setBands(prepareBands(data))
         setLoading(false)
       })
       .catch(err => {
+        if (controller.signal.aborted) {
+          return
+        }
         console.error('Failed to load bands:', err)
-        setError(err.message || 'Failed to load schedule. Please try refreshing the page.')
+        if (!HAS_FALLBACK) {
+          setError(err.message || 'Failed to load schedule. Please try refreshing the page.')
+        }
         setLoading(false)
       })
+    return () => controller.abort()
   }, [])
 
   useEffect(() => {
@@ -87,8 +122,9 @@ function App() {
 
   const myBands = bands.filter(band => selectedBands.includes(band.id))
   const toggleShowPast = () => setShowPast(prev => !prev)
+  const shouldShowLoading = loading && bands.length === 0
 
-  if (loading) {
+  if (shouldShowLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-band-orange text-xl">Loading...</div>
@@ -100,8 +136,8 @@ function App() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md text-center">
-          <div className="text-red-400 text-6xl mb-4">
-            <i className="fa-solid fa-circle-exclamation"></i>
+          <div className="text-red-400 text-6xl mb-4" aria-hidden="true">
+            ⚠️
           </div>
           <h2 className="text-white text-2xl font-bold mb-2">Oops! Something went wrong</h2>
           <p className="text-band-orange mb-6">{error}</p>
@@ -132,16 +168,32 @@ function App() {
             onToggleShowPast={toggleShowPast}
           />
         ) : (
-          <MySchedule
-            bands={myBands}
-            onToggleBand={toggleBand}
-            onClearSchedule={clearSchedule}
-            showPast={showPast}
-            onToggleShowPast={toggleShowPast}
-          />
+          <Suspense
+            fallback={
+              <div className="py-16 text-center text-white/70" role="status" aria-live="polite">
+                Loading your schedule...
+              </div>
+            }
+          >
+            <MySchedule
+              bands={myBands}
+              onToggleBand={toggleBand}
+              onClearSchedule={clearSchedule}
+              showPast={showPast}
+              onToggleShowPast={toggleShowPast}
+            />
+          </Suspense>
         )}
       </main>
-      <VenueInfo />
+      <Suspense
+        fallback={
+          <div className="py-12 text-center text-white/60" role="status" aria-live="polite">
+            Loading venue tips...
+          </div>
+        }
+      >
+        <VenueInfo />
+      </Suspense>
     </div>
   )
 }

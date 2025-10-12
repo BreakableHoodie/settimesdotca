@@ -48,7 +48,9 @@ function Header({ view, setView }) {
             }`}
             aria-label="Buy tickets for Long Weekend Band Crawl"
           >
-            <i className="fa-solid fa-ticket" aria-hidden="true"></i>
+            <span aria-hidden="true" className="leading-none">
+              🎟️
+            </span>
             <span>Tickets</span>
           </a>
         </div>
@@ -77,7 +79,9 @@ function Header({ view, setView }) {
             aria-label="Visit our Instagram"
             title="Visit our Instagram"
           >
-            <i className="fa-brands fa-instagram" aria-hidden="true"></i>
+            <span aria-hidden="true" className="text-xl leading-none">
+              📸
+            </span>
           </a>
           <a
             href="https://www.facebook.com/events/2539604946400304"
@@ -87,7 +91,9 @@ function Header({ view, setView }) {
             aria-label="Visit our Facebook"
             title="Visit our Facebook"
           >
-            <i className="fa-brands fa-facebook" aria-hidden="true"></i>
+            <span aria-hidden="true" className="text-xl leading-none">
+              📘
+            </span>
           </a>
         </div>
 

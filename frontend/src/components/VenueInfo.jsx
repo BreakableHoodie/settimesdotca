@@ -41,7 +41,7 @@ function VenueInfo() {
             >
               <h4 className="font-bold text-white text-sm mb-1">{venue.name}</h4>
               <p className="text-band-orange text-xs mb-1 flex items-center justify-center gap-2">
-                <i className="fa-solid fa-location-dot" aria-hidden="true"></i>
+                <span aria-hidden="true">📍</span>
                 <span>{venue.address}</span>
               </p>
               {venue.note && (
@@ -61,7 +61,7 @@ function VenueInfo() {
               className="text-band-orange hover:text-yellow-400 transition-colors font-semibold flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-band-orange"
               title="Buy tickets"
             >
-              <i className="fa-solid fa-ticket" aria-hidden="true"></i>
+              <span aria-hidden="true">🎟️</span>
               <span>Get Tickets</span>
             </a>
             <a
@@ -71,7 +71,7 @@ function VenueInfo() {
               className="text-band-orange hover:text-yellow-400 transition-colors font-semibold flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-band-orange"
               title="Follow on Instagram"
             >
-              <i className="fa-brands fa-instagram" aria-hidden="true"></i>
+              <span aria-hidden="true">📸</span>
               <span>Instagram</span>
             </a>
             <a
@@ -81,7 +81,7 @@ function VenueInfo() {
               className="text-band-orange hover:text-yellow-400 transition-colors font-semibold flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-band-orange"
               title="View event on Facebook"
             >
-              <i className="fa-brands fa-facebook" aria-hidden="true"></i>
+              <span aria-hidden="true">📘</span>
               <span>Facebook</span>
             </a>
           </div>
@@ -118,7 +118,7 @@ function VenueInfo() {
               rel="noopener noreferrer"
               className="text-band-orange/70 hover:text-band-orange transition-colors inline-flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-band-orange"
             >
-              <i className="fa-brands fa-instagram" aria-hidden="true"></i>
+              <span aria-hidden="true">📸</span>
               <span>Dre</span>
             </a>
           </p>

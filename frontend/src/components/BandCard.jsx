@@ -38,11 +38,9 @@ function BandCard({
       aria-label={labelBase}
       title={labelBase}
     >
-      {isSelected ? (
-        <i className="fa-solid fa-xmark text-lg align-middle" aria-hidden="true"></i>
-      ) : (
-        <i className="fa-solid fa-plus text-lg align-middle" aria-hidden="true"></i>
-      )}
+      <span aria-hidden="true" className="align-middle leading-none">
+        {isSelected ? '×' : '+'}
+      </span>
     </button>
   )
 

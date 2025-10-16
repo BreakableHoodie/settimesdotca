@@ -56,27 +56,44 @@ function App() {
   useEffect(() => {
     const controller = new AbortController()
 
-    // Load bands data with cache-busting version and timestamp
-    fetch(`/bands.json?v=${DATA_VERSION}`, {
-      signal: controller.signal,
-    })
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`Failed to load schedule (HTTP ${res.status})`)
+    // Try loading from API first, then fallback to static file
+    const loadData = async () => {
+      try {
+        // Try API endpoint first
+        const apiRes = await fetch('/api/schedule?event=current', {
+          signal: controller.signal,
+        })
+
+        if (apiRes.ok) {
+          const data = await apiRes.json()
+          const validation = validateBandsData(data)
+          if (validation.valid) {
+            setError(null)
+            setBands(prepareBands(data))
+            setLoading(false)
+            return
+          }
         }
-        return res.json()
-      })
-      .then(data => {
-        // Validate schedule data
+
+        // API failed or returned invalid data, try static file
+        const staticRes = await fetch(`/bands.json?v=${DATA_VERSION}`, {
+          signal: controller.signal,
+        })
+
+        if (!staticRes.ok) {
+          throw new Error(`Failed to load schedule (HTTP ${staticRes.status})`)
+        }
+
+        const data = await staticRes.json()
         const validation = validateBandsData(data)
         if (!validation.valid) {
           throw new Error(validation.error)
         }
+
         setError(null)
         setBands(prepareBands(data))
         setLoading(false)
-      })
-      .catch(err => {
+      } catch (err) {
         if (controller.signal.aborted) {
           return
         }
@@ -85,7 +102,10 @@ function App() {
           setError(err.message || 'Failed to load schedule. Please try refreshing the page.')
         }
         setLoading(false)
-      })
+      }
+    }
+
+    loadData()
     return () => controller.abort()
   }, [])
 

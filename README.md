@@ -20,6 +20,25 @@ A mobile-first web app that lets attendees build and view their personalized sch
 - Improved accessibility: consistent focus states, touch-friendly controls, and semantic labelling.
 - Clipboard fallback for older Safari/iOS so copy still works without prompts.
 
+## Admin Panel
+
+This project now includes a full-featured admin panel with Cloudflare D1 database integration for managing events, venues, and bands.
+
+**Features:**
+- Password-protected admin interface at `/admin`
+- Manage multiple events (create, duplicate, publish/unpublish)
+- CRUD operations for venues and bands
+- Time conflict detection for overlapping performances
+- Rate limiting and audit logging for security
+- Master password recovery system
+- Mobile-responsive design
+
+**Quick Access:**
+- Local: `http://localhost:5173/admin`
+- Production: `https://yourdomain.com/admin`
+
+**Setup:** See [D1_SETUP.md](D1_SETUP.md) for complete database setup, security configuration, and deployment instructions.
+
 ## Project Structure
 
 ```sh
@@ -184,10 +203,12 @@ Inspired by the event poster (`docs/schedule.webp`):
 
 ## Tech Stack
 
-- **Frontend:** React 18, Vite 5, Tailwind CSS 3
-- **Backend:** Express.js, Helmet, Compression
-- **Build:** Docker multi-stage build
-- **Persistence:** localStorage (browser-based)
+- **Frontend:** React 18, Vite 5, Tailwind CSS 3, React Router
+- **Backend:** Cloudflare Pages Functions (serverless)
+- **Database:** Cloudflare D1 (SQLite)
+- **Admin Panel:** Password-protected with rate limiting
+- **Build:** Docker multi-stage build (optional)
+- **Persistence:** localStorage (user schedules) + D1 (event data)
 
 ## Browser Support
 

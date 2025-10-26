@@ -418,7 +418,7 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
           <div className='bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto'>
             <div className='p-6'>
               <div className='flex justify-between items-center mb-4'>
-                <h3 className='text-xl font-bold text-white'>Metrics for "{showMetrics.name}"</h3>
+                <h3 className='text-xl font-bold text-white'>Metrics for &quot;{showMetrics.name}&quot;</h3>
                 <button
                   onClick={() => setShowMetrics(null)}
                   className='text-gray-400 hover:text-white text-2xl'
@@ -438,7 +438,7 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
           <div className='bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
             <div className='p-6'>
               <div className='flex justify-between items-center mb-4'>
-                <h3 className='text-xl font-bold text-white'>Embed Code for "{showEmbedCode.name}"</h3>
+                <h3 className='text-xl font-bold text-white'>Embed Code for &quot;{showEmbedCode.name}&quot;</h3>
                 <button
                   onClick={() => setShowEmbedCode(null)}
                   className='text-gray-400 hover:text-white text-2xl'

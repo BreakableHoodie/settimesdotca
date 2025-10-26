@@ -153,7 +153,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       )
       
       if (existingBand) {
-        showToast(`A band named "${formData.name}" already exists. Please choose a different name.`, 'error')
+        showToast(`A band named &quot;${formData.name}&quot; already exists. Please choose a different name.`, 'error')
         setSubmitting(false)
         return
       }
@@ -169,7 +169,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       
       // If the API returns an error about duplicate names, show that error
       if (result.error && result.error.includes('Duplicate band name')) {
-        showToast(result.message || `A band named "${formData.name}" already exists. Please choose a different name.`, 'error')
+        showToast(result.message || `A band named &quot;${formData.name}&quot; already exists. Please choose a different name.`, 'error')
         setSubmitting(false)
         return
       }
@@ -180,7 +180,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     } catch (err) {
       // Check if the error is about duplicate names
       if (err.message && err.message.includes('Duplicate band name')) {
-        showToast(`A band named "${formData.name}" already exists. Please choose a different name.`, 'error')
+        showToast(`A band named &quot;${formData.name}&quot; already exists. Please choose a different name.`, 'error')
       } else {
         showToast('Failed to add band: ' + err.message, 'error')
       }
@@ -201,7 +201,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       )
       
       if (existingBand) {
-        showToast(`A band named "${formData.name}" already exists. Please choose a different name.`, 'error')
+        showToast(`A band named &quot;${formData.name}&quot; already exists. Please choose a different name.`, 'error')
         setSubmitting(false)
         return
       }
@@ -216,7 +216,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       
       // If the API returns an error about duplicate names, show that error
       if (result.error && result.error.includes('Duplicate band name')) {
-        showToast(result.message || `A band named "${formData.name}" already exists. Please choose a different name.`, 'error')
+        showToast(result.message || `A band named &quot;${formData.name}&quot; already exists. Please choose a different name.`, 'error')
         setSubmitting(false)
         return
       }
@@ -227,7 +227,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     } catch (err) {
       // Check if the error is about duplicate names
       if (err.message && err.message.includes('Duplicate band name')) {
-        showToast(`A band named "${formData.name}" already exists. Please choose a different name.`, 'error')
+        showToast(`A band named &quot;${formData.name}&quot; already exists. Please choose a different name.`, 'error')
       } else {
         showToast('Failed to update band: ' + err.message, 'error')
       }
@@ -237,7 +237,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
   }
 
   const handleDelete = async (bandId, bandName) => {
-    if (!window.confirm(`Are you sure you want to delete "${bandName}"?`)) {
+    if (!window.confirm(`Are you sure you want to delete &quot;${bandName}&quot;?`)) {
       return
     }
 

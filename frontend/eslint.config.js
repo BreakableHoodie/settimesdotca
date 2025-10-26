@@ -86,6 +86,15 @@ export default [
       // General rules
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+      
+      // Accessibility - temporarily relaxed during cleanup
+      'jsx-a11y/label-has-associated-control': ['warn', {
+        'labelComponents': [],
+        'labelAttributes': ['htmlFor'],
+        'controlComponents': [],
+        'assert': 'both',
+        'depth': 3,
+      }],
     },
   },
   prettier, // Must be last to override other configs

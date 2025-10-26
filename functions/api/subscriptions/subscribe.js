@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
 
     // Check if subscription already exists
     const { results: existing } = await env.DB.prepare(`
-      SELECT id, verified FROM email_subscriptions
+      SELECT id, verified, verification_token FROM email_subscriptions
       WHERE email = ? AND city = ? AND genre = ?
     `).bind(email, city, genre).all()
 

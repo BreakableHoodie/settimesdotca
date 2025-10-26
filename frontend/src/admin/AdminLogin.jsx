@@ -112,7 +112,7 @@ export default function AdminLogin({ onLoginSuccess }) {
         </form>
 
         <p className='text-gray-400 text-sm text-center'>
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <button
             type='button'
             onClick={() => navigate('/admin/signup')}

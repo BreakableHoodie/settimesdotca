@@ -53,13 +53,11 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       if (selectedEventId) {
         // Load bands for specific event
       const result = await bandsApi.getByEvent(selectedEventId)
-        console.log('Loading bands for event:', selectedEventId, result.bands)
         setBands(result.bands || [])
       } else {
         // Load all bands (including orphaned ones) when no event selected
         const result = await bandsApi.getAll()
-        console.log('Loading all bands:', result.bands)
-      setBands(result.bands || [])
+        setBands(result.bands || [])
       }
     } catch (err) {
       console.error('Error loading bands:', err)

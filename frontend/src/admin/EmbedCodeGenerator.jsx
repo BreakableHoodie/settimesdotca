@@ -18,7 +18,7 @@ export default function EmbedCodeGenerator({ event }) {
     <div className="bg-band-purple rounded-lg p-4">
       <h3 className="text-white font-bold mb-2">Embed on Your Website</h3>
       <p className="text-gray-400 text-sm mb-4">
-        Copy this code and paste it into your website's HTML
+        Copy this code and paste it into your website&apos;s HTML
       </p>
 
       <pre className="bg-band-navy p-3 rounded text-sm text-white overflow-x-auto mb-4">
@@ -34,7 +34,7 @@ export default function EmbedCodeGenerator({ event }) {
 
       <div className="mt-4 p-3 bg-blue-900/30 border border-blue-600 rounded">
         <p className="text-blue-200 text-sm">
-          <strong>Preview:</strong> <a href={`/embed/${event.slug}`} target="_blank" className="underline">
+          <strong>Preview:</strong> <a href={`/embed/${event.slug}`} target="_blank" className="underline" rel="noreferrer">
             Open in new tab
           </a>
         </p>

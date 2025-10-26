@@ -16,8 +16,11 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     if (!token) {
-      setStatus('error')
-      setMessage('Invalid reset link. Please request a new password reset.')
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setStatus('error')
+        setMessage('Invalid reset link. Please request a new password reset.')
+      }, 0)
       return
     }
 

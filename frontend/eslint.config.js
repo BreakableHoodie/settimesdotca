@@ -44,6 +44,7 @@ export default [
         document: 'readonly',
         navigator: 'readonly',
         localStorage: 'readonly',
+        sessionStorage: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
         setInterval: 'readonly',
@@ -59,6 +60,10 @@ export default [
         process: 'readonly',
         self: 'readonly',
         caches: 'readonly',
+        alert: 'readonly',
+        confirm: 'readonly',
+        performance: 'readonly',
+        PerformanceObserver: 'readonly',
       },
     },
     settings: {

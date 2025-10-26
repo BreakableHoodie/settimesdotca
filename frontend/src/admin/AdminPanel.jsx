@@ -62,7 +62,7 @@ export default function AdminPanel({ onLogout }) {
     }
   }
 
-  const handleWizardComplete = (event) => {
+  const handleWizardComplete = event => {
     setShowWizard(false)
     showToast(`Event "${event.name}" created successfully!`, 'success')
     loadEvents() // Refresh events list
@@ -77,29 +77,29 @@ export default function AdminPanel({ onLogout }) {
   const tabs = [
     { id: 'events', label: 'Events' },
     { id: 'venues', label: 'Venues' },
-    { id: 'bands', label: 'Performances' }
+    { id: 'bands', label: 'Performances' },
   ]
 
   return (
-    <div className='min-h-screen bg-band-navy'>
+    <div className="min-h-screen bg-band-navy">
       {/* Header */}
-      <header className='bg-band-purple border-b border-band-orange/20 sticky top-0 z-50'>
-        <div className='container mx-auto px-4 py-4'>
-          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-            <div className='flex-1'>
-              <h1 className='text-xl sm:text-2xl font-bold text-band-orange mb-2'>
-                Band Crawl Admin
-              </h1>
+      <header className="bg-band-purple border-b border-band-orange/20 sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-band-orange mb-2">Band Crawl Admin</h1>
 
               {/* Event Selector */}
               {events.length > 0 && (
-                <div className='flex items-center gap-2'>
-                  <label htmlFor='event-selector' className='text-white/70 text-sm'>Event:</label>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="event-selector" className="text-white/70 text-sm">
+                    Event:
+                  </label>
                   <select
-                    id='event-selector'
+                    id="event-selector"
                     value={selectedEventId || ''}
-                    onChange={(e) => setSelectedEventId(Number(e.target.value))}
-                    className='px-3 py-1.5 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm'
+                    onChange={e => setSelectedEventId(Number(e.target.value))}
+                    className="px-3 py-1.5 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
                   >
                     {events.map(event => (
                       <option key={event.id} value={event.id}>
@@ -111,17 +111,17 @@ export default function AdminPanel({ onLogout }) {
               )}
             </div>
 
-            <div className='flex items-center gap-3'>
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowWizard(true)}
-                className='px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-sm sm:text-base'
+                className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-sm sm:text-base"
               >
                 Create Event
               </button>
-              
+
               <button
                 onClick={handleLogout}
-                className='px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm sm:text-base'
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm sm:text-base"
               >
                 Logout
               </button>
@@ -131,9 +131,9 @@ export default function AdminPanel({ onLogout }) {
       </header>
 
       {/* Tab Navigation */}
-      <div className='bg-band-purple border-b border-band-orange/20'>
-        <div className='container mx-auto px-4'>
-          <div className='flex gap-1 sm:gap-2 overflow-x-auto'>
+      <div className="bg-band-purple border-b border-band-orange/20">
+        <div className="container mx-auto px-4">
+          <div className="flex gap-1 sm:gap-2 overflow-x-auto">
             {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -152,24 +152,16 @@ export default function AdminPanel({ onLogout }) {
       </div>
 
       {/* Tab Content */}
-      <div className='container mx-auto px-4 py-6'>
+      <div className="container mx-auto px-4 py-6">
         {loading ? (
-          <div className='text-center py-12'>
-            <div className='text-band-orange text-lg'>Loading...</div>
+          <div className="text-center py-12">
+            <div className="text-band-orange text-lg">Loading...</div>
           </div>
         ) : (
           <>
-            {activeTab === 'events' && (
-              <EventsTab
-                events={events}
-                onEventsChange={loadEvents}
-                showToast={showToast}
-              />
-            )}
+            {activeTab === 'events' && <EventsTab events={events} onEventsChange={loadEvents} showToast={showToast} />}
 
-            {activeTab === 'venues' && (
-              <VenuesTab showToast={showToast} />
-            )}
+            {activeTab === 'venues' && <VenuesTab showToast={showToast} />}
 
             {activeTab === 'bands' && (
               <BandsTab
@@ -185,30 +177,23 @@ export default function AdminPanel({ onLogout }) {
 
       {/* Event Wizard Modal */}
       {showWizard && (
-        <div className='fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50'>
-          <div className='bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto'>
-            <EventWizard
-              onComplete={handleWizardComplete}
-              onCancel={handleWizardCancel}
-            />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <EventWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} />
           </div>
         </div>
       )}
 
       {/* Toast Notification */}
       {toast && (
-        <div className='fixed bottom-4 right-4 z-50 animate-slide-up'>
+        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
           <div
             className={`px-6 py-3 rounded-lg shadow-xl max-w-md ${
-              toast.type === 'error'
-                ? 'bg-red-600 text-white'
-                : 'bg-green-600 text-white'
+              toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
             }`}
           >
-            <div className='flex items-center gap-2'>
-              <span className='text-lg'>
-                {toast.type === 'error' ? '✕' : '✓'}
-              </span>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{toast.type === 'error' ? '✕' : '✓'}</span>
               <span>{toast.message}</span>
             </div>
           </div>

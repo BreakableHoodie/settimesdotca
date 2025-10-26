@@ -5,10 +5,10 @@ export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = searchParams.get('token')
-  
+
   const [formData, setFormData] = useState({
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   })
   const [user, setUser] = useState(null)
   const [status, setStatus] = useState('loading') // loading, ready, submitting, success, error
@@ -42,9 +42,9 @@ export default function ResetPasswordPage() {
       })
   }, [token])
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault()
-    
+
     if (formData.newPassword !== formData.confirmPassword) {
       setMessage('Passwords do not match')
       return
@@ -63,8 +63,8 @@ export default function ResetPasswordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: token,
-          newPassword: formData.newPassword
-        })
+          newPassword: formData.newPassword,
+        }),
       })
 
       const data = await response.json()
@@ -148,7 +148,7 @@ export default function ResetPasswordPage() {
               required
               minLength={8}
               value={formData.newPassword}
-              onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+              onChange={e => setFormData({ ...formData, newPassword: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
               placeholder="Enter new password"
             />
@@ -164,7 +164,7 @@ export default function ResetPasswordPage() {
               required
               minLength={8}
               value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
               placeholder="Confirm new password"
             />
@@ -179,18 +179,18 @@ export default function ResetPasswordPage() {
           </button>
 
           {message && (
-            <div className={`p-4 rounded-lg ${
-              status === 'error' ? 'bg-red-500/20 text-red-200' : 'bg-green-500/20 text-green-200'
-            }`}>
+            <div
+              className={`p-4 rounded-lg ${
+                status === 'error' ? 'bg-red-500/20 text-red-200' : 'bg-green-500/20 text-green-200'
+              }`}
+            >
               {message}
             </div>
           )}
         </form>
 
         <div className="mt-6 pt-6 border-t border-white/10">
-          <p className="text-sm text-gray-400 text-center">
-            Password must be at least 8 characters long
-          </p>
+          <p className="text-sm text-gray-400 text-center">Password must be at least 8 characters long</p>
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { getTimeFilterOptions } from '../utils/timeFilter'
 
 /**
  * TimeFilter - Component for filtering performances by time periods
- * 
+ *
  * Features:
  * - Dropdown/select for time period selection
  * - Mobile-friendly design
@@ -14,7 +14,7 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
   const options = getTimeFilterOptions()
   const selectedOption = options.find(opt => opt.value === selectedFilter) || options[0]
 
-  const handleSelect = (option) => {
+  const handleSelect = option => {
     onFilterChange(option.value)
     setIsOpen(false)
   }
@@ -28,9 +28,10 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
           w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-all duration-150 
           hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 
           focus-visible:ring-offset-2 focus-visible:ring-band-orange
-          ${selectedFilter === 'all' 
-            ? 'bg-band-purple/50 text-white hover:bg-band-purple' 
-            : 'bg-band-orange text-band-navy shadow-lg'
+          ${
+            selectedFilter === 'all'
+              ? 'bg-band-purple/50 text-white hover:bg-band-purple'
+              : 'bg-band-orange text-band-navy shadow-lg'
           }
         `}
         aria-expanded={isOpen}
@@ -39,10 +40,10 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
       >
         <div className="flex items-center justify-center gap-2">
           <span>{selectedOption.label}</span>
-          <svg 
+          <svg
             className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-            fill="none" 
-            stroke="currentColor" 
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -54,15 +55,11 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
       {isOpen && (
         <>
           {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsOpen(false)}
-            aria-hidden="true"
-          />
-          
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} aria-hidden="true" />
+
           {/* Menu */}
           <div className="absolute top-full left-0 right-0 sm:right-auto sm:w-64 mt-2 bg-band-navy border border-band-orange/20 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto">
-            {options.map((option) => (
+            {options.map(option => (
               <button
                 key={option.value}
                 onClick={() => handleSelect(option)}

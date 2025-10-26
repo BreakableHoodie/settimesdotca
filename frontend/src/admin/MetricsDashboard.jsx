@@ -30,17 +30,13 @@ export default function MetricsDashboard({ eventId }) {
         {/* Schedule Builds */}
         <div className="bg-band-purple rounded-lg p-4">
           <div className="text-gray-400 text-sm">Schedule Builds</div>
-          <div className="text-3xl font-bold text-white mt-2">
-            {metrics.totalScheduleBuilds}
-          </div>
+          <div className="text-3xl font-bold text-white mt-2">{metrics.totalScheduleBuilds}</div>
         </div>
 
         {/* Unique Visitors */}
         <div className="bg-band-purple rounded-lg p-4">
           <div className="text-gray-400 text-sm">Unique Visitors</div>
-          <div className="text-3xl font-bold text-white mt-2">
-            {metrics.uniqueVisitors}
-          </div>
+          <div className="text-3xl font-bold text-white mt-2">{metrics.uniqueVisitors}</div>
         </div>
 
         {/* Last Updated */}
@@ -59,7 +55,9 @@ export default function MetricsDashboard({ eventId }) {
           {metrics.popularBands.length > 0 ? (
             metrics.popularBands.map((band, idx) => (
               <div key={band.band_id} className="flex justify-between text-sm">
-                <span className="text-white">{idx + 1}. {band.band_name}</span>
+                <span className="text-white">
+                  {idx + 1}. {band.band_name}
+                </span>
                 <span className="text-gray-400">{band.schedule_count} schedules</span>
               </div>
             ))

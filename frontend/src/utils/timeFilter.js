@@ -73,10 +73,10 @@ export function getEndOfNextWeek(date) {
  */
 export function isHappeningNow(performance) {
   if (!performance.startMs || !performance.endMs) return false
-  
+
   const now = getCurrentDateTime().getTime()
   const thirtyMinutes = 30 * 60 * 1000
-  
+
   return performance.startMs <= now + thirtyMinutes && performance.endMs >= now - thirtyMinutes
 }
 
@@ -85,11 +85,11 @@ export function isHappeningNow(performance) {
  */
 export function isHappeningToday(performance) {
   if (!performance.startMs) return false
-  
+
   const today = getCurrentDateTime()
   const startOfToday = getStartOfDay(today).getTime()
   const endOfToday = getEndOfDay(today).getTime()
-  
+
   return performance.startMs >= startOfToday && performance.startMs <= endOfToday
 }
 
@@ -98,11 +98,11 @@ export function isHappeningToday(performance) {
  */
 export function isHappeningThisWeek(performance) {
   if (!performance.startMs) return false
-  
+
   const today = getCurrentDateTime()
   const startOfWeek = getStartOfWeek(today).getTime()
   const endOfWeek = getEndOfWeek(today).getTime()
-  
+
   return performance.startMs >= startOfWeek && performance.startMs <= endOfWeek
 }
 
@@ -111,11 +111,11 @@ export function isHappeningThisWeek(performance) {
  */
 export function isHappeningNextWeek(performance) {
   if (!performance.startMs) return false
-  
+
   const today = getCurrentDateTime()
   const startOfNextWeek = getStartOfNextWeek(today).getTime()
   const endOfNextWeek = getEndOfNextWeek(today).getTime()
-  
+
   return performance.startMs >= startOfNextWeek && performance.startMs <= endOfNextWeek
 }
 
@@ -124,11 +124,11 @@ export function isHappeningNextWeek(performance) {
  */
 export function isHappeningThisMonth(performance) {
   if (!performance.startMs) return false
-  
+
   const today = getCurrentDateTime()
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).getTime()
   const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999).getTime()
-  
+
   return performance.startMs >= startOfMonth && performance.startMs <= endOfMonth
 }
 
@@ -137,11 +137,11 @@ export function isHappeningThisMonth(performance) {
  */
 export function isHappeningNextMonth(performance) {
   if (!performance.startMs) return false
-  
+
   const today = getCurrentDateTime()
   const startOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1).getTime()
   const endOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0, 23, 59, 59, 999).getTime()
-  
+
   return performance.startMs >= startOfNextMonth && performance.startMs <= endOfNextMonth
 }
 
@@ -150,7 +150,7 @@ export function isHappeningNextMonth(performance) {
  */
 export function filterPerformancesByTime(performances, timeFilter) {
   if (!performances || !Array.isArray(performances)) return []
-  
+
   switch (timeFilter) {
     case 'all':
       return performances
@@ -182,7 +182,7 @@ export function getTimeFilterOptions() {
     { value: 'this-week', label: 'This Week', description: 'Performances this week' },
     { value: 'next-week', label: 'Next Week', description: 'Performances next week' },
     { value: 'this-month', label: 'This Month', description: 'Performances this month' },
-    { value: 'next-month', label: 'Next Month', description: 'Performances next month' }
+    { value: 'next-month', label: 'Next Month', description: 'Performances next month' },
   ]
 }
 
@@ -191,11 +191,11 @@ export function getTimeFilterOptions() {
  */
 export function getTimeDescription(performance) {
   if (!performance.startMs) return 'Time TBD'
-  
+
   const now = getCurrentDateTime().getTime()
   const startTime = performance.startMs
   const endTime = performance.endMs
-  
+
   // If performance is happening now
   if (isHappeningNow(performance)) {
     if (startTime <= now && endTime >= now) {
@@ -205,31 +205,31 @@ export function getTimeDescription(performance) {
       return `Starting in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}`
     }
   }
-  
+
   // If performance is today
   if (isHappeningToday(performance)) {
     const startDate = new Date(startTime)
     return `Today at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
   }
-  
+
   // If performance is this week
   if (isHappeningThisWeek(performance)) {
     const startDate = new Date(startTime)
     return startDate.toLocaleDateString([], { weekday: 'long', hour: '2-digit', minute: '2-digit' })
   }
-  
+
   // If performance is next week
   if (isHappeningNextWeek(performance)) {
     const startDate = new Date(startTime)
     return `Next ${startDate.toLocaleDateString([], { weekday: 'long' })} at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
   }
-  
+
   // Default to formatted date and time
   const startDate = new Date(startTime)
-  return startDate.toLocaleDateString([], { 
-    month: 'short', 
-    day: 'numeric', 
-    hour: '2-digit', 
-    minute: '2-digit' 
+  return startDate.toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }

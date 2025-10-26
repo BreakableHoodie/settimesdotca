@@ -94,13 +94,9 @@ function Header({ view, setView, timeFilter, onTimeFilterChange }) {
         >
           {/* Time Filter - only show when viewing all performances */}
           {view === 'all' && (
-            <TimeFilter
-              selectedFilter={timeFilter}
-              onFilterChange={onTimeFilterChange}
-              className="w-full sm:w-auto"
-            />
+            <TimeFilter selectedFilter={timeFilter} onFilterChange={onTimeFilterChange} className="w-full sm:w-auto" />
           )}
-          
+
           {/* View Toggle Buttons */}
           <div className="flex gap-2">
             <button

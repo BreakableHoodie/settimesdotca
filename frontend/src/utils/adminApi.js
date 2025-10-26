@@ -13,7 +13,7 @@ function getHeaders() {
   const sessionToken = getSessionToken()
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${sessionToken || ''}`,
+    Authorization: `Bearer ${sessionToken || ''}`,
   }
 }
 
@@ -79,9 +79,9 @@ export const authApi = {
     return {
       email: window.sessionStorage.getItem('userEmail'),
       name: window.sessionStorage.getItem('userName'),
-      role: window.sessionStorage.getItem('userRole')
+      role: window.sessionStorage.getItem('userRole'),
     }
-  }
+  },
 }
 
 // Events API

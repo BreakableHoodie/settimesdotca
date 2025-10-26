@@ -18,7 +18,7 @@ export function measurePageLoad() {
 
         // Core Web Vitals (approximations)
         fcp: getFirstContentfulPaint(),
-        lcp: getLargestContentfulPaint()
+        lcp: getLargestContentfulPaint(),
       }
 
       // Log to console in dev
@@ -39,7 +39,7 @@ function getFirstContentfulPaint() {
 }
 
 function getLargestContentfulPaint() {
-  const observer = new PerformanceObserver((list) => {
+  const observer = new PerformanceObserver(list => {
     const entries = list.getEntries()
     const lastEntry = entries[entries.length - 1]
     console.log('LCP:', Math.round(lastEntry.startTime), 'ms')

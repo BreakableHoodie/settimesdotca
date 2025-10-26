@@ -5,12 +5,12 @@ export default function SubscribePage() {
     email: '',
     city: 'kitchener',
     genre: 'all',
-    frequency: 'weekly'
+    frequency: 'weekly',
   })
   const [status, setStatus] = useState('idle') // idle, submitting, success, error
   const [message, setMessage] = useState('')
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault()
     setStatus('submitting')
 
@@ -18,7 +18,7 @@ export default function SubscribePage() {
       const response = await fetch('/api/subscriptions/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       })
 
       const data = await response.json()
@@ -42,9 +42,7 @@ export default function SubscribePage() {
       <div className="max-w-2xl mx-auto pt-20">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4">
-            Never Miss a Show
-          </h1>
+          <h1 className="text-4xl font-bold text-white mb-4">Never Miss a Show</h1>
           <p className="text-xl text-gray-300">
             Get weekly emails about concerts in your city. No algorithm, no ads, just shows.
           </p>
@@ -63,7 +61,7 @@ export default function SubscribePage() {
                 id="email"
                 required
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={e => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
                 placeholder="you@example.com"
               />
@@ -77,7 +75,7 @@ export default function SubscribePage() {
               <select
                 id="city"
                 value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                onChange={e => setFormData({ ...formData, city: e.target.value })}
                 className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none"
               >
                 <option value="kitchener">Kitchener</option>
@@ -96,7 +94,7 @@ export default function SubscribePage() {
               <select
                 id="genre"
                 value={formData.genre}
-                onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
+                onChange={e => setFormData({ ...formData, genre: e.target.value })}
                 className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none"
               >
                 <option value="all">All Genres</option>
@@ -116,7 +114,7 @@ export default function SubscribePage() {
               <select
                 id="frequency"
                 value={formData.frequency}
-                onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                onChange={e => setFormData({ ...formData, frequency: e.target.value })}
                 className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none"
               >
                 <option value="weekly">Weekly</option>
@@ -135,9 +133,11 @@ export default function SubscribePage() {
 
             {/* Status message */}
             {message && (
-              <div className={`p-4 rounded-lg ${
-                status === 'success' ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'
-              }`}>
+              <div
+                className={`p-4 rounded-lg ${
+                  status === 'success' ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'
+                }`}
+              >
                 {message}
               </div>
             )}
@@ -155,9 +155,7 @@ export default function SubscribePage() {
 
         {/* Alternative feeds */}
         <div className="mt-12 text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">
-            Prefer RSS or Calendar Sync?
-          </h2>
+          <h2 className="text-2xl font-bold text-white mb-4">Prefer RSS or Calendar Sync?</h2>
           <div className="flex flex-wrap justify-center gap-4">
             <a
               href="/api/feeds/ical?city=portland&genre=all"

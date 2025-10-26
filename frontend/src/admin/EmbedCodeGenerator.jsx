@@ -17,24 +17,18 @@ export default function EmbedCodeGenerator({ event }) {
   return (
     <div className="bg-band-purple rounded-lg p-4">
       <h3 className="text-white font-bold mb-2">Embed on Your Website</h3>
-      <p className="text-gray-400 text-sm mb-4">
-        Copy this code and paste it into your website&apos;s HTML
-      </p>
+      <p className="text-gray-400 text-sm mb-4">Copy this code and paste it into your website&apos;s HTML</p>
 
-      <pre className="bg-band-navy p-3 rounded text-sm text-white overflow-x-auto mb-4">
-        {embedCode}
-      </pre>
+      <pre className="bg-band-navy p-3 rounded text-sm text-white overflow-x-auto mb-4">{embedCode}</pre>
 
-      <button
-        onClick={handleCopy}
-        className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
-      >
+      <button onClick={handleCopy} className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600">
         Copy Code
       </button>
 
       <div className="mt-4 p-3 bg-blue-900/30 border border-blue-600 rounded">
         <p className="text-blue-200 text-sm">
-          <strong>Preview:</strong> <a href={`/embed/${event.slug}`} target="_blank" className="underline" rel="noreferrer">
+          <strong>Preview:</strong>{' '}
+          <a href={`/embed/${event.slug}`} target="_blank" className="underline" rel="noreferrer">
             Open in new tab
           </a>
         </p>

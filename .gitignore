@@ -30,3 +30,13 @@ psi_report*.json
 
 # Docker
 .dockerignore
+
+# Cloudflare Wrangler
+.wrangler/
+
+# Claude AI
+.claude/
+
+# Temporary files
+*.tmp
+*.temp

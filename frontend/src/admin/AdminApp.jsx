@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import AdminLogin from './AdminLogin'
+import SignupPage from './SignupPage'
 import AdminPanel from './AdminPanel'
+import { authApi } from '../utils/adminApi'
 
 /**
  * AdminApp - Root component for the admin interface
@@ -9,7 +12,7 @@ import AdminPanel from './AdminPanel'
  * or the main admin panel based on authentication status.
  *
  * Usage:
- * - Import this component and render it at your /admin route
+ * - Import this component and render it at your /admin/* route
  * - Authentication state persists via sessionStorage
  * - Automatically checks for existing session on mount
  */
@@ -20,9 +23,8 @@ export default function AdminApp() {
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = () => {
-      const adminPassword = window.sessionStorage.getItem('adminPassword')
-      if (adminPassword) {
-        // Could optionally verify the password with the backend here
+      const currentUser = authApi.getCurrentUser()
+      if (currentUser) {
         setIsAuthenticated(true)
       }
       setChecking(false)
@@ -36,6 +38,7 @@ export default function AdminApp() {
   }
 
   const handleLogout = () => {
+    authApi.logout()
     setIsAuthenticated(false)
   }
 
@@ -48,10 +51,32 @@ export default function AdminApp() {
     )
   }
 
-  // Show login or admin panel based on auth state
-  if (!isAuthenticated) {
-    return <AdminLogin onLoginSuccess={handleLoginSuccess} />
-  }
-
-  return <AdminPanel onLogout={handleLogout} />
+  return (
+    <Routes>
+      <Route
+        path="login"
+        element={
+          isAuthenticated ?
+          <Navigate to="/admin" replace /> :
+          <AdminLogin onLoginSuccess={handleLoginSuccess} />
+        }
+      />
+      <Route
+        path="signup"
+        element={
+          isAuthenticated ?
+          <Navigate to="/admin" replace /> :
+          <SignupPage />
+        }
+      />
+      <Route
+        path="*"
+        element={
+          isAuthenticated ?
+          <AdminPanel onLogout={handleLogout} /> :
+          <Navigate to="/admin/login" replace />
+        }
+      />
+    </Routes>
+  )
 }

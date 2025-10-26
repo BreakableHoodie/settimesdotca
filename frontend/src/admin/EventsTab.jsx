@@ -22,7 +22,7 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
     name: '',
     date: '',
     slug: '',
-    is_published: false
+    is_published: false,
   })
   const [loading, setLoading] = useState(false)
 
@@ -31,13 +31,13 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
       name: '',
       date: '',
       slug: '',
-      is_published: false
+      is_published: false,
     })
     setShowCreateForm(false)
     setDuplicatingEventId(null)
   }
 
-  const handleCreate = async (e) => {
+  const handleCreate = async e => {
     e.preventDefault()
     setLoading(true)
 
@@ -53,7 +53,7 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
     }
   }
 
-  const handleDuplicate = async (e) => {
+  const handleDuplicate = async e => {
     e.preventDefault()
     setLoading(true)
 
@@ -61,7 +61,7 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
       await eventsApi.duplicate(duplicatingEventId, {
         name: formData.name,
         date: formData.date,
-        slug: formData.slug
+        slug: formData.slug,
       })
       showToast('Event duplicated successfully!', 'success')
       resetForm()
@@ -89,9 +89,10 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
   }
 
   const handleDelete = async (eventId, eventName, bandCount) => {
-    const confirmMessage = bandCount > 0 
-      ? `Are you sure you want to delete "${eventName}"? This will remove the event but keep all ${bandCount} band(s) (they will become unassigned and can be moved to other events). This action cannot be undone.`
-      : `Are you sure you want to delete "${eventName}"? This action cannot be undone.`
+    const confirmMessage =
+      bandCount > 0
+        ? `Are you sure you want to delete "${eventName}"? This will remove the event but keep all ${bandCount} band(s) (they will become unassigned and can be moved to other events). This action cannot be undone.`
+        : `Are you sure you want to delete "${eventName}"? This action cannot be undone.`
 
     if (!window.confirm(confirmMessage)) {
       return
@@ -106,27 +107,27 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
     }
   }
 
-  const startDuplicate = (event) => {
+  const startDuplicate = event => {
     setDuplicatingEventId(event.id)
     setFormData({
       name: `${event.name} (Copy)`,
       date: event.date,
       slug: `${event.slug}-copy`,
-      is_published: false
+      is_published: false,
     })
     setShowCreateForm(false)
   }
 
-  const handleInputChange = (e) => {
+  const handleInputChange = e => {
     const { name, value, type, checked } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }))
   }
 
   // Auto-generate slug from name
-  const handleNameChange = (e) => {
+  const handleNameChange = e => {
     const name = e.target.value
     const slug = name
       .toLowerCase()
@@ -136,19 +137,19 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
     setFormData(prev => ({
       ...prev,
       name,
-      slug: prev.slug || slug // Only auto-fill if slug is empty
+      slug: prev.slug || slug, // Only auto-fill if slug is empty
     }))
   }
 
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       {/* Header */}
-      <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-        <h2 className='text-2xl font-bold text-white'>Events</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h2 className="text-2xl font-bold text-white">Events</h2>
         {!showCreateForm && !duplicatingEventId && (
           <button
             onClick={() => setShowCreateForm(true)}
-            className='px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors'
+            className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors"
           >
             + Create New Event
           </button>
@@ -157,65 +158,70 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
 
       {/* Create/Duplicate Form */}
       {(showCreateForm || duplicatingEventId) && (
-        <div className='bg-band-purple p-6 rounded-lg border border-band-orange/20'>
-          <h3 className='text-lg font-bold text-band-orange mb-4'>
+        <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
+          <h3 className="text-lg font-bold text-band-orange mb-4">
             {duplicatingEventId ? 'Duplicate Event' : 'Create New Event'}
           </h3>
 
           <form onSubmit={duplicatingEventId ? handleDuplicate : handleCreate}>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label htmlFor="event-name" className='block text-white mb-2 text-sm'>Event Name *</label>
+                <label htmlFor="event-name" className="block text-white mb-2 text-sm">
+                  Event Name *
+                </label>
                 <input
-                  id="event-name" type='text'
-                  name='name'
+                  id="event-name"
+                  type="text"
+                  name="name"
                   value={formData.name}
                   onChange={handleNameChange}
-                  className='w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none'
+                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
                   required
-                  placeholder='Long Weekend Vol. 4'
+                  placeholder="Long Weekend Vol. 4"
                 />
               </div>
 
               <div>
-                <label htmlFor="event-date" className='block text-white mb-2 text-sm'>Date *</label>
+                <label htmlFor="event-date" className="block text-white mb-2 text-sm">
+                  Date *
+                </label>
                 <input
-                  type='date'
-                  name='date'
+                  type="date"
+                  name="date"
                   value={formData.date}
                   onChange={handleInputChange}
-                  className='w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none'
+                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
                   required
                 />
               </div>
 
               <div>
-                <label htmlFor="event-slug" className='block text-white mb-2 text-sm'>Slug *</label>
+                <label htmlFor="event-slug" className="block text-white mb-2 text-sm">
+                  Slug *
+                </label>
                 <input
-                  type='text'
-                  name='slug'
+                  type="text"
+                  name="slug"
                   value={formData.slug}
                   onChange={handleInputChange}
-                  className='w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none font-mono text-sm'
+                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none font-mono text-sm"
                   required
-                  placeholder='long-weekend-vol-4'
-                  pattern='[a-z0-9\-]+'
-                  title='Only lowercase letters, numbers, and hyphens'
+                  placeholder="long-weekend-vol-4"
+                  pattern="[a-z0-9\-]+"
+                  title="Only lowercase letters, numbers, and hyphens"
                 />
-                <p className='text-xs text-white/50 mt-1'>
-                  URL-friendly identifier (lowercase, hyphens only)
-                </p>
+                <p className="text-xs text-white/50 mt-1">URL-friendly identifier (lowercase, hyphens only)</p>
               </div>
 
               {!duplicatingEventId && (
-                <div className='flex items-center'>
-                  <label className='flex items-center gap-2 text-white cursor-pointer'>
+                <div className="flex items-center">
+                  <label className="flex items-center gap-2 text-white cursor-pointer">
                     <input
-                      type='checkbox'
-                      name='is_published'
+                      type="checkbox"
+                      name="is_published"
                       checked={formData.is_published}
                       onChange={handleInputChange}
-                      className='w-4 h-4 rounded border-gray-600 text-band-orange focus:ring-band-orange'
+                      className="w-4 h-4 rounded border-gray-600 text-band-orange focus:ring-band-orange"
                     />
                     <span>Publish immediately</span>
                   </label>
@@ -223,18 +229,18 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
               )}
             </div>
 
-            <div className='flex gap-2'>
+            <div className="flex gap-2">
               <button
-                type='submit'
+                type="submit"
                 disabled={loading}
-                className='px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors'
+                className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors"
               >
                 {loading ? 'Saving...' : duplicatingEventId ? 'Duplicate Event' : 'Create Event'}
               </button>
               <button
-                type='button'
+                type="button"
                 onClick={resetForm}
-                className='px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors'
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
@@ -244,63 +250,57 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
       )}
 
       {/* Events List */}
-      <div className='bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden'>
+      <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
         {events.length === 0 ? (
-          <div className='p-8 text-center text-white/50'>
-            No events yet. Create your first event to get started!
-          </div>
+          <div className="p-8 text-center text-white/50">No events yet. Create your first event to get started!</div>
         ) : (
           <>
             {/* Desktop Table */}
-            <div className='hidden md:block overflow-x-auto'>
-              <table className='w-full'>
-                <thead className='bg-band-navy/50 border-b border-band-orange/20'>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-band-navy/50 border-b border-band-orange/20">
                   <tr>
-                    <th className='px-4 py-3 text-left text-white font-semibold'>Name</th>
-                    <th className='px-4 py-3 text-left text-white font-semibold'>Date</th>
-                    <th className='px-4 py-3 text-left text-white font-semibold'>Slug</th>
-                    <th className='px-4 py-3 text-left text-white font-semibold'>Status</th>
-                    <th className='px-4 py-3 text-left text-white font-semibold'>Bands</th>
-                    <th className='px-4 py-3 text-right text-white font-semibold'>Actions</th>
+                    <th className="px-4 py-3 text-left text-white font-semibold">Name</th>
+                    <th className="px-4 py-3 text-left text-white font-semibold">Date</th>
+                    <th className="px-4 py-3 text-left text-white font-semibold">Slug</th>
+                    <th className="px-4 py-3 text-left text-white font-semibold">Status</th>
+                    <th className="px-4 py-3 text-left text-white font-semibold">Bands</th>
+                    <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>
                   </tr>
                 </thead>
-                <tbody className='divide-y divide-band-orange/10'>
+                <tbody className="divide-y divide-band-orange/10">
                   {events.map(event => (
-                    <tr key={event.id} className='hover:bg-band-navy/30 transition-colors'>
-                      <td className='px-4 py-3 text-white font-medium'>{event.name}</td>
-                      <td className='px-4 py-3 text-white/70'>
+                    <tr key={event.id} className="hover:bg-band-navy/30 transition-colors">
+                      <td className="px-4 py-3 text-white font-medium">{event.name}</td>
+                      <td className="px-4 py-3 text-white/70">
                         {new Date(event.date).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'short',
-                          day: 'numeric'
+                          day: 'numeric',
                         })}
                       </td>
-                      <td className='px-4 py-3 text-band-orange font-mono text-sm'>
-                        {event.slug}
-                      </td>
-                      <td className='px-4 py-3'>
+                      <td className="px-4 py-3 text-band-orange font-mono text-sm">{event.slug}</td>
+                      <td className="px-4 py-3">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            event.is_published
-                              ? 'bg-green-900/50 text-green-300'
-                              : 'bg-yellow-900/50 text-yellow-300'
+                            event.is_published ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'
                           }`}
                         >
                           {event.is_published ? 'Published' : 'Draft'}
                         </span>
                       </td>
-                      <td className='px-4 py-3 text-white/70'>{event.band_count || 0}</td>
-                      <td className='px-4 py-3'>
-                        <div className='flex justify-end gap-2'>
+                      <td className="px-4 py-3 text-white/70">{event.band_count || 0}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
                           <button
                             onClick={() => setShowMetrics(event)}
-                            className='px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors'
+                            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors"
                           >
                             Metrics
                           </button>
                           <button
                             onClick={() => setShowEmbedCode(event)}
-                            className='px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors'
+                            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors"
                           >
                             Embed
                           </button>
@@ -316,13 +316,13 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
                           </button>
                           <button
                             onClick={() => startDuplicate(event)}
-                            className='px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors'
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
                           >
                             Duplicate
                           </button>
                           <button
                             onClick={() => handleDelete(event.id, event.name, event.band_count || 0)}
-                            className='px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors'
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
                           >
                             Delete
                           </button>
@@ -335,50 +335,48 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
             </div>
 
             {/* Mobile Cards */}
-            <div className='md:hidden divide-y divide-band-orange/10'>
+            <div className="md:hidden divide-y divide-band-orange/10">
               {events.map(event => (
-                <div key={event.id} className='p-4 space-y-3'>
-                  <div className='flex items-start justify-between'>
+                <div key={event.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <h3 className='text-white font-semibold'>{event.name}</h3>
-                      <p className='text-white/70 text-sm'>
+                      <h3 className="text-white font-semibold">{event.name}</h3>
+                      <p className="text-white/70 text-sm">
                         {new Date(event.date).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'short',
-                          day: 'numeric'
+                          day: 'numeric',
                         })}
                       </p>
                     </div>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        event.is_published
-                          ? 'bg-green-900/50 text-green-300'
-                          : 'bg-yellow-900/50 text-yellow-300'
+                        event.is_published ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'
                       }`}
                     >
                       {event.is_published ? 'Published' : 'Draft'}
                     </span>
                   </div>
 
-                  <div className='text-sm'>
-                    <span className='text-white/50'>Slug: </span>
-                    <span className='text-band-orange font-mono'>{event.slug}</span>
+                  <div className="text-sm">
+                    <span className="text-white/50">Slug: </span>
+                    <span className="text-band-orange font-mono">{event.slug}</span>
                   </div>
 
-                  <div className='text-sm text-white/70'>
+                  <div className="text-sm text-white/70">
                     {event.band_count || 0} band{event.band_count !== 1 ? 's' : ''}
                   </div>
 
-                  <div className='flex gap-2 pt-2'>
+                  <div className="flex gap-2 pt-2">
                     <button
                       onClick={() => setShowMetrics(event)}
-                      className='flex-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors'
+                      className="flex-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors"
                     >
                       Metrics
                     </button>
                     <button
                       onClick={() => setShowEmbedCode(event)}
-                      className='flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors'
+                      className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors"
                     >
                       Embed
                     </button>
@@ -394,13 +392,13 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
                     </button>
                     <button
                       onClick={() => startDuplicate(event)}
-                      className='flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors'
+                      className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
                     >
                       Duplicate
                     </button>
                     <button
                       onClick={() => handleDelete(event.id, event.name, event.band_count || 0)}
-                      className='flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors'
+                      className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
                     >
                       Delete
                     </button>
@@ -414,15 +412,12 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
 
       {/* Metrics Dashboard Modal */}
       {showMetrics && (
-        <div className='fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50'>
-          <div className='bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto'>
-            <div className='p-6'>
-              <div className='flex justify-between items-center mb-4'>
-                <h3 className='text-xl font-bold text-white'>Metrics for "{showMetrics.name}"</h3>
-                <button
-                  onClick={() => setShowMetrics(null)}
-                  className='text-gray-400 hover:text-white text-2xl'
-                >
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-white">Metrics for &quot;{showMetrics.name}&quot;</h3>
+                <button onClick={() => setShowMetrics(null)} className="text-gray-400 hover:text-white text-2xl">
                   ×
                 </button>
               </div>
@@ -434,15 +429,12 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
 
       {/* Embed Code Generator Modal */}
       {showEmbedCode && (
-        <div className='fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50'>
-          <div className='bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
-            <div className='p-6'>
-              <div className='flex justify-between items-center mb-4'>
-                <h3 className='text-xl font-bold text-white'>Embed Code for "{showEmbedCode.name}"</h3>
-                <button
-                  onClick={() => setShowEmbedCode(null)}
-                  className='text-gray-400 hover:text-white text-2xl'
-                >
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-white">Embed Code for &quot;{showEmbedCode.name}&quot;</h3>
+                <button onClick={() => setShowEmbedCode(null)} className="text-gray-400 hover:text-white text-2xl">
                   ×
                 </button>
               </div>

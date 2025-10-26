@@ -34,7 +34,8 @@ function LoadingFallback() {
 // Register service worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker
+      .register('/sw.js')
       .then(reg => console.log('SW registered:', reg.scope))
       .catch(err => console.error('SW registration failed:', err))
   })
@@ -56,11 +57,14 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Admin panel: Lazy loaded */}
-        <Route path="/admin/*" element={
-          <Suspense fallback={<LoadingFallback />}>
-            <AdminApp />
-          </Suspense>
-        } />
+        <Route
+          path="/admin/*"
+          element={
+            <Suspense fallback={<LoadingFallback />}>
+              <AdminApp />
+            </Suspense>
+          }
+        />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

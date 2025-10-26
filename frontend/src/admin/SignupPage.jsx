@@ -8,19 +8,19 @@ export default function SignupPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    name: ''
+    name: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleChange = (e) => {
+  const handleChange = e => {
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }))
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault()
     setError('')
 
@@ -88,9 +88,7 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-white mb-2 text-sm">
-              Confirm Password *
-            </label>
+            <label className="block text-white mb-2 text-sm">Confirm Password *</label>
             <input
               type="password"
               name="confirmPassword"
@@ -102,9 +100,7 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-white mb-2 text-sm">
-              Display Name (Optional)
-            </label>
+            <label className="block text-white mb-2 text-sm">Display Name (Optional)</label>
             <input
               type="text"
               name="name"

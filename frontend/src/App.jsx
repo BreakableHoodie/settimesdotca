@@ -181,12 +181,7 @@ function App() {
   return (
     <div className="min-h-screen pb-20">
       <OfflineIndicator />
-      <Header 
-        view={view} 
-        setView={setView} 
-        timeFilter={timeFilter}
-        onTimeFilterChange={setTimeFilter}
-      />
+      <Header view={view} setView={setView} timeFilter={timeFilter} onTimeFilterChange={setTimeFilter} />
       <ComingUp bands={myBands} />
       <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
         {view === 'all' ? (

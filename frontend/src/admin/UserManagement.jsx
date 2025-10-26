@@ -18,10 +18,10 @@ export default function UserManagement() {
     try {
       const response = await fetch('/api/admin/users', {
         headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('sessionToken')}`
-        }
+          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
+        },
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         setUsers(data.users)
@@ -42,13 +42,13 @@ export default function UserManagement() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('sessionToken')}`
+          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
         },
-        body: JSON.stringify({ reason: resetReason })
+        body: JSON.stringify({ reason: resetReason }),
       })
 
       const data = await response.json()
-      
+
       if (response.ok) {
         alert(`Password reset initiated for ${selectedUser.email}.\nReset URL: ${data.resetUrl}`)
         setShowResetModal(false)
@@ -64,7 +64,7 @@ export default function UserManagement() {
     }
   }
 
-  const handleToggleUserStatus = async (user) => {
+  const handleToggleUserStatus = async user => {
     if (!confirm(`Are you sure you want to ${user.is_active ? 'deactivate' : 'activate'} ${user.email}?`)) {
       return
     }
@@ -74,8 +74,8 @@ export default function UserManagement() {
       const response = await fetch(`/api/admin/users/${user.id}/toggle-status`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('sessionToken')}`
-        }
+          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
+        },
       })
 
       if (response.ok) {
@@ -111,12 +111,8 @@ export default function UserManagement() {
           <table className="w-full">
             <thead className="bg-white/5">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Role
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">User</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Status
                 </th>
@@ -129,7 +125,7 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {users.map((user) => (
+              {users.map(user => (
                 <tr key={user.id} className="hover:bg-white/5">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
@@ -138,20 +134,20 @@ export default function UserManagement() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      user.role === 'admin' 
-                        ? 'bg-red-100 text-red-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        user.role === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                      }`}
+                    >
                       {user.role}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      user.is_active 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        user.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
                       {user.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
@@ -173,9 +169,7 @@ export default function UserManagement() {
                       <button
                         onClick={() => handleToggleUserStatus(user)}
                         className={`transition ${
-                          user.is_active 
-                            ? 'text-red-400 hover:text-red-300' 
-                            : 'text-green-400 hover:text-green-300'
+                          user.is_active ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'
                         }`}
                         title={user.is_active ? 'Deactivate User' : 'Activate User'}
                         disabled={actionLoading}
@@ -197,10 +191,10 @@ export default function UserManagement() {
           <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-6 max-w-md w-full">
             <h3 className="text-lg font-bold text-white mb-4">Reset Password</h3>
             <p className="text-gray-300 mb-4">
-              This will send a password reset link to <strong>{selectedUser?.email}</strong>.
-              The user will need to complete the reset process themselves.
+              This will send a password reset link to <strong>{selectedUser?.email}</strong>. The user will need to
+              complete the reset process themselves.
             </p>
-            
+
             <div className="mb-4">
               <label htmlFor="resetReason" className="block text-white font-medium mb-2">
                 Reason (Optional)
@@ -208,7 +202,7 @@ export default function UserManagement() {
               <textarea
                 id="resetReason"
                 value={resetReason}
-                onChange={(e) => setResetReason(e.target.value)}
+                onChange={e => setResetReason(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
                 placeholder="Reason for password reset..."
                 rows={3}

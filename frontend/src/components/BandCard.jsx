@@ -68,9 +68,11 @@ function BandCard({ band, isSelected, onToggle, showVenue = true, clickable = tr
             <h3 className="font-mono font-bold text-white text-base md:text-lg leading-snug">{band.name}</h3>
           )}
         </div>
-        <p className={`text-sm md:text-base font-mono font-semibold leading-snug ${
-          isHappeningNow(band) ? 'text-yellow-200 animate-pulse' : ''
-        }`}>
+        <p
+          className={`text-sm md:text-base font-mono font-semibold leading-snug ${
+            isHappeningNow(band) ? 'text-yellow-200 animate-pulse' : ''
+          }`}
+        >
           {getTimeDescription(band)}
         </p>
         {showVenue && <p className="text-sm opacity-80 font-medium leading-snug">{band.venue}</p>}

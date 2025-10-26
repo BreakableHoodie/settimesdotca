@@ -5,7 +5,16 @@ import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
 import BandCard from './BandCard'
 
-function ScheduleView({ bands, selectedBands, onToggleBand, onSelectAll, currentTime, showPast, onToggleShowPast, timeFilter }) {
+function ScheduleView({
+  bands,
+  selectedBands,
+  onToggleBand,
+  onSelectAll,
+  currentTime,
+  showPast,
+  onToggleShowPast,
+  timeFilter,
+}) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
   const nowDate = currentTime instanceof Date ? currentTime : new Date(currentTime)
@@ -18,7 +27,7 @@ function ScheduleView({ bands, selectedBands, onToggleBand, onSelectAll, current
 
   // First apply time filter, then apply showPast filter
   const timeFilteredBands = filterPerformancesByTime(bands, timeFilter)
-  
+
   const visibleBands = showPast
     ? timeFilteredBands
     : timeFilteredBands.filter(band => {

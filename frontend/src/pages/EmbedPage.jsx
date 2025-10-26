@@ -12,14 +12,14 @@ export default function EmbedPage() {
     const loadEventData = async () => {
       try {
         setLoading(true)
-        
+
         // Try to load event data by slug
         const response = await fetch(`/api/schedule?event=${slug}`)
-        
+
         if (!response.ok) {
           throw new Error(`Event not found: ${slug}`)
         }
-        
+
         const data = await response.json()
         setBands(data)
         setError(null)
@@ -57,7 +57,7 @@ export default function EmbedPage() {
 
   return (
     <div className="min-h-screen bg-band-navy p-2">
-      <ScheduleView 
+      <ScheduleView
         bands={bands}
         selectedBands={[]}
         onToggleBand={() => {}} // No-op for embed

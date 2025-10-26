@@ -8,19 +8,19 @@ function BasicsStep({ eventData, onChange }) {
   const handleChange = (field, value) => {
     onChange(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }))
   }
 
   // Auto-generate slug from name
-  const generateSlug = (name) => {
+  const generateSlug = name => {
     return name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
   }
 
-  const handleNameChange = (name) => {
+  const handleNameChange = name => {
     handleChange('name', name)
     handleChange('slug', generateSlug(name))
   }
@@ -28,13 +28,13 @@ function BasicsStep({ eventData, onChange }) {
   return (
     <div className="space-y-4">
       <h3 className="text-xl font-bold text-white mb-4">Event Basics</h3>
-      
+
       <div>
         <label className="block text-white mb-2 text-sm">Event Name *</label>
         <input
           type="text"
           value={eventData.name}
-          onChange={(e) => handleNameChange(e.target.value)}
+          onChange={e => handleNameChange(e.target.value)}
           className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           placeholder="Long Weekend Band Crawl Vol. 6"
           required
@@ -46,7 +46,7 @@ function BasicsStep({ eventData, onChange }) {
         <input
           type="date"
           value={eventData.date}
-          onChange={(e) => handleChange('date', e.target.value)}
+          onChange={e => handleChange('date', e.target.value)}
           className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           required
         />
@@ -57,21 +57,19 @@ function BasicsStep({ eventData, onChange }) {
         <input
           type="text"
           value={eventData.slug}
-          onChange={(e) => handleChange('slug', e.target.value)}
+          onChange={e => handleChange('slug', e.target.value)}
           className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           placeholder="vol-6"
           required
         />
-        <p className="text-gray-400 text-xs mt-1">
-          This will be used in the URL: /events/{eventData.slug}
-        </p>
+        <p className="text-gray-400 text-xs mt-1">This will be used in the URL: /events/{eventData.slug}</p>
       </div>
 
       <div>
         <label className="block text-white mb-2 text-sm">Description</label>
         <textarea
           value={eventData.description}
-          onChange={(e) => handleChange('description', e.target.value)}
+          onChange={e => handleChange('description', e.target.value)}
           className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           rows={3}
           placeholder="Describe your event..."
@@ -89,46 +87,41 @@ function VenuesStep({ eventData, onChange }) {
 
   const handleAddVenue = () => {
     if (!newVenue.name.trim()) return
-    
+
     const venue = {
       id: Date.now(), // Temporary ID
       name: newVenue.name.trim(),
-      address: newVenue.address.trim()
+      address: newVenue.address.trim(),
     }
-    
+
     setVenues(prev => [...prev, venue])
     onChange(prev => ({
       ...prev,
-      venues: [...prev.venues, venue]
+      venues: [...prev.venues, venue],
     }))
     setNewVenue({ name: '', address: '' })
   }
 
-  const handleRemoveVenue = (venueId) => {
+  const handleRemoveVenue = venueId => {
     setVenues(prev => prev.filter(v => v.id !== venueId))
     onChange(prev => ({
       ...prev,
-      venues: prev.venues.filter(v => v.id !== venueId)
+      venues: prev.venues.filter(v => v.id !== venueId),
     }))
   }
 
   return (
     <div className="space-y-4">
       <h3 className="text-xl font-bold text-white mb-4">Venues</h3>
-      
+
       <div className="space-y-3">
         {venues.map(venue => (
           <div key={venue.id} className="bg-band-navy rounded p-3 flex justify-between items-center">
             <div>
               <div className="text-white font-medium">{venue.name}</div>
-              {venue.address && (
-                <div className="text-gray-400 text-sm">{venue.address}</div>
-              )}
+              {venue.address && <div className="text-gray-400 text-sm">{venue.address}</div>}
             </div>
-            <button
-              onClick={() => handleRemoveVenue(venue.id)}
-              className="text-red-400 hover:text-red-300"
-            >
+            <button onClick={() => handleRemoveVenue(venue.id)} className="text-red-400 hover:text-red-300">
               Remove
             </button>
           </div>
@@ -141,14 +134,14 @@ function VenuesStep({ eventData, onChange }) {
           <input
             type="text"
             value={newVenue.name}
-            onChange={(e) => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
+            onChange={e => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
             className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             placeholder="Venue name"
           />
           <input
             type="text"
             value={newVenue.address}
-            onChange={(e) => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
+            onChange={e => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
             className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             placeholder="Address (optional)"
           />
@@ -173,47 +166,47 @@ function BandsStep({ eventData, onChange }) {
     venueId: '',
     startTime: '',
     endTime: '',
-    url: ''
+    url: '',
   })
 
   const handleAddBand = () => {
     if (!newBand.name.trim() || !newBand.venueId || !newBand.startTime || !newBand.endTime) return
-    
+
     const band = {
       id: Date.now(), // Temporary ID
       name: newBand.name.trim(),
       venueId: parseInt(newBand.venueId),
       startTime: newBand.startTime,
       endTime: newBand.endTime,
-      url: newBand.url.trim()
+      url: newBand.url.trim(),
     }
-    
+
     setBands(prev => [...prev, band])
     onChange(prev => ({
       ...prev,
-      bands: [...prev.bands, band]
+      bands: [...prev.bands, band],
     }))
     setNewBand({
       name: '',
       venueId: '',
       startTime: '',
       endTime: '',
-      url: ''
+      url: '',
     })
   }
 
-  const handleRemoveBand = (bandId) => {
+  const handleRemoveBand = bandId => {
     setBands(prev => prev.filter(b => b.id !== bandId))
     onChange(prev => ({
       ...prev,
-      bands: prev.bands.filter(b => b.id !== bandId)
+      bands: prev.bands.filter(b => b.id !== bandId),
     }))
   }
 
   return (
     <div className="space-y-4">
       <h3 className="text-xl font-bold text-white mb-4">Bands</h3>
-      
+
       <div className="space-y-3">
         {bands.map(band => {
           const venue = eventData.venues.find(v => v.id === band.venueId)
@@ -225,10 +218,7 @@ function BandsStep({ eventData, onChange }) {
                   {venue?.name} • {band.startTime} - {band.endTime}
                 </div>
               </div>
-              <button
-                onClick={() => handleRemoveBand(band.id)}
-                className="text-red-400 hover:text-red-300"
-              >
+              <button onClick={() => handleRemoveBand(band.id)} className="text-red-400 hover:text-red-300">
                 Remove
               </button>
             </div>
@@ -242,19 +232,21 @@ function BandsStep({ eventData, onChange }) {
           <input
             type="text"
             value={newBand.name}
-            onChange={(e) => setNewBand(prev => ({ ...prev, name: e.target.value }))}
+            onChange={e => setNewBand(prev => ({ ...prev, name: e.target.value }))}
             className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             placeholder="Band name"
           />
-          
+
           <select
             value={newBand.venueId}
-            onChange={(e) => setNewBand(prev => ({ ...prev, venueId: e.target.value }))}
+            onChange={e => setNewBand(prev => ({ ...prev, venueId: e.target.value }))}
             className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           >
             <option value="">Select venue</option>
             {eventData.venues.map(venue => (
-              <option key={venue.id} value={venue.id}>{venue.name}</option>
+              <option key={venue.id} value={venue.id}>
+                {venue.name}
+              </option>
             ))}
           </select>
 
@@ -262,14 +254,14 @@ function BandsStep({ eventData, onChange }) {
             <input
               type="time"
               value={newBand.startTime}
-              onChange={(e) => setNewBand(prev => ({ ...prev, startTime: e.target.value }))}
+              onChange={e => setNewBand(prev => ({ ...prev, startTime: e.target.value }))}
               className="px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
               placeholder="Start time"
             />
             <input
               type="time"
               value={newBand.endTime}
-              onChange={(e) => setNewBand(prev => ({ ...prev, endTime: e.target.value }))}
+              onChange={e => setNewBand(prev => ({ ...prev, endTime: e.target.value }))}
               className="px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
               placeholder="End time"
             />
@@ -278,11 +270,11 @@ function BandsStep({ eventData, onChange }) {
           <input
             type="url"
             value={newBand.url}
-            onChange={(e) => setNewBand(prev => ({ ...prev, url: e.target.value }))}
+            onChange={e => setNewBand(prev => ({ ...prev, url: e.target.value }))}
             className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             placeholder="Band website/social media (optional)"
           />
-          
+
           <button
             type="button"
             onClick={handleAddBand}
@@ -301,28 +293,28 @@ function PublishStep({ eventData }) {
   return (
     <div className="space-y-4">
       <h3 className="text-xl font-bold text-white mb-4">Review & Publish</h3>
-      
+
       <div className="bg-band-navy rounded p-4 space-y-3">
         <div>
           <span className="text-gray-400 text-sm">Event Name:</span>
           <div className="text-white font-medium">{eventData.name}</div>
         </div>
-        
+
         <div>
           <span className="text-gray-400 text-sm">Date:</span>
           <div className="text-white">{eventData.date}</div>
         </div>
-        
+
         <div>
           <span className="text-gray-400 text-sm">URL:</span>
           <div className="text-white">/events/{eventData.slug}</div>
         </div>
-        
+
         <div>
           <span className="text-gray-400 text-sm">Venues:</span>
           <div className="text-white">{eventData.venues.length} venue(s)</div>
         </div>
-        
+
         <div>
           <span className="text-gray-400 text-sm">Bands:</span>
           <div className="text-white">{eventData.bands.length} band(s)</div>
@@ -346,7 +338,7 @@ export default function EventWizard({ onComplete, onCancel }) {
     slug: '',
     description: '',
     venues: [],
-    bands: []
+    bands: [],
   })
   const [loading, setLoading] = useState(false)
 
@@ -354,7 +346,7 @@ export default function EventWizard({ onComplete, onCancel }) {
     basics: <BasicsStep eventData={eventData} onChange={setEventData} />,
     venues: <VenuesStep eventData={eventData} onChange={setEventData} />,
     bands: <BandsStep eventData={eventData} onChange={setEventData} />,
-    publish: <PublishStep eventData={eventData} />
+    publish: <PublishStep eventData={eventData} />,
   }
 
   const handleNext = () => {
@@ -371,14 +363,14 @@ export default function EventWizard({ onComplete, onCancel }) {
 
   const handlePublish = async () => {
     setLoading(true)
-    
+
     try {
       // Create event
       const event = await eventsApi.create({
         name: eventData.name,
         date: eventData.date,
         slug: eventData.slug,
-        description: eventData.description
+        description: eventData.description,
       })
 
       // Create venues
@@ -386,7 +378,7 @@ export default function EventWizard({ onComplete, onCancel }) {
         await venuesApi.create({
           name: venue.name,
           address: venue.address,
-          event_id: event.id
+          event_id: event.id,
         })
       }
 
@@ -398,7 +390,7 @@ export default function EventWizard({ onComplete, onCancel }) {
           start_time: band.startTime,
           end_time: band.endTime,
           url: band.url,
-          event_id: event.id
+          event_id: event.id,
         })
       }
 
@@ -435,8 +427,8 @@ export default function EventWizard({ onComplete, onCancel }) {
               idx === currentStep
                 ? 'text-band-orange font-bold'
                 : idx < currentStep
-                ? 'text-green-400'
-                : 'text-gray-500'
+                  ? 'text-green-400'
+                  : 'text-gray-500'
             }`}
           >
             <div className="text-sm capitalize">{step}</div>
@@ -445,9 +437,7 @@ export default function EventWizard({ onComplete, onCancel }) {
       </div>
 
       {/* Current step content */}
-      <div className="mb-6">
-        {stepComponents[STEPS[currentStep]]}
-      </div>
+      <div className="mb-6">{stepComponents[STEPS[currentStep]]}</div>
 
       {/* Navigation buttons */}
       <div className="flex justify-between">

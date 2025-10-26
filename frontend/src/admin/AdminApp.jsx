@@ -45,8 +45,8 @@ export default function AdminApp() {
   // Show loading state while checking session
   if (checking) {
     return (
-      <div className='min-h-screen bg-band-navy flex items-center justify-center'>
-        <div className='text-band-orange text-lg'>Loading...</div>
+      <div className="min-h-screen bg-band-navy flex items-center justify-center">
+        <div className="text-band-orange text-lg">Loading...</div>
       </div>
     )
   }
@@ -56,26 +56,13 @@ export default function AdminApp() {
       <Route
         path="login"
         element={
-          isAuthenticated ?
-          <Navigate to="/admin" replace /> :
-          <AdminLogin onLoginSuccess={handleLoginSuccess} />
+          isAuthenticated ? <Navigate to="/admin" replace /> : <AdminLogin onLoginSuccess={handleLoginSuccess} />
         }
       />
-      <Route
-        path="signup"
-        element={
-          isAuthenticated ?
-          <Navigate to="/admin" replace /> :
-          <SignupPage />
-        }
-      />
+      <Route path="signup" element={isAuthenticated ? <Navigate to="/admin" replace /> : <SignupPage />} />
       <Route
         path="*"
-        element={
-          isAuthenticated ?
-          <AdminPanel onLogout={handleLogout} /> :
-          <Navigate to="/admin/login" replace />
-        }
+        element={isAuthenticated ? <AdminPanel onLogout={handleLogout} /> : <Navigate to="/admin/login" replace />}
       />
     </Routes>
   )

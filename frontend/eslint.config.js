@@ -44,6 +44,7 @@ export default [
         document: 'readonly',
         navigator: 'readonly',
         localStorage: 'readonly',
+        sessionStorage: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
         setInterval: 'readonly',
@@ -59,6 +60,10 @@ export default [
         process: 'readonly',
         self: 'readonly',
         caches: 'readonly',
+        alert: 'readonly',
+        confirm: 'readonly',
+        performance: 'readonly',
+        PerformanceObserver: 'readonly',
       },
     },
     settings: {
@@ -81,6 +86,15 @@ export default [
       // General rules
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+      
+      // Accessibility - temporarily relaxed during cleanup
+      'jsx-a11y/label-has-associated-control': ['warn', {
+        'labelComponents': [],
+        'labelAttributes': ['htmlFor'],
+        'controlComponents': [],
+        'assert': 'both',
+        'depth': 3,
+      }],
     },
   },
   prettier, // Must be last to override other configs

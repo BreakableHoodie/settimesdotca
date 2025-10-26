@@ -83,6 +83,7 @@ jobs:
         run: npm run lighthouse
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          CI: true
 
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v4

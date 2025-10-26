@@ -3,49 +3,57 @@
 // GET /api/schedule?event={slug}
 
 export async function onRequestGet(context) {
-  const { request, env } = context
-  const url = new URL(request.url)
-  const eventParam = url.searchParams.get('event') || 'current'
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const eventParam = url.searchParams.get("event") || "current";
 
   try {
-    const { DB } = env
+    const { DB } = env;
 
-    let event
-    let bands
+    let event;
+    let bands;
 
-    if (eventParam === 'current') {
+    if (eventParam === "current") {
       // Get the most recent published event
-      event = await DB.prepare(`
+      event = await DB.prepare(
+        `
         SELECT * FROM events
         WHERE is_published = 1
         ORDER BY date DESC
         LIMIT 1
-      `).first()
+      `
+      ).first();
     } else {
       // Get event by slug
-      event = await DB.prepare(`
+      event = await DB.prepare(
+        `
         SELECT * FROM events
         WHERE slug = ? AND is_published = 1
-      `).bind(eventParam).first()
+      `
+      )
+        .bind(eventParam)
+        .first();
     }
 
     if (!event) {
       return new Response(
         JSON.stringify({
-          error: 'Event not found',
-          message: eventParam === 'current'
-            ? 'No published events available'
-            : `Event "${eventParam}" not found or not published`
+          error: "Event not found",
+          message:
+            eventParam === "current"
+              ? "No published events available"
+              : `Event "${eventParam}" not found or not published`,
         }),
         {
           status: 404,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { "Content-Type": "application/json" },
         }
-      )
+      );
     }
 
     // Get all bands for this event with venue information
-    const bandsResult = await DB.prepare(`
+    const bandsResult = await DB.prepare(
+      `
       SELECT
         b.id,
         b.name,
@@ -57,43 +65,43 @@ export async function onRequestGet(context) {
       INNER JOIN venues v ON b.venue_id = v.id
       WHERE b.event_id = ?
       ORDER BY b.start_time, v.name
-    `).bind(event.id).all()
+    `
+    )
+      .bind(event.id)
+      .all();
 
-    bands = bandsResult.results || []
+    bands = bandsResult.results || [];
 
     // Format response to match existing bands.json structure
-    const formattedBands = bands.map(band => ({
-      id: `${band.name.toLowerCase().replace(/\s+/g, '-')}-${band.id}`,
+    const formattedBands = bands.map((band) => ({
+      id: `${band.name.toLowerCase().replace(/\s+/g, "-")}-${band.id}`,
       name: band.name,
       venue: band.venue,
       date: event.date,
       startTime: band.startTime,
       endTime: band.endTime,
-      url: band.url || null
-    }))
+      url: band.url || null,
+    }));
 
-    return new Response(
-      JSON.stringify(formattedBands),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
-        }
-      }
-    )
+    return new Response(JSON.stringify(formattedBands), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+      },
+    });
   } catch (error) {
-    console.error('Error fetching schedule:', error)
+    console.error("Error fetching schedule:", error);
 
     return new Response(
       JSON.stringify({
-        error: 'Database error',
-        message: 'Failed to fetch event schedule'
+        error: "Database error",
+        message: "Failed to fetch event schedule",
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
       }
-    )
+    );
   }
 }

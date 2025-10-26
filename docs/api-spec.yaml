@@ -1,0 +1,902 @@
+openapi: 3.0.3
+info:
+  title: Long Weekend Band Crawl API
+  version: 1.0.0
+  description: |
+    API for managing and accessing Long Weekend Band Crawl event schedules.
+
+    The API provides:
+    - Public schedule access for attendees
+    - Admin panel for event, venue, and band management
+    - Rate-limited authentication with audit logging
+    - Conflict detection for overlapping performances
+
+    **Base URL:** https://your-domain.pages.dev
+
+  contact:
+    name: Long Weekend Band Crawl
+  license:
+    name: MIT
+
+servers:
+  - url: https://your-domain.pages.dev
+    description: Production server
+  - url: http://localhost:5173
+    description: Local development server
+
+tags:
+  - name: Public
+    description: Public API endpoints (no authentication required)
+  - name: Admin - Auth
+    description: Authentication endpoints for admin panel
+  - name: Admin - Events
+    description: Event management (CRUD operations)
+  - name: Admin - Venues
+    description: Venue management (CRUD operations)
+  - name: Admin - Bands
+    description: Band/performance management with conflict detection
+
+security:
+  - AdminPassword: []
+
+paths:
+  /api/schedule:
+    get:
+      tags:
+        - Public
+      summary: Get event schedule
+      description: |
+        Fetches the schedule for a specific event or the most recent published event.
+
+        **Query Parameters:**
+        - `event=current` (default) - Returns the most recent published event
+        - `event={slug}` - Returns a specific event by slug (e.g., "vol-5")
+
+        **Response Format:** Compatible with existing bands.json structure
+      operationId: getSchedule
+      security: []
+      parameters:
+        - name: event
+          in: query
+          description: Event slug or "current" for most recent published event
+          required: false
+          schema:
+            type: string
+            default: current
+            example: vol-5
+      responses:
+        '200':
+          description: Schedule successfully retrieved
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: public, max-age=300
+              description: Response is cached for 5 minutes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScheduleBand'
+              example:
+                - id: the-strokes-1
+                  name: The Strokes
+                  venue: Room 47
+                  date: '2025-06-14'
+                  startTime: '20:00'
+                  endTime: '21:00'
+                  url: https://thestrokes.com
+                - id: arctic-monkeys-2
+                  name: Arctic Monkeys
+                  venue: The Basement
+                  date: '2025-06-14'
+                  startTime: '21:30'
+                  endTime: '22:30'
+                  url: null
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Event not found
+                message: No published events available
+        '500':
+          description: Database error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/auth/login:
+    post:
+      tags:
+        - Admin - Auth
+      summary: Admin login
+      description: |
+        Authenticate admin user with password.
+
+        **Rate Limiting:**
+        - 5 failed attempts in 10 minutes → 1 hour IP lockout
+        - All attempts logged in auth_audit table
+        - Lockout can be manually reset via SQL
+
+        **Security:**
+        - Password stored in environment variable (ADMIN_PASSWORD)
+        - IP-based tracking via CF-Connecting-IP header
+        - Successful login resets rate limit counter
+      operationId: adminLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  description: Admin password (stored in env.ADMIN_PASSWORD)
+                  example: your-strong-password-here
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Login successful
+        '400':
+          description: Bad request (missing password)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid password
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+                  message:
+                    type: string
+                    example: Invalid password. 4 attempts remaining before lockout.
+                  remainingAttempts:
+                    type: integer
+                    example: 4
+        '429':
+          description: Rate limited (too many failed attempts)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Too many failed attempts
+                  message:
+                    type: string
+                    example: Too many failed login attempts. Please try again in 45 minutes.
+                  locked:
+                    type: boolean
+                    example: true
+                  minutesRemaining:
+                    type: integer
+                    example: 45
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/events:
+    get:
+      tags:
+        - Admin - Events
+      summary: List all events
+      description: |
+        Returns all events (published and unpublished) with band counts.
+        Sorted by date descending (newest first).
+      operationId: listEvents
+      responses:
+        '200':
+          description: Events successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+              example:
+                events:
+                  - id: 1
+                    name: Long Weekend Band Crawl Vol. 5
+                    date: '2025-06-14'
+                    slug: vol-5
+                    is_published: 1
+                    created_at: '2025-01-15T10:30:00Z'
+                    band_count: 50
+                  - id: 2
+                    name: Long Weekend Band Crawl Vol. 6
+                    date: '2025-12-20'
+                    slug: vol-6
+                    is_published: 0
+                    created_at: '2025-10-01T14:20:00Z'
+                    band_count: 0
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+
+    post:
+      tags:
+        - Admin - Events
+      summary: Create new event
+      description: |
+        Creates a new event with validation for:
+        - Required fields (name, date, slug)
+        - Date format (YYYY-MM-DD)
+        - Slug format (lowercase, numbers, hyphens only)
+        - Unique slug (no duplicates)
+      operationId: createEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreate'
+            example:
+              name: Long Weekend Band Crawl Vol. 6
+              date: '2025-12-20'
+              slug: vol-6
+              isPublished: false
+      responses:
+        '201':
+          description: Event successfully created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  event:
+                    $ref: '#/components/schemas/Event'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingFields:
+                  value:
+                    error: Validation error
+                    message: Name, date, and slug are required
+                invalidDate:
+                  value:
+                    error: Validation error
+                    message: Date must be in YYYY-MM-DD format
+                invalidSlug:
+                  value:
+                    error: Validation error
+                    message: Slug must contain only lowercase letters, numbers, and hyphens
+        '409':
+          description: Slug already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Conflict
+                message: An event with this slug already exists
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+
+  /api/admin/venues:
+    get:
+      tags:
+        - Admin - Venues
+      summary: List all venues
+      description: |
+        Returns all venues with band counts.
+        Sorted by name alphabetically.
+      operationId: listVenues
+      responses:
+        '200':
+          description: Venues successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venues:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Venue'
+              example:
+                venues:
+                  - id: 1
+                    name: Room 47
+                    address: 123 Main St
+                    band_count: 15
+                  - id: 2
+                    name: The Basement
+                    address: null
+                    band_count: 12
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+
+    post:
+      tags:
+        - Admin - Venues
+      summary: Create new venue
+      description: |
+        Creates a new venue with validation for:
+        - Required name field
+        - Unique venue name (no duplicates)
+        - Optional address field
+      operationId: createVenue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VenueCreate'
+            example:
+              name: The Basement
+              address: 456 Underground Ave
+      responses:
+        '201':
+          description: Venue successfully created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  venue:
+                    $ref: '#/components/schemas/Venue'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Validation error
+                message: Venue name is required
+        '409':
+          description: Venue name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Conflict
+                message: A venue with this name already exists
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+
+  /api/admin/bands:
+    get:
+      tags:
+        - Admin - Bands
+      summary: List bands for an event
+      description: |
+        Returns all bands for a specific event with venue and event names.
+        Sorted by start time, then venue name.
+      operationId: listBands
+      parameters:
+        - name: event_id
+          in: query
+          required: true
+          description: ID of the event to fetch bands for
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Bands successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bands:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BandWithDetails'
+              example:
+                bands:
+                  - id: 1
+                    event_id: 1
+                    venue_id: 1
+                    name: The Strokes
+                    start_time: '20:00'
+                    end_time: '21:00'
+                    url: https://thestrokes.com
+                    created_at: '2025-01-15T10:30:00Z'
+                    venue_name: Room 47
+                    event_name: Long Weekend Band Crawl Vol. 5
+        '400':
+          description: Missing event_id parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Bad request
+                message: event_id parameter is required
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+
+    post:
+      tags:
+        - Admin - Bands
+      summary: Create new band
+      description: |
+        Creates a new band with comprehensive validation and conflict detection.
+
+        **Validation:**
+        - Required fields: eventId, venueId, name, startTime, endTime
+        - Time format: HH:MM (24-hour)
+        - End time must be after start time
+        - Event and venue must exist
+
+        **Conflict Detection:**
+        - Checks for overlapping times at the same venue
+        - Returns conflicts as warnings (does not prevent creation)
+        - Frontend highlights conflicts in red for admin review
+      operationId: createBand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BandCreate'
+            example:
+              eventId: 1
+              venueId: 1
+              name: The Strokes
+              startTime: '20:00'
+              endTime: '21:00'
+              url: https://thestrokes.com
+      responses:
+        '201':
+          description: Band successfully created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  band:
+                    $ref: '#/components/schemas/Band'
+                  conflicts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BandConflict'
+                    description: Present only if conflicts exist
+                  warning:
+                    type: string
+                    description: Present only if conflicts exist
+                    example: This band overlaps with 2 other band(s) at the same venue
+              examples:
+                noConflicts:
+                  value:
+                    success: true
+                    band:
+                      id: 1
+                      event_id: 1
+                      venue_id: 1
+                      name: The Strokes
+                      start_time: '20:00'
+                      end_time: '21:00'
+                      url: https://thestrokes.com
+                      created_at: '2025-01-15T10:30:00Z'
+                withConflicts:
+                  value:
+                    success: true
+                    band:
+                      id: 2
+                      event_id: 1
+                      venue_id: 1
+                      name: Arctic Monkeys
+                      start_time: '20:30'
+                      end_time: '21:30'
+                      url: null
+                      created_at: '2025-01-15T11:00:00Z'
+                    conflicts:
+                      - id: 1
+                        name: The Strokes
+                        startTime: '20:00'
+                        endTime: '21:00'
+                    warning: This band overlaps with 1 other band(s) at the same venue
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingFields:
+                  value:
+                    error: Validation error
+                    message: eventId, venueId, name, startTime, and endTime are required
+                invalidTime:
+                  value:
+                    error: Validation error
+                    message: Times must be in HH:MM format
+                endBeforeStart:
+                  value:
+                    error: Validation error
+                    message: End time must be after start time
+        '404':
+          description: Event or venue not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                eventNotFound:
+                  value:
+                    error: Not found
+                    message: Event not found
+                venueNotFound:
+                  value:
+                    error: Not found
+                    message: Venue not found
+        '500':
+          $ref: '#/components/responses/DatabaseError'
+
+components:
+  securitySchemes:
+    AdminPassword:
+      type: apiKey
+      in: header
+      name: X-Admin-Password
+      description: |
+        Admin password for authentication. Stored in environment variable ADMIN_PASSWORD.
+        Required for all /api/admin/* endpoints (except auth endpoints).
+
+        **Rate Limiting:**
+        - 5 failed attempts in 10 minutes → 1 hour IP lockout
+        - All attempts logged with IP address and timestamp
+
+  schemas:
+    ScheduleBand:
+      type: object
+      description: Band schedule item for public API (compatible with bands.json format)
+      required:
+        - id
+        - name
+        - venue
+        - date
+        - startTime
+        - endTime
+      properties:
+        id:
+          type: string
+          description: Generated ID (band-name-{db_id})
+          example: the-strokes-1
+        name:
+          type: string
+          description: Band name
+          example: The Strokes
+        venue:
+          type: string
+          description: Venue name
+          example: Room 47
+        date:
+          type: string
+          format: date
+          description: Event date (YYYY-MM-DD)
+          example: '2025-06-14'
+        startTime:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: Start time (HH:MM, 24-hour format)
+          example: '20:00'
+        endTime:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: End time (HH:MM, 24-hour format)
+          example: '21:00'
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Optional URL to band info/social media
+          example: https://thestrokes.com
+
+    Event:
+      type: object
+      required:
+        - id
+        - name
+        - date
+        - slug
+        - is_published
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Event ID
+          example: 1
+        name:
+          type: string
+          description: Event name
+          example: Long Weekend Band Crawl Vol. 5
+        date:
+          type: string
+          format: date
+          description: Event date (YYYY-MM-DD)
+          example: '2025-06-14'
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          description: URL-friendly identifier (lowercase, numbers, hyphens only)
+          example: vol-5
+        is_published:
+          type: integer
+          enum: [0, 1]
+          description: Publication status (0 = draft, 1 = published)
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp (ISO 8601)
+          example: '2025-01-15T10:30:00Z'
+        band_count:
+          type: integer
+          description: Number of bands in this event (only in list responses)
+          example: 50
+
+    EventCreate:
+      type: object
+      required:
+        - name
+        - date
+        - slug
+      properties:
+        name:
+          type: string
+          description: Event name
+          example: Long Weekend Band Crawl Vol. 6
+        date:
+          type: string
+          format: date
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Event date (YYYY-MM-DD)
+          example: '2025-12-20'
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          description: URL-friendly identifier (lowercase, numbers, hyphens only)
+          example: vol-6
+        isPublished:
+          type: boolean
+          description: Whether the event should be published immediately
+          default: false
+          example: false
+
+    Venue:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          description: Venue ID
+          example: 1
+        name:
+          type: string
+          description: Venue name (must be unique)
+          example: Room 47
+        address:
+          type: string
+          nullable: true
+          description: Optional venue address
+          example: 123 Main St
+        band_count:
+          type: integer
+          description: Number of bands at this venue (only in list responses)
+          example: 15
+
+    VenueCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Venue name (must be unique)
+          example: The Basement
+        address:
+          type: string
+          description: Optional venue address
+          example: 456 Underground Ave
+
+    Band:
+      type: object
+      required:
+        - id
+        - event_id
+        - venue_id
+        - name
+        - start_time
+        - end_time
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Band ID
+          example: 1
+        event_id:
+          type: integer
+          description: Event ID (foreign key)
+          example: 1
+        venue_id:
+          type: integer
+          description: Venue ID (foreign key)
+          example: 1
+        name:
+          type: string
+          description: Band name
+          example: The Strokes
+        start_time:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: Start time (HH:MM, 24-hour format)
+          example: '20:00'
+        end_time:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: End time (HH:MM, 24-hour format)
+          example: '21:00'
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Optional URL to band info/social media
+          example: https://thestrokes.com
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp (ISO 8601)
+          example: '2025-01-15T10:30:00Z'
+
+    BandWithDetails:
+      allOf:
+        - $ref: '#/components/schemas/Band'
+        - type: object
+          required:
+            - venue_name
+            - event_name
+          properties:
+            venue_name:
+              type: string
+              description: Venue name (joined from venues table)
+              example: Room 47
+            event_name:
+              type: string
+              description: Event name (joined from events table)
+              example: Long Weekend Band Crawl Vol. 5
+
+    BandCreate:
+      type: object
+      required:
+        - eventId
+        - venueId
+        - name
+        - startTime
+        - endTime
+      properties:
+        eventId:
+          type: integer
+          description: Event ID (must exist)
+          example: 1
+        venueId:
+          type: integer
+          description: Venue ID (must exist)
+          example: 1
+        name:
+          type: string
+          description: Band name
+          example: The Strokes
+        startTime:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: Start time (HH:MM, 24-hour format)
+          example: '20:00'
+        endTime:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: End time (HH:MM, 24-hour format, must be after startTime)
+          example: '21:00'
+        url:
+          type: string
+          format: uri
+          description: Optional URL to band info/social media
+          example: https://thestrokes.com
+
+    BandConflict:
+      type: object
+      description: Band that conflicts with the current band (overlapping time at same venue)
+      required:
+        - id
+        - name
+        - startTime
+        - endTime
+      properties:
+        id:
+          type: integer
+          description: Conflicting band's ID
+          example: 1
+        name:
+          type: string
+          description: Conflicting band's name
+          example: The Strokes
+        startTime:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: Conflicting band's start time
+          example: '20:00'
+        endTime:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: Conflicting band's end time
+          example: '21:00'
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type/category
+          example: Validation error
+        message:
+          type: string
+          description: Human-readable error message
+          example: Name, date, and slug are required
+        details:
+          type: object
+          description: Optional additional error details
+          additionalProperties: true
+
+  responses:
+    DatabaseError:
+      description: Database error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Database error
+            message: Failed to fetch events

@@ -123,36 +123,14 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    // Check rate limit
-    const rateLimitCheck = await checkRateLimit(DB, ipAddress);
-    if (!rateLimitCheck.allowed) {
-      await logAuthEvent(DB, ipAddress, "login_attempt", false, {
-        reason: "rate_limited",
-      });
-
-      return new Response(
-        JSON.stringify({
-          error: "Too many failed attempts",
-          message: `Too many failed login attempts. Please try again in ${rateLimitCheck.minutesRemaining} minutes.`,
-          locked: true,
-          minutesRemaining: rateLimitCheck.minutesRemaining,
-        }),
-        {
-          status: 429,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
+    // Rate limiting temporarily disabled (rate_limit table removed for single-org simplification)
+    // TODO: Re-implement rate limiting if needed for security
 
     // Parse request body
     const body = await request.json().catch(() => ({}));
     const { email, password } = body;
 
     if (!email || !password) {
-      await logAuthEvent(DB, ipAddress, "login_attempt", false, {
-        reason: "missing_credentials",
-      });
-
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -167,26 +145,12 @@ export async function onRequestPost(context) {
 
     // Find user
     const user = await DB.prepare(`
-      SELECT u.*, o.name as org_name, o.slug as org_slug
-      FROM users u
-      JOIN organizations o ON u.org_id = o.id
-      WHERE u.email = ?
+      SELECT id, email, password_hash, name, role, last_login
+      FROM users
+      WHERE email = ?
     `).bind(email).first();
 
     if (!user) {
-      // Increment failed attempts
-      await DB.prepare(`
-        INSERT INTO rate_limit (ip_address, failed_attempts, last_attempt)
-        VALUES (?, 1, datetime('now'))
-        ON CONFLICT(ip_address) DO UPDATE SET
-          failed_attempts = failed_attempts + 1,
-          last_attempt = datetime('now')
-      `).bind(ipAddress).run();
-
-      await logAuthEvent(DB, ipAddress, "login_attempt", false, {
-        reason: "user_not_found",
-      });
-
       return new Response(
         JSON.stringify({
           error: "Authentication failed",
@@ -203,23 +167,6 @@ export async function onRequestPost(context) {
     const passwordValid = await verifyPassword(password, user.password_hash);
 
     if (!passwordValid) {
-      // Increment failed attempts
-      await DB.prepare(`
-        INSERT INTO rate_limit (ip_address, failed_attempts, last_attempt)
-        VALUES (?, 1, datetime('now'))
-        ON CONFLICT(ip_address) DO UPDATE SET
-          failed_attempts = failed_attempts + 1,
-          last_attempt = datetime('now'),
-          lockout_until = CASE
-            WHEN failed_attempts + 1 >= 5 THEN datetime('now', '+15 minutes')
-            ELSE lockout_until
-          END
-      `).bind(ipAddress).run();
-
-      await logAuthEvent(DB, ipAddress, "login_attempt", false, {
-        reason: "invalid_password",
-      });
-
       return new Response(
         JSON.stringify({
           error: "Authentication failed",
@@ -232,11 +179,6 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Reset rate limit on successful login
-    await DB.prepare(
-      'DELETE FROM rate_limit WHERE ip_address = ?'
-    ).bind(ipAddress).run();
-
     // Update last login
     await DB.prepare(
       'UPDATE users SET last_login = datetime(\'now\') WHERE id = ?'
@@ -245,20 +187,13 @@ export async function onRequestPost(context) {
     // Generate session token
     const sessionToken = crypto.randomUUID();
 
-    // Log successful login
-    await logAuthEvent(DB, ipAddress, "login", true, {
-      userAgent: request.headers.get('User-Agent'),
-    });
-
     return new Response(
       JSON.stringify({
         success: true,
         user: {
           id: user.id,
           email: user.email,
-          orgId: user.org_id,
-          orgName: user.org_name,
-          orgSlug: user.org_slug,
+          name: user.name,
           role: user.role
         },
         sessionToken

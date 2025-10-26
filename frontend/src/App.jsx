@@ -1,11 +1,12 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
-import Header from './components/Header'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import bandsFallbackRaw from '../public/bands.json?raw'
 import ComingUp from './components/ComingUp'
+import Header from './components/Header'
+import OfflineIndicator from './components/OfflineIndicator'
 import ScheduleView from './components/ScheduleView'
 import { validateBandsData } from './utils/validation'
-import bandsFallbackRaw from '../public/bands.json?raw'
 
 const MySchedule = lazy(() => import('./components/MySchedule'))
 const VenueInfo = lazy(() => import('./components/VenueInfo'))
@@ -48,6 +49,7 @@ function App() {
     const hasBands = saved && JSON.parse(saved).length > 0
     return hasBands ? 'mine' : 'all'
   })
+  const [timeFilter, setTimeFilter] = useState('all')
   const [loading, setLoading] = useState(!HAS_FALLBACK)
   const [error, setError] = useState(null)
   const [showPast, setShowPast] = useState(false)
@@ -172,7 +174,13 @@ function App() {
 
   return (
     <div className="min-h-screen pb-20">
-      <Header view={view} setView={setView} />
+      <OfflineIndicator />
+      <Header 
+        view={view} 
+        setView={setView} 
+        timeFilter={timeFilter}
+        onTimeFilterChange={setTimeFilter}
+      />
       <ComingUp bands={myBands} />
       <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
         {view === 'all' ? (
@@ -184,6 +192,7 @@ function App() {
             currentTime={currentTime}
             showPast={showPast}
             onToggleShowPast={toggleShowPast}
+            timeFilter={timeFilter}
           />
         ) : (
           <Suspense

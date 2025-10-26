@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 function ComingUp({ bands }) {
   const [nextBand, setNextBand] = useState(null)

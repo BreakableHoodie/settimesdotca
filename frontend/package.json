@@ -1,5 +1,5 @@
 {
-  "name": "longweekend-bandcrawl-frontend",
+  "name": "concert-manager-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "analyze": "vite-bundle-visualizer",
     "deploy:dev": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch dev",
     "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch main",
     "psi": "node scripts/run-psi.mjs",
@@ -54,7 +55,9 @@
     "prettier": "^3.6.2",
     "psi": "^4.1.0",
     "tailwindcss": "^3.4.0",
+    "terser": "^5.44.0",
     "vite": "^5.0.8",
+    "vite-bundle-visualizer": "^1.0.0",
     "vitest": "^3.2.4",
     "wrangler": "^4.42.2"
   }

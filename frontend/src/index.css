@@ -46,3 +46,28 @@ body {
 .playing-now {
   animation: pulse-glow 2s ease-in-out infinite;
 }
+
+/* Bulk operation button styles */
+.btn-secondary {
+  @apply px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition;
+}
+
+.btn-primary {
+  @apply px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition;
+}
+
+.btn-danger {
+  @apply px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition;
+}
+
+.btn-icon {
+  @apply p-2 hover:bg-gray-700 rounded transition;
+}
+
+/* Touch targets for mobile */
+@media (max-width: 768px) {
+  input[type="checkbox"] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

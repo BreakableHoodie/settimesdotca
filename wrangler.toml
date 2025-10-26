@@ -23,7 +23,7 @@ pages_build_output_dir = "frontend/dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "bandcrawl-db"
-database_id = "YOUR_DATABASE_ID_HERE"  # Replace with actual ID from `wrangler d1 create`
+database_id = "6a1fca7d-22e2-4384-8277-5aecd0c97f2f"
 
 # For local development, Wrangler will create a local SQLite database
 # Local DB path: .wrangler/state/v3/d1/miniflare-D1DatabaseObject/
@@ -42,9 +42,6 @@ database_id = "YOUR_DATABASE_ID_HERE"  # Replace with actual ID from `wrangler d
 # ADMIN_PASSWORD=your-strong-admin-password-here
 # MASTER_PASSWORD=your-even-stronger-master-password-here
 # DEVELOPER_CONTACT=555-123-4567
-
-# Node.js compatibility for Pages Functions
-compatibility_flags = ["nodejs_compat"]
 
 # Build configuration
 [build]

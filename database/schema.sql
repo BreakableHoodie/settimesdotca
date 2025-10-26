@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS venues (
 -- Bands table: stores performance schedule for each event
 CREATE TABLE IF NOT EXISTS bands (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  event_id INTEGER NOT NULL,             -- FK to events table
+  event_id INTEGER,                      -- FK to events table (nullable for orphaned bands)
   venue_id INTEGER NOT NULL,             -- FK to venues table
   name TEXT NOT NULL,                    -- Band name
   start_time TEXT NOT NULL,              -- Format: HH:MM (24-hour)
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS bands (
   url TEXT,                              -- Optional URL to band info/social media
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
 
-  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
   FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE RESTRICT
 );
 

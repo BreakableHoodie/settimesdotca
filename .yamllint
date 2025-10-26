@@ -1,0 +1,6 @@
+extends: default
+
+# Netlify/Cloudflare _headers files use a bespoke syntax, so let yamllint skip them.
+ignore: |
+  frontend/public/_headers
+  frontend/dist/_headers

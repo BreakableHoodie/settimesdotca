@@ -1,5 +1,3 @@
-import { useEffect, useMemo, useState } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faBell,
   faBolt,
@@ -20,9 +18,11 @@ import {
   faTrashCan,
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
-import BandCard from './BandCard'
-import { formatTimeRange } from '../utils/timeFormat'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { useEffect, useMemo, useState } from 'react'
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx'
+import { formatTimeRange } from '../utils/timeFormat'
+import BandCard from './BandCard'
 
 function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleShowPast }) {
   const [currentTime, setCurrentTime] = useState(new Date())

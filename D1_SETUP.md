@@ -99,8 +99,9 @@ npm run dev
 ```
 
 Access the app:
-- Main app: http://localhost:5173
-- Admin panel: http://localhost:5173/admin
+
+- Main app: <http://localhost:5173>
+- Admin panel: <http://localhost:5173/admin>
 
 ---
 
@@ -178,6 +179,7 @@ Access your admin panel at: `https://yourdomain.com/admin`
 ### Managing Events
 
 **Create New Event:**
+
 1. Go to **Events** tab
 2. Click **Create New Event**
 3. Fill in:
@@ -188,34 +190,40 @@ Access your admin panel at: `https://yourdomain.com/admin`
 4. Click **Create**
 
 **Duplicate Event:**
+
 1. Find the event you want to duplicate
 2. Click **Duplicate**
 3. Enter new name, date, and slug
 4. All bands and venues will be copied to the new event
 
 **Publish/Unpublish:**
+
 - Toggle the publish button to make events visible to the public
 - Only published events appear on the main schedule
 
 ### Managing Venues
 
 **Add Venue:**
+
 1. Go to **Venues** tab
 2. Fill in venue name and address
 3. Click **Add Venue**
 
 **Edit Venue:**
+
 1. Click **Edit** on the venue
 2. Update name/address
 3. Click **Save**
 
 **Delete Venue:**
+
 - Only venues with 0 bands can be deleted
 - Delete all bands at the venue first
 
 ### Managing Bands
 
 **Add Band:**
+
 1. Go to **Bands** tab
 2. Select an event from the dropdown
 3. Fill in:
@@ -227,11 +235,13 @@ Access your admin panel at: `https://yourdomain.com/admin`
 4. Click **Add Band**
 
 **Conflict Detection:**
+
 - System automatically detects overlapping times at the same venue
 - Conflicts are highlighted in red
 - You can still save conflicting bands (warnings only)
 
 **Edit Band:**
+
 1. Click **Edit** on the band
 2. Update details
 3. Conflicts are re-checked on save
@@ -243,6 +253,7 @@ Access your admin panel at: `https://yourdomain.com/admin`
 ### Password Management
 
 **ADMIN_PASSWORD:**
+
 - 16+ characters minimum
 - Mix of letters, numbers, symbols
 - Share only with trusted organizers via secure channel (password manager share, encrypted message)
@@ -250,6 +261,7 @@ Access your admin panel at: `https://yourdomain.com/admin`
 - Change immediately if compromise suspected
 
 **MASTER_PASSWORD:**
+
 - 20+ characters minimum
 - ONLY stored in developer's password manager
 - NEVER shared with organizers
@@ -259,6 +271,7 @@ Access your admin panel at: `https://yourdomain.com/admin`
 ### Rate Limiting
 
 The system automatically protects against brute force:
+
 - 5 failed login attempts in 10 minutes = 1 hour IP lockout
 - All auth attempts logged in `auth_audit` table
 - Friendly lockout messages shown to users
@@ -272,6 +285,7 @@ SELECT * FROM auth_audit ORDER BY timestamp DESC LIMIT 100;
 ```
 
 Monitor for:
+
 - Repeated failed attempts from same IP
 - Successful logins at unusual times
 - Password reset requests
@@ -301,12 +315,15 @@ Monitor for:
 **Problem:** API returns 404 when fetching schedule
 
 **Solutions:**
+
 1. Check that at least one event is published:
+
    ```bash
    wrangler d1 execute bandcrawl-db --command "SELECT * FROM events WHERE is_published = 1"
    ```
 
 2. Publish an event via admin panel or SQL:
+
    ```bash
    wrangler d1 execute bandcrawl-db --command "UPDATE events SET is_published = 1 WHERE id = 1"
    ```
@@ -316,9 +333,11 @@ Monitor for:
 **Problem:** D1 database not bound correctly
 
 **Solutions:**
+
 1. Check `wrangler.toml` has correct database_id
 2. Verify D1 binding in Cloudflare Pages dashboard
 3. Ensure database exists:
+
    ```bash
    wrangler d1 list
    ```
@@ -328,6 +347,7 @@ Monitor for:
 **Problem:** Password not set or incorrect
 
 **Solutions:**
+
 1. Check environment variables in Cloudflare dashboard
 2. For local dev, ensure `.dev.vars` exists with correct passwords
 3. Restart Wrangler dev server after changing `.dev.vars`
@@ -337,12 +357,15 @@ Monitor for:
 **Problem:** Database tables are empty
 
 **Solutions:**
+
 1. Run schema creation:
+
    ```bash
    wrangler d1 execute bandcrawl-db --file=database/schema.sql
    ```
 
 2. Add seed data or migrate:
+
    ```bash
    wrangler d1 execute bandcrawl-db --file=database/seed.sql
    ```
@@ -352,8 +375,10 @@ Monitor for:
 **Problem:** Too many failed login attempts
 
 **Solutions:**
+
 1. Wait 1 hour for automatic unlock
 2. Or manually reset in database:
+
    ```bash
    wrangler d1 execute bandcrawl-db --command "DELETE FROM rate_limit WHERE ip_address = 'your.ip.here'"
    ```
@@ -363,6 +388,7 @@ Monitor for:
 ### Forgot admin password
 
 **Solutions:**
+
 1. Click "Forgot password?" on login screen
 2. Contact developer using phone number shown
 3. Or use master password to retrieve admin password
@@ -372,9 +398,11 @@ Monitor for:
 **Problem:** Functions not running locally
 
 **Solutions:**
+
 1. Use `wrangler pages dev` instead of `npm run dev`
 2. Or ensure Vite proxy is configured (already set up in `vite.config.js`)
 3. Check that D1 binding is correct:
+
    ```bash
    npx wrangler pages dev dist --binding DB=bandcrawl-db --local
    ```
@@ -386,6 +414,7 @@ Monitor for:
 ### Useful SQL Queries
 
 **List all events with band counts:**
+
 ```sql
 SELECT e.*, COUNT(b.id) as band_count
 FROM events e
@@ -394,6 +423,7 @@ GROUP BY e.id;
 ```
 
 **Find time conflicts:**
+
 ```sql
 SELECT b1.name as band1, b2.name as band2, v.name as venue,
        b1.start_time, b1.end_time, b2.start_time, b2.end_time
@@ -408,6 +438,7 @@ WHERE b1.event_id = 1;
 ```
 
 **View recent auth attempts:**
+
 ```sql
 SELECT timestamp, action, success, ip_address
 FROM auth_audit
@@ -416,6 +447,7 @@ LIMIT 50;
 ```
 
 **Check current rate limits:**
+
 ```sql
 SELECT * FROM rate_limit
 WHERE lockout_until > datetime('now')
@@ -456,6 +488,7 @@ The app uses a three-tier fallback:
 3. If fails, use embedded fallback (compiled into app)
 
 This ensures the app works even if:
+
 - D1 database is not set up yet
 - API is temporarily down
 - Network connectivity issues
@@ -502,8 +535,9 @@ longweekendbandcrawl/
 ## Support
 
 For issues or questions:
+
 1. Check this guide and troubleshooting section
-2. Review Cloudflare D1 documentation: https://developers.cloudflare.com/d1/
+2. Review Cloudflare D1 documentation: <https://developers.cloudflare.com/d1/>
 3. Contact developer at the phone number in your admin panel "Forgot Password" screen
 
 ---
@@ -511,6 +545,7 @@ For issues or questions:
 ## Changelog
 
 **2025-10-15:** Initial D1 admin panel implementation
+
 - Complete CRUD operations for events, venues, and bands
 - Password-protected admin panel with rate limiting
 - Time conflict detection for band scheduling

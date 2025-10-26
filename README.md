@@ -1,6 +1,6 @@
-# Long Weekend Band Crawl Mobile Schedule
+# Concert Manager - Event Schedule Builder
 
-A mobile-first web app that lets attendees build and view their personalized schedules for the Long Weekend Band Crawl. Select bands, see conflicts, and get "coming up in X minutes" reminders.
+A mobile-first web app for managing concert events and performances. Build personalized schedules, manage venues, and track upcoming performances with conflict detection and time-based reminders.
 
 ## Features
 
@@ -25,6 +25,7 @@ A mobile-first web app that lets attendees build and view their personalized sch
 This project now includes a full-featured admin panel with Cloudflare D1 database integration for managing events, venues, and bands.
 
 **Features:**
+
 - Password-protected admin interface at `/admin`
 - Manage multiple events (create, duplicate, publish/unpublish)
 - CRUD operations for venues and bands
@@ -34,6 +35,7 @@ This project now includes a full-featured admin panel with Cloudflare D1 databas
 - Mobile-responsive design
 
 **Quick Access:**
+
 - Local: `http://localhost:5173/admin`
 - Production: `https://yourdomain.com/admin`
 

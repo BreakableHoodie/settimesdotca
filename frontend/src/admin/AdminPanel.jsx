@@ -3,6 +3,7 @@ import { eventsApi } from '../utils/adminApi'
 import EventsTab from './EventsTab'
 import VenuesTab from './VenuesTab'
 import BandsTab from './BandsTab'
+import EventWizard from './EventWizard'
 
 /**
  * AdminPanel - Main container for admin panel with tab navigation
@@ -20,6 +21,7 @@ export default function AdminPanel({ onLogout }) {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
+  const [showWizard, setShowWizard] = useState(false)
 
   const loadEvents = useCallback(async () => {
     try {
@@ -56,9 +58,18 @@ export default function AdminPanel({ onLogout }) {
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
-      window.sessionStorage.removeItem('adminPassword')
       onLogout()
     }
+  }
+
+  const handleWizardComplete = (event) => {
+    setShowWizard(false)
+    showToast(`Event "${event.name}" created successfully!`, 'success')
+    loadEvents() // Refresh events list
+  }
+
+  const handleWizardCancel = () => {
+    setShowWizard(false)
   }
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
@@ -66,7 +77,7 @@ export default function AdminPanel({ onLogout }) {
   const tabs = [
     { id: 'events', label: 'Events' },
     { id: 'venues', label: 'Venues' },
-    { id: 'bands', label: 'Bands' }
+    { id: 'bands', label: 'Performances' }
   ]
 
   return (
@@ -100,12 +111,21 @@ export default function AdminPanel({ onLogout }) {
               )}
             </div>
 
-            <button
-              onClick={handleLogout}
-              className='px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm sm:text-base'
-            >
-              Logout
-            </button>
+            <div className='flex items-center gap-3'>
+              <button
+                onClick={() => setShowWizard(true)}
+                className='px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-sm sm:text-base'
+              >
+                Create Event
+              </button>
+              
+              <button
+                onClick={handleLogout}
+                className='px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm sm:text-base'
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -155,12 +175,25 @@ export default function AdminPanel({ onLogout }) {
               <BandsTab
                 selectedEventId={selectedEventId}
                 selectedEvent={selectedEvent}
+                events={events}
                 showToast={showToast}
               />
             )}
           </>
         )}
       </div>
+
+      {/* Event Wizard Modal */}
+      {showWizard && (
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50'>
+          <div className='bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto'>
+            <EventWizard
+              onComplete={handleWizardComplete}
+              onCancel={handleWizardCancel}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (

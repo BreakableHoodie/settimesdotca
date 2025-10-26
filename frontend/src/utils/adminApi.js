@@ -3,17 +3,17 @@
 
 const API_BASE = '/api/admin'
 
-// Get admin password from sessionStorage
-function getAdminPassword() {
-  return window.sessionStorage.getItem('adminPassword')
+// Get session token from sessionStorage
+function getSessionToken() {
+  return window.sessionStorage.getItem('sessionToken')
 }
 
-// Create headers with admin password
+// Create headers with session token
 function getHeaders() {
-  const password = getAdminPassword()
+  const sessionToken = getSessionToken()
   return {
     'Content-Type': 'application/json',
-    'X-Admin-Password': password || ''
+    'Authorization': `Bearer ${sessionToken || ''}`,
   }
 }
 
@@ -30,22 +30,57 @@ async function handleResponse(response) {
 
 // Auth API
 export const authApi = {
-  async login(password) {
+  async signup(email, password, orgName) {
+    const response = await fetch(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, orgName }),
+    })
+    const data = await handleResponse(response)
+
+    // Store session token
+    if (data.sessionToken) {
+      window.sessionStorage.setItem('sessionToken', data.sessionToken)
+      window.sessionStorage.setItem('userEmail', data.user.email)
+      window.sessionStorage.setItem('orgId', data.user.orgId)
+      window.sessionStorage.setItem('orgName', data.user.orgName)
+    }
+
+    return data
+  },
+
+  async login(email, password) {
     const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password })
+      body: JSON.stringify({ email, password }),
     })
-    return handleResponse(response)
+    const data = await handleResponse(response)
+
+    // Store session token
+    if (data.sessionToken) {
+      window.sessionStorage.setItem('sessionToken', data.sessionToken)
+      window.sessionStorage.setItem('userEmail', data.user.email)
+      window.sessionStorage.setItem('orgId', data.user.orgId)
+      window.sessionStorage.setItem('orgName', data.user.orgName)
+    }
+
+    return data
   },
 
-  async resetPassword(masterPassword) {
-    const response = await fetch(`${API_BASE}/auth/reset`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ masterPassword })
-    })
-    return handleResponse(response)
+  async logout() {
+    window.sessionStorage.clear()
+  },
+
+  getCurrentUser() {
+    const sessionToken = window.sessionStorage.getItem('sessionToken')
+    if (!sessionToken) return null
+
+    return {
+      email: window.sessionStorage.getItem('userEmail'),
+      orgId: parseInt(window.sessionStorage.getItem('orgId')),
+      orgName: window.sessionStorage.getItem('orgName')
+    }
   }
 }
 
@@ -53,7 +88,7 @@ export const authApi = {
 export const eventsApi = {
   async getAll() {
     const response = await fetch(`${API_BASE}/events`, {
-      headers: getHeaders()
+      headers: getHeaders(),
     })
     return handleResponse(response)
   },
@@ -62,7 +97,7 @@ export const eventsApi = {
     const response = await fetch(`${API_BASE}/events`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify(eventData)
+      body: JSON.stringify(eventData),
     })
     return handleResponse(response)
   },
@@ -70,7 +105,7 @@ export const eventsApi = {
   async togglePublish(eventId) {
     const response = await fetch(`${API_BASE}/events/${eventId}/publish`, {
       method: 'PUT',
-      headers: getHeaders()
+      headers: getHeaders(),
     })
     return handleResponse(response)
   },
@@ -79,17 +114,32 @@ export const eventsApi = {
     const response = await fetch(`${API_BASE}/events/${eventId}/duplicate`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify(newEventData)
+      body: JSON.stringify(newEventData),
     })
     return handleResponse(response)
-  }
+  },
+
+  async delete(eventId) {
+    const response = await fetch(`${API_BASE}/events/${eventId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    })
+    return handleResponse(response)
+  },
+
+  async getMetrics(eventId) {
+    const response = await fetch(`${API_BASE}/events/${eventId}/metrics`, {
+      headers: getHeaders(),
+    })
+    return handleResponse(response)
+  },
 }
 
 // Venues API
 export const venuesApi = {
   async getAll() {
     const response = await fetch(`${API_BASE}/venues`, {
-      headers: getHeaders()
+      headers: getHeaders(),
     })
     return handleResponse(response)
   },
@@ -98,7 +148,7 @@ export const venuesApi = {
     const response = await fetch(`${API_BASE}/venues`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify(venueData)
+      body: JSON.stringify(venueData),
     })
     return handleResponse(response)
   },
@@ -107,7 +157,7 @@ export const venuesApi = {
     const response = await fetch(`${API_BASE}/venues/${venueId}`, {
       method: 'PUT',
       headers: getHeaders(),
-      body: JSON.stringify(venueData)
+      body: JSON.stringify(venueData),
     })
     return handleResponse(response)
   },
@@ -115,17 +165,24 @@ export const venuesApi = {
   async delete(venueId) {
     const response = await fetch(`${API_BASE}/venues/${venueId}`, {
       method: 'DELETE',
-      headers: getHeaders()
+      headers: getHeaders(),
     })
     return handleResponse(response)
-  }
+  },
 }
 
 // Bands API
 export const bandsApi = {
+  async getAll() {
+    const response = await fetch(`${API_BASE}/bands`, {
+      headers: getHeaders(),
+    })
+    return handleResponse(response)
+  },
+
   async getByEvent(eventId) {
     const response = await fetch(`${API_BASE}/bands?event_id=${eventId}`, {
-      headers: getHeaders()
+      headers: getHeaders(),
     })
     return handleResponse(response)
   },
@@ -134,7 +191,7 @@ export const bandsApi = {
     const response = await fetch(`${API_BASE}/bands`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify(bandData)
+      body: JSON.stringify(bandData),
     })
     return handleResponse(response)
   },
@@ -143,7 +200,7 @@ export const bandsApi = {
     const response = await fetch(`${API_BASE}/bands/${bandId}`, {
       method: 'PUT',
       headers: getHeaders(),
-      body: JSON.stringify(bandData)
+      body: JSON.stringify(bandData),
     })
     return handleResponse(response)
   },
@@ -151,8 +208,8 @@ export const bandsApi = {
   async delete(bandId) {
     const response = await fetch(`${API_BASE}/bands/${bandId}`, {
       method: 'DELETE',
-      headers: getHeaders()
+      headers: getHeaders(),
     })
     return handleResponse(response)
-  }
+  },
 }

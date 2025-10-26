@@ -54,6 +54,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 ```
 
 Now you can access:
+
 - Main app: `http://localhost:5173/`
 - Admin panel: `http://localhost:5173/admin`
 
@@ -142,7 +143,8 @@ Access at: `http://localhost:5173/`
 
 If using Option 1 (recommended), configure your server to serve `index.html` for all routes.
 
-### Express.js Example:
+### Express.js Example
+
 ```javascript
 // Serve admin route
 app.get('/admin', (req, res) => {
@@ -155,7 +157,8 @@ app.get('*', (req, res) => {
 })
 ```
 
-### Vite Dev Server:
+### Vite Dev Server
+
 Already configured! Just use `/admin` path.
 
 ## File Structure After Integration
@@ -196,10 +199,7 @@ Add a link in your public app's header to access admin:
 
 ```jsx
 // In your Header component
-<a
-  href="/admin"
-  className="text-white/70 hover:text-white text-sm"
->
+<a href="/admin" className="text-white/70 hover:text-white text-sm">
   Admin
 </a>
 ```
@@ -208,10 +208,7 @@ Add a link in admin panel to return to public app:
 
 ```jsx
 // In AdminPanel.jsx header section
-<a
-  href="/"
-  className="text-band-orange hover:text-orange-300 text-sm"
->
+<a href="/" className="text-band-orange hover:text-orange-300 text-sm">
   ← Back to Schedule
 </a>
 ```
@@ -242,24 +239,28 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/admin'
 
 ## Troubleshooting
 
-### Admin panel not loading:
+### Admin panel not loading
+
 - Check console for errors
 - Verify all admin files are in `src/admin/` directory
 - Ensure `adminApi.js` is in `src/utils/`
 - Check API base URL matches backend
 
-### API calls failing:
+### API calls failing
+
 - Verify backend is running
 - Check API endpoint paths match backend routes
 - Inspect network tab for error details
 - Verify admin password is stored in sessionStorage
 
-### Routing not working:
+### Routing not working
+
 - Ensure `react-router-dom` is installed
 - Check BrowserRouter is wrapping Routes
 - Verify backend serves index.html for all routes
 
-### Styles not applying:
+### Styles not applying
+
 - Verify Tailwind config includes admin directory: `"./src/**/*.{js,jsx}"`
 - Check `index.css` imports Tailwind directives
 - Rebuild with `npm run build` if needed

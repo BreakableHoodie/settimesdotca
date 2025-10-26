@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { eventsApi } from '../utils/adminApi'
+import EmbedCodeGenerator from './EmbedCodeGenerator'
+import MetricsDashboard from './MetricsDashboard'
 
 /**
  * EventsTab - Manage events (create, duplicate, publish/unpublish)
@@ -14,6 +16,8 @@ import { eventsApi } from '../utils/adminApi'
 export default function EventsTab({ events, onEventsChange, showToast }) {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [duplicatingEventId, setDuplicatingEventId] = useState(null)
+  const [showEmbedCode, setShowEmbedCode] = useState(null)
+  const [showMetrics, setShowMetrics] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     date: '',
@@ -81,6 +85,24 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
       onEventsChange()
     } catch (err) {
       showToast(`Failed to ${action} event: ` + err.message, 'error')
+    }
+  }
+
+  const handleDelete = async (eventId, eventName, bandCount) => {
+    const confirmMessage = bandCount > 0 
+      ? `Are you sure you want to delete "${eventName}"? This will remove the event but keep all ${bandCount} band(s) (they will become unassigned and can be moved to other events). This action cannot be undone.`
+      : `Are you sure you want to delete "${eventName}"? This action cannot be undone.`
+
+    if (!window.confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      const result = await eventsApi.delete(eventId)
+      showToast(result.message || `Event "${eventName}" deleted successfully!`, 'success')
+      onEventsChange()
+    } catch (err) {
+      showToast('Failed to delete event: ' + err.message, 'error')
     }
   }
 
@@ -271,6 +293,18 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
                       <td className='px-4 py-3'>
                         <div className='flex justify-end gap-2'>
                           <button
+                            onClick={() => setShowMetrics(event)}
+                            className='px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors'
+                          >
+                            Metrics
+                          </button>
+                          <button
+                            onClick={() => setShowEmbedCode(event)}
+                            className='px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors'
+                          >
+                            Embed
+                          </button>
+                          <button
                             onClick={() => handleTogglePublish(event.id, event.is_published)}
                             className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                               event.is_published
@@ -285,6 +319,12 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
                             className='px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors'
                           >
                             Duplicate
+                          </button>
+                          <button
+                            onClick={() => handleDelete(event.id, event.name, event.band_count || 0)}
+                            className='px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors'
+                          >
+                            Delete
                           </button>
                         </div>
                       </td>
@@ -331,6 +371,18 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
 
                   <div className='flex gap-2 pt-2'>
                     <button
+                      onClick={() => setShowMetrics(event)}
+                      className='flex-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors'
+                    >
+                      Metrics
+                    </button>
+                    <button
+                      onClick={() => setShowEmbedCode(event)}
+                      className='flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors'
+                    >
+                      Embed
+                    </button>
+                    <button
                       onClick={() => handleTogglePublish(event.id, event.is_published)}
                       className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
                         event.is_published
@@ -346,6 +398,12 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
                     >
                       Duplicate
                     </button>
+                    <button
+                      onClick={() => handleDelete(event.id, event.name, event.band_count || 0)}
+                      className='flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors'
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
@@ -353,6 +411,46 @@ export default function EventsTab({ events, onEventsChange, showToast }) {
           </>
         )}
       </div>
+
+      {/* Metrics Dashboard Modal */}
+      {showMetrics && (
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50'>
+          <div className='bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto'>
+            <div className='p-6'>
+              <div className='flex justify-between items-center mb-4'>
+                <h3 className='text-xl font-bold text-white'>Metrics for "{showMetrics.name}"</h3>
+                <button
+                  onClick={() => setShowMetrics(null)}
+                  className='text-gray-400 hover:text-white text-2xl'
+                >
+                  ×
+                </button>
+              </div>
+              <MetricsDashboard eventId={showMetrics.id} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Embed Code Generator Modal */}
+      {showEmbedCode && (
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50'>
+          <div className='bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
+            <div className='p-6'>
+              <div className='flex justify-between items-center mb-4'>
+                <h3 className='text-xl font-bold text-white'>Embed Code for "{showEmbedCode.name}"</h3>
+                <button
+                  onClick={() => setShowEmbedCode(null)}
+                  className='text-gray-400 hover:text-white text-2xl'
+                >
+                  ×
+                </button>
+              </div>
+              <EmbedCodeGenerator event={showEmbedCode} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

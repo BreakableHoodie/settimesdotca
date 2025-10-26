@@ -1,7 +1,17 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { bandsApi, venuesApi } from '../utils/adminApi'
 import BulkActionBar from './BulkActionBar'
 import BulkPreviewModal from './BulkPreviewModal'
+import BandForm from './BandForm'
+import {
+  calculateEndTimeFromDuration,
+  deriveDurationMinutes,
+  detectConflicts,
+  formatDurationLabel,
+  formatTimeLabel,
+  formatTimeRangeLabel,
+  sortBandsByStart,
+} from './utils/timeUtils'
 
 /**
  * BandsTab - Manage performances for the selected event
@@ -21,13 +31,15 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     name: '',
+    event_id: selectedEventId ? selectedEventId.toString() : '',
     venue_id: '',
     start_time: '',
     end_time: '',
+    duration: '',
     url: '',
-  })
+  }))
   const [submitting, setSubmitting] = useState(false)
 
   // Bulk operation state
@@ -72,10 +84,6 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     loadBands() // Load bands on component mount
   }, [loadVenues, loadBands])
 
-  useEffect(() => {
-    loadBands()
-  }, [selectedEventId, loadBands])
-
   // Clear selections when event changes
   useEffect(() => {
     setSelectedBands(new Set())
@@ -85,7 +93,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
   const resetForm = () => {
     setFormData({
       name: '',
-      event_id: '',
+      event_id: selectedEventId ? selectedEventId.toString() : '',
       venue_id: '',
       start_time: '',
       end_time: '',
@@ -96,41 +104,52 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     setEditingId(null)
   }
 
-  // Calculate end time from start time + duration
-  const calculateEndTime = (startTime, durationMinutes) => {
-    if (!startTime || !durationMinutes) return ''
-    const [hours, minutes] = startTime.split(':').map(Number)
-    const totalMinutes = hours * 60 + minutes + parseInt(durationMinutes)
-    const endHours = Math.floor(totalMinutes / 60) % 24
-    const endMinutes = totalMinutes % 60
-    return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`
-  }
-
-  // Calculate duration from start and end times
-  const calculateDuration = (startTime, endTime) => {
-    if (!startTime || !endTime) return ''
-    const [startH, startM] = startTime.split(':').map(Number)
-    const [endH, endM] = endTime.split(':').map(Number)
-    let duration = endH * 60 + endM - (startH * 60 + startM)
-    if (duration < 0) duration += 24 * 60 // Handle overnight
-    return duration.toString()
-  }
+  useEffect(() => {
+    if (!editingId) {
+      setFormData(prev => ({
+        ...prev,
+        event_id: selectedEventId ? selectedEventId.toString() : '',
+        ...(selectedEventId ? {} : { start_time: '', end_time: '', duration: '' }),
+      }))
+    }
+  }, [selectedEventId, editingId])
 
   const handleInputChange = e => {
     const { name, value } = e.target
 
     if (name === 'start_time') {
       // If duration is set, recalculate end_time
-      const newEndTime = formData.duration ? calculateEndTime(value, formData.duration) : formData.end_time
+      const newEndTime = formData.duration
+        ? calculateEndTimeFromDuration(value, formData.duration)
+        : formData.end_time
       setFormData(prev => ({ ...prev, start_time: value, end_time: newEndTime }))
     } else if (name === 'end_time') {
       // Recalculate duration when end_time changes
-      const newDuration = formData.start_time ? calculateDuration(formData.start_time, value) : formData.duration
-      setFormData(prev => ({ ...prev, end_time: value, duration: newDuration }))
+      const durationMinutes = deriveDurationMinutes(formData.start_time, value)
+      setFormData(prev => ({
+        ...prev,
+        end_time: value,
+        duration: durationMinutes != null ? String(durationMinutes) : prev.duration,
+      }))
     } else if (name === 'duration') {
       // Recalculate end_time when duration changes
-      const newEndTime = formData.start_time ? calculateEndTime(formData.start_time, value) : formData.end_time
+      const newEndTime = formData.start_time
+        ? calculateEndTimeFromDuration(formData.start_time, value)
+        : formData.end_time
       setFormData(prev => ({ ...prev, duration: value, end_time: newEndTime }))
+    } else if (name === 'event_id') {
+      setFormData(prev => ({
+        ...prev,
+        event_id: value,
+        ...(value
+          ? {}
+          : {
+              venue_id: '',
+              start_time: '',
+              end_time: '',
+              duration: '',
+            }),
+      }))
     } else {
       setFormData(prev => ({ ...prev, [name]: value }))
     }
@@ -150,12 +169,14 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
         return
       }
 
+      const eventId = formData.event_id ? Number(formData.event_id) : null
+
       const result = await bandsApi.create({
-        eventId: selectedEventId || (formData.event_id ? Number(formData.event_id) : null),
+        eventId,
         venueId: formData.venue_id ? Number(formData.venue_id) : null,
         name: formData.name,
-        startTime: formData.start_time,
-        endTime: formData.end_time,
+        startTime: formData.start_time || null,
+        endTime: formData.end_time || null,
         url: formData.url,
       })
 
@@ -169,7 +190,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
         return
       }
 
-      showToast(selectedEventId ? 'Band added successfully!' : 'Band added!', 'success')
+      showToast(eventId ? 'Band added successfully!' : 'Band saved without an event.', 'success')
       resetForm()
       loadBands()
     } catch (err) {
@@ -200,11 +221,14 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
         return
       }
 
+      const eventId = formData.event_id ? Number(formData.event_id) : null
+
       const result = await bandsApi.update(editingId, {
+        eventId,
         venueId: formData.venue_id ? Number(formData.venue_id) : null,
         name: formData.name,
-        startTime: formData.start_time,
-        endTime: formData.end_time,
+        startTime: formData.start_time || null,
+        endTime: formData.end_time || null,
         url: formData.url,
       })
 
@@ -249,13 +273,14 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
 
   const startEdit = band => {
     setEditingId(band.id)
-    const duration = calculateDuration(band.start_time, band.end_time)
+    const durationMinutes = deriveDurationMinutes(band.start_time, band.end_time)
     setFormData({
       name: band.name,
-      venue_id: band.venue_id.toString(),
-      start_time: band.start_time,
-      end_time: band.end_time,
-      duration: duration,
+      event_id: band.event_id != null ? band.event_id.toString() : '',
+      venue_id: band.venue_id != null ? band.venue_id.toString() : '',
+      start_time: band.start_time || '',
+      end_time: band.end_time || '',
+      duration: durationMinutes != null ? String(durationMinutes) : '',
       url: band.url || '',
     })
     setShowAddForm(false)
@@ -339,64 +364,41 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     setPreviewData(null)
   }
 
-  /**
-   * Check for time conflicts at the same venue
-   * Returns array of conflicting band names
-   */
-  const getConflicts = band => {
-    // No conflicts if no venue assigned or missing time info
-    if (!band.venue_id || !band.start_time || !band.end_time) return []
-
-    const conflicts = []
-    const bandStart = band.start_time
-    const bandEnd = band.end_time
-
-    bands.forEach(other => {
-      // Skip self when editing or when displaying (same band)
-      if (other.id === band.id) return
-      // Skip different venues or bands without venues
-      if (!other.venue_id || other.venue_id !== band.venue_id) return
-
-      const otherStart = other.start_time
-      const otherEnd = other.end_time
-
-      // Check if times overlap
-      const overlaps =
-        (bandStart >= otherStart && bandStart < otherEnd) ||
-        (bandEnd > otherStart && bandEnd <= otherEnd) ||
-        (bandStart <= otherStart && bandEnd >= otherEnd)
-
-      if (overlaps) {
-        conflicts.push(other.name)
-      }
-    })
-
-    return conflicts
-  }
-
-  // Format time for display (HH:MM to h:MM AM/PM)
-  const formatTime = time => {
-    if (!time) return ''
-    const [hours, minutes] = time.split(':')
-    const h = parseInt(hours)
-    const ampm = h >= 12 ? 'PM' : 'AM'
-    const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
-    return `${displayHour}:${minutes} ${ampm}`
-  }
+  const getConflicts = useCallback(band => detectConflicts(band, bands), [bands])
 
   // Get venue name by ID
   const getVenueName = venueId => {
     if (!venueId) return 'No venue assigned'
-    const venue = venues.find(v => v.id === venueId)
+    const venue = venues.find(v => String(v.id) === String(venueId))
     return venue ? venue.name : 'Unknown Venue'
   }
 
+  const getDurationLabel = band => {
+    if (band?.duration != null && band.duration !== '') {
+      return `${band.duration} min`
+    }
+    return formatDurationLabel(band?.start_time, band?.end_time)
+  }
+
   // Sort bands by start time
-  const sortedBands = [...bands].sort((a, b) => {
-    if (a.start_time < b.start_time) return -1
-    if (a.start_time > b.start_time) return 1
-    return 0
-  })
+  const sortedBands = useMemo(() => sortBandsByStart(bands), [bands])
+
+  const formConflicts = useMemo(() => {
+    if (!formData.event_id || !formData.venue_id || !formData.start_time || !formData.end_time) {
+      return []
+    }
+
+    return detectConflicts(
+      {
+        id: editingId,
+        event_id: Number(formData.event_id),
+        venue_id: Number(formData.venue_id),
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+      },
+      bands
+    )
+  }, [bands, editingId, formData.end_time, formData.event_id, formData.start_time, formData.venue_id])
 
   if (!selectedEventId) {
     return (
@@ -451,9 +453,9 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       <tr key={band.id} className="hover:bg-band-navy/30 transition-colors">
                         <td className="px-4 py-3 text-white font-medium">{band.name}</td>
                         <td className="px-4 py-3 text-white/70">{getVenueName(band.venue_id)}</td>
-                        <td className="px-4 py-3 text-white/70">{formatTime(band.start_time)}</td>
-                        <td className="px-4 py-3 text-white/70">{formatTime(band.end_time)}</td>
-                        <td className="px-4 py-3 text-white/70">{band.duration} min</td>
+                        <td className="px-4 py-3 text-white/70">{formatTimeLabel(band.start_time)}</td>
+                        <td className="px-4 py-3 text-white/70">{formatTimeLabel(band.end_time)}</td>
+                        <td className="px-4 py-3 text-white/70">{getDurationLabel(band)}</td>
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-2">
                             <button
@@ -463,7 +465,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                               Edit
                             </button>
                             <button
-                              onClick={() => handleDelete(band.id)}
+                              onClick={() => handleDelete(band.id, band.name)}
                               className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
                             >
                               Delete
@@ -488,10 +490,8 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                         <p className="text-white/70 text-sm">{getVenueName(band.venue_id)}</p>
                       </div>
                       <div className="text-right text-sm text-white/70">
-                        <div>
-                          {formatTime(band.start_time)} - {formatTime(band.end_time)}
-                        </div>
-                        <div>{band.duration} min</div>
+                        <div>{formatTimeRangeLabel(band.start_time, band.end_time)}</div>
+                        <div>{getDurationLabel(band)}</div>
                       </div>
                     </div>
 
@@ -503,7 +503,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(band.id)}
+                        onClick={() => handleDelete(band.id, band.name)}
                         className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
                       >
                         Delete
@@ -523,231 +523,27 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
         {/* Add/Edit Form */}
         {(showAddForm || editingId) && (
           <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
-            <h3 className="text-lg font-bold text-band-orange mb-4">
-              {editingId ? 'Edit Performance' : 'Add Performance'}
-            </h3>
-            <p className="text-white/70 text-sm mb-4">
-              {selectedEventId
-                ? 'This band will be added to the selected event.'
-                : 'This band will be available to assign to events later.'}
-            </p>
+          <h3 className="text-lg font-bold text-band-orange mb-4">
+            {editingId ? 'Edit Band' : 'Add Band'}
+          </h3>
+          <p className="text-white/70 text-sm mb-4">
+            {selectedEventId
+              ? 'This band will be added to the selected event.'
+              : 'This band will be available to assign to events later.'}
+          </p>
 
-            <form onSubmit={editingId ? handleUpdate : handleAdd}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label htmlFor="band-name" className="block text-white mb-2 text-sm">
-                    Band Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                    required
-                    placeholder="The Rockers"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label htmlFor="band-url" className="block text-white mb-2 text-sm">
-                    Website/Social Media
-                  </label>
-                  <input
-                    type="url"
-                    name="url"
-                    value={formData.url}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                    placeholder="https://example.com"
-                  />
-                </div>
-
-                {/* Event Assignment Section - Only show when no event selected */}
-                {!selectedEventId && (
-                  <>
-                    <div className="sm:col-span-2">
-                      <label className="block text-white mb-2 text-sm font-semibold">Assign to Event (Optional)</label>
-                      <p className="text-white/70 text-xs mb-3">
-                        You can assign this band to an event now, or leave it unassigned and assign it later.
-                      </p>
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label htmlFor="band-event" className="block text-white mb-2 text-sm">
-                        Event
-                      </label>
-                      <select
-                        id="band-event"
-                        name="event_id"
-                        value={formData.event_id || ''}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                      >
-                        <option value="">No event assigned yet</option>
-                        {events.map(event => (
-                          <option key={event.id} value={event.id}>
-                            {event.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label htmlFor="band-venue" className="block text-white mb-2 text-sm">
-                        Venue
-                      </label>
-                      <select
-                        id="band-venue"
-                        name="venue_id"
-                        value={formData.venue_id || ''}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                      >
-                        <option value="">No venue assigned yet</option>
-                        {venues.map(venue => (
-                          <option key={venue.id} value={venue.id}>
-                            {venue.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Time fields - only show when event is selected */}
-                    {formData.event_id && (
-                      <>
-                        <div>
-                          <label htmlFor="band-start-time" className="block text-white mb-2 text-sm">
-                            Start Time
-                          </label>
-                          <input
-                            type="time"
-                            name="start_time"
-                            value={formData.start_time}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label htmlFor="band-end-time" className="block text-white mb-2 text-sm">
-                            End Time
-                          </label>
-                          <input
-                            type="time"
-                            name="end_time"
-                            value={formData.end_time}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label htmlFor="band-duration" className="block text-white mb-2 text-sm">
-                            Duration (minutes)
-                            <span className="text-gray-400 text-xs ml-2">or set end time above</span>
-                          </label>
-                          <input
-                            type="number"
-                            name="duration"
-                            value={formData.duration}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                            placeholder="45"
-                            min="1"
-                          />
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-
-                {/* When event is selected, show venue and times normally */}
-                {selectedEventId && (
-                  <>
-                    <div className="sm:col-span-2">
-                      <label htmlFor="band-venue" className="block text-white mb-2 text-sm">
-                        Venue
-                        <span className="text-gray-400 text-xs ml-2">(optional - assign later)</span>
-                      </label>
-                      <select
-                        id="band-venue"
-                        name="venue_id"
-                        value={formData.venue_id}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                      >
-                        <option value="">No venue assigned yet</option>
-                        {venues.map(venue => (
-                          <option key={venue.id} value={venue.id}>
-                            {venue.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label htmlFor="band-start-time" className="block text-white mb-2 text-sm">
-                        Start Time
-                      </label>
-                      <input
-                        type="time"
-                        name="start_time"
-                        value={formData.start_time}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor="band-end-time" className="block text-white mb-2 text-sm">
-                        End Time
-                      </label>
-                      <input
-                        type="time"
-                        name="end_time"
-                        value={formData.end_time}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor="band-duration" className="block text-white mb-2 text-sm">
-                        Duration (minutes)
-                        <span className="text-gray-400 text-xs ml-2">or set end time above</span>
-                      </label>
-                      <input
-                        type="number"
-                        name="duration"
-                        value={formData.duration}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                        placeholder="45"
-                        min="1"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="flex gap-2 mt-6">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors disabled:opacity-50"
-                >
-                  {submitting ? 'Saving...' : editingId ? 'Update Performance' : 'Add Performance'}
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+            <BandForm
+              events={events}
+              venues={venues}
+              formData={formData}
+              submitting={submitting}
+              mode={editingId ? 'edit' : 'create'}
+              showEventIntro
+              onChange={handleInputChange}
+              onSubmit={editingId ? handleUpdate : handleAdd}
+              onCancel={resetForm}
+              conflicts={formConflicts}
+            />
           </div>
         )}
       </div>
@@ -813,139 +609,17 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
         <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
           <h3 className="text-lg font-bold text-band-orange mb-4">{editingId ? 'Edit Band' : 'Add New Band'}</h3>
 
-          <form onSubmit={editingId ? handleUpdate : handleAdd}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div className="sm:col-span-2">
-                <label htmlFor="band-name" className="block text-white mb-2 text-sm">
-                  Band Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  required
-                  placeholder="The Rockers"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="band-venue" className="block text-white mb-2 text-sm">
-                  Venue
-                  <span className="text-gray-400 text-xs ml-2">(optional - assign later)</span>
-                </label>
-                <select
-                  id="band-venue"
-                  name="venue_id"
-                  value={formData.venue_id}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                >
-                  <option value="">No venue assigned yet</option>
-                  {venues.map(venue => (
-                    <option key={venue.id} value={venue.id}>
-                      {venue.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="band-start-time" className="block text-white mb-2 text-sm">
-                  Start Time *
-                </label>
-                <input
-                  type="time"
-                  name="start_time"
-                  value={formData.start_time}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="band-duration" className="block text-white mb-2 text-sm">
-                  Duration (minutes)
-                  <span className="text-gray-400 text-xs ml-2">or set end time below</span>
-                </label>
-                <input
-                  type="number"
-                  name="duration"
-                  value={formData.duration}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  placeholder="45"
-                  min="1"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="band-end-time" className="block text-white mb-2 text-sm">
-                  End Time *<span className="text-gray-400 text-xs ml-2">or set duration above</span>
-                </label>
-                <input
-                  type="time"
-                  name="end_time"
-                  value={formData.end_time}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="band-url" className="block text-white mb-2 text-sm">
-                  URL (optional)
-                </label>
-                <input
-                  type="url"
-                  name="url"
-                  value={formData.url}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  placeholder="https://example.com"
-                />
-              </div>
-            </div>
-
-            {/* Conflict Warning */}
-            {formData.venue_id &&
-              formData.start_time &&
-              formData.end_time &&
-              (() => {
-                const conflicts = getConflicts({
-                  id: editingId, // Pass the editing ID so it skips itself
-                  venue_id: Number(formData.venue_id),
-                  start_time: formData.start_time,
-                  end_time: formData.end_time,
-                })
-                return conflicts.length > 0 ? (
-                  <div className="bg-red-900/30 border border-red-600 rounded p-3 mb-4">
-                    <p className="text-red-200 text-sm font-semibold mb-1">Time Conflict Detected!</p>
-                    <p className="text-red-200 text-sm">This time overlaps with: {conflicts.join(', ')}</p>
-                  </div>
-                ) : null
-              })()}
-
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors"
-              >
-                {submitting ? 'Saving...' : editingId ? 'Update Performance' : 'Add Performance'}
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+          <BandForm
+            events={events}
+            venues={venues}
+            formData={formData}
+            submitting={submitting}
+            mode={editingId ? 'edit' : 'create'}
+            onChange={handleInputChange}
+            onSubmit={editingId ? handleUpdate : handleAdd}
+            onCancel={resetForm}
+            conflicts={formConflicts}
+          />
         </div>
       )}
 
@@ -1019,20 +693,13 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                           </div>
                         </td>
                         <td className="px-4 py-3 text-white/70">{getVenueName(band.venue_id)}</td>
-                        <td className="px-4 py-3 text-white/70">{formatTime(band.start_time)}</td>
-                        <td className="px-4 py-3 text-white/70">{formatTime(band.end_time)}</td>
+                        <td className="px-4 py-3 text-white/70">{formatTimeLabel(band.start_time)}</td>
+                        <td className="px-4 py-3 text-white/70">{formatTimeLabel(band.end_time)}</td>
                         <td className="px-4 py-3">
                           {hasConflict ? (
                             <span className="text-red-400 text-xs font-semibold">CONFLICT</span>
                           ) : (
-                            <span className="text-white/50 text-sm">
-                              {(() => {
-                                const [sh, sm] = band.start_time.split(':').map(Number)
-                                const [eh, em] = band.end_time.split(':').map(Number)
-                                const mins = eh * 60 + em - (sh * 60 + sm)
-                                return `${mins} min`
-                              })()}
-                            </span>
+                            <span className="text-white/50 text-sm">{getDurationLabel(band)}</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -1105,9 +772,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       </div>
                       <div>
                         <span className="text-white/50">Time: </span>
-                        <span className="text-white">
-                          {formatTime(band.start_time)} - {formatTime(band.end_time)}
-                        </span>
+                        <span className="text-white">{formatTimeRangeLabel(band.start_time, band.end_time)}</span>
                       </div>
                     </div>
 

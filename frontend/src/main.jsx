@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import App from './App.jsx'
 import EmbedPage from './pages/EmbedPage.jsx'
 import SubscribePage from './pages/SubscribePage.jsx'
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import { measurePageLoad } from './utils/performance'
 import './index.css'
 
@@ -52,6 +53,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/" element={<App />} />
         <Route path="/embed/:slug" element={<EmbedPage />} />
         <Route path="/subscribe" element={<SubscribePage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Admin panel: Lazy loaded */}
         <Route path="/admin/*" element={

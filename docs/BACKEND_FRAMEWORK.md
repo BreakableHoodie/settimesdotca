@@ -994,7 +994,7 @@ longweekendbandcrawl/
 │   ├── admin/               # Admin panel
 │   └── utils/               # API client
 ├── wrangler.toml            # Cloudflare config
-└── BACKEND_FRAMEWORK.md     # This file
+└── docs/BACKEND_FRAMEWORK.md     # This file
 ```
 
 ---
@@ -1068,6 +1068,6 @@ CREATE INDEX idx_rate_limit_ip ON rate_limit(ip_address);
 
 For questions or clarifications, refer to:
 
-- `D1_SETUP.md` - Database setup and admin panel usage
-- `CLAUDE.md` - Project overview and design guidance
+- `docs/D1_SETUP.md` - Database setup and admin panel usage
+- `docs/CLAUDE.md` - Project overview and design guidance
 - Cloudflare D1 Docs: <https://developers.cloudflare.com/d1/>

@@ -39,7 +39,7 @@ This project now includes a full-featured admin panel with Cloudflare D1 databas
 - Local: `http://localhost:5173/admin`
 - Production: `https://yourdomain.com/admin`
 
-**Setup:** See [D1_SETUP.md](D1_SETUP.md) for complete database setup, security configuration, and deployment instructions.
+**Setup:** See [docs/D1_SETUP.md](docs/D1_SETUP.md) for complete database setup, security configuration, and deployment instructions.
 
 ## Project Structure
 
@@ -73,7 +73,7 @@ longweekendbandcrawl/
 ├── setup.sh                        # Install dependencies
 ├── .gitignore
 ├── .dockerignore
-├── CLAUDE.md                       # Project instructions
+├── docs/CLAUDE.md                  # Project instructions
 └── README.md
 ```
 

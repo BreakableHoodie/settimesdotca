@@ -30,20 +30,20 @@ async function handleResponse(response) {
 
 // Auth API
 export const authApi = {
-  async signup(email, password, orgName) {
+  async signup(email, password, name) {
     const response = await fetch(`${API_BASE}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, orgName }),
+      body: JSON.stringify({ email, password, name, role: 'admin' }),
     })
     const data = await handleResponse(response)
 
-    // Store session token
+    // Store session token and user data
     if (data.sessionToken) {
       window.sessionStorage.setItem('sessionToken', data.sessionToken)
       window.sessionStorage.setItem('userEmail', data.user.email)
-      window.sessionStorage.setItem('orgId', data.user.orgId)
-      window.sessionStorage.setItem('orgName', data.user.orgName)
+      window.sessionStorage.setItem('userName', data.user.name || '')
+      window.sessionStorage.setItem('userRole', data.user.role)
     }
 
     return data
@@ -57,12 +57,12 @@ export const authApi = {
     })
     const data = await handleResponse(response)
 
-    // Store session token
+    // Store session token and user data
     if (data.sessionToken) {
       window.sessionStorage.setItem('sessionToken', data.sessionToken)
       window.sessionStorage.setItem('userEmail', data.user.email)
-      window.sessionStorage.setItem('orgId', data.user.orgId)
-      window.sessionStorage.setItem('orgName', data.user.orgName)
+      window.sessionStorage.setItem('userName', data.user.name || '')
+      window.sessionStorage.setItem('userRole', data.user.role)
     }
 
     return data
@@ -78,8 +78,8 @@ export const authApi = {
 
     return {
       email: window.sessionStorage.getItem('userEmail'),
-      orgId: parseInt(window.sessionStorage.getItem('orgId')),
-      orgName: window.sessionStorage.getItem('orgName')
+      name: window.sessionStorage.getItem('userName'),
+      role: window.sessionStorage.getItem('userRole')
     }
   }
 }

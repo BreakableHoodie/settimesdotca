@@ -83,7 +83,22 @@ export async function onRequestGet(context) {
       url: band.url || null,
     }));
 
-    return new Response(JSON.stringify(formattedBands), {
+    // Include event metadata for frontend display
+    const eventMetadata = {
+      id: event.id,
+      name: event.name,
+      date: event.date,
+      slug: event.slug,
+      ticket_url: event.ticket_url,
+      theme_colors: event.theme_colors,
+      venue_info: event.venue_info,
+      social_links: event.social_links
+    };
+
+    return new Response(JSON.stringify({
+      bands: formattedBands,
+      event: eventMetadata
+    }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

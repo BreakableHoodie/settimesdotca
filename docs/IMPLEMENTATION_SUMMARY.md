@@ -126,8 +126,8 @@ This ensures the app works even if D1 is not set up yet.
 **Files Created:**
 
 - `.env.example` - Environment variable template with security guidance
-- `D1_SETUP.md` - Complete setup guide (local + production)
-- `IMPLEMENTATION_SUMMARY.md` - This file
+- `docs/D1_SETUP.md` - Complete setup guide (local + production)
+- `docs/IMPLEMENTATION_SUMMARY.md` - This file
 
 **Modified Files:**
 
@@ -183,9 +183,9 @@ longweekendbandcrawl/
 ├── wrangler.toml                       # D1 bindings
 ├── .env.example                        # Environment variables template
 ├── .gitignore                          # Updated with .dev.vars
-├── D1_SETUP.md                         # Setup documentation
+├── docs/D1_SETUP.md                         # Setup documentation
 ├── README.md                           # Updated with admin info
-└── IMPLEMENTATION_SUMMARY.md           # This file
+└── docs/IMPLEMENTATION_SUMMARY.md           # This file
 ```
 
 ---

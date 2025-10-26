@@ -680,8 +680,8 @@ ALTER TABLE events ADD COLUMN org_id INTEGER REFERENCES organizations(id);
 
 - **Schema File:** `database/schema.sql`
 - **API Documentation:** `docs/api-spec.yaml`
-- **Backend Framework:** `BACKEND_FRAMEWORK.md`
-- **Implementation Roadmap:** `IMPLEMENTATION_ROADMAP.md`
+- **Backend Framework:** `docs/BACKEND_FRAMEWORK.md`
+- **Implementation Roadmap:** `docs/IMPLEMENTATION_ROADMAP.md`
 - **Cloudflare D1 Docs:** https://developers.cloudflare.com/d1/
 
 ---

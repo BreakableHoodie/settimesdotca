@@ -39,6 +39,7 @@ const HAS_FALLBACK = FALLBACK_BANDS.length > 0
 
 function App() {
   const [bands, setBands] = useState(FALLBACK_BANDS)
+  const [eventData, setEventData] = useState(null)
   const [selectedBands, setSelectedBands] = useState(() => {
     const saved = localStorage.getItem('selectedBands')
     return saved ? JSON.parse(saved) : []
@@ -68,10 +69,15 @@ function App() {
 
         if (apiRes.ok) {
           const data = await apiRes.json()
-          const validation = validateBandsData(data)
+          // API response can be { bands: [...], event: {...} } or just [...]
+          const bandsData = Array.isArray(data) ? data : data.bands
+          const eventInfo = data.event || null
+
+          const validation = validateBandsData(bandsData)
           if (validation.valid) {
             setError(null)
-            setBands(prepareBands(data))
+            setBands(prepareBands(bandsData))
+            setEventData(eventInfo)
             setLoading(false)
             return
           }
@@ -219,7 +225,7 @@ function App() {
           </div>
         }
       >
-        <VenueInfo />
+        <VenueInfo eventData={eventData} />
       </Suspense>
     </div>
   )

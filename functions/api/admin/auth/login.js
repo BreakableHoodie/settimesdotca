@@ -5,6 +5,7 @@
 
 import { verifyPassword } from '../../../utils/crypto.js'
 
+// Get client IP from request
 function getClientIP(request) {
   return (
     request.headers.get("CF-Connecting-IP") ||
@@ -13,120 +14,32 @@ function getClientIP(request) {
   );
 }
 
-async function checkRateLimit(DB, ipAddress) {
-  const record = await DB.prepare(
-    `
-    SELECT * FROM rate_limit WHERE ip_address = ?
-  `
-  )
-    .bind(ipAddress)
-    .first();
+// Rate limiting: check failed login attempts
+async function checkRateLimit(DB, email, ipAddress) {
+  const windowStart = new Date(Date.now() - 10 * 60000).toISOString(); // 10 min window
 
-  if (record && record.lockout_until) {
-    const lockoutUntil = new Date(record.lockout_until);
-    if (lockoutUntil > new Date()) {
-      const minutesRemaining = Math.ceil((lockoutUntil - new Date()) / 60000);
-      return { allowed: false, locked: true, minutesRemaining };
-    }
+  const attempts = await DB.prepare(
+    `SELECT COUNT(*) as count FROM auth_attempts
+     WHERE (email = ? OR ip_address = ?)
+     AND attempt_type = 'login'
+     AND success = 0
+     AND created_at > ?`
+  ).bind(email, ipAddress, windowStart).first();
+
+  if (attempts.count >= 5) {
+    return { allowed: false, remaining: Math.ceil((new Date(windowStart) - Date.now() + 10 * 60000) / 60000) };
   }
 
-  return { allowed: true, locked: false };
-}
-
-async function recordFailedAttempt(DB, ipAddress) {
-  const now = new Date().toISOString();
-  const LOCKOUT_THRESHOLD = 5;
-  const LOCKOUT_WINDOW_MINUTES = 10;
-  const LOCKOUT_DURATION_HOURS = 1;
-
-  let record = await DB.prepare(
-    `
-    SELECT * FROM rate_limit WHERE ip_address = ?
-  `
-  )
-    .bind(ipAddress)
-    .first();
-
-  if (!record) {
-    await DB.prepare(
-      `
-      INSERT INTO rate_limit (ip_address, failed_attempts, last_attempt)
-      VALUES (?, 1, ?)
-    `
-    )
-      .bind(ipAddress, now)
-      .run();
-    return 1;
-  }
-
-  const windowStart = new Date(
-    Date.now() - LOCKOUT_WINDOW_MINUTES * 60000
-  ).toISOString();
-  const lastAttempt = new Date(record.last_attempt);
-  const windowStartDate = new Date(windowStart);
-
-  let failedAttempts =
-    lastAttempt < windowStartDate ? 1 : record.failed_attempts + 1;
-  let lockoutUntil = null;
-
-  if (failedAttempts >= LOCKOUT_THRESHOLD) {
-    lockoutUntil = new Date(
-      Date.now() + LOCKOUT_DURATION_HOURS * 60 * 60000
-    ).toISOString();
-  }
-
-  await DB.prepare(
-    `
-    UPDATE rate_limit
-    SET failed_attempts = ?, lockout_until = ?, last_attempt = ?
-    WHERE ip_address = ?
-  `
-  )
-    .bind(failedAttempts, lockoutUntil, now, ipAddress)
-    .run();
-
-  return failedAttempts;
-}
-
-async function resetRateLimit(DB, ipAddress) {
-  await DB.prepare(
-    `
-    UPDATE rate_limit
-    SET failed_attempts = 0, lockout_until = NULL
-    WHERE ip_address = ?
-  `
-  )
-    .bind(ipAddress)
-    .run();
-}
-
-async function logAuthEvent(DB, ipAddress, action, success, details = null) {
-  await DB.prepare(
-    `
-    INSERT INTO auth_audit (ip_address, action, success, user_agent, details)
-    VALUES (?, ?, ?, ?, ?)
-  `
-  )
-    .bind(
-      ipAddress,
-      action,
-      success ? 1 : 0,
-      details?.userAgent || null,
-      details ? JSON.stringify(details) : null
-    )
-    .run();
+  return { allowed: true };
 }
 
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
   const ipAddress = getClientIP(request);
+  const userAgent = request.headers.get('User-Agent') || 'unknown';
 
   try {
-    // Rate limiting temporarily disabled (rate_limit table removed for single-org simplification)
-    // TODO: Re-implement rate limiting if needed for security
-
-    // Parse request body
     const body = await request.json().catch(() => ({}));
     const { email, password } = body;
 
@@ -143,14 +56,35 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Find user
+    // Check rate limit
+    const rateCheck = await checkRateLimit(DB, email, ipAddress);
+    if (!rateCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "Too many attempts",
+          message: `Too many failed login attempts. Please try again in ${rateCheck.remaining} minutes.`,
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Find user with all needed fields
     const user = await DB.prepare(`
-      SELECT id, email, password_hash, name, role, last_login
+      SELECT id, email, password_hash, name, role, is_active
       FROM users
       WHERE email = ?
     `).bind(email).first();
 
     if (!user) {
+      // Log failed attempt (user not found)
+      await DB.prepare(
+        `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
+         VALUES (?, ?, ?, 'login', 0, 'user_not_found')`
+      ).bind(email, ipAddress, userAgent).run();
+
       return new Response(
         JSON.stringify({
           error: "Authentication failed",
@@ -158,6 +92,26 @@ export async function onRequestPost(context) {
         }),
         {
           status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Check if account is active
+    if (user.is_active === 0) {
+      // Log failed attempt (account disabled)
+      await DB.prepare(
+        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+         VALUES (?, ?, ?, ?, 'login', 0, 'account_disabled')`
+      ).bind(user.id, email, ipAddress, userAgent).run();
+
+      return new Response(
+        JSON.stringify({
+          error: "Account disabled",
+          message: "Your account has been deactivated. Please contact an administrator.",
+        }),
+        {
+          status: 403,
           headers: { "Content-Type": "application/json" },
         }
       );
@@ -167,6 +121,12 @@ export async function onRequestPost(context) {
     const passwordValid = await verifyPassword(password, user.password_hash);
 
     if (!passwordValid) {
+      // Log failed attempt (invalid password)
+      await DB.prepare(
+        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+         VALUES (?, ?, ?, ?, 'login', 0, 'invalid_password')`
+      ).bind(user.id, email, ipAddress, userAgent).run();
+
       return new Response(
         JSON.stringify({
           error: "Authentication failed",
@@ -179,6 +139,10 @@ export async function onRequestPost(context) {
       );
     }
 
+    // Password valid - check if 2FA is required
+    // TODO: Implement 2FA check here when TOTP/WebAuthn/Email OTP are ready
+    // For now, proceed with session creation
+
     // Update last login
     await DB.prepare(
       'UPDATE users SET last_login = datetime(\'now\') WHERE id = ?'
@@ -186,6 +150,19 @@ export async function onRequestPost(context) {
 
     // Generate session token
     const sessionToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 30 * 60000).toISOString(); // 30 min default
+
+    // Create session
+    await DB.prepare(
+      `INSERT INTO sessions (id, user_id, ip_address, user_agent, expires_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(sessionToken, user.id, ipAddress, userAgent, expiresAt).run();
+
+    // Log successful login
+    await DB.prepare(
+      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
+       VALUES (?, ?, ?, ?, 'login', 1)`
+    ).bind(user.id, email, ipAddress, userAgent).run();
 
     return new Response(
       JSON.stringify({

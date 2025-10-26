@@ -740,9 +740,9 @@ Track these to measure backend maturity:
 
 ### Project Files
 
-- `BACKEND_FRAMEWORK.md` - Architecture and patterns
-- `D1_SETUP.md` - Database setup guide
-- `CLAUDE.md` - Project overview
+- `docs/BACKEND_FRAMEWORK.md` - Architecture and patterns
+- `docs/D1_SETUP.md` - Database setup guide
+- `docs/CLAUDE.md` - Project overview
 - `README.md` - User-facing documentation
 
 ### SuperClaude Framework
@@ -760,7 +760,7 @@ Track these to measure backend maturity:
 1. Run `/sc:load` to establish project context
 2. Run `/sc:docs api --format openapi` to document existing API
 3. Run `/sc:test generate` for critical endpoints (auth, schedule)
-4. Review `BACKEND_FRAMEWORK.md` for architecture understanding
+4. Review `docs/BACKEND_FRAMEWORK.md` for architecture understanding
 
 **Short-term (This Month):**
 
@@ -787,4 +787,4 @@ Track these to measure backend maturity:
 
 **End of Implementation Roadmap**
 
-For additional guidance, use SuperClaude commands or refer to `BACKEND_FRAMEWORK.md`.
+For additional guidance, use SuperClaude commands or refer to `docs/BACKEND_FRAMEWORK.md`.

@@ -56,7 +56,7 @@ I've successfully created all admin panel UI components for the Long Weekend Ban
 ### Documentation
 
 7. **README.md** (Component documentation)
-8. **ADMIN_INTEGRATION_EXAMPLE.md** (Integration guide)
+8. **docs/frontend/ADMIN_INTEGRATION_EXAMPLE.md** (Integration guide)
 
 ## Features Implemented
 
@@ -177,7 +177,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 Access at: `http://localhost:5173/`
 
-See `ADMIN_INTEGRATION_EXAMPLE.md` for complete details.
+See `docs/frontend/ADMIN_INTEGRATION_EXAMPLE.md` for complete details.
 
 ## File Structure
 

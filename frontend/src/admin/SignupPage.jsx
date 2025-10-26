@@ -8,7 +8,7 @@ export default function SignupPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    orgName: ''
+    name: ''
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -35,15 +35,10 @@ export default function SignupPage() {
       return
     }
 
-    if (!formData.orgName.trim()) {
-      setError('Organization name is required')
-      return
-    }
-
     setLoading(true)
 
     try {
-      await authApi.signup(formData.email, formData.password, formData.orgName)
+      await authApi.signup(formData.email, formData.password, formData.name)
       // Redirect to admin panel on success
       navigate('/admin')
     } catch (err) {
@@ -57,7 +52,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-band-navy flex items-center justify-center p-4">
       <div className="bg-band-purple rounded-lg shadow-lg p-8 max-w-md w-full">
         <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
-        <p className="text-gray-400 mb-6">Start managing your events</p>
+        <p className="text-gray-400 mb-6">Pink Lemonade Records - Waterloo Region</p>
 
         {error && (
           <div className="bg-red-900/30 border border-red-600 rounded p-3 mb-4">
@@ -66,21 +61,6 @@ export default function SignupPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-white mb-2 text-sm">
-              Organization Name *
-            </label>
-            <input
-              type="text"
-              name="orgName"
-              value={formData.orgName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-              placeholder="Pink Lemonade Records"
-              required
-            />
-          </div>
-
           <div>
             <label className="block text-white mb-2 text-sm">Email *</label>
             <input
@@ -118,6 +98,20 @@ export default function SignupPage() {
               onChange={handleChange}
               className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
               required
+            />
+          </div>
+
+          <div>
+            <label className="block text-white mb-2 text-sm">
+              Display Name (Optional)
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              placeholder="Your Name"
             />
           </div>
 

@@ -4,6 +4,9 @@ import EventsTab from './EventsTab'
 import VenuesTab from './VenuesTab'
 import BandsTab from './BandsTab'
 import EventWizard from './EventWizard'
+import BottomNav from './BottomNav'
+import ContextBanner from './components/ContextBanner'
+import Breadcrumbs from './components/Breadcrumbs'
 
 /**
  * AdminPanel - Main container for admin panel with tab navigation
@@ -29,11 +32,9 @@ export default function AdminPanel({ onLogout }) {
       const result = await eventsApi.getAll()
       setEvents(result.events || [])
 
-      // Auto-select first published event, or first event
-      if (result.events && result.events.length > 0) {
-        const publishedEvent = result.events.find(e => e.is_published)
-        setSelectedEventId(publishedEvent?.id || result.events[0].id)
-      }
+      // Default to global view (no event selected)
+      // User can optionally select an event from the dropdown
+      setSelectedEventId(null)
     } catch (err) {
       showToast('Failed to load events: ' + err.message, 'error')
     } finally {
@@ -45,6 +46,31 @@ export default function AdminPanel({ onLogout }) {
   useEffect(() => {
     loadEvents()
   }, [loadEvents])
+
+  // Listen for custom filter events from event detail view
+  useEffect(() => {
+    const handleFilterVenue = event => {
+      const { venueId } = event.detail
+      setActiveTab('venues')
+      // Store the venue ID to filter in VenuesTab
+      sessionStorage.setItem('filterVenueId', venueId.toString())
+    }
+
+    const handleFilterBand = event => {
+      const { bandName } = event.detail
+      setActiveTab('bands')
+      // Store the band name to filter in BandsTab
+      sessionStorage.setItem('filterBandName', bandName)
+    }
+
+    window.addEventListener('filterVenue', handleFilterVenue)
+    window.addEventListener('filterBand', handleFilterBand)
+
+    return () => {
+      window.removeEventListener('filterVenue', handleFilterVenue)
+      window.removeEventListener('filterBand', handleFilterBand)
+    }
+  }, [])
 
   /**
    * Show toast notification
@@ -77,7 +103,7 @@ export default function AdminPanel({ onLogout }) {
   const tabs = [
     { id: 'events', label: 'Events' },
     { id: 'venues', label: 'Venues' },
-    { id: 'bands', label: 'Performances' },
+    { id: 'bands', label: 'Performers' },
   ]
 
   return (
@@ -93,20 +119,33 @@ export default function AdminPanel({ onLogout }) {
               {events.length > 0 && (
                 <div className="flex items-center gap-2">
                   <label htmlFor="event-selector" className="text-white/70 text-sm">
-                    Event:
+                    Filter:
                   </label>
                   <select
                     id="event-selector"
                     value={selectedEventId || ''}
-                    onChange={e => setSelectedEventId(Number(e.target.value))}
+                    onChange={e => {
+                      const value = e.target.value
+                      setSelectedEventId(value ? Number(value) : null)
+                    }}
                     className="px-3 py-1.5 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
                   >
+                    <option value="">All Venues/Bands (Global View)</option>
                     {events.map(event => (
                       <option key={event.id} value={event.id}>
                         {event.name} {event.is_published ? '(Published)' : '(Draft)'}
                       </option>
                     ))}
                   </select>
+                  {selectedEventId && (
+                    <button
+                      onClick={() => setSelectedEventId(null)}
+                      className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors min-h-[44px] flex items-center justify-center whitespace-nowrap"
+                      title="Clear event filter"
+                    >
+                      Clear Filter
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -114,14 +153,14 @@ export default function AdminPanel({ onLogout }) {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowWizard(true)}
-                className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-sm sm:text-base"
+                className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-base sm:text-lg font-medium min-h-[48px] flex items-center justify-center"
               >
                 Create Event
               </button>
 
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm sm:text-base"
+                className="px-6 py-3 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-base font-medium min-h-[44px] flex items-center justify-center"
               >
                 Logout
               </button>
@@ -138,7 +177,7 @@ export default function AdminPanel({ onLogout }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap ${
+                className={`px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap min-h-[48px] flex items-center ${
                   activeTab === tab.id
                     ? 'text-band-orange border-b-2 border-band-orange'
                     : 'text-white/70 hover:text-white hover:bg-band-navy/30'
@@ -152,14 +191,34 @@ export default function AdminPanel({ onLogout }) {
       </div>
 
       {/* Tab Content */}
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 pb-24 md:pb-6">
+        {/* Context Banner - Shows when event is selected */}
+        <ContextBanner event={selectedEvent} onClear={() => setSelectedEventId(null)} />
+
+        {/* Breadcrumbs - Navigation hierarchy */}
+        <Breadcrumbs
+          selectedEvent={selectedEvent}
+          onClearEvent={() => setSelectedEventId(null)}
+          activeTab={activeTab}
+          tabs={tabs}
+        />
+
         {loading ? (
           <div className="text-center py-12">
             <div className="text-band-orange text-lg">Loading...</div>
           </div>
         ) : (
           <>
-            {activeTab === 'events' && <EventsTab events={events} onEventsChange={loadEvents} showToast={showToast} />}
+            {activeTab === 'events' && (
+              <EventsTab 
+                events={events} 
+                onEventsChange={loadEvents} 
+                showToast={showToast}
+                selectedEventId={selectedEventId}
+                selectedEvent={selectedEvent}
+                onEventFilterChange={setSelectedEventId}
+              />
+            )}
 
             {activeTab === 'venues' && <VenuesTab showToast={showToast} />}
 
@@ -169,6 +228,7 @@ export default function AdminPanel({ onLogout }) {
                 selectedEvent={selectedEvent}
                 events={events}
                 showToast={showToast}
+                onEventFilterChange={setSelectedEventId}
               />
             )}
           </>
@@ -186,7 +246,7 @@ export default function AdminPanel({ onLogout }) {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+        <div className="fixed bottom-4 md:bottom-4 right-4 z-50 animate-slide-up" style={{ bottom: '90px' }}>
           <div
             className={`px-6 py-3 rounded-lg shadow-xl max-w-md ${
               toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
@@ -199,6 +259,9 @@ export default function AdminPanel({ onLogout }) {
           </div>
         </div>
       )}
+
+      {/* Bottom Navigation (Mobile Only) */}
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   )
 }

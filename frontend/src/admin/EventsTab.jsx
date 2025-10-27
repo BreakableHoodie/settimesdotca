@@ -546,6 +546,21 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                   {/* Overall Event Total */}
                   {(() => {
                     // Calculate event span (earliest start to latest end)
+                    // First pass: Detect if we have midnight-crossing event
+                    let hasEveningShows = false
+                    let hasEarlyMorningShows = false
+
+                    eventBands.forEach(band => {
+                      if (band.start_time) {
+                        const [h] = band.start_time.split(':').map(Number)
+                        if (h >= 18) hasEveningShows = true
+                        if (h < 6) hasEarlyMorningShows = true
+                      }
+                    })
+
+                    const isMidnightCrossing = hasEveningShows && hasEarlyMorningShows
+
+                    // Second pass: Calculate span with midnight adjustment if needed
                     let earliestStart = null
                     let latestEnd = null
 
@@ -556,25 +571,29 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                         const startMinutes = startH * 60 + startM
                         const endMinutes = endH * 60 + endM
 
-                        // Handle midnight crossover for both start and end times
-                        // If start time is early morning (00:00-05:59), treat as next day
+                        // Only adjust early morning times if we detected midnight crossing
                         let adjustedStart = startMinutes
-                        if (startH >= 0 && startH < 6) {
-                          adjustedStart = startMinutes + 24 * 60
-                        }
-
-                        // If end is before start or also early morning, it crosses midnight
                         let adjustedEnd = endMinutes
-                        if (endMinutes < startMinutes || (endH >= 0 && endH < 6)) {
+
+                        if (isMidnightCrossing) {
+                          // Adjust early morning times (00:00-05:59) to next day
+                          if (startH < 6) {
+                            adjustedStart = startMinutes + 24 * 60
+                          }
+                          if (endH < 6) {
+                            adjustedEnd = endMinutes + 24 * 60
+                          }
+                        } else if (endMinutes < startMinutes) {
+                          // Single performance crosses midnight
                           adjustedEnd = endMinutes + 24 * 60
                         }
 
-                        // Track earliest start with adjusted times
+                        // Track earliest start
                         if (earliestStart === null || adjustedStart < earliestStart) {
                           earliestStart = adjustedStart
                         }
 
-                        // Track latest end with adjusted times
+                        // Track latest end
                         if (latestEnd === null || adjustedEnd > latestEnd) {
                           latestEnd = adjustedEnd
                         }

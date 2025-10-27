@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react'
 import { eventsApi } from '../utils/adminApi'
 import EmbedCodeGenerator from './EmbedCodeGenerator'
 import MetricsDashboard from './MetricsDashboard'
+import ArchivedEventBanner from './components/ArchivedEventBanner'
+import {
+  getEventState,
+  isEventArchived,
+  confirmArchivedEventEdit,
+  confirmArchivedEventDelete
+} from '../utils/eventLifecycle'
 
 /**
  * EventsTab - Manage events (create, duplicate, publish/unpublish)
@@ -144,6 +151,16 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
   }
 
   const startEdit = event => {
+    // Check if event is archived
+    if (isEventArchived(event.date)) {
+      // Show two-confirmation gate
+      if (!confirmArchivedEventEdit(event)) {
+        showToast('Edit cancelled. Use "Copy as Template" to create a new event instead.', 'error')
+        return
+      }
+      showToast(`Editing archived event "${event.name}". Changes will be logged.`, 'success')
+    }
+
     setEditingEventId(event.id)
     setFormData({
       name: event.name,
@@ -224,14 +241,26 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
     }
   }
 
-  const handleDelete = async (eventId, eventName, bandCount) => {
-    const confirmMessage =
-      bandCount > 0
-        ? `Are you sure you want to delete "${eventName}"? This will remove the event but keep all ${bandCount} band(s) (they will become unassigned and can be moved to other events). This action cannot be undone.`
-        : `Are you sure you want to delete "${eventName}"? This action cannot be undone.`
+  const handleDelete = async (event) => {
+    const { id: eventId, name: eventName, date: eventDate, band_count: bandCount } = event
 
-    if (!window.confirm(confirmMessage)) {
-      return
+    // Check if event is archived
+    if (isEventArchived(eventDate)) {
+      // Use special confirmation for archived events
+      if (!confirmArchivedEventDelete(event)) {
+        showToast('Delete cancelled for archived event.', 'error')
+        return
+      }
+    } else {
+      // Regular confirmation for non-archived events
+      const confirmMessage =
+        bandCount > 0
+          ? `Are you sure you want to delete "${eventName}"? This will remove the event but keep all ${bandCount} band(s) (they will become unassigned and can be moved to other events). This action cannot be undone.`
+          : `Are you sure you want to delete "${eventName}"? This action cannot be undone.`
+
+      if (!window.confirm(confirmMessage)) {
+        return
+      }
     }
 
     try {
@@ -279,8 +308,24 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
 
   // If event is selected, show event detail view
   if (selectedEvent && selectedEventId) {
+    const eventState = getEventState(selectedEvent.date)
+
     return (
       <div className="space-y-6">
+        {/* Archived Event Warning Banner */}
+        <ArchivedEventBanner
+          event={selectedEvent}
+          state={eventState}
+          onCopyAsTemplate={event => {
+            // Copy event as template (start duplicate with new date)
+            startDuplicate(event)
+            showToast(
+              'Event copied as template. Update the name, date, and slug for your new event.',
+              'success'
+            )
+          }}
+        />
+
         {/* Event Details Card */}
         <div className="bg-band-purple rounded-lg border border-band-orange/20 p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -891,7 +936,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                             Duplicate
                           </button>
                           <button
-                            onClick={() => handleDelete(event.id, event.name, event.band_count || 0)}
+                            onClick={() => handleDelete(event)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
                           >
                             Delete
@@ -967,7 +1012,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                       Duplicate
                     </button>
                     <button
-                      onClick={() => handleDelete(event.id, event.name, event.band_count || 0)}
+                      onClick={() => handleDelete(event)}
                       className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
                     >
                       Delete

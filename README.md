@@ -22,17 +22,46 @@ A mobile-first web app for managing concert events and performances. Build perso
 
 ## Admin Panel
 
-This project now includes a full-featured admin panel with Cloudflare D1 database integration for managing events, venues, and bands.
+This project includes a full-featured admin panel with Cloudflare D1 database integration for managing events, venues, and bands.
 
-**Features:**
+### ✅ Current Features
 
+**Core Admin:**
 - Password-protected admin interface at `/admin`
-- Manage multiple events (create, duplicate, publish/unpublish)
-- CRUD operations for venues and bands
+- Multi-event management (create, publish/unpublish, manage multiple concurrent events)
+- CRUD operations for Events, Venues, and Bands/Performances
 - Time conflict detection for overlapping performances
+- Bulk operations (move venue, change time, delete multiple)
+- Visual checkbox multi-select with conflict preview
 - Rate limiting and audit logging for security
 - Master password recovery system
-- Mobile-responsive design
+- Mobile-responsive design (basic)
+
+**Sprint 3 - Discovery Features (Complete):**
+- ✅ Email subscription system with city/genre filtering
+- ✅ Public events API (`/api/events/public`) - no authentication required
+- ✅ iCal feed generation (`/api/feeds/ical`) - calendar sync
+- ✅ Comprehensive test coverage (35 tests, 90%+ coverage)
+
+### 🚧 Upcoming Features
+
+**Priority 1: Mobile Optimization + Documentation** (In Progress)
+- Touch-friendly UI with WCAG-compliant touch targets (≥44px)
+- Bottom navigation for thumb-friendly mobile access
+- Swipe gestures for common actions
+- Mobile-optimized forms and keyboards
+- Comprehensive user guide for non-technical organizers
+- In-app help system with contextual tooltips
+- **Target:** 1 week implementation
+- **Specification:** `docs/CURSOR_TASK_MOBILE_OPTIMIZATION.md`
+
+**Priority 2: Lightweight Band Profile Images**
+- Small profile photos for bands (128x128px thumbnails)
+- Cloudflare R2 storage (FREE at current scale)
+- WebP format with lazy loading
+- Optional display toggle
+- No performance impact
+- **Target:** 4-6 hours implementation
 
 **Quick Access:**
 

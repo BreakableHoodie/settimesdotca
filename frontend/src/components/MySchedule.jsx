@@ -19,7 +19,7 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx'
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
@@ -28,7 +28,6 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
   const [currentTime, setCurrentTime] = useState(new Date())
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false)
-  const dreReminderPlacedRef = useRef(false)
 
   // Update current time every minute
   useEffect(() => {
@@ -132,6 +131,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       })
 
   const hiddenFinishedCount = sortedBands.length - visibleBands.length
+
+  // Find first highlighted band ID (only show reminder for the first one)
+  const firstHighlightedBandId = useMemo(() => {
+    return visibleBands.find(band => highlightedBandIds.has(band.id))?.id || null
+  }, [visibleBands, highlightedBandIds])
 
   // Detect overlaps and conflicts
   const conflicts = []
@@ -301,11 +305,6 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     }
   }
 
-  // Reset reminder flag when visible bands change
-  useEffect(() => {
-    dreReminderPlacedRef.current = false
-  }, [visibleBands])
-
   return (
     <div className="py-6 space-y-6 sm:space-y-8">
       <div className="max-w-5xl mx-auto space-y-4">
@@ -429,10 +428,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           const hasConflict = conflicts.some(c => c.band1 === band.id || c.band2 === band.id)
           const hasOverlap = overlaps.some(c => c.band1 === band.id || c.band2 === band.id)
           const travelWarning = travelWarnings[band.id]
-          const showDreReminder = !dreReminderPlacedRef.current && highlightedBandIds.has(band.id)
-          if (showDreReminder) {
-            dreReminderPlacedRef.current = true
-          }
+          const showDreReminder = band.id === firstHighlightedBandId
 
           // Calculate gap from previous band
           let timeGap = null

@@ -41,8 +41,15 @@ export async function onRequestPost(context) {
       })
     }
 
-    // Role validation (default to 'editor', only 'admin' or 'editor' allowed)
-    const userRole = role === 'admin' ? 'admin' : 'editor'
+    // SECURITY: All signups default to 'editor' role only
+    // Admin accounts must be created via database migration or by existing admins
+    // Prevents privilege escalation via unauthenticated signup
+    const userRole = 'editor'
+
+    // Ignore any role parameter passed by client to prevent privilege escalation
+    if (role === 'admin') {
+      console.warn(`Signup attempt with admin role blocked for email: ${email}`)
+    }
 
     // Check if user already exists
     const existingUser = await DB.prepare(

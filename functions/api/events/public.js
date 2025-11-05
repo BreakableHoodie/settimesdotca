@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
       FROM events e
       LEFT JOIN bands b ON b.event_id = e.id
       LEFT JOIN venues v ON v.id IN (SELECT DISTINCT venue_id FROM bands WHERE event_id = e.id)
-      WHERE e.published = 1
+      WHERE e.is_published = 1
     `
 
     const params = []

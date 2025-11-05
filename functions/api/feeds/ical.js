@@ -30,7 +30,7 @@ export async function onRequestGet(context) {
       FROM events e
       LEFT JOIN bands b ON b.event_id = e.id
       LEFT JOIN venues v ON v.id = b.venue_id
-      WHERE e.published = 1
+      WHERE e.is_published = 1
       AND e.date >= date('now')
     `
 

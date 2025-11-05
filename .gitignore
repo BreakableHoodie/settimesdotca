@@ -12,6 +12,7 @@ yarn-error.log*
 .env
 .env.local
 .env.production
+.dev.vars
 
 # IDE
 .vscode/
@@ -29,3 +30,13 @@ psi_report*.json
 
 # Docker
 .dockerignore
+
+# Cloudflare Wrangler
+.wrangler/
+
+# Claude AI
+.claude/
+
+# Temporary files
+*.tmp
+*.temp

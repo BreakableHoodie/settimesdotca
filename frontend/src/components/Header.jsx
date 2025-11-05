@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faFacebook, faInstagram } from '@fortawesome/free-brands-svg-icons'
 import { faTicket } from '@fortawesome/free-solid-svg-icons'
-import { faInstagram, faFacebook } from '@fortawesome/free-brands-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { useEffect, useState } from 'react'
+import TimeFilter from './TimeFilter'
 
-function Header({ view, setView }) {
+function Header({ view, setView, timeFilter, onTimeFilterChange }) {
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -35,7 +36,7 @@ function Header({ view, setView }) {
                 : 'text-2xl md:text-3xl text-center'
             }`}
           >
-            LONG WEEKEND BAND CRAWL
+            CONCERT MANAGER
           </h1>
 
           <a
@@ -57,7 +58,7 @@ function Header({ view, setView }) {
             scrolled ? 'opacity-0 -translate-y-2 pointer-events-none' : 'opacity-100 translate-y-0 text-center'
           }`}
         >
-          Sunday October 12th 2025 · Mobile Schedule
+          Event Schedule Builder · Performance Management
         </p>
         <div
           className={`flex justify-center items-center gap-6 sm:gap-8 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
@@ -87,34 +88,42 @@ function Header({ view, setView }) {
         </div>
 
         <div
-          className={`flex justify-center gap-2 ${
+          className={`flex flex-col sm:flex-row justify-center items-center gap-3 ${
             scrolled ? 'mt-1' : 'mt-3'
           } transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}
         >
-          <button
-            onClick={() => setView('all')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ffbe57] ${
-              view === 'all'
-                ? 'bg-[#ffbe57] text-band-navy shadow-lg'
-                : 'bg-band-purple/50 text-white hover:bg-band-purple'
-            }`}
-            title="View all bands"
-            aria-pressed={view === 'all'}
-          >
-            All Bands
-          </button>
-          <button
-            onClick={() => setView('mine')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ffbe57] ${
-              view === 'mine'
-                ? 'bg-[#ffbe57] text-band-navy shadow-lg'
-                : 'bg-band-purple/50 text-white hover:bg-band-purple'
-            }`}
-            title="View my schedule"
-            aria-pressed={view === 'mine'}
-          >
-            My Schedule
-          </button>
+          {/* Time Filter - only show when viewing all performances */}
+          {view === 'all' && (
+            <TimeFilter selectedFilter={timeFilter} onFilterChange={onTimeFilterChange} className="w-full sm:w-auto" />
+          )}
+
+          {/* View Toggle Buttons */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setView('all')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ffbe57] ${
+                view === 'all'
+                  ? 'bg-[#ffbe57] text-band-navy shadow-lg'
+                  : 'bg-band-purple/50 text-white hover:bg-band-purple'
+              }`}
+              title="View all performances"
+              aria-pressed={view === 'all'}
+            >
+              All Performances
+            </button>
+            <button
+              onClick={() => setView('mine')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ffbe57] ${
+                view === 'mine'
+                  ? 'bg-[#ffbe57] text-band-navy shadow-lg'
+                  : 'bg-band-purple/50 text-white hover:bg-band-purple'
+              }`}
+              title="View my schedule"
+              aria-pressed={view === 'mine'}
+            >
+              My Schedule
+            </button>
+          </div>
         </div>
       </div>
     </header>

@@ -1,6 +1,7 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { formatTime } from '../utils/timeFormat'
+import { getTimeDescription, isHappeningNow } from '../utils/timeFilter'
 
 function BandCard({ band, isSelected, onToggle, showVenue = true, clickable = true, onRemove }) {
   const handleToggle = () => {
@@ -67,8 +68,12 @@ function BandCard({ band, isSelected, onToggle, showVenue = true, clickable = tr
             <h3 className="font-mono font-bold text-white text-base md:text-lg leading-snug">{band.name}</h3>
           )}
         </div>
-        <p className="text-sm md:text-base font-mono font-semibold leading-snug">
-          {formatTime(band.startTime)} - {formatTime(band.endTime)}
+        <p
+          className={`text-sm md:text-base font-mono font-semibold leading-snug ${
+            isHappeningNow(band) ? 'text-yellow-200 animate-pulse' : ''
+          }`}
+        >
+          {getTimeDescription(band)}
         </p>
         {showVenue && <p className="text-sm opacity-80 font-medium leading-snug">{band.venue}</p>}
       </div>

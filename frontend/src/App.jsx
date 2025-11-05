@@ -1,11 +1,12 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
-import Header from './components/Header'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import bandsFallbackRaw from '../public/bands.json?raw'
 import ComingUp from './components/ComingUp'
+import Header from './components/Header'
+import OfflineIndicator from './components/OfflineIndicator'
 import ScheduleView from './components/ScheduleView'
 import { validateBandsData } from './utils/validation'
-import bandsFallbackRaw from '../public/bands.json?raw'
 
 const MySchedule = lazy(() => import('./components/MySchedule'))
 const VenueInfo = lazy(() => import('./components/VenueInfo'))
@@ -38,6 +39,7 @@ const HAS_FALLBACK = FALLBACK_BANDS.length > 0
 
 function App() {
   const [bands, setBands] = useState(FALLBACK_BANDS)
+  const [eventData, setEventData] = useState(null)
   const [selectedBands, setSelectedBands] = useState(() => {
     const saved = localStorage.getItem('selectedBands')
     return saved ? JSON.parse(saved) : []
@@ -48,6 +50,7 @@ function App() {
     const hasBands = saved && JSON.parse(saved).length > 0
     return hasBands ? 'mine' : 'all'
   })
+  const [timeFilter, setTimeFilter] = useState('all')
   const [loading, setLoading] = useState(!HAS_FALLBACK)
   const [error, setError] = useState(null)
   const [showPast, setShowPast] = useState(false)
@@ -56,27 +59,49 @@ function App() {
   useEffect(() => {
     const controller = new AbortController()
 
-    // Load bands data with cache-busting version and timestamp
-    fetch(`/bands.json?v=${DATA_VERSION}`, {
-      signal: controller.signal,
-    })
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`Failed to load schedule (HTTP ${res.status})`)
+    // Try loading from API first, then fallback to static file
+    const loadData = async () => {
+      try {
+        // Try API endpoint first
+        const apiRes = await fetch('/api/schedule?event=current', {
+          signal: controller.signal,
+        })
+
+        if (apiRes.ok) {
+          const data = await apiRes.json()
+          // API response can be { bands: [...], event: {...} } or just [...]
+          const bandsData = Array.isArray(data) ? data : data.bands
+          const eventInfo = data.event || null
+
+          const validation = validateBandsData(bandsData)
+          if (validation.valid) {
+            setError(null)
+            setBands(prepareBands(bandsData))
+            setEventData(eventInfo)
+            setLoading(false)
+            return
+          }
         }
-        return res.json()
-      })
-      .then(data => {
-        // Validate schedule data
+
+        // API failed or returned invalid data, try static file
+        const staticRes = await fetch(`/bands.json?v=${DATA_VERSION}`, {
+          signal: controller.signal,
+        })
+
+        if (!staticRes.ok) {
+          throw new Error(`Failed to load schedule (HTTP ${staticRes.status})`)
+        }
+
+        const data = await staticRes.json()
         const validation = validateBandsData(data)
         if (!validation.valid) {
           throw new Error(validation.error)
         }
+
         setError(null)
         setBands(prepareBands(data))
         setLoading(false)
-      })
-      .catch(err => {
+      } catch (err) {
         if (controller.signal.aborted) {
           return
         }
@@ -85,7 +110,10 @@ function App() {
           setError(err.message || 'Failed to load schedule. Please try refreshing the page.')
         }
         setLoading(false)
-      })
+      }
+    }
+
+    loadData()
     return () => controller.abort()
   }, [])
 
@@ -152,7 +180,8 @@ function App() {
 
   return (
     <div className="min-h-screen pb-20">
-      <Header view={view} setView={setView} />
+      <OfflineIndicator />
+      <Header view={view} setView={setView} timeFilter={timeFilter} onTimeFilterChange={setTimeFilter} />
       <ComingUp bands={myBands} />
       <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
         {view === 'all' ? (
@@ -164,6 +193,7 @@ function App() {
             currentTime={currentTime}
             showPast={showPast}
             onToggleShowPast={toggleShowPast}
+            timeFilter={timeFilter}
           />
         ) : (
           <Suspense
@@ -190,7 +220,7 @@ function App() {
           </div>
         }
       >
-        <VenueInfo />
+        <VenueInfo eventData={eventData} />
       </Suspense>
     </div>
   )

@@ -75,6 +75,7 @@ Proxy status: Proxied (orange cloud)
 
 - This is a single-page app - Cloudflare Pages should handle this automatically with Vite
 - If issues persist, create `frontend/public/_redirects` file:
+
   ```
   /*    /index.html   200
   ```
@@ -95,7 +96,7 @@ npm run build
 npm run preview
 ```
 
-This will serve the production build locally on http://localhost:4173 for testing.
+This will serve the production build locally on <http://localhost:4173> for testing.
 
 ### Post-Deployment Checklist
 
@@ -120,5 +121,5 @@ To update the band schedule after deployment:
 ---
 
 **Event Date:** October 12, 2025
-**Deployment Domain:** https://lwbc.dredre.net
+**Deployment Domain:** <https://lwbc.dredre.net>
 **Repository:** BreakableHoodie/longweekend-bandcrawl

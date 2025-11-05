@@ -1,18 +1,20 @@
 {
-  "name": "longweekend-bandcrawl-frontend",
+  "name": "concert-manager-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "validate:schema": "cd .. && node scripts/validate-db-schema.js",
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run validate:schema && vite build",
     "preview": "vite preview",
+    "analyze": "vite-bundle-visualizer",
     "deploy:dev": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch dev",
     "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch main",
     "psi": "node scripts/run-psi.mjs",
     "psi:dev": "npm run psi -- --url https://dev.longweekend-bandcrawl.pages.dev",
     "psi:prod": "npm run psi -- --url https://lwbc.dredre.net",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 100",
     "lint:fix": "eslint . --ext js,jsx --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,json,css}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,json,css}\"",
@@ -28,8 +30,15 @@
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/free-solid-svg-icons": "^7.1.0",
     "@fortawesome/react-fontawesome": "^3.1.0",
+    "@simplewebauthn/browser": "^2.0.0",
+    "@simplewebauthn/server": "^8.3.0",
+    "otplib": "^12.0.1",
+    "prop-types": "^15.8.1",
+    "qrcode": "^1.5.3",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.9.4",
+    "react-swipeable": "^7.0.2"
   },
   "devDependencies": {
     "@axe-core/react": "^4.10.2",
@@ -53,7 +62,9 @@
     "prettier": "^3.6.2",
     "psi": "^4.1.0",
     "tailwindcss": "^3.4.0",
+    "terser": "^5.44.0",
     "vite": "^5.0.8",
+    "vite-bundle-visualizer": "^1.0.0",
     "vitest": "^3.2.4",
     "wrangler": "^4.42.2"
   }

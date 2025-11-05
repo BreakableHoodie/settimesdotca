@@ -1,0 +1,54 @@
+# Cloudflare Pages Configuration for Long Weekend Band Crawl
+#
+# This configuration is used for:
+# - Local development with Wrangler
+# - D1 database bindings
+# - Environment variables (secrets set via Cloudflare dashboard)
+
+name = "longweekend-bandcrawl"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "frontend/dist"
+
+# D1 Database Binding
+#
+# The database will be available in Pages Functions as `env.DB`
+#
+# Setup instructions:
+# 1. Create the database: wrangler d1 create bandcrawl-db
+# 2. Note the database_id from the output
+# 3. Update the database_id below
+# 4. Initialize schema: wrangler d1 execute bandcrawl-db --file=database/schema.sql
+# 5. Add sample data: wrangler d1 execute bandcrawl-db --file=database/seed.sql
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bandcrawl-db"
+database_id = "6a1fca7d-22e2-4384-8277-5aecd0c97f2f"
+
+# For local development, Wrangler will create a local SQLite database
+# Local DB path: .wrangler/state/v3/d1/miniflare-D1DatabaseObject/
+
+# Environment Variables
+#
+# These should be set in Cloudflare Pages dashboard under Settings > Environment Variables
+#
+# Required variables:
+# - ADMIN_PASSWORD: Regular password for organizers (16+ characters)
+# - MASTER_PASSWORD: Recovery password (different from ADMIN_PASSWORD, 20+ characters)
+# - DEVELOPER_CONTACT: Phone number shown on forgot password screen
+#
+# For local development, create a .dev.vars file (NOT committed to git):
+#
+# ADMIN_PASSWORD=your-strong-admin-password-here
+# MASTER_PASSWORD=your-even-stronger-master-password-here
+# DEVELOPER_CONTACT=555-123-4567
+
+# Build configuration
+[build]
+command = "cd frontend && npm install && npm run build"
+
+# Custom routes (optional - Pages handles this automatically)
+# Uncomment if you need custom routing behavior
+# [[routes]]
+# pattern = "/api/*"
+# custom_domain = false

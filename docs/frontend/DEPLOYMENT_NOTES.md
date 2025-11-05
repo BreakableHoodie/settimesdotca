@@ -7,6 +7,7 @@ The service worker uses versioned cache names to ensure users get fresh content 
 **Before each deployment:**
 
 1. Update the cache version in `public/sw.js`:
+
    ```javascript
    const CACHE_NAME = 'bandcrawl-vX' // Increment X
    ```

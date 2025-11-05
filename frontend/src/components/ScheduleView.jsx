@@ -1,10 +1,20 @@
-import { useState } from 'react'
+import { faCheck, faCopy } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCopy, faCheck } from '@fortawesome/free-solid-svg-icons'
-import BandCard from './BandCard'
+import { useState } from 'react'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
+import { filterPerformancesByTime } from '../utils/timeFilter'
+import BandCard from './BandCard'
 
-function ScheduleView({ bands, selectedBands, onToggleBand, onSelectAll, currentTime, showPast, onToggleShowPast }) {
+function ScheduleView({
+  bands,
+  selectedBands,
+  onToggleBand,
+  onSelectAll,
+  currentTime,
+  showPast,
+  onToggleShowPast,
+  timeFilter,
+}) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
   const nowDate = currentTime instanceof Date ? currentTime : new Date(currentTime)
@@ -15,9 +25,12 @@ function ScheduleView({ bands, selectedBands, onToggleBand, onSelectAll, current
     return bandEndMs <= nowMs ? count + 1 : count
   }, 0)
 
+  // First apply time filter, then apply showPast filter
+  const timeFilteredBands = filterPerformancesByTime(bands, timeFilter)
+
   const visibleBands = showPast
-    ? bands
-    : bands.filter(band => {
+    ? timeFilteredBands
+    : timeFilteredBands.filter(band => {
         const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
         return bandEndMs > nowMs
       })
@@ -61,7 +74,8 @@ function ScheduleView({ bands, selectedBands, onToggleBand, onSelectAll, current
         await navigator.clipboard.writeText(text)
         return true
       }
-    } catch {
+    } catch (error) {
+      console.error('Clipboard API failed, using fallback:', error)
       /* fallback below */
     }
 
@@ -82,7 +96,8 @@ function ScheduleView({ bands, selectedBands, onToggleBand, onSelectAll, current
         selection.addRange(originalRange)
       }
       return successful
-    } catch {
+    } catch (error) {
+      console.error('Fallback copy method failed:', error)
       return false
     }
   }

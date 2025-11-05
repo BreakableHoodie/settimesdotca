@@ -1,6 +1,6 @@
-# Long Weekend Band Crawl Mobile Schedule
+# Concert Manager - Event Schedule Builder
 
-A mobile-first web app that lets attendees build and view their personalized schedules for the Long Weekend Band Crawl. Select bands, see conflicts, and get "coming up in X minutes" reminders.
+A mobile-first web app for managing concert events and performances. Build personalized schedules, manage venues, and track upcoming performances with conflict detection and time-based reminders.
 
 ## Features
 
@@ -19,6 +19,56 @@ A mobile-first web app that lets attendees build and view their personalized sch
 - Inline clipboard helpers: `Copy Schedule` (selected bands) and `Copy Full Schedule` with live success feedback.
 - Improved accessibility: consistent focus states, touch-friendly controls, and semantic labelling.
 - Clipboard fallback for older Safari/iOS so copy still works without prompts.
+
+## Admin Panel
+
+This project includes a full-featured admin panel with Cloudflare D1 database integration for managing events, venues, and bands.
+
+### ✅ Current Features
+
+**Core Admin:**
+- Password-protected admin interface at `/admin`
+- Multi-event management (create, publish/unpublish, manage multiple concurrent events)
+- CRUD operations for Events, Venues, and Bands/Performances
+- Time conflict detection for overlapping performances
+- Bulk operations (move venue, change time, delete multiple)
+- Visual checkbox multi-select with conflict preview
+- Rate limiting and audit logging for security
+- Master password recovery system
+- Mobile-responsive design (basic)
+
+**Sprint 3 - Discovery Features (Complete):**
+- ✅ Email subscription system with city/genre filtering
+- ✅ Public events API (`/api/events/public`) - no authentication required
+- ✅ iCal feed generation (`/api/feeds/ical`) - calendar sync
+- ✅ Comprehensive test coverage (35 tests, 90%+ coverage)
+
+### 🚧 Upcoming Features
+
+**Priority 1: Mobile Optimization + Documentation** (In Progress)
+- Touch-friendly UI with WCAG-compliant touch targets (≥44px)
+- Bottom navigation for thumb-friendly mobile access
+- Swipe gestures for common actions
+- Mobile-optimized forms and keyboards
+- Comprehensive user guide for non-technical organizers
+- In-app help system with contextual tooltips
+- **Target:** 1 week implementation
+- **Specification:** `docs/CURSOR_TASK_MOBILE_OPTIMIZATION.md`
+
+**Priority 2: Lightweight Band Profile Images**
+- Small profile photos for bands (128x128px thumbnails)
+- Cloudflare R2 storage (FREE at current scale)
+- WebP format with lazy loading
+- Optional display toggle
+- No performance impact
+- **Target:** 4-6 hours implementation
+
+**Quick Access:**
+
+- Local: `http://localhost:5173/admin`
+- Production: `https://yourdomain.com/admin`
+
+**Setup:** See [docs/D1_SETUP.md](docs/D1_SETUP.md) for complete database setup, security configuration, and deployment instructions.
 
 ## Project Structure
 
@@ -52,7 +102,7 @@ longweekendbandcrawl/
 ├── setup.sh                        # Install dependencies
 ├── .gitignore
 ├── .dockerignore
-├── CLAUDE.md                       # Project instructions
+├── docs/CLAUDE.md                  # Project instructions
 └── README.md
 ```
 
@@ -184,10 +234,12 @@ Inspired by the event poster (`docs/schedule.webp`):
 
 ## Tech Stack
 
-- **Frontend:** React 18, Vite 5, Tailwind CSS 3
-- **Backend:** Express.js, Helmet, Compression
-- **Build:** Docker multi-stage build
-- **Persistence:** localStorage (browser-based)
+- **Frontend:** React 18, Vite 5, Tailwind CSS 3, React Router
+- **Backend:** Cloudflare Pages Functions (serverless)
+- **Database:** Cloudflare D1 (SQLite)
+- **Admin Panel:** Password-protected with rate limiting
+- **Build:** Docker multi-stage build (optional)
+- **Persistence:** localStorage (user schedules) + D1 (event data)
 
 ## Browser Support
 

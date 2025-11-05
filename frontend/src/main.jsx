@@ -5,11 +5,13 @@ import App from './App.jsx'
 import EmbedPage from './pages/EmbedPage.jsx'
 import SubscribePage from './pages/SubscribePage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
 import './index.css'
 
-// Lazy load admin panel (not needed for fans)
+// Lazy load admin panel and band profiles (not needed for initial page load)
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
+const BandProfilePage = lazy(() => import('./pages/BandProfilePage.jsx'))
 
 const hostname = typeof window !== 'undefined' ? window.location.hostname || '' : ''
 const isPreviewBuild = hostname.startsWith('dev.') || hostname.endsWith('.pages.dev')
@@ -31,13 +33,28 @@ function LoadingFallback() {
   )
 }
 
-// Register service worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then(reg => console.log('SW registered:', reg.scope))
-      .catch(err => console.error('SW registration failed:', err))
+// Service worker: TEMPORARILY DISABLED to fix caching issues during development
+// Re-enable for production by uncommenting the registration code below
+// if ('serviceWorker' in navigator) {
+//   window.addEventListener('load', () => {
+//     navigator.serviceWorker
+//       .register('/sw.js')
+//       .then(reg => console.log('SW registered:', reg.scope))
+//       .catch(err => console.error('SW registration failed:', err))
+//   })
+// }
+
+// Unregister any existing service workers to clear stale cache (dev only)
+if ('serviceWorker' in navigator && import.meta.env.DEV) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    if (registrations.length > 0) {
+      console.log('Unregistering', registrations.length, 'service worker(s)...')
+      registrations.forEach(registration => {
+        registration.unregister().then(() => {
+          console.log('Service worker unregistered - Please refresh the page to see latest changes')
+        })
+      })
+    }
   })
 }
 
@@ -48,24 +65,40 @@ if (import.meta.env.DEV) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        {/* Fan experience: Load immediately */}
-        <Route path="/" element={<App />} />
-        <Route path="/embed/:slug" element={<EmbedPage />} />
-        <Route path="/subscribe" element={<SubscribePage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          {/* Fan experience: Load immediately */}
+          <Route path="/" element={<App />} />
+          <Route path="/embed/:slug" element={<EmbedPage />} />
+          <Route path="/subscribe" element={<SubscribePage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Admin panel: Lazy loaded */}
-        <Route
-          path="/admin/*"
-          element={
-            <Suspense fallback={<LoadingFallback />}>
-              <AdminApp />
-            </Suspense>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+          {/* Band profiles: Lazy loaded */}
+          <Route
+            path="/band/:id"
+            element={
+              <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
+                <Suspense fallback={<LoadingFallback />}>
+                  <BandProfilePage />
+                </Suspense>
+              </ErrorBoundary>
+            }
+          />
+
+          {/* Admin panel: Lazy loaded */}
+          <Route
+            path="/admin/*"
+            element={
+              <ErrorBoundary title="Admin Panel Error" message="An error occurred in the admin panel. Please refresh.">
+                <Suspense fallback={<LoadingFallback />}>
+                  <AdminApp />
+                </Suspense>
+              </ErrorBoundary>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 )

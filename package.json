@@ -1,0 +1,19 @@
+{
+  "name": "longweekend-bandcrawl",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Long Weekend Band Crawl - Cloudflare Workers project",
+  "scripts": {
+    "migrate:local": "bash scripts/migrate-local-db.sh",
+    "validate:schema": "node scripts/validate-db-schema.js",
+    "prebuild": "npm run validate:schema",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^1.6.1",
+    "vitest": "^1.0.0"
+  }
+}
+

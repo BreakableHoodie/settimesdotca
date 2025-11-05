@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "validate:schema": "cd .. && node scripts/validate-db-schema.js",
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run validate:schema && vite build",
     "preview": "vite preview",
     "analyze": "vite-bundle-visualizer",
     "deploy:dev": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch dev",
@@ -29,13 +30,14 @@
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/free-solid-svg-icons": "^7.1.0",
     "@fortawesome/react-fontawesome": "^3.1.0",
+    "@simplewebauthn/browser": "^2.0.0",
+    "@simplewebauthn/server": "^8.3.0",
+    "otplib": "^12.0.1",
+    "qrcode": "^1.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.9.4",
-    "otplib": "^12.0.1",
-    "qrcode": "^1.5.3",
-    "@simplewebauthn/server": "^8.3.0",
-    "@simplewebauthn/browser": "^2.0.0"
+    "react-swipeable": "^7.0.2"
   },
   "devDependencies": {
     "@axe-core/react": "^4.10.2",

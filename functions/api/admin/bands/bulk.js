@@ -65,8 +65,7 @@ export async function onRequestPatch(context) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Database operation failed",
-        details: error.message,
+        error: "Database operation failed"
       }),
       {
         status: 500,

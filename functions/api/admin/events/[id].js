@@ -327,8 +327,7 @@ export async function onRequestDelete(context) {
     console.error("Delete event error:", error);
     return new Response(
       JSON.stringify({
-        error: "Database operation failed",
-        details: error.message,
+        error: "Database operation failed"
       }),
       {
         status: 500,

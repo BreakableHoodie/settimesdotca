@@ -19,7 +19,8 @@ export function measurePageLoad() {
     
     setTimeout(() => {
       // Double-check DEV mode before logging (in case import.meta.env changes)
-      if (!import.meta.env.DEV) {
+      // This check happens at execution time, not registration time
+      if (!import.meta.env || !import.meta.env.DEV) {
         return
       }
       
@@ -46,7 +47,7 @@ export function measurePageLoad() {
       }
 
       // Log to console in dev
-      if (import.meta.env.DEV) {
+      if (import.meta.env && import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.table(metrics)
       }

@@ -50,9 +50,26 @@ describe('Performance Utilities - Console Logging', () => {
           navigationStart: 0,
           loadEventEnd: 100
         },
-        getEntriesByType: vi.fn().mockReturnValue([
-          { name: 'first-contentful-paint', startTime: 50 }
-        ])
+        getEntriesByType: vi.fn().mockImplementation((type) => {
+          if (type === 'navigation') {
+            return [{
+              domainLookupStart: 0,
+              domainLookupEnd: 10,
+              connectStart: 10,
+              connectEnd: 20,
+              requestStart: 20,
+              responseStart: 30,
+              responseEnd: 40,
+              domContentLoadedEventStart: 40,
+              domContentLoadedEventEnd: 50,
+              fetchStart: 0,
+              loadEventEnd: 100
+            }]
+          } else if (type === 'paint') {
+            return [{ name: 'first-contentful-paint', startTime: 50 }]
+          }
+          return []
+        })
       }
 
       const { measurePageLoad } = await import('../performance.js')
@@ -121,9 +138,26 @@ describe('Performance Utilities - Console Logging', () => {
           navigationStart: 0,
           loadEventEnd: 100
         },
-        getEntriesByType: vi.fn().mockReturnValue([
-          { name: 'first-contentful-paint', startTime: 50 }
-        ])
+        getEntriesByType: vi.fn().mockImplementation((type) => {
+          if (type === 'navigation') {
+            return [{
+              domainLookupStart: 0,
+              domainLookupEnd: 10,
+              connectStart: 10,
+              connectEnd: 20,
+              requestStart: 20,
+              responseStart: 30,
+              responseEnd: 40,
+              domContentLoadedEventStart: 40,
+              domContentLoadedEventEnd: 50,
+              fetchStart: 0,
+              loadEventEnd: 100
+            }]
+          } else if (type === 'paint') {
+            return [{ name: 'first-contentful-paint', startTime: 50 }]
+          }
+          return []
+        })
       }
 
       const { measurePageLoad } = await import('../performance.js')
@@ -195,6 +229,7 @@ describe('Performance Utilities - Console Logging', () => {
     beforeEach(() => {
       vi.stubGlobal('import.meta', { env: { DEV: true } })
 
+      // Mock getEntriesByType to return different entries based on type
       global.performance = {
         timing: {
           domainLookupStart: 100,
@@ -209,9 +244,26 @@ describe('Performance Utilities - Console Logging', () => {
           navigationStart: 0,
           loadEventEnd: 500
         },
-        getEntriesByType: vi.fn().mockReturnValue([
-          { name: 'first-contentful-paint', startTime: 300 }
-        ])
+        getEntriesByType: vi.fn().mockImplementation((type) => {
+          if (type === 'navigation') {
+            return [{
+              domainLookupStart: 100,
+              domainLookupEnd: 120,
+              connectStart: 120,
+              connectEnd: 150,
+              requestStart: 150,
+              responseStart: 200,
+              responseEnd: 250,
+              domContentLoadedEventStart: 250,
+              domContentLoadedEventEnd: 300,
+              fetchStart: 0,
+              loadEventEnd: 500
+            }]
+          } else if (type === 'paint') {
+            return [{ name: 'first-contentful-paint', startTime: 300 }]
+          }
+          return []
+        })
       }
     })
 
@@ -288,7 +340,24 @@ describe('Performance Utilities - Console Logging', () => {
     })
 
     it('should return null for missing FCP', async () => {
-      global.performance.getEntriesByType = vi.fn().mockReturnValue([])
+      global.performance.getEntriesByType = vi.fn().mockImplementation((type) => {
+        if (type === 'navigation') {
+          return [{
+            domainLookupStart: 100,
+            domainLookupEnd: 120,
+            connectStart: 120,
+            connectEnd: 150,
+            requestStart: 150,
+            responseStart: 200,
+            responseEnd: 250,
+            domContentLoadedEventStart: 250,
+            domContentLoadedEventEnd: 300,
+            fetchStart: 0,
+            loadEventEnd: 500
+          }]
+        }
+        return [] // No paint entries
+      })
 
       const { measurePageLoad } = await import('../performance.js')
 
@@ -326,22 +395,30 @@ describe('Performance Utilities - Console Logging', () => {
           navigationStart: 0,
           loadEventEnd: 100
         },
-        getEntriesByType: vi.fn().mockReturnValue([
-          { name: 'first-contentful-paint', startTime: 50 }
-        ])
+        getEntriesByType: vi.fn().mockImplementation((type) => {
+          if (type === 'navigation') {
+            return [{
+              domainLookupStart: 0,
+              domainLookupEnd: 10,
+              connectStart: 10,
+              connectEnd: 20,
+              requestStart: 20,
+              responseStart: 30,
+              responseEnd: 40,
+              domContentLoadedEventStart: 40,
+              domContentLoadedEventEnd: 50,
+              fetchStart: 0,
+              loadEventEnd: 100
+            }]
+          } else if (type === 'paint') {
+            return [{ name: 'first-contentful-paint', startTime: 50 }]
+          }
+          return []
+        })
       }
 
-      global.PerformanceObserver = class {
-        constructor(callback) {
-          this.callback = callback
-          setTimeout(() => {
-            this.callback({
-              getEntries: () => [{ startTime: 1500 }]
-            })
-          }, 0)
-        }
-        observe() {}
-      }
+      // Don't mock PerformanceObserver for production test - it should not be created
+      delete global.PerformanceObserver
 
       const { measurePageLoad } = await import('../performance.js')
 

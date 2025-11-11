@@ -161,7 +161,7 @@ export default function UserManagement() {
       } else {
         alert(`Error: ${data.error}`)
       }
-    } catch (error) {
+    } catch {
       alert('Failed to initiate password reset')
     } finally {
       setActionLoading(false)
@@ -190,7 +190,7 @@ export default function UserManagement() {
         const data = await response.json()
         alert(`Error: ${data.error}`)
       }
-    } catch (error) {
+    } catch {
       alert('Failed to update user status')
     } finally {
       setActionLoading(false)

@@ -76,8 +76,9 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-white mb-2 text-sm">Password *</label>
+            <label htmlFor="signup-password" className="block text-white mb-2 text-sm">Password *</label>
             <input
+              id="signup-password"
               type="password"
               name="password"
               value={formData.password}
@@ -89,8 +90,9 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-white mb-2 text-sm">Confirm Password *</label>
+            <label htmlFor="signup-confirm-password" className="block text-white mb-2 text-sm">Confirm Password *</label>
             <input
+              id="signup-confirm-password"
               type="password"
               name="confirmPassword"
               value={formData.confirmPassword}
@@ -101,8 +103,9 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-white mb-2 text-sm">Display Name (Optional)</label>
+            <label htmlFor="signup-name" className="block text-white mb-2 text-sm">Display Name (Optional)</label>
             <input
+              id="signup-name"
               type="text"
               name="name"
               value={formData.name}

@@ -499,11 +499,11 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
   const getConflicts = useCallback(band => detectConflicts(band, bands), [bands])
 
   // Get venue name by ID
-  const getVenueName = venueId => {
+  const getVenueName = useCallback((venueId) => {
     if (!venueId) return 'No venue assigned'
     const venue = venues.find(v => String(v.id) === String(venueId))
     return venue ? venue.name : 'Unknown Venue'
-  }
+  }, [venues])
 
   const getDurationLabel = band => {
     if (band?.duration != null && band.duration !== '') {

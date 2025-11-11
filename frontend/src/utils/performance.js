@@ -51,6 +51,11 @@ function getLargestContentfulPaint() {
     return null
   }
 
+  // Only create observer if in DEV mode (to avoid triggering callbacks in production tests)
+  if (!import.meta.env.DEV) {
+    return null
+  }
+
   // Use global.PerformanceObserver in test env, window.PerformanceObserver in browser
   const Observer = typeof global !== 'undefined' && global.PerformanceObserver 
     ? global.PerformanceObserver 

@@ -1,6 +1,5 @@
 import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { formatTime } from '../utils/timeFormat'
 import { getTimeDescription, isHappeningNow } from '../utils/timeFilter'
 
 function BandCard({ band, isSelected, onToggle, showVenue = true, clickable = true, onRemove }) {

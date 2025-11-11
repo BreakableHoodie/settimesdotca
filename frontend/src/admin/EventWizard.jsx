@@ -84,7 +84,7 @@ function BasicsStep({ eventData, onChange }) {
 }
 
 // Step 2: Venues
-function VenuesStep({ eventData, onChange }) {
+function VenuesStep({ eventData: _eventData, onChange }) {
   const [venues, setVenues] = useState([])
   const [newVenue, setNewVenue] = useState({ name: '', address: '' })
 

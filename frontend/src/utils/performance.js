@@ -1,8 +1,14 @@
 // Privacy-preserving performance monitoring
 // No user tracking, aggregate metrics only
 
+let loadListenerAdded = false
+
 export function measurePageLoad() {
   if (!window.performance) return
+  
+  // Prevent multiple listeners from being added
+  if (loadListenerAdded) return
+  loadListenerAdded = true
 
   window.addEventListener('load', () => {
     setTimeout(() => {

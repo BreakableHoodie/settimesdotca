@@ -16,19 +16,11 @@ describe('Performance Utilities - Console Logging', () => {
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     consoleTableSpy = vi.spyOn(console, 'table').mockImplementation(() => {})
 
-    // Clear all event listeners to prevent test interference
-    window.removeEventListener('load', () => {})
-
+    // Reset the module-level flag to allow fresh listeners in each test
+    // This will be reset when the module is re-imported after vi.resetModules()
+    
     // Clear module cache to get fresh imports
     vi.resetModules()
-  })
-
-  afterEach(() => {
-    consoleLogSpy.mockRestore()
-    consoleTableSpy.mockRestore()
-    
-    // Clean up any event listeners
-    window.removeEventListener('load', () => {})
   })
 
   describe('Development Mode (DEV=true)', () => {

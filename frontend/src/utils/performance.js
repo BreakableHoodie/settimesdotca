@@ -1,116 +1,175 @@
+/* eslint-disable no-console -- Performance instrumentation intentionally logs metrics in dev */
 // Privacy-preserving performance monitoring
 // No user tracking, aggregate metrics only
 
-// Use a global symbol to track if listener was added to this window instance
-// Global symbols persist across module resets in tests
+const DEV_FLAG = '__APP_DEV__'
 const LISTENER_ADDED = Symbol.for('performanceListenerAdded')
 
 export function measurePageLoad() {
-  if (!window.performance) return
-  
-  // Prevent multiple listeners from being added to the same window instance
-  if (window[LISTENER_ADDED]) return
+  if (typeof window === 'undefined' || !window.performance) {
+    return
+  }
+
+  if (window[LISTENER_ADDED]) {
+    return
+  }
   window[LISTENER_ADDED] = true
 
-  window.addEventListener('load', () => {
-    // Check DEV mode FIRST before doing anything else
-    // This ensures listeners from dev tests don't execute in production tests
-    // Use strict check to ensure we're not in production
-    const isDev = import.meta?.env?.DEV === true
-    if (!isDev) {
+  const runMeasurements = () => {
+    if (!getIsDevEnvironment()) {
       return
     }
-    
-    // Prevent multiple executions if listener fires multiple times
-    if (window[LISTENER_ADDED] === 'executed') return
-    window[LISTENER_ADDED] = 'executed'
-    
+
     setTimeout(() => {
-      // Double-check DEV mode before logging (in case import.meta.env changes)
-      // This check happens at execution time, not registration time
-      const isDevAtExecution = import.meta?.env?.DEV === true
-      if (!isDevAtExecution) {
+      // Guard again in case env flipped between registration and execution
+      if (!getIsDevEnvironment()) {
         return
       }
-      
-      // Use modern Navigation Timing Level 2 API
-      const navEntries = performance.getEntriesByType('navigation')
-      if (navEntries.length === 0) {
+
+      const timing = resolveTimingEntry()
+      if (!timing) {
         console.warn('Navigation Timing API not supported')
         return
       }
 
-      const timing = navEntries[0]
       const metrics = {
-        // Page load metrics
-        dns: Math.round(timing.domainLookupEnd - timing.domainLookupStart),
-        tcp: Math.round(timing.connectEnd - timing.connectStart),
-        request: Math.round(timing.responseStart - timing.requestStart),
-        response: Math.round(timing.responseEnd - timing.responseStart),
-        dom: Math.round(timing.domContentLoadedEventEnd - timing.domContentLoadedEventStart),
-        load: Math.round(timing.loadEventEnd - timing.fetchStart),
-
-        // Core Web Vitals (approximations)
+        dns: diff(timing.domainLookupEnd, timing.domainLookupStart),
+        tcp: diff(timing.connectEnd, timing.connectStart),
+        request: diff(timing.responseStart, timing.requestStart),
+        response: diff(timing.responseEnd, timing.responseStart),
+        dom: diff(timing.domContentLoadedEventEnd, timing.domContentLoadedEventStart),
+        load: diff(timing.loadEventEnd, getFetchStart(timing)),
         fcp: getFirstContentfulPaint(),
-        lcp: getLargestContentfulPaint(),
+        lcp: null,
       }
 
-      // Log to console in dev
-      const isDevForLogging = import.meta?.env?.DEV === true
-      if (isDevForLogging) {
-        // eslint-disable-next-line no-console
+      if (getIsDevEnvironment()) {
         console.table(metrics)
       }
 
-      // Could send to analytics endpoint (future)
-      // sendMetrics(metrics)
+      getLargestContentfulPaint(getIsDevEnvironment())
     }, 0)
-  })
+  }
+
+  const triggerMeasurements = () => {
+    window[LISTENER_ADDED] = 'executed'
+    runMeasurements()
+  }
+
+  if (hasWindowFinishedLoading()) {
+    triggerMeasurements()
+  } else {
+    window.addEventListener('load', triggerMeasurements, { once: true })
+  }
+}
+
+function hasWindowFinishedLoading() {
+  if (typeof document !== 'undefined' && document.readyState === 'complete') {
+    return true
+  }
+
+  if (typeof performance !== 'undefined' && performance.timing) {
+    const loadEventEnd = performance.timing.loadEventEnd
+    return typeof loadEventEnd === 'number' && loadEventEnd > 0
+  }
+
+  return false
+}
+
+function resolveTimingEntry() {
+  if (typeof performance === 'undefined') {
+    return null
+  }
+
+  if (typeof performance.getEntriesByType === 'function') {
+    const entries = performance.getEntriesByType('navigation') || []
+    if (entries.length > 0 && typeof entries[0].domainLookupStart === 'number') {
+      return entries[0]
+    }
+  }
+
+  if (performance.timing) {
+    return performance.timing
+  }
+
+  return null
+}
+
+function diff(end, start) {
+  if (typeof end !== 'number' || typeof start !== 'number') {
+    return null
+  }
+
+  const value = Math.round(end - start)
+  return Number.isNaN(value) ? null : value
+}
+
+function getFetchStart(timing) {
+  if (typeof timing.fetchStart === 'number') {
+    return timing.fetchStart
+  }
+  if (typeof timing.startTime === 'number') {
+    return timing.startTime
+  }
+  return timing.navigationStart ?? 0
 }
 
 function getFirstContentfulPaint() {
-  const entries = performance.getEntriesByType('paint')
+  if (typeof performance === 'undefined' || typeof performance.getEntriesByType !== 'function') {
+    return null
+  }
+
+  const entries = performance.getEntriesByType('paint') || []
   const fcp = entries.find(entry => entry.name === 'first-contentful-paint')
   return fcp ? Math.round(fcp.startTime) : null
 }
 
-function getLargestContentfulPaint() {
-  // Check if PerformanceObserver is available (works in both browser and Node.js test env)
-  if (typeof PerformanceObserver === 'undefined' && typeof global !== 'undefined' && typeof global.PerformanceObserver === 'undefined') {
+function getLargestContentfulPaint(isDev) {
+  if (!isDev) {
     return null
   }
 
-  // Only create observer if in DEV mode (to avoid triggering callbacks in production tests)
-  if (!import.meta.env.DEV) {
-    return null
-  }
+  const observerCtor =
+    (typeof globalThis !== 'undefined' && globalThis.PerformanceObserver) ||
+    (typeof PerformanceObserver !== 'undefined' ? PerformanceObserver : null)
 
-  // Use global.PerformanceObserver in test env, window.PerformanceObserver in browser
-  const Observer = typeof global !== 'undefined' && global.PerformanceObserver 
-    ? global.PerformanceObserver 
-    : typeof PerformanceObserver !== 'undefined' 
-      ? PerformanceObserver 
-      : null
-
-  if (!Observer) {
+  if (!observerCtor) {
     return null
   }
 
   try {
-    const observer = new Observer(list => {
+    const observer = new observerCtor(list => {
       const entries = list.getEntries()
+      if (!entries.length) {
+        return
+      }
+
       const lastEntry = entries[entries.length - 1]
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
+      if (isDev) {
         console.log('LCP:', Math.round(lastEntry.startTime), 'ms')
       }
     })
 
-    observer.observe({ entryTypes: ['largest-contentful-paint'] })
+    observer.observe({ type: 'largest-contentful-paint', buffered: true })
   } catch {
-    // LCP not supported
     return null
   }
-  
-  return null // LCP is measured asynchronously, return null for immediate value
+
+  return null
+}
+
+function getIsDevEnvironment() {
+  if (typeof globalThis !== 'undefined' && typeof globalThis[DEV_FLAG] === 'boolean') {
+    return globalThis[DEV_FLAG]
+  }
+
+  if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env.DEV === 'boolean') {
+    return import.meta.env.DEV
+  }
+
+  if (typeof process !== 'undefined' && process.env && typeof process.env.NODE_ENV === 'string') {
+    return process.env.NODE_ENV !== 'production'
+  }
+
+  return true
 }

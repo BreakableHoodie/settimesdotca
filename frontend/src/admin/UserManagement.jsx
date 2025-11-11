@@ -254,7 +254,7 @@ export default function UserManagement() {
               {users.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="px-6 py-8 text-center text-gray-300">
-                    No users found. Click &quot;Add User&quot; to create one.
+                    No users found. Click &ldquo;Add User&rdquo; to create one.
                   </td>
                 </tr>
               ) : (

@@ -1,10 +1,44 @@
 import '@testing-library/jest-dom'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach } from 'vitest'
 
 // Cleanup after each test
 afterEach(() => {
   cleanup()
+})
+
+const createStorageMock = () => {
+  let store = new Map()
+
+  return {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => {
+      store.set(String(key), String(value))
+    },
+    removeItem: key => {
+      store.delete(String(key))
+    },
+    clear: () => {
+      store.clear()
+    },
+  }
+}
+
+const localStorageMock = createStorageMock()
+const sessionStorageMock = createStorageMock()
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  configurable: true,
+})
+Object.defineProperty(window, 'sessionStorage', {
+  value: sessionStorageMock,
+  configurable: true,
+})
+
+beforeEach(() => {
+  localStorageMock.clear()
+  sessionStorageMock.clear()
 })
 
 // Mock window.matchMedia

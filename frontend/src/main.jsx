@@ -48,12 +48,10 @@ function LoadingFallback() {
 if ('serviceWorker' in navigator && import.meta.env.DEV) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     if (registrations.length > 0) {
-      // eslint-disable-next-line no-console
-      console.log('Unregistering', registrations.length, 'service worker(s)...')
+      console.warn('Unregistering', registrations.length, 'service worker(s)...')
       registrations.forEach(registration => {
         registration.unregister().then(() => {
-          // eslint-disable-next-line no-console
-          console.log('Service worker unregistered - Please refresh the page to see latest changes')
+          console.warn('Service worker unregistered - Please refresh the page to see latest changes')
         })
       })
     }

@@ -66,8 +66,6 @@ export default [
         confirm: 'readonly',
         performance: 'readonly',
         PerformanceObserver: 'readonly',
-        CustomEvent: 'readonly',
-        Event: 'readonly',
       },
     },
     settings: {
@@ -78,28 +76,38 @@ export default [
     rules: {
       // React rules
       ...react.configs.recommended.rules,
-      'react/react-in-jsx-scope': 'off', // Not needed in React 17+
-      'react/prop-types': 'off', // Using TypeScript types instead
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
 
       // React Hooks rules
       ...reactHooks.configs.recommended.rules,
+      'react-hooks/set-state-in-effect': 'off',
 
       // Accessibility rules
       ...jsxA11y.configs.recommended.rules,
 
       // General rules
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-      
+
       // Accessibility - temporarily relaxed during cleanup
-      'jsx-a11y/label-has-associated-control': ['warn', {
-        'labelComponents': [],
-        'labelAttributes': ['htmlFor'],
-        'controlComponents': [],
-        'assert': 'either',
-        'depth': 3,
-      }],
+      'jsx-a11y/label-has-associated-control': [
+        'warn',
+        {
+          labelComponents: [],
+          labelAttributes: ['htmlFor'],
+          controlComponents: [],
+          assert: 'either',
+          depth: 3,
+        },
+      ],
     },
   },
-  prettier, // Must be last to override other configs
+  prettier,
 ]

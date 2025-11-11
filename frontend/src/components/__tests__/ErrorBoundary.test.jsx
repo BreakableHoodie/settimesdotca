@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import ErrorBoundary from '../ErrorBoundary'
 
@@ -17,6 +18,8 @@ const ThrowError = ({ shouldThrow }) => {
   }
   return <div>No error</div>
 }
+
+const renderWithRouter = (ui, options) => render(ui, { wrapper: MemoryRouter, ...options })
 
 describe('ErrorBoundary', () => {
   let consoleErrorSpy
@@ -32,7 +35,7 @@ describe('ErrorBoundary', () => {
 
   describe('Normal Operation', () => {
     it('should render children when no error occurs', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <div>Test content</div>
         </ErrorBoundary>
@@ -42,7 +45,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should not render fallback UI when children render successfully', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={false} />
         </ErrorBoundary>
@@ -55,7 +58,7 @@ describe('ErrorBoundary', () => {
 
   describe('Error Catching', () => {
     it('should catch errors thrown by child components', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -65,7 +68,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should display default error UI on error', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -77,7 +80,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should log error to console', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -96,7 +99,7 @@ describe('ErrorBoundary', () => {
     it('should render custom fallback when provided', () => {
       const CustomFallback = () => <div>Custom error message</div>
 
-      render(
+      renderWithRouter(
         <ErrorBoundary fallback={<CustomFallback />}>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -107,7 +110,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should use custom title when provided', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary title="Custom Error Title">
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -117,7 +120,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should use custom message when provided', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary message="Custom error explanation">
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -127,7 +130,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should support both custom title and message', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary title="Admin Error" message="Please contact support">
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -142,7 +145,7 @@ describe('ErrorBoundary', () => {
     it('should show error details in development mode', () => {
       // Note: import.meta.env.DEV is set at build time
       // This test validates the structure, not dynamic behavior
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -162,7 +165,7 @@ describe('ErrorBoundary', () => {
 
   describe('Recovery Actions', () => {
     it('should provide refresh page button', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -174,7 +177,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should provide go home link', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -188,7 +191,7 @@ describe('ErrorBoundary', () => {
 
   describe('Accessibility', () => {
     it('should have proper semantic structure', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -200,7 +203,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should use appropriate heading level (h1)', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -213,7 +216,7 @@ describe('ErrorBoundary', () => {
 
   describe('Error State Persistence', () => {
     it('should maintain error state after catching error', () => {
-      const { rerender } = render(
+      const { rerender } = renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -235,7 +238,7 @@ describe('ErrorBoundary', () => {
 
   describe('Multiple Children', () => {
     it('should handle multiple children', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <div>Child 1</div>
           <div>Child 2</div>
@@ -249,7 +252,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should catch error from any child', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <div>Safe child 1</div>
           <ThrowError shouldThrow={true} />
@@ -265,7 +268,7 @@ describe('ErrorBoundary', () => {
 
   describe('Nested Error Boundaries', () => {
     it('should allow nesting error boundaries', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary title="Outer Boundary">
           <div>Outer safe content</div>
           <ErrorBoundary title="Inner Boundary">
@@ -286,7 +289,7 @@ describe('ErrorBoundary', () => {
         throw new Error('Fallback error')
       }
 
-      render(
+      renderWithRouter(
         <ErrorBoundary title="Outer Boundary">
           <ErrorBoundary fallback={<FallbackThatThrows />}>
             <ThrowError shouldThrow={true} />
@@ -301,7 +304,7 @@ describe('ErrorBoundary', () => {
 
   describe('Styling', () => {
     it('should apply correct CSS classes for layout', () => {
-      const { container } = render(
+      const { container } = renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>
@@ -313,7 +316,7 @@ describe('ErrorBoundary', () => {
     })
 
     it('should style buttons appropriately', () => {
-      render(
+      renderWithRouter(
         <ErrorBoundary>
           <ThrowError shouldThrow={true} />
         </ErrorBoundary>

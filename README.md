@@ -43,25 +43,25 @@ This project includes a full-featured admin panel with Cloudflare D1 database in
 - ✅ iCal feed generation (`/api/feeds/ical`) - calendar sync
 - ✅ Comprehensive test coverage (35 tests, 90%+ coverage)
 
-### 🚧 Upcoming Features
+### 🚧 Development Roadmap
 
-**Priority 1: Mobile Optimization + Documentation** (In Progress)
-- Touch-friendly UI with WCAG-compliant touch targets (≥44px)
-- Bottom navigation for thumb-friendly mobile access
-- Swipe gestures for common actions
-- Mobile-optimized forms and keyboards
-- Comprehensive user guide for non-technical organizers
-- In-app help system with contextual tooltips
-- **Target:** 1 week implementation
-- **Specification:** `docs/CURSOR_TASK_MOBILE_OPTIMIZATION.md`
+**Current Focus**: Production-ready demo by November 30, 2025
 
-**Priority 2: Lightweight Band Profile Images**
-- Small profile photos for bands (128x128px thumbnails)
-- Cloudflare R2 storage (FREE at current scale)
-- WebP format with lazy loading
-- Optional display toggle
-- No performance impact
-- **Target:** 4-6 hours implementation
+See **[ROADMAP_TO_DEMO.md](/ROADMAP_TO_DEMO.md)** for the complete 3-week sprint plan.
+
+**Key Priorities**:
+1. Multi-user RBAC (admin/editor/viewer roles)
+2. Complete event management workflow
+3. Band profiles with photos, bios, and stats
+4. Public timeline (current/upcoming/past events)
+5. Polished admin interface with context switching
+6. Production documentation and testing
+
+**Out of Scope** (Post-Demo v2.0):
+- Multi-org tenancy
+- Co-promoter collaboration
+- Event cloning/templates
+- Advanced analytics
 
 **Quick Access:**
 

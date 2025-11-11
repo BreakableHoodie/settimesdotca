@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Convenience wrapper around the `psi` package.
- * Runs PageSpeed Insights for one or more strategies (mobile/desktop)
- * and prints a concise summary. Set `PSI_API_KEY` env var to avoid
- * anonymous rate limits.
+ * Lightweight PageSpeed Insights client that avoids the abandoned
+ * `psi` npm dependency. Relies on the public REST API via fetch.
+ * Set PSI_API_KEY to unlock higher quotas.
  */
-import psi from 'psi';
+
+const PSI_ENDPOINT = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
 
 const args = process.argv.slice(2);
 
@@ -93,12 +93,24 @@ const formatMs = (milliseconds) => {
 
 const summaries = [];
 
+const runPsiRequest = async ({ url: targetUrl, strategy, apiKey: key }) => {
+  const params = new URLSearchParams({ url: targetUrl, strategy });
+  if (key) {
+    params.set('key', key);
+  }
+
+  const response = await fetch(`${PSI_ENDPOINT}?${params.toString()}`);
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`PSI request failed (${response.status}): ${errorBody}`);
+  }
+
+  return response.json();
+};
+
 for (const strategy of strategyFlags) {
   try {
-    const { data } = await psi(url, {
-      strategy,
-      key: apiKey ?? undefined,
-    });
+    const data = await runPsiRequest({ url, strategy, apiKey });
 
     const { lighthouseResult } = data;
     if (!lighthouseResult) {

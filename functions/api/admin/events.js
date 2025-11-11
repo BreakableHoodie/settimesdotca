@@ -25,17 +25,30 @@ export async function onRequestGet(context) {
       return permCheck.response;
     }
 
-    const result = await DB.prepare(
-      `
+    // Parse query parameters
+    const url = new URL(request.url);
+    const showArchived = url.searchParams.get('archived') === 'true';
+
+    // Build query based on archived filter
+    let query = `
       SELECT
         e.*,
         COUNT(b.id) as band_count
       FROM events e
       LEFT JOIN bands b ON e.id = b.event_id
+    `;
+
+    // Filter by archived status
+    if (!showArchived) {
+      query += ` WHERE (e.status != 'archived' OR e.status IS NULL)`;
+    }
+
+    query += `
       GROUP BY e.id
       ORDER BY e.date DESC
-    `
-    ).all();
+    `;
+
+    const result = await DB.prepare(query).all();
 
     return new Response(
       JSON.stringify({
@@ -78,7 +91,7 @@ export async function onRequestPost(context) {
     const currentUser = permCheck.user;
 
     const body = await request.json().catch(() => ({}));
-    const { name, date, slug, isPublished = false } = body;
+    const { name, date, slug, status = 'draft' } = body;
 
     // Validation
     if (!name || !date || !slug) {
@@ -86,6 +99,20 @@ export async function onRequestPost(context) {
         JSON.stringify({
           error: "Validation error",
           message: "Name, date, and slug are required",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Validate name (min 3 chars)
+    if (name.trim().length < 3) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Name must be at least 3 characters",
         }),
         {
           status: 400,
@@ -108,6 +135,23 @@ export async function onRequestPost(context) {
       );
     }
 
+    // Validate date is not in past
+    const eventDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (eventDate < today) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Date cannot be in the past",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Validate slug format (URL-friendly)
     if (!/^[a-z0-9-]+$/.test(slug)) {
       return new Response(
@@ -115,6 +159,20 @@ export async function onRequestPost(context) {
           error: "Validation error",
           message:
             "Slug must contain only lowercase letters, numbers, and hyphens",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Validate status
+    if (!['draft', 'published', 'archived'].includes(status)) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Status must be: draft, published, or archived",
         }),
         {
           status: 400,
@@ -148,19 +206,19 @@ export async function onRequestPost(context) {
     // Create event with creator tracking
     const result = await DB.prepare(
       `
-      INSERT INTO events (name, date, slug, is_published, created_by_user_id)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO events (name, date, slug, status, is_published, created_by_user_id)
+      VALUES (?, ?, ?, ?, ?, ?)
       RETURNING *
     `
     )
-      .bind(name, date, slug, isPublished ? 1 : 0, currentUser.userId)
+      .bind(name, date, slug, status, status === 'published' ? 1 : 0, currentUser.userId)
       .first();
 
     // Audit log
     await auditLog(env, currentUser.userId, 'event.created', 'event', result.id, {
       name,
       slug,
-      isPublished
+      status
     }, ipAddress);
 
     return new Response(

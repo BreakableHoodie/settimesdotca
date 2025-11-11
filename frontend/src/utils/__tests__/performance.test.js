@@ -5,7 +5,7 @@
  * Validates DEV-only logging and performance measurement
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 describe('Performance Utilities - Console Logging', () => {
   let consoleLogSpy

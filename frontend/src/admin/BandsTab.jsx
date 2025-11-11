@@ -559,7 +559,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     }
     // Default: sort by start time
     return sortBandsByStart(bands)
-  }, [bands, sortConfig.key, sortConfig.direction])
+  }, [bands, sortConfig.key, sortConfig.direction, getVenueName])
 
   const formConflicts = useMemo(() => {
     if (!formData.event_id || !formData.venue_id || !formData.start_time || !formData.end_time) {

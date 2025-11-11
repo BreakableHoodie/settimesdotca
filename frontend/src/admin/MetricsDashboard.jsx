@@ -1,15 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { eventsApi } from '../utils/adminApi'
 
 export default function MetricsDashboard({ eventId }) {
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadMetrics()
-  }, [eventId])
-
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async () => {
     try {
       const data = await eventsApi.getMetrics(eventId)
       setMetrics(data.metrics)
@@ -18,7 +14,11 @@ export default function MetricsDashboard({ eventId }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [eventId])
+
+  useEffect(() => {
+    loadMetrics()
+  }, [loadMetrics])
 
   if (loading) return <div className="text-white">Loading metrics...</div>
 

@@ -30,8 +30,9 @@ function BasicsStep({ eventData, onChange }) {
       <h3 className="text-xl font-bold text-white mb-4">Event Basics</h3>
 
       <div>
-        <label className="block text-white mb-2 text-sm">Event Name *</label>
+        <label htmlFor="event-name" className="block text-white mb-2 text-sm">Event Name *</label>
         <input
+          id="event-name"
           type="text"
           value={eventData.name}
           onChange={e => handleNameChange(e.target.value)}
@@ -42,8 +43,9 @@ function BasicsStep({ eventData, onChange }) {
       </div>
 
       <div>
-        <label className="block text-white mb-2 text-sm">Event Date *</label>
+        <label htmlFor="event-date" className="block text-white mb-2 text-sm">Event Date *</label>
         <input
+          id="event-date"
           type="date"
           value={eventData.date}
           onChange={e => handleChange('date', e.target.value)}
@@ -53,8 +55,9 @@ function BasicsStep({ eventData, onChange }) {
       </div>
 
       <div>
-        <label className="block text-white mb-2 text-sm">URL Slug *</label>
+        <label htmlFor="event-slug" className="block text-white mb-2 text-sm">URL Slug *</label>
         <input
+          id="event-slug"
           type="text"
           value={eventData.slug}
           onChange={e => handleChange('slug', e.target.value)}
@@ -66,8 +69,9 @@ function BasicsStep({ eventData, onChange }) {
       </div>
 
       <div>
-        <label className="block text-white mb-2 text-sm">Description</label>
+        <label htmlFor="event-description" className="block text-white mb-2 text-sm">Description</label>
         <textarea
+          id="event-description"
           value={eventData.description}
           onChange={e => handleChange('description', e.target.value)}
           className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
@@ -83,7 +87,6 @@ function BasicsStep({ eventData, onChange }) {
 function VenuesStep({ eventData, onChange }) {
   const [venues, setVenues] = useState([])
   const [newVenue, setNewVenue] = useState({ name: '', address: '' })
-  const [loading, setLoading] = useState(false)
 
   const handleAddVenue = () => {
     if (!newVenue.name.trim()) return

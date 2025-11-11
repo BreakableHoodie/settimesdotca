@@ -46,17 +46,36 @@ function getFirstContentfulPaint() {
 }
 
 function getLargestContentfulPaint() {
-  const observer = new PerformanceObserver(list => {
-    const entries = list.getEntries()
-    const lastEntry = entries[entries.length - 1]
-    if (import.meta.env.DEV) {
-      console.log('LCP:', Math.round(lastEntry.startTime), 'ms')
-    }
-  })
+  // Check if PerformanceObserver is available (works in both browser and Node.js test env)
+  if (typeof PerformanceObserver === 'undefined' && typeof global !== 'undefined' && typeof global.PerformanceObserver === 'undefined') {
+    return null
+  }
+
+  // Use global.PerformanceObserver in test env, window.PerformanceObserver in browser
+  const Observer = typeof global !== 'undefined' && global.PerformanceObserver 
+    ? global.PerformanceObserver 
+    : typeof PerformanceObserver !== 'undefined' 
+      ? PerformanceObserver 
+      : null
+
+  if (!Observer) {
+    return null
+  }
 
   try {
+    const observer = new Observer(list => {
+      const entries = list.getEntries()
+      const lastEntry = entries[entries.length - 1]
+      if (import.meta.env.DEV) {
+        console.log('LCP:', Math.round(lastEntry.startTime), 'ms')
+      }
+    })
+
     observer.observe({ entryTypes: ['largest-contentful-paint'] })
   } catch (e) {
     // LCP not supported
+    return null
   }
+  
+  return null // LCP is measured asynchronously, return null for immediate value
 }

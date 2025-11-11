@@ -62,8 +62,9 @@ export default function SignupPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-white mb-2 text-sm">Email *</label>
+            <label htmlFor="signup-email" className="block text-white mb-2 text-sm">Email *</label>
             <input
+              id="signup-email"
               type="email"
               name="email"
               value={formData.email}

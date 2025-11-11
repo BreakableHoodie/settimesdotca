@@ -19,7 +19,17 @@
       "Read(//Users/andrelevesque/Projects/**)",
       "Bash(npm install:*)",
       "Bash(timeout 10 npx wrangler:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git mv:*)",
+      "Bash(docs/GENERALIZATION_PLAN_FUTURE.md)",
+      "Bash(git restore:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git clean:*)",
+      "Bash(git remote:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,3 +1,5 @@
+import EventStatusBadge from './EventStatusBadge'
+
 /**
  * ContextBanner - Visual indicator showing current event context
  *
@@ -13,7 +15,7 @@ export default function ContextBanner({ event, onClear }) {
   // Format date for display
   const formatDate = dateString => {
     if (!dateString) return ''
-    const date = new Date(dateString)
+    const date = new Date(dateString + 'T00:00:00')
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -32,14 +34,9 @@ export default function ContextBanner({ event, onClear }) {
               <span className="text-band-orange font-bold text-lg">{event.name}</span>
               <span className="text-white/50 text-sm">
                 ({event.band_count || 0} performers
-                {event.date && ` • ${formatDate(event.date)}`}
-                {event.is_published !== undefined && (
-                  <span className={event.is_published ? 'text-green-400' : 'text-yellow-400'}>
-                    {' • '}
-                    {event.is_published ? 'Published' : 'Draft'}
-                  </span>
-                )})
+                {event.date && ` • ${formatDate(event.date)}`})
               </span>
+              <EventStatusBadge status={event.status} />
             </div>
           </div>
         </div>

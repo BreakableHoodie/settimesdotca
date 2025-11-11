@@ -1,6 +1,8 @@
 // Admin specific event operations
+// PATCH /api/admin/events/{id} - Update event details
 // PUT /api/admin/events/{id}/publish - Toggle publish status
 // POST /api/admin/events/{id}/duplicate - Duplicate event
+// DELETE /api/admin/events/{id} - Delete event
 
 import { checkPermission, auditLog } from '../_middleware.js'
 
@@ -19,6 +21,192 @@ function getEventId(request) {
   const parts = url.pathname.split("/");
   const idIndex = parts.indexOf("events") + 1;
   return parts[idIndex];
+}
+
+// PATCH - Update event details (editor and admin only)
+export async function onRequestPatch(context) {
+  const { request, env } = context;
+  const { DB } = env;
+  const ipAddress = getClientIP(request);
+
+  try {
+    // Check permission (editor and above)
+    const permCheck = await checkPermission(request, env, 'editor');
+    if (permCheck.error) {
+      return permCheck.response;
+    }
+
+    const currentUser = permCheck.user;
+    const eventId = getEventId(request);
+
+    if (!eventId || isNaN(eventId)) {
+      return new Response(
+        JSON.stringify({
+          error: "Bad request",
+          message: "Invalid event ID",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Get current event
+    const event = await DB.prepare(
+      `SELECT * FROM events WHERE id = ?`
+    )
+      .bind(eventId)
+      .first();
+
+    if (!event) {
+      return new Response(
+        JSON.stringify({
+          error: "Not found",
+          message: "Event not found",
+        }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const { name, date, status } = body;
+
+    // Validate: cannot change slug
+    if (body.slug && body.slug !== event.slug) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Cannot change slug (would break URLs)",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const params = [];
+
+    if (name !== undefined) {
+      if (name.trim().length < 3) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Name must be at least 3 characters",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      updates.push('name = ?');
+      params.push(name);
+    }
+
+    if (date !== undefined) {
+      // Validate date format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Date must be in YYYY-MM-DD format",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      updates.push('date = ?');
+      params.push(date);
+    }
+
+    if (status !== undefined) {
+      // Validate status
+      if (!['draft', 'published', 'archived'].includes(status)) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Status must be: draft, published, or archived",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      updates.push('status = ?');
+      updates.push('is_published = ?');
+      params.push(status);
+      params.push(status === 'published' ? 1 : 0);
+    }
+
+    // Always update updated_by_user_id
+    updates.push('updated_by_user_id = ?');
+    params.push(currentUser.userId);
+
+    // Add event ID as the last parameter
+    params.push(eventId);
+
+    if (updates.length === 1) {
+      // Only updated_by_user_id, no actual changes
+      return new Response(
+        JSON.stringify({
+          error: "Bad request",
+          message: "No fields to update",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Execute update
+    const result = await DB.prepare(
+      `UPDATE events SET ${updates.join(', ')} WHERE id = ? RETURNING *`
+    )
+      .bind(...params)
+      .first();
+
+    // Audit log
+    await auditLog(env, currentUser.userId, 'event.updated', 'event', eventId, {
+      name: name || event.name,
+      changes: { name, date, status }
+    }, ipAddress);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        event: result,
+        message: "Event updated successfully",
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    console.error("Error updating event:", error);
+
+    return new Response(
+      JSON.stringify({
+        error: "Database error",
+        message: "Failed to update event",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
 }
 
 // PUT - Toggle publish status (editor and admin only)

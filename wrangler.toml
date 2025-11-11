@@ -8,6 +8,9 @@
 name = "longweekend-bandcrawl"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "frontend/dist"
+# Note: Cloudflare Pages ignores wrangler [build] configs and expects the final
+# artifacts to be present in pages_build_output_dir. The GitHub Actions workflow
+# handles installing dependencies and running `npm run build` before deploying.
 
 # D1 Database Binding
 #
@@ -42,10 +45,6 @@ database_id = "6a1fca7d-22e2-4384-8277-5aecd0c97f2f"
 # ADMIN_PASSWORD=your-strong-admin-password-here
 # MASTER_PASSWORD=your-even-stronger-master-password-here
 # DEVELOPER_CONTACT=555-123-4567
-
-# Build configuration
-[build]
-command = "cd frontend && npm install && npm run build"
 
 # Custom routes (optional - Pages handles this automatically)
 # Uncomment if you need custom routing behavior

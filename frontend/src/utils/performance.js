@@ -1,16 +1,22 @@
 // Privacy-preserving performance monitoring
 // No user tracking, aggregate metrics only
 
-let loadListenerAdded = false
+// Use a global symbol to track if listener was added to this window instance
+// Global symbols persist across module resets in tests
+const LISTENER_ADDED = Symbol.for('performanceListenerAdded')
 
 export function measurePageLoad() {
   if (!window.performance) return
   
-  // Prevent multiple listeners from being added
-  if (loadListenerAdded) return
-  loadListenerAdded = true
+  // Prevent multiple listeners from being added to the same window instance
+  if (window[LISTENER_ADDED]) return
+  window[LISTENER_ADDED] = true
 
   window.addEventListener('load', () => {
+    // Prevent multiple executions if listener fires multiple times
+    if (window[LISTENER_ADDED] === 'executed') return
+    window[LISTENER_ADDED] = 'executed'
+    
     setTimeout(() => {
       // Use modern Navigation Timing Level 2 API
       const navEntries = performance.getEntriesByType('navigation')

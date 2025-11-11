@@ -16,9 +16,12 @@ describe('Performance Utilities - Console Logging', () => {
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     consoleTableSpy = vi.spyOn(console, 'table').mockImplementation(() => {})
 
-    // Reset the module-level flag to allow fresh listeners in each test
-    // This will be reset when the module is re-imported after vi.resetModules()
-    
+    // Clear the listener flag on window to allow fresh listeners in each test
+    const LISTENER_ADDED = Symbol.for('performanceListenerAdded')
+    if (window[LISTENER_ADDED]) {
+      delete window[LISTENER_ADDED]
+    }
+
     // Clear module cache to get fresh imports
     vi.resetModules()
   })
@@ -72,13 +75,11 @@ describe('Performance Utilities - Console Logging', () => {
 
       const { measurePageLoad } = await import('../performance.js')
 
-      // Trigger load event
-      await new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true })
-        window.dispatchEvent(new Event('load'))
-      })
-
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event after listener is set up
+      window.dispatchEvent(new Event('load'))
 
       // Wait for setTimeout(0) callback
       await new Promise(resolve => setTimeout(resolve, 10))
@@ -103,7 +104,12 @@ describe('Performance Utilities - Console Logging', () => {
       }
 
       const { measurePageLoad } = await import('../performance.js')
+      
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event so getLargestContentfulPaint() is called
+      window.dispatchEvent(new Event('load'))
 
       // Wait for PerformanceObserver callback
       await new Promise(resolve => setTimeout(resolve, 10))
@@ -161,12 +167,11 @@ describe('Performance Utilities - Console Logging', () => {
 
       const { measurePageLoad } = await import('../performance.js')
 
-      await new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true })
-        window.dispatchEvent(new Event('load'))
-      })
-
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event after listener is set up
+      window.dispatchEvent(new Event('load'))
       await new Promise(resolve => setTimeout(resolve, 10))
 
       // Should NOT call console.table in production
@@ -269,12 +274,11 @@ describe('Performance Utilities - Console Logging', () => {
     it('should calculate DNS time correctly', async () => {
       const { measurePageLoad } = await import('../performance.js')
 
-      await new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true })
-        window.dispatchEvent(new Event('load'))
-      })
-
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event after listener is set up
+      window.dispatchEvent(new Event('load'))
       await new Promise(resolve => setTimeout(resolve, 10))
 
       expect(consoleTableSpy).toHaveBeenCalledWith(
@@ -287,12 +291,11 @@ describe('Performance Utilities - Console Logging', () => {
     it('should calculate TCP time correctly', async () => {
       const { measurePageLoad } = await import('../performance.js')
 
-      await new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true })
-        window.dispatchEvent(new Event('load'))
-      })
-
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event after listener is set up
+      window.dispatchEvent(new Event('load'))
       await new Promise(resolve => setTimeout(resolve, 10))
 
       expect(consoleTableSpy).toHaveBeenCalledWith(
@@ -305,12 +308,11 @@ describe('Performance Utilities - Console Logging', () => {
     it('should calculate total load time correctly', async () => {
       const { measurePageLoad } = await import('../performance.js')
 
-      await new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true })
-        window.dispatchEvent(new Event('load'))
-      })
-
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event after listener is set up
+      window.dispatchEvent(new Event('load'))
       await new Promise(resolve => setTimeout(resolve, 10))
 
       expect(consoleTableSpy).toHaveBeenCalledWith(
@@ -323,12 +325,11 @@ describe('Performance Utilities - Console Logging', () => {
     it('should extract FCP metric', async () => {
       const { measurePageLoad } = await import('../performance.js')
 
-      await new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true })
-        window.dispatchEvent(new Event('load'))
-      })
-
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event after listener is set up
+      window.dispatchEvent(new Event('load'))
       await new Promise(resolve => setTimeout(resolve, 10))
 
       expect(consoleTableSpy).toHaveBeenCalledWith(
@@ -360,12 +361,11 @@ describe('Performance Utilities - Console Logging', () => {
 
       const { measurePageLoad } = await import('../performance.js')
 
-      await new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true })
-        window.dispatchEvent(new Event('load'))
-      })
-
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event after listener is set up
+      window.dispatchEvent(new Event('load'))
       await new Promise(resolve => setTimeout(resolve, 10))
 
       expect(consoleTableSpy).toHaveBeenCalledWith(
@@ -426,12 +426,11 @@ describe('Performance Utilities - Console Logging', () => {
 
       const { measurePageLoad } = await import('../performance.js')
 
-      await new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true })
-        window.dispatchEvent(new Event('load'))
-      })
-
+      // Set up listener BEFORE dispatching load event
       measurePageLoad()
+
+      // Trigger load event after listener is set up
+      window.dispatchEvent(new Event('load'))
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Production build should have ZERO console calls

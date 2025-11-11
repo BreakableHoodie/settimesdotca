@@ -10,11 +10,13 @@
 ## 🎯 Quick Decision Guide
 
 ### Option A: Complete Sprint 3 Testing (2-3 hours)
+
 **Goal:** Finish validating all Sprint 3 features
 **Files:** Public Events API + iCal Feed tests
 **Effort:** 14 test cases, 2-3 hours
 
 ### Option B: Start Image Upload System (1-2 days)
+
 **Goal:** Implement drag-and-drop image upload with R2
 **Priority:** High user value, critical feature
 **Effort:** R2 setup + endpoints + UI components
@@ -26,11 +28,13 @@
 ### Quick Start (30 seconds)
 
 **1. Open Cursor**
+
 ```bash
 cursor /Users/andrelevesque/Projects/longweekendbandcrawl/longweekendbandcrawl
 ```
 
 **2. Copy This Prompt**
+
 ```
 Read docs/CURSOR_TASK_SPRINT3_REMAINING_TESTS.md and implement all test cases following the specification.
 
@@ -66,6 +70,7 @@ Start with Phase 1 (Setup) from the specification document.
 ### Research Phase (SuperClaude - 30 minutes)
 
 **Commands to run FIRST:**
+
 ```bash
 # Research R2 integration
 /sc:research "Cloudflare R2 direct upload from browser"
@@ -83,6 +88,7 @@ Start with Phase 1 (Setup) from the specification document.
 ### Implementation Phase (Cursor - 4-6 hours)
 
 **After SuperClaude research, create spec document:**
+
 ```
 docs/CURSOR_TASK_IMAGE_UPLOAD.md
 ```
@@ -94,12 +100,14 @@ docs/CURSOR_TASK_IMAGE_UPLOAD.md
 ## ✅ What's Already Done
 
 ### Sprint 3 Testing Status
+
 - ✅ Subscription system tests (21/21 passing, 90%+ coverage)
 - ✅ Production bug fixed (verification_token in SELECT query)
 - ⏳ Public API tests (pending)
 - ⏳ iCal feed tests (pending)
 
 ### Configuration Files
+
 - ✅ `.cursorrules` - Comprehensive coding standards
 - ✅ `vitest.config.js` - Test configuration
 - ✅ `package.json` - Test scripts setup
@@ -110,6 +118,7 @@ docs/CURSOR_TASK_IMAGE_UPLOAD.md
 ## 🔍 Validation Commands
 
 ### After Option A Completes
+
 ```bash
 # Run all tests
 npm test
@@ -125,6 +134,7 @@ npm run test:coverage
 ```
 
 ### After Option B Completes
+
 ```bash
 # Test upload endpoint
 curl -X POST http://localhost:8788/api/admin/upload \
@@ -141,14 +151,17 @@ npx wrangler pages dev frontend/dist --d1 DB --r2 ASSETS
 ## 📊 Updated Project Status
 
 ### Sprint 3 Features
+
 - ✅ Email Subscriptions (21 tests, 90%+ coverage, bug fixed)
 - ⏳ Public Event API (implementation complete, tests pending)
 - ⏳ iCal Feeds (implementation complete, tests pending)
 
 ### Priority 1: Image Upload
+
 - ❌ Not started (waiting for Option B decision)
 
 ### Sprint 3 Completion Status
+
 - **With Option A:** 100% tested and validated ✅
 - **Without Option A:** Subscriptions validated (66%), public API/iCal untested
 
@@ -157,14 +170,18 @@ npx wrangler pages dev frontend/dist --d1 DB --r2 ASSETS
 ## 💡 Recommendation
 
 ### If Priority is Quality & Completeness
+
 → **Choose Option A** (Complete Sprint 3 tests)
+
 - Time: 2-3 hours
 - Ensures all Sprint 3 features are validated
 - Establishes comprehensive test coverage baseline
 - Lower risk before starting new feature
 
 ### If Priority is User Value & Features
+
 → **Choose Option B** (Start Image Upload)
+
 - Time: 1-2 days (with research)
 - High user value (visual engagement)
 - Non-technical user friendly
@@ -175,26 +192,28 @@ npx wrangler pages dev frontend/dist --d1 DB --r2 ASSETS
 ## 🎯 Next Action Decision
 
 **A)** Complete Sprint 3 tests (2-3 hours)
-   → Paste Option A prompt into Cursor
+→ Paste Option A prompt into Cursor
 
 **B)** Start Image Upload system (1-2 days)
-   → Run SuperClaude research commands first
-   → Then create spec and hand off to Cursor
+→ Run SuperClaude research commands first
+→ Then create spec and hand off to Cursor
 
 **C)** Something else?
-   → Specify what you'd like to prioritize
+→ Specify what you'd like to prioritize
 
 ---
 
 ## 📚 Key Documents
 
 **For Option A:**
+
 - `docs/CURSOR_TASK_SPRINT3_REMAINING_TESTS.md` - Main task spec
 - `functions/api/subscriptions/__tests__/` - Pattern reference
 - `functions/api/events/public.js` - Implementation to test
 - `functions/api/feeds/ical.js` - Implementation to test
 
 **For Option B:**
+
 - `docs/PROJECT_STATUS_AND_ROADMAP.md` - Priority 1 details
 - Need to create: `docs/CURSOR_TASK_IMAGE_UPLOAD.md`
 
@@ -203,12 +222,14 @@ npx wrangler pages dev frontend/dist --d1 DB --r2 ASSETS
 ## 🚀 You're Ready!
 
 **Option A (Sprint 3 Tests):**
+
 1. Copy prompt from section above
 2. Paste into Cursor chat
 3. Press Enter
 4. Wait 2-3 hours
 
 **Option B (Image Upload):**
+
 1. Run SuperClaude research commands
 2. Review research findings
 3. Create implementation spec
@@ -223,4 +244,4 @@ npx wrangler pages dev frontend/dist --d1 DB --r2 ASSETS
 
 **END OF READY FOR CURSOR - NEXT TASKS**
 
-*For previous task status, see `docs/STATUS_SUBSCRIPTION_TESTS_2025_10_26.md`*
+_For previous task status, see `docs/STATUS_SUBSCRIPTION_TESTS_2025_10_26.md`_

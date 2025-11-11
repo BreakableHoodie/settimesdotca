@@ -15,6 +15,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 **File**: `/home/user/longweekend-bandcrawl/frontend/src/main.jsx` (104 lines)
 
 **Strengths:**
+
 - Clean router setup with lazy loading for admin/band profiles
 - Error boundaries wrapping lazy-loaded routes properly (lines 81-99)
 - Service worker cleanup for dev environment (lines 47-59)
@@ -22,6 +23,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 - Robots meta tag configuration for preview builds (lines 16-26)
 
 **Issues:**
+
 - Service worker commented out indefinitely - should be resolved with a plan
 
 ---
@@ -29,6 +31,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 **File**: `/home/user/longweekend-bandcrawl/frontend/src/App.jsx` (229 lines)
 
 **Strengths:**
+
 - Good separation of concerns: data loading, state management, UI rendering
 - Proper use of lazy loading for MySchedule and VenueInfo
 - Clean error states with proper messaging
@@ -36,12 +39,12 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 - Cache-busting versioning strategy (line 15)
 
 **Issues:**
+
 - **Multiple useEffect hooks** (lines 59-127) - could be consolidated
   - Lines 59-118: Data loading with abort controller
   - Lines 120-126: Current time updates
   - Lines 128-131: localStorage persistence
   - Suggestion: Merge time-related effects
-  
 - **Duplicate localStorage reads** (lines 44-50) - reads selectedBands twice in useState initializers
   - Line 44: `const saved = localStorage.getItem('selectedBands')`
   - Line 49: `const saved = localStorage.getItem('selectedBands')` (again!)
@@ -56,15 +59,15 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 
 ### Component Size Analysis
 
-| Component | Lines | Assessment |
-|-----------|-------|-----------|
-| EventsTab.jsx | **1,063** | ⚠️ EXTREMELY LARGE |
-| BandsTab.jsx | **814** | ⚠️ VERY LARGE |
-| EventWizard.jsx | 471 | ⚠️ LARGE |
-| MySchedule.jsx | 526 | ⚠️ LARGE |
-| ScheduleView.jsx | 209 | ✓ Acceptable |
-| AdminPanel.jsx | 267 | ⚠️ LARGE |
-| VenuesTab.jsx | 295 | ⚠️ LARGE |
+| Component        | Lines     | Assessment         |
+| ---------------- | --------- | ------------------ |
+| EventsTab.jsx    | **1,063** | ⚠️ EXTREMELY LARGE |
+| BandsTab.jsx     | **814**   | ⚠️ VERY LARGE      |
+| EventWizard.jsx  | 471       | ⚠️ LARGE           |
+| MySchedule.jsx   | 526       | ⚠️ LARGE           |
+| ScheduleView.jsx | 209       | ✓ Acceptable       |
+| AdminPanel.jsx   | 267       | ⚠️ LARGE           |
+| VenuesTab.jsx    | 295       | ⚠️ LARGE           |
 
 ### Complex Components Requiring Refactoring
 
@@ -79,18 +82,18 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
    - Bulk operations (lines 289-365)
    - Form state management (lines 34-156)
    - Rendering UI for both orphaned and event-assigned bands (lines 403-814)
-   
 2. **Form state is overly complex** (lines 34-42, 93-105, 107-115):
+
    ```jsx
    // Lines 34-42: Initial state
    const [formData, setFormData] = useState(() => ({
      name: '', event_id: selectedEventId ? selectedEventId.toString() : '',
      venue_id: '', start_time: '', end_time: '', duration: '', url: '',
    }))
-   
+
    // Lines 93-105: Reset form
    const resetForm = () => { setFormData({ ...lots of fields }) }
-   
+
    // Lines 107-115: Update on event change
    useEffect(() => {
      if (!editingId) {
@@ -98,7 +101,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
      }
    }, [selectedEventId, editingId])
    ```
-   
+
    **Recommendation**: Extract form state to a custom hook or form library
 
 3. **Input change handler is 39 lines** (lines 117-156):
@@ -113,12 +116,13 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
    - Suggestion: Let API be source of truth, show error from API
 
 **Recommendations:**
+
 - Extract BandForm rendering to separate component (lines 535-547)
 - Extract bulk operations to separate component/hook
 - Create custom hook for form state management
 - Move conflict detection to utils
 
-#### 2. **EventsTab.jsx** - 1,063 Lines 
+#### 2. **EventsTab.jsx** - 1,063 Lines
 
 **Location**: `/home/user/longweekend-bandcrawl/frontend/src/admin/EventsTab.jsx`
 
@@ -131,6 +135,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
    - EventPublishing (publish/unpublish logic)
 
 2. **Many state variables** (first 100 lines show):
+
    ```jsx
    const [showCreateForm, setShowCreateForm] = useState(false)
    const [editingEventId, setEditingEventId] = useState(null)
@@ -150,6 +155,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
    - Duplicate API calls not prevented
 
 **Recommendations:**
+
 - Break into 4-5 smaller components
 - Extract business logic to custom hooks
 - Use consistent API pattern from adminApi
@@ -161,16 +167,18 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 **Issues:**
 
 1. **Conflict detection is O(n²)** (lines 135-161):
+
    ```jsx
    // Loops through all visible bands twice looking for overlaps
    for (let i = 0; i < visibleBands.length; i++) {
-     const current = visibleBands[i]
+     const current = visibleBands[i];
      for (let j = i + 1; j < visibleBands.length; j++) {
-       const other = visibleBands[j]
+       const other = visibleBands[j];
        // Check overlap logic...
      }
    }
    ```
+
    - For a 50-band schedule, this is 1,225 comparisons
    - **Recommendation**: Use memoized helper from utils or Map-based lookup
 
@@ -187,12 +195,14 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 4. **Variable `dreReminderPlaced` is a flag** (line 301, 427-430):
    - Anti-pattern in React - using mutable variable in render
    - Should use state or a proper ternary condition
+
    ```jsx
-   let dreReminderPlaced = false // Line 301 - BAD
+   let dreReminderPlaced = false; // Line 301 - BAD
    // Then in map:
-   const showDreReminder = !dreReminderPlaced && highlightedBandIds.has(band.id)
+   const showDreReminder =
+     !dreReminderPlaced && highlightedBandIds.has(band.id);
    if (showDreReminder) {
-     dreReminderPlaced = true // Line 429 - MUTATION IN RENDER!
+     dreReminderPlaced = true; // Line 429 - MUTATION IN RENDER!
    }
    ```
 
@@ -201,6 +211,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
    - Should be extracted to shared utility
 
 **Recommendations:**
+
 - Extract conflict detection to memoized utility
 - Extract reminder logic to utils
 - Fix dreReminderPlaced anti-pattern with proper logic
@@ -215,24 +226,26 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 
 **File**: `frontend/package.json`
 
-**Problem**: 
+**Problem**:
+
 - `BandForm.jsx` imports and uses `PropTypes` (line 1)
 - But `prop-types` is NOT listed in dependencies
 
 ```jsx
 // BandForm.jsx line 1
-import PropTypes from 'prop-types'
+import PropTypes from "prop-types";
 
 // BandForm.jsx lines 183-202
 BandForm.propTypes = {
   events: PropTypes.arrayOf(PropTypes.object).isRequired,
   // ...
-}
+};
 ```
 
 **Status**: Likely works because it's in devDependencies or peer dependency from somewhere, but this will cause build failures or runtime errors in production.
 
 **Fix**: Add to `package.json`:
+
 ```json
 "dependencies": {
   "prop-types": "^15.8.1"
@@ -245,20 +258,22 @@ BandForm.propTypes = {
 
 **Problem**: Only `BandForm.jsx` uses PropTypes. Other components with props don't validate:
 
-| Component | Accepts Props | Has Validation |
-|-----------|---------------|-----------------|
-| BandCard.jsx (84 lines) | Yes (band, isSelected, onToggle, etc.) | ❌ No |
-| MySchedule.jsx (526 lines) | Yes (bands, onToggleBand, etc.) | ❌ No |
-| ScheduleView.jsx (209 lines) | Yes (8 props) | ❌ No |
-| Header.jsx (133 lines) | Yes (view, setView, etc.) | ❌ No |
-| ComingUp.jsx (85 lines) | Yes (bands) | ❌ No |
+| Component                    | Accepts Props                          | Has Validation |
+| ---------------------------- | -------------------------------------- | -------------- |
+| BandCard.jsx (84 lines)      | Yes (band, isSelected, onToggle, etc.) | ❌ No          |
+| MySchedule.jsx (526 lines)   | Yes (bands, onToggleBand, etc.)        | ❌ No          |
+| ScheduleView.jsx (209 lines) | Yes (8 props)                          | ❌ No          |
+| Header.jsx (133 lines)       | Yes (view, setView, etc.)              | ❌ No          |
+| ComingUp.jsx (85 lines)      | Yes (bands)                            | ❌ No          |
 
-**Impact**: 
+**Impact**:
+
 - Runtime errors won't be caught until they happen
 - No IDE warnings for prop misuse
 - Harder to maintain component contracts
 
 **Recommendation**: Either:
+
 1. Add PropTypes to all components (lowest effort)
 2. Migrate to TypeScript (better long-term)
 3. At minimum, document prop interfaces in JSDoc comments
@@ -272,7 +287,7 @@ BandForm.propTypes = {
 Line 3 imports `useState` but never uses it - only uses `useState` indirectly via props and `faCheck, faCopy` icons are imported but used correctly.
 
 ```jsx
-import { useState } from 'react'  // LINE 3 - UNUSED
+import { useState } from "react"; // LINE 3 - UNUSED
 ```
 
 Actually reviewing more carefully: only `useState` is declared for `copyAllLabel` state. This is used. The import is necessary.
@@ -283,7 +298,8 @@ Actually reviewing more carefully: only `useState` is declared for `copyAllLabel
 
 ### Issue #4: localStorage Access Pattern - Inconsistent
 
-**Problem**: 
+**Problem**:
+
 1. Direct `localStorage` access scattered throughout (28 instances)
 2. No abstraction layer
 3. Magic strings repeated
@@ -292,14 +308,14 @@ Actually reviewing more carefully: only `useState` is declared for `copyAllLabel
 
 ```jsx
 // App.jsx lines 44, 49, 130
-localStorage.getItem('selectedBands')
-localStorage.setItem('selectedBands', JSON.stringify(selectedBands))
+localStorage.getItem("selectedBands");
+localStorage.setItem("selectedBands", JSON.stringify(selectedBands));
 
 // BandsTab.jsx line 308
-localStorage.getItem('adminPassword')
+localStorage.getItem("adminPassword");
 
 // adminApi.js lines 72
-window.sessionStorage.clear()
+window.sessionStorage.clear();
 ```
 
 **Recommendation**: Create storage utility:
@@ -307,17 +323,19 @@ window.sessionStorage.clear()
 ```jsx
 // utils/storage.js
 const KEYS = {
-  SELECTED_BANDS: 'selectedBands',
-  ADMIN_PASSWORD: 'adminPassword',
-  SESSION_TOKEN: 'sessionToken',
-}
+  SELECTED_BANDS: "selectedBands",
+  ADMIN_PASSWORD: "adminPassword",
+  SESSION_TOKEN: "sessionToken",
+};
 
 export const storage = {
-  getSelectedBands: () => JSON.parse(localStorage.getItem(KEYS.SELECTED_BANDS) || '[]'),
-  setSelectedBands: (bands) => localStorage.setItem(KEYS.SELECTED_BANDS, JSON.stringify(bands)),
+  getSelectedBands: () =>
+    JSON.parse(localStorage.getItem(KEYS.SELECTED_BANDS) || "[]"),
+  setSelectedBands: (bands) =>
+    localStorage.setItem(KEYS.SELECTED_BANDS, JSON.stringify(bands)),
   getAdminPassword: () => localStorage.getItem(KEYS.ADMIN_PASSWORD),
   clearSession: () => sessionStorage.clear(),
-}
+};
 ```
 
 ---
@@ -331,24 +349,26 @@ Lines 77-100 have catch blocks with only comments:
 ```jsx
 try {
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    await navigator.clipboard.writeText(text)
-    return true
+    await navigator.clipboard.writeText(text);
+    return true;
   }
 } catch {
-  /* fallback below */  // LINE 78 - NO ERROR LOGGING
+  /* fallback below */
+  // LINE 78 - NO ERROR LOGGING
 }
 
 try {
-  const textarea = document.createElement('textarea')
+  const textarea = document.createElement("textarea");
   // ... more logic
 } catch {
-  return false  // LINE 99 - SILENT FAILURE
+  return false; // LINE 99 - SILENT FAILURE
 }
 ```
 
 **Impact**: If copy fails for unknown reasons, user gets no feedback and no logs for debugging.
 
 **Recommendation**: Log errors:
+
 ```jsx
 catch (err) {
   console.warn('[ScheduleView] Copy to clipboard failed:', err)
@@ -362,6 +382,7 @@ Similar issue in `/home/user/longweekend-bandcrawl/frontend/src/components/MySch
 ### Issue #6: Accessibility Concerns
 
 **Good Examples** ✓:
+
 - Proper `aria-label`, `aria-pressed`, `role` attributes throughout
 - Focus visible rings on buttons
 - `aria-live="polite"` on status elements (ComingUp, MySchedule)
@@ -370,29 +391,35 @@ Similar issue in `/home/user/longweekend-bandcrawl/frontend/src/components/MySch
 **Issues** ⚠️:
 
 1. **VenueInfo.jsx** - `JSON.parse` without error handling (line 7-8):
+
 ```jsx
-const venues = eventData?.venue_info ? JSON.parse(eventData.venue_info) : []
+const venues = eventData?.venue_info ? JSON.parse(eventData.venue_info) : [];
 ```
+
 If venue_info is malformed JSON, entire component crashes. Should wrap in try-catch.
 
 2. **BandCard.jsx** - Inconsistent keyboard handling (lines 18-24):
+
 ```jsx
-const handleKeyDown = e => {
-  if (!clickable) return
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault()
-    handleToggle()
+const handleKeyDown = (e) => {
+  if (!clickable) return;
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    handleToggle();
   }
-}
+};
 ```
+
 Only works when focused. Good, but could be clearer with `role="button"` on non-button divs.
 
 3. **Header.jsx** - Social media links missing labels (lines 68-87):
+
 ```jsx
 <a href="https://www.instagram.com/..." className="...">
   <FontAwesomeIcon icon={faInstagram} aria-hidden="true" />
 </a>
 ```
+
 Should have visible text or better aria-label. Currently relies on title attribute.
 
 ---
@@ -404,6 +431,7 @@ Should have visible text or better aria-label. Currently relies on title attribu
 **Assessment**: ✓ Reasonable for app size, but could be improved
 
 The app uses React local state effectively but without a clear pattern:
+
 - `App.jsx`: 8 state variables (bands, selectedBands, view, timeFilter, loading, error, showPast, currentTime)
 - `AdminPanel.jsx`: 6 state variables (activeTab, selectedEventId, events, loading, toast, showWizard)
 - `BandsTab.jsx`: 12+ state variables + Set for selectedBands
@@ -415,18 +443,25 @@ The app uses React local state effectively but without a clear pattern:
 ```jsx
 // PROBLEMATIC - Creates new object on every render
 const [formData, setFormData] = useState(() => ({
-  name: '',
-  event_id: selectedEventId ? selectedEventId.toString() : '',
+  name: "",
+  event_id: selectedEventId ? selectedEventId.toString() : "",
   // ...
-}))
+}));
 ```
 
 Better approach:
+
 ```jsx
 const INITIAL_FORM = {
-  name: '', event_id: '', venue_id: '', start_time: '', end_time: '', duration: '', url: ''
-}
-const [formData, setFormData] = useState(INITIAL_FORM)
+  name: "",
+  event_id: "",
+  venue_id: "",
+  start_time: "",
+  end_time: "",
+  duration: "",
+  url: "",
+};
+const [formData, setFormData] = useState(INITIAL_FORM);
 ```
 
 ---
@@ -438,6 +473,7 @@ const [formData, setFormData] = useState(INITIAL_FORM)
 **File**: `/home/user/longweekend-bandcrawl/frontend/src/main.jsx`
 
 Routes are clean and logical:
+
 - `/` → Main app (eager loaded)
 - `/admin/*` → Admin panel (lazy loaded)
 - `/embed/:slug` → Embed page (eager loaded)
@@ -445,6 +481,7 @@ Routes are clean and logical:
 - `/subscribe`, `/reset-password` → Pages (eager loaded)
 
 **Good practices**:
+
 - Lazy loading for heavy admin interface
 - Fallback loading states
 - Error boundaries on async routes
@@ -460,6 +497,7 @@ No issues found with routing.
 **File**: `/home/user/longweekend-bandcrawl/frontend/src/components/ErrorBoundary.jsx` (94 lines)
 
 **Strengths**:
+
 - Proper class component implementation
 - Custom fallback prop support
 - Dev-only error details (lines 55-69)
@@ -467,6 +505,7 @@ No issues found with routing.
 - Good styling and UX
 
 **Minor Issue**:
+
 - Line 38: `this.props.fallback` check but also hardcoded default UI below
 - Could be clearer about precedence
 
@@ -479,41 +518,48 @@ No issues found with routing.
 **Issues**:
 
 1. **Timing measurement is incorrect** (line 8):
+
 ```jsx
-window.addEventListener('load', () => {
-  setTimeout(() => {  // WHY TIMEOUT?
-    const timing = window.performance.timing  // This is deprecated!
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    // WHY TIMEOUT?
+    const timing = window.performance.timing; // This is deprecated!
     // ...
-  }, 0)
-})
+  }, 0);
+});
 ```
+
 - `setTimeout(..., 0)` defeats the purpose of measuring load time
 - `window.performance.timing` is deprecated, should use `PerformanceObserver`
 
 2. **getLargestContentfulPaint creates observer but doesn't return value** (lines 41-55):
+
 ```jsx
 function getLargestContentfulPaint() {
-  const observer = new PerformanceObserver(list => {
-    const entries = list.getEntries()
-    const lastEntry = entries[entries.length - 1]
+  const observer = new PerformanceObserver((list) => {
+    const entries = list.getEntries();
+    const lastEntry = entries[entries.length - 1];
     if (import.meta.env.DEV) {
-      console.log('LCP:', Math.round(lastEntry.startTime), 'ms')  // Only logs!
+      console.log("LCP:", Math.round(lastEntry.startTime), "ms"); // Only logs!
     }
-  })
+  });
   // ... but returns undefined!
 }
 ```
+
 Function logs LCP to console but doesn't return it for metrics object.
 
 3. **Metrics object references undefined value** (line 21):
+
 ```jsx
 const metrics = {
   // ...
-  lcp: getLargestContentfulPaint(),  // Returns undefined!
-}
+  lcp: getLargestContentfulPaint(), // Returns undefined!
+};
 ```
 
-**Recommendation**: 
+**Recommendation**:
+
 - Use modern Performance API
 - Fix LCP measurement and return value
 - Remove setTimeout - measure when page actually loads
@@ -525,12 +571,14 @@ const metrics = {
 **File**: `/home/user/longweekend-bandcrawl/frontend/src/utils/validation.js` (102 lines)
 
 **Strengths**:
+
 - Comprehensive band data validation
 - Detailed error messages with band context
 - Regex validation for dates/times
 - Checks for parseability
 
 **Minor Improvement**:
+
 - Line 97 comment says "For simplicity, we'll allow any end time" - but what if end_time is before start_time?
 - Should validate: `endDateTime > startDateTime`
 
@@ -541,12 +589,14 @@ const metrics = {
 **File**: `/home/user/longweekend-bandcrawl/frontend/src/utils/adminApi.js` (first 100 lines shown)
 
 **Strengths**:
+
 - Centralized API calls
 - Consistent error handling (handleResponse)
 - Session token management
 - Modular exports (authApi, eventsApi, bandsApi)
 
 **Could Improve**:
+
 - No retry logic
 - No timeout handling
 - Direct `localStorage` access instead of utils abstraction
@@ -560,31 +610,36 @@ const metrics = {
 **File**: `/home/user/longweekend-bandcrawl/frontend/src/components/MySchedule.jsx`
 
 Lines 120-124 create new array every render:
+
 ```jsx
-const sortedBands = [...bands].sort((a, b) => {  // Creates new array EVERY render
-  const aTime = new Date(`${a.date}T${a.startTime}:00`)
-  const bTime = new Date(`${b.date}T${b.startTime}:00`)
-  return aTime - bTime
-})
+const sortedBands = [...bands].sort((a, b) => {
+  // Creates new array EVERY render
+  const aTime = new Date(`${a.date}T${a.startTime}:00`);
+  const bTime = new Date(`${b.date}T${b.startTime}:00`);
+  return aTime - bTime;
+});
 ```
 
 **Fix**: Memoize:
+
 ```jsx
 const sortedBands = useMemo(
-  () => [...bands].sort((a, b) => {
-    const aTime = new Date(`${a.date}T${a.startTime}:00`)
-    const bTime = new Date(`${b.date}T${b.startTime}:00`)
-    return aTime - bTime
-  }),
-  [bands]
-)
+  () =>
+    [...bands].sort((a, b) => {
+      const aTime = new Date(`${a.date}T${a.startTime}:00`);
+      const bTime = new Date(`${b.date}T${b.startTime}:00`);
+      return aTime - bTime;
+    }),
+  [bands],
+);
 ```
 
 **File**: `/home/user/longweekend-bandcrawl/frontend/src/admin/BandsTab.jsx`
 
 Line 384 already does this correctly:
+
 ```jsx
-const sortedBands = useMemo(() => sortBandsByStart(bands), [bands])  // GOOD
+const sortedBands = useMemo(() => sortBandsByStart(bands), [bands]); // GOOD
 ```
 
 ---
@@ -596,9 +651,9 @@ const sortedBands = useMemo(() => sortBandsByStart(bands), [bands])  // GOOD
 ```jsx
 const baseClasses = `w-full p-4 rounded-xl transition-transform duration-150 ${
   isSelected
-    ? 'bg-band-orange text-band-navy shadow-lg scale-105 border-2 border-yellow-400'
-    : 'bg-band-orange/90 text-band-navy hover:bg-band-orange hover:scale-102 shadow-md'
-} relative`
+    ? "bg-band-orange text-band-navy shadow-lg scale-105 border-2 border-yellow-400"
+    : "bg-band-orange/90 text-band-navy hover:bg-band-orange hover:scale-102 shadow-md"
+} relative`;
 ```
 
 This creates new string every render. For a card that's used 50 times, this is 50 recalculations.
@@ -613,12 +668,11 @@ This creates new string every render. For a card that's used 50 times, this is 5
 
 1. **Fix missing prop-types dependency** - CRITICAL
    - Add to package.json or remove usage
-   
 2. **Add prop validation** - All components
    - At minimum use JSDoc prop types
    - Consider migrating to TypeScript
 
-3. **Fix performance.js** 
+3. **Fix performance.js**
    - Use modern Performance API
    - Fix LCP measurement
 
@@ -670,11 +724,13 @@ This creates new string every render. For a card that's used 50 times, this is 5
 ## Test Coverage
 
 **Status**: Test files exist but minimal coverage
+
 - `ErrorBoundary.test.jsx` - Good coverage for error boundary
 - `a11y.test.jsx` - Accessibility testing
 - `performance.test.js` - Performance monitoring tests
 
 **Recommendation**: Add tests for:
+
 - `BandsTab` form submission and validation
 - `MySchedule` conflict detection
 - `App` localStorage persistence
@@ -684,21 +740,22 @@ This creates new string every render. For a card that's used 50 times, this is 5
 
 ## Summary Metrics
 
-| Metric | Value | Assessment |
-|--------|-------|-----------|
-| Largest component | 1,063 lines | ⚠️ Needs refactoring |
-| Prop validation coverage | 10% | ⚠️ Low |
-| Shared utilities | ~8 files | ✓ Good |
-| Code duplication | ~5 instances | ⚠️ Moderate |
-| Test coverage | ~15% | ⚠️ Low |
-| Accessibility | ~80% | ✓ Good |
-| Error handling | ~70% | ⚠️ Could improve |
+| Metric                   | Value        | Assessment           |
+| ------------------------ | ------------ | -------------------- |
+| Largest component        | 1,063 lines  | ⚠️ Needs refactoring |
+| Prop validation coverage | 10%          | ⚠️ Low               |
+| Shared utilities         | ~8 files     | ✓ Good               |
+| Code duplication         | ~5 instances | ⚠️ Moderate          |
+| Test coverage            | ~15%         | ⚠️ Low               |
+| Accessibility            | ~80%         | ✓ Good               |
+| Error handling           | ~70%         | ⚠️ Could improve     |
 
 ---
 
 ## Final Assessment
 
 **Strengths:**
+
 - Clean routing and lazy loading strategy
 - Good accessibility practices
 - Well-structured utility files
@@ -706,6 +763,7 @@ This creates new string every render. For a card that's used 50 times, this is 5
 - Responsive UI components
 
 **Weaknesses:**
+
 - Component complexity getting out of hand (EventsTab, BandsTab)
 - Missing type safety (no PropTypes/TypeScript)
 - Undeclared dependency (prop-types)
@@ -713,4 +771,3 @@ This creates new string every render. For a card that's used 50 times, this is 5
 - Performance issues in conflict detection
 
 **Recommendation**: Invest 2-3 sprints in refactoring BandsTab and EventsTab, adding prop validation, and fixing the critical issues before adding major new features.
-

@@ -212,9 +212,9 @@ export default function AdminPanel({ onLogout }) {
         ) : (
           <>
             {activeTab === 'events' && (
-              <EventsTab 
-                events={events} 
-                onEventsChange={loadEvents} 
+              <EventsTab
+                events={events}
+                onEventsChange={loadEvents}
                 showToast={showToast}
                 selectedEventId={selectedEventId}
                 selectedEvent={selectedEvent}

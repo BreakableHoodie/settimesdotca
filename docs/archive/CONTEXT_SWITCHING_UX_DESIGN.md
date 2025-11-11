@@ -10,6 +10,7 @@
 ## Executive Summary
 
 Context switching in the admin panel exists but causes confusion because users cannot easily tell:
+
 1. **Which context they're in** (global vs event-specific)
 2. **How to get back** to global view
 3. **What data they're viewing** when switching tabs
@@ -34,12 +35,14 @@ This document provides professional UX design recommendations prioritized by use
 ### Mental Model Mismatch
 
 **What Users Expect:**
+
 - Clear visual indication of "workspace" (like switching folders in file manager)
 - Obvious "back" or "exit" to return to previous state
 - Persistent visual reminder of current context
 - Familiar navigation patterns from apps they use (Instagram, Facebook, Email)
 
 **What System Currently Provides:**
+
 - Small dropdown with ambiguous label
 - Hidden "Clear Filter" button
 - No visual distinction between contexts
@@ -50,21 +53,27 @@ This document provides professional UX design recommendations prioritized by use
 ## UX Design Principles Applied
 
 ### 1. Progressive Disclosure
+
 Don't overwhelm users with all options at once. Show what's relevant to current context.
 
 ### 2. Visual Hierarchy
+
 Use color, size, and position to indicate importance and relationships.
 
 ### 3. Recognition Over Recall
+
 Users shouldn't need to remember their context. Make it always visible.
 
 ### 4. Consistency
+
 Apply familiar navigation patterns from apps users already know.
 
 ### 5. Forgiveness
+
 Make it easy to undo or go back. Reduce anxiety about "getting lost."
 
 ### 6. Mobile-First Touch Targets
+
 Minimum 44x44px touch targets (WCAG 2.1 AAA compliance).
 
 ---
@@ -74,9 +83,11 @@ Minimum 44x44px touch targets (WCAG 2.1 AAA compliance).
 ## Priority 1: CRITICAL (Fix Before Mobile Optimization)
 
 ### 1.1 Context Banner with Clear Exit Path
+
 **UX Impact: 🔴 CRITICAL** | **Effort: 2 hours** | **Mobile-Optimized: Yes**
 
 **Problem Solved:**
+
 - Users don't know which event they're managing
 - Can't find way back to global view
 - Forget context when switching tabs
@@ -120,6 +131,7 @@ Minimum 44x44px touch targets (WCAG 2.1 AAA compliance).
 ```
 
 **Accessibility:**
+
 - ARIA label: "Currently managing event: Long Weekend Vol. 4. Press to exit to global view."
 - Keyboard shortcut: ESC key exits context
 - Screen reader announces context change
@@ -131,9 +143,11 @@ See `docs/CONTEXT_SWITCHING_IMPROVEMENTS.md` Phase 1.1 (lines 98-118)
 ---
 
 ### 1.2 Breadcrumb Navigation
+
 **UX Impact: 🔴 CRITICAL** | **Effort: 2 hours** | **Mobile-Optimized: Yes**
 
 **Problem Solved:**
+
 - Users don't understand hierarchical location
 - No visual "you are here" indicator
 - Difficult to navigate back through levels
@@ -189,6 +203,7 @@ Mobile (Collapsed):
    - Quick navigation to any level
 
 **Accessibility:**
+
 - ARIA: `nav` with `aria-label="Breadcrumb navigation"`
 - Each item: `aria-current="page"` for active item
 - Screen reader: "Navigation: All Events, then Long Weekend Vol. 4, then Performers, current page"
@@ -198,9 +213,11 @@ Mobile (Collapsed):
 ## Priority 2: IMPORTANT (Include in Mobile Optimization)
 
 ### 2.1 Tab Badges with Context-Aware Counts
+
 **UX Impact: 🟡 IMPORTANT** | **Effort: 1 hour** | **Mobile-Optimized: Yes**
 
 **Problem Solved:**
+
 - Users forget they're in filtered mode when switching tabs
 - No indication of how filter affects data in each tab
 - Unclear if viewing "all" or "some" records
@@ -241,19 +258,23 @@ Event Context (Vol. 4 selected):
   - Color-coded: orange = filtered, gray = global
 
 **Interaction:**
+
 - Hover over badge → Tooltip: "Showing 24 performers for Long Weekend Vol. 4"
 - No click action (badge is informational only)
 
 **Accessibility:**
+
 - ARIA label on tab: "Performers, 24 items in current event"
 - Screen reader: "Performers tab, showing 24 of 50 total performers for selected event"
 
 ---
 
 ### 2.2 Tab Content Headers with Context Summary
+
 **UX Impact: 🟡 IMPORTANT** | **Effort: 2 hours** | **Mobile-Optimized: Yes**
 
 **Problem Solved:**
+
 - Tab content doesn't acknowledge filter state
 - Users don't understand what they're viewing
 - No reinforcement of context within tab
@@ -313,15 +334,18 @@ Event Context (Vol. 4 selected):
 ```
 
 **Accessibility:**
+
 - ARIA live region: Announces context when tab loads
 - Screen reader: "Performers section. Showing 24 performers for Long Weekend Vol. 4 event."
 
 ---
 
 ### 2.3 Improved Event Selector Label & Design
+
 **UX Impact: 🟡 IMPORTANT** | **Effort: 30 minutes** | **Mobile-Optimized: Yes**
 
 **Problem Solved:**
+
 - "Filter:" label doesn't convey significance
 - Users don't understand this controls their workspace
 - Dropdown blends into header
@@ -386,6 +410,7 @@ AFTER:
 - Exit button below dropdown for thumb reach
 
 **Accessibility:**
+
 - ARIA label: "Select event workspace. Currently: Long Weekend Vol. 4"
 - Keyboard: Arrow keys navigate, Enter selects, ESC closes
 - Screen reader: "Event workspace selector. 5 options available. Currently selected: All Events, Global View."
@@ -395,9 +420,11 @@ AFTER:
 ## Priority 3: NICE TO HAVE (Future Iteration)
 
 ### 3.1 Quick Actions in Context Banner
+
 **UX Impact: 🟢 NICE TO HAVE** | **Effort: 2 hours**
 
 **Problem Solved:**
+
 - Common actions require navigation to Events tab
 - Inefficient workflow for event management
 - No quick access to event details
@@ -419,6 +446,7 @@ AFTER:
 - Tooltips on hover (desktop) or long-press (mobile)
 
 **Mobile:**
+
 - Horizontal scroll for actions
 - Swipe gesture to access all actions
 - Most common actions visible without scrolling
@@ -426,9 +454,11 @@ AFTER:
 ---
 
 ### 3.2 Event Stats Quick View
+
 **UX Impact: 🟢 NICE TO HAVE** | **Effort: 1 hour**
 
 **Problem Solved:**
+
 - Users want quick stats without leaving context
 - No visual summary of event scope
 - Stats only visible in Events tab detail view
@@ -446,9 +476,11 @@ AFTER:
 ---
 
 ### 3.3 Persistent Filter Indicator (Sticky)
+
 **UX Impact: 🟢 NICE TO HAVE** | **Effort: 1 hour**
 
 **Problem Solved:**
+
 - Context banner might scroll out of view on long pages
 - Users lose context reminder when scrolling
 
@@ -461,6 +493,7 @@ AFTER:
 ### Touch Target Sizing (WCAG 2.1 AAA Compliance)
 
 **Minimum Sizes:**
+
 - Primary actions (Exit, Breadcrumb links): 48x48px
 - Secondary actions (Badges, metadata): 44x44px
 - Text links: 44px height with padding
@@ -509,6 +542,7 @@ AFTER:
 ### Color Contrast
 
 **Tested Combinations:**
+
 - Brand orange (#FF6B35) on navy background: **4.8:1** (AA compliant)
 - White text on orange badge: **4.5:1** (AA compliant)
 - Light gray (white/70) on navy: **7.2:1** (AAA compliant)
@@ -516,6 +550,7 @@ AFTER:
 ### Keyboard Navigation
 
 **Tab Order:**
+
 1. Event Workspace dropdown
 2. Exit Event button
 3. Breadcrumb links (left to right)
@@ -523,6 +558,7 @@ AFTER:
 5. Tab content
 
 **Keyboard Shortcuts:**
+
 - `ESC` - Exit current event context to global view
 - `Ctrl/Cmd + E` - Jump to Events tab
 - `Ctrl/Cmd + V` - Jump to Venues tab
@@ -535,8 +571,14 @@ AFTER:
 
 ```html
 <!-- Context Banner -->
-<div role="alert" aria-live="polite" aria-label="Currently managing event: Long Weekend Vol. 4">
-  <button aria-label="Exit to global view and manage all events">Exit to Global View</button>
+<div
+  role="alert"
+  aria-live="polite"
+  aria-label="Currently managing event: Long Weekend Vol. 4"
+>
+  <button aria-label="Exit to global view and manage all events">
+    Exit to Global View
+  </button>
 </div>
 
 <!-- Breadcrumb -->
@@ -548,12 +590,17 @@ AFTER:
 </nav>
 
 <!-- Tab with Badge -->
-<button role="tab" aria-selected="true" aria-label="Performers, showing 24 items in current event">
+<button
+  role="tab"
+  aria-selected="true"
+  aria-label="Performers, showing 24 items in current event"
+>
   Performers <span aria-label="24 items">(24)</span>
 </button>
 ```
 
 **Focus Management:**
+
 - When context changes, focus moves to context banner
 - Screen reader announces: "Context changed. Now managing Long Weekend Vol. 4."
 - Focus visible indicator: 2px orange outline with 2px offset
@@ -563,10 +610,14 @@ AFTER:
 ```css
 @media (prefers-reduced-motion: reduce) {
   /* Disable badge pulse animation */
-  .badge-filtered { animation: none; }
+  .badge-filtered {
+    animation: none;
+  }
 
   /* Disable context banner slide-in */
-  .context-banner { transition: none; }
+  .context-banner {
+    transition: none;
+  }
 }
 ```
 
@@ -577,12 +628,14 @@ AFTER:
 ### Linear (Project Management)
 
 **What They Do Well:**
+
 - **Contextual breadcrumbs** at top of every view
 - **Subtle background color changes** when in project vs global view
 - **Quick exit path** always visible
 - **Keyboard shortcuts** prominently displayed
 
 **Apply to Our Design:**
+
 - Breadcrumb pattern (Priority 1.2)
 - Background color shift in filtered tabs (Priority 2.2)
 - Keyboard shortcut hints in tooltips
@@ -590,12 +643,14 @@ AFTER:
 ### Notion (Workspace Switcher)
 
 **What They Do Well:**
+
 - **Workspace selector** is prominently placed
 - **Visual icon** indicates current workspace
 - **Metadata preview** in dropdown (members, pages, etc.)
 - **Smooth transitions** between contexts
 
 **Apply to Our Design:**
+
 - Event workspace selector design (Priority 2.3)
 - Metadata in dropdown options (performer count, venue count)
 - Icon-based visual language
@@ -603,12 +658,14 @@ AFTER:
 ### Shopify Admin (Multi-Store)
 
 **What They Do Well:**
+
 - **Store indicator** always visible in header
 - **Color-coded badges** for different store states
 - **Quick store switcher** with search
 - **Contextual actions** appear/disappear based on context
 
 **Apply to Our Design:**
+
 - Context banner always-visible design (Priority 1.1)
 - Badge system for filtered/global states (Priority 2.1)
 - Contextual quick actions (Priority 3.1)
@@ -616,12 +673,14 @@ AFTER:
 ### WordPress Dashboard (Multi-Site)
 
 **What They Do Well:**
+
 - **Site selector** in admin bar
 - **Clear "Network Admin" vs "Site Admin"** visual distinction
 - **Consistent placement** of context controls
 - **Mobile-optimized** admin interface
 
 **Apply to Our Design:**
+
 - Visual distinction between global/event views
 - Consistent header placement of event selector
 - Mobile-first responsive patterns
@@ -629,12 +688,14 @@ AFTER:
 ### GitHub (Repository Context)
 
 **What They Do Well:**
+
 - **Repository breadcrumb** always shows org/repo/path
 - **Branch selector** is visually prominent
 - **Contextual tabs** change based on repository
 - **File tree navigation** with clear hierarchy
 
 **Apply to Our Design:**
+
 - Hierarchical breadcrumb structure (Priority 1.2)
 - Context-aware tab content (Priority 2.2)
 
@@ -670,6 +731,7 @@ AFTER:
 ```
 
 **Visual Details:**
+
 - Orange background gradient on context banner (#FF6B35 → rgba(255,107,53,0.1))
 - White text throughout for readability
 - Orange accent on active tab (bottom border)
@@ -710,6 +772,7 @@ AFTER:
 ```
 
 **Mobile Interaction Notes:**
+
 - Swipe left/right on tab bar to switch tabs
 - Tap "..." in breadcrumb to expand full path
 - Pull down on context banner to refresh
@@ -761,28 +824,33 @@ AFTER:
 ### Usability Testing Checklist
 
 **Task 1: Navigate from Global to Event Context**
+
 - [ ] User can find event selector without assistance
 - [ ] User understands purpose of event selector
 - [ ] User successfully selects an event
 - [ ] User recognizes they are now in event context
 
 **Task 2: Switch Between Tabs in Event Context**
+
 - [ ] User maintains awareness of which event they're managing
 - [ ] User understands what data is displayed in each tab
 - [ ] User doesn't get confused when switching tabs
 
 **Task 3: Return to Global View**
+
 - [ ] User can find exit path within 5 seconds
 - [ ] User understands what "Exit to Global View" means
 - [ ] User successfully returns to global view
 - [ ] User recognizes they are now in global context
 
 **Task 4: Navigate Using Breadcrumbs**
+
 - [ ] User understands breadcrumb hierarchy
 - [ ] User can navigate back using breadcrumbs
 - [ ] User finds breadcrumbs helpful for orientation
 
 **Success Metrics:**
+
 - **Task completion rate:** >90%
 - **Time to find exit:** <5 seconds
 - **User confidence rating:** >4/5
@@ -791,17 +859,20 @@ AFTER:
 ### A/B Testing Scenarios
 
 **Test A: Context Banner Placement**
+
 - Variant 1: Banner above breadcrumb
 - Variant 2: Banner below breadcrumb
 - Metric: User recognition speed
 
 **Test B: Exit Button Label**
+
 - Variant 1: "Exit to Global View"
 - Variant 2: "← Back to All Events"
 - Variant 3: "✕ Exit Event"
 - Metric: Click-through rate, user understanding
 
 **Test C: Badge Style**
+
 - Variant 1: Orange circle with count
 - Variant 2: Text badge with "filtered" label
 - Variant 3: Icon badge with filter funnel
@@ -832,18 +903,14 @@ Medium Impact, Medium Effort (LATER):
 ### Recommended Implementation Phases
 
 **Phase 1: Critical UX Fixes (4.5 hours)**
+
 1. Context Banner with Exit Path (2h)
 2. Breadcrumb Navigation (2h)
 3. Improved Event Selector Label (30m)
 
-**Phase 2: Mobile Optimization Integration (3 hours)**
-4. Tab Badges with Counts (1h)
-5. Tab Content Context Headers (2h)
+**Phase 2: Mobile Optimization Integration (3 hours)** 4. Tab Badges with Counts (1h) 5. Tab Content Context Headers (2h)
 
-**Phase 3: Polish & Enhancement (4 hours)**
-6. Quick Actions in Banner (2h)
-7. Event Stats Quick View (1h)
-8. Sticky Banner on Scroll (1h)
+**Phase 3: Polish & Enhancement (4 hours)** 6. Quick Actions in Banner (2h) 7. Event Stats Quick View (1h) 8. Sticky Banner on Scroll (1h)
 
 **Total Estimated Effort:** 11.5 hours (~1.5 days)
 
@@ -852,6 +919,7 @@ Medium Impact, Medium Effort (LATER):
 ## Design Validation Criteria
 
 ### Before Implementation:
+
 - [ ] Mobile mockups reviewed and approved
 - [ ] Color contrast ratios tested (4.5:1 minimum)
 - [ ] Touch target sizes verified (44x44px minimum)
@@ -859,6 +927,7 @@ Medium Impact, Medium Effort (LATER):
 - [ ] Screen reader script written and tested
 
 ### During Implementation:
+
 - [ ] Component matches approved design specs
 - [ ] Responsive breakpoints tested (320px, 768px, 1024px)
 - [ ] ARIA attributes implemented correctly
@@ -866,6 +935,7 @@ Medium Impact, Medium Effort (LATER):
 - [ ] Focus visible indicators present
 
 ### Post-Implementation:
+
 - [ ] User testing with 5+ non-technical users
 - [ ] Task completion rate >90%
 - [ ] Zero critical accessibility violations
@@ -879,16 +949,19 @@ Medium Impact, Medium Effort (LATER):
 ### Quantitative Metrics
 
 **Navigation Efficiency:**
+
 - Time to exit context: <5 seconds (target)
 - Breadcrumb click-through rate: >30%
 - Tab switch without confusion: >95%
 
 **Context Awareness:**
+
 - Users correctly identify current context: >95%
 - Users find exit path on first attempt: >90%
 - Users understand filtered vs global state: >90%
 
 **Mobile Performance:**
+
 - Touch target accuracy: >98%
 - Gesture recognition rate: >95%
 - Mobile task completion: Same as desktop
@@ -896,11 +969,13 @@ Medium Impact, Medium Effort (LATER):
 ### Qualitative Metrics
 
 **User Feedback:**
+
 - "I know where I am": >90% agreement
 - "I can easily go back": >90% agreement
 - "Context is always clear": >85% agreement
 
 **Usability Testing:**
+
 - Zero "I'm lost" moments
 - Positive comments on clarity
 - Reduced support tickets about navigation
@@ -912,18 +987,21 @@ Medium Impact, Medium Effort (LATER):
 ### Shared Design Patterns
 
 **Touch Interactions:**
+
 - Context banner swipe gestures
 - Tab bar swipe navigation
 - Long-press for contextual menus
 - Pull-to-refresh in event context
 
 **Responsive Layout:**
+
 - Stacked mobile layouts
 - Collapsible breadcrumbs
 - Full-width buttons for thumb reach
 - Bottom navigation integration
 
 **Performance:**
+
 - Optimized context banner rendering
 - Smooth tab transitions
 - Minimal reflow on context switch
@@ -951,6 +1029,7 @@ Medium Impact, Medium Effort (LATER):
 ## Appendix: Design Assets Needed
 
 ### Icons Required
+
 - ⚠️ Warning/Context indicator
 - 📍 Pin/Location marker
 - 🌍 Globe (global view)
@@ -962,6 +1041,7 @@ Medium Impact, Medium Effort (LATER):
 - 🔗 Link/Embed
 
 ### Color Palette
+
 - Brand Orange: #FF6B35
 - Band Navy: #1A1F2E
 - Band Purple: #2A1F3D
@@ -974,6 +1054,7 @@ Medium Impact, Medium Effort (LATER):
 - Orange/10: rgba(255, 107, 53, 0.1)
 
 ### Typography
+
 - Primary Font: System UI (-apple-system, BlinkMacSystemFont, Segoe UI, Roboto)
 - Heading Sizes: 20px (mobile) / 24px (desktop)
 - Body Sizes: 14px (mobile) / 16px (desktop)
@@ -981,6 +1062,7 @@ Medium Impact, Medium Effort (LATER):
 - Line Height: 1.5 (body), 1.2 (headings)
 
 ### Spacing Scale
+
 - xs: 4px
 - sm: 8px
 - md: 16px
@@ -988,6 +1070,7 @@ Medium Impact, Medium Effort (LATER):
 - xl: 32px
 
 ### Border Radius
+
 - Small (badges, buttons): 6px
 - Medium (cards): 8px
 - Large (modals): 12px
@@ -999,31 +1082,29 @@ Medium Impact, Medium Effort (LATER):
 ### Priority Sequence for Development
 
 **Week 1: Critical UX Fixes**
+
 1. Implement context banner with exit path
 2. Add breadcrumb navigation
 3. Update event selector label and styling
 
-**Week 2: Mobile Optimization Phase**
-4. Add tab badges with context-aware counts
-5. Implement tab content headers with context summary
-6. Test on real mobile devices
+**Week 2: Mobile Optimization Phase** 4. Add tab badges with context-aware counts 5. Implement tab content headers with context summary 6. Test on real mobile devices
 
-**Week 3: Polish & Validation**
-7. User testing with non-technical organizers
-8. Iterate based on feedback
-9. Accessibility audit and fixes
+**Week 3: Polish & Validation** 7. User testing with non-technical organizers 8. Iterate based on feedback 9. Accessibility audit and fixes
 
 ### Risk Mitigation
 
 **Risk: Users Still Get Lost**
+
 - Mitigation: A/B test different label variations
 - Fallback: Add inline help tooltips
 
 **Risk: Mobile Touch Targets Too Small**
+
 - Mitigation: Validate on actual devices before launch
 - Fallback: Increase spacing, reduce content density
 
 **Risk: Performance Impact on Older Devices**
+
 - Mitigation: Lazy load context banner animations
 - Fallback: Disable animations on low-end devices
 
@@ -1041,6 +1122,7 @@ Medium Impact, Medium Effort (LATER):
 **Document Status:** Ready for Review
 **Next Action:** Stakeholder approval of Priority 1 designs
 **Related Documents:**
+
 - `docs/CONTEXT_SWITCHING_IMPROVEMENTS.md` (Technical Analysis)
 - `docs/CURSOR_TASK_MOBILE_OPTIMIZATION.md` (Mobile Work)
 - `docs/PROJECT_STATUS_AND_ROADMAP.md` (Project Planning)

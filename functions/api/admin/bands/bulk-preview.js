@@ -15,7 +15,7 @@ export async function onRequestPost(context) {
   // Get current band data
   const placeholders = band_ids.map(() => "?").join(",");
   const bands = await env.DB.prepare(
-    `SELECT * FROM bands WHERE id IN (${placeholders})`
+    `SELECT * FROM bands WHERE id IN (${placeholders})`,
   )
     .bind(...band_ids)
     .all();
@@ -50,7 +50,7 @@ export async function onRequestPost(context) {
             (start_time < ? AND end_time > ?) OR
             (start_time >= ? AND start_time < ?)
           )
-      `
+      `,
       )
         .bind(
           venue_id,
@@ -59,7 +59,7 @@ export async function onRequestPost(context) {
           band.end_time,
           band.start_time,
           band.start_time,
-          band.end_time
+          band.end_time,
         )
         .all();
 
@@ -97,7 +97,7 @@ export async function onRequestPost(context) {
             (start_time < ? AND end_time > ?) OR
             (start_time >= ? AND start_time < ?)
           )
-      `
+      `,
       )
         .bind(
           band.venue_id,
@@ -106,7 +106,7 @@ export async function onRequestPost(context) {
           band.end_time,
           start_time,
           start_time,
-          band.end_time
+          band.end_time,
         )
         .all();
 

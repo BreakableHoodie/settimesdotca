@@ -5,18 +5,22 @@ Complete admin panel UI for managing the Long Weekend Band Crawl events, venues,
 ## Components Overview
 
 ### 1. AdminLogin.jsx
+
 Entry point for admin authentication. Handles login, password recovery, and session management.
 
 **Features:**
+
 - Password-based authentication
 - Lockout protection after failed attempts
 - Master password recovery system
 - Session storage for authenticated state
 
 ### 2. AdminPanel.jsx
+
 Main container for the admin interface with tab navigation and event selection.
 
 **Features:**
+
 - Tab navigation (Events, Venues, Bands)
 - Event selector dropdown
 - Toast notification system
@@ -24,12 +28,15 @@ Main container for the admin interface with tab navigation and event selection.
 - Responsive mobile-first design
 
 **Props:**
+
 - `onLogout`: Function - Callback when user logs out
 
 ### 3. EventsTab.jsx
+
 Manage events including creation, duplication, and publishing.
 
 **Features:**
+
 - List all events with details (name, date, slug, status, band count)
 - Create new events with validation
 - Duplicate existing events
@@ -38,14 +45,17 @@ Manage events including creation, duplication, and publishing.
 - Mobile-responsive table/cards
 
 **Props:**
+
 - `events`: Array - List of all events
 - `onEventsChange`: Function - Callback to reload events after changes
 - `showToast`: Function - Display toast notifications
 
 ### 4. VenuesTab.jsx
+
 Manage venue information across all events.
 
 **Features:**
+
 - List all venues with name, address, and band count
 - Add new venues
 - Edit existing venues
@@ -53,12 +63,15 @@ Manage venue information across all events.
 - Mobile-responsive design
 
 **Props:**
+
 - `showToast`: Function - Display toast notifications
 
 ### 5. BandsTab.jsx
+
 Manage bands for a specific event.
 
 **Features:**
+
 - Event-specific band management
 - Add bands with name, venue, times, and optional URL
 - Edit and delete bands
@@ -69,6 +82,7 @@ Manage bands for a specific event.
 - Mobile-responsive design
 
 **Props:**
+
 - `selectedEventId`: Number - Currently selected event ID
 - `selectedEvent`: Object - Currently selected event data
 - `showToast`: Function - Display toast notifications
@@ -76,29 +90,29 @@ Manage bands for a specific event.
 ## Integration Example
 
 ```jsx
-import { useState } from 'react'
-import AdminLogin from './admin/AdminLogin'
-import AdminPanel from './admin/AdminPanel'
+import { useState } from "react";
+import AdminLogin from "./admin/AdminLogin";
+import AdminPanel from "./admin/AdminPanel";
 
 function AdminApp() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const handleLoginSuccess = () => {
-    setIsAuthenticated(true)
-  }
+    setIsAuthenticated(true);
+  };
 
   const handleLogout = () => {
-    setIsAuthenticated(false)
-  }
+    setIsAuthenticated(false);
+  };
 
   if (!isAuthenticated) {
-    return <AdminLogin onLoginSuccess={handleLoginSuccess} />
+    return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
   }
 
-  return <AdminPanel onLogout={handleLogout} />
+  return <AdminPanel onLogout={handleLogout} />;
 }
 
-export default AdminApp
+export default AdminApp;
 ```
 
 ## Routing Integration
@@ -106,9 +120,9 @@ export default AdminApp
 If using React Router:
 
 ```jsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import App from './App'
-import AdminApp from './AdminApp'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import App from "./App";
+import AdminApp from "./AdminApp";
 
 function Root() {
   return (
@@ -118,7 +132,7 @@ function Root() {
         <Route path="/admin" element={<AdminApp />} />
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
 ```
 
@@ -136,8 +150,8 @@ All components use the established band crawl color palette:
 The toast system provides user feedback for all operations:
 
 ```javascript
-showToast('Operation successful!', 'success')
-showToast('Operation failed: error message', 'error')
+showToast("Operation successful!", "success");
+showToast("Operation failed: error message", "error");
 ```
 
 Toasts auto-dismiss after 5 seconds and appear in the bottom-right corner.
@@ -156,15 +170,18 @@ All API calls include the admin password from `sessionStorage` in request header
 ## Validation & Edge Cases
 
 ### Events
+
 - Slug validation (lowercase, hyphens only)
 - Auto-slug generation from event name
 - Date validation
 
 ### Venues
+
 - Cannot delete venues with assigned bands
 - Tooltip explanations for disabled actions
 
 ### Bands
+
 - Time conflict detection at venue level
 - Visual warnings for overlapping times
 - Required venue selection

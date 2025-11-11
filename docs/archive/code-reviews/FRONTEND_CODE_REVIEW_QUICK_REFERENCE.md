@@ -2,23 +2,23 @@
 
 ## Critical Issues (Fix Immediately)
 
-| Issue | File(s) | Location | Severity | Impact |
-|-------|---------|----------|----------|--------|
-| Missing `prop-types` dependency | `package.json`, `BandForm.jsx` | Line 1 | CRITICAL | Build/runtime failures in production |
-| Empty catch blocks (silent failures) | `ScheduleView.jsx`, `MySchedule.jsx` | Lines 77-100, 275-298 | HIGH | No error logging, users get no feedback |
-| `dreReminderPlaced` anti-pattern | `MySchedule.jsx` | Line 301, 427-430 | HIGH | Mutable state in render function, React anti-pattern |
-| Malformed JSON parsing | `VenueInfo.jsx` | Line 7-8 | HIGH | Component crash on invalid data |
-| Deprecated API usage | `performance.js` | Line 9 | MEDIUM | `window.performance.timing` is deprecated |
+| Issue                                | File(s)                              | Location              | Severity | Impact                                               |
+| ------------------------------------ | ------------------------------------ | --------------------- | -------- | ---------------------------------------------------- |
+| Missing `prop-types` dependency      | `package.json`, `BandForm.jsx`       | Line 1                | CRITICAL | Build/runtime failures in production                 |
+| Empty catch blocks (silent failures) | `ScheduleView.jsx`, `MySchedule.jsx` | Lines 77-100, 275-298 | HIGH     | No error logging, users get no feedback              |
+| `dreReminderPlaced` anti-pattern     | `MySchedule.jsx`                     | Line 301, 427-430     | HIGH     | Mutable state in render function, React anti-pattern |
+| Malformed JSON parsing               | `VenueInfo.jsx`                      | Line 7-8              | HIGH     | Component crash on invalid data                      |
+| Deprecated API usage                 | `performance.js`                     | Line 9                | MEDIUM   | `window.performance.timing` is deprecated            |
 
 ## Major Issues (Fix Before Next Release)
 
-| Issue | Component | Lines | Priority | Effort |
-|-------|-----------|-------|----------|--------|
-| **Monolithic Component** | EventsTab.jsx | 1-1063 | HIGH | Refactor into 4+ components |
-| **Complex Component** | BandsTab.jsx | 1-814 | HIGH | Refactor form logic to hook |
-| **Complex Logic** | MySchedule.jsx | 120-300 | MEDIUM | Extract utility functions |
-| **No Prop Validation** | All components (except BandForm) | - | MEDIUM | Add PropTypes or JSDoc |
-| **Duplicate Code** | copyBands() | ScheduleView.jsx (67-101), MySchedule.jsx (261-299) | MEDIUM | Extract to shared utility |
+| Issue                    | Component                        | Lines                                               | Priority | Effort                      |
+| ------------------------ | -------------------------------- | --------------------------------------------------- | -------- | --------------------------- |
+| **Monolithic Component** | EventsTab.jsx                    | 1-1063                                              | HIGH     | Refactor into 4+ components |
+| **Complex Component**    | BandsTab.jsx                     | 1-814                                               | HIGH     | Refactor form logic to hook |
+| **Complex Logic**        | MySchedule.jsx                   | 120-300                                             | MEDIUM   | Extract utility functions   |
+| **No Prop Validation**   | All components (except BandForm) | -                                                   | MEDIUM   | Add PropTypes or JSDoc      |
+| **Duplicate Code**       | copyBands()                      | ScheduleView.jsx (67-101), MySchedule.jsx (261-299) | MEDIUM   | Extract to shared utility   |
 
 ## Code Organization Issues
 
@@ -26,7 +26,7 @@
 
 ```
 utils/storage.js          - Abstract localStorage/sessionStorage access
-utils/copyBands.js        - Shared copy-to-clipboard logic  
+utils/copyBands.js        - Shared copy-to-clipboard logic
 utils/scheduleReminder.js - MySchedule reminder logic
 utils/conflictDetection.js - Optimize O(n²) overlap checking
 admin/hooks/useFormState.js - Custom hook for BandsTab form
@@ -34,11 +34,11 @@ admin/hooks/useFormState.js - Custom hook for BandsTab form
 
 ### Duplicate Code
 
-| Location | Duplication | Solution |
-|----------|-------------|----------|
-| `ScheduleView.jsx:67-101` + `MySchedule.jsx:261-299` | `copyBands()` function | Extract to `utils/copyBands.js` |
-| `BandsTab.jsx:163-170` + `BandsTab.jsx:214-222` | Duplicate name checking | Let API be source of truth |
-| `MySchedule.jsx:189-202` + Similar in BandsTab | Travel warnings | Move to configurable backend data |
+| Location                                             | Duplication             | Solution                          |
+| ---------------------------------------------------- | ----------------------- | --------------------------------- |
+| `ScheduleView.jsx:67-101` + `MySchedule.jsx:261-299` | `copyBands()` function  | Extract to `utils/copyBands.js`   |
+| `BandsTab.jsx:163-170` + `BandsTab.jsx:214-222`      | Duplicate name checking | Let API be source of truth        |
+| `MySchedule.jsx:189-202` + Similar in BandsTab       | Travel warnings         | Move to configurable backend data |
 
 ## Component Size Breakdown
 
@@ -55,21 +55,23 @@ admin/hooks/useFormState.js - Custom hook for BandsTab form
 
 ## Performance Issues
 
-| Issue | Location | Type | Fix |
-|-------|----------|------|-----|
-| O(n²) conflict checking | MySchedule.jsx:135-161 | Algorithm | Use Map-based lookup |
-| Un-memoized array creation | MySchedule.jsx:120-124 | Re-render | Add `useMemo` |
-| Form state recreation | BandsTab.jsx:34-42 | Memory | Extract to constant |
-| Time zone calculation | Every render in various components | Computation | Memoize results |
+| Issue                      | Location                           | Type        | Fix                  |
+| -------------------------- | ---------------------------------- | ----------- | -------------------- |
+| O(n²) conflict checking    | MySchedule.jsx:135-161             | Algorithm   | Use Map-based lookup |
+| Un-memoized array creation | MySchedule.jsx:120-124             | Re-render   | Add `useMemo`        |
+| Form state recreation      | BandsTab.jsx:34-42                 | Memory      | Extract to constant  |
+| Time zone calculation      | Every render in various components | Computation | Memoize results      |
 
 ## Prop Validation Status
 
 ### Components WITH Validation ✓
+
 - BandForm.jsx (uses PropTypes)
 
 ### Components WITHOUT Validation ❌
+
 - BandCard.jsx (8 props)
-- MySchedule.jsx (7 props)  
+- MySchedule.jsx (7 props)
 - ScheduleView.jsx (8 props)
 - Header.jsx (4 props)
 - ComingUp.jsx (1 prop)
@@ -81,51 +83,55 @@ admin/hooks/useFormState.js - Custom hook for BandsTab form
 ## State Management
 
 ### Current Approach
+
 - Local state in components (Recommended for app size)
 - localStorage for user preferences
 - sessionStorage for admin auth
 
 ### Concern
+
 - localStorage accessed directly 28+ times (no abstraction)
 - No clear patterns for shared state between routes
 
 ### Recommendation
+
 - Create `utils/storage.js` to centralize all storage access
 - Consider React Context if state sharing increases
 
 ## Error Handling Assessment
 
-| Category | Status | Examples |
-|----------|--------|----------|
-| API errors | ✓ Handled | App.jsx:104-113, errorBoundary |
-| JSON parsing | ❌ Not handled | VenueInfo.jsx:7-8 |
-| Clipboard | ⚠️ Partial | ScheduleView.jsx:77-100 (no logging) |
-| Form validation | ✓ Good | BandsTab.jsx, BandForm.jsx |
-| Async operations | ⚠️ No timeout | App.jsx fetch calls |
+| Category         | Status         | Examples                             |
+| ---------------- | -------------- | ------------------------------------ |
+| API errors       | ✓ Handled      | App.jsx:104-113, errorBoundary       |
+| JSON parsing     | ❌ Not handled | VenueInfo.jsx:7-8                    |
+| Clipboard        | ⚠️ Partial     | ScheduleView.jsx:77-100 (no logging) |
+| Form validation  | ✓ Good         | BandsTab.jsx, BandForm.jsx           |
+| Async operations | ⚠️ No timeout  | App.jsx fetch calls                  |
 
 ## Accessibility Status
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| ARIA labels | ✓ Good | Most components have proper labels |
-| Focus visible | ✓ Good | Proper focus rings on interactive elements |
-| Keyboard navigation | ✓ Good | Buttons, links work with Enter/Space |
-| Color contrast | ✓ Good | Orange/navy theme has good contrast |
-| Error messages | ⚠️ Fair | Could be more descriptive |
-| Form labels | ✓ Good | Associated with form fields |
+| Feature             | Status  | Notes                                      |
+| ------------------- | ------- | ------------------------------------------ |
+| ARIA labels         | ✓ Good  | Most components have proper labels         |
+| Focus visible       | ✓ Good  | Proper focus rings on interactive elements |
+| Keyboard navigation | ✓ Good  | Buttons, links work with Enter/Space       |
+| Color contrast      | ✓ Good  | Orange/navy theme has good contrast        |
+| Error messages      | ⚠️ Fair | Could be more descriptive                  |
+| Form labels         | ✓ Good  | Associated with form fields                |
 
 ## Testing Status
 
-| Test Type | Coverage | Files |
-|-----------|----------|-------|
-| Unit Tests | ~15% | `__tests__/` folders |
-| Integration | ~5% | Minimal |
-| A11y Tests | ✓ Present | `test/a11y.test.jsx` |
-| E2E | ❌ None | - |
+| Test Type   | Coverage  | Files                |
+| ----------- | --------- | -------------------- |
+| Unit Tests  | ~15%      | `__tests__/` folders |
+| Integration | ~5%       | Minimal              |
+| A11y Tests  | ✓ Present | `test/a11y.test.jsx` |
+| E2E         | ❌ None   | -                    |
 
 ### Critical Tests Needed
+
 - [ ] BandsTab form submission
-- [ ] MySchedule conflict detection  
+- [ ] MySchedule conflict detection
 - [ ] localStorage persistence
 - [ ] API error handling
 - [ ] Admin authentication flow
@@ -177,13 +183,15 @@ frontend/src/
 ## Refactoring Priority
 
 ### Phase 1: Critical Fixes (1 sprint)
+
 1. Add `prop-types` to dependencies
-2. Fix empty catch blocks  
+2. Fix empty catch blocks
 3. Fix `dreReminderPlaced` anti-pattern
 4. Add try-catch to JSON.parse in VenueInfo
 5. Fix performance.js deprecated API
 
 ### Phase 2: Refactoring (2-3 sprints)
+
 1. Split EventsTab.jsx into 4+ components
 2. Split BandsTab.jsx - extract form logic
 3. Extract copyBands to utils
@@ -191,12 +199,14 @@ frontend/src/
 5. Add PropTypes to all components
 
 ### Phase 3: Optimization (1 sprint)
+
 1. Optimize conflict detection algorithm
 2. Add memoization where needed
 3. Improve error messages
 4. Add missing tests
 
 ### Phase 4: Future (Post-MVP)
+
 1. Migrate to TypeScript
 2. Add more comprehensive tests
 3. Implement state management library if complexity increases
@@ -205,14 +215,16 @@ frontend/src/
 ## Quick Wins (Low Effort, High Value)
 
 1. **Extract constants** (1 hour)
+
    ```jsx
    const STORAGE_KEYS = {
-     SELECTED_BANDS: 'selectedBands',
-     ADMIN_PASSWORD: 'adminPassword',
-   }
+     SELECTED_BANDS: "selectedBands",
+     ADMIN_PASSWORD: "adminPassword",
+   };
    ```
 
 2. **Add error logging** (30 min)
+
    ```jsx
    catch (err) {
      console.warn('[ComponentName] Operation failed:', err)
@@ -257,7 +269,6 @@ Error Handling:                 ~70%
 
 1. **Read full review**: `FRONTEND_CODE_REVIEW.md`
 2. **Create tickets** for Phase 1 critical fixes
-3. **Schedule refactoring** for BandsTab/EventsTab  
+3. **Schedule refactoring** for BandsTab/EventsTab
 4. **Add to CI pipeline**: PropTypes validation, unused import detection
 5. **Plan migration**: TypeScript roadmap (if needed)
-

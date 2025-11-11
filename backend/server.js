@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3000;
 app.use(
   helmet({
     contentSecurityPolicy: false, // Disable for development
-  })
+  }),
 );
 app.use(compression());
 app.use(express.json());

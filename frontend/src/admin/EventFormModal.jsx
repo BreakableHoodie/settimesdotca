@@ -53,28 +53,29 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
   }, [event, isOpen])
 
   // Auto-generate slug from name (only when creating)
-  const handleNameChange = (e) => {
+  const handleNameChange = e => {
     const name = e.target.value
     setFormData(prev => ({
       ...prev,
       name,
       // Only auto-generate slug if user hasn't manually edited it
-      slug: !slugEdited && !isEditing
-        ? name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '')
-        : prev.slug,
+      slug:
+        !slugEdited && !isEditing
+          ? name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+          : prev.slug,
     }))
   }
 
-  const handleSlugChange = (e) => {
+  const handleSlugChange = e => {
     const slug = e.target.value
     setFormData(prev => ({ ...prev, slug }))
     setSlugEdited(true) // Mark as manually edited
   }
 
-  const handleInputChange = (e) => {
+  const handleInputChange = e => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
@@ -109,7 +110,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
     return true
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault()
     setError('')
 
@@ -127,16 +128,14 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         return
       }
 
-      const url = isEditing
-        ? `/api/admin/events/${event.id}`
-        : '/api/admin/events'
+      const url = isEditing ? `/api/admin/events/${event.id}` : '/api/admin/events'
 
       const method = isEditing ? 'PATCH' : 'POST'
 
       const response = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
@@ -174,9 +173,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         <div className="p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-band-orange">
-              {isEditing ? 'Edit Event' : 'Create New Event'}
-            </h2>
+            <h2 className="text-2xl font-bold text-band-orange">{isEditing ? 'Edit Event' : 'Create New Event'}</h2>
             <button
               onClick={onClose}
               className="text-white/50 hover:text-white text-2xl transition-colors"
@@ -198,9 +195,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded text-red-200 text-sm">
-              {error}
-            </div>
+            <div className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded text-red-200 text-sm">{error}</div>
           )}
 
           {/* Form */}
@@ -263,9 +258,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 required
                 min={!isEditing ? today : undefined}
               />
-              {!isEditing && (
-                <p className="text-xs text-white/50 mt-1">Date cannot be in the past</p>
-              )}
+              {!isEditing && <p className="text-xs text-white/50 mt-1">Date cannot be in the past</p>}
             </div>
 
             {/* Status */}

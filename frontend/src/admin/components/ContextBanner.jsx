@@ -19,7 +19,7 @@ export default function ContextBanner({ event, onClear }) {
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     })
   }
 

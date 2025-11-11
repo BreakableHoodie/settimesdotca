@@ -63,9 +63,7 @@ export default function BandProfilePage() {
         <div className="container mx-auto px-4 py-12">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-white mb-4">Band Not Found</h1>
-            <p className="text-gray-400 mb-6">
-              We couldn&apos;t find a profile for this band.
-            </p>
+            <p className="text-gray-400 mb-6">We couldn&apos;t find a profile for this band.</p>
             <Link
               to="/"
               className="inline-block px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium"
@@ -88,16 +86,10 @@ export default function BandProfilePage() {
           {/* Band Photo with Overlay */}
           {profile.photo_url ? (
             <div className="relative h-80 bg-gradient-to-b from-band-navy via-band-purple to-band-navy overflow-hidden">
-              <img
-                src={profile.photo_url}
-                alt={profile.name}
-                className="w-full h-full object-cover opacity-60"
-              />
+              <img src={profile.photo_url} alt={profile.name} className="w-full h-full object-cover opacity-60" />
               <div className="absolute inset-0 bg-gradient-to-t from-band-purple via-transparent to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-6">
-                <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-3">
-                  {profile.name}
-                </h1>
+                <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-3">{profile.name}</h1>
                 <div className="flex flex-wrap gap-3">
                   {profile.genre && (
                     <span className="px-4 py-2 bg-band-orange text-white rounded-lg font-bold text-sm shadow-lg">
@@ -134,9 +126,7 @@ export default function BandProfilePage() {
           {(profile.description || profile.social) && (
             <div className="p-6 bg-band-purple/50 border-t border-white/10">
               {profile.description && (
-                <p className="text-white/90 mb-4 leading-relaxed whitespace-pre-wrap">
-                  {profile.description}
-                </p>
+                <p className="text-white/90 mb-4 leading-relaxed whitespace-pre-wrap">{profile.description}</p>
               )}
               {profile.social && (
                 <div className="flex flex-wrap gap-3">
@@ -207,29 +197,23 @@ export default function BandProfilePage() {
                 </div>
                 <div className="divide-y divide-white/10">
                   {profile.upcoming.map((performance, idx) => (
-                    <div
-                      key={idx}
-                      className="p-6 hover:bg-band-navy/30 transition-colors"
-                    >
+                    <div key={idx} className="p-6 hover:bg-band-navy/30 transition-colors">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-band-orange mb-2">
-                            {performance.event_name}
-                          </h3>
+                          <h3 className="text-xl font-semibold text-band-orange mb-2">{performance.event_name}</h3>
                           <div className="flex flex-wrap gap-3 text-sm text-white/70">
                             {performance.event_date && (
                               <span className="flex items-center gap-1">
-                                📅 {new Date(performance.event_date).toLocaleDateString('en-US', {
+                                📅{' '}
+                                {new Date(performance.event_date).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'long',
-                                  day: 'numeric'
+                                  day: 'numeric',
                                 })}
                               </span>
                             )}
                             {performance.venue_name && (
-                              <span className="flex items-center gap-1">
-                                📍 {performance.venue_name}
-                              </span>
+                              <span className="flex items-center gap-1">📍 {performance.venue_name}</span>
                             )}
                             {performance.start_time && performance.end_time && (
                               <span className="flex items-center gap-1">
@@ -264,29 +248,23 @@ export default function BandProfilePage() {
                 </div>
                 <div className="divide-y divide-white/10">
                   {profile.past.map((performance, idx) => (
-                    <div
-                      key={idx}
-                      className="p-6 hover:bg-band-navy/30 transition-colors"
-                    >
+                    <div key={idx} className="p-6 hover:bg-band-navy/30 transition-colors">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-band-orange mb-2">
-                            {performance.event_name}
-                          </h3>
+                          <h3 className="text-xl font-semibold text-band-orange mb-2">{performance.event_name}</h3>
                           <div className="flex flex-wrap gap-3 text-sm text-white/70">
                             {performance.event_date && (
                               <span className="flex items-center gap-1">
-                                📅 {new Date(performance.event_date).toLocaleDateString('en-US', {
+                                📅{' '}
+                                {new Date(performance.event_date).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'long',
-                                  day: 'numeric'
+                                  day: 'numeric',
                                 })}
                               </span>
                             )}
                             {performance.venue_name && (
-                              <span className="flex items-center gap-1">
-                                📍 {performance.venue_name}
-                              </span>
+                              <span className="flex items-center gap-1">📍 {performance.venue_name}</span>
                             )}
                             {performance.start_time && performance.end_time && (
                               <span className="flex items-center gap-1">
@@ -325,4 +303,3 @@ export default function BandProfilePage() {
     </div>
   )
 }
-

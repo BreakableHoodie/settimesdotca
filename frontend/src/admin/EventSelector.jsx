@@ -39,7 +39,7 @@ export default function EventSelector({ onCreateEvent }) {
   // Filter out archived events
   const nonArchivedEvents = events.filter(e => e.status !== 'archived')
 
-  const handleSelectEvent = (eventId) => {
+  const handleSelectEvent = eventId => {
     switchEvent(eventId)
     setIsOpen(false)
   }
@@ -52,9 +52,7 @@ export default function EventSelector({ onCreateEvent }) {
   }
 
   if (loading) {
-    return (
-      <div className="text-white/50 text-sm">Loading events...</div>
-    )
+    return <div className="text-white/50 text-sm">Loading events...</div>
   }
 
   return (
@@ -68,9 +66,7 @@ export default function EventSelector({ onCreateEvent }) {
         <span className="text-lg">📍</span>
         <div className="text-left">
           <div className="text-xs text-white/50">Event Context:</div>
-          <div className="font-medium">
-            {currentEvent ? currentEvent.name : 'All Events'}
-          </div>
+          <div className="font-medium">{currentEvent ? currentEvent.name : 'All Events'}</div>
         </div>
         <svg
           className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -116,11 +112,12 @@ export default function EventSelector({ onCreateEvent }) {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-white truncate">{event.name}</div>
                       <div className="text-xs text-white/50">
-                        {event.date && new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                        {event.date &&
+                          new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
                         {' • '}
                         {event.band_count || 0} bands
                       </div>

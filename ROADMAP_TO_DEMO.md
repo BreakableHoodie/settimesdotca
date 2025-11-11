@@ -10,6 +10,7 @@
 ## 🎯 Definition of "Production Ready"
 
 ### Must Have (Non-Negotiable)
+
 - ✅ Multi-user authentication with RBAC (admin/editor/viewer roles)
 - ✅ Complete event lifecycle: create, edit, publish, archive
 - ✅ Band/performer management with profiles (photos, bios, stats)
@@ -22,6 +23,7 @@
 - ✅ Automated tests preventing regressions (80%+ coverage)
 
 ### Nice to Have (Demo Polish)
+
 - 📊 Basic analytics dashboard (event views, popular bands)
 - 🔔 Email notifications for new events (subscription system)
 - 📱 PWA capabilities (offline schedule viewing)
@@ -29,6 +31,7 @@
 - 📸 Drag-and-drop image uploads (R2 integration)
 
 ### Explicitly Out of Scope
+
 - ❌ Multi-org tenancy (future v2.0)
 - ❌ Co-promoter collaboration (future v2.0)
 - ❌ Event cloning/templates (not essential for demo)
@@ -40,9 +43,11 @@
 ## 📅 3-Week Sprint Plan
 
 ### Week 1: Backend Foundation (Nov 11-17)
+
 **Goal**: Complete backend functionality and RBAC
 
 #### Sprint 1.1: RBAC & User Management (2 days)
+
 - [ ] Implement role-based access control (admin, editor, viewer)
 - [ ] User management UI (add/edit/remove users, assign roles)
 - [ ] Permission checks on all admin endpoints
@@ -50,12 +55,14 @@
 - [ ] Tests for RBAC enforcement
 
 **Acceptance Criteria**:
+
 - Admin can create users with different roles
 - Editor can manage events/bands but not users
 - Viewer has read-only access
 - All API endpoints enforce permissions
 
 #### Sprint 1.2: Event Management Complete (2 days)
+
 - [ ] Event creation wizard (simplified, not multi-step)
 - [ ] Event editing (name, date, venues, status)
 - [ ] Event publishing/unpublishing toggle
@@ -64,12 +71,14 @@
 - [ ] Context switching UI (event dropdown in admin header)
 
 **Acceptance Criteria**:
+
 - Can create new event in <2 minutes
 - Can switch between events seamlessly
 - Can publish/unpublish without data loss
 - Archive view shows old events separately
 
 #### Sprint 1.3: Band Profile Management (3 days)
+
 - [ ] Band profile CRUD (create, read, update, delete)
 - [ ] Photo upload (R2 integration or placeholder)
 - [ ] Bio/description editor (rich text or markdown)
@@ -79,6 +88,7 @@
 - [ ] Stats calculation (total shows, venues played)
 
 **Acceptance Criteria**:
+
 - Band profiles have photos, bios, social links
 - Performance history shows accurate data
 - Stats update automatically when bands added to events
@@ -87,9 +97,11 @@
 ---
 
 ### Week 2: Frontend & UX (Nov 18-24)
+
 **Goal**: Polished public interface and admin UX
 
 #### Sprint 2.1: Public Event Timeline (2 days)
+
 - [ ] Current/Now Playing section (real-time)
 - [ ] Upcoming Events section (future events)
 - [ ] Past Events section (archived, collapsed)
@@ -98,12 +110,14 @@
 - [ ] Loading states and error boundaries
 
 **Acceptance Criteria**:
+
 - Timeline shows correct events in each section
 - "Now Playing" highlights current performances
 - Past events are accessible but not prominent
 - Works smoothly on mobile devices
 
 #### Sprint 2.2: Band Profile Pages (2 days)
+
 - [ ] Public band profile page (/bands/:slug)
 - [ ] Display photo, bio, genre, origin
 - [ ] Show performance history (past shows)
@@ -112,12 +126,14 @@
 - [ ] SEO-friendly metadata
 
 **Acceptance Criteria**:
+
 - Band profiles look professional
 - Stats are accurate and meaningful
 - Photos load quickly (lazy loading)
 - Mobile-friendly layout
 
 #### Sprint 2.3: Admin Interface Polish (3 days)
+
 - [ ] Context banner (shows current event at top)
 - [ ] Breadcrumbs for navigation clarity
 - [ ] Helpful tooltips and hints
@@ -127,6 +143,7 @@
 - [ ] Consistent design patterns across tabs
 
 **Acceptance Criteria**:
+
 - New users understand interface without training
 - No confusion about current context
 - All actions provide clear feedback
@@ -135,9 +152,11 @@
 ---
 
 ### Week 3: Testing, Docs & Demo Prep (Nov 25-30)
+
 **Goal**: Production-ready system with documentation
 
 #### Sprint 3.1: Testing & Bug Fixes (2 days)
+
 - [ ] E2E tests for critical workflows
 - [ ] Fix all known bugs in backlog
 - [ ] Security audit (SQL injection, XSS, auth bypass)
@@ -146,12 +165,14 @@
 - [ ] Accessibility audit (WCAG 2.1 AA)
 
 **Acceptance Criteria**:
+
 - 80%+ test coverage on critical paths
 - No P0/P1 bugs remaining
 - Security checklist 100% complete
 - All pages load in <2 seconds
 
 #### Sprint 3.2: Documentation (2 days)
+
 - [ ] User Guide (for event organizers)
 - [ ] Admin Handbook (for system administrators)
 - [ ] Quick Start Guide (get running in 10 minutes)
@@ -160,11 +181,13 @@
 - [ ] Deployment guide (production setup)
 
 **Acceptance Criteria**:
+
 - Non-technical user can manage events with User Guide
 - Admin can deploy to production with Deployment Guide
 - All common questions answered in docs
 
 #### Sprint 3.3: Demo Preparation (1 day)
+
 - [ ] Seed production database with demo data
 - [ ] Prepare demo script (15-20 min presentation)
 - [ ] Screenshots/screen recordings for deck
@@ -173,6 +196,7 @@
 - [ ] Polish visual design and branding
 
 **Acceptance Criteria**:
+
 - Demo runs smoothly without errors
 - All key features visible in 15-20 minutes
 - Backup materials ready for offline demo
@@ -183,6 +207,7 @@
 ## 🚨 Risk Management
 
 ### High-Risk Areas
+
 1. **Time Constraint** (19 days is tight)
    - Mitigation: Cut non-essential features aggressively
    - Daily progress tracking with TodoWrite
@@ -204,6 +229,7 @@
    - Graceful degradation without photos
 
 ### Mitigation Strategies
+
 - **Daily Standups**: Review progress against timeline
 - **Cut Fast**: If feature takes >1 day over estimate, cut it
 - **Parallel Work**: Frontend + Backend can progress simultaneously
@@ -214,18 +240,20 @@
 ## 📋 Feature Decision Matrix
 
 ### Must Build (Essential for Demo)
-| Feature | Why Essential | Estimate |
-|---------|--------------|----------|
-| RBAC | Multi-user requirement | 2 days |
-| Event Management | Core workflow | 2 days |
-| Band Profiles | Key differentiator | 3 days |
-| Public Timeline | Demo centerpiece | 2 days |
-| Admin Interface Polish | Usability requirement | 3 days |
-| Documentation | Production readiness | 2 days |
+
+| Feature                | Why Essential          | Estimate |
+| ---------------------- | ---------------------- | -------- |
+| RBAC                   | Multi-user requirement | 2 days   |
+| Event Management       | Core workflow          | 2 days   |
+| Band Profiles          | Key differentiator     | 3 days   |
+| Public Timeline        | Demo centerpiece       | 2 days   |
+| Admin Interface Polish | Usability requirement  | 3 days   |
+| Documentation          | Production readiness   | 2 days   |
 
 **Total**: 14 days (leaves 5 days buffer)
 
 ### Can Defer (Post-Demo)
+
 - Event cloning/templates (time-saver, not essential)
 - CSV bulk import (can manually enter demo data)
 - Advanced analytics (basic metrics sufficient)
@@ -234,6 +262,7 @@
 - Drag-and-drop uploads (can use file input)
 
 ### Must Cut (Out of Scope)
+
 - Multi-org tenancy (v2.0 feature)
 - Co-promoter collaboration (future idea)
 - White-label customization (not needed)
@@ -245,6 +274,7 @@
 ## ✅ Acceptance Criteria by Role
 
 ### Event Organizer (Primary User)
+
 - [ ] Can create new event in <2 minutes
 - [ ] Can add bands with photos/bios easily
 - [ ] Can publish event to make it public
@@ -253,6 +283,7 @@
 - [ ] Mobile-friendly for on-the-go management
 
 ### Site Visitor (Public User)
+
 - [ ] Can see current/upcoming/past events
 - [ ] Can browse band profiles with photos/bios
 - [ ] Can view band performance history
@@ -261,6 +292,7 @@
 - [ ] No broken links or errors
 
 ### System Administrator
+
 - [ ] Can add/remove admin users
 - [ ] Can assign roles (admin/editor/viewer)
 - [ ] Can monitor system health (logs, metrics)
@@ -272,18 +304,21 @@
 ## 📊 Progress Tracking
 
 ### Week 1 Milestones
+
 - [ ] RBAC implemented and tested
 - [ ] Event management workflow complete
 - [ ] Band profiles with basic functionality
 - [ ] Backend API complete and documented
 
 ### Week 2 Milestones
+
 - [ ] Public timeline showing events correctly
 - [ ] Band profile pages looking professional
 - [ ] Admin interface polished and intuitive
 - [ ] No major UX issues remaining
 
 ### Week 3 Milestones
+
 - [ ] All tests passing (80%+ coverage)
 - [ ] Documentation complete (User Guide + Admin Handbook)
 - [ ] Demo rehearsed and ready
@@ -294,6 +329,7 @@
 ## 🎯 Demo Day Success Criteria
 
 ### Before Demo
+
 - [ ] System deployed to production URL
 - [ ] Demo database seeded with realistic data
 - [ ] All key workflows tested 3+ times
@@ -301,6 +337,7 @@
 - [ ] Demo script memorized
 
 ### During Demo (15-20 min)
+
 1. **Login** (30 sec): Show authentication and role selection
 2. **Create Event** (3 min): Demonstrate event creation workflow
 3. **Add Bands** (3 min): Show band profile creation and assignment
@@ -311,6 +348,7 @@
 8. **Q&A** (5 min): Answer questions and explore features
 
 ### After Demo
+
 - [ ] Positive feedback on usability
 - [ ] No major bugs encountered
 - [ ] Questions answered confidently
@@ -321,6 +359,7 @@
 ## 🔄 Daily Workflow
 
 ### Each Day (Monday-Friday)
+
 1. **Morning** (30 min)
    - Review roadmap and current sprint
    - Update TodoWrite with daily tasks
@@ -338,6 +377,7 @@
    - Commit and push changes
 
 ### Weekly Checkpoints
+
 - **Friday EOD**: Review week's progress
 - **Sunday**: Plan upcoming week's sprints
 - **Adjust**: Cut features if falling behind
@@ -347,18 +387,21 @@
 ## 📞 Decision Points
 
 ### If Falling Behind Schedule
+
 - **Cut features from "Nice to Have" list**
 - **Simplify workflows** (e.g., single-page event creation vs wizard)
 - **Use placeholders** (e.g., mock photos vs R2 integration)
 - **Defer polish** (functional > beautiful for demo)
 
 ### If Ahead of Schedule
+
 - **Add from "Nice to Have" list** (analytics, PWA, email)
 - **Extra testing and QA**
 - **Documentation polish**
 - **Design improvements**
 
 ### Pivot Triggers
+
 - **>2 days behind schedule** → Cut one "Nice to Have" feature
 - **>5 days behind schedule** → Emergency scope reduction meeting
 - **Major blocker (>1 day)** → Seek help or find workaround
@@ -368,18 +411,21 @@
 ## 🎓 Post-Demo Roadmap (v2.0)
 
 ### Short-term (Dec 2025)
+
 - User feedback incorporation
 - Bug fixes from production use
 - Performance optimizations
 - Documentation updates
 
 ### Medium-term (Q1 2026)
+
 - Multi-org tenancy architecture
 - Co-promoter collaboration features
 - Event cloning and templates
 - Advanced analytics and reporting
 
 ### Long-term (Q2+ 2026)
+
 - White-label SaaS platform
 - Integration APIs for ticketing systems
 - Mobile app (iOS/Android)
@@ -390,18 +436,21 @@
 ## 📈 Success Metrics
 
 ### Demo Success
+
 - [ ] Demo completed without errors
 - [ ] All key features demonstrated
 - [ ] Positive feedback from audience
 - [ ] Interest in using the system
 
 ### Production Readiness
+
 - [ ] 80%+ test coverage
 - [ ] Zero P0/P1 bugs
 - [ ] Documentation complete
 - [ ] Security audit passed
 
 ### User Experience
+
 - [ ] New users can create event in <5 minutes
 - [ ] No confusion about navigation/context
 - [ ] Mobile experience smooth

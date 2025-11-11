@@ -4,7 +4,7 @@
 // POST /api/admin/events/{id}/duplicate - Duplicate event
 // DELETE /api/admin/events/{id} - Delete event
 
-import { checkPermission, auditLog } from '../_middleware.js'
+import { checkPermission, auditLog } from "../_middleware.js";
 
 // Get client IP from request
 function getClientIP(request) {
@@ -31,7 +31,7 @@ export async function onRequestPatch(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, 'editor');
+    const permCheck = await checkPermission(request, env, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -48,14 +48,12 @@ export async function onRequestPatch(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     // Get current event
-    const event = await DB.prepare(
-      `SELECT * FROM events WHERE id = ?`
-    )
+    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`)
       .bind(eventId)
       .first();
 
@@ -68,7 +66,7 @@ export async function onRequestPatch(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -85,7 +83,7 @@ export async function onRequestPatch(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -103,10 +101,10 @@ export async function onRequestPatch(context) {
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
-      updates.push('name = ?');
+      updates.push("name = ?");
       params.push(name);
     }
 
@@ -121,16 +119,16 @@ export async function onRequestPatch(context) {
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
-      updates.push('date = ?');
+      updates.push("date = ?");
       params.push(date);
     }
 
     if (status !== undefined) {
       // Validate status
-      if (!['draft', 'published', 'archived'].includes(status)) {
+      if (!["draft", "published", "archived"].includes(status)) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
@@ -139,17 +137,17 @@ export async function onRequestPatch(context) {
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
-      updates.push('status = ?');
-      updates.push('is_published = ?');
+      updates.push("status = ?");
+      updates.push("is_published = ?");
       params.push(status);
-      params.push(status === 'published' ? 1 : 0);
+      params.push(status === "published" ? 1 : 0);
     }
 
     // Always update updated_by_user_id
-    updates.push('updated_by_user_id = ?');
+    updates.push("updated_by_user_id = ?");
     params.push(currentUser.userId);
 
     // Add event ID as the last parameter
@@ -165,22 +163,30 @@ export async function onRequestPatch(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     // Execute update
     const result = await DB.prepare(
-      `UPDATE events SET ${updates.join(', ')} WHERE id = ? RETURNING *`
+      `UPDATE events SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
     )
       .bind(...params)
       .first();
 
     // Audit log
-    await auditLog(env, currentUser.userId, 'event.updated', 'event', eventId, {
-      name: name || event.name,
-      changes: { name, date, status }
-    }, ipAddress);
+    await auditLog(
+      env,
+      currentUser.userId,
+      "event.updated",
+      "event",
+      eventId,
+      {
+        name: name || event.name,
+        changes: { name, date, status },
+      },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({
@@ -191,7 +197,7 @@ export async function onRequestPatch(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error updating event:", error);
@@ -204,7 +210,7 @@ export async function onRequestPatch(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -218,7 +224,7 @@ export async function onRequestPut(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, 'editor');
+    const permCheck = await checkPermission(request, env, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -235,7 +241,7 @@ export async function onRequestPut(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -245,7 +251,7 @@ export async function onRequestPut(context) {
       const event = await DB.prepare(
         `
         SELECT * FROM events WHERE id = ?
-      `
+      `,
       )
         .bind(eventId)
         .first();
@@ -259,7 +265,7 @@ export async function onRequestPut(context) {
           {
             status: 404,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -271,15 +277,23 @@ export async function onRequestPut(context) {
         SET is_published = ?, updated_by_user_id = ?
         WHERE id = ?
         RETURNING *
-      `
+      `,
       )
         .bind(newStatus, currentUser.userId, eventId)
         .first();
 
       // Audit log
-      await auditLog(env, currentUser.userId, newStatus === 1 ? 'event.published' : 'event.unpublished', 'event', eventId, {
-        name: event.name
-      }, ipAddress);
+      await auditLog(
+        env,
+        currentUser.userId,
+        newStatus === 1 ? "event.published" : "event.unpublished",
+        "event",
+        eventId,
+        {
+          name: event.name,
+        },
+        ipAddress,
+      );
 
       return new Response(
         JSON.stringify({
@@ -290,7 +304,7 @@ export async function onRequestPut(context) {
         {
           status: 200,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -302,7 +316,7 @@ export async function onRequestPut(context) {
       {
         status: 404,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error updating event:", error);
@@ -315,7 +329,7 @@ export async function onRequestPut(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -338,7 +352,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -357,7 +371,7 @@ export async function onRequestPost(context) {
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -365,7 +379,7 @@ export async function onRequestPost(context) {
       const originalEvent = await DB.prepare(
         `
         SELECT * FROM events WHERE id = ?
-      `
+      `,
       )
         .bind(eventId)
         .first();
@@ -379,7 +393,7 @@ export async function onRequestPost(context) {
           {
             status: 404,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -387,7 +401,7 @@ export async function onRequestPost(context) {
       const existingEvent = await DB.prepare(
         `
         SELECT id FROM events WHERE slug = ?
-      `
+      `,
       )
         .bind(slug)
         .first();
@@ -401,7 +415,7 @@ export async function onRequestPost(context) {
           {
             status: 409,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -411,7 +425,7 @@ export async function onRequestPost(context) {
         INSERT INTO events (name, date, slug, is_published)
         VALUES (?, ?, ?, 0)
         RETURNING *
-      `
+      `,
       )
         .bind(name, date, slug)
         .first();
@@ -423,7 +437,7 @@ export async function onRequestPost(context) {
         SELECT ?, venue_id, name, start_time, end_time, url
         FROM bands
         WHERE event_id = ?
-      `
+      `,
       )
         .bind(newEvent.id, eventId)
         .run();
@@ -432,7 +446,7 @@ export async function onRequestPost(context) {
       const bandCount = await DB.prepare(
         `
         SELECT COUNT(*) as count FROM bands WHERE event_id = ?
-      `
+      `,
       )
         .bind(newEvent.id)
         .first();
@@ -447,7 +461,7 @@ export async function onRequestPost(context) {
         {
           status: 201,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -459,7 +473,7 @@ export async function onRequestPost(context) {
       {
         status: 404,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error duplicating event:", error);
@@ -472,7 +486,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -485,7 +499,7 @@ export async function onRequestDelete(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(request, env, 'admin');
+    const permCheck = await checkPermission(request, env, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -495,70 +509,67 @@ export async function onRequestDelete(context) {
     const eventIdNum = parseInt(eventId);
 
     if (isNaN(eventIdNum)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid event ID" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      return new Response(JSON.stringify({ error: "Invalid event ID" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Check if event exists
-    const event = await DB.prepare(
-      "SELECT id, name FROM events WHERE id = ?"
-    )
+    const event = await DB.prepare("SELECT id, name FROM events WHERE id = ?")
       .bind(eventIdNum)
       .first();
 
     if (!event) {
-      return new Response(
-        JSON.stringify({ error: "Event not found" }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      return new Response(JSON.stringify({ error: "Event not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Check if event has any bands (for informational message)
     const bandCount = await DB.prepare(
-      "SELECT COUNT(*) as count FROM bands WHERE event_id = ?"
+      "SELECT COUNT(*) as count FROM bands WHERE event_id = ?",
     )
       .bind(eventIdNum)
       .first();
 
     // Delete the event (database will automatically set event_id to NULL for bands due to ON DELETE SET NULL)
-    await DB.prepare("DELETE FROM events WHERE id = ?")
-      .bind(eventIdNum)
-      .run();
+    await DB.prepare("DELETE FROM events WHERE id = ?").bind(eventIdNum).run();
 
     // Audit log
-    await auditLog(env, currentUser.userId, 'event.deleted', 'event', eventIdNum, {
-      name: event.name,
-      bandCount: bandCount.count
-    }, ipAddress);
+    await auditLog(
+      env,
+      currentUser.userId,
+      "event.deleted",
+      "event",
+      eventIdNum,
+      {
+        name: event.name,
+        bandCount: bandCount.count,
+      },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} band(s) are now unassigned and can be moved to other events)` : ''}`
+        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} band(s) are now unassigned and can be moved to other events)` : ""}`,
       }),
       {
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
-
   } catch (error) {
     console.error("Delete event error:", error);
     return new Response(
       JSON.stringify({
-        error: "Database operation failed"
+        error: "Database operation failed",
       }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

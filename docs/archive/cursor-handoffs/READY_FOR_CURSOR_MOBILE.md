@@ -92,6 +92,7 @@ Start with Phase 1 (Touch Target Audit) from the specification document.
 ## 📋 What's Already Done
 
 ### Sprint 3 Status ✅
+
 - ✅ Subscription system tests (21/21 passing, 90%+ coverage)
 - ✅ Public API tests (8/8 passing, 92%+ coverage)
 - ✅ iCal feed tests (6/6 passing, 92%+ coverage)
@@ -99,12 +100,14 @@ Start with Phase 1 (Touch Target Audit) from the specification document.
 - **Total: 35/35 tests passing**
 
 ### Configuration Files ✅
+
 - ✅ Tailwind CSS configured with custom colors
 - ✅ React Router setup in AdminPanel
 - ✅ Existing admin components: BandsTab, VenuesTab, EventsTab, SubscriptionsTab
 - ✅ Mobile-responsive basics exist (need optimization)
 
 ### Documentation ✅
+
 - ✅ `docs/CURSOR_TASK_MOBILE_OPTIMIZATION.md` - Complete specification (6,000+ words)
 - ✅ `docs/PROJECT_STATUS_AND_ROADMAP.md` - Updated priorities
 - ✅ `README.md` - Updated current/upcoming features
@@ -115,6 +118,7 @@ Start with Phase 1 (Touch Target Audit) from the specification document.
 ## 🔍 Key Context for Implementation
 
 ### User Profile
+
 - **Who**: Non-technical event organizers
 - **Events**: 4-5 large band crawls/year + many smaller events (2-4 acts)
 - **Devices**: Primarily phones and tablets
@@ -122,12 +126,14 @@ Start with Phase 1 (Touch Target Audit) from the specification document.
 - **Needs**: Simple, intuitive, well-documented admin tools
 
 ### Technical Constraints
+
 - **Performance**: Must remain fast for schedule view
 - **Cost**: Keep cheap (no revenue yet)
 - **Compatibility**: iOS Safari 14+, Android Chrome 90+
 - **Accessibility**: WCAG AA minimum (44px touch targets)
 
 ### Design System
+
 - **Colors**: Deep navy (#1a1845), purple (#2d2554), orange (#f5a962)
 - **Framework**: Tailwind CSS 3
 - **Components**: React 18 functional components
@@ -138,9 +144,11 @@ Start with Phase 1 (Touch Target Audit) from the specification document.
 ## 🛠️ Implementation Phases Overview
 
 ### Phase 1: Touch Targets (1 day)
+
 **Focus:** Audit and fix all interactive elements to ≥44px
 
 **Files to modify:**
+
 - `frontend/src/admin/BandsTab.jsx`
 - `frontend/src/admin/VenuesTab.jsx`
 - `frontend/src/admin/EventsTab.jsx`
@@ -148,27 +156,32 @@ Start with Phase 1 (Touch Target Audit) from the specification document.
 - `frontend/src/admin/AdminPanel.jsx`
 
 **Pattern:**
+
 ```javascript
 // BEFORE (too small)
-className="px-4 py-2 bg-band-orange text-white rounded"
+className = "px-4 py-2 bg-band-orange text-white rounded";
 
 // AFTER (44px minimum)
-className="px-6 py-3 bg-band-orange text-white rounded min-h-[44px]"
+className = "px-6 py-3 bg-band-orange text-white rounded min-h-[44px]";
 
 // Primary actions (48px AAA)
-className="px-8 py-4 bg-band-orange text-white rounded min-h-[48px] text-lg"
+className = "px-8 py-4 bg-band-orange text-white rounded min-h-[48px] text-lg";
 ```
 
 ### Phase 2: Bottom Navigation (1 day)
+
 **Focus:** Thumb-friendly mobile navigation
 
 **Create:**
+
 - `frontend/src/admin/components/BottomNav.jsx`
 
 **Modify:**
+
 - `frontend/src/admin/AdminPanel.jsx` (integrate BottomNav)
 
 **Pattern:**
+
 ```javascript
 <nav className="fixed bottom-0 left-0 right-0 bg-band-purple border-t border-band-orange/20 md:hidden z-50">
   {/* 56px minimum height for bottom nav */}
@@ -176,14 +189,17 @@ className="px-8 py-4 bg-band-orange text-white rounded min-h-[48px] text-lg"
 ```
 
 ### Phase 3: Form Optimization (1 day)
+
 **Focus:** Mobile keyboard optimization
 
 **Files to modify:**
+
 - `frontend/src/admin/forms/BandForm.jsx`
 - `frontend/src/admin/forms/VenueForm.jsx`
 - `frontend/src/admin/forms/EventForm.jsx`
 
 **Pattern:**
+
 ```javascript
 <input type="email" />        // Email keyboard
 <input type="tel" />           // Phone keyboard
@@ -193,38 +209,48 @@ className="px-8 py-4 bg-band-orange text-white rounded min-h-[48px] text-lg"
 ```
 
 ### Phase 4: Swipe Gestures (1 day)
+
 **Focus:** Swipe-to-delete interactions
 
 **Install:**
+
 ```bash
 npm install react-swipeable
 ```
 
 **Create:**
+
 - `frontend/src/admin/components/SwipeableListItem.jsx`
 
 **Modify:**
+
 - `frontend/src/admin/BandsTab.jsx` (use swipeable component)
 
 ### Phase 5: Performance (0.5 days)
+
 **Focus:** Lazy loading and optimization
 
 **Create:**
+
 - `frontend/src/admin/components/LazyList.jsx`
 - `frontend/src/admin/components/LoadingSkeleton.jsx`
 
 **Modify:**
+
 - All tabs to use lazy loading for large lists
 
 ### Phase 6: Documentation (2 days) 🔴 CRITICAL
+
 **Focus:** User guide and in-app help
 
 **Create:**
+
 - `docs/USER_GUIDE.md` (following template in spec)
 - `frontend/src/admin/components/HelpPanel.jsx`
 - `frontend/src/admin/components/ContextualTooltip.jsx`
 
 **Sections for USER_GUIDE.md:**
+
 1. Getting Started (login, navigation basics)
 2. Creating Your First Event (step-by-step with screenshots)
 3. Adding Venues (with examples)
@@ -235,13 +261,16 @@ npm install react-swipeable
 8. FAQ (quick reference)
 
 ### Phase 7: Testing & Validation (0.5 days)
+
 **Focus:** Real device testing and compliance
 
 **Test on:**
+
 - iOS Safari (iPhone 12+, iPad)
 - Android Chrome (Pixel 5+, Samsung Galaxy)
 
 **Validate:**
+
 - Touch targets ≥44px (use browser DevTools)
 - Swipe gestures smooth and responsive
 - Forms trigger correct keyboards
@@ -255,6 +284,7 @@ npm install react-swipeable
 ### After Each Phase Completes
 
 **Phase 1-5: Component Testing**
+
 ```bash
 cd frontend
 
@@ -269,6 +299,7 @@ npm run dev
 ```
 
 **Phase 6: Documentation Validation**
+
 ```bash
 # Check documentation exists
 ls -lh docs/USER_GUIDE.md
@@ -282,6 +313,7 @@ cat docs/USER_GUIDE.md | wc -l  # Should be 200+ lines
 ```
 
 **Phase 7: Final Testing**
+
 ```bash
 # Build for production
 npm run build
@@ -298,6 +330,7 @@ npm run preview
 ## 📊 Success Metrics
 
 ### Must Pass ✅
+
 - [ ] All touch targets ≥44px (audit with DevTools)
 - [ ] Bottom navigation visible on mobile (<768px)
 - [ ] Swipe gestures functional on touch devices
@@ -308,6 +341,7 @@ npm run preview
 - [ ] No Lighthouse performance regression (≥90)
 
 ### Nice to Have 🎯
+
 - [ ] Touch targets ≥48px for primary actions (AAA)
 - [ ] Animated transitions for swipe gestures
 - [ ] Loading skeletons for better perceived performance
@@ -320,22 +354,27 @@ npm run preview
 ## 🚨 Common Pitfalls to Avoid
 
 ### 1. Touch Target Size
+
 ❌ **Wrong:** `py-2` (≈32px) - Too small for mobile
 ✅ **Right:** `py-3 min-h-[44px]` - WCAG compliant
 
 ### 2. Bottom Navigation Z-Index
+
 ❌ **Wrong:** No z-index - Hidden behind content
 ✅ **Right:** `z-50` - Always on top
 
 ### 3. Input Types
+
 ❌ **Wrong:** `type="text"` for emails - Generic keyboard
 ✅ **Right:** `type="email"` - Email keyboard with @
 
 ### 4. Swipe Gesture Feedback
+
 ❌ **Wrong:** No visual feedback - Confusing UX
 ✅ **Right:** Translate animation + delete button visible
 
 ### 5. Documentation Depth
+
 ❌ **Wrong:** Technical jargon - "Configure wrangler.toml D1 bindings"
 ✅ **Right:** Plain language - "Step 1: Log in to your admin panel"
 
@@ -344,6 +383,7 @@ npm run preview
 ## 📚 Key Files Reference
 
 ### Admin Components (to modify)
+
 - `frontend/src/admin/AdminPanel.jsx` - Main admin container
 - `frontend/src/admin/BandsTab.jsx` - Band management
 - `frontend/src/admin/VenuesTab.jsx` - Venue management
@@ -351,11 +391,13 @@ npm run preview
 - `frontend/src/admin/SubscriptionsTab.jsx` - Subscription viewing
 
 ### Forms (to optimize)
+
 - `frontend/src/admin/forms/BandForm.jsx`
 - `frontend/src/admin/forms/VenueForm.jsx`
 - `frontend/src/admin/forms/EventForm.jsx`
 
 ### New Components (to create)
+
 - `frontend/src/admin/components/BottomNav.jsx`
 - `frontend/src/admin/components/SwipeableListItem.jsx`
 - `frontend/src/admin/components/LazyList.jsx`
@@ -364,11 +406,13 @@ npm run preview
 - `frontend/src/admin/components/ContextualTooltip.jsx`
 
 ### Documentation (to create)
+
 - `docs/USER_GUIDE.md` - Main user documentation
 - (Optional) `docs/TROUBLESHOOTING.md` - Common issues
 - (Optional) `docs/QUICK_REFERENCE.md` - Cheat sheet
 
 ### Specification
+
 - `docs/CURSOR_TASK_MOBILE_OPTIMIZATION.md` - Complete spec (6,000+ words)
 
 ---
@@ -376,24 +420,28 @@ npm run preview
 ## 🎯 After Completion Checklist
 
 ### Code Quality
+
 - [ ] All files formatted with Prettier
 - [ ] No ESLint errors
 - [ ] No console warnings in browser
 - [ ] Components properly typed (if using TypeScript)
 
 ### Functionality
+
 - [ ] All admin tabs accessible on mobile
 - [ ] Forms submit successfully on mobile
 - [ ] Swipe gestures don't interfere with scrolling
 - [ ] Bottom nav doesn't cover content
 
 ### Documentation
+
 - [ ] USER_GUIDE.md reviewed for clarity
 - [ ] All screenshots/examples included
 - [ ] Troubleshooting section complete
 - [ ] In-app help tooltips working
 
 ### Testing
+
 - [ ] Tested on iPhone (iOS Safari)
 - [ ] Tested on Android (Chrome)
 - [ ] Tested on iPad (larger touch targets)
@@ -411,6 +459,7 @@ npm run preview
 4. **Expected duration:** 1 week (7 days)
 
 **Cursor will:**
+
 - Implement all 7 phases systematically
 - Create new components as needed
 - Modify existing admin components
@@ -422,6 +471,7 @@ npm run preview
 ## 📞 After Implementation
 
 ### Review Checklist
+
 1. Test on actual mobile devices (not just browser DevTools)
 2. Validate touch targets with accessibility inspector
 3. Review USER_GUIDE.md with non-technical user
@@ -429,6 +479,7 @@ npm run preview
 5. Commit all changes with descriptive message
 
 ### Next Priority
+
 After mobile optimization complete:
 → **Priority 2: Lightweight Band Profile Images (R2)**
 → Specification: `docs/CURSOR_TASK_BAND_IMAGES.md` (to be created)
@@ -442,5 +493,5 @@ After mobile optimization complete:
 
 **END OF CURSOR HANDOFF - MOBILE OPTIMIZATION**
 
-*For technical details, see: `docs/CURSOR_TASK_MOBILE_OPTIMIZATION.md`*
-*For project status, see: `docs/PROJECT_STATUS_AND_ROADMAP.md`*
+_For technical details, see: `docs/CURSOR_TASK_MOBILE_OPTIMIZATION.md`_
+_For project status, see: `docs/PROJECT_STATUS_AND_ROADMAP.md`_

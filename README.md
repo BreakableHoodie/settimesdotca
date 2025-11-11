@@ -27,6 +27,7 @@ This project includes a full-featured admin panel with Cloudflare D1 database in
 ### ✅ Current Features
 
 **Core Admin:**
+
 - Password-protected admin interface at `/admin`
 - Multi-event management (create, publish/unpublish, manage multiple concurrent events)
 - CRUD operations for Events, Venues, and Bands/Performances
@@ -38,6 +39,7 @@ This project includes a full-featured admin panel with Cloudflare D1 database in
 - Mobile-responsive design (basic)
 
 **Sprint 3 - Discovery Features (Complete):**
+
 - ✅ Email subscription system with city/genre filtering
 - ✅ Public events API (`/api/events/public`) - no authentication required
 - ✅ iCal feed generation (`/api/feeds/ical`) - calendar sync
@@ -50,6 +52,7 @@ This project includes a full-featured admin panel with Cloudflare D1 database in
 See **[ROADMAP_TO_DEMO.md](/ROADMAP_TO_DEMO.md)** for the complete 3-week sprint plan.
 
 **Key Priorities**:
+
 1. Multi-user RBAC (admin/editor/viewer roles)
 2. Complete event management workflow
 3. Band profiles with photos, bios, and stats
@@ -58,6 +61,7 @@ See **[ROADMAP_TO_DEMO.md](/ROADMAP_TO_DEMO.md)** for the complete 3-week sprint
 6. Production documentation and testing
 
 **Out of Scope** (Post-Demo v2.0):
+
 - Multi-org tenancy
 - Co-promoter collaboration
 - Event cloning/templates
@@ -264,20 +268,17 @@ This repository is hosted on GitHub at [`BreakableHoodie/longweekend-bandcrawl`]
    ```
 
 2. **Connect the repo to Cloudflare Pages**
-
    - In the Cloudflare dashboard go to **Pages → Create a project → Connect to Git**.
    - Authorise the Cloudflare Pages GitHub app and grant it access to `BreakableHoodie/longweekend-bandcrawl`.
    - Pick `main` as the production branch and add `dev` as a preview branch so staging deploys happen automatically.
 
 3. **Configure build settings**
-
    - **Project root:** `frontend`
    - **Build command:** `npm run build`
    - **Output directory:** `dist`
    - Set `NODE_VERSION=20` (Build settings → Environment variables) to match the Cloudflare build image requirement.
 
 4. **Deploy**
-
    - Cloudflare installs dependencies, runs the Vite build, and publishes to the `*.pages.dev` domain.
    - Add your custom domain in **Pages → Custom domains** when ready.
 

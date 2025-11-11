@@ -27,7 +27,7 @@ export async function onRequestPut(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -44,7 +44,7 @@ export async function onRequestPut(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -52,7 +52,7 @@ export async function onRequestPut(context) {
     const venue = await DB.prepare(
       `
       SELECT * FROM venues WHERE id = ?
-    `
+    `,
     )
       .bind(venueId)
       .first();
@@ -66,7 +66,7 @@ export async function onRequestPut(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -75,7 +75,7 @@ export async function onRequestPut(context) {
       const existingVenue = await DB.prepare(
         `
         SELECT id FROM venues WHERE name = ? AND id != ?
-      `
+      `,
       )
         .bind(name, venueId)
         .first();
@@ -89,7 +89,7 @@ export async function onRequestPut(context) {
           {
             status: 409,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
     }
@@ -101,7 +101,7 @@ export async function onRequestPut(context) {
       SET name = ?, address = ?
       WHERE id = ?
       RETURNING *
-    `
+    `,
     )
       .bind(name, address || null, venueId)
       .first();
@@ -114,7 +114,7 @@ export async function onRequestPut(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error updating venue:", error);
@@ -127,7 +127,7 @@ export async function onRequestPut(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -149,7 +149,7 @@ export async function onRequestDelete(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -157,7 +157,7 @@ export async function onRequestDelete(context) {
     const venue = await DB.prepare(
       `
       SELECT * FROM venues WHERE id = ?
-    `
+    `,
     )
       .bind(venueId)
       .first();
@@ -171,7 +171,7 @@ export async function onRequestDelete(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -179,7 +179,7 @@ export async function onRequestDelete(context) {
     const bandCount = await DB.prepare(
       `
       SELECT COUNT(*) as count FROM bands WHERE venue_id = ?
-    `
+    `,
     )
       .bind(venueId)
       .first();
@@ -193,7 +193,7 @@ export async function onRequestDelete(context) {
         {
           status: 409,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -201,7 +201,7 @@ export async function onRequestDelete(context) {
     await DB.prepare(
       `
       DELETE FROM venues WHERE id = ?
-    `
+    `,
     )
       .bind(venueId)
       .run();
@@ -214,7 +214,7 @@ export async function onRequestDelete(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error deleting venue:", error);
@@ -227,7 +227,7 @@ export async function onRequestDelete(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

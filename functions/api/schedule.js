@@ -21,7 +21,7 @@ export async function onRequestGet(context) {
         WHERE is_published = 1
         ORDER BY date DESC
         LIMIT 1
-      `
+      `,
       ).first();
     } else {
       // Get event by slug
@@ -29,7 +29,7 @@ export async function onRequestGet(context) {
         `
         SELECT * FROM events
         WHERE slug = ? AND is_published = 1
-      `
+      `,
       )
         .bind(eventParam)
         .first();
@@ -47,7 +47,7 @@ export async function onRequestGet(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -65,7 +65,7 @@ export async function onRequestGet(context) {
       INNER JOIN venues v ON b.venue_id = v.id
       WHERE b.event_id = ?
       ORDER BY b.start_time, v.name
-    `
+    `,
     )
       .bind(event.id)
       .all();
@@ -92,19 +92,22 @@ export async function onRequestGet(context) {
       ticket_url: event.ticket_url,
       theme_colors: event.theme_colors,
       venue_info: event.venue_info,
-      social_links: event.social_links
+      social_links: event.social_links,
     };
 
-    return new Response(JSON.stringify({
-      bands: formattedBands,
-      event: eventMetadata
-    }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+    return new Response(
+      JSON.stringify({
+        bands: formattedBands,
+        event: eventMetadata,
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+        },
       },
-    });
+    );
   } catch (error) {
     console.error("Error fetching schedule:", error);
 
@@ -116,7 +119,7 @@ export async function onRequestGet(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

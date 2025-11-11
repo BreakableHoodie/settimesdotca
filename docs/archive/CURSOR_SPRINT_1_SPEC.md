@@ -76,11 +76,13 @@ INSERT INTO users (email, password_hash, org_id, role) VALUES
 ```
 
 **Run migration:**
+
 ```bash
 npx wrangler d1 execute bandcrawl-db --local --file=database/migration-multi-org.sql
 ```
 
 **Testing:**
+
 ```bash
 # Verify tables created
 npx wrangler d1 execute bandcrawl-db --local --command="SELECT name FROM sqlite_master WHERE type='table'"
@@ -97,127 +99,155 @@ npx wrangler d1 execute bandcrawl-db --local --command="SELECT name FROM sqlite_
 **Create new file** for user registration:
 
 ```javascript
-import bcrypt from 'bcryptjs'
+import bcrypt from "bcryptjs";
 
 export async function onRequestPost(context) {
-  const { request, env } = context
-  const { DB } = env
+  const { request, env } = context;
+  const { DB } = env;
 
   try {
-    const { email, password, orgName } = await request.json()
+    const { email, password, orgName } = await request.json();
 
     // Validation
     if (!email || !password || !orgName) {
-      return new Response(JSON.stringify({
-        error: 'Validation error',
-        message: 'Email, password, and organization name are required'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Email, password, and organization name are required",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return new Response(JSON.stringify({
-        error: 'Validation error',
-        message: 'Invalid email format'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Invalid email format",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Password strength validation (min 8 chars)
     if (password.length < 8) {
-      return new Response(JSON.stringify({
-        error: 'Validation error',
-        message: 'Password must be at least 8 characters'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Password must be at least 8 characters",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Check if user already exists
     const existingUser = await DB.prepare(
-      'SELECT id FROM users WHERE email = ?'
-    ).bind(email).first()
+      "SELECT id FROM users WHERE email = ?",
+    )
+      .bind(email)
+      .first();
 
     if (existingUser) {
-      return new Response(JSON.stringify({
-        error: 'Conflict',
-        message: 'Email already registered'
-      }), {
-        status: 409,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          error: "Conflict",
+          message: "Email already registered",
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Create organization slug from name
     const slug = orgName
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
 
     // Check if slug already exists
     const existingOrg = await DB.prepare(
-      'SELECT id FROM organizations WHERE slug = ?'
-    ).bind(slug).first()
+      "SELECT id FROM organizations WHERE slug = ?",
+    )
+      .bind(slug)
+      .first();
 
     if (existingOrg) {
-      return new Response(JSON.stringify({
-        error: 'Conflict',
-        message: 'Organization name already taken'
-      }), {
-        status: 409,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          error: "Conflict",
+          message: "Organization name already taken",
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Hash password
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash(password, 10);
 
     // Create organization
     const org = await DB.prepare(
-      'INSERT INTO organizations (name, slug) VALUES (?, ?) RETURNING id'
-    ).bind(orgName, slug).first()
+      "INSERT INTO organizations (name, slug) VALUES (?, ?) RETURNING id",
+    )
+      .bind(orgName, slug)
+      .first();
 
     // Create user
     const user = await DB.prepare(
-      'INSERT INTO users (email, password_hash, org_id, role) VALUES (?, ?, ?, ?) RETURNING id, email'
-    ).bind(email, passwordHash, org.id, 'admin').first()
+      "INSERT INTO users (email, password_hash, org_id, role) VALUES (?, ?, ?, ?) RETURNING id, email",
+    )
+      .bind(email, passwordHash, org.id, "admin")
+      .first();
 
     // Generate session token (simple UUID for now)
-    const sessionToken = crypto.randomUUID()
+    const sessionToken = crypto.randomUUID();
 
     // Store session (you'll need a sessions table or use JWT)
     // For simplicity, return token and let client store in sessionStorage
 
-    return new Response(JSON.stringify({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        orgId: org.id,
-        orgName: orgName
+    return new Response(
+      JSON.stringify({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          orgId: org.id,
+          orgName: orgName,
+        },
+        sessionToken,
+      }),
+      {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
       },
-      sessionToken
-    }), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    })
-
+    );
   } catch (error) {
-    console.error('Signup error:', error)
-    return new Response(JSON.stringify({
-      error: 'Server error',
-      message: 'Failed to create account'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    console.error("Signup error:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Server error",
+        message: "Failed to create account",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }
 ```
@@ -227,79 +257,99 @@ export async function onRequestPost(context) {
 **Replace existing** password-only auth with email/password:
 
 ```javascript
-import bcrypt from 'bcryptjs'
+import bcrypt from "bcryptjs";
 
 export async function onRequestPost(context) {
-  const { request, env } = context
-  const { DB } = env
+  const { request, env } = context;
+  const { DB } = env;
 
   try {
-    const { email, password } = await request.json()
+    const { email, password } = await request.json();
 
     // Validation
     if (!email || !password) {
-      return new Response(JSON.stringify({
-        error: 'Validation error',
-        message: 'Email and password are required'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Email and password are required",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Rate limiting (check existing rate_limit table)
-    const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown'
+    const clientIP = request.headers.get("CF-Connecting-IP") || "unknown";
 
     const rateLimit = await DB.prepare(
-      'SELECT * FROM rate_limit WHERE ip_address = ?'
-    ).bind(clientIP).first()
+      "SELECT * FROM rate_limit WHERE ip_address = ?",
+    )
+      .bind(clientIP)
+      .first();
 
     if (rateLimit?.lockout_until) {
-      const lockoutTime = new Date(rateLimit.lockout_until)
+      const lockoutTime = new Date(rateLimit.lockout_until);
       if (lockoutTime > new Date()) {
-        return new Response(JSON.stringify({
-          error: 'Too many attempts',
-          message: 'Account temporarily locked. Try again later.'
-        }), {
-          status: 429,
-          headers: { 'Content-Type': 'application/json' }
-        })
+        return new Response(
+          JSON.stringify({
+            error: "Too many attempts",
+            message: "Account temporarily locked. Try again later.",
+          }),
+          {
+            status: 429,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       }
     }
 
     // Find user
-    const user = await DB.prepare(`
+    const user = await DB.prepare(
+      `
       SELECT u.*, o.name as org_name, o.slug as org_slug
       FROM users u
       JOIN organizations o ON u.org_id = o.id
       WHERE u.email = ?
-    `).bind(email).first()
+    `,
+    )
+      .bind(email)
+      .first();
 
     if (!user) {
       // Increment failed attempts
-      await DB.prepare(`
+      await DB.prepare(
+        `
         INSERT INTO rate_limit (ip_address, failed_attempts, last_attempt)
         VALUES (?, 1, datetime('now'))
         ON CONFLICT(ip_address) DO UPDATE SET
           failed_attempts = failed_attempts + 1,
           last_attempt = datetime('now')
-      `).bind(clientIP).run()
+      `,
+      )
+        .bind(clientIP)
+        .run();
 
-      return new Response(JSON.stringify({
-        error: 'Authentication failed',
-        message: 'Invalid email or password'
-      }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          error: "Authentication failed",
+          message: "Invalid email or password",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Verify password
-    const passwordValid = await bcrypt.compare(password, user.password_hash)
+    const passwordValid = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordValid) {
       // Increment failed attempts
-      await DB.prepare(`
+      await DB.prepare(
+        `
         INSERT INTO rate_limit (ip_address, failed_attempts, last_attempt)
         VALUES (?, 1, datetime('now'))
         ON CONFLICT(ip_address) DO UPDATE SET
@@ -309,61 +359,78 @@ export async function onRequestPost(context) {
             WHEN failed_attempts + 1 >= 5 THEN datetime('now', '+15 minutes')
             ELSE lockout_until
           END
-      `).bind(clientIP).run()
+      `,
+      )
+        .bind(clientIP)
+        .run();
 
-      return new Response(JSON.stringify({
-        error: 'Authentication failed',
-        message: 'Invalid email or password'
-      }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          error: "Authentication failed",
+          message: "Invalid email or password",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Reset rate limit on successful login
-    await DB.prepare(
-      'DELETE FROM rate_limit WHERE ip_address = ?'
-    ).bind(clientIP).run()
+    await DB.prepare("DELETE FROM rate_limit WHERE ip_address = ?")
+      .bind(clientIP)
+      .run();
 
     // Update last login
     await DB.prepare(
-      'UPDATE users SET last_login = datetime(\'now\') WHERE id = ?'
-    ).bind(user.id).run()
+      "UPDATE users SET last_login = datetime('now') WHERE id = ?",
+    )
+      .bind(user.id)
+      .run();
 
     // Generate session token
-    const sessionToken = crypto.randomUUID()
+    const sessionToken = crypto.randomUUID();
 
     // Log successful login
-    await DB.prepare(`
+    await DB.prepare(
+      `
       INSERT INTO auth_audit (action, success, ip_address, user_agent)
       VALUES ('login', 1, ?, ?)
-    `).bind(clientIP, request.headers.get('User-Agent')).run()
+    `,
+    )
+      .bind(clientIP, request.headers.get("User-Agent"))
+      .run();
 
-    return new Response(JSON.stringify({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        orgId: user.org_id,
-        orgName: user.org_name,
-        orgSlug: user.org_slug,
-        role: user.role
+    return new Response(
+      JSON.stringify({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          orgId: user.org_id,
+          orgName: user.org_name,
+          orgSlug: user.org_slug,
+          role: user.role,
+        },
+        sessionToken,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
       },
-      sessionToken
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    })
-
+    );
   } catch (error) {
-    console.error('Login error:', error)
-    return new Response(JSON.stringify({
-      error: 'Server error',
-      message: 'Login failed'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    console.error("Login error:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Server error",
+        message: "Login failed",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }
 ```
@@ -377,65 +444,65 @@ export async function onRequestPost(context) {
 export const authApi = {
   async signup(email, password, orgName) {
     const response = await fetch(`${API_BASE}/auth/signup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, orgName }),
-    })
-    const data = await handleResponse(response)
+    });
+    const data = await handleResponse(response);
 
     // Store session token
     if (data.sessionToken) {
-      window.sessionStorage.setItem('sessionToken', data.sessionToken)
-      window.sessionStorage.setItem('userEmail', data.user.email)
-      window.sessionStorage.setItem('orgId', data.user.orgId)
-      window.sessionStorage.setItem('orgName', data.user.orgName)
+      window.sessionStorage.setItem("sessionToken", data.sessionToken);
+      window.sessionStorage.setItem("userEmail", data.user.email);
+      window.sessionStorage.setItem("orgId", data.user.orgId);
+      window.sessionStorage.setItem("orgName", data.user.orgName);
     }
 
-    return data
+    return data;
   },
 
   async login(email, password) {
     const response = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-    })
-    const data = await handleResponse(response)
+    });
+    const data = await handleResponse(response);
 
     // Store session token
     if (data.sessionToken) {
-      window.sessionStorage.setItem('sessionToken', data.sessionToken)
-      window.sessionStorage.setItem('userEmail', data.user.email)
-      window.sessionStorage.setItem('orgId', data.user.orgId)
-      window.sessionStorage.setItem('orgName', data.user.orgName)
+      window.sessionStorage.setItem("sessionToken", data.sessionToken);
+      window.sessionStorage.setItem("userEmail", data.user.email);
+      window.sessionStorage.setItem("orgId", data.user.orgId);
+      window.sessionStorage.setItem("orgName", data.user.orgName);
     }
 
-    return data
+    return data;
   },
 
   async logout() {
-    window.sessionStorage.clear()
+    window.sessionStorage.clear();
   },
 
   getCurrentUser() {
-    const sessionToken = window.sessionStorage.getItem('sessionToken')
-    if (!sessionToken) return null
+    const sessionToken = window.sessionStorage.getItem("sessionToken");
+    if (!sessionToken) return null;
 
     return {
-      email: window.sessionStorage.getItem('userEmail'),
-      orgId: parseInt(window.sessionStorage.getItem('orgId')),
-      orgName: window.sessionStorage.getItem('orgName')
-    }
-  }
-}
+      email: window.sessionStorage.getItem("userEmail"),
+      orgId: parseInt(window.sessionStorage.getItem("orgId")),
+      orgName: window.sessionStorage.getItem("orgName"),
+    };
+  },
+};
 
 // Update getHeaders to use session token instead of admin password
 function getHeaders() {
-  const sessionToken = window.sessionStorage.getItem('sessionToken')
+  const sessionToken = window.sessionStorage.getItem("sessionToken");
   return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${sessionToken || ''}`,
-  }
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${sessionToken || ""}`,
+  };
 }
 ```
 
@@ -448,60 +515,60 @@ function getHeaders() {
 **Create new file:**
 
 ```jsx
-import { useState } from 'react'
-import { authApi } from '../utils/adminApi'
-import { useNavigate } from 'react-router-dom'
+import { useState } from "react";
+import { authApi } from "../utils/adminApi";
+import { useNavigate } from "react-router-dom";
 
 export default function SignupPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    orgName: ''
-  })
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+    email: "",
+    password: "",
+    confirmPassword: "",
+    orgName: "",
+  });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
-    }))
-  }
+      [e.target.name]: e.target.value,
+    }));
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
+    e.preventDefault();
+    setError("");
 
     // Validation
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      return
+      setError("Passwords do not match");
+      return;
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
+      setError("Password must be at least 8 characters");
+      return;
     }
 
     if (!formData.orgName.trim()) {
-      setError('Organization name is required')
-      return
+      setError("Organization name is required");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
 
     try {
-      await authApi.signup(formData.email, formData.password, formData.orgName)
+      await authApi.signup(formData.email, formData.password, formData.orgName);
       // Redirect to admin panel on success
-      navigate('/admin')
+      navigate("/admin");
     } catch (err) {
-      setError(err.message || 'Signup failed. Please try again.')
+      setError(err.message || "Signup failed. Please try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-band-navy flex items-center justify-center p-4">
@@ -576,19 +643,19 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full px-4 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors font-semibold"
           >
-            {loading ? 'Creating account...' : 'Create Account'}
+            {loading ? "Creating account..." : "Create Account"}
           </button>
         </form>
 
         <p className="text-gray-400 text-sm mt-4 text-center">
-          Already have an account?{' '}
+          Already have an account?{" "}
           <a href="/admin/login" className="text-band-orange hover:underline">
             Log in
           </a>
         </p>
       </div>
     </div>
-  )
+  );
 }
 ```
 
@@ -611,40 +678,40 @@ export default function SignupPage() {
 **Create new file** for 4-step wizard:
 
 ```jsx
-import { useState } from 'react'
-import { eventsApi } from '../utils/adminApi'
+import { useState } from "react";
+import { eventsApi } from "../utils/adminApi";
 
-const STEPS = ['basics', 'venues', 'bands', 'publish']
+const STEPS = ["basics", "venues", "bands", "publish"];
 
 export default function EventWizard({ onComplete, onCancel }) {
-  const [currentStep, setCurrentStep] = useState(0)
+  const [currentStep, setCurrentStep] = useState(0);
   const [eventData, setEventData] = useState({
-    name: '',
-    date: '',
-    slug: '',
-    description: '',
+    name: "",
+    date: "",
+    slug: "",
+    description: "",
     venues: [],
-    bands: []
-  })
+    bands: [],
+  });
 
   const stepComponents = {
     basics: <BasicsStep eventData={eventData} onChange={setEventData} />,
     venues: <VenuesStep eventData={eventData} onChange={setEventData} />,
     bands: <BandsStep eventData={eventData} onChange={setEventData} />,
-    publish: <PublishStep eventData={eventData} />
-  }
+    publish: <PublishStep eventData={eventData} />,
+  };
 
   const handleNext = () => {
     if (currentStep < STEPS.length - 1) {
-      setCurrentStep(prev => prev + 1)
+      setCurrentStep((prev) => prev + 1);
     }
-  }
+  };
 
   const handleBack = () => {
     if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1)
+      setCurrentStep((prev) => prev - 1);
     }
-  }
+  };
 
   const handlePublish = async () => {
     try {
@@ -653,18 +720,18 @@ export default function EventWizard({ onComplete, onCancel }) {
         name: eventData.name,
         date: eventData.date,
         slug: eventData.slug,
-        description: eventData.description
-      })
+        description: eventData.description,
+      });
 
       // Create venues
       // Create bands
       // ...
 
-      onComplete(event)
+      onComplete(event);
     } catch (error) {
-      console.error('Failed to create event:', error)
+      console.error("Failed to create event:", error);
     }
-  }
+  };
 
   return (
     <div className="bg-band-purple rounded-lg p-6">
@@ -675,10 +742,10 @@ export default function EventWizard({ onComplete, onCancel }) {
             key={step}
             className={`flex-1 text-center ${
               idx === currentStep
-                ? 'text-band-orange font-bold'
+                ? "text-band-orange font-bold"
                 : idx < currentStep
-                ? 'text-green-400'
-                : 'text-gray-500'
+                  ? "text-green-400"
+                  : "text-gray-500"
             }`}
           >
             <div className="text-sm capitalize">{step}</div>
@@ -687,9 +754,7 @@ export default function EventWizard({ onComplete, onCancel }) {
       </div>
 
       {/* Current step content */}
-      <div className="mb-6">
-        {stepComponents[STEPS[currentStep]]}
-      </div>
+      <div className="mb-6">{stepComponents[STEPS[currentStep]]}</div>
 
       {/* Navigation buttons */}
       <div className="flex justify-between">
@@ -697,7 +762,7 @@ export default function EventWizard({ onComplete, onCancel }) {
           onClick={currentStep === 0 ? onCancel : handleBack}
           className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
         >
-          {currentStep === 0 ? 'Cancel' : 'Back'}
+          {currentStep === 0 ? "Cancel" : "Back"}
         </button>
 
         {currentStep < STEPS.length - 1 ? (
@@ -717,7 +782,7 @@ export default function EventWizard({ onComplete, onCancel }) {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // Implement each step component...
@@ -744,12 +809,12 @@ export default function EmbedCodeGenerator({ event }) {
   frameborder="0"
   title="${event.name} Schedule"
 ></iframe>
-  `.trim()
+  `.trim();
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(embedCode)
-    alert('Embed code copied!')
-  }
+    navigator.clipboard.writeText(embedCode);
+    alert("Embed code copied!");
+  };
 
   return (
     <div className="bg-band-purple rounded-lg p-4">
@@ -771,13 +836,18 @@ export default function EmbedCodeGenerator({ event }) {
 
       <div className="mt-4 p-3 bg-blue-900/30 border border-blue-600 rounded">
         <p className="text-blue-200 text-sm">
-          <strong>Preview:</strong> <a href={`/embed/${event.slug}`} target="_blank" className="underline">
+          <strong>Preview:</strong>{" "}
+          <a
+            href={`/embed/${event.slug}`}
+            target="_blank"
+            className="underline"
+          >
             Open in new tab
           </a>
         </p>
       </div>
     </div>
-  )
+  );
 }
 ```
 
@@ -786,11 +856,11 @@ export default function EmbedCodeGenerator({ event }) {
 **Create embed view** (minimal UI for iframe):
 
 ```jsx
-import { useParams } from 'react-router-dom'
-import ScheduleView from '../components/ScheduleView'
+import { useParams } from "react-router-dom";
+import ScheduleView from "../components/ScheduleView";
 
 export default function EmbedPage() {
-  const { slug } = useParams()
+  const { slug } = useParams();
 
   // Load event by slug
   // Render minimal schedule view (no header/footer)
@@ -799,7 +869,7 @@ export default function EmbedPage() {
     <div className="min-h-screen bg-band-navy p-2">
       <ScheduleView eventSlug={slug} embedded={true} />
     </div>
-  )
+  );
 }
 ```
 
@@ -813,26 +883,31 @@ export default function EmbedPage() {
 
 ```javascript
 export async function onRequestGet(context) {
-  const { request, env, params } = context
-  const { DB } = env
-  const eventId = params.id
+  const { request, env, params } = context;
+  const { DB } = env;
+  const eventId = params.id;
 
   try {
     // Verify user owns this event (check org_id)
     // ...
 
     // Get event metrics
-    const metrics = await DB.prepare(`
+    const metrics = await DB.prepare(
+      `
       SELECT
         total_schedule_builds,
         unique_visitors,
         last_updated
       FROM event_metrics
       WHERE event_id = ?
-    `).bind(eventId).first()
+    `,
+    )
+      .bind(eventId)
+      .first();
 
     // Get most popular bands
-    const popularBands = await DB.prepare(`
+    const popularBands = await DB.prepare(
+      `
       SELECT
         band_id,
         COUNT(*) as schedule_count
@@ -841,28 +916,36 @@ export async function onRequestGet(context) {
       GROUP BY band_id
       ORDER BY schedule_count DESC
       LIMIT 10
-    `).bind(eventId).all()
+    `,
+    )
+      .bind(eventId)
+      .all();
 
-    return new Response(JSON.stringify({
-      success: true,
-      metrics: {
-        totalScheduleBuilds: metrics?.total_schedule_builds || 0,
-        uniqueVisitors: metrics?.unique_visitors || 0,
-        lastUpdated: metrics?.last_updated,
-        popularBands: popularBands.results || []
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    })
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        metrics: {
+          totalScheduleBuilds: metrics?.total_schedule_builds || 0,
+          uniqueVisitors: metrics?.unique_visitors || 0,
+          lastUpdated: metrics?.last_updated,
+          popularBands: popularBands.results || [],
+        },
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
-    console.error('Metrics error:', error)
-    return new Response(JSON.stringify({
-      error: 'Failed to load metrics'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    console.error("Metrics error:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Failed to load metrics",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }
 ```
@@ -872,29 +955,29 @@ export async function onRequestGet(context) {
 **Create dashboard** showing key metrics:
 
 ```jsx
-import { useState, useEffect } from 'react'
-import { eventsApi } from '../utils/adminApi'
+import { useState, useEffect } from "react";
+import { eventsApi } from "../utils/adminApi";
 
 export default function MetricsDashboard({ eventId }) {
-  const [metrics, setMetrics] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [metrics, setMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadMetrics()
-  }, [eventId])
+    loadMetrics();
+  }, [eventId]);
 
   const loadMetrics = async () => {
     try {
-      const data = await eventsApi.getMetrics(eventId)
-      setMetrics(data.metrics)
+      const data = await eventsApi.getMetrics(eventId);
+      setMetrics(data.metrics);
     } catch (error) {
-      console.error('Failed to load metrics:', error)
+      console.error("Failed to load metrics:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  if (loading) return <div className="text-white">Loading metrics...</div>
+  if (loading) return <div className="text-white">Loading metrics...</div>;
 
   return (
     <div className="space-y-4">
@@ -932,14 +1015,18 @@ export default function MetricsDashboard({ eventId }) {
         <div className="space-y-2">
           {metrics.popularBands.map((band, idx) => (
             <div key={band.band_id} className="flex justify-between text-sm">
-              <span className="text-white">{idx + 1}. {band.band_name}</span>
-              <span className="text-gray-400">{band.schedule_count} schedules</span>
+              <span className="text-white">
+                {idx + 1}. {band.band_name}
+              </span>
+              <span className="text-gray-400">
+                {band.schedule_count} schedules
+              </span>
             </div>
           ))}
         </div>
       </div>
     </div>
-  )
+  );
 }
 ```
 
@@ -948,12 +1035,14 @@ export default function MetricsDashboard({ eventId }) {
 ## Testing Checklist
 
 ### Database Migration
+
 - [ ] Tables created successfully
 - [ ] Indexes exist
 - [ ] Seed data inserted (Pink Lemonade, Fat Scheid)
 - [ ] Foreign keys working
 
 ### Authentication
+
 - [ ] Signup creates org + user
 - [ ] Login works with email/password
 - [ ] Rate limiting prevents brute force
@@ -961,6 +1050,7 @@ export default function MetricsDashboard({ eventId }) {
 - [ ] Logout clears session
 
 ### Event Creation
+
 - [ ] Wizard progresses through 4 steps
 - [ ] Event created with org_id
 - [ ] Venues assigned to event
@@ -968,12 +1058,14 @@ export default function MetricsDashboard({ eventId }) {
 - [ ] Public page accessible at `/events/{slug}`
 
 ### Embed Widget
+
 - [ ] Code generator produces valid HTML
 - [ ] Copy button works
 - [ ] Embed page renders schedule
 - [ ] No admin UI in embed view
 
 ### Metrics
+
 - [ ] Dashboard loads metrics
 - [ ] Schedule builds counted
 - [ ] Popular bands ranked
@@ -984,26 +1076,31 @@ export default function MetricsDashboard({ eventId }) {
 ## Deployment Steps
 
 1. **Run migration:**
+
    ```bash
    npx wrangler d1 execute bandcrawl-db --local --file=database/migration-multi-org.sql
    ```
 
 2. **Install bcrypt:**
+
    ```bash
    npm install bcryptjs
    ```
 
 3. **Rebuild frontend:**
+
    ```bash
    cd frontend && npm run build
    ```
 
 4. **Test locally:**
+
    ```bash
    npx wrangler pages dev frontend/dist --binding DB=bandcrawl-db --local
    ```
 
 5. **Deploy to production:**
+
    ```bash
    # Run migration on production D1
    npx wrangler d1 execute bandcrawl-db --file=database/migration-multi-org.sql
@@ -1017,6 +1114,7 @@ export default function MetricsDashboard({ eventId }) {
 ## Success Criteria
 
 Sprint 1 is complete when:
+
 - ✅ Promoters can sign up and create account
 - ✅ Promoters can log in with email/password
 - ✅ Promoters can create events via wizard
@@ -1024,4 +1122,3 @@ Sprint 1 is complete when:
 - ✅ Embed code generator works
 - ✅ Metrics dashboard shows basic stats
 - ✅ All tests pass
-

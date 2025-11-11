@@ -13,12 +13,14 @@
 Optimize the admin panel for mobile/tablet usage and create comprehensive user documentation for non-technical event organizers.
 
 **Target Users:** Event organizers who:
+
 - Run 4-5 large band crawl events + many smaller events/year
 - Are NOT technically savvy
 - Manage events primarily from phones/tablets
 - Need clear, simple instructions
 
 **Dual Goals:**
+
 1. **Mobile Optimization** - Touch-friendly, fast, intuitive admin interface
 2. **User Documentation** - Step-by-step guides for all admin tasks
 
@@ -27,6 +29,7 @@ Optimize the admin panel for mobile/tablet usage and create comprehensive user d
 ## 📋 Prerequisites Check
 
 Before starting, verify these exist:
+
 - ✅ Admin panel implemented (`frontend/src/admin/`)
 - ✅ Tailwind CSS configured
 - ✅ Existing responsive classes (needs improvement)
@@ -41,10 +44,12 @@ If missing, **STOP** and notify user.
 ### Part 1: Mobile UI/UX Optimization (4-5 days)
 
 #### 1.1 Touch Target Optimization
+
 **Current Problem:** Buttons too small (py-2 ≈ 32px height)
 **WCAG Standard:** Minimum 44px × 44px, AAA = 48px
 
 **Files to Modify:**
+
 ```
 frontend/src/admin/
 ├── AdminPanel.jsx        # Header buttons, tabs
@@ -57,18 +62,20 @@ frontend/src/admin/
 ```
 
 **Changes Required:**
+
 ```javascript
 // BEFORE (too small for mobile)
-className="px-4 py-2 bg-band-orange text-white rounded"
+className = "px-4 py-2 bg-band-orange text-white rounded";
 
 // AFTER (minimum 44px touch target)
-className="px-6 py-3 bg-band-orange text-white rounded min-h-[44px]"
+className = "px-6 py-3 bg-band-orange text-white rounded min-h-[44px]";
 
 // Larger for primary actions
-className="px-8 py-4 bg-band-orange text-white rounded min-h-[48px] text-lg"
+className = "px-8 py-4 bg-band-orange text-white rounded min-h-[48px] text-lg";
 ```
 
 **Specific Requirements:**
+
 - All buttons: `min-h-[44px]` minimum
 - Primary actions: `min-h-[48px]` recommended
 - Increase `px` and `py` proportionally
@@ -77,18 +84,21 @@ className="px-8 py-4 bg-band-orange text-white rounded min-h-[48px] text-lg"
 ---
 
 #### 1.2 Form Optimization for Mobile
+
 **Current Problem:** Desktop-oriented forms hard to use on mobile keyboards
 
 **Changes Required:**
 
 **Input Field Sizing:**
+
 ```javascript
 // Input fields should be larger
-className="w-full px-4 py-3 rounded border text-base sm:text-sm"
+className = "w-full px-4 py-3 rounded border text-base sm:text-sm";
 // ^ text-base (16px) prevents iOS zoom on focus
 ```
 
 **Mobile Keyboard Optimization:**
+
 ```javascript
 // Use correct input types for mobile keyboards
 <input type="email" />        // Email keyboard
@@ -100,6 +110,7 @@ className="w-full px-4 py-3 rounded border text-base sm:text-sm"
 ```
 
 **Form Layout:**
+
 ```javascript
 // Stack vertically on mobile, horizontal on desktop
 <div className="flex flex-col md:flex-row gap-4">
@@ -117,29 +128,31 @@ className="w-full px-4 py-3 rounded border text-base sm:text-sm"
 ---
 
 #### 1.3 Mobile Navigation Improvements
+
 **Current:** Top tabs may be hard to reach with thumb
 
 **Add Bottom Navigation Option:**
+
 ```javascript
 // Create BottomNav.jsx component
 export default function BottomNav({ activeTab, onTabChange }) {
   const tabs = [
-    { id: 'events', label: 'Events', icon: '📅' },
-    { id: 'venues', label: 'Venues', icon: '📍' },
-    { id: 'bands', label: 'Bands', icon: '🎸' },
-  ]
+    { id: "events", label: "Events", icon: "📅" },
+    { id: "venues", label: "Venues", icon: "📍" },
+    { id: "bands", label: "Bands", icon: "🎸" },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-band-purple border-t border-band-orange/20 md:hidden z-50">
       <div className="flex justify-around">
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={`flex-1 py-3 text-center min-h-[56px] ${
               activeTab === tab.id
-                ? 'text-band-orange bg-band-navy/30'
-                : 'text-white/70'
+                ? "text-band-orange bg-band-navy/30"
+                : "text-white/70"
             }`}
           >
             <div className="text-2xl">{tab.icon}</div>
@@ -148,11 +161,12 @@ export default function BottomNav({ activeTab, onTabChange }) {
         ))}
       </div>
     </nav>
-  )
+  );
 }
 ```
 
 **Integrate into AdminPanel.jsx:**
+
 ```javascript
 import BottomNav from './BottomNav'
 
@@ -167,29 +181,34 @@ import BottomNav from './BottomNav'
 ---
 
 #### 1.4 Swipe Gestures for Common Actions
+
 **Use Case:** Swipe left on band/venue to reveal delete button
 
 **Install react-swipeable:**
+
 ```bash
 npm install --save react-swipeable
 ```
 
 **Implement in BandsTab.jsx:**
+
 ```javascript
-import { useSwipeable } from 'react-swipeable'
+import { useSwipeable } from "react-swipeable";
 
 function BandListItem({ band, onEdit, onDelete }) {
-  const [showDelete, setShowDelete] = useState(false)
+  const [showDelete, setShowDelete] = useState(false);
 
   const handlers = useSwipeable({
     onSwipedLeft: () => setShowDelete(true),
     onSwipedRight: () => setShowDelete(false),
     trackMouse: true, // Also works on desktop
-  })
+  });
 
   return (
     <div {...handlers} className="relative">
-      <div className={`transition-transform ${showDelete ? '-translate-x-20' : ''}`}>
+      <div
+        className={`transition-transform ${showDelete ? "-translate-x-20" : ""}`}
+      >
         {/* Band content */}
       </div>
 
@@ -202,33 +221,36 @@ function BandListItem({ band, onEdit, onDelete }) {
         </button>
       )}
     </div>
-  )
+  );
 }
 ```
 
 ---
 
 #### 1.5 Performance Optimization for Mobile
+
 **Mobile devices have slower CPUs and worse network**
 
 **Lazy Loading:**
+
 ```javascript
 // Load tabs only when needed
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense } from "react";
 
-const BandsTab = lazy(() => import('./BandsTab'))
-const VenuesTab = lazy(() => import('./VenuesTab'))
+const BandsTab = lazy(() => import("./BandsTab"));
+const VenuesTab = lazy(() => import("./VenuesTab"));
 
 function AdminPanel() {
   return (
     <Suspense fallback={<LoadingSpinner />}>
-      {activeTab === 'bands' && <BandsTab />}
+      {activeTab === "bands" && <BandsTab />}
     </Suspense>
-  )
+  );
 }
 ```
 
 **Image Optimization:**
+
 ```javascript
 // When band photos are added, use lazy loading
 <img
@@ -240,6 +262,7 @@ function AdminPanel() {
 ```
 
 **Bundle Size Reduction:**
+
 ```bash
 # Analyze current bundle
 npm run build
@@ -251,9 +274,11 @@ npx vite-bundle-visualizer
 ---
 
 #### 1.6 Improved Visual Feedback
+
 **Current:** May not be clear when actions are processing
 
 **Loading States:**
+
 ```javascript
 <button
   disabled={submitting}
@@ -265,15 +290,16 @@ npx vite-bundle-visualizer
       Processing...
     </span>
   ) : (
-    'Save Band'
+    "Save Band"
   )}
 </button>
 ```
 
 **Success Animations:**
+
 ```javascript
 // Add success checkmark animation
-className="transition-all ${success ? 'scale-110 text-green-500' : ''}"
+className = "transition-all ${success ? 'scale-110 text-green-500' : ''}";
 ```
 
 ---
@@ -281,6 +307,7 @@ className="transition-all ${success ? 'scale-110 text-green-500' : ''}"
 ### Part 2: User Documentation (2-3 days)
 
 #### 2.1 In-App Help System
+
 **Create:** `frontend/src/admin/components/HelpPanel.jsx`
 
 ```javascript
@@ -293,13 +320,13 @@ export default function HelpPanel({ topic }) {
         "Click 'Add Performance' to add a new band",
         "Fill in band name, venue, and time",
         "Click 'Save' to add the performance",
-        "Edit or delete performances using the buttons on each row"
+        "Edit or delete performances using the buttons on each row",
       ],
       tips: [
         "Performances are automatically sorted by start time",
         "Overlapping times at the same venue will show a warning",
-        "Use bulk actions to move multiple bands at once"
-      ]
+        "Use bulk actions to move multiple bands at once",
+      ],
     },
     venues: {
       title: "Managing Venues",
@@ -308,8 +335,8 @@ export default function HelpPanel({ topic }) {
     events: {
       title: "Managing Events",
       // ... similar structure
-    }
-  }
+    },
+  };
 
   return (
     <div className="bg-band-purple/50 rounded-lg p-4 mb-4">
@@ -330,11 +357,12 @@ export default function HelpPanel({ topic }) {
         </ul>
       </div>
     </div>
-  )
+  );
 }
 ```
 
 **Toggle Help in Each Tab:**
+
 ```javascript
 const [showHelp, setShowHelp] = useState(false)
 
@@ -351,6 +379,7 @@ const [showHelp, setShowHelp] = useState(false)
 ---
 
 #### 2.2 User Guide Documentation
+
 **Create:** `docs/USER_GUIDE.md`
 
 ```markdown
@@ -361,6 +390,7 @@ const [showHelp, setShowHelp] = useState(false)
 This guide will help you manage your band crawl events, even if you're not tech-savvy!
 
 ## Table of Contents
+
 1. [Getting Started](#getting-started)
 2. [Creating Your First Event](#creating-your-first-event)
 3. [Adding Venues](#adding-venues)
@@ -372,6 +402,7 @@ This guide will help you manage your band crawl events, even if you're not tech-
 ## Getting Started
 
 ### Logging In
+
 1. Go to yoursite.com/admin
 2. Enter your email and password
 3. Click "Login"
@@ -379,7 +410,9 @@ This guide will help you manage your band crawl events, even if you're not tech-
 **Tip:** Bookmark this page on your phone for quick access!
 
 ### The Admin Dashboard
+
 After logging in, you'll see three tabs:
+
 - **Events** - Create and manage your band crawl events
 - **Venues** - Add locations where bands will perform
 - **Performances** - Schedule which bands play where and when
@@ -389,10 +422,12 @@ After logging in, you'll see three tabs:
 ## Creating Your First Event
 
 ### Step 1: Open the Event Wizard
+
 1. Click the orange "Create Event" button at the top
 2. You'll see a step-by-step wizard
 
 ### Step 2: Enter Event Details
+
 - **Event Name:** "Long Weekend Band Crawl 2024"
 - **Start Date:** First day of the event
 - **End Date:** Last day of the event
@@ -401,6 +436,7 @@ After logging in, you'll see three tabs:
 **Important:** The city must match for all venues in this event!
 
 ### Step 3: Add Venues
+
 1. For each venue, enter:
    - Venue name (e.g., "The Analog Cafe")
    - Full address
@@ -409,6 +445,7 @@ After logging in, you'll see three tabs:
 3. Click "Next" when done
 
 ### Step 4: Add Performances
+
 1. For each band/performer:
    - Band name
    - Select venue from dropdown
@@ -421,6 +458,7 @@ After logging in, you'll see three tabs:
 **Tip:** Add them in chronological order to stay organized!
 
 ### Step 5: Review and Create
+
 1. Review all the information
 2. Click "Create Event"
 3. Success! Your event is created as a DRAFT
@@ -447,6 +485,7 @@ If you need to add venues to an existing event:
 ## Adding Performances
 
 ### Quick Add
+
 1. Go to **Performances** tab
 2. Select your event at the top
 3. Click "Add Performance"
@@ -454,13 +493,16 @@ If you need to add venues to an existing event:
 5. Click "Save"
 
 ### Conflict Warnings
+
 If you schedule two bands at the same venue at the same time, you'll see a **red warning**.
 
 **To fix:**
+
 1. Adjust the start/end times so they don't overlap
 2. Or move one band to a different venue
 
 ### Bulk Operations
+
 Need to move multiple bands to a new venue?
 
 1. Check the boxes next to the bands
@@ -480,13 +522,16 @@ Need to move multiple bands to a new venue?
 Users can subscribe to get email updates about your events.
 
 ### Viewing Subscribers
+
 1. Go to **Events** tab
 2. Find your event
 3. Click "View Subscribers"
 4. See list of all email subscriptions
 
 ### Subscription Types
+
 Users can subscribe by:
+
 - **City** - All events in their city
 - **Genre** - All events with their favorite music genre
 - **Frequency** - Daily, weekly, or monthly updates
@@ -498,6 +543,7 @@ Users can subscribe by:
 ## Publishing Your Event
 
 ### Making Your Event Public
+
 1. Go to **Events** tab
 2. Find your draft event
 3. Click "Edit"
@@ -507,7 +553,9 @@ Users can subscribe by:
 **Important:** Only publish when ALL information is correct! Once published, attendees can see it.
 
 ### Unpublishing
+
 Need to make changes?
+
 1. Uncheck "Published"
 2. Make your edits
 3. Re-publish when ready
@@ -517,22 +565,29 @@ Need to make changes?
 ## Troubleshooting
 
 ### "I can't add a performance - the venue dropdown is empty"
+
 **Solution:** Add venues first! Go to Venues tab and create your venues before adding performances.
 
 ### "I see a conflict warning but the times look right"
+
 **Solution:** Make sure you're looking at the full time range. A band ending at 9:00pm conflicts with another starting at 9:00pm. Leave at least 15-30 minutes between acts for setup.
 
 ### "My changes aren't showing on the public schedule"
+
 **Solution:**
+
 1. Make sure the event is Published (not Draft)
 2. Wait 1-2 minutes for the cache to update
 3. Refresh the public page
 
 ### "I accidentally deleted a performance"
+
 **Solution:** Unfortunately, deletions are permanent. You'll need to re-add it manually. Double-check before clicking delete!
 
 ### "The site isn't loading on my phone"
+
 **Solution:**
+
 1. Try refreshing the page
 2. Check your internet connection
 3. Try a different browser (Chrome, Safari)
@@ -543,6 +598,7 @@ Need to make changes?
 ## Tips for Success
 
 ### Before the Event
+
 - [ ] Create event at least 2 weeks in advance
 - [ ] Add all venues first
 - [ ] Add all performances with accurate times
@@ -550,12 +606,14 @@ Need to make changes?
 - [ ] Publish event
 
 ### During Setup
+
 - [ ] Keep venue names consistent (don't use "The Analog" and "Analog Cafe")
 - [ ] Use 24-hour time or include AM/PM
 - [ ] Add 15-30 minute buffers between bands
 - [ ] Test the public schedule before publishing
 
 ### Best Practices
+
 - **Save Often** - Don't rely on auto-save
 - **Preview First** - Use bulk preview before applying changes
 - **Double-Check Times** - Incorrect times cause attendee confusion
@@ -566,10 +624,12 @@ Need to make changes?
 ## Getting Help
 
 ### Contact Support
+
 - Email: support@bandcrawl.example.com
 - Include your event name and what you're trying to do
 
 ### Quick Reference Card
+
 Print this and keep it handy!
 
 **Login:** yoursite.com/admin
@@ -586,6 +646,7 @@ Print this and keep it handy!
 ---
 
 #### 2.3 Video Tutorials (Optional but Recommended)
+
 **Create simple screen recordings:**
 
 1. **Getting Started** (2 min)
@@ -604,6 +665,7 @@ Print this and keep it handy!
    - Publishing events
 
 **Tools:**
+
 - Screen record on phone/tablet (most realistic)
 - Use Loom or QuickTime for recording
 - Host on YouTube (unlisted links)
@@ -612,13 +674,14 @@ Print this and keep it handy!
 ---
 
 #### 2.4 Contextual Help Tooltips
+
 **Add help icons with explanations:**
 
 ```javascript
-import { QuestionMarkCircleIcon } from '@heroicons/react/24/outline'
+import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 
 function Tooltip({ text }) {
-  const [show, setShow] = useState(false)
+  const [show, setShow] = useState(false);
 
   return (
     <div className="relative inline-block">
@@ -634,14 +697,14 @@ function Tooltip({ text }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // Usage
 <label className="flex items-center gap-2">
   Start Time
   <Tooltip text="When this band starts performing. Must not overlap with other bands at this venue." />
-</label>
+</label>;
 ```
 
 ---
@@ -649,6 +712,7 @@ function Tooltip({ text }) {
 ## 📈 Success Criteria
 
 ### Part 1: Mobile UI/UX
+
 - [ ] All buttons ≥ 44px height (WCAG compliance)
 - [ ] Form inputs use correct mobile keyboard types
 - [ ] Bottom navigation functional on mobile (<768px)
@@ -659,6 +723,7 @@ function Tooltip({ text }) {
 - [ ] Touch targets have ≥8px spacing between them
 
 ### Part 2: Documentation
+
 - [ ] USER_GUIDE.md complete with all sections
 - [ ] In-app help panel implemented for each tab
 - [ ] Help toggle button in each tab
@@ -668,6 +733,7 @@ function Tooltip({ text }) {
 - [ ] (Optional) Video tutorials created and linked
 
 ### Quality Gates
+
 - [ ] Tested on iOS Safari (iPhone)
 - [ ] Tested on Android Chrome
 - [ ] Tested on iPad Safari
@@ -680,6 +746,7 @@ function Tooltip({ text }) {
 ## 🔧 Commands
 
 ### Development
+
 ```bash
 # Run dev server
 cd frontend && npm run dev
@@ -697,6 +764,7 @@ npm run typecheck
 ```
 
 ### Testing
+
 ```bash
 # Lighthouse mobile audit
 npm run psi:dev -- --mobile
@@ -711,32 +779,41 @@ npx axe http://localhost:5173/admin --mobile
 ## 🐛 Troubleshooting
 
 ### Issue: Buttons still too small on mobile
+
 **Check:**
+
 ```bash
 grep -r "py-1\|py-2" frontend/src/admin/
 ```
+
 **Fix:** Replace with py-3 or py-4
 
 ### Issue: iOS zoom on input focus
+
 **Solution:** Ensure text-base (16px minimum) on inputs
+
 ```javascript
-className="text-base sm:text-sm"  // 16px on mobile, 14px on desktop
+className = "text-base sm:text-sm"; // 16px on mobile, 14px on desktop
 ```
 
 ### Issue: Bottom nav conflicts with content
+
 **Solution:** Add bottom padding
+
 ```javascript
 <div className="pb-20 md:pb-0">
 ```
 
 ### Issue: Swipe gestures conflict with scrolling
+
 **Solution:** Set swipe threshold higher
+
 ```javascript
 const handlers = useSwipeable({
   onSwipedLeft: () => setShowDelete(true),
-  delta: 50,  // Require 50px swipe
-  preventScrollOnSwipe: false
-})
+  delta: 50, // Require 50px swipe
+  preventScrollOnSwipe: false,
+});
 ```
 
 ---
@@ -754,6 +831,7 @@ const handlers = useSwipeable({
 ## ✅ Acceptance Checklist
 
 **Before Marking Complete:**
+
 - [ ] All touch targets meet WCAG standards
 - [ ] Forms optimized for mobile keyboards
 - [ ] Bottom navigation implemented
@@ -768,6 +846,7 @@ const handlers = useSwipeable({
 - [ ] Visual feedback on all interactions
 
 **After Implementation:**
+
 - [ ] Run `npm run lint` (no errors)
 - [ ] Run mobile Lighthouse audit
 - [ ] Test full workflow on mobile device
@@ -779,6 +858,7 @@ const handlers = useSwipeable({
 ## 🎯 Deliverables
 
 ### Commit 1: Touch Target Optimization
+
 ```bash
 git add frontend/src/admin/*.jsx
 git commit -m "feat(mobile): optimize touch targets for WCAG compliance
@@ -789,6 +869,7 @@ git commit -m "feat(mobile): optimize touch targets for WCAG compliance
 ```
 
 ### Commit 2: Mobile Navigation
+
 ```bash
 git add frontend/src/admin/BottomNav.jsx
 git add frontend/src/admin/AdminPanel.jsx
@@ -800,6 +881,7 @@ git commit -m "feat(mobile): add bottom navigation for mobile devices
 ```
 
 ### Commit 3: Form Optimization
+
 ```bash
 git add frontend/src/admin/*Form.jsx
 git commit -m "feat(mobile): optimize forms for mobile keyboards
@@ -810,6 +892,7 @@ git commit -m "feat(mobile): optimize forms for mobile keyboards
 ```
 
 ### Commit 4: Swipe Gestures
+
 ```bash
 git add frontend/src/admin/BandsTab.jsx
 git add package.json
@@ -821,6 +904,7 @@ git commit -m "feat(mobile): add swipe gestures for delete actions
 ```
 
 ### Commit 5: Documentation
+
 ```bash
 git add docs/USER_GUIDE.md
 git add frontend/src/admin/components/HelpPanel.jsx
@@ -837,42 +921,49 @@ git commit -m "docs: add comprehensive user guide and in-app help
 ## 🚦 Status Tracking
 
 ### Phase 1: Touch Targets (1 day)
+
 - [ ] Audit all buttons and interactive elements
 - [ ] Update to min-h-[44px] or min-h-[48px]
 - [ ] Test on mobile device
 - [ ] Fix any issues
 
 ### Phase 2: Mobile Navigation (1 day)
+
 - [ ] Create BottomNav component
 - [ ] Integrate into AdminPanel
 - [ ] Add appropriate spacing
 - [ ] Test navigation flow
 
 ### Phase 3: Form Optimization (1 day)
+
 - [ ] Update all input types
 - [ ] Adjust font sizes
 - [ ] Implement responsive layouts
 - [ ] Test with mobile keyboards
 
 ### Phase 4: Swipe Gestures (1 day)
+
 - [ ] Install react-swipeable
 - [ ] Implement in BandsTab
 - [ ] Implement in VenuesTab (if needed)
 - [ ] Test and refine
 
 ### Phase 5: Performance (0.5 days)
+
 - [ ] Implement lazy loading
 - [ ] Optimize bundle size
 - [ ] Run Lighthouse audit
 - [ ] Fix performance issues
 
 ### Phase 6: Documentation (2 days)
+
 - [ ] Write USER_GUIDE.md
 - [ ] Create HelpPanel component
 - [ ] Add contextual tooltips
 - [ ] Review and refine
 
 ### Phase 7: Testing & Validation (0.5 days)
+
 - [ ] Test on iPhone Safari
 - [ ] Test on Android Chrome
 - [ ] Test on iPad
@@ -886,12 +977,14 @@ git commit -m "docs: add comprehensive user guide and in-app help
 ## 💡 Tips for Success
 
 ### For Cursor Implementation
+
 1. **Start with touch targets** - Most impactful change
 2. **Test frequently** - Use browser DevTools mobile emulation
 3. **Follow existing patterns** - Match current design system
 4. **Don't over-engineer** - Keep it simple for non-technical users
 
 ### For Testing
+
 1. **Use real devices** - Emulation doesn't catch everything
 2. **Test with non-technical user** - Get feedback early
 3. **Check edge cases** - Small screens, large fonts, landscape mode
@@ -913,4 +1006,4 @@ git commit -m "docs: add comprehensive user guide and in-app help
 
 **END OF CURSOR TASK**
 
-*This task is Priority 1 before implementing R2 image upload system.*
+_This task is Priority 1 before implementing R2 image upload system._

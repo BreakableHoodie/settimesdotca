@@ -24,7 +24,7 @@ async function verifySession(DB, sessionToken) {
       FROM sessions s
       INNER JOIN users u ON s.user_id = u.id
       WHERE s.id = ? AND s.expires_at > datetime('now')
-    `
+    `,
     )
       .bind(sessionToken)
       .first();
@@ -32,7 +32,7 @@ async function verifySession(DB, sessionToken) {
     if (session && session.is_active === 1) {
       // Update last activity
       await DB.prepare(
-        `UPDATE sessions SET last_activity_at = datetime('now') WHERE id = ?`
+        `UPDATE sessions SET last_activity_at = datetime('now') WHERE id = ?`,
       )
         .bind(sessionToken)
         .run();
@@ -61,13 +61,25 @@ export async function checkPermission(request, env, requiredRole) {
     request.headers.get("X-Session-Token");
 
   if (!sessionToken) {
-    return { error: true, response: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } }) };
+    return {
+      error: true,
+      response: new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }),
+    };
   }
 
   const user = await verifySession(env.DB, sessionToken);
 
   if (!user) {
-    return { error: true, response: new Response(JSON.stringify({ error: 'Invalid session' }), { status: 401, headers: { 'Content-Type': 'application/json' } }) };
+    return {
+      error: true,
+      response: new Response(JSON.stringify({ error: "Invalid session" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }),
+    };
   }
 
   const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
@@ -75,29 +87,50 @@ export async function checkPermission(request, env, requiredRole) {
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 
   if (userLevel < requiredLevel) {
-    return { error: true, response: new Response(JSON.stringify({ error: 'Forbidden', message: 'Insufficient permissions' }), { status: 403, headers: { 'Content-Type': 'application/json' } }) };
+    return {
+      error: true,
+      response: new Response(
+        JSON.stringify({
+          error: "Forbidden",
+          message: "Insufficient permissions",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      ),
+    };
   }
 
   return { error: false, user };
 }
 
 // Audit log function - logs all admin actions
-export async function auditLog(env, userId, action, resourceType, resourceId, details, ipAddress) {
+export async function auditLog(
+  env,
+  userId,
+  action,
+  resourceType,
+  resourceId,
+  details,
+  ipAddress,
+) {
   try {
-    await env.DB.prepare(`
+    await env.DB.prepare(
+      `
       INSERT INTO audit_log (user_id, action, resource_type, resource_id, details, ip_address)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(
-      userId,
-      action,
-      resourceType || null,
-      resourceId || null,
-      details ? JSON.stringify(details) : null,
-      ipAddress || 'unknown'
-    ).run();
+    `,
+    )
+      .bind(
+        userId,
+        action,
+        resourceType || null,
+        resourceId || null,
+        details ? JSON.stringify(details) : null,
+        ipAddress || "unknown",
+      )
+      .run();
   } catch (error) {
     // Log error but don't fail the request if audit logging fails
-    console.error('Audit log error:', error);
+    console.error("Audit log error:", error);
   }
 }
 
@@ -131,7 +164,7 @@ export async function onRequest(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -155,7 +188,7 @@ export async function onRequest(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

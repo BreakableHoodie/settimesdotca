@@ -45,7 +45,7 @@ async function main() {
       "..",
       "frontend",
       "public",
-      "bands.json"
+      "bands.json",
     );
 
     if (!fs.existsSync(bandsPath)) {
@@ -65,7 +65,7 @@ async function main() {
 
     // Get event details from user
     const eventName = await question(
-      'Event name (e.g., "Long Weekend Band Crawl - October 2025"): '
+      'Event name (e.g., "Long Weekend Band Crawl - October 2025"): ',
     );
     const eventDate =
       bandsData[0]?.date || (await question("Event date (YYYY-MM-DD): "));
@@ -85,7 +85,7 @@ async function main() {
 
     console.error(`\nExtracted ${venues.length} unique venues`);
     console.error(
-      `Event will be ${isPublished ? "published" : "unpublished"}\n`
+      `Event will be ${isPublished ? "published" : "unpublished"}\n`,
     );
     console.error("Generating SQL...\n");
 
@@ -102,8 +102,8 @@ async function main() {
     sql.push("-- Insert event");
     sql.push(
       `INSERT INTO events (name, date, slug, is_published) VALUES (${escapeSQL(
-        eventName
-      )}, ${escapeSQL(eventDate)}, ${escapeSQL(eventSlug)}, ${isPublished});`
+        eventName,
+      )}, ${escapeSQL(eventDate)}, ${escapeSQL(eventSlug)}, ${isPublished});`,
     );
     sql.push("");
 
@@ -112,8 +112,8 @@ async function main() {
     venues.forEach((venue) => {
       sql.push(
         `INSERT INTO venues (name, address) VALUES (${escapeSQL(
-          venue.name
-        )}, NULL);`
+          venue.name,
+        )}, NULL);`,
       );
     });
     sql.push("");
@@ -121,7 +121,7 @@ async function main() {
     // Insert bands
     sql.push("-- Insert bands");
     sql.push(
-      "-- Note: event_id = 1 assumes this is the first event in the database"
+      "-- Note: event_id = 1 assumes this is the first event in the database",
     );
     sql.push("-- Adjust if needed based on your database state");
     sql.push("");
@@ -135,10 +135,10 @@ async function main() {
 
       sql.push(
         `INSERT INTO bands (event_id, venue_id, name, start_time, end_time, url) VALUES (${eventId}, ${venueId}, ${escapeSQL(
-          band.name
+          band.name,
         )}, ${escapeSQL(band.startTime)}, ${escapeSQL(
-          band.endTime
-        )}, ${escapeSQL(url)});`
+          band.endTime,
+        )}, ${escapeSQL(url)});`,
       );
     });
 
@@ -149,17 +149,17 @@ async function main() {
     console.error("To execute this migration:");
     console.error("  1. Save the output to a file:");
     console.error(
-      "     node database/migrate-bands-json.js > database/migration.sql"
+      "     node database/migrate-bands-json.js > database/migration.sql",
     );
     console.error("");
     console.error("  2. Execute with wrangler:");
     console.error(
-      "     wrangler d1 execute bandcrawl-db --file=database/migration.sql"
+      "     wrangler d1 execute bandcrawl-db --file=database/migration.sql",
     );
     console.error("");
     console.error("  3. Or execute locally for testing:");
     console.error(
-      "     wrangler d1 execute bandcrawl-db --local --file=database/migration.sql"
+      "     wrangler d1 execute bandcrawl-db --local --file=database/migration.sql",
     );
     console.error("");
   } catch (error) {

@@ -90,10 +90,12 @@ erDiagram
 **Problem:** The old schema duplicated band data for each event. If "The Harpoonist" played Vol. 5, Vol. 6, and Vol. 7, their name and URL were stored three times. Updating the band's website meant editing three rows.
 
 **Solution:** Separate band identity (profile) from performance scheduling:
+
 - **`band_profiles`:** Who the band is (name, bio, photos, social links)
 - **performances`:** When/where they played (event, venue, time)
 
 **Benefits:**
+
 1. Update band info once → reflects across all events
 2. See complete performance history per band
 3. Build searchable band library for reuse
@@ -104,10 +106,12 @@ erDiagram
 **Challenge:** Prevent duplicates like "The Harpoonist" vs "THE HARPOONIST" while preserving artistic capitalization like "mxmtoon", "CHVRCHES", "deadmau5".
 
 **Solution:** Two-field approach:
+
 - `name`: Display name (preserves user input exactly)
 - `name_normalized`: Lowercase + trimmed for duplicate checking (UNIQUE constraint)
 
 **Normalization Rules:**
+
 ```javascript
 // Convert to lowercase, trim, collapse multiple spaces
 const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -122,6 +126,7 @@ const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
 
 **User Experience:**
 When creating a band that matches an existing normalized name:
+
 1. API returns 409 Conflict
 2. Frontend shows: "⚠️ Similar band found: The Harpoonist (played Vol. 5, Vol. 4)"
 3. User chooses: [Use This Band] or [Create Different Band]
@@ -132,6 +137,7 @@ When creating a band that matches an existing normalized name:
 See `database/migration-v1-to-v2.sql` for complete migration script.
 
 **Summary:**
+
 1. Extract unique bands from old `bands` table using normalization
 2. Create `band_profiles` with deduplication
 3. Create `performances` linking to profiles
@@ -143,21 +149,23 @@ See `database/migration-v1-to-v2.sql` for complete migration script.
 
 Stores each band crawl event (e.g., Vol. 5, Vol. 6).
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique event identifier |
-| `name` | TEXT | NOT NULL | Display name (e.g., "Long Weekend Band Crawl Vol. 5") |
-| `date` | TEXT | NOT NULL | Event date in YYYY-MM-DD format |
-| `slug` | TEXT | NOT NULL, UNIQUE | URL-friendly identifier (e.g., "vol-5", "vol-6") |
-| `is_published` | INTEGER | NOT NULL, DEFAULT 0 | Publication status: 0 = draft, 1 = published |
-| `created_at` | TEXT | NOT NULL, DEFAULT now() | ISO 8601 creation timestamp |
+| Column         | Type    | Constraints                | Description                                           |
+| -------------- | ------- | -------------------------- | ----------------------------------------------------- |
+| `id`           | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique event identifier                               |
+| `name`         | TEXT    | NOT NULL                   | Display name (e.g., "Long Weekend Band Crawl Vol. 5") |
+| `date`         | TEXT    | NOT NULL                   | Event date in YYYY-MM-DD format                       |
+| `slug`         | TEXT    | NOT NULL, UNIQUE           | URL-friendly identifier (e.g., "vol-5", "vol-6")      |
+| `is_published` | INTEGER | NOT NULL, DEFAULT 0        | Publication status: 0 = draft, 1 = published          |
+| `created_at`   | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 creation timestamp                           |
 
 **Business Rules:**
+
 - `slug` must be lowercase, numbers, and hyphens only (validated at application layer)
 - Only published events (`is_published = 1`) are visible in public API
 - Deleting an event cascades to all associated bands
 
 **Indexes:**
+
 - `idx_events_published` on `is_published` - Fast filtering of published events
 - `idx_events_slug` on `slug` - Fast lookups for public schedule API
 
@@ -165,19 +173,21 @@ Stores each band crawl event (e.g., Vol. 5, Vol. 6).
 
 Stores venue information shared across all events.
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique venue identifier |
-| `name` | TEXT | NOT NULL, UNIQUE | Venue name (e.g., "Room 47", "The Basement") |
-| `address` | TEXT | NULL | Optional physical address |
+| Column    | Type    | Constraints                | Description                                  |
+| --------- | ------- | -------------------------- | -------------------------------------------- |
+| `id`      | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique venue identifier                      |
+| `name`    | TEXT    | NOT NULL, UNIQUE           | Venue name (e.g., "Room 47", "The Basement") |
+| `address` | TEXT    | NULL                       | Optional physical address                    |
 
 **Business Rules:**
+
 - Venue names must be unique across all events
 - Venues can be reused across multiple events (e.g., "Room 47" in Vol. 5 and Vol. 6)
 - Deleting a venue is RESTRICTED if bands are scheduled there
 
 **Design Decision:**
 Venues are shared across events (not event-specific) because:
+
 - Same physical venues are typically used year after year
 - Reduces data duplication
 - Simplifies venue management in admin panel
@@ -186,19 +196,20 @@ Venues are shared across events (not event-specific) because:
 
 Stores reusable band identity across all events. This is the "band library."
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique band profile identifier |
-| `name` | TEXT | NOT NULL | Display name (preserves artistic capitalization) |
-| `name_normalized` | TEXT | NOT NULL, UNIQUE | Lowercase + trimmed for duplicate detection |
-| `description` | TEXT | NULL | Band bio/description (markdown supported) |
-| `photo_url` | TEXT | NULL | Hero image URL (uploaded or external link) |
-| `genre` | TEXT | NULL | Genre tags (comma-separated for MVP) |
-| `social_links` | TEXT | NULL | JSON: {"bandcamp": "url", "instagram": "@handle", ...} |
-| `created_at` | TEXT | NOT NULL, DEFAULT now() | ISO 8601 creation timestamp |
-| `updated_at` | TEXT | NOT NULL, DEFAULT now() | ISO 8601 last update timestamp |
+| Column            | Type    | Constraints                | Description                                            |
+| ----------------- | ------- | -------------------------- | ------------------------------------------------------ |
+| `id`              | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique band profile identifier                         |
+| `name`            | TEXT    | NOT NULL                   | Display name (preserves artistic capitalization)       |
+| `name_normalized` | TEXT    | NOT NULL, UNIQUE           | Lowercase + trimmed for duplicate detection            |
+| `description`     | TEXT    | NULL                       | Band bio/description (markdown supported)              |
+| `photo_url`       | TEXT    | NULL                       | Hero image URL (uploaded or external link)             |
+| `genre`           | TEXT    | NULL                       | Genre tags (comma-separated for MVP)                   |
+| `social_links`    | TEXT    | NULL                       | JSON: {"bandcamp": "url", "instagram": "@handle", ...} |
+| `created_at`      | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 creation timestamp                            |
+| `updated_at`      | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 last update timestamp                         |
 
 **Business Rules:**
+
 - `name_normalized` enforces duplicate detection (see normalization rules above)
 - Artistic capitalization preserved in `name` field ("mxmtoon", "CHVRCHES")
 - `social_links` stores flexible JSON for any platform (Bandcamp, Instagram, Facebook, Spotify, YouTube, etc.)
@@ -206,6 +217,7 @@ Stores reusable band identity across all events. This is the "band library."
 - Auto-updates `updated_at` on any edit (via trigger)
 
 **Indexes:**
+
 - `idx_band_profiles_normalized` on `name_normalized` (UNIQUE) - Fast duplicate detection
 - `idx_band_profiles_name` on `name` - Fast autocomplete search
 - `idx_band_profiles_genre` on `genre` - Fast filtering by genre
@@ -214,29 +226,32 @@ Stores reusable band identity across all events. This is the "band library."
 
 Links band profiles to events with scheduling details. Replaces old `bands` table.
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique performance identifier |
-| `event_id` | INTEGER | NOT NULL, FK → events(id) | Event this performance belongs to |
-| `band_profile_id` | INTEGER | NOT NULL, FK → band_profiles(id) | Which band is performing |
-| `venue_id` | INTEGER | NOT NULL, FK → venues(id) | Venue where band performs |
-| `start_time` | TEXT | NOT NULL | Performance start time (HH:MM, 24-hour) |
-| `end_time` | TEXT | NOT NULL | Performance end time (HH:MM, 24-hour) |
-| `notes` | TEXT | NULL | Optional per-performance notes (e.g., "acoustic set") |
-| `created_at` | TEXT | NOT NULL, DEFAULT now() | ISO 8601 creation timestamp |
+| Column            | Type    | Constraints                      | Description                                           |
+| ----------------- | ------- | -------------------------------- | ----------------------------------------------------- |
+| `id`              | INTEGER | PRIMARY KEY, AUTOINCREMENT       | Unique performance identifier                         |
+| `event_id`        | INTEGER | NOT NULL, FK → events(id)        | Event this performance belongs to                     |
+| `band_profile_id` | INTEGER | NOT NULL, FK → band_profiles(id) | Which band is performing                              |
+| `venue_id`        | INTEGER | NOT NULL, FK → venues(id)        | Venue where band performs                             |
+| `start_time`      | TEXT    | NOT NULL                         | Performance start time (HH:MM, 24-hour)               |
+| `end_time`        | TEXT    | NOT NULL                         | Performance end time (HH:MM, 24-hour)                 |
+| `notes`           | TEXT    | NULL                             | Optional per-performance notes (e.g., "acoustic set") |
+| `created_at`      | TEXT    | NOT NULL, DEFAULT now()          | ISO 8601 creation timestamp                           |
 
 **Foreign Keys:**
+
 - `event_id → events(id) ON DELETE CASCADE` - Deleting event removes performances
 - `band_profile_id → band_profiles(id) ON DELETE RESTRICT` - Cannot delete band if they have performances
 - `venue_id → venues(id) ON DELETE RESTRICT` - Cannot delete venue if performances scheduled
 
 **Business Rules:**
+
 - `end_time` must be after `start_time` (validated at application layer)
 - Conflict detection warns when performances overlap at same venue
 - Times are stored in 24-hour HH:MM format (e.g., "20:00", "21:30")
 - Same band can perform at multiple events (that's the point!)
 
 **Indexes:**
+
 - `idx_performances_event` on `event_id` - Fast filtering by event
 - `idx_performances_band` on `band_profile_id` - Fast performance history queries
 - `idx_performances_venue` on `venue_id` - Fast conflict detection
@@ -246,27 +261,30 @@ Links band profiles to events with scheduling details. Replaces old `bands` tabl
 
 Logs all authentication attempts for security monitoring and forensics.
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique audit log identifier |
-| `timestamp` | TEXT | NOT NULL, DEFAULT now() | ISO 8601 timestamp of attempt |
-| `action` | TEXT | NOT NULL | Action type (e.g., "login_attempt", "password_reset") |
-| `success` | INTEGER | NOT NULL | 0 = failed, 1 = successful |
-| `ip_address` | TEXT | NOT NULL | Client IP address (from CF-Connecting-IP header) |
-| `user_agent` | TEXT | NULL | Browser/client user agent string |
-| `details` | TEXT | NULL | Optional JSON with additional context |
+| Column       | Type    | Constraints                | Description                                           |
+| ------------ | ------- | -------------------------- | ----------------------------------------------------- |
+| `id`         | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique audit log identifier                           |
+| `timestamp`  | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 timestamp of attempt                         |
+| `action`     | TEXT    | NOT NULL                   | Action type (e.g., "login_attempt", "password_reset") |
+| `success`    | INTEGER | NOT NULL                   | 0 = failed, 1 = successful                            |
+| `ip_address` | TEXT    | NOT NULL                   | Client IP address (from CF-Connecting-IP header)      |
+| `user_agent` | TEXT    | NULL                       | Browser/client user agent string                      |
+| `details`    | TEXT    | NULL                       | Optional JSON with additional context                 |
 
 **Business Rules:**
+
 - Every authentication attempt is logged (success and failure)
 - IP addresses are captured from Cloudflare's `CF-Connecting-IP` header
 - Audit logs are append-only (no updates or deletes in application logic)
 - Useful for security investigations and compliance
 
 **Indexes:**
+
 - `idx_auth_audit_timestamp` on `timestamp` - Fast time-based queries
 - `idx_auth_audit_ip` on `ip_address` - Fast IP-based queries
 
 **Query Examples:**
+
 ```sql
 -- Failed login attempts in last 24 hours
 SELECT * FROM auth_audit
@@ -285,13 +303,13 @@ ORDER BY timestamp DESC;
 
 Tracks failed login attempts and implements IP-based rate limiting.
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique rate limit record identifier |
-| `ip_address` | TEXT | NOT NULL, UNIQUE | Client IP address |
-| `failed_attempts` | INTEGER | NOT NULL, DEFAULT 0 | Counter of failed login attempts |
-| `lockout_until` | TEXT | NULL | ISO timestamp when lockout expires (NULL if not locked) |
-| `last_attempt` | TEXT | NOT NULL, DEFAULT now() | ISO 8601 timestamp of last attempt |
+| Column            | Type    | Constraints                | Description                                             |
+| ----------------- | ------- | -------------------------- | ------------------------------------------------------- |
+| `id`              | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique rate limit record identifier                     |
+| `ip_address`      | TEXT    | NOT NULL, UNIQUE           | Client IP address                                       |
+| `failed_attempts` | INTEGER | NOT NULL, DEFAULT 0        | Counter of failed login attempts                        |
+| `lockout_until`   | TEXT    | NULL                       | ISO timestamp when lockout expires (NULL if not locked) |
+| `last_attempt`    | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 timestamp of last attempt                      |
 
 **Rate Limiting Algorithm:**
 
@@ -300,6 +318,7 @@ Tracks failed login attempts and implements IP-based rate limiting.
 3. **Lockout:** 1 hour
 
 **Flow:**
+
 ```
 Attempt 1-4: Increment counter, allow retry
 Attempt 5:   Increment counter, set lockout_until = now + 1 hour
@@ -308,15 +327,18 @@ Success:     Reset failed_attempts to 0, clear lockout_until
 ```
 
 **Business Rules:**
+
 - One row per IP address (UNIQUE constraint)
 - Successful login resets the counter to 0
 - Lockout period begins after 5th failed attempt
 - Counter resets after 10 minutes of inactivity (checked at login time)
 
 **Indexes:**
+
 - `idx_rate_limit_ip` on `ip_address` - Fast lookups during login
 
 **Query Examples:**
+
 ```sql
 -- Currently locked-out IPs
 SELECT ip_address, lockout_until, failed_attempts
@@ -342,6 +364,7 @@ WHERE ip_address = 'X.X.X.X';
 - **Rationale:** When an event is deleted, all associated band performances should be removed
 
 Example:
+
 ```
 events (id=1, name="Vol. 5")
   └─ bands (id=1, event_id=1, name="The Strokes")
@@ -356,6 +379,7 @@ events (id=1, name="Vol. 5")
 - **Rationale:** Cannot delete a venue if bands are scheduled there (data integrity protection)
 
 Example:
+
 ```
 venues (id=1, name="Room 47")
   └─ bands (id=1, venue_id=1, name="The Strokes", event_id=1)
@@ -373,6 +397,7 @@ Events and venues have an implicit many-to-many relationship through the `bands`
 - The `bands` table acts as the junction table
 
 Example:
+
 ```
 Event "Vol. 5" uses venues: Room 47, The Basement, Exit/In
 Event "Vol. 6" uses venues: Room 47, The Basement, Marathon Music Works
@@ -386,6 +411,7 @@ Venue "Room 47" is used by events: Vol. 5, Vol. 6
 The database uses 8 strategic indexes to optimize common queries:
 
 #### Events Queries
+
 ```sql
 -- Fast: Uses idx_events_slug
 SELECT * FROM events WHERE slug = 'vol-5';
@@ -395,6 +421,7 @@ SELECT * FROM events WHERE is_published = 1;
 ```
 
 #### Bands Queries
+
 ```sql
 -- Fast: Uses idx_bands_event
 SELECT * FROM bands WHERE event_id = 1;
@@ -412,6 +439,7 @@ AND end_time > '20:00';
 ```
 
 #### Security Queries
+
 ```sql
 -- Fast: Uses idx_rate_limit_ip
 SELECT * FROM rate_limit WHERE ip_address = 'X.X.X.X';
@@ -430,42 +458,47 @@ WHERE timestamp > datetime('now', '-1 day');
 ## Database Constraints
 
 ### Primary Keys
+
 All tables use `INTEGER PRIMARY KEY AUTOINCREMENT` for:
+
 - Guaranteed uniqueness
 - Efficient joins
 - Automatic row ID generation
 
 ### Unique Constraints
+
 - `events.slug` - Ensures URL-friendly identifiers are unique
 - `venues.name` - Prevents duplicate venue names
 - `rate_limit.ip_address` - One rate limit record per IP
 
 ### Foreign Key Constraints
+
 - **CASCADE:** Deleting events removes associated bands
 - **RESTRICT:** Cannot delete venues with scheduled bands
 
 ### NOT NULL Constraints
+
 Applied to all essential fields to enforce data integrity at database level.
 
 ## Data Types and Formats
 
 ### TEXT Fields
 
-| Field Type | Format | Example | Validation |
-|------------|--------|---------|------------|
-| Date | YYYY-MM-DD | "2025-06-14" | Regex: `^\d{4}-\d{2}-\d{2}$` |
-| Time | HH:MM | "20:00", "21:30" | Regex: `^([01]\d\|2[0-3]):([0-5]\d)$` |
-| Timestamp | ISO 8601 | "2025-01-15T10:30:00Z" | SQLite datetime('now') |
-| Slug | kebab-case | "vol-5", "lwbc-2024" | Regex: `^[a-z0-9-]+$` |
-| URL | HTTP/HTTPS | "https://band.com" | Optional, max 500 chars |
+| Field Type | Format     | Example                | Validation                            |
+| ---------- | ---------- | ---------------------- | ------------------------------------- |
+| Date       | YYYY-MM-DD | "2025-06-14"           | Regex: `^\d{4}-\d{2}-\d{2}$`          |
+| Time       | HH:MM      | "20:00", "21:30"       | Regex: `^([01]\d\|2[0-3]):([0-5]\d)$` |
+| Timestamp  | ISO 8601   | "2025-01-15T10:30:00Z" | SQLite datetime('now')                |
+| Slug       | kebab-case | "vol-5", "lwbc-2024"   | Regex: `^[a-z0-9-]+$`                 |
+| URL        | HTTP/HTTPS | "https://band.com"     | Optional, max 500 chars               |
 
 ### INTEGER Fields
 
-| Field | Range | Usage |
-|-------|-------|-------|
-| `is_published` | 0 or 1 | Boolean flag (0 = draft, 1 = published) |
-| `success` | 0 or 1 | Boolean flag (0 = failed, 1 = successful) |
-| `failed_attempts` | 0-5+ | Counter (5+ triggers lockout) |
+| Field             | Range  | Usage                                     |
+| ----------------- | ------ | ----------------------------------------- |
+| `is_published`    | 0 or 1 | Boolean flag (0 = draft, 1 = published)   |
+| `success`         | 0 or 1 | Boolean flag (0 = failed, 1 = successful) |
+| `failed_attempts` | 0-5+   | Counter (5+ triggers lockout)             |
 
 ## Common Query Patterns
 
@@ -569,6 +602,7 @@ database/migrations/
 ```
 
 **Migration Pattern:**
+
 ```sql
 -- 002_add_band_genre.sql
 ALTER TABLE bands ADD COLUMN genre TEXT;
@@ -641,10 +675,12 @@ node database/migrate-bands-json.js
 Potential schema extensions for future features:
 
 ### Priority 1: CSV Import/Export
+
 - No schema changes required
 - Application-level feature using existing tables
 
 ### Priority 2: Asset Management (R2)
+
 ```sql
 ALTER TABLE events ADD COLUMN image_url TEXT;
 ALTER TABLE venues ADD COLUMN image_url TEXT;
@@ -652,6 +688,7 @@ ALTER TABLE bands ADD COLUMN image_url TEXT;
 ```
 
 ### Priority 3: Analytics
+
 ```sql
 CREATE TABLE band_selections (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -665,6 +702,7 @@ CREATE INDEX idx_selections_timestamp ON band_selections(selected_at);
 ```
 
 ### Priority 4: Multi-Tenancy
+
 ```sql
 CREATE TABLE organizations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

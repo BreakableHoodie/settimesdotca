@@ -8,7 +8,7 @@ import {
   getEventState,
   isEventArchived,
   confirmArchivedEventEdit,
-  confirmArchivedEventDelete
+  confirmArchivedEventDelete,
 } from '../utils/eventLifecycle'
 
 /**
@@ -21,7 +21,14 @@ import {
  * - Toggle publish/unpublish status
  * - Mobile-responsive table/cards
  */
-export default function EventsTab({ events, onEventsChange, showToast, selectedEventId, selectedEvent, onEventFilterChange }) {
+export default function EventsTab({
+  events,
+  onEventsChange,
+  showToast,
+  selectedEventId,
+  selectedEvent,
+  onEventFilterChange,
+}) {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingEventId, setEditingEventId] = useState(null)
   const [duplicatingEventId, setDuplicatingEventId] = useState(null)
@@ -46,11 +53,11 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
       const loadEventData = async () => {
         try {
           const bandsResponse = await fetch('/api/admin/bands', {
-            headers: { Authorization: `Bearer ${window.sessionStorage.getItem('sessionToken')}` }
+            headers: { Authorization: `Bearer ${window.sessionStorage.getItem('sessionToken')}` },
           })
           const bandsData = await bandsResponse.json()
           const eventBandsData = bandsData.bands.filter(b => b.event_id === selectedEventId)
-          
+
           // Get venue names from the bands
           const uniqueVenues = {}
           eventBandsData.forEach(band => {
@@ -58,7 +65,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
               uniqueVenues[band.venue_id] = band.venue_name
             }
           })
-          
+
           setEventVenues(Object.entries(uniqueVenues).map(([id, name]) => ({ id: Number(id), name })))
           setEventBands(eventBandsData)
         } catch (err) {
@@ -84,7 +91,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
     if (!sortConfig.key) return 0
     let aVal = a[sortConfig.key]
     let bVal = b[sortConfig.key]
-    
+
     if (sortConfig.key === 'band_count') {
       aVal = parseInt(aVal) || 0
       bVal = parseInt(bVal) || 0
@@ -95,7 +102,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
       aVal = a.is_published ? 1 : 0
       bVal = b.is_published ? 1 : 0
     }
-    
+
     if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
     if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
     return 0
@@ -243,7 +250,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
     }
   }
 
-  const handleDelete = async (event) => {
+  const handleDelete = async event => {
     const { id: eventId, name: eventName, date: eventDate, band_count: bandCount } = event
 
     // Check if event is archived
@@ -321,10 +328,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
           onCopyAsTemplate={event => {
             // Copy event as template (start duplicate with new date)
             startDuplicate(event)
-            showToast(
-              'Event copied as template. Update the name, date, and slug for your new event.',
-              'success'
-            )
+            showToast('Event copied as template. Update the name, date, and slug for your new event.', 'success')
           }}
         />
 
@@ -344,13 +348,16 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                   })}
                 </p>
                 <p>
-                  <span className="font-semibold">Slug:</span> <span className="font-mono text-band-orange">{selectedEvent.slug}</span>
+                  <span className="font-semibold">Slug:</span>{' '}
+                  <span className="font-mono text-band-orange">{selectedEvent.slug}</span>
                 </p>
                 <p>
                   <span className="font-semibold">Status:</span>{' '}
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                    selectedEvent.is_published ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'
-                  }`}>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                      selectedEvent.is_published ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'
+                    }`}
+                  >
                     {selectedEvent.is_published ? 'Published' : 'Draft'}
                   </span>
                 </p>
@@ -450,113 +457,121 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
           )}
 
           {/* Schedule by Venue */}
-          {eventBands.length > 0 && (() => {
-            // Group bands by venue
-            const bandsByVenue = {}
-            eventBands.forEach(band => {
-              const venueKey = band.venue_name || 'Unassigned'
-              if (!bandsByVenue[venueKey]) {
-                bandsByVenue[venueKey] = []
-              }
-              bandsByVenue[venueKey].push(band)
-            })
+          {eventBands.length > 0 &&
+            (() => {
+              // Group bands by venue
+              const bandsByVenue = {}
+              eventBands.forEach(band => {
+                const venueKey = band.venue_name || 'Unassigned'
+                if (!bandsByVenue[venueKey]) {
+                  bandsByVenue[venueKey] = []
+                }
+                bandsByVenue[venueKey].push(band)
+              })
 
-            // Sort venues alphabetically
-            const sortedVenues = Object.keys(bandsByVenue).sort()
+              // Sort venues alphabetically
+              const sortedVenues = Object.keys(bandsByVenue).sort()
 
-            return (
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold text-white mb-3">Schedule by Venue</h3>
-                <div className="space-y-4">
-                  {sortedVenues.map(venueName => (
-                    <div key={venueName} className="bg-band-navy/30 rounded-lg border border-band-orange/10">
-                      <button
-                        type="button"
-                        className="w-full px-4 py-3 text-base font-semibold text-band-orange border-b border-band-orange/20 cursor-pointer hover:bg-band-navy/20 transition-colors text-left"
-                        onClick={() => {
-                          // Find venue ID from eventBands
-                          const venue = eventBands.find(b => b.venue_name === venueName)
-                          if (venue?.venue_id) {
-                            window.location.href = '#venues'
-                            setTimeout(() => {
-                              window.dispatchEvent(new CustomEvent('filterVenue', { detail: { venueId: venue.venue_id } }))
-                            }, 100)
-                          }
-                        }}
-                        title="View venue profile"
-                      >
-                        {venueName}
-                      </button>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-band-navy/20">
-                            <tr>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Time</th>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Performer</th>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Duration</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-band-orange/10">
-                            {bandsByVenue[venueName]
-                              .sort((a, b) => {
-                                // Convert time strings (HH:MM) to minutes for proper chronological sorting
-                                // Handle late-night performances (00:00-06:00) by adding 24 hours to them
-                                const parseTime = time => {
-                                  if (!time) return 9999 // Put empty times at end
-                                  const [hours, minutes] = time.split(':').map(Number)
-                                  let totalMinutes = hours * 60 + minutes
-                                  // Late night performances (00:00 to 05:59) should come after evening
-                                  if (hours < 6) {
-                                    totalMinutes += 24 * 60 // Add 24 hours for proper sequencing
-                                  }
-                                  return totalMinutes
-                                }
-                                
-                                const timeA = parseTime(a.start_time)
-                                const timeB = parseTime(b.start_time)
-                                return timeA - timeB
-                              })
-                              .map(band => {
-                                const duration = band.start_time && band.end_time 
-                                  ? (() => {
-                                      const [startH, startM] = band.start_time.split(':').map(Number)
-                                      const [endH, endM] = band.end_time.split(':').map(Number)
-                                      const startMinutes = startH * 60 + startM
-                                      const endMinutes = endH * 60 + endM
-                                      
-                                      // Handle midnight crossover (e.g., 23:40 to 00:00)
-                                      if (endMinutes < startMinutes) {
-                                        return (24 * 60) - startMinutes + endMinutes
-                                      }
-                                      return endMinutes - startMinutes
-                                    })()
-                                  : null
-                                
-                                return (
-                                  <tr key={band.id} className="hover:bg-band-navy/20 transition-colors">
-                                    <td className="px-4 py-2 text-white/90 font-mono text-sm">
-                                      {band.start_time && band.end_time ? `${band.start_time} - ${band.end_time}` : '-'}
-                                    </td>
-                                    <td className="px-4 py-2">
-                                      <button
-                                        onClick={() => {
-                                          window.location.href = '#bands'
-                                          setTimeout(() => {
-                                            window.dispatchEvent(new CustomEvent('filterBand', { detail: { bandName: band.name } }))
-                                          }, 100)
-                                        }}
-                                        className="text-white hover:text-band-orange transition-colors cursor-pointer"
-                                        title="View performer profile"
-                                      >
-                                        {band.name}
-                                      </button>
-                                    </td>
-                                    <td className="px-4 py-2 text-white/70 text-sm">
-                                      {duration ? `${duration} min` : '-'}
-                                    </td>
-                                  </tr>
+              return (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Schedule by Venue</h3>
+                  <div className="space-y-4">
+                    {sortedVenues.map(venueName => (
+                      <div key={venueName} className="bg-band-navy/30 rounded-lg border border-band-orange/10">
+                        <button
+                          type="button"
+                          className="w-full px-4 py-3 text-base font-semibold text-band-orange border-b border-band-orange/20 cursor-pointer hover:bg-band-navy/20 transition-colors text-left"
+                          onClick={() => {
+                            // Find venue ID from eventBands
+                            const venue = eventBands.find(b => b.venue_name === venueName)
+                            if (venue?.venue_id) {
+                              window.location.href = '#venues'
+                              setTimeout(() => {
+                                window.dispatchEvent(
+                                  new CustomEvent('filterVenue', { detail: { venueId: venue.venue_id } })
                                 )
-                              })}
+                              }, 100)
+                            }
+                          }}
+                          title="View venue profile"
+                        >
+                          {venueName}
+                        </button>
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-band-navy/20">
+                              <tr>
+                                <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Time</th>
+                                <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Performer</th>
+                                <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Duration</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-band-orange/10">
+                              {bandsByVenue[venueName]
+                                .sort((a, b) => {
+                                  // Convert time strings (HH:MM) to minutes for proper chronological sorting
+                                  // Handle late-night performances (00:00-06:00) by adding 24 hours to them
+                                  const parseTime = time => {
+                                    if (!time) return 9999 // Put empty times at end
+                                    const [hours, minutes] = time.split(':').map(Number)
+                                    let totalMinutes = hours * 60 + minutes
+                                    // Late night performances (00:00 to 05:59) should come after evening
+                                    if (hours < 6) {
+                                      totalMinutes += 24 * 60 // Add 24 hours for proper sequencing
+                                    }
+                                    return totalMinutes
+                                  }
+
+                                  const timeA = parseTime(a.start_time)
+                                  const timeB = parseTime(b.start_time)
+                                  return timeA - timeB
+                                })
+                                .map(band => {
+                                  const duration =
+                                    band.start_time && band.end_time
+                                      ? (() => {
+                                          const [startH, startM] = band.start_time.split(':').map(Number)
+                                          const [endH, endM] = band.end_time.split(':').map(Number)
+                                          const startMinutes = startH * 60 + startM
+                                          const endMinutes = endH * 60 + endM
+
+                                          // Handle midnight crossover (e.g., 23:40 to 00:00)
+                                          if (endMinutes < startMinutes) {
+                                            return 24 * 60 - startMinutes + endMinutes
+                                          }
+                                          return endMinutes - startMinutes
+                                        })()
+                                      : null
+
+                                  return (
+                                    <tr key={band.id} className="hover:bg-band-navy/20 transition-colors">
+                                      <td className="px-4 py-2 text-white/90 font-mono text-sm">
+                                        {band.start_time && band.end_time
+                                          ? `${band.start_time} - ${band.end_time}`
+                                          : '-'}
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        <button
+                                          onClick={() => {
+                                            window.location.href = '#bands'
+                                            setTimeout(() => {
+                                              window.dispatchEvent(
+                                                new CustomEvent('filterBand', { detail: { bandName: band.name } })
+                                              )
+                                            }, 100)
+                                          }}
+                                          className="text-white hover:text-band-orange transition-colors cursor-pointer"
+                                          title="View performer profile"
+                                        >
+                                          {band.name}
+                                        </button>
+                                      </td>
+                                      <td className="px-4 py-2 text-white/70 text-sm">
+                                        {duration ? `${duration} min` : '-'}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
                               {/* Venue Total Row */}
                               {(() => {
                                 const venueTotal = bandsByVenue[venueName].reduce((sum, band) => {
@@ -565,10 +580,10 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                                     const [endH, endM] = band.end_time.split(':').map(Number)
                                     const startMinutes = startH * 60 + startM
                                     const endMinutes = endH * 60 + endM
-                                    
+
                                     // Handle midnight crossover
                                     if (endMinutes < startMinutes) {
-                                      return sum + ((24 * 60) - startMinutes + endMinutes)
+                                      return sum + (24 * 60 - startMinutes + endMinutes)
                                     }
                                     return sum + (endMinutes - startMinutes)
                                   }
@@ -585,87 +600,87 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                                   </tr>
                                 )
                               })()}
-                          </tbody>
-                        </table>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  
-                  {/* Overall Event Total */}
-                  {(() => {
-                    // Calculate event span (earliest start to latest end)
-                    // First pass: Detect if we have midnight-crossing event
-                    let hasEveningShows = false
-                    let hasEarlyMorningShows = false
+                    ))}
 
-                    eventBands.forEach(band => {
-                      if (band.start_time) {
-                        const [h] = band.start_time.split(':').map(Number)
-                        if (h >= 18) hasEveningShows = true
-                        if (h < 6) hasEarlyMorningShows = true
-                      }
-                    })
+                    {/* Overall Event Total */}
+                    {(() => {
+                      // Calculate event span (earliest start to latest end)
+                      // First pass: Detect if we have midnight-crossing event
+                      let hasEveningShows = false
+                      let hasEarlyMorningShows = false
 
-                    const isMidnightCrossing = hasEveningShows && hasEarlyMorningShows
+                      eventBands.forEach(band => {
+                        if (band.start_time) {
+                          const [h] = band.start_time.split(':').map(Number)
+                          if (h >= 18) hasEveningShows = true
+                          if (h < 6) hasEarlyMorningShows = true
+                        }
+                      })
 
-                    // Second pass: Calculate span with midnight adjustment if needed
-                    let earliestStart = null
-                    let latestEnd = null
+                      const isMidnightCrossing = hasEveningShows && hasEarlyMorningShows
 
-                    eventBands.forEach(band => {
-                      if (band.start_time && band.end_time) {
-                        const [startH, startM] = band.start_time.split(':').map(Number)
-                        const [endH, endM] = band.end_time.split(':').map(Number)
-                        const startMinutes = startH * 60 + startM
-                        const endMinutes = endH * 60 + endM
+                      // Second pass: Calculate span with midnight adjustment if needed
+                      let earliestStart = null
+                      let latestEnd = null
 
-                        // Only adjust early morning times if we detected midnight crossing
-                        let adjustedStart = startMinutes
-                        let adjustedEnd = endMinutes
+                      eventBands.forEach(band => {
+                        if (band.start_time && band.end_time) {
+                          const [startH, startM] = band.start_time.split(':').map(Number)
+                          const [endH, endM] = band.end_time.split(':').map(Number)
+                          const startMinutes = startH * 60 + startM
+                          const endMinutes = endH * 60 + endM
 
-                        if (isMidnightCrossing) {
-                          // Adjust early morning times (00:00-05:59) to next day
-                          if (startH < 6) {
-                            adjustedStart = startMinutes + 24 * 60
-                          }
-                          if (endH < 6) {
+                          // Only adjust early morning times if we detected midnight crossing
+                          let adjustedStart = startMinutes
+                          let adjustedEnd = endMinutes
+
+                          if (isMidnightCrossing) {
+                            // Adjust early morning times (00:00-05:59) to next day
+                            if (startH < 6) {
+                              adjustedStart = startMinutes + 24 * 60
+                            }
+                            if (endH < 6) {
+                              adjustedEnd = endMinutes + 24 * 60
+                            }
+                          } else if (endMinutes < startMinutes) {
+                            // Single performance crosses midnight
                             adjustedEnd = endMinutes + 24 * 60
                           }
-                        } else if (endMinutes < startMinutes) {
-                          // Single performance crosses midnight
-                          adjustedEnd = endMinutes + 24 * 60
-                        }
 
-                        // Track earliest start
-                        if (earliestStart === null || adjustedStart < earliestStart) {
-                          earliestStart = adjustedStart
-                        }
+                          // Track earliest start
+                          if (earliestStart === null || adjustedStart < earliestStart) {
+                            earliestStart = adjustedStart
+                          }
 
-                        // Track latest end
-                        if (latestEnd === null || adjustedEnd > latestEnd) {
-                          latestEnd = adjustedEnd
+                          // Track latest end
+                          if (latestEnd === null || adjustedEnd > latestEnd) {
+                            latestEnd = adjustedEnd
+                          }
                         }
-                      }
-                    })
+                      })
 
-                    const eventSpan = earliestStart && latestEnd ? latestEnd - earliestStart : 0
-                    
-                    return (
-                      <div className="mt-4 bg-band-orange/20 rounded-lg p-4 border-2 border-band-orange">
-                        <div className="flex justify-between items-center">
-                          <span className="text-band-orange font-semibold text-lg">Event Duration</span>
-                          <span className="text-band-orange font-bold text-lg">
-                            {eventSpan ? `${eventSpan} min (${Math.round(eventSpan / 60)}h ${eventSpan % 60}m)` : '-'}
-                          </span>
+                      const eventSpan = earliestStart && latestEnd ? latestEnd - earliestStart : 0
+
+                      return (
+                        <div className="mt-4 bg-band-orange/20 rounded-lg p-4 border-2 border-band-orange">
+                          <div className="flex justify-between items-center">
+                            <span className="text-band-orange font-semibold text-lg">Event Duration</span>
+                            <span className="text-band-orange font-bold text-lg">
+                              {eventSpan ? `${eventSpan} min (${Math.round(eventSpan / 60)}h ${eventSpan % 60}m)` : '-'}
+                            </span>
+                          </div>
+                          <p className="text-white/60 text-sm mt-1">From first to last performance</p>
                         </div>
-                        <p className="text-white/60 text-sm mt-1">From first to last performance</p>
-                      </div>
-                    )
-                  })()}
+                      )
+                    })()}
+                  </div>
                 </div>
-              </div>
-            )
-          })()}
+              )
+            })()}
         </div>
 
         {/* Modals */}
@@ -800,7 +815,13 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                 disabled={loading}
                 className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors"
               >
-                {loading ? 'Saving...' : editingEventId ? 'Update Event' : duplicatingEventId ? 'Duplicate Event' : 'Create Event'}
+                {loading
+                  ? 'Saving...'
+                  : editingEventId
+                    ? 'Update Event'
+                    : duplicatingEventId
+                      ? 'Duplicate Event'
+                      : 'Create Event'}
               </button>
               <button
                 type="button"
@@ -825,31 +846,31 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
               <table className="w-full">
                 <thead className="bg-band-navy/50 border-b border-band-orange/20">
                   <tr>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                       onClick={() => handleSort('name')}
                     >
                       Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                       onClick={() => handleSort('date')}
                     >
                       Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                       onClick={() => handleSort('slug')}
                     >
                       Slug {sortConfig.key === 'slug' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                       onClick={() => handleSort('is_published')}
                     >
                       Status {sortConfig.key === 'is_published' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                       onClick={() => handleSort('band_count')}
                     >

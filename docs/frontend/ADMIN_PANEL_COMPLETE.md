@@ -132,11 +132,11 @@ I've successfully created all admin panel UI components for the Long Weekend Ban
 Update `src/main.jsx`:
 
 ```jsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import App from './App.jsx'
-import AdminApp from './admin/AdminApp.jsx'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import App from "./App.jsx";
+import AdminApp from "./admin/AdminApp.jsx";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
@@ -144,8 +144,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/admin" element={<AdminApp />} />
       </Routes>
     </BrowserRouter>
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);
 ```
 
 Access at: `http://localhost:5173/admin`
@@ -155,7 +155,7 @@ Access at: `http://localhost:5173/admin`
 Use HashRouter instead of BrowserRouter:
 
 ```jsx
-import { HashRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from "react-router-dom";
 // ... same routes
 ```
 
@@ -166,13 +166,13 @@ Access at: `http://localhost:5173/#/admin`
 Replace App temporarily in `main.jsx`:
 
 ```jsx
-import AdminApp from './admin/AdminApp.jsx'
+import AdminApp from "./admin/AdminApp.jsx";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AdminApp />
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);
 ```
 
 Access at: `http://localhost:5173/`

@@ -3,14 +3,14 @@
 // Compatible with Google Calendar, Apple Calendar, Outlook
 
 export async function onRequestGet(context) {
-  const { request, env } = context
-  const url = new URL(request.url)
+  const { request, env } = context;
+  const url = new URL(request.url);
 
   // Extract city from subdomain or path
-  const hostname = url.hostname
-  const pathParts = url.pathname.split('/')
-  const city = url.searchParams.get('city') || 'all'
-  const genre = url.searchParams.get('genre') || 'all'
+  const hostname = url.hostname;
+  const pathParts = url.pathname.split("/");
+  const city = url.searchParams.get("city") || "all";
+  const genre = url.searchParams.get("genre") || "all";
 
   try {
     // Get events
@@ -32,83 +32,86 @@ export async function onRequestGet(context) {
       LEFT JOIN venues v ON v.id = b.venue_id
       WHERE e.is_published = 1
       AND e.date >= date('now')
-    `
+    `;
 
-    const params = []
+    const params = [];
 
-    if (city !== 'all') {
-      query += ` AND LOWER(e.city) = LOWER(?)`
-      params.push(city)
+    if (city !== "all") {
+      query += ` AND LOWER(e.city) = LOWER(?)`;
+      params.push(city);
     }
 
-    if (genre !== 'all') {
-      query += ` AND LOWER(b.genre) = LOWER(?)`
-      params.push(genre)
+    if (genre !== "all") {
+      query += ` AND LOWER(b.genre) = LOWER(?)`;
+      params.push(genre);
     }
 
-    query += ` ORDER BY e.date ASC, b.start_time ASC`
+    query += ` ORDER BY e.date ASC, b.start_time ASC`;
 
-    const { results: bands } = await env.DB.prepare(query).bind(...params).all()
+    const { results: bands } = await env.DB.prepare(query)
+      .bind(...params)
+      .all();
 
     // Generate iCal content
-    const ical = generateICal(bands, city, genre)
+    const ical = generateICal(bands, city, genre);
 
     return new Response(ical, {
       headers: {
-        'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${city}-${genre}.ics"`,
-        'Cache-Control': 'public, max-age=3600' // Cache for 1 hour
-      }
-    })
-
+        "Content-Type": "text/calendar; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${city}-${genre}.ics"`,
+        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+      },
+    });
   } catch (error) {
-    console.error('iCal generation error:', error)
-    return new Response('Failed to generate calendar feed', { status: 500 })
+    console.error("iCal generation error:", error);
+    return new Response("Failed to generate calendar feed", { status: 500 });
   }
 }
 
 function generateICal(bands, city, genre) {
-  const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+  const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 
   let ical = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Concert Schedule//EN',
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Concert Schedule//EN",
     `X-WR-CALNAME:${city} ${genre} Shows`,
-    'X-WR-TIMEZONE:America/Los_Angeles',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH'
-  ]
+    "X-WR-TIMEZONE:America/Los_Angeles",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+  ];
 
   for (const band of bands) {
-    if (!band.band_name) continue
+    if (!band.band_name) continue;
 
     // Parse date and time
-    const eventDate = band.date // YYYY-MM-DD
-    const startTime = band.start_time || '20:00' // HH:MM
-    const endTime = band.end_time || '21:00'
+    const eventDate = band.date; // YYYY-MM-DD
+    const startTime = band.start_time || "20:00"; // HH:MM
+    const endTime = band.end_time || "21:00";
 
     // Convert to iCal format (YYYYMMDDTHHMMSS)
-    const dtstart = `${eventDate.replace(/-/g, '')}T${startTime.replace(/:/g, '')}00`
-    const dtend = `${eventDate.replace(/-/g, '')}T${endTime.replace(/:/g, '')}00`
+    const dtstart = `${eventDate.replace(/-/g, "")}T${startTime.replace(/:/g, "")}00`;
+    const dtend = `${eventDate.replace(/-/g, "")}T${endTime.replace(/:/g, "")}00`;
 
     // Generate unique ID
-    const uid = `band-${band.id}-${eventDate}@concertschedule.app`
+    const uid = `band-${band.id}-${eventDate}@concertschedule.app`;
 
     // Location
-    const location = band.venue_name ?
-      `${band.venue_name}${band.address ? ', ' + band.address : ''}` :
-      'TBD'
+    const location = band.venue_name
+      ? `${band.venue_name}${band.address ? ", " + band.address : ""}`
+      : "TBD";
 
     // Description
     const description = [
       band.band_name,
-      band.venue_name ? `Venue: ${band.venue_name}` : '',
-      band.description || ''
-    ].filter(Boolean).join('\\n')
+      band.venue_name ? `Venue: ${band.venue_name}` : "",
+      band.description || "",
+    ]
+      .filter(Boolean)
+      .join("\\n");
 
     ical.push(
-      'BEGIN:VEVENT',
+      "BEGIN:VEVENT",
       `UID:${uid}`,
       `DTSTAMP:${now}`,
       `DTSTART:${dtstart}`,
@@ -116,21 +119,21 @@ function generateICal(bands, city, genre) {
       `SUMMARY:${escapeIcal(band.band_name)}`,
       `LOCATION:${escapeIcal(location)}`,
       `DESCRIPTION:${escapeIcal(description)}`,
-      'STATUS:CONFIRMED',
-      'END:VEVENT'
-    )
+      "STATUS:CONFIRMED",
+      "END:VEVENT",
+    );
   }
 
-  ical.push('END:VCALENDAR')
+  ical.push("END:VCALENDAR");
 
-  return ical.join('\r\n')
+  return ical.join("\r\n");
 }
 
 function escapeIcal(text) {
-  if (!text) return ''
+  if (!text) return "";
   return text
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\n/g, '\\n')
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
 }

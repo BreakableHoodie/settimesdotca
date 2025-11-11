@@ -23,6 +23,7 @@
 ## Task 1: Service Worker Caching
 
 ### Goal
+
 Aggressive offline-first caching so app works in clubs with poor signal.
 
 ### File: `frontend/public/sw.js`
@@ -30,144 +31,144 @@ Aggressive offline-first caching so app works in clubs with poor signal.
 **Replace existing Service Worker** with this implementation:
 
 ```javascript
-const CACHE_VERSION = 'v2'
-const CACHE_NAME = `schedule-${CACHE_VERSION}`
+const CACHE_VERSION = "v2";
+const CACHE_NAME = `schedule-${CACHE_VERSION}`;
 
 // Assets to cache immediately on install
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/assets/index.css',
-  '/assets/index.js',
-  '/manifest.json'
-]
+  "/",
+  "/index.html",
+  "/assets/index.css",
+  "/assets/index.js",
+  "/manifest.json",
+];
 
 // Install: cache static assets
-self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker', CACHE_VERSION)
+self.addEventListener("install", (event) => {
+  console.log("[SW] Installing service worker", CACHE_VERSION);
 
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching static assets')
-      return cache.addAll(STATIC_ASSETS)
-    })
-  )
+      console.log("[SW] Caching static assets");
+      return cache.addAll(STATIC_ASSETS);
+    }),
+  );
 
   // Force activation immediately
-  self.skipWaiting()
-})
+  self.skipWaiting();
+});
 
 // Activate: clean up old caches
-self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker', CACHE_VERSION)
+self.addEventListener("activate", (event) => {
+  console.log("[SW] Activating service worker", CACHE_VERSION);
 
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name.startsWith('schedule-') && name !== CACHE_NAME)
+          .filter((name) => name.startsWith("schedule-") && name !== CACHE_NAME)
           .map((name) => {
-            console.log('[SW] Deleting old cache:', name)
-            return caches.delete(name)
-          })
-      )
-    })
-  )
+            console.log("[SW] Deleting old cache:", name);
+            return caches.delete(name);
+          }),
+      );
+    }),
+  );
 
   // Take control of all pages immediately
-  self.clients.claim()
-})
+  self.clients.claim();
+});
 
 // Fetch: Cache-first with network fallback
-self.addEventListener('fetch', (event) => {
-  const { request } = event
-  const url = new URL(request.url)
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
 
   // Only cache same-origin requests
   if (url.origin !== self.location.origin) {
-    return
+    return;
   }
 
   // API requests: Network-first with cache fallback
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirstStrategy(request))
-    return
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(networkFirstStrategy(request));
+    return;
   }
 
   // Static assets: Cache-first with network fallback
-  event.respondWith(cacheFirstStrategy(request))
-})
+  event.respondWith(cacheFirstStrategy(request));
+});
 
 // Cache-first strategy (for static assets)
 async function cacheFirstStrategy(request) {
-  const cached = await caches.match(request)
+  const cached = await caches.match(request);
 
   if (cached) {
     // Return cached version immediately
     // Update cache in background
-    updateCache(request)
-    return cached
+    updateCache(request);
+    return cached;
   }
 
   // Not in cache, fetch from network
   try {
-    const response = await fetch(request)
+    const response = await fetch(request);
 
     // Cache successful responses
     if (response.ok) {
-      const cache = await caches.open(CACHE_NAME)
-      cache.put(request, response.clone())
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone());
     }
 
-    return response
+    return response;
   } catch (error) {
-    console.error('[SW] Fetch failed:', error)
+    console.error("[SW] Fetch failed:", error);
 
     // Return offline page if available
-    const offlinePage = await caches.match('/offline.html')
-    if (offlinePage) return offlinePage
+    const offlinePage = await caches.match("/offline.html");
+    if (offlinePage) return offlinePage;
 
     // Return basic error response
-    return new Response('Offline - content not cached', {
+    return new Response("Offline - content not cached", {
       status: 503,
-      statusText: 'Service Unavailable'
-    })
+      statusText: "Service Unavailable",
+    });
   }
 }
 
 // Network-first strategy (for API requests)
 async function networkFirstStrategy(request) {
   try {
-    const response = await fetch(request)
+    const response = await fetch(request);
 
     // Cache successful GET requests
-    if (response.ok && request.method === 'GET') {
-      const cache = await caches.open(CACHE_NAME)
-      cache.put(request, response.clone())
+    if (response.ok && request.method === "GET") {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone());
     }
 
-    return response
+    return response;
   } catch (error) {
     // Network failed, try cache
-    const cached = await caches.match(request)
+    const cached = await caches.match(request);
 
     if (cached) {
-      console.log('[SW] Serving cached API response:', request.url)
-      return cached
+      console.log("[SW] Serving cached API response:", request.url);
+      return cached;
     }
 
-    throw error
+    throw error;
   }
 }
 
 // Update cache in background
 async function updateCache(request) {
   try {
-    const response = await fetch(request)
+    const response = await fetch(request);
 
     if (response.ok) {
-      const cache = await caches.open(CACHE_NAME)
-      await cache.put(request, response)
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response);
     }
   } catch (error) {
     // Silent fail for background updates
@@ -182,64 +183,68 @@ async function updateCache(request) {
 ```html
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Offline - Schedule App</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      text-align: center;
-    }
-    .container {
-      max-width: 400px;
-      padding: 2rem;
-    }
-    h1 {
-      font-size: 3rem;
-      margin: 0 0 1rem 0;
-    }
-    p {
-      font-size: 1.125rem;
-      line-height: 1.6;
-      margin: 0 0 2rem 0;
-      opacity: 0.9;
-    }
-    button {
-      background: #ff6b35;
-      color: white;
-      border: none;
-      padding: 1rem 2rem;
-      font-size: 1rem;
-      border-radius: 0.5rem;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    button:hover {
-      background: #ff8555;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>📡</h1>
-    <h2>You're Offline</h2>
-    <p>This page isn't cached yet. Check your connection and try again.</p>
-    <button onclick="window.location.reload()">Retry</button>
-  </div>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline - Schedule App</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        text-align: center;
+      }
+      .container {
+        max-width: 400px;
+        padding: 2rem;
+      }
+      h1 {
+        font-size: 3rem;
+        margin: 0 0 1rem 0;
+      }
+      p {
+        font-size: 1.125rem;
+        line-height: 1.6;
+        margin: 0 0 2rem 0;
+        opacity: 0.9;
+      }
+      button {
+        background: #ff6b35;
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        font-size: 1rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:hover {
+        background: #ff8555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📡</h1>
+      <h2>You're Offline</h2>
+      <p>This page isn't cached yet. Check your connection and try again.</p>
+      <button onclick="window.location.reload()">Retry</button>
+    </div>
+  </body>
 </html>
 ```
 
 ### Testing Checklist
+
 - [ ] Service worker installs successfully
 - [ ] Static assets cached on first load
 - [ ] App works offline after initial visit
@@ -252,6 +257,7 @@ async function updateCache(request) {
 ## Task 2: Bundle Optimization
 
 ### Goal
+
 Reduce JavaScript bundle to < 60KB (target from FAN_FIRST_SPEC: 60KB JS).
 
 ### File: `frontend/vite.config.js`
@@ -259,23 +265,23 @@ Reduce JavaScript bundle to < 60KB (target from FAN_FIRST_SPEC: 60KB JS).
 **Update build configuration**:
 
 ```javascript
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
 
   build: {
     // Bundle size optimizations
-    target: 'es2020',
-    minify: 'terser',
+    target: "es2020",
+    minify: "terser",
 
     terserOptions: {
       compress: {
-        drop_console: true,        // Remove console.log in production
-        drop_debugger: true,        // Remove debugger statements
-        pure_funcs: ['console.info', 'console.debug']
-      }
+        drop_console: true, // Remove console.log in production
+        drop_debugger: true, // Remove debugger statements
+        pure_funcs: ["console.info", "console.debug"],
+      },
     },
 
     rollupOptions: {
@@ -283,27 +289,27 @@ export default defineConfig({
         // Manual chunk splitting
         manualChunks: {
           // Vendor chunk (React, ReactDOM)
-          vendor: ['react', 'react-dom'],
+          vendor: ["react", "react-dom"],
 
           // Admin panel (lazy loaded)
           admin: [
-            './src/admin/AdminPanel.jsx',
-            './src/admin/BandsTab.jsx',
-            './src/admin/EventsTab.jsx'
-          ]
-        }
-      }
+            "./src/admin/AdminPanel.jsx",
+            "./src/admin/BandsTab.jsx",
+            "./src/admin/EventsTab.jsx",
+          ],
+        },
+      },
     },
 
     // Warnings for large chunks
-    chunkSizeWarningLimit: 100 // KB
+    chunkSizeWarningLimit: 100, // KB
   },
 
   // Production optimizations
   esbuild: {
-    drop: ['console', 'debugger']
-  }
-})
+    drop: ["console", "debugger"],
+  },
+});
 ```
 
 ### File: `frontend/package.json`
@@ -325,11 +331,13 @@ export default defineConfig({
 ```
 
 **Install analyzer**:
+
 ```bash
 npm install --save-dev vite-bundle-visualizer
 ```
 
 ### Testing Checklist
+
 - [ ] Run `npm run build` and check output sizes
 - [ ] Total JS bundle < 60KB gzipped
 - [ ] Run `npm run analyze` to visualize bundle
@@ -341,6 +349,7 @@ npm install --save-dev vite-bundle-visualizer
 ## Task 3: Lazy Loading
 
 ### Goal
+
 Defer non-critical features to reduce initial load time.
 
 ### File: `frontend/src/App.jsx`
@@ -348,20 +357,20 @@ Defer non-critical features to reduce initial load time.
 **Implement code splitting for admin panel**:
 
 ```javascript
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Header from './components/Header'
-import ScheduleView from './components/ScheduleView'
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Header from "./components/Header";
+import ScheduleView from "./components/ScheduleView";
 
 // Lazy load admin panel (not needed for fans)
-const AdminPanel = lazy(() => import('./admin/AdminPanel'))
+const AdminPanel = lazy(() => import("./admin/AdminPanel"));
 
 function LoadingFallback() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-band-navy to-band-purple">
       <div className="text-white text-xl">Loading...</div>
     </div>
-  )
+  );
 }
 
 function App() {
@@ -369,25 +378,31 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* Fan experience: Load immediately */}
-        <Route path="/" element={
-          <>
-            <Header />
-            <ScheduleView />
-          </>
-        } />
+        <Route
+          path="/"
+          element={
+            <>
+              <Header />
+              <ScheduleView />
+            </>
+          }
+        />
 
         {/* Admin panel: Lazy loaded */}
-        <Route path="/admin/*" element={
-          <Suspense fallback={<LoadingFallback />}>
-            <AdminPanel />
-          </Suspense>
-        } />
+        <Route
+          path="/admin/*"
+          element={
+            <Suspense fallback={<LoadingFallback />}>
+              <AdminPanel />
+            </Suspense>
+          }
+        />
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
 
-export default App
+export default App;
 ```
 
 ### File: `frontend/src/main.jsx`
@@ -395,29 +410,31 @@ export default App
 **Optimize React rendering**:
 
 ```javascript
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './index.css'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App.jsx";
+import "./index.css";
 
 // Register service worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('SW registered:', reg.scope))
-      .catch(err => console.error('SW registration failed:', err))
-  })
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => console.log("SW registered:", reg.scope))
+      .catch((err) => console.error("SW registration failed:", err));
+  });
 }
 
 // Use concurrent mode for better performance
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);
 ```
 
 ### Testing Checklist
+
 - [ ] Admin panel loads separately (check Network tab)
 - [ ] Initial page load < 1s on Fast 3G (Chrome DevTools)
 - [ ] Service worker registers successfully
@@ -429,6 +446,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 ## Task 4: Image Optimization
 
 ### Goal
+
 Eliminate unnecessary images, optimize remaining ones.
 
 ### Changes Required
@@ -473,32 +491,33 @@ Eliminate unnecessary images, optimize remaining ones.
 
 ```javascript
 export default {
-  content: ['./index.html', './src/**/*.{js,jsx}'],
+  content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        'band-navy': '#1a1a2e',
-        'band-purple': '#16213e',
-        'band-orange': '#ff6b35'
+        "band-navy": "#1a1a2e",
+        "band-purple": "#16213e",
+        "band-orange": "#ff6b35",
       },
       fontFamily: {
         // System fonts only (no web fonts)
         sans: [
-          'system-ui',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'Segoe UI',
-          'Roboto',
-          'sans-serif'
-        ]
-      }
-    }
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "sans-serif",
+        ],
+      },
+    },
   },
-  plugins: []
-}
+  plugins: [],
+};
 ```
 
 ### Testing Checklist
+
 - [ ] No images loaded on schedule view
 - [ ] No web fonts loaded (check Network tab)
 - [ ] Lighthouse score > 90 for Performance
@@ -509,6 +528,7 @@ export default {
 ## Task 5: Offline Enhancements
 
 ### Goal
+
 Improve offline experience and add connection status indicator.
 
 ### File: `frontend/src/components/OfflineIndicator.jsx`
@@ -516,34 +536,38 @@ Improve offline experience and add connection status indicator.
 **Create new component**:
 
 ```javascript
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 
 export default function OfflineIndicator() {
-  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false)
-    const handleOffline = () => setIsOffline(true)
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
 
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
-  if (!isOffline) return null
+  if (!isOffline) return null;
 
   return (
     <div className="fixed bottom-4 left-4 right-4 bg-yellow-500 text-black px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        <path
+          fillRule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+          clipRule="evenodd"
+        />
       </svg>
       <span className="font-medium">You're offline - using cached data</span>
     </div>
-  )
+  );
 }
 ```
 
@@ -552,7 +576,7 @@ export default function OfflineIndicator() {
 **Add offline indicator**:
 
 ```javascript
-import OfflineIndicator from './components/OfflineIndicator'
+import OfflineIndicator from "./components/OfflineIndicator";
 
 function App() {
   return (
@@ -560,11 +584,12 @@ function App() {
       <OfflineIndicator />
       {/* ... rest of app */}
     </BrowserRouter>
-  )
+  );
 }
 ```
 
 ### Testing Checklist
+
 - [ ] Indicator appears when offline (DevTools → Network → Offline)
 - [ ] Indicator disappears when back online
 - [ ] App functions normally while offline
@@ -575,6 +600,7 @@ function App() {
 ## Task 6: Performance Monitoring
 
 ### Goal
+
 Add basic performance tracking (privacy-preserving).
 
 ### File: `frontend/src/utils/performance.js`
@@ -586,51 +612,52 @@ Add basic performance tracking (privacy-preserving).
 // No user tracking, aggregate metrics only
 
 export function measurePageLoad() {
-  if (!window.performance || !window.performance.timing) return
+  if (!window.performance || !window.performance.timing) return;
 
-  window.addEventListener('load', () => {
+  window.addEventListener("load", () => {
     setTimeout(() => {
-      const timing = window.performance.timing
+      const timing = window.performance.timing;
       const metrics = {
         // Page load metrics
         dns: timing.domainLookupEnd - timing.domainLookupStart,
         tcp: timing.connectEnd - timing.connectStart,
         request: timing.responseStart - timing.requestStart,
         response: timing.responseEnd - timing.responseStart,
-        dom: timing.domContentLoadedEventEnd - timing.domContentLoadedEventStart,
+        dom:
+          timing.domContentLoadedEventEnd - timing.domContentLoadedEventStart,
         load: timing.loadEventEnd - timing.navigationStart,
 
         // Core Web Vitals (approximations)
         fcp: getFirstContentfulPaint(),
-        lcp: getLargestContentfulPaint()
-      }
+        lcp: getLargestContentfulPaint(),
+      };
 
       // Log to console in dev
       if (import.meta.env.DEV) {
-        console.table(metrics)
+        console.table(metrics);
       }
 
       // Could send to analytics endpoint (future)
       // sendMetrics(metrics)
-    }, 0)
-  })
+    }, 0);
+  });
 }
 
 function getFirstContentfulPaint() {
-  const entries = performance.getEntriesByType('paint')
-  const fcp = entries.find(entry => entry.name === 'first-contentful-paint')
-  return fcp ? Math.round(fcp.startTime) : null
+  const entries = performance.getEntriesByType("paint");
+  const fcp = entries.find((entry) => entry.name === "first-contentful-paint");
+  return fcp ? Math.round(fcp.startTime) : null;
 }
 
 function getLargestContentfulPaint() {
   const observer = new PerformanceObserver((list) => {
-    const entries = list.getEntries()
-    const lastEntry = entries[entries.length - 1]
-    console.log('LCP:', Math.round(lastEntry.startTime), 'ms')
-  })
+    const entries = list.getEntries();
+    const lastEntry = entries[entries.length - 1];
+    console.log("LCP:", Math.round(lastEntry.startTime), "ms");
+  });
 
   try {
-    observer.observe({ entryTypes: ['largest-contentful-paint'] })
+    observer.observe({ entryTypes: ["largest-contentful-paint"] });
   } catch (e) {
     // LCP not supported
   }
@@ -642,15 +669,16 @@ function getLargestContentfulPaint() {
 **Enable performance monitoring**:
 
 ```javascript
-import { measurePageLoad } from './utils/performance'
+import { measurePageLoad } from "./utils/performance";
 
 // Monitor performance (dev only for now)
 if (import.meta.env.DEV) {
-  measurePageLoad()
+  measurePageLoad();
 }
 ```
 
 ### Testing Checklist
+
 - [ ] Performance metrics logged in console (dev mode)
 - [ ] FCP < 1s on Fast 3G
 - [ ] LCP < 2.5s on Fast 3G
@@ -662,17 +690,18 @@ if (import.meta.env.DEV) {
 
 **Target metrics** (from FAN_FIRST_SPEC.md):
 
-| Metric | Target | Measured |
-|--------|--------|----------|
-| HTML | 10 KB | ___ KB |
-| CSS | 15 KB | ___ KB |
-| JS | 60 KB | ___ KB |
-| Data | 10 KB | ___ KB |
-| Images | 0 KB | ___ KB |
-| **Total** | **~100 KB** | **___ KB** |
-| Render time (3G) | < 1s | ___ ms |
+| Metric           | Target      | Measured      |
+| ---------------- | ----------- | ------------- |
+| HTML             | 10 KB       | \_\_\_ KB     |
+| CSS              | 15 KB       | \_\_\_ KB     |
+| JS               | 60 KB       | \_\_\_ KB     |
+| Data             | 10 KB       | \_\_\_ KB     |
+| Images           | 0 KB        | \_\_\_ KB     |
+| **Total**        | **~100 KB** | **\_\_\_ KB** |
+| Render time (3G) | < 1s        | \_\_\_ ms     |
 
 **Lighthouse targets**:
+
 - Performance: > 90
 - Accessibility: > 95
 - Best Practices: > 90
@@ -683,11 +712,13 @@ if (import.meta.env.DEV) {
 ## Deployment Steps
 
 1. **Install dependencies:**
+
    ```bash
    npm install --save-dev vite-bundle-visualizer
    ```
 
 2. **Test offline mode:**
+
    ```bash
    npm run build
    npx wrangler pages dev frontend/dist --local
@@ -696,12 +727,14 @@ if (import.meta.env.DEV) {
    ```
 
 3. **Analyze bundle:**
+
    ```bash
    npm run analyze
    # Opens visual bundle analysis
    ```
 
 4. **Lighthouse audit:**
+
    ```bash
    # Open Chrome DevTools → Lighthouse
    # Run audit on mobile + desktop
@@ -718,6 +751,7 @@ if (import.meta.env.DEV) {
 ## Success Criteria
 
 Sprint 2 complete when:
+
 - ✅ Service worker caches all static assets
 - ✅ App works offline after first visit
 - ✅ Bundle size < 100KB total (gzipped)
@@ -735,12 +769,14 @@ Sprint 2 complete when:
 ## SuperClaude Notes
 
 **Framework alignment:**
+
 - **Performance First** principle from FAN_FIRST_SPEC.md
 - **Privacy Respecting** - no tracking, aggregate metrics only
 - **Token Efficiency** - minimal comments, clear code structure
 - **Evidence-Based** - Lighthouse scores, bundle analyzer, Network tab
 
 **Tools used:**
+
 - Vite for bundling
 - Terser for minification
 - Service Worker API for offline

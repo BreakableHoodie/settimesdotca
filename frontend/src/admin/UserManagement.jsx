@@ -308,7 +308,9 @@ export default function UserManagement() {
                         <button
                           onClick={() => handleToggleUserStatus(user)}
                           className={`transition ${
-                            user.isActive ? 'text-yellow-400 hover:text-yellow-300' : 'text-green-400 hover:text-green-300'
+                            user.isActive
+                              ? 'text-yellow-400 hover:text-yellow-300'
+                              : 'text-green-400 hover:text-green-300'
                           }`}
                           title={user.isActive ? 'Deactivate User' : 'Activate User'}
                           disabled={actionLoading}

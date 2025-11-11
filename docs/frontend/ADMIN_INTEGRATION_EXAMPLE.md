@@ -7,41 +7,52 @@ This guide shows how to integrate the admin panel into your existing Long Weeken
 Update your `src/main.jsx` to include routing:
 
 ```jsx
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import App from './App.jsx'
-import AdminApp from './admin/AdminApp.jsx'
-import './index.css'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import App from "./App.jsx";
+import AdminApp from "./admin/AdminApp.jsx";
+import "./index.css";
 
-const hostname = typeof window !== 'undefined' ? window.location.hostname || '' : ''
-const isPreviewBuild = hostname.startsWith('dev.') || hostname.endsWith('.pages.dev')
-const robotsMeta = typeof document !== 'undefined' ? document.querySelector("meta[name='robots']") : null
+const hostname =
+  typeof window !== "undefined" ? window.location.hostname || "" : "";
+const isPreviewBuild =
+  hostname.startsWith("dev.") || hostname.endsWith(".pages.dev");
+const robotsMeta =
+  typeof document !== "undefined"
+    ? document.querySelector("meta[name='robots']")
+    : null;
 if (robotsMeta) {
-  robotsMeta.setAttribute('content', isPreviewBuild ? 'noindex, nofollow' : 'index,follow')
-} else if (typeof document !== 'undefined') {
-  const meta = document.createElement('meta')
-  meta.name = 'robots'
-  meta.content = isPreviewBuild ? 'noindex, nofollow' : 'index,follow'
-  document.head.appendChild(meta)
+  robotsMeta.setAttribute(
+    "content",
+    isPreviewBuild ? "noindex, nofollow" : "index,follow",
+  );
+} else if (typeof document !== "undefined") {
+  const meta = document.createElement("meta");
+  meta.name = "robots";
+  meta.content = isPreviewBuild ? "noindex, nofollow" : "index,follow";
+  document.head.appendChild(meta);
 }
 
 // Unregister service workers
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      registrations.forEach(registration => {
-        registration.unregister().then(success => {
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => {
+        registration.unregister().then((success) => {
           if (success) {
-            console.warn('[App] Service worker unregistered:', registration.scope)
+            console.warn(
+              "[App] Service worker unregistered:",
+              registration.scope,
+            );
           }
-        })
-      })
-    })
-  })
+        });
+      });
+    });
+  });
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
@@ -49,8 +60,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/admin" element={<AdminApp />} />
       </Routes>
     </BrowserRouter>
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);
 ```
 
 Now you can access:
@@ -81,16 +92,16 @@ Create a new file `admin.html` in your `public` folder:
 Then create `src/admin-entry.jsx`:
 
 ```jsx
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import AdminApp from './admin/AdminApp.jsx'
-import './index.css'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import AdminApp from "./admin/AdminApp.jsx";
+import "./index.css";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AdminApp />
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);
 ```
 
 Access at: `http://localhost:5173/admin.html`
@@ -100,16 +111,16 @@ Access at: `http://localhost:5173/admin.html`
 If you don't want to configure backend routing, use HashRouter:
 
 ```jsx
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { HashRouter, Routes, Route } from 'react-router-dom'
-import App from './App.jsx'
-import AdminApp from './admin/AdminApp.jsx'
-import './index.css'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { HashRouter, Routes, Route } from "react-router-dom";
+import App from "./App.jsx";
+import AdminApp from "./admin/AdminApp.jsx";
+import "./index.css";
 
 // ... existing meta and service worker code ...
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <HashRouter>
       <Routes>
@@ -117,8 +128,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/admin" element={<AdminApp />} />
       </Routes>
     </HashRouter>
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);
 ```
 
 Access at: `http://localhost:5173/#/admin`
@@ -128,13 +139,13 @@ Access at: `http://localhost:5173/#/admin`
 For quick testing, temporarily replace your App in `main.jsx`:
 
 ```jsx
-import AdminApp from './admin/AdminApp.jsx'
+import AdminApp from "./admin/AdminApp.jsx";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AdminApp />
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);
 ```
 
 Access at: `http://localhost:5173/`
@@ -147,14 +158,14 @@ If using Option 1 (recommended), configure your server to serve `index.html` for
 
 ```javascript
 // Serve admin route
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'))
-})
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
+});
 
 // Serve all other routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'))
-})
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
+});
 ```
 
 ### Vite Dev Server
@@ -225,7 +236,7 @@ VITE_ADMIN_ROUTE=/admin
 Use in code:
 
 ```javascript
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/admin'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/admin";
 ```
 
 ## Security Considerations

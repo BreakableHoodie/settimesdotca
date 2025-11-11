@@ -2,7 +2,7 @@
 // GET /api/admin/events - List all events
 // POST /api/admin/events - Create new event
 
-import { checkPermission, auditLog } from './_middleware.js'
+import { checkPermission, auditLog } from "./_middleware.js";
 
 // Get client IP from request
 function getClientIP(request) {
@@ -20,14 +20,14 @@ export async function onRequestGet(context) {
 
   try {
     // Check permission (viewer and above)
-    const permCheck = await checkPermission(request, env, 'viewer');
+    const permCheck = await checkPermission(request, env, "viewer");
     if (permCheck.error) {
       return permCheck.response;
     }
 
     // Parse query parameters
     const url = new URL(request.url);
-    const showArchived = url.searchParams.get('archived') === 'true';
+    const showArchived = url.searchParams.get("archived") === "true";
 
     // Build query based on archived filter
     let query = `
@@ -57,7 +57,7 @@ export async function onRequestGet(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error fetching events:", error);
@@ -70,7 +70,7 @@ export async function onRequestGet(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -83,7 +83,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, 'editor');
+    const permCheck = await checkPermission(request, env, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -91,7 +91,7 @@ export async function onRequestPost(context) {
     const currentUser = permCheck.user;
 
     const body = await request.json().catch(() => ({}));
-    const { name, date, slug, status = 'draft' } = body;
+    const { name, date, slug, status = "draft" } = body;
 
     // Validation
     if (!name || !date || !slug) {
@@ -103,7 +103,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -117,7 +117,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -131,7 +131,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -148,7 +148,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -163,12 +163,12 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     // Validate status
-    if (!['draft', 'published', 'archived'].includes(status)) {
+    if (!["draft", "published", "archived"].includes(status)) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -177,7 +177,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -185,7 +185,7 @@ export async function onRequestPost(context) {
     const existingEvent = await DB.prepare(
       `
       SELECT id FROM events WHERE slug = ?
-    `
+    `,
     )
       .bind(slug)
       .first();
@@ -199,7 +199,7 @@ export async function onRequestPost(context) {
         {
           status: 409,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -209,17 +209,32 @@ export async function onRequestPost(context) {
       INSERT INTO events (name, date, slug, status, is_published, created_by_user_id)
       VALUES (?, ?, ?, ?, ?, ?)
       RETURNING *
-    `
+    `,
     )
-      .bind(name, date, slug, status, status === 'published' ? 1 : 0, currentUser.userId)
+      .bind(
+        name,
+        date,
+        slug,
+        status,
+        status === "published" ? 1 : 0,
+        currentUser.userId,
+      )
       .first();
 
     // Audit log
-    await auditLog(env, currentUser.userId, 'event.created', 'event', result.id, {
-      name,
-      slug,
-      status
-    }, ipAddress);
+    await auditLog(
+      env,
+      currentUser.userId,
+      "event.created",
+      "event",
+      result.id,
+      {
+        name,
+        slug,
+        status,
+      },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({
@@ -229,7 +244,7 @@ export async function onRequestPost(context) {
       {
         status: 201,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error creating event:", error);
@@ -242,7 +257,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

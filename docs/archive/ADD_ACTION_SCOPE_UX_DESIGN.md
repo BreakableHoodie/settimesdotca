@@ -13,6 +13,7 @@ This ambiguity causes confusion, potential duplicate entries, and incorrect data
 ## Current State Analysis
 
 ### Data Model
+
 ```
 Venues:
   - Global entities (id, name, address, website, instagram, facebook)
@@ -30,41 +31,44 @@ Performances:
 ```
 
 ### Context Mechanism
+
 ```javascript
 // AdminPanel.jsx line 123-137
 <select
-  value={selectedEventId || ''}
-  onChange={e => setSelectedEventId(value ? Number(value) : null)}
+  value={selectedEventId || ""}
+  onChange={(e) => setSelectedEventId(value ? Number(value) : null)}
 >
   <option value="">All Venues/Bands (Global View)</option>
-  {events.map(event => (
+  {events.map((event) => (
     <option value={event.id}>{event.name}</option>
   ))}
 </select>
 ```
 
 **Two Views**:
+
 1. **Global View** (`selectedEventId === null`): Shows all performers/venues across all events
 2. **Event View** (`selectedEventId !== null`): Shows performers/venues for specific event
 
 ### Current Add Flow Issues
 
 **BandsTab.jsx (Line 467-476)**:
+
 ```jsx
-<button onClick={() => setShowAddForm(true)}>
-  + Add Performer
-</button>
+<button onClick={() => setShowAddForm(true)}>+ Add Performer</button>
 ```
+
 - No indication of scope
 - Same button in both global and event contexts
 - Form shows after click with explanation text (lines 785-787)
 
 **Current Form Explanation** (Lines 785-787):
+
 ```jsx
 <p className="text-white/70 text-sm mb-4">
   {selectedEventId
-    ? 'This band will be added to the selected event.'
-    : 'This band will be available to assign to events later.'}
+    ? "This band will be added to the selected event."
+    : "This band will be available to assign to events later."}
 </p>
 ```
 
@@ -73,6 +77,7 @@ Performances:
 ## User Mental Models
 
 ### Persona 1: Event Organizer (Non-Technical)
+
 **Context**: Managing "Long Weekend Vol. 4"
 **Intent Scenarios**:
 
@@ -92,6 +97,7 @@ Performances:
    - Current confusion: "Will this venue appear in past events?"
 
 ### Persona 2: Database Maintainer
+
 **Context**: Managing global performer/venue pools
 **Intent Scenarios**:
 
@@ -109,14 +115,14 @@ Performances:
 
 ### Scenario Matrix
 
-| Context | User Intent | Expected Action | Current Behavior | Gap |
-|---------|-------------|-----------------|------------------|-----|
-| **Global View** | Add venue for future use | Create global venue only | ✅ Creates global venue | None |
-| **Global View** | Add performer for future | Create global performer | ✅ Creates global performer | None |
-| **Event View** | Add new performer to event | Create global + schedule | ✅ Creates + schedules | **Unclear intent** |
-| **Event View** | Add existing performer to event | Search + schedule | ❌ No search flow | **Missing feature** |
-| **Event View** | Add new venue to event | Create global + use | ✅ Creates global venue | **Unclear intent** |
-| **Event View** | Use existing venue | Select from dropdown | ✅ Works in form | None |
+| Context         | User Intent                     | Expected Action          | Current Behavior            | Gap                 |
+| --------------- | ------------------------------- | ------------------------ | --------------------------- | ------------------- |
+| **Global View** | Add venue for future use        | Create global venue only | ✅ Creates global venue     | None                |
+| **Global View** | Add performer for future        | Create global performer  | ✅ Creates global performer | None                |
+| **Event View**  | Add new performer to event      | Create global + schedule | ✅ Creates + schedules      | **Unclear intent**  |
+| **Event View**  | Add existing performer to event | Search + schedule        | ❌ No search flow           | **Missing feature** |
+| **Event View**  | Add new venue to event          | Create global + use      | ✅ Creates global venue     | **Unclear intent**  |
+| **Event View**  | Use existing venue              | Select from dropdown     | ✅ Works in form            | None                |
 
 ### Critical Issues
 
@@ -128,15 +134,19 @@ Performances:
 ## UX Design Solutions
 
 ### Principle 1: Scope BEFORE Action
+
 **Rule**: Users must understand scope before clicking any "Add" button.
 
 ### Principle 2: Context-Aware Language
+
 **Rule**: Button labels and form titles change based on context.
 
 ### Principle 3: Progressive Disclosure
+
 **Rule**: Show complexity only when needed.
 
 ### Principle 4: Confirmation Feedback
+
 **Rule**: Success messages must confirm what was created AND where.
 
 ---
@@ -148,12 +158,14 @@ Performances:
 **When**: `selectedEventId !== null` (Event View)
 
 **Replace Single Button**:
+
 ```jsx
 // ❌ BEFORE (Ambiguous)
 <button>+ Add Performer</button>
 ```
 
 **With Split Actions**:
+
 ```jsx
 // ✅ AFTER (Clear Intent)
 <div className="flex flex-col sm:flex-row gap-3">
@@ -171,6 +183,7 @@ Performances:
 ```
 
 **Mobile Design**:
+
 ```
 ┌─────────────────────────────────────┐
 │ ┌───────────────────────────────┐   │
@@ -185,6 +198,7 @@ Performances:
 ```
 
 **Desktop Design**:
+
 ```
 ┌───────────────────────────────────────────────────────────┐
 │  [+ Create New Performer]  [🔗 Add Existing Performer]    │
@@ -197,6 +211,7 @@ Performances:
 ### Pattern 2: Context Badge Visual Indicator
 
 **Global Context Badge**:
+
 ```jsx
 <button>
   <Icon.Globe />
@@ -206,6 +221,7 @@ Performances:
 ```
 
 **Event Context Badge**:
+
 ```jsx
 <button>
   <Icon.Calendar />
@@ -215,6 +231,7 @@ Performances:
 ```
 
 **Visual Hierarchy**:
+
 ```
 GLOBAL VIEW:
 ┌─────────────────────────────────┐
@@ -234,20 +251,27 @@ EVENT VIEW:
 ### Pattern 3: Modal Title with Scope Context
 
 **Current** (Ambiguous):
+
 ```jsx
 <h3>Add New Band</h3>
 ```
 
 **Improved** (Context-Aware):
-```jsx
-{/* Global Context */}
-<h3>Create Performer (Available to All Events)</h3>
 
-{/* Event Context */}
-<h3>Create Performer for {selectedEvent.name}</h3>
+```jsx
+{
+  /* Global Context */
+}
+<h3>Create Performer (Available to All Events)</h3>;
+
+{
+  /* Event Context */
+}
+<h3>Create Performer for {selectedEvent.name}</h3>;
 ```
 
 **Visual Design**:
+
 ```
 ┌─────────────────────────────────────────────────┐
 │ Create Performer for Long Weekend Vol. 4        │
@@ -272,6 +296,7 @@ EVENT VIEW:
 **Flow**: User clicks "Add Existing Performer" in event context
 
 **Modal Design**:
+
 ```
 ┌─────────────────────────────────────────────────┐
 │ Add Existing Performer to Long Weekend Vol. 4   │
@@ -299,6 +324,7 @@ EVENT VIEW:
 ```
 
 **Step 2: Scheduling Details**:
+
 ```
 ┌─────────────────────────────────────────────────┐
 │ Schedule Performers for Long Weekend Vol. 4     │
@@ -321,23 +347,32 @@ EVENT VIEW:
 ### Pattern 5: Success Messages with Scope Clarity
 
 **Current** (Vague):
+
 ```jsx
-showToast('Band added successfully!', 'success')
+showToast("Band added successfully!", "success");
 ```
 
 **Improved** (Specific):
+
 ```jsx
 // Global Context
-showToast('✓ "The Midnight Sons" added to performer database', 'success')
+showToast('✓ "The Midnight Sons" added to performer database', "success");
 
 // Event Context (Create New)
-showToast('✓ "Tokyo Police Club" created and scheduled for Long Weekend Vol. 4', 'success')
+showToast(
+  '✓ "Tokyo Police Club" created and scheduled for Long Weekend Vol. 4',
+  "success",
+);
 
 // Event Context (Add Existing)
-showToast('✓ "The Gaslight Anthem" scheduled for Long Weekend Vol. 4 at 20:00', 'success')
+showToast(
+  '✓ "The Gaslight Anthem" scheduled for Long Weekend Vol. 4 at 20:00',
+  "success",
+);
 ```
 
 **Toast Visual Design**:
+
 ```
 ┌────────────────────────────────────────┐
 │ ✓ "Tokyo Police Club" created          │
@@ -354,20 +389,28 @@ showToast('✓ "The Gaslight Anthem" scheduled for Long Weekend Vol. 4 at 20:00'
 ### Component 1: `ScopeAwareActionButton`
 
 **Props**:
+
 ```typescript
 interface ScopeAwareActionButtonProps {
-  context: 'global' | 'event';
+  context: "global" | "event";
   eventName?: string;
-  entityType: 'performer' | 'venue';
+  entityType: "performer" | "venue";
   onCreateNew: () => void;
   onAddExisting?: () => void; // Only for event context
 }
 ```
 
 **Render Logic**:
+
 ```jsx
-function ScopeAwareActionButton({ context, eventName, entityType, onCreateNew, onAddExisting }) {
-  if (context === 'global') {
+function ScopeAwareActionButton({
+  context,
+  eventName,
+  entityType,
+  onCreateNew,
+  onAddExisting,
+}) {
+  if (context === "global") {
     return (
       <button onClick={onCreateNew} className="btn-primary">
         <Globe className="icon" />
@@ -388,7 +431,7 @@ function ScopeAwareActionButton({ context, eventName, entityType, onCreateNew, o
         </div>
       </button>
 
-      {entityType === 'performer' && (
+      {entityType === "performer" && (
         <button onClick={onAddExisting} className="btn-secondary flex-1">
           <Link className="icon" />
           <span>Add Existing {entityType}</span>
@@ -404,6 +447,7 @@ function ScopeAwareActionButton({ context, eventName, entityType, onCreateNew, o
 ### Component 2: `AddExistingPerformerModal`
 
 **Props**:
+
 ```typescript
 interface AddExistingPerformerModalProps {
   eventId: number;
@@ -423,11 +467,14 @@ interface PerformerSchedule {
 ```
 
 **State Machine**:
-```typescript
-type Step = 'select' | 'schedule' | 'confirm';
 
-const [currentStep, setCurrentStep] = useState<Step>('select');
-const [selectedPerformers, setSelectedPerformers] = useState<Set<number>>(new Set());
+```typescript
+type Step = "select" | "schedule" | "confirm";
+
+const [currentStep, setCurrentStep] = useState<Step>("select");
+const [selectedPerformers, setSelectedPerformers] = useState<Set<number>>(
+  new Set(),
+);
 const [schedules, setSchedules] = useState<PerformerSchedule[]>([]);
 ```
 
@@ -438,22 +485,26 @@ const [schedules, setSchedules] = useState<PerformerSchedule[]>([]);
 **Purpose**: Visual indicator at top of form showing what will happen
 
 **Props**:
+
 ```typescript
 interface ScopeContextBannerProps {
-  context: 'global' | 'event';
+  context: "global" | "event";
   eventName?: string;
-  entityType: 'performer' | 'venue';
-  mode: 'create' | 'addExisting';
+  entityType: "performer" | "venue";
+  mode: "create" | "addExisting";
 }
 ```
 
 **Render**:
+
 ```jsx
 function ScopeContextBanner({ context, eventName, entityType, mode }) {
-  if (context === 'global') {
+  if (context === "global") {
     return (
       <div className="bg-blue-900/20 border border-blue-600 rounded p-4 mb-4">
-        <h4 className="text-blue-200 font-semibold mb-2">Global {entityType}</h4>
+        <h4 className="text-blue-200 font-semibold mb-2">
+          Global {entityType}
+        </h4>
         <ul className="text-blue-200 text-sm space-y-1">
           <li>✓ Will be added to the global {entityType} database</li>
           <li>✓ Available to assign to any event</li>
@@ -463,7 +514,7 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
     );
   }
 
-  if (mode === 'create') {
+  if (mode === "create") {
     return (
       <div className="bg-orange-900/20 border border-orange-600 rounded p-4 mb-4">
         <h4 className="text-orange-200 font-semibold mb-2">
@@ -501,6 +552,7 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
 ### Conditional Field Display
 
 **Global Context Form**:
+
 ```jsx
 <form>
   <Input name="name" label="Performer Name" required />
@@ -516,9 +568,15 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
 ```
 
 **Event Context Form (Create New)**:
+
 ```jsx
 <form>
-  <ScopeContextBanner context="event" eventName={eventName} entityType="performer" mode="create" />
+  <ScopeContextBanner
+    context="event"
+    eventName={eventName}
+    entityType="performer"
+    mode="create"
+  />
 
   <Input name="name" label="Performer Name" required />
   <Input name="url" label="Website/Social Media" optional />
@@ -528,7 +586,9 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
 
   <Select name="venue_id" label="Venue" required>
     <option value="">Select venue...</option>
-    {venues.map(v => <option value={v.id}>{v.name}</option>)}
+    {venues.map((v) => (
+      <option value={v.id}>{v.name}</option>
+    ))}
   </Select>
 
   <div className="grid grid-cols-2 gap-4">
@@ -576,6 +636,7 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
 **Current Flow**: User must click "Add Performer", fill form, no search option
 
 **Improved Flow**:
+
 1. User clicks "Add Existing Performer"
 2. Searches for "Tokyo Police Club"
 3. No results found
@@ -596,6 +657,7 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
 **Current**: Error message after submission attempt
 
 **Improved**: Real-time duplicate detection
+
 ```jsx
 <Input
   name="name"
@@ -605,7 +667,7 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
     if (exists) {
       showWarning(
         `"${value}" already exists. Did you mean to add them to this event instead?`,
-        { action: 'Switch to Add Existing', onClick: switchToAddExisting }
+        { action: "Switch to Add Existing", onClick: switchToAddExisting },
       );
     }
   }}
@@ -613,6 +675,7 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
 ```
 
 **Warning Display**:
+
 ```
 ┌────────────────────────────────────────────────┐
 │ Name: [The Gaslight Anthem____]                │
@@ -633,6 +696,7 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
 **Clarification Strategy**:
 
 **Option A: Always Global** (Recommended)
+
 - Venues are ALWAYS global entities
 - Event context just filters display
 - Make this explicit in UI
@@ -641,13 +705,12 @@ function ScopeContextBanner({ context, eventName, entityType, mode }) {
 // In event context
 <button>
   <span>Create Venue</span>
-  <span className="text-xs opacity-70">
-    (Available to all events)
-  </span>
+  <span className="text-xs opacity-70">(Available to all events)</span>
 </button>
 ```
 
 **Form Banner**:
+
 ```
 ┌────────────────────────────────────────────────┐
 │ ℹ️  Venues are shared across all events         │
@@ -707,11 +770,13 @@ useEffect(() => {
 ## Mobile-First Design Specifications
 
 ### Touch Target Sizes
+
 - Minimum button height: `48px` (44px iOS + 4px buffer)
 - Minimum tap area: `48px × 48px`
 - Spacing between tappable elements: `8px` minimum
 
 ### Mobile Action Buttons
+
 ```jsx
 <div className="flex flex-col gap-3 w-full">
   <button className="min-h-[48px] w-full rounded-lg bg-band-orange text-white font-medium px-6 py-3 flex items-center justify-between">
@@ -730,6 +795,7 @@ useEffect(() => {
 ```
 
 ### Mobile Modal Design
+
 ```
 Full-screen on mobile (<768px)
 Centered modal on desktop (≥768px)
@@ -768,28 +834,30 @@ Desktop:
 ### Phase 1: Quick Wins (Low Effort, High Impact)
 
 **1.1 Update Button Labels** (2 hours)
+
 ```jsx
 // BandsTab.jsx
 <button>
   {selectedEventId
     ? `+ Create Performer for ${selectedEvent.name}`
-    : '+ Add Performer (Global)'
-  }
+    : "+ Add Performer (Global)"}
 </button>
 ```
 
 **1.2 Add Context Banner to Forms** (3 hours)
+
 - Implement `ScopeContextBanner` component
 - Show at top of all add/edit forms
 - Clarify what will be created/modified
 
 **1.3 Improve Success Messages** (1 hour)
+
 ```jsx
 showToast(
   selectedEventId
     ? `✓ "${bandName}" created and scheduled for ${selectedEvent.name}`
     : `✓ "${bandName}" added to performer database`,
-  'success'
+  "success",
 );
 ```
 
@@ -800,11 +868,13 @@ showToast(
 ### Phase 2: Split Action Buttons (Medium Effort, High Impact)
 
 **2.1 Create `ScopeAwareActionButton` Component** (4 hours)
+
 - Build reusable component with context awareness
 - Implement split button pattern for event context
 - Add visual badges for clarity
 
 **2.2 Update BandsTab & VenuesTab** (2 hours)
+
 - Replace existing add buttons with `ScopeAwareActionButton`
 - Wire up new action handlers
 - Test both contexts
@@ -816,16 +886,19 @@ showToast(
 ### Phase 3: Add Existing Flow (High Effort, High Value)
 
 **3.1 Create `AddExistingPerformerModal` Component** (8 hours)
+
 - Build search interface with filtering
 - Implement multi-select with checkboxes
 - Show performer history (last played, events)
 
 **3.2 Create Scheduling Step** (6 hours)
+
 - Build form for batch scheduling
 - Venue and time assignment for each performer
 - Conflict detection warnings
 
 **3.3 API Integration** (4 hours)
+
 - Create endpoint for adding existing performers to event
 - Batch create performances
 - Validation and error handling
@@ -837,16 +910,19 @@ showToast(
 ### Phase 4: Enhanced UX Polish (Medium Effort)
 
 **4.1 Real-Time Duplicate Detection** (4 hours)
+
 - Debounced name check on input
 - Show suggestions when duplicates found
 - Offer quick switch to "Add Existing" flow
 
 **4.2 Venue Context Clarification** (2 hours)
+
 - Add permanent "Venues are global" messaging
 - Update venue forms with clarification
 - Ensure consistency across contexts
 
 **4.3 Mobile Optimization** (6 hours)
+
 - Full-screen modals on mobile
 - Touch-optimized controls
 - Test on iOS Safari, Android Chrome
@@ -860,6 +936,7 @@ showToast(
 ### Usability Testing Script
 
 **Task 1: Add New Performer to Event**
+
 - Setup: User viewing "Long Weekend Vol. 4"
 - Instruction: "Add a new performer called 'The National' to this event"
 - Success Criteria:
@@ -868,6 +945,7 @@ showToast(
   - Success message confirms both actions
 
 **Task 2: Add Existing Performer to Event**
+
 - Setup: Database has "The Gaslight Anthem"
 - Instruction: "The Gaslight Anthem is playing again, add them to this event"
 - Success Criteria:
@@ -876,6 +954,7 @@ showToast(
   - User schedules with venue and time
 
 **Task 3: Add Global Venue**
+
 - Setup: Global view (no event selected)
 - Instruction: "Add 'The Oasis' venue for future events"
 - Success Criteria:
@@ -886,6 +965,7 @@ showToast(
 ### A/B Testing Metrics
 
 **Metrics to Track**:
+
 1. **Error Rate**: Duplicate performer creations (should decrease)
 2. **Time to Complete**: Add performer workflow (should stay same or improve)
 3. **User Confidence**: Post-action survey "I understand what I just created" (should increase to >90%)
@@ -896,12 +976,14 @@ showToast(
 ## Success Criteria
 
 ### Quantitative Goals
+
 - **Zero ambiguity** in user testing (10/10 users understand scope)
 - **<2% error rate** in adding wrong entity type
 - **<5 seconds** to understand action scope from UI
 - **Zero duplicate creations** due to unclear flow
 
 ### Qualitative Goals
+
 - Users can verbalize what will happen before clicking
 - No post-action confusion about where data was created
 - Mobile users find split buttons easy to tap
@@ -912,27 +994,31 @@ showToast(
 ## Appendix A: Button Label Examples
 
 ### Event Context
-| Entity | Primary Button | Secondary Button |
-|--------|----------------|------------------|
+
+| Entity    | Primary Button                     | Secondary Button         |
+| --------- | ---------------------------------- | ------------------------ |
 | Performer | "Create New Performer for {Event}" | "Add Existing Performer" |
-| Venue | "Create Venue (Available to All)" | N/A |
+| Venue     | "Create Venue (Available to All)"  | N/A                      |
 
 ### Global Context
-| Entity | Button Label |
-|--------|--------------|
+
+| Entity    | Button Label                      |
+| --------- | --------------------------------- |
 | Performer | "Add Performer (Global Database)" |
-| Venue | "Add Venue (Global Database)" |
+| Venue     | "Add Venue (Global Database)"     |
 
 ---
 
 ## Appendix B: Color Coding System
 
 ### Context Colors
+
 - **Global Context**: Blue (`bg-blue-900/20`, `border-blue-600`)
 - **Event Context (Create)**: Orange (`bg-orange-900/20`, `border-orange-600`)
 - **Event Context (Add Existing)**: Green (`bg-green-900/20`, `border-green-600`)
 
 ### Rationale
+
 - Blue = Information, neutral, database-level
 - Orange = Creation, action, event-specific
 - Green = Connection, reuse, existing entities

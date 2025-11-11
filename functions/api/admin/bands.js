@@ -9,7 +9,7 @@ async function checkConflicts(
   venueId,
   startTime,
   endTime,
-  excludeBandId = null
+  excludeBandId = null,
 ) {
   const conflicts = [];
 
@@ -64,7 +64,7 @@ export async function onRequestGet(context) {
 
   try {
     let result;
-    
+
     if (eventId) {
       // Get bands for specific event
       result = await DB.prepare(
@@ -78,7 +78,7 @@ export async function onRequestGet(context) {
         INNER JOIN events e ON b.event_id = e.id
         WHERE b.event_id = ?
         ORDER BY b.start_time, v.name
-      `
+      `,
       )
         .bind(eventId)
         .all();
@@ -94,9 +94,8 @@ export async function onRequestGet(context) {
         LEFT JOIN venues v ON b.venue_id = v.id
         LEFT JOIN events e ON b.event_id = e.id
         ORDER BY b.start_time, v.name
-      `
-      )
-        .all();
+      `,
+      ).all();
     }
 
     return new Response(
@@ -106,7 +105,7 @@ export async function onRequestGet(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error fetching bands:", error);
@@ -119,7 +118,7 @@ export async function onRequestGet(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -143,7 +142,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -153,12 +152,13 @@ export async function onRequestPost(context) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
-          message: "For event bands, venueId, startTime, and endTime are required",
+          message:
+            "For event bands, venueId, startTime, and endTime are required",
         }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -172,7 +172,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -185,7 +185,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -199,7 +199,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -208,7 +208,7 @@ export async function onRequestPost(context) {
       const event = await DB.prepare(
         `
         SELECT id FROM events WHERE id = ?
-      `
+      `,
       )
         .bind(eventId)
         .first();
@@ -222,7 +222,7 @@ export async function onRequestPost(context) {
           {
             status: 404,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
     }
@@ -232,7 +232,7 @@ export async function onRequestPost(context) {
       const venue = await DB.prepare(
         `
         SELECT id FROM venues WHERE id = ?
-      `
+      `,
       )
         .bind(venueId)
         .first();
@@ -246,14 +246,14 @@ export async function onRequestPost(context) {
           {
             status: 404,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
     }
 
     // Check for duplicate band name
     const existingBand = await DB.prepare(
-      `SELECT id, name FROM bands WHERE LOWER(name) = LOWER(?)`
+      `SELECT id, name FROM bands WHERE LOWER(name) = LOWER(?)`,
     )
       .bind(name)
       .first();
@@ -267,7 +267,7 @@ export async function onRequestPost(context) {
         {
           status: 409, // Conflict
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -279,7 +279,7 @@ export async function onRequestPost(context) {
         eventId,
         venueId,
         startTime,
-        endTime
+        endTime,
       );
     }
 
@@ -289,7 +289,7 @@ export async function onRequestPost(context) {
       INSERT INTO bands (event_id, venue_id, name, start_time, end_time, url)
       VALUES (?, ?, ?, ?, ?, ?)
       RETURNING *
-    `
+    `,
     )
       .bind(eventId, venueId, name, startTime, endTime, url || null)
       .first();
@@ -307,7 +307,7 @@ export async function onRequestPost(context) {
       {
         status: 201,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error creating band:", error);
@@ -320,7 +320,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

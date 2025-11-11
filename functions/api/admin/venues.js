@@ -17,7 +17,7 @@ export async function onRequestGet(context) {
       LEFT JOIN bands b ON v.id = b.venue_id
       GROUP BY v.id
       ORDER BY v.name
-    `
+    `,
     ).all();
 
     return new Response(
@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error fetching venues:", error);
@@ -40,7 +40,7 @@ export async function onRequestGet(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -64,7 +64,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -72,7 +72,7 @@ export async function onRequestPost(context) {
     const existingVenue = await DB.prepare(
       `
       SELECT id FROM venues WHERE name = ?
-    `
+    `,
     )
       .bind(name)
       .first();
@@ -86,7 +86,7 @@ export async function onRequestPost(context) {
         {
           status: 409,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -96,7 +96,7 @@ export async function onRequestPost(context) {
       INSERT INTO venues (name, address)
       VALUES (?, ?)
       RETURNING *
-    `
+    `,
     )
       .bind(name, address || null)
       .first();
@@ -109,7 +109,7 @@ export async function onRequestPost(context) {
       {
         status: 201,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error creating venue:", error);
@@ -122,7 +122,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

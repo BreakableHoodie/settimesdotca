@@ -140,7 +140,7 @@ export async function onRequestPost(context) {
   // Get current band data
   const placeholders = band_ids.map(() => "?").join(",");
   const bands = await env.DB.prepare(
-    `SELECT * FROM bands WHERE id IN (${placeholders})`
+    `SELECT * FROM bands WHERE id IN (${placeholders})`,
   )
     .bind(...band_ids)
     .all();
@@ -175,7 +175,7 @@ export async function onRequestPost(context) {
             (start_time < ? AND end_time > ?) OR
             (start_time >= ? AND start_time < ?)
           )
-      `
+      `,
       )
         .bind(
           venue_id,
@@ -184,7 +184,7 @@ export async function onRequestPost(context) {
           band.end_time,
           band.start_time,
           band.start_time,
-          band.end_time
+          band.end_time,
         )
         .all();
 
@@ -230,8 +230,8 @@ export async function onRequestPatch(context) {
       const statements = band_ids.map((id) =>
         env.DB.prepare("UPDATE bands SET venue_id = ? WHERE id = ?").bind(
           venue_id,
-          id
-        )
+          id,
+        ),
       );
 
       result = await env.DB.batch(statements);
@@ -247,15 +247,15 @@ export async function onRequestPatch(context) {
               end_time = datetime(?, '+' ||
                 (strftime('%s', end_time) - strftime('%s', start_time)) || ' seconds')
           WHERE id = ?
-        `
-        ).bind(start_time, start_time, id)
+        `,
+        ).bind(start_time, start_time, id),
       );
 
       result = await env.DB.batch(statements);
     } else if (action === "delete") {
       const placeholders = band_ids.map(() => "?").join(",");
       result = await env.DB.prepare(
-        `DELETE FROM bands WHERE id IN (${placeholders})`
+        `DELETE FROM bands WHERE id IN (${placeholders})`,
       )
         .bind(...band_ids)
         .run();
@@ -269,7 +269,7 @@ export async function onRequestPatch(context) {
       }),
       {
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Bulk operation failed:", error);
@@ -282,7 +282,7 @@ export async function onRequestPatch(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -798,36 +798,30 @@ Add to `frontend/tailwind.config.js` or component styles:
 ## Implementation Order (for Cursor)
 
 1. **Backend API** (30 min)
-
    - Create `bulk-preview.js` endpoint
    - Create `bulk.js` endpoint
    - Test with Postman/curl
 
 2. **State Management** (15 min)
-
    - Add state to `BandsTab.jsx`
    - Add selection handlers
 
 3. **Table Checkboxes** (20 min)
-
    - Add checkbox column
    - Implement indeterminate master checkbox
    - Add row highlighting
 
 4. **BulkActionBar** (30 min)
-
    - Create component
    - Implement progressive disclosure
    - Add action-specific forms
 
 5. **BulkPreviewModal** (20 min)
-
    - Create modal component
    - Display changes and conflicts
    - Handle confirm/cancel
 
 6. **Mobile Responsive** (20 min)
-
    - Card layout for small screens
    - Stack action bar vertically
    - Test touch targets

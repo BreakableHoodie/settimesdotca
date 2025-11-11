@@ -347,7 +347,6 @@ longweekendbandcrawl/
    ```
 
 2. **Answer prompts:**
-
    - Event name (e.g., "Long Weekend Band Crawl - October 2025")
    - Event date (auto-detected from bands.json)
    - Event slug (e.g., "october-2025")
@@ -377,21 +376,18 @@ longweekendbandcrawl/
 ### Immediate (Required for Production)
 
 1. **Set up D1 database:**
-
    - Follow D1_SETUP.md instructions
    - Create production database
    - Initialize schema
    - Migrate existing data
 
 2. **Configure environment variables:**
-
    - Generate strong ADMIN_PASSWORD (16+ chars)
    - Generate strong MASTER_PASSWORD (20+ chars)
    - Set DEVELOPER_CONTACT
    - Add to Cloudflare Pages dashboard
 
 3. **Test locally:**
-
    - Verify all admin functions work
    - Test conflict detection
    - Verify fallback strategy works

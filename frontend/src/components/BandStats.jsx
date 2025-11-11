@@ -1,9 +1,7 @@
 import PropTypes from 'prop-types'
 
 function formatLabel(key) {
-  return key
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, letter => letter.toUpperCase())
+  return key.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase())
 }
 
 function formatValue(value) {

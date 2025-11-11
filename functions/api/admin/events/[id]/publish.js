@@ -1,7 +1,7 @@
 // Publish/Unpublish event endpoint
 // POST /api/admin/events/{id}/publish
 
-import { checkPermission, auditLog } from '../../_middleware.js'
+import { checkPermission, auditLog } from "../../_middleware.js";
 
 // Get client IP from request
 function getClientIP(request) {
@@ -28,7 +28,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, 'editor');
+    const permCheck = await checkPermission(request, env, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -45,14 +45,12 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     // Get current event
-    const event = await DB.prepare(
-      `SELECT * FROM events WHERE id = ?`
-    )
+    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`)
       .bind(eventId)
       .first();
 
@@ -65,7 +63,7 @@ export async function onRequestPost(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -73,12 +71,12 @@ export async function onRequestPost(context) {
     const { publish } = body;
 
     // Determine new status
-    const newStatus = publish ? 'published' : 'draft';
+    const newStatus = publish ? "published" : "draft";
 
     // If publishing, check that event has at least 1 band
     if (publish) {
       const bandCount = await DB.prepare(
-        `SELECT COUNT(*) as count FROM bands WHERE event_id = ?`
+        `SELECT COUNT(*) as count FROM bands WHERE event_id = ?`,
       )
         .bind(eventId)
         .first();
@@ -87,12 +85,13 @@ export async function onRequestPost(context) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
-            message: "Cannot publish event with no bands. Add at least one band first.",
+            message:
+              "Cannot publish event with no bands. Add at least one band first.",
           }),
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
     }
@@ -104,7 +103,7 @@ export async function onRequestPost(context) {
       SET status = ?, is_published = ?, updated_by_user_id = ?
       WHERE id = ?
       RETURNING *
-    `
+    `,
     )
       .bind(newStatus, publish ? 1 : 0, currentUser.userId, eventId)
       .first();
@@ -113,26 +112,28 @@ export async function onRequestPost(context) {
     await auditLog(
       env,
       currentUser.userId,
-      publish ? 'event.published' : 'event.unpublished',
-      'event',
+      publish ? "event.published" : "event.unpublished",
+      "event",
       eventId,
       {
         name: event.name,
-        status: newStatus
+        status: newStatus,
       },
-      ipAddress
+      ipAddress,
     );
 
     return new Response(
       JSON.stringify({
         success: true,
         event: result,
-        message: publish ? "Event published successfully" : "Event unpublished successfully",
+        message: publish
+          ? "Event published successfully"
+          : "Event unpublished successfully",
       }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error publishing/unpublishing event:", error);
@@ -145,7 +146,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

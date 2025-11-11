@@ -87,11 +87,7 @@ describe('ErrorBoundary', () => {
       )
 
       expect(consoleErrorSpy).toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'ErrorBoundary caught error:',
-        expect.any(Error),
-        expect.any(Object)
-      )
+      expect(consoleErrorSpy).toHaveBeenCalledWith('ErrorBoundary caught error:', expect.any(Error), expect.any(Object))
     })
   })
 

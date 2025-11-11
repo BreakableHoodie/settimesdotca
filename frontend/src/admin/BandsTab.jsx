@@ -19,7 +19,16 @@ import {
 /**
  * SwipeableBandCard - Mobile swipeable card component for band display
  */
-function SwipeableBandCard({ band, swipedBandId, getVenueName, getDurationLabel, formatTimeRangeLabel, startEdit, handleDelete, setSwipedBandId }) {
+function SwipeableBandCard({
+  band,
+  swipedBandId,
+  getVenueName,
+  getDurationLabel,
+  formatTimeRangeLabel,
+  startEdit,
+  handleDelete,
+  setSwipedBandId,
+}) {
   const handlers = useSwipeable({
     onSwipedLeft: () => setSwipedBandId(band.id),
     onSwipedRight: () => setSwipedBandId(null),
@@ -65,7 +74,7 @@ function SwipeableBandCard({ band, swipedBandId, getVenueName, getDurationLabel,
           </div>
         </div>
       </div>
-      
+
       {swipedBandId === band.id && (
         <button
           onClick={() => {
@@ -126,7 +135,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
   const [previewData, setPreviewData] = useState(null)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  
+
   // Swipe gesture state for mobile
   const [swipedBandId, setSwipedBandId] = useState(null)
 
@@ -224,9 +233,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
 
     if (name === 'start_time') {
       // If duration is set, recalculate end_time
-      const newEndTime = formData.duration
-        ? calculateEndTimeFromDuration(value, formData.duration)
-        : formData.end_time
+      const newEndTime = formData.duration ? calculateEndTimeFromDuration(value, formData.duration) : formData.end_time
       setFormData(prev => ({ ...prev, start_time: value, end_time: newEndTime }))
     } else if (name === 'end_time') {
       // Recalculate duration when end_time changes
@@ -499,11 +506,14 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
   const getConflicts = useCallback(band => detectConflicts(band, bands), [bands])
 
   // Get venue name by ID
-  const getVenueName = useCallback((venueId) => {
-    if (!venueId) return 'No venue assigned'
-    const venue = venues.find(v => String(v.id) === String(venueId))
-    return venue ? venue.name : 'Unknown Venue'
-  }, [venues])
+  const getVenueName = useCallback(
+    venueId => {
+      if (!venueId) return 'No venue assigned'
+      const venue = venues.find(v => String(v.id) === String(venueId))
+      return venue ? venue.name : 'Unknown Venue'
+    },
+    [venues]
+  )
 
   const getDurationLabel = band => {
     if (band?.duration != null && band.duration !== '') {
@@ -583,11 +593,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     if (sortConfig.key !== columnKey) {
       return <span className="text-white/30 ml-1">⇅</span>
     }
-    return (
-      <span className="text-band-orange ml-1">
-        {sortConfig.direction === 'asc' ? '↑' : '↓'}
-      </span>
-    )
+    return <span className="text-band-orange ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
   }
 
   if (!selectedEventId) {
@@ -672,11 +678,11 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       .filter(Boolean)
                       .sort()
                       .pop() // Get most recent date
-                    
+
                     // Prepare data for sorting
                     const lastPlayed = lastPlayedDate || ''
                     const eventsCount = uniqueEvents.length
-                    
+
                     return { bandName, uniqueEvents, lastPlayed, eventsCount, bandOccurrences: bandOccurrences[0] }
                   })
                   .sort((a, b) => {
@@ -749,11 +755,13 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                             </div>
                           </td>
                           <td className="px-4 py-3 text-white/70">
-                            {lastPlayed ? new Date(lastPlayed).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            }) : '-'}
+                            {lastPlayed
+                              ? new Date(lastPlayed).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })
+                              : '-'}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex justify-end gap-2">
@@ -784,7 +792,10 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                         {isEditing && (
                           <tr>
                             <td colSpan="6" className="p-0">
-                              <div ref={editFormRef} className="bg-band-navy/50 p-6 border-t border-b border-band-orange/20">
+                              <div
+                                ref={editFormRef}
+                                className="bg-band-navy/50 p-6 border-t border-b border-band-orange/20"
+                              >
                                 <h3 className="text-lg font-bold text-band-orange mb-4">Edit Band</h3>
                                 <BandForm
                                   events={events}
@@ -820,37 +831,43 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                     className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                     onClick={() => handleSort('name')}
                   >
-                    Band Name {sortConfig.key === 'name' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Band Name{' '}
+                    {sortConfig.key === 'name' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
                     className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                     onClick={() => handleSort('origin')}
                   >
-                    Origin {sortConfig.key === 'origin' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Origin{' '}
+                    {sortConfig.key === 'origin' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
                     className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                     onClick={() => handleSort('genre')}
                   >
-                    Genre {sortConfig.key === 'genre' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Genre{' '}
+                    {sortConfig.key === 'genre' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
                     className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                     onClick={() => handleSort('venue_id')}
                   >
-                    Venue {sortConfig.key === 'venue_id' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Venue{' '}
+                    {sortConfig.key === 'venue_id' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                     onClick={() => handleSort('start_time')}
                   >
-                    Start Time {sortConfig.key === 'start_time' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Start Time{' '}
+                    {sortConfig.key === 'start_time' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                     onClick={() => handleSort('end_time')}
                   >
-                    End Time {sortConfig.key === 'end_time' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    End Time{' '}
+                    {sortConfig.key === 'end_time' && selectedEventId && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-4 py-3 text-left text-white font-semibold">Duration</th>
                   <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>
@@ -967,7 +984,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
           </div>
         )}
 
-            {/* Mobile Cards - Event View */}
+        {/* Mobile Cards - Event View */}
         {bands.length > 0 && selectedEventId && (
           <div className="md:hidden divide-y divide-band-orange/10">
             {sortedBands.map(band => (
@@ -997,14 +1014,12 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
         {/* Add/Edit Form */}
         {(showAddForm || editingId) && (
           <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
-          <h3 className="text-lg font-bold text-band-orange mb-4">
-            {editingId ? 'Edit Band' : 'Add Band'}
-          </h3>
-          <p className="text-white/70 text-sm mb-4">
-            {selectedEventId
-              ? 'This band will be added to the selected event.'
-              : 'This band will be available to assign to events later.'}
-          </p>
+            <h3 className="text-lg font-bold text-band-orange mb-4">{editingId ? 'Edit Band' : 'Add Band'}</h3>
+            <p className="text-white/70 text-sm mb-4">
+              {selectedEventId
+                ? 'This band will be added to the selected event.'
+                : 'This band will be available to assign to events later.'}
+            </p>
 
             <BandForm
               events={events}
@@ -1129,8 +1144,8 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
         {!loading && sortedBands.length === 0 ? (
           <div className="p-8 text-center text-white/50">
-            {selectedEventId 
-              ? 'No bands yet for this event. Add your first band to get started!' 
+            {selectedEventId
+              ? 'No bands yet for this event. Add your first band to get started!'
               : 'No bands available'}
           </div>
         ) : loading ? (
@@ -1161,9 +1176,15 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       className="px-4 py-3 min-h-[48px] text-left text-white font-semibold cursor-pointer hover:text-band-orange transition-colors"
                       onClick={() => handleSort('name')}
                       tabIndex={0}
-                      aria-sort={sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        sortConfig.key === 'name'
+                          ? sortConfig.direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
                       aria-label={`Sort by band name${sortConfig.key === 'name' ? ` ${sortConfig.direction === 'asc' ? 'ascending' : 'descending'}` : ''}`}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSort('name')}
+                      onKeyPress={e => e.key === 'Enter' && handleSort('name')}
                     >
                       Band Name <SortIcon columnKey="name" />
                     </th>
@@ -1171,9 +1192,15 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       className="px-4 py-3 min-h-[48px] text-left text-white font-semibold cursor-pointer hover:text-band-orange transition-colors"
                       onClick={() => handleSort('origin')}
                       tabIndex={0}
-                      aria-sort={sortConfig.key === 'origin' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        sortConfig.key === 'origin'
+                          ? sortConfig.direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
                       aria-label={`Sort by origin${sortConfig.key === 'origin' ? ` ${sortConfig.direction === 'asc' ? 'ascending' : 'descending'}` : ''}`}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSort('origin')}
+                      onKeyPress={e => e.key === 'Enter' && handleSort('origin')}
                     >
                       Origin <SortIcon columnKey="origin" />
                     </th>
@@ -1181,9 +1208,15 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       className="px-4 py-3 min-h-[48px] text-left text-white font-semibold cursor-pointer hover:text-band-orange transition-colors"
                       onClick={() => handleSort('genre')}
                       tabIndex={0}
-                      aria-sort={sortConfig.key === 'genre' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        sortConfig.key === 'genre'
+                          ? sortConfig.direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
                       aria-label={`Sort by genre${sortConfig.key === 'genre' ? ` ${sortConfig.direction === 'asc' ? 'ascending' : 'descending'}` : ''}`}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSort('genre')}
+                      onKeyPress={e => e.key === 'Enter' && handleSort('genre')}
                     >
                       Genre <SortIcon columnKey="genre" />
                     </th>
@@ -1191,9 +1224,15 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       className="px-4 py-3 min-h-[48px] text-left text-white font-semibold cursor-pointer hover:text-band-orange transition-colors"
                       onClick={() => handleSort('venue_id')}
                       tabIndex={0}
-                      aria-sort={sortConfig.key === 'venue_id' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        sortConfig.key === 'venue_id'
+                          ? sortConfig.direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
                       aria-label={`Sort by venue${sortConfig.key === 'venue_id' ? ` ${sortConfig.direction === 'asc' ? 'ascending' : 'descending'}` : ''}`}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSort('venue_id')}
+                      onKeyPress={e => e.key === 'Enter' && handleSort('venue_id')}
                     >
                       Venue <SortIcon columnKey="venue_id" />
                     </th>
@@ -1201,9 +1240,15 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       className="px-4 py-3 min-h-[48px] text-left text-white font-semibold cursor-pointer hover:text-band-orange transition-colors"
                       onClick={() => handleSort('start_time')}
                       tabIndex={0}
-                      aria-sort={sortConfig.key === 'start_time' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        sortConfig.key === 'start_time'
+                          ? sortConfig.direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
                       aria-label={`Sort by start time${sortConfig.key === 'start_time' ? ` ${sortConfig.direction === 'asc' ? 'ascending' : 'descending'}` : ''}`}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSort('start_time')}
+                      onKeyPress={e => e.key === 'Enter' && handleSort('start_time')}
                     >
                       Start Time <SortIcon columnKey="start_time" />
                     </th>
@@ -1211,9 +1256,15 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                       className="px-4 py-3 min-h-[48px] text-left text-white font-semibold cursor-pointer hover:text-band-orange transition-colors"
                       onClick={() => handleSort('end_time')}
                       tabIndex={0}
-                      aria-sort={sortConfig.key === 'end_time' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        sortConfig.key === 'end_time'
+                          ? sortConfig.direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
                       aria-label={`Sort by end time${sortConfig.key === 'end_time' ? ` ${sortConfig.direction === 'asc' ? 'ascending' : 'descending'}` : ''}`}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSort('end_time')}
+                      onKeyPress={e => e.key === 'Enter' && handleSort('end_time')}
                     >
                       End Time <SortIcon columnKey="end_time" />
                     </th>
@@ -1234,82 +1285,85 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                             selectedBands.has(band.id) ? 'bg-blue-900/30' : ''
                           } ${isEditing ? 'opacity-50' : ''}`}
                         >
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            className="w-5 h-5 cursor-pointer"
-                            checked={selectedBands.has(band.id)}
-                            onChange={e => handleSelectBand(band.id, e.target.checked)}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div>
-                            <div className="text-white font-medium">{band.name}</div>
-                            {band.url && (
-                              <a
-                                href={band.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-band-orange text-xs hover:underline"
-                              >
-                                View Link
-                              </a>
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              className="w-5 h-5 cursor-pointer"
+                              checked={selectedBands.has(band.id)}
+                              onChange={e => handleSelectBand(band.id, e.target.checked)}
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div>
+                              <div className="text-white font-medium">{band.name}</div>
+                              {band.url && (
+                                <a
+                                  href={band.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-band-orange text-xs hover:underline"
+                                >
+                                  View Link
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-white/70">{band.origin || '-'}</td>
+                          <td className="px-4 py-3 text-white/70">{band.genre || '-'}</td>
+                          <td className="px-4 py-3 text-white/70">{getVenueName(band.venue_id)}</td>
+                          <td className="px-4 py-3 text-white/70">{formatTimeLabel(band.start_time)}</td>
+                          <td className="px-4 py-3 text-white/70">{formatTimeLabel(band.end_time)}</td>
+                          <td className="px-4 py-3">
+                            {hasConflict ? (
+                              <span className="text-red-400 text-xs font-semibold">CONFLICT</span>
+                            ) : (
+                              <span className="text-white/50 text-sm">{getDurationLabel(band)}</span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-white/70">{band.origin || '-'}</td>
-                        <td className="px-4 py-3 text-white/70">{band.genre || '-'}</td>
-                        <td className="px-4 py-3 text-white/70">{getVenueName(band.venue_id)}</td>
-                        <td className="px-4 py-3 text-white/70">{formatTimeLabel(band.start_time)}</td>
-                        <td className="px-4 py-3 text-white/70">{formatTimeLabel(band.end_time)}</td>
-                        <td className="px-4 py-3">
-                          {hasConflict ? (
-                            <span className="text-red-400 text-xs font-semibold">CONFLICT</span>
-                          ) : (
-                            <span className="text-white/50 text-sm">{getDurationLabel(band)}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => startEdit(band)}
-                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors min-h-[44px]"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(band.id, band.name)}
-                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors min-h-[44px]"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* Inline Edit Form */}
-                      {isEditing && (
-                        <tr>
-                          <td colSpan="9" className="p-0">
-                            <div ref={editFormRef} className="bg-band-navy/50 p-6 border-t border-b border-band-orange/20">
-                              <h3 className="text-lg font-bold text-band-orange mb-4">Edit Band</h3>
-                              <BandForm
-                                events={events}
-                                venues={venues}
-                                formData={formData}
-                                submitting={submitting}
-                                mode="edit"
-                                globalView={!selectedEventId}
-                                onChange={handleInputChange}
-                                onSubmit={handleUpdate}
-                                onCancel={resetForm}
-                                conflicts={formConflicts}
-                              />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => startEdit(band)}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors min-h-[44px]"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(band.id, band.name)}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors min-h-[44px]"
+                              >
+                                Delete
+                              </button>
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
+
+                        {/* Inline Edit Form */}
+                        {isEditing && (
+                          <tr>
+                            <td colSpan="9" className="p-0">
+                              <div
+                                ref={editFormRef}
+                                className="bg-band-navy/50 p-6 border-t border-b border-band-orange/20"
+                              >
+                                <h3 className="text-lg font-bold text-band-orange mb-4">Edit Band</h3>
+                                <BandForm
+                                  events={events}
+                                  venues={venues}
+                                  formData={formData}
+                                  submitting={submitting}
+                                  mode="edit"
+                                  globalView={!selectedEventId}
+                                  onChange={handleInputChange}
+                                  onSubmit={handleUpdate}
+                                  onCancel={resetForm}
+                                  conflicts={formConflicts}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     )
                   })}
                 </tbody>
@@ -1325,97 +1379,97 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
 
                 return (
                   <React.Fragment key={band.id}>
-                  <div
-                    className={`p-4 space-y-3 ${hasConflict ? 'bg-red-900/20' : ''} ${
-                      selectedBands.has(band.id) ? 'ring-2 ring-blue-500' : ''
-                    } ${isEditing ? 'opacity-50' : ''}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        className="w-6 h-6 mt-1 cursor-pointer"
-                        checked={selectedBands.has(band.id)}
-                        onChange={e => handleSelectBand(band.id, e.target.checked)}
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="text-white font-semibold">{band.name}</h3>
-                            {band.url && (
-                              <a
-                                href={band.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-band-orange text-xs hover:underline"
-                              >
-                                View Link
-                              </a>
-                            )}
+                    <div
+                      className={`p-4 space-y-3 ${hasConflict ? 'bg-red-900/20' : ''} ${
+                        selectedBands.has(band.id) ? 'ring-2 ring-blue-500' : ''
+                      } ${isEditing ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          className="w-6 h-6 mt-1 cursor-pointer"
+                          checked={selectedBands.has(band.id)}
+                          onChange={e => handleSelectBand(band.id, e.target.checked)}
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="text-white font-semibold">{band.name}</h3>
+                              {band.url && (
+                                <a
+                                  href={band.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-band-orange text-xs hover:underline"
+                                >
+                                  View Link
+                                </a>
+                              )}
+                            </div>
+                            {hasConflict && <span className="text-red-400 text-xs font-semibold">CONFLICT</span>}
                           </div>
-                          {hasConflict && <span className="text-red-400 text-xs font-semibold">CONFLICT</span>}
                         </div>
                       </div>
-                    </div>
 
-                    <div className="text-sm space-y-1">
-                      {band.origin && (
+                      <div className="text-sm space-y-1">
+                        {band.origin && (
+                          <div>
+                            <span className="text-white/50">Origin: </span>
+                            <span className="text-white">{band.origin}</span>
+                          </div>
+                        )}
+                        {band.genre && (
+                          <div>
+                            <span className="text-white/50">Genre: </span>
+                            <span className="text-white">{band.genre}</span>
+                          </div>
+                        )}
                         <div>
-                          <span className="text-white/50">Origin: </span>
-                          <span className="text-white">{band.origin}</span>
+                          <span className="text-white/50">Venue: </span>
+                          <span className="text-white">{getVenueName(band.venue_id)}</span>
                         </div>
-                      )}
-                      {band.genre && (
                         <div>
-                          <span className="text-white/50">Genre: </span>
-                          <span className="text-white">{band.genre}</span>
+                          <span className="text-white/50">Time: </span>
+                          <span className="text-white">{formatTimeRangeLabel(band.start_time, band.end_time)}</span>
                         </div>
-                      )}
-                      <div>
-                        <span className="text-white/50">Venue: </span>
-                        <span className="text-white">{getVenueName(band.venue_id)}</span>
                       </div>
-                      <div>
-                        <span className="text-white/50">Time: </span>
-                        <span className="text-white">{formatTimeRangeLabel(band.start_time, band.end_time)}</span>
+
+                      {hasConflict && <div className="text-xs text-red-400">Overlaps with: {conflicts.join(', ')}</div>}
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => startEdit(band)}
+                          className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-base font-medium transition-colors min-h-[44px]"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(band.id, band.name)}
+                          className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded text-base font-medium transition-colors min-h-[44px]"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
 
-                    {hasConflict && <div className="text-xs text-red-400">Overlaps with: {conflicts.join(', ')}</div>}
-
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        onClick={() => startEdit(band)}
-                        className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-base font-medium transition-colors min-h-[44px]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(band.id, band.name)}
-                        className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded text-base font-medium transition-colors min-h-[44px]"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Inline Edit Form for Mobile */}
-                  {isEditing && (
-                    <div ref={editFormRef} className="bg-band-navy/50 p-4 border-t border-b border-band-orange/20">
-                      <h3 className="text-lg font-bold text-band-orange mb-4">Edit Band</h3>
-                      <BandForm
-                        events={events}
-                        venues={venues}
-                        formData={formData}
-                        submitting={submitting}
-                        mode="edit"
-                        globalView={!selectedEventId}
-                        onChange={handleInputChange}
-                        onSubmit={handleUpdate}
-                        onCancel={resetForm}
-                        conflicts={formConflicts}
-                      />
-                    </div>
-                  )}
+                    {/* Inline Edit Form for Mobile */}
+                    {isEditing && (
+                      <div ref={editFormRef} className="bg-band-navy/50 p-4 border-t border-b border-band-orange/20">
+                        <h3 className="text-lg font-bold text-band-orange mb-4">Edit Band</h3>
+                        <BandForm
+                          events={events}
+                          venues={venues}
+                          formData={formData}
+                          submitting={submitting}
+                          mode="edit"
+                          globalView={!selectedEventId}
+                          onChange={handleInputChange}
+                          onSubmit={handleUpdate}
+                          onCancel={resetForm}
+                          conflicts={formConflicts}
+                        />
+                      </div>
+                    )}
                   </React.Fragment>
                 )
               })}

@@ -31,8 +31,8 @@ export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) 
                 {stateInfo.label} - {hoursRemaining}h Remaining
               </div>
               <div className="text-white/70 text-sm mt-1">
-                Event ended {daysAgo} {daysAgo === 1 ? 'day' : 'days'} ago. You can still make
-                edits during the 48-hour grace period.
+                Event ended {daysAgo} {daysAgo === 1 ? 'day' : 'days'} ago. You can still make edits during the 48-hour
+                grace period.
               </div>
             </div>
           </div>
@@ -53,8 +53,8 @@ export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) 
             <div>
               <div className="text-gray-300 font-semibold">{stateInfo.label}</div>
               <div className="text-white/60 text-sm mt-1">
-                This event ended {daysAgo} {daysAgo === 1 ? 'day' : 'days'} ago. Editing historical
-                data is restricted to preserve event records.
+                This event ended {daysAgo} {daysAgo === 1 ? 'day' : 'days'} ago. Editing historical data is restricted
+                to preserve event records.
               </div>
             </div>
           </div>

@@ -71,20 +71,20 @@ ALTER TABLE venues ADD COLUMN created_by_user_id INTEGER REFERENCES users(id);
 
 ## Role Permissions Matrix
 
-| Action | Admin | Editor | Viewer |
-|--------|-------|--------|--------|
-| View events/bands/venues | ✅ | ✅ | ✅ |
-| Create events | ✅ | ✅ | ❌ |
-| Edit events | ✅ | ✅ | ❌ |
-| Delete events | ✅ | ❌ | ❌ |
-| Publish/unpublish events | ✅ | ✅ | ❌ |
-| Manage bands | ✅ | ✅ | ❌ |
-| Manage venues | ✅ | ✅ | ❌ |
-| View users | ✅ | ❌ | ❌ |
-| Create users | ✅ | ❌ | ❌ |
-| Edit users | ✅ | ❌ | ❌ |
-| Delete users | ✅ | ❌ | ❌ |
-| View audit log | ✅ | ❌ | ❌ |
+| Action                   | Admin | Editor | Viewer |
+| ------------------------ | ----- | ------ | ------ |
+| View events/bands/venues | ✅    | ✅     | ✅     |
+| Create events            | ✅    | ✅     | ❌     |
+| Edit events              | ✅    | ✅     | ❌     |
+| Delete events            | ✅    | ❌     | ❌     |
+| Publish/unpublish events | ✅    | ✅     | ❌     |
+| Manage bands             | ✅    | ✅     | ❌     |
+| Manage venues            | ✅    | ✅     | ❌     |
+| View users               | ✅    | ❌     | ❌     |
+| Create users             | ✅    | ❌     | ❌     |
+| Edit users               | ✅    | ❌     | ❌     |
+| Delete users             | ✅    | ❌     | ❌     |
+| View audit log           | ✅    | ❌     | ❌     |
 
 ---
 
@@ -107,6 +107,7 @@ ALTER TABLE venues ADD COLUMN created_by_user_id INTEGER REFERENCES users(id);
 ### User Management (New)
 
 #### 1. List Users
+
 **Endpoint**: `GET /api/admin/users`
 **Permission**: Admin only
 **File**: `functions/api/admin/users.js`
@@ -130,6 +131,7 @@ ALTER TABLE venues ADD COLUMN created_by_user_id INTEGER REFERENCES users(id);
 ```
 
 #### 2. Create User
+
 **Endpoint**: `POST /api/admin/users`
 **Permission**: Admin only
 **File**: `functions/api/admin/users.js`
@@ -160,6 +162,7 @@ ALTER TABLE venues ADD COLUMN created_by_user_id INTEGER REFERENCES users(id);
 ```
 
 #### 3. Update User
+
 **Endpoint**: `PATCH /api/admin/users/:id`
 **Permission**: Admin only (users can update own displayName)
 **File**: `functions/api/admin/users/[id].js`
@@ -183,6 +186,7 @@ ALTER TABLE venues ADD COLUMN created_by_user_id INTEGER REFERENCES users(id);
 ```
 
 #### 4. Delete User
+
 **Endpoint**: `DELETE /api/admin/users/:id`
 **Permission**: Admin only
 **File**: `functions/api/admin/users/[id].js`
@@ -202,6 +206,7 @@ ALTER TABLE venues ADD COLUMN created_by_user_id INTEGER REFERENCES users(id);
 ```
 
 #### 5. Get Audit Log
+
 **Endpoint**: `GET /api/admin/audit-log`
 **Permission**: Admin only
 **File**: `functions/api/admin/audit-log.js`
@@ -241,9 +246,9 @@ ALTER TABLE venues ADD COLUMN created_by_user_id INTEGER REFERENCES users(id);
 // ADD: Role checking middleware
 
 export async function checkPermission(request, env, requiredRole) {
-  const token = getCookie(request.headers.get('Cookie'), 'admin_token');
+  const token = getCookie(request.headers.get("Cookie"), "admin_token");
   if (!token) {
-    return new Response('Unauthorized', { status: 401 });
+    return new Response("Unauthorized", { status: 401 });
   }
 
   const payload = await verifyJWT(token, env.JWT_SECRET);
@@ -253,24 +258,44 @@ export async function checkPermission(request, env, requiredRole) {
   const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
 
   if (roleHierarchy[userRole] < roleHierarchy[requiredRole]) {
-    return new Response('Forbidden', { status: 403 });
+    return new Response("Forbidden", { status: 403 });
   }
 
   request.user = payload; // Attach user to request
   return null; // Permission granted
 }
 
-export async function auditLog(env, userId, action, resourceType, resourceId, details, ipAddress) {
-  await env.DB.prepare(`
+export async function auditLog(
+  env,
+  userId,
+  action,
+  resourceType,
+  resourceId,
+  details,
+  ipAddress,
+) {
+  await env.DB.prepare(
+    `
     INSERT INTO audit_log (user_id, action, resource_type, resource_id, details, ip_address)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(userId, action, resourceType, resourceId, JSON.stringify(details), ipAddress).run();
+  `,
+  )
+    .bind(
+      userId,
+      action,
+      resourceType,
+      resourceId,
+      JSON.stringify(details),
+      ipAddress,
+    )
+    .run();
 }
 ```
 
 ### Update All Protected Endpoints
 
 **Files to Update**:
+
 - `functions/api/admin/events.js`
 - `functions/api/admin/bands.js`
 - `functions/api/admin/venues.js`
@@ -287,11 +312,11 @@ export async function onRequest(context) {
   const { request, env } = context;
 
   // Check permission based on HTTP method
-  let requiredRole = 'viewer';
-  if (request.method === 'POST' || request.method === 'PATCH') {
-    requiredRole = 'editor';
-  } else if (request.method === 'DELETE') {
-    requiredRole = 'admin';
+  let requiredRole = "viewer";
+  if (request.method === "POST" || request.method === "PATCH") {
+    requiredRole = "editor";
+  } else if (request.method === "DELETE") {
+    requiredRole = "admin";
   }
 
   const permError = await checkPermission(request, env, requiredRole);
@@ -300,7 +325,15 @@ export async function onRequest(context) {
   // Execute action with request.user available
 
   // Log action
-  await auditLog(env, request.user.userId, 'event.created', 'event', eventId, {}, getIP(request));
+  await auditLog(
+    env,
+    request.user.userId,
+    "event.created",
+    "event",
+    eventId,
+    {},
+    getIP(request),
+  );
 }
 ```
 
@@ -434,32 +467,32 @@ export async function onRequest(context) {
 
 ```javascript
 // Test cases:
-describe('User Management API', () => {
-  describe('GET /api/admin/users', () => {
-    it('should return all users for admin', async () => {});
-    it('should return 403 for editor', async () => {});
-    it('should return 403 for viewer', async () => {});
+describe("User Management API", () => {
+  describe("GET /api/admin/users", () => {
+    it("should return all users for admin", async () => {});
+    it("should return 403 for editor", async () => {});
+    it("should return 403 for viewer", async () => {});
   });
 
-  describe('POST /api/admin/users', () => {
-    it('should create user with valid data', async () => {});
-    it('should reject duplicate email', async () => {});
-    it('should reject invalid role', async () => {});
-    it('should hash password', async () => {});
-    it('should return 403 for non-admin', async () => {});
+  describe("POST /api/admin/users", () => {
+    it("should create user with valid data", async () => {});
+    it("should reject duplicate email", async () => {});
+    it("should reject invalid role", async () => {});
+    it("should hash password", async () => {});
+    it("should return 403 for non-admin", async () => {});
   });
 
-  describe('PATCH /api/admin/users/:id', () => {
-    it('should update user role', async () => {});
-    it('should update display name', async () => {});
-    it('should activate/deactivate user', async () => {});
-    it('should prevent non-admin updates', async () => {});
+  describe("PATCH /api/admin/users/:id", () => {
+    it("should update user role", async () => {});
+    it("should update display name", async () => {});
+    it("should activate/deactivate user", async () => {});
+    it("should prevent non-admin updates", async () => {});
   });
 
-  describe('DELETE /api/admin/users/:id', () => {
-    it('should soft delete user', async () => {});
-    it('should prevent deleting self', async () => {});
-    it('should prevent deleting last admin', async () => {});
+  describe("DELETE /api/admin/users/:id", () => {
+    it("should soft delete user", async () => {});
+    it("should prevent deleting self", async () => {});
+    it("should prevent deleting last admin", async () => {});
   });
 });
 ```
@@ -470,23 +503,23 @@ describe('User Management API', () => {
 
 ```javascript
 // Test scenarios:
-describe('RBAC Integration', () => {
-  it('should enforce permissions on event creation', async () => {
+describe("RBAC Integration", () => {
+  it("should enforce permissions on event creation", async () => {
     // Editor can create
     // Viewer cannot create
   });
 
-  it('should enforce permissions on event deletion', async () => {
+  it("should enforce permissions on event deletion", async () => {
     // Admin can delete
     // Editor cannot delete
   });
 
-  it('should log all admin actions', async () => {
+  it("should log all admin actions", async () => {
     // Create user
     // Check audit log
   });
 
-  it('should prevent privilege escalation', async () => {
+  it("should prevent privilege escalation", async () => {
     // Editor tries to make self admin
     // Should fail
   });
@@ -498,6 +531,7 @@ describe('RBAC Integration', () => {
 ## Acceptance Criteria
 
 ### Backend
+
 - [ ] Users table created with migration
 - [ ] Audit log table created
 - [ ] All 5 user management endpoints working
@@ -508,6 +542,7 @@ describe('RBAC Integration', () => {
 - [ ] JWT includes role and displayName
 
 ### Frontend
+
 - [ ] Users tab in admin panel
 - [ ] User list table with all columns
 - [ ] Create user modal with validation
@@ -519,6 +554,7 @@ describe('RBAC Integration', () => {
 - [ ] Access denied message for forbidden actions
 
 ### Security
+
 - [ ] Role hierarchy enforced (admin > editor > viewer)
 - [ ] Viewers cannot modify data
 - [ ] Editors cannot delete or manage users
@@ -527,6 +563,7 @@ describe('RBAC Integration', () => {
 - [ ] Cannot bypass permissions with direct API calls
 
 ### Testing
+
 - [ ] Unit tests for all API endpoints (80%+ coverage)
 - [ ] Integration tests for RBAC scenarios
 - [ ] Manual test: Create/edit/delete users
@@ -579,6 +616,7 @@ describe('RBAC Integration', () => {
 ## Handoff Notes for Cursor/Copilot
 
 ### Start Here:
+
 1. Create `database/migrations/001_add_rbac.sql` with schema above
 2. Run migration: `sqlite3 .wrangler/state/v3/d1/*.sqlite < database/migrations/001_add_rbac.sql`
 3. Create `functions/api/admin/users.js` with all CRUD operations
@@ -587,6 +625,7 @@ describe('RBAC Integration', () => {
 6. Add Users tab to admin navigation
 
 ### Key Files to Create:
+
 - `database/migrations/001_add_rbac.sql`
 - `functions/api/admin/users.js`
 - `functions/api/admin/users/[id].js`
@@ -599,6 +638,7 @@ describe('RBAC Integration', () => {
 - `tests/functions/api/admin/users.test.js`
 
 ### Key Files to Update:
+
 - `functions/_middleware.js` (add permission checking)
 - `functions/api/admin/events.js` (add permission checks)
 - `functions/api/admin/bands.js` (add permission checks)
@@ -606,6 +646,7 @@ describe('RBAC Integration', () => {
 - `frontend/src/admin/AdminApp.jsx` (add Users tab)
 
 ### Dependencies:
+
 - bcryptjs (password hashing) - already installed
 - JWT library - already in use
 - No new npm packages needed
@@ -620,6 +661,7 @@ describe('RBAC Integration', () => {
 4. Should there be user invitation flow instead of direct creation?
 
 **Default Answers** (proceed with these if not specified):
+
 1. Yes, add "Change Password" to user dropdown
 2. Not for demo (defer to post-demo)
 3. No (defer to post-demo)

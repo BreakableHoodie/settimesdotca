@@ -1,9 +1,9 @@
 // Web Crypto API password hashing utilities for Cloudflare Workers
 // Uses PBKDF2 instead of bcrypt (which requires Node.js)
 
-const SALT_LENGTH = 16
-const ITERATIONS = 100000
-const KEY_LENGTH = 32
+const SALT_LENGTH = 16;
+const ITERATIONS = 100000;
+const KEY_LENGTH = 32;
 
 /**
  * Hash a password using PBKDF2
@@ -12,40 +12,40 @@ const KEY_LENGTH = 32
  */
 export async function hashPassword(password) {
   // Generate random salt
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH))
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
 
   // Convert password to bytes
-  const encoder = new TextEncoder()
-  const passwordBytes = encoder.encode(password)
+  const encoder = new TextEncoder();
+  const passwordBytes = encoder.encode(password);
 
   // Import key
   const key = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     passwordBytes,
-    { name: 'PBKDF2' },
+    { name: "PBKDF2" },
     false,
-    ['deriveBits']
-  )
+    ["deriveBits"],
+  );
 
   // Derive key using PBKDF2
   const derivedBits = await crypto.subtle.deriveBits(
     {
-      name: 'PBKDF2',
+      name: "PBKDF2",
       salt: salt,
       iterations: ITERATIONS,
-      hash: 'SHA-256'
+      hash: "SHA-256",
     },
     key,
-    KEY_LENGTH * 8
-  )
+    KEY_LENGTH * 8,
+  );
 
   // Convert to base64 for storage
-  const hashArray = new Uint8Array(derivedBits)
-  const saltBase64 = btoa(String.fromCharCode(...salt))
-  const hashBase64 = btoa(String.fromCharCode(...hashArray))
+  const hashArray = new Uint8Array(derivedBits);
+  const saltBase64 = btoa(String.fromCharCode(...salt));
+  const hashBase64 = btoa(String.fromCharCode(...hashArray));
 
   // Return format: salt:hash
-  return `${saltBase64}:${hashBase64}`
+  return `${saltBase64}:${hashBase64}`;
 }
 
 /**
@@ -57,46 +57,46 @@ export async function hashPassword(password) {
 export async function verifyPassword(password, storedHash) {
   try {
     // Parse stored hash
-    const [saltBase64, hashBase64] = storedHash.split(':')
+    const [saltBase64, hashBase64] = storedHash.split(":");
     if (!saltBase64 || !hashBase64) {
-      return false
+      return false;
     }
 
     // Decode salt
-    const salt = Uint8Array.from(atob(saltBase64), c => c.charCodeAt(0))
+    const salt = Uint8Array.from(atob(saltBase64), (c) => c.charCodeAt(0));
 
     // Convert password to bytes
-    const encoder = new TextEncoder()
-    const passwordBytes = encoder.encode(password)
+    const encoder = new TextEncoder();
+    const passwordBytes = encoder.encode(password);
 
     // Import key
     const key = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       passwordBytes,
-      { name: 'PBKDF2' },
+      { name: "PBKDF2" },
       false,
-      ['deriveBits']
-    )
+      ["deriveBits"],
+    );
 
     // Derive key using same parameters
     const derivedBits = await crypto.subtle.deriveBits(
       {
-        name: 'PBKDF2',
+        name: "PBKDF2",
         salt: salt,
         iterations: ITERATIONS,
-        hash: 'SHA-256'
+        hash: "SHA-256",
       },
       key,
-      KEY_LENGTH * 8
-    )
+      KEY_LENGTH * 8,
+    );
 
     // Compare hashes
-    const hashArray = new Uint8Array(derivedBits)
-    const computedHash = btoa(String.fromCharCode(...hashArray))
+    const hashArray = new Uint8Array(derivedBits);
+    const computedHash = btoa(String.fromCharCode(...hashArray));
 
-    return computedHash === hashBase64
+    return computedHash === hashBase64;
   } catch (error) {
-    console.error('Password verification error:', error)
-    return false
+    console.error("Password verification error:", error);
+    return false;
   }
 }

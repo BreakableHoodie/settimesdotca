@@ -17,12 +17,14 @@
 Events progress through distinct lifecycle states based on their relationship to the current date/time:
 
 #### **Upcoming**
+
 - **Definition:** Event end date/time is in the future
 - **Protection Level:** None (fully editable)
 - **Visual Treatment:** Standard/default appearance
 - **Actions Available:** Edit, Delete, Cancel, Publish
 
 #### **Recently Completed**
+
 - **Definition:** 0-48 hours after event end date/time
 - **Protection Level:** Light (editable with warnings)
 - **Visual Treatment:** Yellow/amber warning banner
@@ -30,6 +32,7 @@ Events progress through distinct lifecycle states based on their relationship to
 - **Rationale:** Allows quick post-event corrections without friction
 
 #### **Archived**
+
 - **Definition:** 48+ hours after event end date/time OR manually archived
 - **Protection Level:** High (confirmation gates + soft delete)
 - **Visual Treatment:** Muted/gray with archive badge
@@ -39,6 +42,7 @@ Events progress through distinct lifecycle states based on their relationship to
 ### Grace Period Rationale
 
 **Why 48 hours?**
+
 - ✅ Allows immediate post-event corrections (typos, notes, final attendance)
 - ✅ Gives time to add wrap-up content (photos, reviews, metrics)
 - ✅ Short enough to prevent long-term manipulation
@@ -46,6 +50,7 @@ Events progress through distinct lifecycle states based on their relationship to
 - ✅ Aligns with typical event workflow patterns
 
 **Alternative Considered:** 7-day period
+
 - ❌ Too long - increases risk of historical data corruption
 - ❌ Events feel "stale" but still editable (confusing UX)
 - ✅ Only needed for very complex multi-week events (rare edge case)
@@ -55,6 +60,7 @@ Events progress through distinct lifecycle states based on their relationship to
 **Rule:** Use event END date/time, never start date
 
 **Example:**
+
 - 3-day festival: Friday 7 PM → Sunday 11 PM
 - Grace period: Sunday 11 PM → Tuesday 11 PM (48 hours after END)
 - During festival (Fri-Sun): Fully editable, no warnings
@@ -72,18 +78,22 @@ Events progress through distinct lifecycle states based on their relationship to
 **Rejected Alternatives:**
 
 ❌ **Full Read-Only**
+
 - Can't fix legitimate errors in historical data
 - Too restrictive for real-world needs
 
 ❌ **Limited Edits (Metadata Only)**
+
 - Users confused why some fields are locked
 - What if core data (date/venue) is actually wrong?
 
 ❌ **Admin Unlock Only**
+
 - Requires complex permission system
 - Organizers often ARE the admin (small organizations)
 
 ✅ **RECOMMENDED: Soft Delete + Confirmation Gates**
+
 - Prevents accidental deletion entirely
 - Allows edits with strong confirmation prompts
 - No permission system needed
@@ -95,12 +105,14 @@ Events progress through distinct lifecycle states based on their relationship to
 #### **Recently Completed (0-48 hours after end):**
 
 **Edit Behavior:**
+
 - All edits allowed without confirmation
 - Yellow warning banner always visible (non-dismissible)
-- Banner text: *"This event has ended. Changes will affect historical records."*
+- Banner text: _"This event has ended. Changes will affect historical records."_
 - No modal dialogs (quick corrections still easy)
 
 **Delete Behavior:**
+
 - "Delete" button replaced with "Archive Now"
 - Archive action: Soft delete with unarchive option
 - No confirmation needed (reversible action)
@@ -108,21 +120,24 @@ Events progress through distinct lifecycle states based on their relationship to
 #### **Archived (48+ hours after end):**
 
 **Edit Behavior:**
+
 - Edit requires confirmation modal BEFORE opening edit form
-- Confirmation text: *"This event is archived. Are you sure you want to modify historical data?"*
+- Confirmation text: _"This event is archived. Are you sure you want to modify historical data?"_
 - Three-button choice:
   - **Cancel** (default/recommended)
   - **Copy as New Event** (constructive alternative)
   - **Edit Anyway** (proceeds with edit)
-- After editing, second confirmation on Save: *"Confirm changes to historical data?"*
+- After editing, second confirmation on Save: _"Confirm changes to historical data?"_
 - Two-step confirmation prevents muscle-memory accidents
 
 **Delete Behavior:**
+
 - No "Delete" button visible (completely hidden)
 - Archive action only: Moves to archived section, preserves all data
 - Unarchive available if archiving was mistake
 
 **Rationale:**
+
 - Two confirmation steps create strong friction for destructive changes
 - Offering "Copy as New" provides constructive alternative at decision point
 - Hiding delete entirely removes temptation/accident risk
@@ -134,6 +149,7 @@ Events progress through distinct lifecycle states based on their relationship to
 ### Mobile-First Design Requirements
 
 **Context:** Users are primarily on phones/tablets
+
 - ✅ Clear visual hierarchy at a glance
 - ✅ Touch-friendly buttons and spacing
 - ✅ Minimal text, maximum clarity
@@ -142,6 +158,7 @@ Events progress through distinct lifecycle states based on their relationship to
 ### Event List View
 
 #### Upcoming Events (Default State)
+
 ```
 ┌─────────────────────────────────┐
 │ Summer Band Crawl               │
@@ -151,13 +168,16 @@ Events progress through distinct lifecycle states based on their relationship to
 │ [Edit] [View Details]           │
 └─────────────────────────────────┘
 ```
+
 **Visual Properties:**
+
 - Background: White/default
 - Text: Standard contrast
 - Border: Subtle gray
 - Icons: None needed (clean)
 
 #### Recently Completed (Yellow Accent)
+
 ```
 ┌─────────────────────────────────┐
 │ ⚠️ Spring Fest                  │ ← Yellow/amber background
@@ -167,13 +187,16 @@ Events progress through distinct lifecycle states based on their relationship to
 │ [Edit] [Archive Now] [View]     │
 └─────────────────────────────────┘
 ```
+
 **Visual Properties:**
+
 - Background: Light amber (#FFF9E6)
 - Border: Amber accent (#FFD700)
 - Icon: ⚠️ Warning triangle
 - Time indicator: "Ended X hrs ago"
 
 #### Archived Events (Muted State)
+
 ```
 ┌─────────────────────────────────┐
 │ 🗄️ Winter Crawl                 │ ← Gray/muted background
@@ -183,7 +206,9 @@ Events progress through distinct lifecycle states based on their relationship to
 │ [View] [Copy as Template]       │ ← No "Edit" button
 └─────────────────────────────────┘
 ```
+
 **Visual Properties:**
+
 - Background: Light gray (#F5F5F5)
 - Text: Muted gray (#666666)
 - Icon: 🗄️ Archive/file cabinet
@@ -192,38 +217,41 @@ Events progress through distinct lifecycle states based on their relationship to
 
 ### Color Scheme
 
-| State | Primary Color | Background | Border | Use Case |
-|-------|---------------|------------|--------|----------|
-| Upcoming | Default | White | Light gray | Normal editable events |
-| Recent | Amber/Yellow | #FFF9E6 | #FFD700 | Caution: event just ended |
-| Archived | Gray | #F5F5F5 | #DDDDDD | Historical: protected data |
+| State    | Primary Color | Background | Border     | Use Case                   |
+| -------- | ------------- | ---------- | ---------- | -------------------------- |
+| Upcoming | Default       | White      | Light gray | Normal editable events     |
+| Recent   | Amber/Yellow  | #FFF9E6    | #FFD700    | Caution: event just ended  |
+| Archived | Gray          | #F5F5F5    | #DDDDDD    | Historical: protected data |
 
 **Never use red:** Red implies error/failure, not appropriate for normal lifecycle progression
 
 ### Icon System
 
-| Icon | State | Meaning |
-|------|-------|---------|
-| 📅 | Upcoming | Optional (can omit for clean look) |
-| ⚠️ | Recent | Warning: recently ended |
-| 🗄️ | Archived | File cabinet: historical storage |
+| Icon | State    | Meaning                            |
+| ---- | -------- | ---------------------------------- |
+| 📅   | Upcoming | Optional (can omit for clean look) |
+| ⚠️   | Recent   | Warning: recently ended            |
+| 🗄️   | Archived | File cabinet: historical storage   |
 
 **Accessibility:** Always pair icons with text labels for screen readers
 
 ### List Organization
 
 **Default View:**
+
 - Show upcoming events only
 - Chronological order: Soonest first
 - Clean, focused interface
 
 **"Show Past Events" Toggle:**
+
 - Collapsed by default (hidden)
 - Expand to reveal archived events below upcoming
 - Clear visual separator (e.g., "Past Events" header)
 - Reverse chronological: Most recent first
 
 **Filter Dropdown Options:**
+
 - **Upcoming** (default)
 - **Recent** (last 2 days)
 - **Archived** (older than 2 days)
@@ -266,6 +294,7 @@ Events progress through distinct lifecycle states based on their relationship to
 ```
 
 **Design Principles:**
+
 1. **Persistent context banner** - Always visible, can't scroll away
 2. **Constructive alternatives first** - "Copy as Template" more prominent than edit
 3. **Edit available but de-emphasized** - Overflow menu, not primary button
@@ -292,6 +321,7 @@ Events progress through distinct lifecycle states based on their relationship to
 ```
 
 **Design Principles:**
+
 1. **Encouraging banner** - "You can still make corrections" (positive framing)
 2. **Edit remains easy** - Primary button position, no confirmation
 3. **Manual archive option** - For users who want to lock it early
@@ -329,6 +359,7 @@ Events progress through distinct lifecycle states based on their relationship to
 ```
 
 **Button Hierarchy:**
+
 1. **Cancel** - Primary/recommended action (default focus)
 2. **Copy as New Event** - Secondary/constructive alternative
 3. **Edit Anyway** - Tertiary/risky action (visually de-emphasized)
@@ -360,11 +391,13 @@ Events progress through distinct lifecycle states based on their relationship to
 ```
 
 **Key Features:**
+
 - **Change summary** - Shows what's being modified (transparency)
 - **Date reminder** - Reinforces this is old data
 - **Two-button choice** - Simple cancel or confirm (no third option here)
 
 **Why two confirmations?**
+
 1. First confirmation: "Do you really want to edit this?" (prevents accidental entry)
 2. Second confirmation: "Are these changes correct?" (prevents accidental save)
 3. Creates strong friction against muscle-memory mistakes
@@ -379,6 +412,7 @@ Events progress through distinct lifecycle states based on their relationship to
 **User Goal:** Review past event for reference or analytics
 
 **Steps:**
+
 1. **Dashboard** → Navigate to "Events" section
 2. **Expand** → Tap "Show Past Events" toggle (collapsed by default)
 3. **Browse** → Chronological list of archived events appears below upcoming
@@ -390,12 +424,14 @@ Events progress through distinct lifecycle states based on their relationship to
    - Copy as template for new event
 
 **Key Features:**
+
 - **Search/Filter:** By date range, venue name, band name
 - **Quick Stats:** "You've organized 47 events since 2020"
 - **Export Options:** PDF event summary, CSV data for spreadsheet analysis
 - **Analytics:** Most popular venues, average attendance, bands per event
 
 **UX Priorities:**
+
 - ✅ Default view shows only upcoming (focus on future)
 - ✅ Past events easily accessible but not cluttering main view
 - ✅ Clear visual separation between current and historical
@@ -407,6 +443,7 @@ Events progress through distinct lifecycle states based on their relationship to
 **User Goal:** Fix typo or incorrect data in past event
 
 **Steps:**
+
 1. **Navigate** → Find archived event in "Past Events" section
 2. **Notice** → No "Edit" button in primary position
 3. **Discover** → Find "Edit Event" in overflow menu (⋮)
@@ -422,6 +459,7 @@ Events progress through distinct lifecycle states based on their relationship to
 9. **Success** → Event updated, audit log entry created
 
 **Error Prevention Layers:**
+
 - ✅ Edit hidden in overflow menu (not primary action)
 - ✅ Initial confirmation modal (prevents accidental entry)
 - ✅ Constructive alternative offered (copy as new event)
@@ -430,6 +468,7 @@ Events progress through distinct lifecycle states based on their relationship to
 - ✅ Audit log created (trackability)
 
 **Escape Hatches:**
+
 - User can cancel at ANY point (non-destructive)
 - "Copy as New Event" available in first modal
 - Back button works normally throughout
@@ -441,6 +480,7 @@ Events progress through distinct lifecycle states based on their relationship to
 **User Goal:** Create new event based on successful past event
 
 **Steps:**
+
 1. **Browse** → Find past event to use as reference
 2. **Select** → Tap event to view details
 3. **Copy** → Tap "Copy as Template" button
@@ -453,6 +493,7 @@ Events progress through distinct lifecycle states based on their relationship to
 7. **Success** → New event created, original preserved unchanged
 
 **Benefits:**
+
 - ✅ Encourages reusing successful event formats
 - ✅ Reduces data entry for recurring annual events
 - ✅ Preserves original historical data (no risk of accidental edit)
@@ -460,6 +501,7 @@ Events progress through distinct lifecycle states based on their relationship to
 - ✅ Saves time: Pre-populated venues and bands
 
 **Implementation Details:**
+
 - Copy all fields EXCEPT: `id`, `created_at`, `status`, `published_at`
 - Default new date: Next Saturday after today
 - Default new title: "[Original Title] 2025" (year auto-increment)
@@ -474,6 +516,7 @@ Events progress through distinct lifecycle states based on their relationship to
 **Manual Archive:**
 
 **Steps:**
+
 1. **Event Detail** → Any event (upcoming or past)
 2. **Archive Action** → Tap "Archive" or "Archive Now" button
 3. **Confirmation** → Simple modal:
@@ -485,6 +528,7 @@ Events progress through distinct lifecycle states based on their relationship to
 **Unarchive:**
 
 **Steps:**
+
 1. **Archived Event** → Navigate to archived event detail
 2. **Unarchive** → Tap "Unarchive" button (always visible on archived events)
 3. **No Confirmation** → Immediate action (low-risk, reversible)
@@ -493,6 +537,7 @@ Events progress through distinct lifecycle states based on their relationship to
 **Auto-Archive:**
 
 **System Behavior:**
+
 - Runs hourly via background job
 - Checks all events where `end_datetime + 48 hours < now()`
 - Updates `status: 'archived'` automatically
@@ -507,11 +552,13 @@ Events progress through distinct lifecycle states based on their relationship to
 | **Both** | - | - | Same protection level |
 
 **Why Manual Archive?**
+
 - User wants to hide cancelled event from active view
 - Event is over but within 48h grace period, user done making corrections
 - Organizational cleanup: Archiving old draft events never published
 
 **Why No Delete?**
+
 - Delete is DESTRUCTIVE (can't undo)
 - Archive is NON-DESTRUCTIVE (can unarchive)
 - No legitimate use case for permanently deleting event data
@@ -530,16 +577,19 @@ Events progress through distinct lifecycle states based on their relationship to
 **Event:** Friday 7 PM → Sunday 11 PM
 
 **Solution:**
+
 - ✅ Use event END date/time for all calculations
 - ✅ Event remains fully editable until Sunday 11 PM
 - ✅ No premature archiving during festival
 - ✅ Grace period: Sunday 11 PM → Tuesday 11 PM (48h after END)
 
 **Optional Enhancement:**
+
 - Progress indicator: "Day 2 of 3 • Ends Sunday 11 PM"
 - Status: "In Progress" instead of "Upcoming" or "Completed"
 
 **Database Field:**
+
 ```javascript
 status: 'upcoming' | 'in_progress' | 'completed' | 'archived'
 
@@ -566,11 +616,13 @@ if (now < event.startDateTime) {
 **Action:** User taps "Archive" button
 
 **Solution:**
+
 - ✅ Manual archive allowed for all events (upcoming, recent, or past)
 - ✅ Confirmation modal with clear explanation
 - ✅ Status field includes cancellation reason
 
 **Confirmation Modal:**
+
 ```
 Archive this upcoming event?
 
@@ -584,6 +636,7 @@ Optional: Mark as cancelled?
 ```
 
 **Result:**
+
 - Event moved to "Archived" section
 - Status badge: "CANCELLED" (if checkbox selected) or "ARCHIVED"
 - Can be unarchived if cancellation was mistake
@@ -601,17 +654,20 @@ Optional: Mark as cancelled?
 **Solution:**
 
 **Unarchive Button:**
+
 - Always visible on archived event detail page
 - One-tap action (no confirmation needed)
 - Low-risk operation (reversible)
 
 **Steps to Recover:**
+
 1. Navigate to archived event
 2. Tap "Unarchive" button
 3. Event immediately returns to active status
 4. Appears in appropriate section (upcoming/recent based on dates)
 
 **Banner on Archived Event:**
+
 ```
 ┌─────────────────────────────────────┐
 │ 🗄️ This event was manually archived │
@@ -621,6 +677,7 @@ Optional: Mark as cancelled?
 ```
 
 **Why No Confirmation for Unarchive?**
+
 - Undoing an accidental archive is low-risk
 - Confirmation would add friction to error recovery
 - User already demonstrated intent by navigating to archived event
@@ -633,6 +690,7 @@ Optional: Mark as cancelled?
 **Scenario:** Server time/timezone misconfigured, causes incorrect auto-archiving
 
 **Example Problem:**
+
 - Event in New Orleans (CDT, UTC-5)
 - Server in UTC
 - Event end: 11 PM local = 4 AM UTC next day
@@ -641,12 +699,14 @@ Optional: Mark as cancelled?
 **Solution:**
 
 **Time Storage:**
+
 - Store all event datetimes in UTC in database
 - Convert to organizer's local timezone for display
 - Archive calculations use server time (UTC)
 - Consistent across all users and timezones
 
 **Database Schema:**
+
 ```javascript
 {
   startDateTime: '2024-12-12T01:00:00Z',  // UTC
@@ -657,9 +717,10 @@ Optional: Mark as cancelled?
 ```
 
 **Archive Calculation:**
+
 ```javascript
-const archiveTime = new Date(event.endDateTime)
-archiveTime.setHours(archiveTime.getHours() + 48)
+const archiveTime = new Date(event.endDateTime);
+archiveTime.setHours(archiveTime.getHours() + 48);
 
 if (now >= archiveTime) {
   // Auto-archive
@@ -667,11 +728,13 @@ if (now >= archiveTime) {
 ```
 
 **Grace Period Buffer:**
+
 - 48-hour grace period provides buffer for minor timezone issues
 - Small clock drift won't cause immediate archiving at event end
 - Display logic handles timezone conversion separately from archive logic
 
 **User-Visible Time:**
+
 - Always display in organizer's local timezone
 - "Event ended: Sat, Dec 12, 2024 at 11:00 PM CST"
 - Archive status based on UTC calculation, but displayed time is local
@@ -683,6 +746,7 @@ if (now >= archiveTime) {
 **Scenario:** Organizer discovers major error in 6-month-old archived event
 
 **Example:**
+
 - Event: June 15, 2024 (6 months ago)
 - Error: Wrong venue recorded, affects analytics and historical accuracy
 - Need: Legitimate correction, not malicious tampering
@@ -690,6 +754,7 @@ if (now >= archiveTime) {
 **Solution 1: Simple Two-Confirmation Edit (Single-Organizer Setup)**
 
 **Process:**
+
 1. User finds archived event
 2. Taps "Edit Event" in overflow menu
 3. **First Confirmation:**
@@ -703,6 +768,7 @@ if (now >= archiveTime) {
 7. User confirms → Changes saved
 
 **Audit Log:**
+
 ```javascript
 {
   eventId: '123',
@@ -718,6 +784,7 @@ if (now >= archiveTime) {
 **Solution 2: Request Correction Workflow (Multi-User/Admin Setup)**
 
 **Process:**
+
 1. User submits correction request instead of direct edit
 2. Admin receives notification
 3. Admin reviews request with reason/justification
@@ -725,12 +792,14 @@ if (now >= archiveTime) {
 5. If approved: Changes applied with audit log
 
 **When to Use:**
+
 - Multi-user organization with role hierarchy
 - Extra scrutiny needed for historical data changes
 - Compliance/audit requirements
 - Want to prevent unauthorized historical data modification
 
 **Implementation:**
+
 ```javascript
 // Correction request
 {
@@ -764,6 +833,7 @@ if (now >= archiveTime) {
 **Must Have - Core Protection Mechanisms**
 
 **1. Auto-Archive System**
+
 - **Database Changes:**
   - Add `status` field: `'upcoming' | 'completed' | 'archived'`
   - Add `archived_at` timestamp (nullable)
@@ -772,19 +842,21 @@ if (now >= archiveTime) {
   - Query: `WHERE end_datetime + INTERVAL '48 hours' < NOW() AND status != 'archived'`
   - Update matching events: `SET status = 'archived', archived_at = NOW()`
 - **Calculation Logic:**
+
   ```javascript
   function calculateEventStatus(event) {
-    const now = new Date()
-    const endPlus48h = new Date(event.endDateTime)
-    endPlus48h.setHours(endPlus48h.getHours() + 48)
+    const now = new Date();
+    const endPlus48h = new Date(event.endDateTime);
+    endPlus48h.setHours(endPlus48h.getHours() + 48);
 
-    if (now >= endPlus48h) return 'archived'
-    if (now >= event.endDateTime) return 'completed'
-    return 'upcoming'
+    if (now >= endPlus48h) return "archived";
+    if (now >= event.endDateTime) return "completed";
+    return "upcoming";
   }
   ```
 
 **2. Soft Delete Implementation**
+
 - **Remove Delete Buttons:**
   - Hide/disable "Delete Event" on archived events
   - Replace with "Archive" action on all events
@@ -798,6 +870,7 @@ if (now >= archiveTime) {
   - One-tap, no confirmation
 
 **3. Visual Indicators**
+
 - **Archive Banner:**
   - Component: Persistent top banner on archived event detail pages
   - Text: "🗄️ ARCHIVED EVENT - This event ended on [date] - Historical data is protected"
@@ -812,6 +885,7 @@ if (now >= archiveTime) {
   - Upcoming: White/default background
 
 **4. Basic Confirmation Gates**
+
 - **Edit Confirmation Modal:**
   - Trigger: User attempts to edit archived event
   - Title: "Edit Archived Event?"
@@ -834,6 +908,7 @@ if (now >= archiveTime) {
 **Should Have - Improved UX Without Complexity**
 
 **5. Copy as Template Feature**
+
 - **Button Placement:**
   - Primary position on archived event detail page
   - More prominent than "Edit Event"
@@ -848,6 +923,7 @@ if (now >= archiveTime) {
   - All fields editable
 
 **6. Recently Completed State**
+
 - **Intermediate State:**
   - Events 0-48 hours after end show yellow banner
   - Banner text: "⚠️ Event ended [X hours/days] ago - You can still make corrections"
@@ -861,6 +937,7 @@ if (now >= archiveTime) {
   - Banner persists to remind of recently-ended status
 
 **7. Audit Logging**
+
 - **Data Model:**
   ```javascript
   {
@@ -894,6 +971,7 @@ if (now >= archiveTime) {
 **Nice to Have - Adds Value, Not Essential**
 
 **8. Event Status Field Enhancement**
+
 - **Status Enum:**
   - `'upcoming'` - Future event
   - `'in_progress'` - Multi-day event currently happening
@@ -911,6 +989,7 @@ if (now >= archiveTime) {
   - "CANCELLED" in red, "ARCHIVED" in gray, etc.
 
 **9. Filtering/Search Improvements**
+
 - **Filter Dropdown:**
   - Options: All, Upcoming, Recent (0-48h), Archived, Cancelled
   - Default: Upcoming only
@@ -924,6 +1003,7 @@ if (now >= archiveTime) {
   - Clear visual separator: "Past Events" header
 
 **10. Analytics Dashboard**
+
 - **Metrics:**
   - Total events organized (all-time)
   - Events by year (bar chart)
@@ -948,6 +1028,7 @@ if (now >= archiveTime) {
 **Future Consideration - Requires Infrastructure Changes**
 
 **11. Role-Based Permissions**
+
 - **Roles:**
   - **Viewer:** Read-only access, can view all events
   - **Organizer:** Can edit with confirmations, standard user
@@ -970,6 +1051,7 @@ if (now >= archiveTime) {
   - Defer until multi-user needs are clear
 
 **12. Granular Field Locking**
+
 - **Concept:**
   - Some fields editable on archived events (metadata)
   - Core fields locked (date, time, venues, bands)
@@ -1001,6 +1083,7 @@ if (now >= archiveTime) {
 **Why this priority order?**
 
 **P0 (MVP):**
+
 - Establishes core protection immediately
 - Prevents data loss from day one
 - Simple, clear UX that's easy to understand
@@ -1008,6 +1091,7 @@ if (now >= archiveTime) {
 - Can be built and deployed quickly
 
 **P1 (Enhanced):**
+
 - Improves user experience without adding complexity
 - Copy as template reduces edit temptation (constructive alternative)
 - Audit logging provides transparency and accountability
@@ -1015,12 +1099,14 @@ if (now >= archiveTime) {
 - Low technical risk, high UX value
 
 **P2 (Advanced):**
+
 - Adds analytical value but not essential for protection
 - Requires more development time
 - Value depends on user adoption and engagement
 - Can be deferred until P0/P1 are proven successful
 
 **P3 (Future):**
+
 - Requires significant infrastructure changes
 - Not needed for small teams (1-2 organizers)
 - Value proposition unclear until user base grows
@@ -1028,6 +1114,7 @@ if (now >= archiveTime) {
 - Revisit if multi-user collaboration becomes critical need
 
 **Deployment Strategy:**
+
 - **Sprint 1:** Implement P0 (2-3 days), deploy to production
 - **Sprint 2:** Implement P1 (2-3 days), deploy after testing
 - **Sprint 3+:** Evaluate P2 based on user feedback and analytics
@@ -1068,29 +1155,31 @@ CREATE TABLE event_audit_log (
 ```javascript
 // Run hourly via cron: "0 * * * *"
 async function autoArchiveEvents() {
-  const cutoffTime = new Date()
-  cutoffTime.setHours(cutoffTime.getHours() - 48)
+  const cutoffTime = new Date();
+  cutoffTime.setHours(cutoffTime.getHours() - 48);
 
   const eventsToArchive = await db.events.findMany({
     where: {
       endDateTime: { lte: cutoffTime },
-      status: { notIn: ['archived', 'cancelled'] }
-    }
-  })
+      status: { notIn: ["archived", "cancelled"] },
+    },
+  });
 
   for (const event of eventsToArchive) {
     await db.events.update({
       where: { id: event.id },
       data: {
-        status: 'archived',
-        archivedAt: new Date()
-      }
-    })
+        status: "archived",
+        archivedAt: new Date(),
+      },
+    });
 
-    console.log(`Auto-archived event ${event.id}: ${event.title}`)
+    console.log(`Auto-archived event ${event.id}: ${event.title}`);
   }
 
-  console.log(`Auto-archive complete: ${eventsToArchive.length} events archived`)
+  console.log(
+    `Auto-archive complete: ${eventsToArchive.length} events archived`,
+  );
 }
 ```
 
@@ -1098,23 +1187,23 @@ async function autoArchiveEvents() {
 
 ```javascript
 function getEventStatus(event) {
-  const now = new Date()
-  const endPlus48h = new Date(event.endDateTime)
-  endPlus48h.setHours(endPlus48h.getHours() + 48)
+  const now = new Date();
+  const endPlus48h = new Date(event.endDateTime);
+  endPlus48h.setHours(endPlus48h.getHours() + 48);
 
   // Manual overrides
-  if (event.status === 'cancelled') return 'cancelled'
-  if (event.archivedAt) return 'archived'
+  if (event.status === "cancelled") return "cancelled";
+  if (event.archivedAt) return "archived";
 
   // Automatic calculation
   if (now >= endPlus48h) {
-    return 'archived'
+    return "archived";
   } else if (now >= event.endDateTime && now < endPlus48h) {
-    return 'completed'  // Recently completed (0-48h)
+    return "completed"; // Recently completed (0-48h)
   } else if (now >= event.startDateTime && now < event.endDateTime) {
-    return 'in_progress'  // Multi-day event happening now
+    return "in_progress"; // Multi-day event happening now
   } else {
-    return 'upcoming'
+    return "upcoming";
   }
 }
 ```
@@ -1122,11 +1211,19 @@ function getEventStatus(event) {
 **Confirmation Modal Component (React Example):**
 
 ```jsx
-function EditArchivedEventConfirmation({ event, onCancel, onCopyAsNew, onEditAnyway }) {
+function EditArchivedEventConfirmation({
+  event,
+  onCancel,
+  onCopyAsNew,
+  onEditAnyway,
+}) {
   return (
     <Modal>
       <h2>Edit Archived Event?</h2>
-      <p>⚠️ This event is archived historical data from {formatDate(event.endDateTime)}</p>
+      <p>
+        ⚠️ This event is archived historical data from{" "}
+        {formatDate(event.endDateTime)}
+      </p>
       <p>Editing archived events should only be done to correct errors.</p>
       <p>What would you like to do?</p>
 
@@ -1142,7 +1239,7 @@ function EditArchivedEventConfirmation({ event, onCancel, onCopyAsNew, onEditAny
         </Button>
       </div>
     </Modal>
-  )
+  );
 }
 ```
 
@@ -1153,16 +1250,19 @@ function EditArchivedEventConfirmation({ event, onCancel, onCopyAsNew, onEditAny
 ### How to Measure Effectiveness
 
 **Protection Goals:**
+
 - ✅ Zero accidental deletions of historical events (target: 100%)
 - ✅ Reduced unintentional edits to archived events (target: <1% of edits)
 - ✅ High unarchive rate indicates users understanding archive concept (target: <5% unarchive actions)
 
 **Usability Goals:**
+
 - ✅ Users can find and view past events easily (target: <3 taps from dashboard)
 - ✅ Copy-as-template used frequently (target: 30%+ of new events created from templates)
 - ✅ Low support requests about "can't edit old events" (target: <5 requests/month)
 
 **Data Integrity Goals:**
+
 - ✅ Audit log captures all archived event modifications (target: 100% coverage)
 - ✅ Historical data remains accurate over time (manual verification)
 - ✅ Analytics and reports based on historical data are reliable
@@ -1196,6 +1296,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 ### Implementation Roadmap
 
 **Phase 1 (MVP - Week 1):**
+
 - [ ] Add database fields: `status`, `archived_at`
 - [ ] Implement auto-archive background job
 - [ ] Build archive banner component
@@ -1204,6 +1305,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 - [ ] Deploy to production
 
 **Phase 2 (Enhanced - Week 2):**
+
 - [ ] Build "Copy as Template" feature
 - [ ] Implement recently completed state (yellow banner)
 - [ ] Add basic audit logging
@@ -1211,6 +1313,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 - [ ] User testing and feedback collection
 
 **Phase 3 (Advanced - Week 3-4):**
+
 - [ ] Implement status enum (in_progress, cancelled)
 - [ ] Build filtering/search UI (show past events toggle)
 - [ ] Create analytics dashboard (events by year, popular venues)
@@ -1218,6 +1321,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 - [ ] Performance optimization for large event lists
 
 **Phase 4 (Future - TBD):**
+
 - [ ] Evaluate need for role-based permissions
 - [ ] Consider granular field locking (likely not needed)
 - [ ] Advanced analytics and reporting features
@@ -1226,6 +1330,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 ### Testing Checklist
 
 **Functional Testing:**
+
 - [ ] Auto-archive runs correctly 48 hours after event end
 - [ ] Manual archive works for upcoming, recent, and past events
 - [ ] Unarchive restores event to correct status
@@ -1236,6 +1341,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 - [ ] Timezone handling works correctly (UTC storage, local display)
 
 **UX Testing:**
+
 - [ ] Archive banner visible and non-dismissible
 - [ ] Color coding clearly distinguishes event states
 - [ ] Mobile touch targets are large enough (44x44pt minimum)
@@ -1245,6 +1351,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 - [ ] Audit log displays correctly
 
 **Edge Case Testing:**
+
 - [ ] Multi-day event during festival (in_progress status)
 - [ ] Cancelled future event archived manually
 - [ ] Accidental archive followed by immediate unarchive
@@ -1261,20 +1368,22 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 
 **Alternatives Considered:**
 
-| Duration | Pros | Cons | Verdict |
-|----------|------|------|---------|
-| **24 hours** | Quick protection | Too short for post-event wrap-up | ❌ Too restrictive |
-| **48 hours** | Balanced, allows corrections | Slightly longer exposure | ✅ **Recommended** |
-| **7 days** | Very flexible | High risk of manipulation | ❌ Too permissive |
-| **No grace period** | Maximum protection | Can't fix immediate errors | ❌ Too extreme |
+| Duration            | Pros                         | Cons                             | Verdict            |
+| ------------------- | ---------------------------- | -------------------------------- | ------------------ |
+| **24 hours**        | Quick protection             | Too short for post-event wrap-up | ❌ Too restrictive |
+| **48 hours**        | Balanced, allows corrections | Slightly longer exposure         | ✅ **Recommended** |
+| **7 days**          | Very flexible                | High risk of manipulation        | ❌ Too permissive  |
+| **No grace period** | Maximum protection           | Can't fix immediate errors       | ❌ Too extreme     |
 
 **User Research Insights:**
+
 - Event organizers typically add final notes/photos within 24-48 hours
 - Attendance counts and final metrics finalized 1-2 days post-event
 - Typos/errors discovered usually within first day
 - After 2 days, historical record is "settled" and changes feel risky
 
 **Industry Benchmarks:**
+
 - **QuickBooks:** Locks accounting periods after month-end
 - **Shopify:** Orders editable for 60 days, then view-only
 - **Google Calendar:** Past events editable with warning, no time limit
@@ -1287,6 +1396,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 ### Why Soft Delete Instead of Hard Delete?
 
 **Hard Delete Problems:**
+
 - ❌ Permanent data loss (no recovery)
 - ❌ Breaks analytics (events disappear from year-over-year comparisons)
 - ❌ Accidental deletion is catastrophic
@@ -1294,6 +1404,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 - ❌ Legal/tax records may require historical data retention
 
 **Soft Delete Benefits:**
+
 - ✅ Fully reversible (unarchive anytime)
 - ✅ Preserves analytics and historical trends
 - ✅ Accidental deletion is recoverable
@@ -1302,6 +1413,7 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 - ✅ Supports "hide from view" without destroying data
 
 **Storage Concerns:**
+
 - Soft delete uses slightly more database storage
 - For band crawl events (4-5/year), storage is negligible
 - Even 10 years = ~50 events = <1MB data
@@ -1312,22 +1424,26 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 ### Why Two Confirmations for Archived Event Edits?
 
 **One Confirmation Risks:**
+
 - Users develop muscle memory: "Tap edit → tap confirm" becomes automatic
 - Similar to "OK" button blindness in repetitive dialogs
 - Single confirmation insufficient for preventing accidental changes
 
 **Two Confirmation Benefits:**
+
 - **First confirmation:** Interrupts workflow, forces conscious decision
 - **Second confirmation:** Shows change summary, final check before save
 - Different content each time (not repetitive)
 - Mirrors familiar patterns (e.g., "Are you sure you want to delete?")
 
 **User Testing:**
+
 - Users report feeling "safe" with double confirmation
 - Change summary in second confirmation catches errors before save
 - "Copy as New" option in first confirmation encourages template workflow
 
 **Performance Impact:**
+
 - Adds ~2 seconds to archived event edit flow
 - Acceptable trade-off for data protection
 - Recent events (0-48h) still have no confirmation (smooth UX)
@@ -1343,4 +1459,5 @@ analytics.track('edit_cancelled_at_confirmation', { eventId, confirmationStep: 1
 **Next Review:** After P0 deployment + 2 weeks user feedback
 
 **Change Log:**
+
 - 2024-12: Initial specification created based on user requirement analysis

@@ -96,9 +96,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-white mb-4">
-          {isEditMode ? 'Edit User' : 'Create New User'}
-        </h3>
+        <h3 className="text-lg font-bold text-white mb-4">{isEditMode ? 'Edit User' : 'Create New User'}</h3>
 
         <form onSubmit={handleSubmit}>
           {/* Email */}

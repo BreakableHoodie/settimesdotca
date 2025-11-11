@@ -6,18 +6,20 @@ export async function onRequest(context) {
 
   // Allowed origins for CORS (production and development)
   const ALLOWED_ORIGINS = [
-    'https://lwbc.dredre.net',
-    'https://dev.longweekend-bandcrawl.pages.dev',
-    'https://longweekend-bandcrawl.pages.dev',
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000'
+    "https://lwbc.dredre.net",
+    "https://dev.longweekend-bandcrawl.pages.dev",
+    "https://longweekend-bandcrawl.pages.dev",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
   ];
 
   // Check if origin is allowed
-  const origin = request.headers.get('Origin');
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const origin = request.headers.get("Origin");
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : ALLOWED_ORIGINS[0];
 
   // Add CORS headers for API requests
   const corsHeaders = {
@@ -56,7 +58,7 @@ export async function onRequest(context) {
 
     return new Response(
       JSON.stringify({
-        error: "Internal server error"
+        error: "Internal server error",
       }),
       {
         status: 500,
@@ -64,7 +66,7 @@ export async function onRequest(context) {
           "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
+      },
     );
   }
 }

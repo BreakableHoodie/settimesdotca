@@ -1,7 +1,7 @@
 // Archive event endpoint
 // POST /api/admin/events/{id}/archive
 
-import { checkPermission, auditLog } from '../../_middleware.js'
+import { checkPermission, auditLog } from "../../_middleware.js";
 
 // Get client IP from request
 function getClientIP(request) {
@@ -28,7 +28,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(request, env, 'admin');
+    const permCheck = await checkPermission(request, env, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -45,14 +45,12 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     // Get current event
-    const event = await DB.prepare(
-      `SELECT * FROM events WHERE id = ?`
-    )
+    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`)
       .bind(eventId)
       .first();
 
@@ -65,12 +63,12 @@ export async function onRequestPost(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     // Check if already archived
-    if (event.status === 'archived') {
+    if (event.status === "archived") {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -79,7 +77,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -90,7 +88,7 @@ export async function onRequestPost(context) {
       SET status = 'archived', archived_at = datetime('now'), is_published = 0, updated_by_user_id = ?
       WHERE id = ?
       RETURNING *
-    `
+    `,
     )
       .bind(currentUser.userId, eventId)
       .first();
@@ -99,14 +97,14 @@ export async function onRequestPost(context) {
     await auditLog(
       env,
       currentUser.userId,
-      'event.archived',
-      'event',
+      "event.archived",
+      "event",
       eventId,
       {
         name: event.name,
         previousStatus: event.status,
       },
-      ipAddress
+      ipAddress,
     );
 
     return new Response(
@@ -118,7 +116,7 @@ export async function onRequestPost(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error archiving event:", error);
@@ -131,7 +129,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

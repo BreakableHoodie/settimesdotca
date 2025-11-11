@@ -36,7 +36,7 @@ export function EventProvider({ children }) {
 
       const response = await fetch('/api/admin/events', {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       })
 
@@ -69,7 +69,7 @@ export function EventProvider({ children }) {
   }, [currentEventId, fetchEvents])
 
   // Switch to a different event
-  const switchEvent = (eventId) => {
+  const switchEvent = eventId => {
     const id = eventId ? parseInt(eventId) : null
     setCurrentEventId(id)
 

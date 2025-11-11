@@ -2,20 +2,14 @@ const CACHE_VERSION = 'v2'
 const CACHE_NAME = `schedule-${CACHE_VERSION}`
 
 // Assets to cache immediately on install
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/assets/index.css',
-  '/assets/index.js',
-  '/manifest.json'
-]
+const STATIC_ASSETS = ['/', '/index.html', '/assets/index.css', '/assets/index.js', '/manifest.json']
 
 // Install: cache static assets
-self.addEventListener('install', (event) => {
+self.addEventListener('install', event => {
   console.log('[SW] Installing service worker', CACHE_VERSION)
 
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
+    caches.open(CACHE_NAME).then(cache => {
       console.log('[SW] Caching static assets')
       return cache.addAll(STATIC_ASSETS)
     })
@@ -26,15 +20,15 @@ self.addEventListener('install', (event) => {
 })
 
 // Activate: clean up old caches
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   console.log('[SW] Activating service worker', CACHE_VERSION)
 
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames
-          .filter((name) => name.startsWith('schedule-') && name !== CACHE_NAME)
-          .map((name) => {
+          .filter(name => name.startsWith('schedule-') && name !== CACHE_NAME)
+          .map(name => {
             console.log('[SW] Deleting old cache:', name)
             return caches.delete(name)
           })
@@ -47,7 +41,7 @@ self.addEventListener('activate', (event) => {
 })
 
 // Fetch: Cache-first with network fallback
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
 
@@ -98,7 +92,7 @@ async function cacheFirstStrategy(request) {
     // Return basic error response
     return new Response('Offline - content not cached', {
       status: 503,
-      statusText: 'Service Unavailable'
+      statusText: 'Service Unavailable',
     })
   }
 }

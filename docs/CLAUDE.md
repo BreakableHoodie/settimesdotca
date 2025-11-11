@@ -18,6 +18,7 @@ Use `docs/schedule.webp` as the design inspiration:
 ## Stack & Architecture
 
 ### Frontend
+
 - **Framework:** React 18 + Vite
 - **Routing:** React Router v7
 - **Styling:** TailwindCSS with custom band-crawl theme
@@ -29,12 +30,14 @@ Use `docs/schedule.webp` as the design inspiration:
   - Bundle optimization (143KB main, gzipped 43KB)
 
 ### Backend
+
 - **Runtime:** Cloudflare Pages Functions (serverless)
 - **Database:** Cloudflare D1 (SQLite-based)
 - **Auth:** JWT with 24-hour sessions
 - **API:** RESTful endpoints with JOIN-optimized queries
 
 ### Database Schema
+
 - **events**: Event metadata (name, date, slug, is_published)
 - **venues**: Venue information (name, address, capacity)
 - **performers**: Global performer registry (name, genre, origin, social links)
@@ -43,6 +46,7 @@ Use `docs/schedule.webp` as the design inspiration:
 - **subscriptions**: Email notification system
 
 ### Deployment
+
 - **Platform:** Cloudflare Pages
 - **Prod URL:** https://lwbc.dredre.net
 - **Dev URL:** https://dev.longweekend-bandcrawl.pages.dev
@@ -51,6 +55,7 @@ Use `docs/schedule.webp` as the design inspiration:
 ## Core Features
 
 ### Public Features
+
 - **Event Timeline**: Now/Upcoming/Past events with JOIN-optimized queries (no N+1)
 - **Band Profiles**: Sports card-inspired profiles with performance stats
 - **Embed Pages**: Shareable event schedules
@@ -58,6 +63,7 @@ Use `docs/schedule.webp` as the design inspiration:
 - **PWA Support**: Service worker ready (currently disabled in dev)
 
 ### Admin Features
+
 - **Event Wizard**: Multi-step event creation with venue/performer pickers
 - **Bulk Operations**: CSV import with preview, bulk edit, bulk delete
 - **Performers Manager**: Global performer registry with reusable profiles
@@ -66,6 +72,7 @@ Use `docs/schedule.webp` as the design inspiration:
 - **Context Switching**: Breadcrumbs and banners for clear navigation
 
 ### Performance Optimizations
+
 - ✅ N+1 query pattern eliminated (timeline endpoint)
 - ✅ Code splitting (AdminApp, BandProfilePage)
 - ✅ Zero production console.log statements
@@ -73,6 +80,7 @@ Use `docs/schedule.webp` as the design inspiration:
 - ✅ React Error Boundaries for resilience
 
 ### Security
+
 - ✅ JWT authentication with HttpOnly cookies
 - ✅ SQL injection prevention (parameterized queries)
 - ✅ Input validation on all forms
@@ -85,6 +93,7 @@ Use `docs/schedule.webp` as the design inspiration:
 ## Development Workflow
 
 ### Local Development
+
 ```bash
 # Frontend dev server (Vite HMR)
 cd frontend
@@ -104,6 +113,7 @@ sqlite3 .wrangler/state/v3/d1/*.sqlite < database/migration-file.sql
 ```
 
 ### Testing
+
 ```bash
 # Run all tests (Vitest)
 npm test
@@ -119,6 +129,7 @@ npm run test:a11y
 ```
 
 ### Build & Deploy
+
 ```bash
 # Build production bundle
 npm run build
@@ -131,6 +142,7 @@ npm run deploy:prod
 ```
 
 ### Quality Commands
+
 ```bash
 # Lint code
 npm run lint
@@ -192,6 +204,7 @@ longweekendbandcrawl/
 ## Recent Improvements (Nov 2025)
 
 ### Performance Optimization
+
 1. **N+1 Query Fix** (`functions/api/events/timeline.js`)
    - Replaced sequential queries with JOIN-based approach
    - Reduced database calls from O(n) to O(1) per time period
@@ -208,6 +221,7 @@ longweekendbandcrawl/
    - Error logging preserved for monitoring
 
 ### Reliability
+
 4. **React Error Boundaries** (`frontend/src/components/ErrorBoundary.jsx`)
    - Graceful error handling for entire app
    - Context-specific boundaries for Admin and Band Profiles
@@ -215,6 +229,7 @@ longweekendbandcrawl/
    - User-friendly recovery UI
 
 ### Documentation
+
 5. **SQL Safety Guide** (`docs/SQL_SAFETY.md`)
    - Parameterized query patterns
    - Bulk operation safety
@@ -227,6 +242,7 @@ longweekendbandcrawl/
    - Testing procedures
 
 ### Testing
+
 7. **Comprehensive Test Suite**
    - Timeline API tests (19 tests, all passing)
    - ErrorBoundary component tests (comprehensive coverage)
@@ -266,6 +282,7 @@ longweekendbandcrawl/
 When working on this project:
 
 ### UI/UX
+
 - Match color palette: Navy (#1a1f36), Purple (#2d1b4e), Orange (#ff6b35)
 - Use TailwindCSS utility classes (avoid custom CSS)
 - Mobile-first responsive design (touch targets ≥44px)
@@ -273,6 +290,7 @@ When working on this project:
 - Error states with clear recovery actions
 
 ### Code Quality
+
 - Follow existing patterns in components/utils
 - Add JSDoc comments for complex functions
 - Use descriptive variable names (no abbreviations)
@@ -280,6 +298,7 @@ When working on this project:
 - Wrap async operations in try-catch with error responses
 
 ### Performance
+
 - Use lazy loading for non-critical routes
 - Implement JOIN queries to avoid N+1 patterns
 - Add error boundaries around feature boundaries
@@ -287,6 +306,7 @@ When working on this project:
 - Cache public endpoints (5-minute CDN cache)
 
 ### Security
+
 - ALWAYS use parameterized queries (`.bind()`)
 - Validate inputs against whitelist patterns
 - Never expose SQL errors to users
@@ -294,6 +314,7 @@ When working on this project:
 - Log security events for monitoring
 
 ### Testing
+
 - Write tests for new API endpoints
 - Test error conditions and edge cases
 - Use mocks for database/external dependencies
@@ -311,17 +332,20 @@ When working on this project:
 ## Known Issues & Future Work
 
 ### High Priority
+
 - [ ] Integrate email service (SendGrid/Mailgun) for subscription verification
 - [ ] Implement session timeout warning UI (15 min before expiry)
 - [ ] Add rate limiting to public APIs
 
 ### Medium Priority
+
 - [ ] Implement "Remember Me" (7-day sessions)
 - [ ] Add 2FA for admin accounts
 - [ ] Refactor BandsTab.jsx with useReducer (currently 800+ lines)
 - [ ] Structured logger utility (replace console.error)
 
 ### Low Priority
+
 - [ ] Server-side token revocation (requires Redis/KV)
 - [ ] Session management UI (view/revoke active sessions)
 - [ ] Bulk venue operations

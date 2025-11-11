@@ -16,8 +16,8 @@ export default function PerformerPicker({ eventId, eventVenues }) {
       </div>
 
       <p className="text-white/70 text-sm mt-3">
-        This panel will evolve into a bulk importer that lets you drop an existing performer onto an open slot in just
-        a few clicks. For now, use the <strong>Add Band</strong> button above to create performances manually.
+        This panel will evolve into a bulk importer that lets you drop an existing performer onto an open slot in just a
+        few clicks. For now, use the <strong>Add Band</strong> button above to create performances manually.
       </p>
 
       {venues.length > 0 && (

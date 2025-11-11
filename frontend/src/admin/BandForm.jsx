@@ -15,11 +15,15 @@ export default function BandForm({
 }) {
   // In global view, we're editing band profile, not event-specific performance details
   const requireSchedule = globalView ? false : Boolean(formData.event_id)
-  const submitLabel = submitting 
-    ? 'Saving...' 
-    : mode === 'edit' 
-      ? globalView ? 'Update Band' : 'Update Performance'
-      : globalView ? 'Add Band' : 'Add Performance'
+  const submitLabel = submitting
+    ? 'Saving...'
+    : mode === 'edit'
+      ? globalView
+        ? 'Update Band'
+        : 'Update Performance'
+      : globalView
+        ? 'Add Band'
+        : 'Add Performance'
 
   return (
     <form onSubmit={onSubmit}>
@@ -55,9 +59,7 @@ export default function BandForm({
                 className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 placeholder="Toronto, ON"
               />
-              <p className="text-white/60 text-xs mt-2">
-                Where the band/artist is from (city, region, etc.)
-              </p>
+              <p className="text-white/60 text-xs mt-2">Where the band/artist is from (city, region, etc.)</p>
             </div>
 
             <div className="sm:col-span-2">
@@ -73,9 +75,7 @@ export default function BandForm({
                 className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 placeholder="punk, indie rock, etc."
               />
-              <p className="text-white/60 text-xs mt-2">
-                Comma-separated list of genres
-              </p>
+              <p className="text-white/60 text-xs mt-2">Comma-separated list of genres</p>
             </div>
 
             <div className="sm:col-span-2">
@@ -91,9 +91,7 @@ export default function BandForm({
                 className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 placeholder="https://example.com/band-photo.jpg"
               />
-              <p className="text-white/60 text-xs mt-2">
-                URL to the band&apos;s photo/image
-              </p>
+              <p className="text-white/60 text-xs mt-2">URL to the band&apos;s photo/image</p>
             </div>
 
             <div className="sm:col-span-2">
@@ -109,9 +107,7 @@ export default function BandForm({
                 className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 placeholder="Band bio, description, press quote..."
               />
-              <p className="text-white/60 text-xs mt-2">
-                Short bio or description about the band
-              </p>
+              <p className="text-white/60 text-xs mt-2">Short bio or description about the band</p>
             </div>
           </>
         )}
@@ -144,7 +140,8 @@ export default function BandForm({
             {showEventIntro && (
               <div className="sm:col-span-2">
                 <div className="bg-blue-900/20 border border-blue-600 rounded p-3 text-sm text-blue-100">
-                  You can create bands and venues independently from events. Assign them now or keep them available to attach later.
+                  You can create bands and venues independently from events. Assign them now or keep them available to
+                  attach later.
                 </div>
               </div>
             )}

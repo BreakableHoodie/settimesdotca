@@ -15,9 +15,5 @@ export default function RoleBadge({ role }) {
     }
   }
 
-  return (
-    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleStyles()}`}>
-      {role}
-    </span>
-  )
+  return <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleStyles()}`}>{role}</span>
 }

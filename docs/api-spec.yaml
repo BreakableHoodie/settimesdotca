@@ -65,7 +65,7 @@ paths:
             default: current
             example: vol-5
       responses:
-        '200':
+        "200":
           description: Schedule successfully retrieved
           headers:
             Cache-Control:
@@ -78,37 +78,37 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ScheduleBand'
+                  $ref: "#/components/schemas/ScheduleBand"
               example:
                 - id: the-strokes-1
                   name: The Strokes
                   venue: Room 47
-                  date: '2025-06-14'
-                  startTime: '20:00'
-                  endTime: '21:00'
+                  date: "2025-06-14"
+                  startTime: "20:00"
+                  endTime: "21:00"
                   url: https://thestrokes.com
                 - id: arctic-monkeys-2
                   name: Arctic Monkeys
                   venue: The Basement
-                  date: '2025-06-14'
-                  startTime: '21:30'
-                  endTime: '22:30'
+                  date: "2025-06-14"
+                  startTime: "21:30"
+                  endTime: "22:30"
                   url: null
-        '404':
+        "404":
           description: Event not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: Event not found
                 message: No published events available
-        '500':
+        "500":
           description: Database error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/admin/auth/login:
     post:
@@ -143,7 +143,7 @@ paths:
                   description: Admin password (stored in env.ADMIN_PASSWORD)
                   example: your-strong-password-here
       responses:
-        '200':
+        "200":
           description: Login successful
           content:
             application/json:
@@ -156,13 +156,13 @@ paths:
                   message:
                     type: string
                     example: Login successful
-        '400':
+        "400":
           description: Bad request (missing password)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '401':
+                $ref: "#/components/schemas/Error"
+        "401":
           description: Invalid password
           content:
             application/json:
@@ -178,7 +178,7 @@ paths:
                   remainingAttempts:
                     type: integer
                     example: 4
-        '429':
+        "429":
           description: Rate limited (too many failed attempts)
           content:
             application/json:
@@ -197,12 +197,12 @@ paths:
                   minutesRemaining:
                     type: integer
                     example: 45
-        '500':
+        "500":
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/admin/events:
     get:
@@ -214,7 +214,7 @@ paths:
         Sorted by date descending (newest first).
       operationId: listEvents
       responses:
-        '200':
+        "200":
           description: Events successfully retrieved
           content:
             application/json:
@@ -224,25 +224,25 @@ paths:
                   events:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Event'
+                      $ref: "#/components/schemas/Event"
               example:
                 events:
                   - id: 1
                     name: Long Weekend Band Crawl Vol. 5
-                    date: '2025-06-14'
+                    date: "2025-06-14"
                     slug: vol-5
                     is_published: 1
-                    created_at: '2025-01-15T10:30:00Z'
+                    created_at: "2025-01-15T10:30:00Z"
                     band_count: 50
                   - id: 2
                     name: Long Weekend Band Crawl Vol. 6
-                    date: '2025-12-20'
+                    date: "2025-12-20"
                     slug: vol-6
                     is_published: 0
-                    created_at: '2025-10-01T14:20:00Z'
+                    created_at: "2025-10-01T14:20:00Z"
                     band_count: 0
-        '500':
-          $ref: '#/components/responses/DatabaseError'
+        "500":
+          $ref: "#/components/responses/DatabaseError"
 
     post:
       tags:
@@ -260,14 +260,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EventCreate'
+              $ref: "#/components/schemas/EventCreate"
             example:
               name: Long Weekend Band Crawl Vol. 6
-              date: '2025-12-20'
+              date: "2025-12-20"
               slug: vol-6
               isPublished: false
       responses:
-        '201':
+        "201":
           description: Event successfully created
           content:
             application/json:
@@ -278,13 +278,13 @@ paths:
                     type: boolean
                     example: true
                   event:
-                    $ref: '#/components/schemas/Event'
-        '400':
+                    $ref: "#/components/schemas/Event"
+        "400":
           description: Validation error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               examples:
                 missingFields:
                   value:
@@ -298,17 +298,17 @@ paths:
                   value:
                     error: Validation error
                     message: Slug must contain only lowercase letters, numbers, and hyphens
-        '409':
+        "409":
           description: Slug already exists
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: Conflict
                 message: An event with this slug already exists
-        '500':
-          $ref: '#/components/responses/DatabaseError'
+        "500":
+          $ref: "#/components/responses/DatabaseError"
 
   /api/admin/venues:
     get:
@@ -320,7 +320,7 @@ paths:
         Sorted by name alphabetically.
       operationId: listVenues
       responses:
-        '200':
+        "200":
           description: Venues successfully retrieved
           content:
             application/json:
@@ -330,7 +330,7 @@ paths:
                   venues:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Venue'
+                      $ref: "#/components/schemas/Venue"
               example:
                 venues:
                   - id: 1
@@ -341,8 +341,8 @@ paths:
                     name: The Basement
                     address: null
                     band_count: 12
-        '500':
-          $ref: '#/components/responses/DatabaseError'
+        "500":
+          $ref: "#/components/responses/DatabaseError"
 
     post:
       tags:
@@ -359,12 +359,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VenueCreate'
+              $ref: "#/components/schemas/VenueCreate"
             example:
               name: The Basement
               address: 456 Underground Ave
       responses:
-        '201':
+        "201":
           description: Venue successfully created
           content:
             application/json:
@@ -375,27 +375,27 @@ paths:
                     type: boolean
                     example: true
                   venue:
-                    $ref: '#/components/schemas/Venue'
-        '400':
+                    $ref: "#/components/schemas/Venue"
+        "400":
           description: Validation error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: Validation error
                 message: Venue name is required
-        '409':
+        "409":
           description: Venue name already exists
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: Conflict
                 message: A venue with this name already exists
-        '500':
-          $ref: '#/components/responses/DatabaseError'
+        "500":
+          $ref: "#/components/responses/DatabaseError"
 
   /api/admin/bands:
     get:
@@ -415,7 +415,7 @@ paths:
             type: integer
             example: 1
       responses:
-        '200':
+        "200":
           description: Bands successfully retrieved
           content:
             application/json:
@@ -425,30 +425,30 @@ paths:
                   bands:
                     type: array
                     items:
-                      $ref: '#/components/schemas/BandWithDetails'
+                      $ref: "#/components/schemas/BandWithDetails"
               example:
                 bands:
                   - id: 1
                     event_id: 1
                     venue_id: 1
                     name: The Strokes
-                    start_time: '20:00'
-                    end_time: '21:00'
+                    start_time: "20:00"
+                    end_time: "21:00"
                     url: https://thestrokes.com
-                    created_at: '2025-01-15T10:30:00Z'
+                    created_at: "2025-01-15T10:30:00Z"
                     venue_name: Room 47
                     event_name: Long Weekend Band Crawl Vol. 5
-        '400':
+        "400":
           description: Missing event_id parameter
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: Bad request
                 message: event_id parameter is required
-        '500':
-          $ref: '#/components/responses/DatabaseError'
+        "500":
+          $ref: "#/components/responses/DatabaseError"
 
     post:
       tags:
@@ -473,16 +473,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BandCreate'
+              $ref: "#/components/schemas/BandCreate"
             example:
               eventId: 1
               venueId: 1
               name: The Strokes
-              startTime: '20:00'
-              endTime: '21:00'
+              startTime: "20:00"
+              endTime: "21:00"
               url: https://thestrokes.com
       responses:
-        '201':
+        "201":
           description: Band successfully created
           content:
             application/json:
@@ -493,11 +493,11 @@ paths:
                     type: boolean
                     example: true
                   band:
-                    $ref: '#/components/schemas/Band'
+                    $ref: "#/components/schemas/Band"
                   conflicts:
                     type: array
                     items:
-                      $ref: '#/components/schemas/BandConflict'
+                      $ref: "#/components/schemas/BandConflict"
                     description: Present only if conflicts exist
                   warning:
                     type: string
@@ -512,10 +512,10 @@ paths:
                       event_id: 1
                       venue_id: 1
                       name: The Strokes
-                      start_time: '20:00'
-                      end_time: '21:00'
+                      start_time: "20:00"
+                      end_time: "21:00"
                       url: https://thestrokes.com
-                      created_at: '2025-01-15T10:30:00Z'
+                      created_at: "2025-01-15T10:30:00Z"
                 withConflicts:
                   value:
                     success: true
@@ -524,22 +524,22 @@ paths:
                       event_id: 1
                       venue_id: 1
                       name: Arctic Monkeys
-                      start_time: '20:30'
-                      end_time: '21:30'
+                      start_time: "20:30"
+                      end_time: "21:30"
                       url: null
-                      created_at: '2025-01-15T11:00:00Z'
+                      created_at: "2025-01-15T11:00:00Z"
                     conflicts:
                       - id: 1
                         name: The Strokes
-                        startTime: '20:00'
-                        endTime: '21:00'
+                        startTime: "20:00"
+                        endTime: "21:00"
                     warning: This band overlaps with 1 other band(s) at the same venue
-        '400':
+        "400":
           description: Validation error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               examples:
                 missingFields:
                   value:
@@ -553,12 +553,12 @@ paths:
                   value:
                     error: Validation error
                     message: End time must be after start time
-        '404':
+        "404":
           description: Event or venue not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               examples:
                 eventNotFound:
                   value:
@@ -568,8 +568,8 @@ paths:
                   value:
                     error: Not found
                     message: Venue not found
-        '500':
-          $ref: '#/components/responses/DatabaseError'
+        "500":
+          $ref: "#/components/responses/DatabaseError"
 
 components:
   securitySchemes:
@@ -613,17 +613,17 @@ components:
           type: string
           format: date
           description: Event date (YYYY-MM-DD)
-          example: '2025-06-14'
+          example: "2025-06-14"
         startTime:
           type: string
           pattern: '^\d{2}:\d{2}$'
           description: Start time (HH:MM, 24-hour format)
-          example: '20:00'
+          example: "20:00"
         endTime:
           type: string
           pattern: '^\d{2}:\d{2}$'
           description: End time (HH:MM, 24-hour format)
-          example: '21:00'
+          example: "21:00"
         url:
           type: string
           format: uri
@@ -653,10 +653,10 @@ components:
           type: string
           format: date
           description: Event date (YYYY-MM-DD)
-          example: '2025-06-14'
+          example: "2025-06-14"
         slug:
           type: string
-          pattern: '^[a-z0-9-]+$'
+          pattern: "^[a-z0-9-]+$"
           description: URL-friendly identifier (lowercase, numbers, hyphens only)
           example: vol-5
         is_published:
@@ -668,7 +668,7 @@ components:
           type: string
           format: date-time
           description: Creation timestamp (ISO 8601)
-          example: '2025-01-15T10:30:00Z'
+          example: "2025-01-15T10:30:00Z"
         band_count:
           type: integer
           description: Number of bands in this event (only in list responses)
@@ -690,10 +690,10 @@ components:
           format: date
           pattern: '^\d{4}-\d{2}-\d{2}$'
           description: Event date (YYYY-MM-DD)
-          example: '2025-12-20'
+          example: "2025-12-20"
         slug:
           type: string
-          pattern: '^[a-z0-9-]+$'
+          pattern: "^[a-z0-9-]+$"
           description: URL-friendly identifier (lowercase, numbers, hyphens only)
           example: vol-6
         isPublished:
@@ -771,12 +771,12 @@ components:
           type: string
           pattern: '^\d{2}:\d{2}$'
           description: Start time (HH:MM, 24-hour format)
-          example: '20:00'
+          example: "20:00"
         end_time:
           type: string
           pattern: '^\d{2}:\d{2}$'
           description: End time (HH:MM, 24-hour format)
-          example: '21:00'
+          example: "21:00"
         url:
           type: string
           format: uri
@@ -787,11 +787,11 @@ components:
           type: string
           format: date-time
           description: Creation timestamp (ISO 8601)
-          example: '2025-01-15T10:30:00Z'
+          example: "2025-01-15T10:30:00Z"
 
     BandWithDetails:
       allOf:
-        - $ref: '#/components/schemas/Band'
+        - $ref: "#/components/schemas/Band"
         - type: object
           required:
             - venue_name
@@ -831,12 +831,12 @@ components:
           type: string
           pattern: '^\d{2}:\d{2}$'
           description: Start time (HH:MM, 24-hour format)
-          example: '20:00'
+          example: "20:00"
         endTime:
           type: string
           pattern: '^\d{2}:\d{2}$'
           description: End time (HH:MM, 24-hour format, must be after startTime)
-          example: '21:00'
+          example: "21:00"
         url:
           type: string
           format: uri
@@ -864,12 +864,12 @@ components:
           type: string
           pattern: '^\d{2}:\d{2}$'
           description: Conflicting band's start time
-          example: '20:00'
+          example: "20:00"
         endTime:
           type: string
           pattern: '^\d{2}:\d{2}$'
           description: Conflicting band's end time
-          example: '21:00'
+          example: "21:00"
 
     Error:
       type: object
@@ -896,7 +896,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
           example:
             error: Database error
             message: Failed to fetch events

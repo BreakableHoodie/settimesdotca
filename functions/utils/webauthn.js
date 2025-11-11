@@ -5,13 +5,13 @@ import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
   generateAuthenticationOptions,
-  verifyAuthenticationResponse
-} from '@simplewebauthn/server'
+  verifyAuthenticationResponse,
+} from "@simplewebauthn/server";
 
 // WebAuthn configuration
-const RP_ID = 'localhost' // Change to your domain in production
-const RP_NAME = 'Concert Manager'
-const ORIGIN = 'http://localhost:5173' // Change to your origin in production
+const RP_ID = "localhost"; // Change to your domain in production
+const RP_NAME = "Concert Manager";
+const ORIGIN = "http://localhost:5173"; // Change to your origin in production
 
 /**
  * Generate WebAuthn registration options for a new passkey
@@ -20,26 +20,30 @@ const ORIGIN = 'http://localhost:5173' // Change to your origin in production
  * @param {Array} existingCredentials - Array of existing credential IDs
  * @returns {Object} Registration options for the client
  */
-export function generateWebAuthnRegistrationOptions(userEmail, userName, existingCredentials = []) {
+export function generateWebAuthnRegistrationOptions(
+  userEmail,
+  userName,
+  existingCredentials = [],
+) {
   return generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: RP_ID,
     userID: userEmail,
     userName: userName,
     userDisplayName: userName,
-    attestationType: 'none',
+    attestationType: "none",
     authenticatorSelection: {
-      authenticatorAttachment: 'platform', // Prefer platform authenticators (Touch ID, Windows Hello)
-      userVerification: 'preferred',
-      residentKey: 'preferred'
+      authenticatorAttachment: "platform", // Prefer platform authenticators (Touch ID, Windows Hello)
+      userVerification: "preferred",
+      residentKey: "preferred",
     },
-    excludeCredentials: existingCredentials.map(cred => ({
-      id: Buffer.from(cred.credential_id, 'base64'),
-      type: 'public-key',
-      transports: cred.transports || ['internal']
+    excludeCredentials: existingCredentials.map((cred) => ({
+      id: Buffer.from(cred.credential_id, "base64"),
+      type: "public-key",
+      transports: cred.transports || ["internal"],
     })),
-    supportedAlgorithmIDs: [-7, -257] // ES256 and RS256
-  })
+    supportedAlgorithmIDs: [-7, -257], // ES256 and RS256
+  });
 }
 
 /**
@@ -54,8 +58,8 @@ export function verifyWebAuthnRegistration(response, expectedChallenge) {
     expectedChallenge,
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
-    requireUserVerification: false
-  })
+    requireUserVerification: false,
+  });
 }
 
 /**
@@ -66,13 +70,13 @@ export function verifyWebAuthnRegistration(response, expectedChallenge) {
 export function generateWebAuthnAuthenticationOptions(allowedCredentials = []) {
   return generateAuthenticationOptions({
     rpID: RP_ID,
-    allowCredentials: allowedCredentials.map(cred => ({
-      id: Buffer.from(cred.credential_id, 'base64'),
-      type: 'public-key',
-      transports: cred.transports || ['internal']
+    allowCredentials: allowedCredentials.map((cred) => ({
+      id: Buffer.from(cred.credential_id, "base64"),
+      type: "public-key",
+      transports: cred.transports || ["internal"],
     })),
-    userVerification: 'preferred'
-  })
+    userVerification: "preferred",
+  });
 }
 
 /**
@@ -82,20 +86,24 @@ export function generateWebAuthnAuthenticationOptions(allowedCredentials = []) {
  * @param {Object} credential - Stored credential from database
  * @returns {Object} Verification result
  */
-export function verifyWebAuthnAuthentication(response, expectedChallenge, credential) {
+export function verifyWebAuthnAuthentication(
+  response,
+  expectedChallenge,
+  credential,
+) {
   return verifyAuthenticationResponse({
     response,
     expectedChallenge,
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
     authenticator: {
-      credentialID: Buffer.from(credential.credential_id, 'base64'),
-      credentialPublicKey: Buffer.from(credential.public_key, 'base64'),
+      credentialID: Buffer.from(credential.credential_id, "base64"),
+      credentialPublicKey: Buffer.from(credential.public_key, "base64"),
       counter: credential.counter,
-      transports: credential.transports || ['internal']
+      transports: credential.transports || ["internal"],
     },
-    requireUserVerification: false
-  })
+    requireUserVerification: false,
+  });
 }
 
 /**
@@ -103,6 +111,6 @@ export function verifyWebAuthnAuthentication(response, expectedChallenge, creden
  * @returns {string} Base64 encoded challenge
  */
 export function generateWebAuthnChallenge() {
-  const challenge = crypto.getRandomValues(new Uint8Array(32))
-  return Buffer.from(challenge).toString('base64')
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  return Buffer.from(challenge).toString("base64");
 }

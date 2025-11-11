@@ -17,7 +17,7 @@ async function checkConflicts(
   venueId,
   startTime,
   endTime,
-  excludeBandId = null
+  excludeBandId = null,
 ) {
   const conflicts = [];
 
@@ -76,7 +76,7 @@ export async function onRequestPut(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -93,7 +93,7 @@ export async function onRequestPut(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -107,7 +107,7 @@ export async function onRequestPut(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -120,7 +120,7 @@ export async function onRequestPut(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -134,7 +134,7 @@ export async function onRequestPut(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -142,7 +142,7 @@ export async function onRequestPut(context) {
     const band = await DB.prepare(
       `
       SELECT * FROM bands WHERE id = ?
-    `
+    `,
     )
       .bind(bandId)
       .first();
@@ -156,13 +156,13 @@ export async function onRequestPut(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     // Check for duplicate band name (excluding current band)
     const existingBand = await DB.prepare(
-      `SELECT id, name FROM bands WHERE LOWER(name) = LOWER(?) AND id != ?`
+      `SELECT id, name FROM bands WHERE LOWER(name) = LOWER(?) AND id != ?`,
     )
       .bind(name, bandId)
       .first();
@@ -176,7 +176,7 @@ export async function onRequestPut(context) {
         {
           status: 409, // Conflict
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -184,7 +184,7 @@ export async function onRequestPut(context) {
     const venue = await DB.prepare(
       `
       SELECT id FROM venues WHERE id = ?
-    `
+    `,
     )
       .bind(venueId)
       .first();
@@ -198,7 +198,7 @@ export async function onRequestPut(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -209,7 +209,7 @@ export async function onRequestPut(context) {
       venueId,
       startTime,
       endTime,
-      bandId
+      bandId,
     );
 
     // Update band
@@ -219,7 +219,7 @@ export async function onRequestPut(context) {
       SET venue_id = ?, name = ?, start_time = ?, end_time = ?, url = ?
       WHERE id = ?
       RETURNING *
-    `
+    `,
     )
       .bind(venueId, name, startTime, endTime, url || null, bandId)
       .first();
@@ -237,7 +237,7 @@ export async function onRequestPut(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error updating band:", error);
@@ -250,7 +250,7 @@ export async function onRequestPut(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -272,7 +272,7 @@ export async function onRequestDelete(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -280,7 +280,7 @@ export async function onRequestDelete(context) {
     const band = await DB.prepare(
       `
       SELECT * FROM bands WHERE id = ?
-    `
+    `,
     )
       .bind(bandId)
       .first();
@@ -294,7 +294,7 @@ export async function onRequestDelete(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -302,7 +302,7 @@ export async function onRequestDelete(context) {
     await DB.prepare(
       `
       DELETE FROM bands WHERE id = ?
-    `
+    `,
     )
       .bind(bandId)
       .run();
@@ -315,7 +315,7 @@ export async function onRequestDelete(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error deleting band:", error);
@@ -328,7 +328,7 @@ export async function onRequestDelete(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

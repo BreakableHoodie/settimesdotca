@@ -27,6 +27,7 @@ This directory contains historical documents that have been superseded or comple
 ## Reference Docs (Historical)
 
 See `reference/` subdirectory:
+
 - **FAN_FIRST_SPEC.md** - Early product spec
 - **RBAC_MODEL.md** - Initial RBAC design thoughts
 

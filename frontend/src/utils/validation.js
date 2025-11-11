@@ -8,7 +8,7 @@
  */
 export function sanitizeString(input) {
   if (!input) return ''
-  
+
   return String(input)
     .trim()
     .replace(/[<>]/g, '') // Remove < and > to prevent HTML injection
@@ -24,16 +24,16 @@ export function sanitizeString(input) {
  */
 export function validateUrl(url) {
   if (!url) return null
-  
+
   const sanitized = sanitizeString(url)
   if (!sanitized) return null
-  
+
   // Must start with http:// or https://
   if (!sanitized.match(/^https?:\/\//i)) {
     // Auto-add https:// if missing
     return `https://${sanitized}`
   }
-  
+
   return sanitized
 }
 
@@ -110,7 +110,7 @@ export function validateSlug(slug) {
  */
 export function sanitizeVenueAddress(address) {
   if (!address) return ''
-  
+
   return String(address)
     .trim()
     .replace(/[<>]/g, '') // Remove HTML tags
@@ -138,7 +138,7 @@ export function validateBandsData(data) {
   if (!Array.isArray(data)) {
     return { valid: false, error: 'Bands data must be an array' }
   }
-  
+
   for (const band of data) {
     if (!band.name || typeof band.name !== 'string') {
       return { valid: false, error: 'Each band must have a name string' }
@@ -156,6 +156,6 @@ export function validateBandsData(data) {
       return { valid: false, error: 'Each band must have an endTime string' }
     }
   }
-  
+
   return { valid: true }
 }

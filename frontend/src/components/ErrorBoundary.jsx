@@ -25,7 +25,7 @@ class ErrorBoundary extends Component {
 
     this.setState({
       error,
-      errorInfo
+      errorInfo,
     })
 
     // Could send to error tracking service (Sentry, etc.)
@@ -44,9 +44,7 @@ class ErrorBoundary extends Component {
         <div className="min-h-screen bg-band-navy flex items-center justify-center px-4">
           <div className="max-w-lg w-full bg-band-purple rounded-xl border-2 border-red-500/30 p-8 text-center">
             <div className="text-6xl mb-4">⚠️</div>
-            <h1 className="text-3xl font-bold text-white mb-4">
-              {this.props.title || 'Something went wrong'}
-            </h1>
+            <h1 className="text-3xl font-bold text-white mb-4">{this.props.title || 'Something went wrong'}</h1>
             <p className="text-white/70 mb-6">
               {this.props.message || 'The application encountered an unexpected error. Please try refreshing the page.'}
             </p>
@@ -60,9 +58,7 @@ class ErrorBoundary extends Component {
                 <div className="bg-band-navy p-4 rounded text-sm text-white/80 overflow-auto max-h-60">
                   <p className="font-mono text-red-400 mb-2">{this.state.error.toString()}</p>
                   {this.state.errorInfo && (
-                    <pre className="text-xs whitespace-pre-wrap">
-                      {this.state.errorInfo.componentStack}
-                    </pre>
+                    <pre className="text-xs whitespace-pre-wrap">{this.state.errorInfo.componentStack}</pre>
                   )}
                 </div>
               </details>

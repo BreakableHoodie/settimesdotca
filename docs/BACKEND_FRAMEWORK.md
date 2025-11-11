@@ -27,13 +27,13 @@
 
 ### Technology Stack
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Runtime** | Cloudflare Workers | Edge computing, global distribution |
-| **Database** | Cloudflare D1 (SQLite) | Structured data, ACID compliance |
-| **Frontend** | React + Vite | SPA, mobile-first UI |
-| **Deployment** | Cloudflare Pages | Static hosting + serverless functions |
-| **Version Control** | Git (main/dev branches) | Code management |
+| Layer               | Technology              | Purpose                               |
+| ------------------- | ----------------------- | ------------------------------------- |
+| **Runtime**         | Cloudflare Workers      | Edge computing, global distribution   |
+| **Database**        | Cloudflare D1 (SQLite)  | Structured data, ACID compliance      |
+| **Frontend**        | React + Vite            | SPA, mobile-first UI                  |
+| **Deployment**      | Cloudflare Pages        | Static hosting + serverless functions |
+| **Version Control** | Git (main/dev branches) | Code management                       |
 
 ### Data Model
 
@@ -103,16 +103,19 @@
 ### Architectural Gaps (Prioritized for Non-Technical Users)
 
 🔴 **CRITICAL:**
+
 - **No event cloning** - Can't duplicate events (wastes hours per event)
 - **No visual bulk ops** - Must edit bands one by one (tedious with 50+ bands)
 - **Form-heavy workflows** - Multi-step forms slow down non-technical users
 
 ⚠️ **IMPORTANT:**
+
 - **No mobile admin** - Desktop-only limits when/where work can happen
 - **No image upload** - Event posters must be hosted externally
 - **No preview mode** - Can't see attendee view before publishing
 
 ⚡ **NICE-TO-HAVE:**
+
 - **No versioning** - API breaking changes would affect all clients
 - **No archival** - Old events accumulate without cleanup strategy
 - **No analytics** - No insights into popular bands or venue conflicts
@@ -135,15 +138,18 @@
 ### Frequency Impact (4-5 Events/Year)
 
 **Time Pressure:** With events every 2-3 months, setup must be fast
+
 - **Critical:** Event cloning (copy Vol. 5 → Vol. 6 in minutes)
 - **Critical:** Visual bulk operations (no CSV uploads)
 - **Critical:** Mobile admin (work from anywhere)
 
 **Venue Reuse:** Same venues used repeatedly
+
 - Design: Shared venues table (don't duplicate)
 - Benefit: Change venue address once, applies to all events
 
 **Skill Level:** Non-technical organizers managing frequent events
+
 - Design: No file uploads, no command line, no technical documentation
 - Benefit: Anyone can manage events without training
 
@@ -233,13 +239,13 @@ ORDER BY date DESC;
 
 ### 1. RESTful API Design
 
-| Method | Endpoint | Purpose | Auth |
-|--------|----------|---------|------|
-| `GET` | `/api/schedule?event={slug}` | Fetch schedule | Public |
-| `GET` | `/api/admin/events` | List all events | Admin |
-| `POST` | `/api/admin/events` | Create event | Admin |
-| `PUT` | `/api/admin/events/{id}` | Update event | Admin |
-| `DELETE` | `/api/admin/events/{id}` | Delete event | Admin |
+| Method   | Endpoint                     | Purpose         | Auth   |
+| -------- | ---------------------------- | --------------- | ------ |
+| `GET`    | `/api/schedule?event={slug}` | Fetch schedule  | Public |
+| `GET`    | `/api/admin/events`          | List all events | Admin  |
+| `POST`   | `/api/admin/events`          | Create event    | Admin  |
+| `PUT`    | `/api/admin/events/{id}`     | Update event    | Admin  |
+| `DELETE` | `/api/admin/events/{id}`     | Delete event    | Admin  |
 
 **Response Format:**
 
@@ -533,28 +539,40 @@ wrangler d1 execute bandcrawl-db --file=migration.sql
 export async function onSchedule(event) {
   const { env } = event;
   const cutoffDate = new Date();
-  cutoffDate.setFullYear(cutoffDate.getFullYear() - 2);  // 2 years ago
+  cutoffDate.setFullYear(cutoffDate.getFullYear() - 2); // 2 years ago
 
   // Archive old events
-  await env.DB.prepare(`
+  await env.DB.prepare(
+    `
     UPDATE events
     SET archived_at = datetime('now')
     WHERE date < ? AND archived_at IS NULL
-  `).bind(cutoffDate.toISOString()).run();
+  `,
+  )
+    .bind(cutoffDate.toISOString())
+    .run();
 
   // Delete old rate limit records
-  await env.DB.prepare(`
+  await env.DB.prepare(
+    `
     DELETE FROM rate_limit
     WHERE last_attempt < ?
-  `).bind(cutoffDate.toISOString()).run();
+  `,
+  )
+    .bind(cutoffDate.toISOString())
+    .run();
 
   // Trim audit log (keep 1 year)
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-  await env.DB.prepare(`
+  await env.DB.prepare(
+    `
     DELETE FROM auth_audit
     WHERE timestamp < ?
-  `).bind(oneYearAgo.toISOString()).run();
+  `,
+  )
+    .bind(oneYearAgo.toISOString())
+    .run();
 }
 ```
 
@@ -818,12 +836,12 @@ test('filters conflicts correctly', () => {
 
 ```javascript
 // tests/admin.spec.js
-test('admin can create event', async ({ page }) => {
-  await page.goto('/admin');
-  await page.fill('input[name=password]', 'test-password');
+test("admin can create event", async ({ page }) => {
+  await page.goto("/admin");
+  await page.fill("input[name=password]", "test-password");
   await page.click('button:text("Login")');
-  await page.click('text=Events');
-  await page.click('text=Create New Event');
+  await page.click("text=Events");
+  await page.click("text=Create New Event");
   // ...
 });
 ```
@@ -832,8 +850,8 @@ test('admin can create event', async ({ page }) => {
 
 ```javascript
 // tests/api/schedule.test.js
-test('GET /api/schedule returns current event', async () => {
-  const response = await fetch('/api/schedule?event=current');
+test("GET /api/schedule returns current event", async () => {
+  const response = await fetch("/api/schedule?event=current");
   expect(response.status).toBe(200);
   const data = await response.json();
   expect(data).toHaveLength(50);

@@ -117,20 +117,20 @@ export function formatEventState(eventDate) {
       label: 'Upcoming Event',
       color: 'green',
       emoji: '📅',
-      description: 'Event has not started yet'
+      description: 'Event has not started yet',
     },
     recently_completed: {
       label: 'Grace Period',
       color: 'yellow',
       emoji: '⏰',
-      description: `${getGracePeriodHoursRemaining(eventDate)}h remaining to make edits`
+      description: `${getGracePeriodHoursRemaining(eventDate)}h remaining to make edits`,
     },
     archived: {
       label: 'Archived Event',
       color: 'gray',
       emoji: '🗄️',
-      description: `Ended ${getDaysSinceEvent(eventDate)} days ago`
-    }
+      description: `Ended ${getDaysSinceEvent(eventDate)} days ago`,
+    },
   }
 
   return stateInfo[state]
@@ -155,7 +155,7 @@ export function validateEventAction(eventDate, action) {
   if (state === 'recently_completed') {
     return {
       allowed: true,
-      reason: `Grace period (${getGracePeriodHoursRemaining(eventDate)}h remaining)`
+      reason: `Grace period (${getGracePeriodHoursRemaining(eventDate)}h remaining)`,
     }
   }
 
@@ -166,7 +166,7 @@ export function validateEventAction(eventDate, action) {
     if (restrictedActions.includes(action)) {
       return {
         allowed: false,
-        reason: `Event archived ${getDaysSinceEvent(eventDate)} days ago. Use "Copy as Template" instead.`
+        reason: `Event archived ${getDaysSinceEvent(eventDate)} days ago. Use "Copy as Template" instead.`,
       }
     }
 

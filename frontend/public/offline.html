@@ -1,57 +1,60 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Offline - Schedule App</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      text-align: center;
-    }
-    .container {
-      max-width: 400px;
-      padding: 2rem;
-    }
-    h1 {
-      font-size: 3rem;
-      margin: 0 0 1rem 0;
-    }
-    p {
-      font-size: 1.125rem;
-      line-height: 1.6;
-      margin: 0 0 2rem 0;
-      opacity: 0.9;
-    }
-    button {
-      background: #ff6b35;
-      color: white;
-      border: none;
-      padding: 1rem 2rem;
-      font-size: 1rem;
-      border-radius: 0.5rem;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    button:hover {
-      background: #ff8555;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>📡</h1>
-    <h2>You're Offline</h2>
-    <p>This page isn't cached yet. Check your connection and try again.</p>
-    <button onclick="window.location.reload()">Retry</button>
-  </div>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline - Schedule App</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        text-align: center;
+      }
+      .container {
+        max-width: 400px;
+        padding: 2rem;
+      }
+      h1 {
+        font-size: 3rem;
+        margin: 0 0 1rem 0;
+      }
+      p {
+        font-size: 1.125rem;
+        line-height: 1.6;
+        margin: 0 0 2rem 0;
+        opacity: 0.9;
+      }
+      button {
+        background: #ff6b35;
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        font-size: 1rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:hover {
+        background: #ff8555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📡</h1>
+      <h2>You're Offline</h2>
+      <p>This page isn't cached yet. Check your connection and try again.</p>
+      <button onclick="window.location.reload()">Retry</button>
+    </div>
+  </body>
 </html>

@@ -30,7 +30,9 @@ function BasicsStep({ eventData, onChange }) {
       <h3 className="text-xl font-bold text-white mb-4">Event Basics</h3>
 
       <div>
-        <label htmlFor="event-name" className="block text-white mb-2 text-sm">Event Name *</label>
+        <label htmlFor="event-name" className="block text-white mb-2 text-sm">
+          Event Name *
+        </label>
         <input
           id="event-name"
           type="text"
@@ -43,7 +45,9 @@ function BasicsStep({ eventData, onChange }) {
       </div>
 
       <div>
-        <label htmlFor="event-date" className="block text-white mb-2 text-sm">Event Date *</label>
+        <label htmlFor="event-date" className="block text-white mb-2 text-sm">
+          Event Date *
+        </label>
         <input
           id="event-date"
           type="date"
@@ -55,7 +59,9 @@ function BasicsStep({ eventData, onChange }) {
       </div>
 
       <div>
-        <label htmlFor="event-slug" className="block text-white mb-2 text-sm">URL Slug *</label>
+        <label htmlFor="event-slug" className="block text-white mb-2 text-sm">
+          URL Slug *
+        </label>
         <input
           id="event-slug"
           type="text"
@@ -69,7 +75,9 @@ function BasicsStep({ eventData, onChange }) {
       </div>
 
       <div>
-        <label htmlFor="event-description" className="block text-white mb-2 text-sm">Description</label>
+        <label htmlFor="event-description" className="block text-white mb-2 text-sm">
+          Description
+        </label>
         <textarea
           id="event-description"
           value={eventData.description}

@@ -19,8 +19,8 @@ export async function onRequestPatch(context) {
       const statements = band_ids.map((id) =>
         env.DB.prepare("UPDATE bands SET venue_id = ? WHERE id = ?").bind(
           venue_id,
-          id
-        )
+          id,
+        ),
       );
 
       result = await env.DB.batch(statements);
@@ -36,15 +36,15 @@ export async function onRequestPatch(context) {
               end_time = datetime(?, '+' ||
                 (strftime('%s', end_time) - strftime('%s', start_time)) || ' seconds')
           WHERE id = ?
-        `
-        ).bind(start_time, start_time, id)
+        `,
+        ).bind(start_time, start_time, id),
       );
 
       result = await env.DB.batch(statements);
     } else if (action === "delete") {
       const placeholders = band_ids.map(() => "?").join(",");
       result = await env.DB.prepare(
-        `DELETE FROM bands WHERE id IN (${placeholders})`
+        `DELETE FROM bands WHERE id IN (${placeholders})`,
       )
         .bind(...band_ids)
         .run();
@@ -58,19 +58,19 @@ export async function onRequestPatch(context) {
       }),
       {
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Bulk operation failed:", error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Database operation failed"
+        error: "Database operation failed",
       }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

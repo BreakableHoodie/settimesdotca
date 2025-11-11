@@ -10,10 +10,10 @@ export default defineConfig({
 
     terserOptions: {
       compress: {
-        drop_console: true,        // Remove console.log in production
-        drop_debugger: true,        // Remove debugger statements
-        pure_funcs: ['console.info', 'console.debug']
-      }
+        drop_console: true, // Remove console.log in production
+        drop_debugger: true, // Remove debugger statements
+        pure_funcs: ['console.info', 'console.debug'],
+      },
     },
 
     rollupOptions: {
@@ -24,22 +24,18 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
 
           // Admin panel (lazy loaded)
-          admin: [
-            './src/admin/AdminPanel.jsx',
-            './src/admin/BandsTab.jsx',
-            './src/admin/EventsTab.jsx'
-          ]
-        }
-      }
+          admin: ['./src/admin/AdminPanel.jsx', './src/admin/BandsTab.jsx', './src/admin/EventsTab.jsx'],
+        },
+      },
     },
 
     // Warnings for large chunks
-    chunkSizeWarningLimit: 100 // KB
+    chunkSizeWarningLimit: 100, // KB
   },
 
   // Production optimizations
   esbuild: {
-    drop: ['console', 'debugger']
+    drop: ['console', 'debugger'],
   },
 
   server: {

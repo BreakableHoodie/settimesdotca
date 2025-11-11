@@ -596,15 +596,15 @@
 
 ### When to Use Each MCP Server
 
-| Task | Tool | Reason |
-|------|------|--------|
-| Research best practices | Tavily MCP | Real-time web search |
-| Complex design decisions | Sequential MCP | Multi-step reasoning |
-| Official Cloudflare docs | Context7 MCP | Curated documentation |
-| Bulk refactoring | Morphllm MCP | Pattern-based edits |
-| Symbol operations | Serena MCP | Semantic understanding |
-| Browser testing | Playwright MCP | E2E validation |
-| Session persistence | Serena MCP | Project memory |
+| Task                     | Tool           | Reason                 |
+| ------------------------ | -------------- | ---------------------- |
+| Research best practices  | Tavily MCP     | Real-time web search   |
+| Complex design decisions | Sequential MCP | Multi-step reasoning   |
+| Official Cloudflare docs | Context7 MCP   | Curated documentation  |
+| Bulk refactoring         | Morphllm MCP   | Pattern-based edits    |
+| Symbol operations        | Serena MCP     | Semantic understanding |
+| Browser testing          | Playwright MCP | E2E validation         |
+| Session persistence      | Serena MCP     | Project memory         |
 
 ### Workflow Examples
 

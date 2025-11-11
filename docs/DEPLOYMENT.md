@@ -18,7 +18,6 @@ No environment variables required for this static build.
 ### Step-by-Step Deployment
 
 1. **Connect Repository to Cloudflare Pages**
-
    - Log in to Cloudflare Dashboard
    - Go to Pages → Create a project
    - Connect your GitHub account
@@ -35,7 +34,6 @@ No environment variables required for this static build.
    ```
 
 3. **Configure Custom Domain**
-
    - After initial deployment, go to Pages → Your Project → Custom domains
    - Add custom domain: `lwbc.dredre.net`
    - Follow DNS configuration instructions (likely a CNAME record)

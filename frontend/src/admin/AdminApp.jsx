@@ -4,6 +4,7 @@ import AdminLogin from './AdminLogin'
 import SignupPage from './SignupPage'
 import AdminPanel from './AdminPanel'
 import { authApi } from '../utils/adminApi'
+import { EventProvider } from '../contexts/EventContext'
 
 /**
  * AdminApp - Root component for the admin interface
@@ -15,6 +16,7 @@ import { authApi } from '../utils/adminApi'
  * - Import this component and render it at your /admin/* route
  * - Authentication state persists via sessionStorage
  * - Automatically checks for existing session on mount
+ * - Wraps AdminPanel with EventProvider for event context management
  */
 export default function AdminApp() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -62,7 +64,15 @@ export default function AdminApp() {
       <Route path="signup" element={isAuthenticated ? <Navigate to="/admin" replace /> : <SignupPage />} />
       <Route
         path="*"
-        element={isAuthenticated ? <AdminPanel onLogout={handleLogout} /> : <Navigate to="/admin/login" replace />}
+        element={
+          isAuthenticated ? (
+            <EventProvider>
+              <AdminPanel onLogout={handleLogout} />
+            </EventProvider>
+          ) : (
+            <Navigate to="/admin/login" replace />
+          )
+        }
       />
     </Routes>
   )

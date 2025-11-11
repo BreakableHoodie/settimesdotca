@@ -18,6 +18,11 @@ export function measurePageLoad() {
     window[LISTENER_ADDED] = 'executed'
     
     setTimeout(() => {
+      // Double-check DEV mode before logging (in case import.meta.env changes)
+      if (!import.meta.env.DEV) {
+        return
+      }
+      
       // Use modern Navigation Timing Level 2 API
       const navEntries = performance.getEntriesByType('navigation')
       if (navEntries.length === 0) {

@@ -380,6 +380,13 @@ describe('Performance Utilities - Console Logging', () => {
     beforeEach(() => {
       // Mock production environment BEFORE importing module
       vi.stubGlobal('import.meta', { env: { DEV: false } })
+      
+      // Clear the listener flag on window to ensure fresh state
+      const LISTENER_ADDED = Symbol.for('performanceListenerAdded')
+      if (window[LISTENER_ADDED]) {
+        delete window[LISTENER_ADDED]
+      }
+      
       vi.resetModules()
     })
 

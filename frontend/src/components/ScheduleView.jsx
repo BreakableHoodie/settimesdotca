@@ -74,7 +74,8 @@ function ScheduleView({
         await navigator.clipboard.writeText(text)
         return true
       }
-    } catch {
+    } catch (error) {
+      console.error('Clipboard API failed, using fallback:', error)
       /* fallback below */
     }
 
@@ -95,7 +96,8 @@ function ScheduleView({
         selection.addRange(originalRange)
       }
       return successful
-    } catch {
+    } catch (error) {
+      console.error('Fallback copy method failed:', error)
       return false
     }
   }

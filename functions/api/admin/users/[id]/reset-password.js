@@ -102,13 +102,16 @@ export async function onRequestPost(context) {
     ).run()
 
     // TODO: Send email to user with reset link
-    // For now, return the token (in production, this should be sent via email)
-    const resetUrl = `${env.PUBLIC_URL}/reset-password?token=${resetToken}`
+    // const resetUrl = `${env.PUBLIC_URL}/reset-password?token=${resetToken}`
+    // await sendEmail({
+    //   to: targetUser.email,
+    //   subject: 'Password Reset Request',
+    //   html: `<p>Click here to reset your password (valid for 24 hours): <a href="${resetUrl}">${resetUrl}</a></p>`
+    // })
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Password reset initiated for ${targetUser.email}`,
-      resetUrl: resetUrl, // Remove this in production - only for development
+      message: `Password reset email would be sent to ${targetUser.email}`,
       expiresAt: expiresAt
     }), {
       status: 200,

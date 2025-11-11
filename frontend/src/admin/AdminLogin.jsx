@@ -45,7 +45,8 @@ export default function AdminLogin({ onLoginSuccess }) {
         } else {
           setError(err.message)
         }
-      } catch {
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError)
         setError(err.message)
       }
     } finally {

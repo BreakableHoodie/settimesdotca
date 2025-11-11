@@ -132,6 +132,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
 
   const hiddenFinishedCount = sortedBands.length - visibleBands.length
 
+  // Find first highlighted band ID (only show reminder for the first one)
+  const firstHighlightedBandId = useMemo(() => {
+    return visibleBands.find(band => highlightedBandIds.has(band.id))?.id || null
+  }, [visibleBands, highlightedBandIds])
+
   // Detect overlaps and conflicts
   const conflicts = []
   const overlaps = []
@@ -272,7 +277,8 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
         await navigator.clipboard.writeText(text)
         return true
       }
-    } catch {
+    } catch (error) {
+      console.error('Clipboard API failed, using fallback:', error)
       /* fallback below */
     }
 
@@ -293,12 +299,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
         selection.addRange(originalRange)
       }
       return successful
-    } catch {
+    } catch (error) {
+      console.error('Fallback copy method failed:', error)
       return false
     }
   }
-
-  let dreReminderPlaced = false
 
   return (
     <div className="py-6 space-y-6 sm:space-y-8">
@@ -423,11 +428,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           const hasConflict = conflicts.some(c => c.band1 === band.id || c.band2 === band.id)
           const hasOverlap = overlaps.some(c => c.band1 === band.id || c.band2 === band.id)
           const travelWarning = travelWarnings[band.id]
-          const showDreReminder = !dreReminderPlaced && highlightedBandIds.has(band.id)
-          if (showDreReminder) {
-            // eslint-disable-next-line react-hooks/immutability
-            dreReminderPlaced = true
-          }
+          const showDreReminder = band.id === firstHighlightedBandId
 
           // Calculate gap from previous band
           let timeGap = null

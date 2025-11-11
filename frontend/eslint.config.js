@@ -55,6 +55,8 @@ export default [
         Array: 'readonly',
         AbortController: 'readonly',
         URL: 'readonly',
+        Event: 'readonly',
+        CustomEvent: 'readonly',
         vi: 'readonly',
         global: 'readonly',
         process: 'readonly',

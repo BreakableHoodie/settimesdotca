@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
       FROM events e
       LEFT JOIN bands b ON b.event_id = e.id
       LEFT JOIN venues v ON v.id IN (SELECT DISTINCT venue_id FROM bands WHERE event_id = e.id)
-      WHERE e.published = 1
+      WHERE e.is_published = 1
     `
 
     const params = []
@@ -36,6 +36,16 @@ export async function onRequestGet(context) {
     if (city !== 'all') {
       query += ` AND LOWER(e.city) = LOWER(?)`
       params.push(city)
+    }
+
+    // Filter by genre (optimized to avoid N+1 queries)
+    if (genre !== 'all') {
+      query += ` AND EXISTS (
+        SELECT 1 FROM bands
+        WHERE bands.event_id = e.id
+        AND LOWER(bands.genre) = LOWER(?)
+      )`
+      params.push(genre)
     }
 
     // Filter by upcoming (future events only)
@@ -50,28 +60,8 @@ export async function onRequestGet(context) {
     `
     params.push(limit)
 
-    // Execute query
-    const { results: events } = await env.DB.prepare(query).bind(...params).all()
-
-    // For each event, get bands if genre filter is specified
-    let filteredEvents = events
-
-    if (genre !== 'all') {
-      filteredEvents = []
-
-      for (const event of events) {
-        // Check if event has bands matching genre
-        const { results: bands } = await env.DB.prepare(`
-          SELECT COUNT(*) as count
-          FROM bands
-          WHERE event_id = ? AND LOWER(genre) = LOWER(?)
-        `).bind(event.id, genre).all()
-
-        if (bands[0].count > 0) {
-          filteredEvents.push(event)
-        }
-      }
-    }
+    // Execute query (single query, no N+1 problem)
+    const { results: filteredEvents } = await env.DB.prepare(query).bind(...params).all()
 
     // Return JSON
     return new Response(JSON.stringify({

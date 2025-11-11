@@ -2,14 +2,30 @@
 // Handles CORS, error handling, and common headers
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
+
+  // Allowed origins for CORS (production and development)
+  const ALLOWED_ORIGINS = [
+    'https://lwbc.dredre.net',
+    'https://dev.longweekend-bandcrawl.pages.dev',
+    'https://longweekend-bandcrawl.pages.dev',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000'
+  ];
+
+  // Check if origin is allowed
+  const origin = request.headers.get('Origin');
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
 
   // Add CORS headers for API requests
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Admin-Password",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Credentials": "true",
   };
 
   // Handle preflight requests
@@ -40,8 +56,7 @@ export async function onRequest(context) {
 
     return new Response(
       JSON.stringify({
-        error: "Internal server error",
-        message: error.message,
+        error: "Internal server error"
       }),
       {
         status: 500,

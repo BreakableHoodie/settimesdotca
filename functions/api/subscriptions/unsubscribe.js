@@ -1,6 +1,18 @@
 // Unsubscribe endpoint
 // GET /api/subscriptions/unsubscribe?token=xxx
 
+// HTML escape function to prevent XSS
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }
+  return text.replace(/[&<>"']/g, m => map[m])
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context
   const url = new URL(request.url)
@@ -66,8 +78,8 @@ export async function onRequestGet(context) {
         <body>
           <div class="container">
             <h1>✓ Unsubscribed</h1>
-            <p>You've been removed from ${subscription.city} ${subscription.genre} show notifications.</p>
-            <p>You can resubscribe anytime at <a href="${env.PUBLIC_URL}/subscribe" style="color: #ff6b35;">${env.PUBLIC_URL}/subscribe</a></p>
+            <p>You've been removed from ${escapeHtml(subscription.city)} ${escapeHtml(subscription.genre)} show notifications.</p>
+            <p>You can resubscribe anytime at <a href="${escapeHtml(env.PUBLIC_URL)}/subscribe" style="color: #ff6b35;">${escapeHtml(env.PUBLIC_URL)}/subscribe</a></p>
           </div>
         </body>
       </html>

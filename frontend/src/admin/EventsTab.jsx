@@ -468,8 +468,8 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                 <div className="space-y-4">
                   {sortedVenues.map(venueName => (
                     <div key={venueName} className="bg-band-navy/30 rounded-lg border border-band-orange/10">
-                      <h4 
-                        className="px-4 py-3 text-base font-semibold text-band-orange border-b border-band-orange/20 cursor-pointer hover:bg-band-navy/20 transition-colors"
+                      <button
+                        className="w-full px-4 py-3 text-base font-semibold text-band-orange border-b border-band-orange/20 cursor-pointer hover:bg-band-navy/20 transition-colors text-left"
                         onClick={() => {
                           // Find venue ID from eventBands
                           const venue = eventBands.find(b => b.venue_name === venueName)
@@ -483,7 +483,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                         title="View venue profile"
                       >
                         {venueName}
-                      </h4>
+                      </button>
                       <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead className="bg-band-navy/20">

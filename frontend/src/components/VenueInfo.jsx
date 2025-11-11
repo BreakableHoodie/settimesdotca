@@ -3,9 +3,24 @@ import { faLocationDot, faTicket } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
 function VenueInfo({ eventData }) {
-  // Parse event venue info and social links from JSON
-  const venues = eventData?.venue_info ? JSON.parse(eventData.venue_info) : []
-  const socialLinks = eventData?.social_links ? JSON.parse(eventData.social_links) : {}
+  // Parse event venue info and social links from JSON with error handling
+  let venues = []
+  let socialLinks = {}
+
+  try {
+    venues = eventData?.venue_info ? JSON.parse(eventData.venue_info) : []
+  } catch (error) {
+    console.error('Failed to parse venue_info JSON:', error)
+    venues = []
+  }
+
+  try {
+    socialLinks = eventData?.social_links ? JSON.parse(eventData.social_links) : {}
+  } catch (error) {
+    console.error('Failed to parse social_links JSON:', error)
+    socialLinks = {}
+  }
+
   const ticketUrl = eventData?.ticket_url || socialLinks.ticketLink
   return (
     <footer className="py-10 sm:py-12 mt-12 sm:mt-16 border-t border-band-orange/20 bg-band-navy/30">

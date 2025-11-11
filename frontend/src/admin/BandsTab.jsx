@@ -317,7 +317,8 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       const preview = await response.json()
       setPreviewData(preview)
       setShowPreviewModal(true)
-    } catch {
+    } catch (error) {
+      console.error('Failed to load bulk action preview:', error)
       showToast('Could not load preview. Check connection.', 'error')
     }
   }

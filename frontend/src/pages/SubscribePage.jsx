@@ -31,7 +31,7 @@ export default function SubscribePage() {
         setStatus('error')
         setMessage(data.error || 'Subscription failed. Please try again.')
       }
-    } catch (error) {
+    } catch {
       setStatus('error')
       setMessage('Network error. Please try again.')
     }

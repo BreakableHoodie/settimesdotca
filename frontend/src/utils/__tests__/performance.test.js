@@ -10,12 +10,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 describe('Performance Utilities - Console Logging', () => {
   let consoleLogSpy
   let consoleTableSpy
-  let originalDEV
 
   beforeEach(() => {
     // Spy on console methods
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     consoleTableSpy = vi.spyOn(console, 'table').mockImplementation(() => {})
+
+    // Clear all event listeners to prevent test interference
+    window.removeEventListener('load', () => {})
 
     // Clear module cache to get fresh imports
     vi.resetModules()
@@ -24,14 +26,18 @@ describe('Performance Utilities - Console Logging', () => {
   afterEach(() => {
     consoleLogSpy.mockRestore()
     consoleTableSpy.mockRestore()
+    
+    // Clean up any event listeners
+    window.removeEventListener('load', () => {})
   })
 
   describe('Development Mode (DEV=true)', () => {
     beforeEach(() => {
-      // Mock Vite's import.meta.env.DEV
+      // Mock Vite's import.meta.env.DEV BEFORE importing module
       vi.stubGlobal('import.meta', {
         env: { DEV: true }
       })
+      vi.resetModules()
     })
 
     it('should log performance metrics in dev mode', async () => {
@@ -117,10 +123,11 @@ describe('Performance Utilities - Console Logging', () => {
 
   describe('Production Mode (DEV=false)', () => {
     beforeEach(() => {
-      // Mock production environment
+      // Mock production environment BEFORE importing module
       vi.stubGlobal('import.meta', {
         env: { DEV: false }
       })
+      vi.resetModules()
     })
 
     it('should NOT log performance metrics in production', async () => {
@@ -378,8 +385,13 @@ describe('Performance Utilities - Console Logging', () => {
   })
 
   describe('Zero Console.log in Production Build', () => {
-    it('should have no console.log calls when DEV=false', async () => {
+    beforeEach(() => {
+      // Mock production environment BEFORE importing module
       vi.stubGlobal('import.meta', { env: { DEV: false } })
+      vi.resetModules()
+    })
+
+    it('should have no console.log calls when DEV=false', async () => {
 
       global.performance = {
         timing: {

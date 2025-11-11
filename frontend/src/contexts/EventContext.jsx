@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
 const EventContext = createContext()
 
@@ -26,7 +26,7 @@ export function EventProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   // Fetch events list
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     try {
       const token = sessionStorage.getItem('sessionToken')
       if (!token) {
@@ -61,12 +61,12 @@ export function EventProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentEventId])
 
   // Fetch events on mount and when currentEventId changes
   useEffect(() => {
     fetchEvents()
-  }, [currentEventId])
+  }, [currentEventId, fetchEvents])
 
   // Switch to a different event
   const switchEvent = (eventId) => {

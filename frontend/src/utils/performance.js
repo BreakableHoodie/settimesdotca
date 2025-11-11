@@ -29,6 +29,7 @@ export function measurePageLoad() {
       }
 
       // Log to console in dev
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) {
         console.table(metrics)
       }
@@ -71,6 +72,7 @@ function getLargestContentfulPaint() {
     const observer = new Observer(list => {
       const entries = list.getEntries()
       const lastEntry = entries[entries.length - 1]
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) {
         console.log('LCP:', Math.round(lastEntry.startTime), 'ms')
       }

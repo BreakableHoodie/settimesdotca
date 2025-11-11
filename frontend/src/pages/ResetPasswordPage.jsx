@@ -36,7 +36,7 @@ export default function ResetPasswordPage() {
           setMessage(data.error || 'Invalid or expired reset token')
         }
       })
-      .catch(error => {
+      .catch(_error => {
         setStatus('error')
         setMessage('Failed to verify reset token')
       })
@@ -79,7 +79,7 @@ export default function ResetPasswordPage() {
         setStatus('error')
         setMessage(data.error || 'Failed to reset password')
       }
-    } catch (error) {
+    } catch {
       setStatus('error')
       setMessage('Network error. Please try again.')
     }

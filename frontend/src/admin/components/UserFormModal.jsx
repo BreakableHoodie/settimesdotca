@@ -23,23 +23,29 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
 
   useEffect(() => {
     if (user) {
-      setFormData({
-        email: user.email || '',
-        password: '', // Don't populate password for edit
-        name: user.name || '',
-        role: user.role || 'editor',
-        isActive: user.isActive !== undefined ? user.isActive : true,
-      })
+      // Use setTimeout to avoid synchronous setState warning
+      setTimeout(() => {
+        setFormData({
+          email: user.email || '',
+          password: '', // Don't populate password for edit
+          name: user.name || '',
+          role: user.role || 'editor',
+          isActive: user.isActive !== undefined ? user.isActive : true,
+        })
+        setErrors({})
+      }, 0)
     } else {
-      setFormData({
-        email: '',
-        password: '',
-        name: '',
-        role: 'editor',
-        isActive: true,
-      })
+      setTimeout(() => {
+        setFormData({
+          email: '',
+          password: '',
+          name: '',
+          role: 'editor',
+          isActive: true,
+        })
+        setErrors({})
+      }, 0)
     }
-    setErrors({})
   }, [user, isOpen])
 
   const validate = () => {

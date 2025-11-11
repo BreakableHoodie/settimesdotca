@@ -3,6 +3,7 @@ import { eventsApi } from '../utils/adminApi'
 import EmbedCodeGenerator from './EmbedCodeGenerator'
 import MetricsDashboard from './MetricsDashboard'
 import ArchivedEventBanner from './components/ArchivedEventBanner'
+import HelpPanel from './components/HelpPanel'
 import {
   getEventState,
   isEventArchived,
@@ -37,6 +38,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [eventVenues, setEventVenues] = useState([])
   const [eventBands, setEventBands] = useState([])
+  const [showHelp, setShowHelp] = useState(false)
 
   // Load venues and bands when event is selected
   useEffect(() => {
@@ -469,6 +471,7 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
                   {sortedVenues.map(venueName => (
                     <div key={venueName} className="bg-band-navy/30 rounded-lg border border-band-orange/10">
                       <button
+                        type="button"
                         className="w-full px-4 py-3 text-base font-semibold text-band-orange border-b border-band-orange/20 cursor-pointer hover:bg-band-navy/20 transition-colors text-left"
                         onClick={() => {
                           // Find venue ID from eventBands
@@ -679,16 +682,28 @@ export default function EventsTab({ events, onEventsChange, showToast, selectedE
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-2xl font-bold text-white">Events</h2>
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          <h2 className="text-2xl font-bold text-white">Events</h2>
+          <button
+            onClick={() => setShowHelp(!showHelp)}
+            className="px-4 py-2 text-band-orange underline text-sm hover:text-orange-500 transition-colors min-h-[44px] sm:ml-4"
+            aria-label="Toggle help"
+          >
+            {showHelp ? 'Hide Help' : 'Show Help'}
+          </button>
+        </div>
         {!showCreateForm && !duplicatingEventId && (
           <button
             onClick={() => setShowCreateForm(true)}
-            className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors"
+            className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors min-h-[44px]"
           >
             + Create New Event
           </button>
         )}
       </div>
+
+      {/* Help Panel */}
+      {showHelp && <HelpPanel topic="events" isOpen={showHelp} onClose={() => setShowHelp(false)} />}
 
       {/* Create/Edit/Duplicate Form */}
       {(showCreateForm || duplicatingEventId || editingEventId) && (

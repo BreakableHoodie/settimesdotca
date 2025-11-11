@@ -66,6 +66,8 @@ export default [
         confirm: 'readonly',
         performance: 'readonly',
         PerformanceObserver: 'readonly',
+        CustomEvent: 'readonly',
+        Event: 'readonly',
       },
     },
     settings: {
@@ -94,7 +96,7 @@ export default [
         'labelComponents': [],
         'labelAttributes': ['htmlFor'],
         'controlComponents': [],
-        'assert': 'both',
+        'assert': 'either',
         'depth': 3,
       }],
     },

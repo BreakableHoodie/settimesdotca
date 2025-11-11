@@ -11,9 +11,15 @@ export default function BandForm({
   onSubmit,
   onCancel,
   conflicts,
+  globalView = false,
 }) {
-  const requireSchedule = Boolean(formData.event_id)
-  const submitLabel = submitting ? 'Saving...' : mode === 'edit' ? 'Update Performance' : 'Add Performance'
+  // In global view, we're editing band profile, not event-specific performance details
+  const requireSchedule = globalView ? false : Boolean(formData.event_id)
+  const submitLabel = submitting 
+    ? 'Saving...' 
+    : mode === 'edit' 
+      ? globalView ? 'Update Band' : 'Update Performance'
+      : globalView ? 'Add Band' : 'Add Performance'
 
   return (
     <form onSubmit={onSubmit}>
@@ -28,62 +34,142 @@ export default function BandForm({
             name="name"
             value={formData.name}
             onChange={onChange}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
             required
-            placeholder="The Rockers"
+            placeholder="The Replacements"
           />
         </div>
 
-        <div className="sm:col-span-2">
-          <label htmlFor="band-event" className="block text-white mb-2 text-sm">
-            Event
-          </label>
-          <select
-            id="band-event"
-            name="event_id"
-            value={formData.event_id}
-            onChange={onChange}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-          >
-            <option value="">No event assigned yet</option>
-            {events.map(event => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </select>
-          <p className="text-white/60 text-xs mt-2">
-            Leave this blank to keep the band available or move it between events later.
-          </p>
-        </div>
-
-        {showEventIntro && (
-          <div className="sm:col-span-2">
-            <div className="bg-blue-900/20 border border-blue-600 rounded p-3 text-sm text-blue-100">
-              You can create bands and venues independently from events. Assign them now or keep them available to attach later.
+        {globalView && (
+          <>
+            <div className="sm:col-span-2">
+              <label htmlFor="band-origin" className="block text-white mb-2 text-sm">
+                Origin <span className="text-gray-400 text-xs">(optional)</span>
+              </label>
+              <input
+                id="band-origin"
+                type="text"
+                name="origin"
+                value={formData.origin || ''}
+                onChange={onChange}
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                placeholder="Toronto, ON"
+              />
+              <p className="text-white/60 text-xs mt-2">
+                Where the band/artist is from (city, region, etc.)
+              </p>
             </div>
-          </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="band-genre" className="block text-white mb-2 text-sm">
+                Genre <span className="text-gray-400 text-xs">(optional)</span>
+              </label>
+              <input
+                id="band-genre"
+                type="text"
+                name="genre"
+                value={formData.genre || ''}
+                onChange={onChange}
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                placeholder="punk, indie rock, etc."
+              />
+              <p className="text-white/60 text-xs mt-2">
+                Comma-separated list of genres
+              </p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="band-photo-url" className="block text-white mb-2 text-sm">
+                Photo URL <span className="text-gray-400 text-xs">(optional)</span>
+              </label>
+              <input
+                id="band-photo-url"
+                type="url"
+                name="photo_url"
+                value={formData.photo_url || ''}
+                onChange={onChange}
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                placeholder="https://example.com/band-photo.jpg"
+              />
+              <p className="text-white/60 text-xs mt-2">
+                URL to the band&apos;s photo/image
+              </p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="band-description" className="block text-white mb-2 text-sm">
+                Description <span className="text-gray-400 text-xs">(optional)</span>
+              </label>
+              <textarea
+                id="band-description"
+                name="description"
+                value={formData.description || ''}
+                onChange={onChange}
+                rows={4}
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                placeholder="Band bio, description, press quote..."
+              />
+              <p className="text-white/60 text-xs mt-2">
+                Short bio or description about the band
+              </p>
+            </div>
+          </>
         )}
 
-        <div className="sm:col-span-2">
-          <label htmlFor="band-venue" className="block text-white mb-2 text-sm">
-            Venue <span className="text-gray-400 text-xs ml-2">(optional)</span>
-          </label>
-          <select
-            id="band-venue"
-            name="venue_id"
-            value={formData.venue_id}
-            onChange={onChange}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-          >
-            <option value="">No venue assigned yet</option>
-            {venues.map(venue => (
-              <option key={venue.id} value={venue.id}>
-                {venue.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!globalView && (
+          <>
+            <div className="sm:col-span-2">
+              <label htmlFor="band-event" className="block text-white mb-2 text-sm">
+                Event
+              </label>
+              <select
+                id="band-event"
+                name="event_id"
+                value={formData.event_id}
+                onChange={onChange}
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+              >
+                <option value="">No event assigned yet</option>
+                {events.map(event => (
+                  <option key={event.id} value={event.id}>
+                    {event.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-white/60 text-xs mt-2">
+                Leave this blank to keep the band available or move it between events later.
+              </p>
+            </div>
+
+            {showEventIntro && (
+              <div className="sm:col-span-2">
+                <div className="bg-blue-900/20 border border-blue-600 rounded p-3 text-sm text-blue-100">
+                  You can create bands and venues independently from events. Assign them now or keep them available to attach later.
+                </div>
+              </div>
+            )}
+
+            <div className="sm:col-span-2">
+              <label htmlFor="band-venue" className="block text-white mb-2 text-sm">
+                Venue <span className="text-gray-400 text-xs ml-2">(optional)</span>
+              </label>
+              <select
+                id="band-venue"
+                name="venue_id"
+                value={formData.venue_id}
+                onChange={onChange}
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+              >
+                <option value="">No venue assigned yet</option>
+                {venues.map(venue => (
+                  <option key={venue.id} value={venue.id}>
+                    {venue.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
 
         {requireSchedule && (
           <>
@@ -97,7 +183,7 @@ export default function BandForm({
                 name="start_time"
                 value={formData.start_time}
                 onChange={onChange}
-                className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 required={requireSchedule}
               />
             </div>
@@ -113,7 +199,7 @@ export default function BandForm({
                 name="duration"
                 value={formData.duration}
                 onChange={onChange}
-                className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 placeholder="45"
                 min="1"
               />
@@ -130,7 +216,7 @@ export default function BandForm({
                 name="end_time"
                 value={formData.end_time}
                 onChange={onChange}
-                className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 required={requireSchedule}
               />
             </div>
@@ -138,17 +224,62 @@ export default function BandForm({
         )}
 
         <div className="sm:col-span-2">
-          <label htmlFor="band-url" className="block text-white mb-2 text-sm">
-            Website / Social Media <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          <label htmlFor="band-website" className="block text-white mb-2 text-sm">
+            Website <span className="text-gray-400 text-xs ml-2">(optional)</span>
           </label>
           <input
-            id="band-url"
+            id="band-website"
             type="url"
-            name="url"
-            value={formData.url}
+            name="website"
+            value={formData.website || ''}
             onChange={onChange}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
             placeholder="https://example.com"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-instagram" className="block text-white mb-2 text-sm">
+            Instagram <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-instagram"
+            type="text"
+            name="instagram"
+            value={formData.instagram || ''}
+            onChange={onChange}
+            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            placeholder="@bandhandle"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-bandcamp" className="block text-white mb-2 text-sm">
+            Bandcamp <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-bandcamp"
+            type="url"
+            name="bandcamp"
+            value={formData.bandcamp || ''}
+            onChange={onChange}
+            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            placeholder="https://bandcamp.com/bandname"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-facebook" className="block text-white mb-2 text-sm">
+            Facebook <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-facebook"
+            type="url"
+            name="facebook"
+            value={formData.facebook || ''}
+            onChange={onChange}
+            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            placeholder="https://facebook.com/bandname"
           />
         </div>
       </div>
@@ -164,14 +295,14 @@ export default function BandForm({
         <button
           type="submit"
           disabled={submitting}
-          className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors"
+          className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors min-h-[48px] flex-1 font-medium flex items-center justify-center"
         >
           {submitLabel}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+          className="px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors min-h-[44px] flex-1 font-medium flex items-center justify-center"
         >
           Cancel
         </button>

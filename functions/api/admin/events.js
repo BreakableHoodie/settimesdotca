@@ -2,12 +2,29 @@
 // GET /api/admin/events - List all events
 // POST /api/admin/events - Create new event
 
-// GET - List all events
+import { checkPermission, auditLog } from './_middleware.js'
+
+// Get client IP from request
+function getClientIP(request) {
+  return (
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown"
+  );
+}
+
+// GET - List all events (all authenticated users can view)
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { request, env } = context;
   const { DB } = env;
 
   try {
+    // Check permission (viewer and above)
+    const permCheck = await checkPermission(request, env, 'viewer');
+    if (permCheck.error) {
+      return permCheck.response;
+    }
+
     const result = await DB.prepare(
       `
       SELECT
@@ -45,12 +62,21 @@ export async function onRequestGet(context) {
   }
 }
 
-// POST - Create new event
+// POST - Create new event (editor and admin only)
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
+  const ipAddress = getClientIP(request);
 
   try {
+    // Check permission (editor and above)
+    const permCheck = await checkPermission(request, env, 'editor');
+    if (permCheck.error) {
+      return permCheck.response;
+    }
+
+    const currentUser = permCheck.user;
+
     const body = await request.json().catch(() => ({}));
     const { name, date, slug, isPublished = false } = body;
 
@@ -119,16 +145,23 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Create event
+    // Create event with creator tracking
     const result = await DB.prepare(
       `
-      INSERT INTO events (name, date, slug, is_published)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO events (name, date, slug, is_published, created_by_user_id)
+      VALUES (?, ?, ?, ?, ?)
       RETURNING *
     `
     )
-      .bind(name, date, slug, isPublished ? 1 : 0)
+      .bind(name, date, slug, isPublished ? 1 : 0, currentUser.userId)
       .first();
+
+    // Audit log
+    await auditLog(env, currentUser.userId, 'event.created', 'event', result.id, {
+      name,
+      slug,
+      isPublished
+    }, ipAddress);
 
     return new Response(
       JSON.stringify({

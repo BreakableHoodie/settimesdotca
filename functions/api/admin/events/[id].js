@@ -2,6 +2,17 @@
 // PUT /api/admin/events/{id}/publish - Toggle publish status
 // POST /api/admin/events/{id}/duplicate - Duplicate event
 
+import { checkPermission, auditLog } from '../_middleware.js'
+
+// Get client IP from request
+function getClientIP(request) {
+  return (
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown"
+  );
+}
+
 // Helper to extract event ID from path
 function getEventId(request) {
   const url = new URL(request.url);
@@ -10,13 +21,21 @@ function getEventId(request) {
   return parts[idIndex];
 }
 
-// PUT - Toggle publish status
+// PUT - Toggle publish status (editor and admin only)
 export async function onRequestPut(context) {
   const { request, env } = context;
   const { DB } = env;
   const url = new URL(request.url);
+  const ipAddress = getClientIP(request);
 
   try {
+    // Check permission (editor and above)
+    const permCheck = await checkPermission(request, env, 'editor');
+    if (permCheck.error) {
+      return permCheck.response;
+    }
+
+    const currentUser = permCheck.user;
     const eventId = getEventId(request);
 
     if (!eventId || isNaN(eventId)) {
@@ -61,13 +80,18 @@ export async function onRequestPut(context) {
       const result = await DB.prepare(
         `
         UPDATE events
-        SET is_published = ?
+        SET is_published = ?, updated_by_user_id = ?
         WHERE id = ?
         RETURNING *
       `
       )
-        .bind(newStatus, eventId)
+        .bind(newStatus, currentUser.userId, eventId)
         .first();
+
+      // Audit log
+      await auditLog(env, currentUser.userId, newStatus === 1 ? 'event.published' : 'event.unpublished', 'event', eventId, {
+        name: event.name
+      }, ipAddress);
 
       return new Response(
         JSON.stringify({
@@ -265,12 +289,20 @@ export async function onRequestPost(context) {
   }
 }
 
-// DELETE - Delete event (only if no bands exist)
+// DELETE - Delete event (admin only)
 export async function onRequestDelete(context) {
   const { request, env } = context;
   const { DB } = env;
+  const ipAddress = getClientIP(request);
 
   try {
+    // Check permission (admin only)
+    const permCheck = await checkPermission(request, env, 'admin');
+    if (permCheck.error) {
+      return permCheck.response;
+    }
+
+    const currentUser = permCheck.user;
     const eventId = getEventId(request);
     const eventIdNum = parseInt(eventId);
 
@@ -313,10 +345,16 @@ export async function onRequestDelete(context) {
       .bind(eventIdNum)
       .run();
 
+    // Audit log
+    await auditLog(env, currentUser.userId, 'event.deleted', 'event', eventIdNum, {
+      name: event.name,
+      bandCount: bandCount.count
+    }, ipAddress);
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} band(s) are now unassigned and can be moved to other events)` : ''}` 
+      JSON.stringify({
+        success: true,
+        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} band(s) are now unassigned and can be moved to other events)` : ''}`
       }),
       {
         headers: { "Content-Type": "application/json" },

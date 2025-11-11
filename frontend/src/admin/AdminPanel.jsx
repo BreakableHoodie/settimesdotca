@@ -3,6 +3,7 @@ import { eventsApi } from '../utils/adminApi'
 import EventsTab from './EventsTab'
 import VenuesTab from './VenuesTab'
 import BandsTab from './BandsTab'
+import UserManagement from './UserManagement'
 import EventWizard from './EventWizard'
 import BottomNav from './BottomNav'
 import ContextBanner from './components/ContextBanner'
@@ -104,6 +105,7 @@ export default function AdminPanel({ onLogout }) {
     { id: 'events', label: 'Events' },
     { id: 'venues', label: 'Venues' },
     { id: 'bands', label: 'Performers' },
+    { id: 'users', label: 'Users' },
   ]
 
   return (
@@ -231,6 +233,8 @@ export default function AdminPanel({ onLogout }) {
                 onEventFilterChange={setSelectedEventId}
               />
             )}
+
+            {activeTab === 'users' && <UserManagement />}
           </>
         )}
       </div>

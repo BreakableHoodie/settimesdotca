@@ -13,6 +13,14 @@ export function measurePageLoad() {
   window[LISTENER_ADDED] = true
 
   window.addEventListener('load', () => {
+    // Check DEV mode FIRST before doing anything else
+    // This ensures listeners from dev tests don't execute in production tests
+    // Use strict check to ensure we're not in production
+    const isDev = import.meta?.env?.DEV === true
+    if (!isDev) {
+      return
+    }
+    
     // Prevent multiple executions if listener fires multiple times
     if (window[LISTENER_ADDED] === 'executed') return
     window[LISTENER_ADDED] = 'executed'
@@ -20,7 +28,8 @@ export function measurePageLoad() {
     setTimeout(() => {
       // Double-check DEV mode before logging (in case import.meta.env changes)
       // This check happens at execution time, not registration time
-      if (!import.meta.env || !import.meta.env.DEV) {
+      const isDevAtExecution = import.meta?.env?.DEV === true
+      if (!isDevAtExecution) {
         return
       }
       
@@ -47,7 +56,8 @@ export function measurePageLoad() {
       }
 
       // Log to console in dev
-      if (import.meta.env && import.meta.env.DEV) {
+      const isDevForLogging = import.meta?.env?.DEV === true
+      if (isDevForLogging) {
         // eslint-disable-next-line no-console
         console.table(metrics)
       }

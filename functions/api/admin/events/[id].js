@@ -334,13 +334,21 @@ export async function onRequestPut(context) {
   }
 }
 
-// POST - Duplicate event
+// POST - Duplicate event (editor and admin only)
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
   const url = new URL(request.url);
+  const ipAddress = getClientIP(request);
 
   try {
+    // Check permission (editor and above)
+    const permCheck = await checkPermission(request, env, 'editor');
+    if (permCheck.error) {
+      return permCheck.response;
+    }
+
+    const currentUser = permCheck.user;
     const eventId = getEventId(request);
 
     if (!eventId || isNaN(eventId)) {
@@ -450,6 +458,21 @@ export async function onRequestPost(context) {
       )
         .bind(newEvent.id)
         .first();
+
+      // Audit log
+      await auditLog(
+        env,
+        currentUser.userId,
+        'event.duplicated',
+        'event',
+        newEvent.id,
+        {
+          name: newEvent.name,
+          originalEventId: eventId,
+          bandsCopied: bandCount.count,
+        },
+        ipAddress
+      );
 
       return new Response(
         JSON.stringify({

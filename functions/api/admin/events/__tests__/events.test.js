@@ -292,4 +292,44 @@ describe('Event API - handler integration', () => {
     const data = await res.json()
     expect(data.success).toBeTruthy()
   })
+
+  it('delete actually orphans bands (event_id set to NULL)', async () => {
+    const { env, rawDb } = createTestEnv({ role: 'admin' })
+
+    // Create event with band
+    const ev = insertEvent(rawDb, { name: 'OrphanEvent', slug: 'orphan-event' })
+    const b = insertBand(rawDb, { name: 'OrphanBand', event_id: ev.id })
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'x-test-role': 'admin' },
+    })
+
+    const res = await eventIdHandler.onRequestDelete({ request, env })
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.success).toBeTruthy()
+
+    // Check band now has event_id NULL
+    const row = rawDb.prepare('SELECT * FROM bands WHERE id = ?').get(b.id)
+    expect(row.event_id === null || row.event_id === undefined).toBeTruthy()
+  })
+
+  it('PATCH can update date and status to published', async () => {
+    const { env, rawDb } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'PatchDate', slug: 'patch-date', date: '2026-02-02' })
+
+    const body = { date: '2026-03-03', status: 'published' }
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-test-role': 'editor' },
+      body: JSON.stringify(body),
+    })
+
+    const res = await eventIdHandler.onRequestPatch({ request, env })
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.event.date).toBe('2026-03-03')
+    expect(data.event.status).toBe('published')
+  })
 })

@@ -9,17 +9,41 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js 20
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: ${{ matrix.node }}
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests (vitest)
-        run: npx vitest --run
+      - name: Run affected tests (fast-path)
+        id: affected
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend: 'functions/**/**'
+            frontend: 'frontend/**'
+
+      - name: Run tests
+        if: github.event_name == 'push' || steps.affected.outputs.backend == 'true'
+        run: |
+          echo "Running backend tests"
+          npx vitest --run
+

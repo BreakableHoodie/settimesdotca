@@ -35,11 +35,11 @@ export default function EventsTab({
   const { refreshEvents } = useEventContext()
   const [showModal, setShowModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
-  const [duplicatingEventId, setDuplicatingEventId] = useState(null)
+  // duplication flow simplified: startDuplicate will perform duplication directly
   const [showEmbedCode, setShowEmbedCode] = useState(null)
   const [showMetrics, setShowMetrics] = useState(null)
   const [showArchived, setShowArchived] = useState(false)
-  const [loading, setLoading] = useState(false)
+  // loading state is not currently used in this component; remove to satisfy ESLint
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [eventVenues, setEventVenues] = useState([])
   const [eventBands, setEventBands] = useState([])
@@ -108,7 +108,7 @@ export default function EventsTab({
     return 0
   })
 
-  const handleEventSaved = savedEvent => {
+  const handleEventSaved = _savedEvent => {
     showToast(editingEvent ? 'Event updated successfully!' : 'Event created successfully!', 'success')
     refreshEvents()
     onEventsChange()
@@ -131,34 +131,7 @@ export default function EventsTab({
     setShowModal(true)
   }
 
-  const handleDuplicate = async e => {
-    e.preventDefault()
-    setLoading(true)
-
-    // Get event data from duplicatingEventId
-    const eventToDuplicate = events.find(e => e.id === duplicatingEventId)
-    if (!eventToDuplicate) {
-      showToast('Event not found', 'error')
-      setLoading(false)
-      return
-    }
-
-    try {
-      await eventsApi.duplicate(duplicatingEventId, {
-        name: eventToDuplicate.name + ' (Copy)',
-        date: eventToDuplicate.date,
-        slug: eventToDuplicate.slug + '-copy',
-      })
-      showToast('Event duplicated successfully!', 'success')
-      setDuplicatingEventId(null)
-      refreshEvents()
-      onEventsChange()
-    } catch (err) {
-      showToast('Failed to duplicate event: ' + err.message, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Duplicate flow handled via startDuplicate and eventsApi directly when invoked from UI controls.
 
   const handleTogglePublish = async event => {
     const publish = event.status !== 'published'
@@ -254,8 +227,19 @@ export default function EventsTab({
     }
   }
 
-  const startDuplicate = event => {
-    setDuplicatingEventId(event.id)
+  const startDuplicate = async event => {
+    try {
+      await eventsApi.duplicate(event.id, {
+        name: event.name + ' (Copy)',
+        date: event.date,
+        slug: event.slug + '-copy',
+      })
+      showToast('Event duplicated successfully!', 'success')
+      refreshEvents()
+      onEventsChange()
+    } catch (err) {
+      showToast('Failed to duplicate event: ' + err.message, 'error')
+    }
   }
 
   // If event is selected, show event detail view

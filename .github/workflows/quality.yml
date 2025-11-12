@@ -80,11 +80,11 @@ jobs:
         run: npm run build
 
       - name: Run Lighthouse CI
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: npm run lighthouse
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           CI: true
-
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v4
         if: always()

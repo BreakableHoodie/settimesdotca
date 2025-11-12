@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import Database from "better-sqlite3";
 
 /**
  * createTestDB
@@ -6,10 +6,10 @@ import Database from 'better-sqlite3'
  * This is intentionally small and deterministic so tests are fast and isolated.
  */
 export function createTestDB() {
-  const db = new Database(':memory:')
+  const db = new Database(":memory:");
 
   // Enable foreign key constraints to match production expectations
-  db.pragma('foreign_keys = ON')
+  db.pragma("foreign_keys = ON");
 
   // Minimal users table for RBAC checks
   db.exec(`
@@ -47,39 +47,63 @@ export function createTestDB() {
       city TEXT,
       address TEXT
     );
-  `)
+  `);
 
   // Insert fixture users
-  const insertUser = db.prepare('INSERT INTO users (email, role) VALUES (?, ?)')
-  insertUser.run('admin@test', 'admin')
-  insertUser.run('editor@test', 'editor')
-  insertUser.run('viewer@test', 'viewer')
+  const insertUser = db.prepare(
+    "INSERT INTO users (email, role) VALUES (?, ?)"
+  );
+  insertUser.run("admin@test", "admin");
+  insertUser.run("editor@test", "editor");
+  insertUser.run("viewer@test", "viewer");
 
-  return db
+  return db;
 }
 
 export const mockUsers = {
-  admin: { id: 1, email: 'admin@test', role: 'admin' },
-  editor: { id: 2, email: 'editor@test', role: 'editor' },
-  viewer: { id: 3, email: 'viewer@test', role: 'viewer' },
+  admin: { id: 1, email: "admin@test", role: "admin" },
+  editor: { id: 2, email: "editor@test", role: "editor" },
+  viewer: { id: 3, email: "viewer@test", role: "viewer" },
+};
+
+export function insertEvent(
+  db,
+  {
+    name = "Test Event",
+    slug = "test-event",
+    date = "2025-12-15",
+    status = "draft",
+    created_by = 1,
+  } = {}
+) {
+  const stmt = db.prepare(
+    "INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)"
+  );
+  const info = stmt.run(name, slug, date, status, created_by);
+  return db
+    .prepare("SELECT * FROM events WHERE id = ?")
+    .get(info.lastInsertRowid);
 }
 
-export function insertEvent(db, { name = 'Test Event', slug = 'test-event', date = '2025-12-15', status = 'draft', created_by = 1 } = {}) {
-  const stmt = db.prepare('INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)')
-  const info = stmt.run(name, slug, date, status, created_by)
-  return db.prepare('SELECT * FROM events WHERE id = ?').get(info.lastInsertRowid)
+export function insertBand(db, { name = "Test Band", event_id = null } = {}) {
+  const stmt = db.prepare("INSERT INTO bands (name, event_id) VALUES (?, ?)");
+  const info = stmt.run(name, event_id);
+  return db
+    .prepare("SELECT * FROM bands WHERE id = ?")
+    .get(info.lastInsertRowid);
 }
 
-export function insertBand(db, { name = 'Test Band', event_id = null } = {}) {
-  const stmt = db.prepare('INSERT INTO bands (name, event_id) VALUES (?, ?)')
-  const info = stmt.run(name, event_id)
-  return db.prepare('SELECT * FROM bands WHERE id = ?').get(info.lastInsertRowid)
-}
-
-export function insertVenue(db, { name = 'Test Venue', city = 'Portland', address = null } = {}) {
-  const stmt = db.prepare('INSERT INTO venues (name, city, address) VALUES (?, ?, ?)')
-  const info = stmt.run(name, city, address)
-  return db.prepare('SELECT * FROM venues WHERE id = ?').get(info.lastInsertRowid)
+export function insertVenue(
+  db,
+  { name = "Test Venue", city = "Portland", address = null } = {}
+) {
+  const stmt = db.prepare(
+    "INSERT INTO venues (name, city, address) VALUES (?, ?, ?)"
+  );
+  const info = stmt.run(name, city, address);
+  return db
+    .prepare("SELECT * FROM venues WHERE id = ?")
+    .get(info.lastInsertRowid);
 }
 
 /**
@@ -87,14 +111,14 @@ export function insertVenue(db, { name = 'Test Venue', city = 'Portland', addres
  * Helper to build a test environment object with DB and a role header value.
  * Usage: const { env, headers } = createTestEnv({ role: 'admin' })
  */
-export function createTestEnv({ role = 'editor' } = {}) {
-  const rawDb = createTestDB()
+export function createTestEnv({ role = "editor" } = {}) {
+  const rawDb = createTestDB();
   return {
     env: { DB: createDBEnv(rawDb) },
     rawDb,
     role,
-    headers: { 'x-test-role': role },
-  }
+    headers: { "x-test-role": role },
+  };
 }
 
 /**
@@ -105,54 +129,54 @@ export function createTestEnv({ role = 'editor' } = {}) {
 export function createDBEnv(db) {
   return {
     prepare(sql) {
-      const stmt = db.prepare(sql)
+      const stmt = db.prepare(sql);
       const wrapper = {
         // Support direct calls without bind: .prepare(...).all()
         first() {
           try {
-            return stmt.get()
+            return stmt.get();
           } catch (err) {
-            throw err
+            throw err;
           }
         },
         all() {
           try {
-            const rows = stmt.all()
-            return { results: rows }
+            const rows = stmt.all();
+            return { results: rows };
           } catch (err) {
-            throw err
+            throw err;
           }
         },
         run() {
-          return stmt.run()
+          return stmt.run();
         },
         // Support bound form: .bind(...).first()/all()/run()
         bind(...params) {
-          const bound = params
+          const bound = params;
           return {
             first() {
               try {
-                return stmt.get(...bound)
+                return stmt.get(...bound);
               } catch (err) {
-                throw err
+                throw err;
               }
             },
             all() {
               try {
-                const rows = stmt.all(...bound)
-                return { results: rows }
+                const rows = stmt.all(...bound);
+                return { results: rows };
               } catch (err) {
-                throw err
+                throw err;
               }
             },
             run() {
-              return stmt.run(...bound)
+              return stmt.run(...bound);
             },
-          }
+          };
         },
-      }
+      };
 
-      return wrapper
+      return wrapper;
     },
-  }
+  };
 }

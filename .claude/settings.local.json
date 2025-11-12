@@ -29,7 +29,8 @@
       "Bash(git branch:*)",
       "Bash(git clean:*)",
       "Bash(git remote:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "mcp__filesystem__list_directory"
     ],
     "deny": [],
     "ask": []

@@ -216,6 +216,7 @@ export async function onRequestGet(context) {
     return new Response(
       JSON.stringify({
         error: "Failed to fetch events timeline",
+        details: error instanceof Error ? error.message : String(error),
       }),
       {
         status: 500,

@@ -83,62 +83,7 @@ export async function onRequestPut(context) {
     const body = await request.json().catch(() => ({}));
     const { venueId, name, startTime, endTime, url } = body;
 
-    // Validation
-    if (!name) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Band name is required",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Validate time format (only if times are provided)
-    if (startTime && !/^\d{2}:\d{2}$/.test(startTime)) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Invalid start time format. Use HH:MM (24-hour format)",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    if (endTime && !/^\d{2}:\d{2}$/.test(endTime)) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Invalid end time format. Use HH:MM (24-hour format)",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Validate that end time is after start time
-    if (startTime >= endTime) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "End time must be after start time",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Check if band exists
+    // Check if band exists first
     const band = await DB.prepare(
       `
       SELECT * FROM bands WHERE id = ?
@@ -160,68 +105,177 @@ export async function onRequestPut(context) {
       );
     }
 
-    // Check for duplicate band name (excluding current band)
-    const existingBand = await DB.prepare(
-      `SELECT id, name FROM bands WHERE LOWER(name) = LOWER(?) AND id != ?`,
-    )
-      .bind(name, bandId)
-      .first();
+    // Validation - only validate provided fields
+    if (name !== undefined) {
+      if (!name || name.trim().length === 0) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Band name cannot be empty",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
 
-    if (existingBand) {
+      // Check for duplicate band name (excluding current band)
+      const existingBand = await DB.prepare(
+        `SELECT id, name FROM bands WHERE LOWER(name) = LOWER(?) AND id != ?`,
+      )
+        .bind(name, bandId)
+        .first();
+
+      if (existingBand) {
+        return new Response(
+          JSON.stringify({
+            error: "Duplicate band name",
+            message: `A band named "${name}" already exists. Please choose a different name.`,
+          }),
+          {
+            status: 409, // Conflict
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    // Validate time format (only if times are provided)
+    if (startTime !== undefined && !/^\d{2}:\d{2}$/.test(startTime)) {
       return new Response(
         JSON.stringify({
-          error: "Duplicate band name",
-          message: `A band named "${name}" already exists. Please choose a different name.`,
+          error: "Validation error",
+          message: "Invalid start time format. Use HH:MM (24-hour format)",
         }),
         {
-          status: 409, // Conflict
+          status: 400,
           headers: { "Content-Type": "application/json" },
         },
       );
     }
 
-    // Check if venue exists
-    const venue = await DB.prepare(
-      `
-      SELECT id FROM venues WHERE id = ?
-    `,
-    )
-      .bind(venueId)
-      .first();
-
-    if (!venue) {
+    if (endTime !== undefined && !/^\d{2}:\d{2}$/.test(endTime)) {
       return new Response(
         JSON.stringify({
-          error: "Not found",
-          message: "Venue not found",
+          error: "Validation error",
+          message: "Invalid end time format. Use HH:MM (24-hour format)",
         }),
         {
-          status: 404,
+          status: 400,
           headers: { "Content-Type": "application/json" },
         },
       );
     }
 
-    // Check for conflicts (excluding this band)
-    const conflicts = await checkConflicts(
-      DB,
-      band.event_id,
-      venueId,
-      startTime,
-      endTime,
-      bandId,
-    );
+    // Determine actual times to use (provided or existing)
+    const actualStartTime = startTime !== undefined ? startTime : band.start_time;
+    const actualEndTime = endTime !== undefined ? endTime : band.end_time;
+    const actualVenueId = venueId !== undefined ? venueId : band.venue_id;
 
-    // Update band
+    // Validate that end time is after start time (using actual values)
+    if (actualStartTime && actualEndTime && actualStartTime >= actualEndTime) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "End time must be after start time",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Check if venue exists (only if venueId is being changed)
+    if (venueId !== undefined && venueId !== null) {
+      const venue = await DB.prepare(
+        `
+        SELECT id FROM venues WHERE id = ?
+      `,
+      )
+        .bind(venueId)
+        .first();
+
+      if (!venue) {
+        return new Response(
+          JSON.stringify({
+            error: "Not found",
+            message: "Venue not found",
+          }),
+          {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    // Check for conflicts only if we have all required scheduling fields
+    let conflicts = [];
+    if (actualVenueId && actualStartTime && actualEndTime && band.event_id) {
+      conflicts = await checkConflicts(
+        DB,
+        band.event_id,
+        actualVenueId,
+        actualStartTime,
+        actualEndTime,
+        bandId,
+      );
+    }
+
+    // Build dynamic update query based on provided fields
+    const updates = [];
+    const params = [];
+
+    if (name !== undefined) {
+      updates.push("name = ?");
+      params.push(name);
+    }
+    if (venueId !== undefined) {
+      updates.push("venue_id = ?");
+      params.push(venueId);
+    }
+    if (startTime !== undefined) {
+      updates.push("start_time = ?");
+      params.push(startTime);
+    }
+    if (endTime !== undefined) {
+      updates.push("end_time = ?");
+      params.push(endTime);
+    }
+    if (url !== undefined) {
+      updates.push("url = ?");
+      params.push(url || null);
+    }
+
+    // If no fields to update, return error
+    if (updates.length === 0) {
+      return new Response(
+        JSON.stringify({
+          error: "Bad request",
+          message: "No fields to update",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Add band ID as final parameter
+    params.push(bandId);
+
+    // Update band with dynamic query
     const result = await DB.prepare(
       `
       UPDATE bands
-      SET venue_id = ?, name = ?, start_time = ?, end_time = ?, url = ?
+      SET ${updates.join(", ")}
       WHERE id = ?
       RETURNING *
     `,
     )
-      .bind(venueId, name, startTime, endTime, url || null, bandId)
+      .bind(...params)
       .first();
 
     return new Response(

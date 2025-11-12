@@ -109,10 +109,7 @@ export default function EventsTab({
   })
 
   const handleEventSaved = savedEvent => {
-    showToast(
-      editingEvent ? 'Event updated successfully!' : 'Event created successfully!',
-      'success'
-    )
+    showToast(editingEvent ? 'Event updated successfully!' : 'Event created successfully!', 'success')
     refreshEvents()
     onEventsChange()
     setEditingEvent(null)
@@ -163,7 +160,7 @@ export default function EventsTab({
     }
   }
 
-  const handleTogglePublish = async (event) => {
+  const handleTogglePublish = async event => {
     const publish = event.status !== 'published'
     const action = publish ? 'publish' : 'unpublish'
 
@@ -197,10 +194,8 @@ export default function EventsTab({
     }
   }
 
-  const handleArchive = async (event) => {
-    if (!window.confirm(
-      `Archive "${event.name}"? It will be hidden from the default view and unpublished.`
-    )) {
+  const handleArchive = async event => {
+    if (!window.confirm(`Archive "${event.name}"? It will be hidden from the default view and unpublished.`)) {
       return
     }
 
@@ -300,8 +295,7 @@ export default function EventsTab({
                   <span className="font-mono text-band-orange">{selectedEvent.slug}</span>
                 </p>
                 <p>
-                  <span className="font-semibold">Status:</span>{' '}
-                  <EventStatusBadge status={selectedEvent.status} />
+                  <span className="font-semibold">Status:</span> <EventStatusBadge status={selectedEvent.status} />
                 </p>
               </div>
             </div>
@@ -654,7 +648,7 @@ export default function EventsTab({
             <input
               type="checkbox"
               checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
+              onChange={e => setShowArchived(e.target.checked)}
               className="w-4 h-4 rounded border-gray-600 text-band-orange focus:ring-band-orange"
             />
             <span>Show Archived</span>
@@ -734,91 +728,91 @@ export default function EventsTab({
                   {sortedEvents
                     .filter(event => showArchived || event.status !== 'archived')
                     .map(event => (
-                    <tr key={event.id} className="hover:bg-band-navy/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => onEventFilterChange?.(event.id)}
-                          className="text-white font-medium hover:text-band-orange transition-colors text-left"
-                          title="Filter to this event"
-                        >
-                          {event.name}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-white/70">
-                        {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </td>
-                      <td className="px-4 py-3 text-band-orange font-mono text-sm">{event.slug}</td>
-                      <td className="px-4 py-3">
-                        <EventStatusBadge status={event.status} />
-                      </td>
-                      <td className="px-4 py-3 text-white/70">{event.band_count || 0}</td>
-                      <td className="px-4 py-3">
-                        {event.ticket_link ? (
-                          <div className="flex gap-2">
+                      <tr key={event.id} className="hover:bg-band-navy/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => onEventFilterChange?.(event.id)}
+                            className="text-white font-medium hover:text-band-orange transition-colors text-left"
+                            title="Filter to this event"
+                          >
+                            {event.name}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-white/70">
+                          {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </td>
+                        <td className="px-4 py-3 text-band-orange font-mono text-sm">{event.slug}</td>
+                        <td className="px-4 py-3">
+                          <EventStatusBadge status={event.status} />
+                        </td>
+                        <td className="px-4 py-3 text-white/70">{event.band_count || 0}</td>
+                        <td className="px-4 py-3">
+                          {event.ticket_link ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => window.open(event.ticket_link, '_blank')}
+                                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+                                title="Visit ticket link"
+                              >
+                                🔗 Visit
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  await navigator.clipboard.writeText(event.ticket_link)
+                                  showToast('Ticket link copied!', 'success')
+                                }}
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+                                title="Copy ticket link"
+                              >
+                                📋 Copy
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-white/30 text-sm">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2 flex-wrap">
                             <button
-                              onClick={() => window.open(event.ticket_link, '_blank')}
-                              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
-                              title="Visit ticket link"
+                              onClick={() => startEdit(event)}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
                             >
-                              🔗 Visit
+                              Edit
                             </button>
                             <button
-                              onClick={async () => {
-                                await navigator.clipboard.writeText(event.ticket_link)
-                                showToast('Ticket link copied!', 'success')
-                              }}
-                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
-                              title="Copy ticket link"
+                              onClick={() => handleTogglePublish(event)}
+                              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                                event.status === 'published'
+                                  ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                  : 'bg-green-600 hover:bg-green-700 text-white'
+                              }`}
+                              disabled={event.status === 'archived'}
                             >
-                              📋 Copy
+                              {event.status === 'published' ? 'Unpublish' : 'Publish'}
+                            </button>
+                            {event.status !== 'archived' && (
+                              <button
+                                onClick={() => handleArchive(event)}
+                                className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                                title="Archive event (admin only)"
+                              >
+                                Archive
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(event)}
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+                            >
+                              Delete
                             </button>
                           </div>
-                        ) : (
-                          <span className="text-white/30 text-sm">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2 flex-wrap">
-                          <button
-                            onClick={() => startEdit(event)}
-                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleTogglePublish(event)}
-                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                              event.status === 'published'
-                                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                : 'bg-green-600 hover:bg-green-700 text-white'
-                            }`}
-                            disabled={event.status === 'archived'}
-                          >
-                            {event.status === 'published' ? 'Unpublish' : 'Publish'}
-                          </button>
-                          {event.status !== 'archived' && (
-                            <button
-                              onClick={() => handleArchive(event)}
-                              className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
-                              title="Archive event (admin only)"
-                            >
-                              Archive
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDelete(event)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -828,65 +822,65 @@ export default function EventsTab({
               {sortedEvents
                 .filter(event => showArchived || event.status !== 'archived')
                 .map(event => (
-                <div key={event.id} className="p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-white font-semibold">{event.name}</h3>
-                      <p className="text-white/70 text-sm">
-                        {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </p>
+                  <div key={event.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-white font-semibold">{event.name}</h3>
+                        <p className="text-white/70 text-sm">
+                          {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                      <EventStatusBadge status={event.status} />
                     </div>
-                    <EventStatusBadge status={event.status} />
-                  </div>
 
-                  <div className="text-sm">
-                    <span className="text-white/50">Slug: </span>
-                    <span className="text-band-orange font-mono">{event.slug}</span>
-                  </div>
+                    <div className="text-sm">
+                      <span className="text-white/50">Slug: </span>
+                      <span className="text-band-orange font-mono">{event.slug}</span>
+                    </div>
 
-                  <div className="text-sm text-white/70">
-                    {event.band_count || 0} band{event.band_count !== 1 ? 's' : ''}
-                  </div>
+                    <div className="text-sm text-white/70">
+                      {event.band_count || 0} band{event.band_count !== 1 ? 's' : ''}
+                    </div>
 
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <button
-                      onClick={() => startEdit(event)}
-                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleTogglePublish(event)}
-                      className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                        event.status === 'published'
-                          ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                          : 'bg-green-600 hover:bg-green-700 text-white'
-                      }`}
-                      disabled={event.status === 'archived'}
-                    >
-                      {event.status === 'published' ? 'Unpublish' : 'Publish'}
-                    </button>
-                    {event.status !== 'archived' && (
+                    <div className="flex flex-wrap gap-2 pt-2">
                       <button
-                        onClick={() => handleArchive(event)}
-                        className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                        onClick={() => startEdit(event)}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
                       >
-                        Archive
+                        Edit
                       </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(event)}
-                      className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
-                    >
-                      Delete
-                    </button>
+                      <button
+                        onClick={() => handleTogglePublish(event)}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          event.status === 'published'
+                            ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
+                        disabled={event.status === 'archived'}
+                      >
+                        {event.status === 'published' ? 'Unpublish' : 'Publish'}
+                      </button>
+                      {event.status !== 'archived' && (
+                        <button
+                          onClick={() => handleArchive(event)}
+                          className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                        >
+                          Archive
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(event)}
+                        className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </>
         )}

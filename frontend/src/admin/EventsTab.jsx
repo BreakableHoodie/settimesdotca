@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import { eventsApi } from '../utils/adminApi'
+import { useEventContext } from '../contexts/EventContext'
+import EventFormModal from './EventFormModal'
+import EventStatusBadge from './components/EventStatusBadge'
 import EmbedCodeGenerator from './EmbedCodeGenerator'
 import MetricsDashboard from './MetricsDashboard'
 import ArchivedEventBanner from './components/ArchivedEventBanner'
@@ -29,18 +32,13 @@ export default function EventsTab({
   selectedEvent,
   onEventFilterChange,
 }) {
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [editingEventId, setEditingEventId] = useState(null)
+  const { refreshEvents } = useEventContext()
+  const [showModal, setShowModal] = useState(false)
+  const [editingEvent, setEditingEvent] = useState(null)
   const [duplicatingEventId, setDuplicatingEventId] = useState(null)
   const [showEmbedCode, setShowEmbedCode] = useState(null)
   const [showMetrics, setShowMetrics] = useState(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    date: '',
-    slug: '',
-    ticket_link: '',
-    is_published: false,
-  })
+  const [showArchived, setShowArchived] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [eventVenues, setEventVenues] = useState([])
@@ -98,9 +96,11 @@ export default function EventsTab({
     } else if (sortConfig.key === 'date') {
       aVal = new Date(aVal).getTime()
       bVal = new Date(bVal).getTime()
-    } else if (sortConfig.key === 'is_published') {
-      aVal = a.is_published ? 1 : 0
-      bVal = b.is_published ? 1 : 0
+    } else if (sortConfig.key === 'status') {
+      // Sort order: published > draft > archived
+      const statusOrder = { published: 2, draft: 1, archived: 0 }
+      aVal = statusOrder[a.status] || 0
+      bVal = statusOrder[b.status] || 0
     }
 
     if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
@@ -108,55 +108,15 @@ export default function EventsTab({
     return 0
   })
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      date: '',
-      slug: '',
-      ticket_link: '',
-      is_published: false,
-    })
-    setShowCreateForm(false)
-    setDuplicatingEventId(null)
-    setEditingEventId(null)
-  }
-
-  const handleUpdate = async e => {
-    e.preventDefault()
-    setLoading(true)
-
-    // Validation
-    if (!formData.name || formData.name.trim() === '') {
-      showToast('Event name is required', 'error')
-      setLoading(false)
-      return
-    }
-    if (!formData.date || formData.date.trim() === '') {
-      showToast('Event date is required', 'error')
-      setLoading(false)
-      return
-    }
-    if (!formData.slug || formData.slug.trim() === '') {
-      showToast('Event slug is required', 'error')
-      setLoading(false)
-      return
-    }
-
-    try {
-      await eventsApi.update(editingEventId, {
-        name: formData.name,
-        date: formData.date,
-        slug: formData.slug,
-        ticket_link: formData.ticket_link || null,
-      })
-      showToast('Event updated successfully!', 'success')
-      resetForm()
-      onEventsChange()
-    } catch (err) {
-      showToast('Failed to update event: ' + err.message, 'error')
-    } finally {
-      setLoading(false)
-    }
+  const handleEventSaved = savedEvent => {
+    showToast(
+      editingEvent ? 'Event updated successfully!' : 'Event created successfully!',
+      'success'
+    )
+    refreshEvents()
+    onEventsChange()
+    setEditingEvent(null)
+    setShowModal(false)
   }
 
   const startEdit = event => {
@@ -170,63 +130,31 @@ export default function EventsTab({
       showToast(`Editing archived event "${event.name}". Changes will be logged.`, 'success')
     }
 
-    setEditingEventId(event.id)
-    setFormData({
-      name: event.name,
-      date: event.date,
-      slug: event.slug,
-      ticket_link: event.ticket_link || event.ticket_url || '',
-      is_published: event.is_published,
-    })
-    setShowCreateForm(false)
-    setDuplicatingEventId(null)
-  }
-
-  const handleCreate = async e => {
-    e.preventDefault()
-    setLoading(true)
-
-    // Validation
-    if (!formData.name || formData.name.trim() === '') {
-      showToast('Event name is required', 'error')
-      setLoading(false)
-      return
-    }
-    if (!formData.date || formData.date.trim() === '') {
-      showToast('Event date is required', 'error')
-      setLoading(false)
-      return
-    }
-    if (!formData.slug || formData.slug.trim() === '') {
-      showToast('Event slug is required', 'error')
-      setLoading(false)
-      return
-    }
-
-    try {
-      await eventsApi.create(formData)
-      showToast('Event created successfully!', 'success')
-      resetForm()
-      onEventsChange()
-    } catch (err) {
-      showToast('Failed to create event: ' + err.message, 'error')
-    } finally {
-      setLoading(false)
-    }
+    setEditingEvent(event)
+    setShowModal(true)
   }
 
   const handleDuplicate = async e => {
     e.preventDefault()
     setLoading(true)
 
+    // Get event data from duplicatingEventId
+    const eventToDuplicate = events.find(e => e.id === duplicatingEventId)
+    if (!eventToDuplicate) {
+      showToast('Event not found', 'error')
+      setLoading(false)
+      return
+    }
+
     try {
       await eventsApi.duplicate(duplicatingEventId, {
-        name: formData.name,
-        date: formData.date,
-        slug: formData.slug,
+        name: eventToDuplicate.name + ' (Copy)',
+        date: eventToDuplicate.date,
+        slug: eventToDuplicate.slug + '-copy',
       })
       showToast('Event duplicated successfully!', 'success')
-      resetForm()
+      setDuplicatingEventId(null)
+      refreshEvents()
       onEventsChange()
     } catch (err) {
       showToast('Failed to duplicate event: ' + err.message, 'error')
@@ -235,18 +163,68 @@ export default function EventsTab({
     }
   }
 
-  const handleTogglePublish = async (eventId, currentStatus) => {
-    const action = currentStatus ? 'unpublish' : 'publish'
+  const handleTogglePublish = async (event) => {
+    const publish = event.status !== 'published'
+    const action = publish ? 'publish' : 'unpublish'
+
     if (!window.confirm(`Are you sure you want to ${action} this event?`)) {
       return
     }
 
     try {
-      await eventsApi.togglePublish(eventId)
+      const token = sessionStorage.getItem('sessionToken')
+      const response = await fetch(`/api/admin/events/${event.id}/publish`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ publish }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        showToast(data.message || `Failed to ${action} event`, 'error')
+        return
+      }
+
       showToast(`Event ${action}ed successfully!`, 'success')
+      refreshEvents()
       onEventsChange()
     } catch (err) {
       showToast(`Failed to ${action} event: ` + err.message, 'error')
+    }
+  }
+
+  const handleArchive = async (event) => {
+    if (!window.confirm(
+      `Archive "${event.name}"? It will be hidden from the default view and unpublished.`
+    )) {
+      return
+    }
+
+    try {
+      const token = sessionStorage.getItem('sessionToken')
+      const response = await fetch(`/api/admin/events/${event.id}/archive`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        showToast(data.message || 'Failed to archive event', 'error')
+        return
+      }
+
+      showToast('Event archived successfully!', 'success')
+      refreshEvents()
+      onEventsChange()
+    } catch (err) {
+      showToast('Failed to archive event: ' + err.message, 'error')
     }
   }
 
@@ -283,36 +261,6 @@ export default function EventsTab({
 
   const startDuplicate = event => {
     setDuplicatingEventId(event.id)
-    setFormData({
-      name: `${event.name} (Copy)`,
-      date: event.date,
-      slug: `${event.slug}-copy`,
-      is_published: false,
-    })
-    setShowCreateForm(false)
-  }
-
-  const handleInputChange = e => {
-    const { name, value, type, checked } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }))
-  }
-
-  // Auto-generate slug from name
-  const handleNameChange = e => {
-    const name = e.target.value
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-
-    setFormData(prev => ({
-      ...prev,
-      name,
-      slug: prev.slug || slug, // Only auto-fill if slug is empty
-    }))
   }
 
   // If event is selected, show event detail view
@@ -353,13 +301,7 @@ export default function EventsTab({
                 </p>
                 <p>
                   <span className="font-semibold">Status:</span>{' '}
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      selectedEvent.is_published ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'
-                    }`}
-                  >
-                    {selectedEvent.is_published ? 'Published' : 'Draft'}
-                  </span>
+                  <EventStatusBadge status={selectedEvent.status} />
                 </p>
               </div>
             </div>
@@ -406,8 +348,8 @@ export default function EventsTab({
               <div className="text-white/70 text-sm">Venues</div>
             </div>
             <div className="bg-band-navy/50 rounded-lg p-4">
-              <div className="text-3xl font-bold text-band-orange mb-1">
-                {selectedEvent.is_published ? 'Live' : 'Draft'}
+              <div className="text-3xl font-bold text-band-orange mb-1 capitalize">
+                {selectedEvent.status || 'Draft'}
               </div>
               <div className="text-white/70 text-sm">Status</div>
             </div>
@@ -707,133 +649,41 @@ export default function EventsTab({
             {showHelp ? 'Hide Help' : 'Show Help'}
           </button>
         </div>
-        {!showCreateForm && !duplicatingEventId && (
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-white cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-600 text-band-orange focus:ring-band-orange"
+            />
+            <span>Show Archived</span>
+          </label>
           <button
-            onClick={() => setShowCreateForm(true)}
+            onClick={() => {
+              setEditingEvent(null)
+              setShowModal(true)
+            }}
             className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors min-h-[44px]"
           >
             + Create New Event
           </button>
-        )}
+        </div>
       </div>
 
       {/* Help Panel */}
       {showHelp && <HelpPanel topic="events" isOpen={showHelp} onClose={() => setShowHelp(false)} />}
 
-      {/* Create/Edit/Duplicate Form */}
-      {(showCreateForm || duplicatingEventId || editingEventId) && (
-        <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
-          <h3 className="text-lg font-bold text-band-orange mb-4">
-            {editingEventId ? 'Edit Event' : duplicatingEventId ? 'Duplicate Event' : 'Create New Event'}
-          </h3>
-
-          <form onSubmit={editingEventId ? handleUpdate : duplicatingEventId ? handleDuplicate : handleCreate}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label htmlFor="event-name" className="block text-white mb-2 text-sm">
-                  Event Name *
-                </label>
-                <input
-                  id="event-name"
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleNameChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  required
-                  placeholder="Long Weekend Vol. 4"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="event-date" className="block text-white mb-2 text-sm">
-                  Date *
-                </label>
-                <input
-                  type="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="event-slug" className="block text-white mb-2 text-sm">
-                  Slug *
-                </label>
-                <input
-                  type="text"
-                  name="slug"
-                  value={formData.slug}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none font-mono text-sm"
-                  required
-                  placeholder="long-weekend-vol-4"
-                  pattern="[a-z0-9\-]+"
-                  title="Only lowercase letters, numbers, and hyphens"
-                />
-                <p className="text-xs text-white/50 mt-1">URL-friendly identifier (lowercase, hyphens only)</p>
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="event-ticket-link" className="block text-white mb-2 text-sm">
-                  Ticket Link <span className="text-gray-400 text-xs">(optional)</span>
-                </label>
-                <input
-                  id="event-ticket-link"
-                  type="url"
-                  name="ticket_link"
-                  value={formData.ticket_link || ''}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  placeholder="https://example.com/tickets"
-                />
-                <p className="text-xs text-white/50 mt-1">Link where people can buy tickets</p>
-              </div>
-
-              {!duplicatingEventId && (
-                <div className="flex items-center">
-                  <label className="flex items-center gap-2 text-white cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="is_published"
-                      checked={formData.is_published}
-                      onChange={handleInputChange}
-                      className="w-4 h-4 rounded border-gray-600 text-band-orange focus:ring-band-orange"
-                    />
-                    <span>Publish immediately</span>
-                  </label>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors"
-              >
-                {loading
-                  ? 'Saving...'
-                  : editingEventId
-                    ? 'Update Event'
-                    : duplicatingEventId
-                      ? 'Duplicate Event'
-                      : 'Create Event'}
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* Event Form Modal */}
+      <EventFormModal
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false)
+          setEditingEvent(null)
+        }}
+        event={editingEvent}
+        onSave={handleEventSaved}
+      />
 
       {/* Events List */}
       <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
@@ -866,9 +716,9 @@ export default function EventsTab({
                     </th>
                     <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
-                      onClick={() => handleSort('is_published')}
+                      onClick={() => handleSort('status')}
                     >
-                      Status {sortConfig.key === 'is_published' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
@@ -881,7 +731,9 @@ export default function EventsTab({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-band-orange/10">
-                  {sortedEvents.map(event => (
+                  {sortedEvents
+                    .filter(event => showArchived || event.status !== 'archived')
+                    .map(event => (
                     <tr key={event.id} className="hover:bg-band-navy/30 transition-colors">
                       <td className="px-4 py-3">
                         <button
@@ -901,13 +753,7 @@ export default function EventsTab({
                       </td>
                       <td className="px-4 py-3 text-band-orange font-mono text-sm">{event.slug}</td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            event.is_published ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'
-                          }`}
-                        >
-                          {event.is_published ? 'Published' : 'Draft'}
-                        </span>
+                        <EventStatusBadge status={event.status} />
                       </td>
                       <td className="px-4 py-3 text-white/70">{event.band_count || 0}</td>
                       <td className="px-4 py-3">
@@ -936,7 +782,7 @@ export default function EventsTab({
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 flex-wrap">
                           <button
                             onClick={() => startEdit(event)}
                             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
@@ -944,33 +790,25 @@ export default function EventsTab({
                             Edit
                           </button>
                           <button
-                            onClick={() => setShowMetrics(event)}
-                            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors"
-                          >
-                            Metrics
-                          </button>
-                          <button
-                            onClick={() => setShowEmbedCode(event)}
-                            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors"
-                          >
-                            Embed
-                          </button>
-                          <button
-                            onClick={() => handleTogglePublish(event.id, event.is_published)}
+                            onClick={() => handleTogglePublish(event)}
                             className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                              event.is_published
+                              event.status === 'published'
                                 ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                                 : 'bg-green-600 hover:bg-green-700 text-white'
                             }`}
+                            disabled={event.status === 'archived'}
                           >
-                            {event.is_published ? 'Unpublish' : 'Publish'}
+                            {event.status === 'published' ? 'Unpublish' : 'Publish'}
                           </button>
-                          <button
-                            onClick={() => startDuplicate(event)}
-                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-                          >
-                            Duplicate
-                          </button>
+                          {event.status !== 'archived' && (
+                            <button
+                              onClick={() => handleArchive(event)}
+                              className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                              title="Archive event (admin only)"
+                            >
+                              Archive
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDelete(event)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
@@ -987,7 +825,9 @@ export default function EventsTab({
 
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-band-orange/10">
-              {events.map(event => (
+              {sortedEvents
+                .filter(event => showArchived || event.status !== 'archived')
+                .map(event => (
                 <div key={event.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
@@ -1000,13 +840,7 @@ export default function EventsTab({
                         })}
                       </p>
                     </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        event.is_published ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'
-                      }`}
-                    >
-                      {event.is_published ? 'Published' : 'Draft'}
-                    </span>
+                    <EventStatusBadge status={event.status} />
                   </div>
 
                   <div className="text-sm">
@@ -1018,38 +852,35 @@ export default function EventsTab({
                     {event.band_count || 0} band{event.band_count !== 1 ? 's' : ''}
                   </div>
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-wrap gap-2 pt-2">
                     <button
-                      onClick={() => setShowMetrics(event)}
-                      className="flex-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors"
+                      onClick={() => startEdit(event)}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
                     >
-                      Metrics
+                      Edit
                     </button>
                     <button
-                      onClick={() => setShowEmbedCode(event)}
-                      className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors"
-                    >
-                      Embed
-                    </button>
-                    <button
-                      onClick={() => handleTogglePublish(event.id, event.is_published)}
-                      className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
-                        event.is_published
+                      onClick={() => handleTogglePublish(event)}
+                      className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        event.status === 'published'
                           ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                           : 'bg-green-600 hover:bg-green-700 text-white'
                       }`}
+                      disabled={event.status === 'archived'}
                     >
-                      {event.is_published ? 'Unpublish' : 'Publish'}
+                      {event.status === 'published' ? 'Unpublish' : 'Publish'}
                     </button>
-                    <button
-                      onClick={() => startDuplicate(event)}
-                      className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-                    >
-                      Duplicate
-                    </button>
+                    {event.status !== 'archived' && (
+                      <button
+                        onClick={() => handleArchive(event)}
+                        className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                      >
+                        Archive
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(event)}
-                      className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+                      className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
                     >
                       Delete
                     </button>

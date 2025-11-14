@@ -122,7 +122,10 @@ describe("Admin bands API - smoke", () => {
     expect(r.status).toBe(201);
 
     const getReq = new Request(
-      `https://example.test/api/admin/bands?event_id=${ev.id}`
+      `https://example.test/api/admin/bands?event_id=${ev.id}`,
+      {
+        headers: { ...headers },
+      }
     );
     const getRes = await bandsHandler.onRequestGet({ request: getReq, env });
     expect(getRes.status).toBe(200);

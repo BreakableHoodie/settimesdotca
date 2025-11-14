@@ -5,7 +5,7 @@ import * as venueIdHandler from "../[id].js";
 
 describe("Admin venues API", () => {
   it("can create a venue and then list it", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
 
     const body = { name: "The Roxy", address: "123 Main St" };
     const request = new Request("https://example.test/api/admin/venues", {
@@ -20,7 +20,9 @@ describe("Admin venues API", () => {
     expect(data.venue).toHaveProperty("id");
 
     // Now GET list
-    const getReq = new Request("https://example.test/api/admin/venues");
+    const getReq = new Request("https://example.test/api/admin/venues", {
+      headers: { ...headers },
+    });
     const getRes = await venuesHandler.onRequestGet({ request: getReq, env });
     expect(getRes.status).toBe(200);
     const list = await getRes.json();
@@ -28,12 +30,12 @@ describe("Admin venues API", () => {
   });
 
   it("creating duplicate venue returns 409", async () => {
-    const { env } = createTestEnv({ role: "editor" });
+    const { env, headers } = createTestEnv({ role: "admin" });
 
     const body = { name: "Duplicate Venue" };
     const req1 = new Request("https://example.test/api/admin/venues", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
     const r1 = await venuesHandler.onRequestPost({ request: req1, env });
@@ -41,7 +43,7 @@ describe("Admin venues API", () => {
 
     const req2 = new Request("https://example.test/api/admin/venues", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
     const r2 = await venuesHandler.onRequestPost({ request: req2, env });
@@ -49,7 +51,7 @@ describe("Admin venues API", () => {
   });
 
   it("can update a venue and conflicts on duplicate name", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     const v = insertVenue(rawDb, { name: "Old Name" });
 
     const putReq = new Request(

@@ -1,8 +1,8 @@
 {
-  "name": "longweekend-bandcrawl",
+  "name": "settimes",
   "version": "1.0.0",
   "type": "module",
-  "description": "Long Weekend Band Crawl - Cloudflare Workers project",
+  "description": "SetTimes.ca - Event Schedule & Performance Management Platform",
   "scripts": {
     "migrate:local": "bash scripts/migrate-local-db.sh",
     "validate:schema": "node scripts/validate-db-schema.js",

@@ -1,0 +1,21 @@
+# Test User Credentials for RBAC QA
+# DO NOT COMMIT - Add to .gitignore
+
+# Admin users
+ADMIN_EMAIL=admin@pinklemonaderecords.com
+ADMIN_PASSWORD=P!nkL3m0n@de2024#Admin
+
+ADMIN2_EMAIL=sarah@pinklemonaderecords.com
+ADMIN2_PASSWORD=S@rahSecure2024#Admin
+
+# Editor user
+EDITOR_EMAIL=editor@pinklemonaderecords.com
+EDITOR_PASSWORD=Edit0rAccess2024#Content
+
+# Viewer user
+VIEWER_EMAIL=viewer@pinklemonaderecords.com
+VIEWER_PASSWORD=V!ew3rOnly2024#Read
+
+# Inactive user (for testing)
+INACTIVE_EMAIL=inactive@pinklemonaderecords.com
+INACTIVE_PASSWORD=!nact!ve2024#Test

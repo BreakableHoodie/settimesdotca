@@ -1,9 +1,57 @@
 # Production Roadmap to Demo (Nov 30, 2025)
 
-**Last Updated**: November 11, 2025
-**Deadline**: November 30, 2025 (19 days)
-**Status**: Staging branch created, consolidating features
+**Last Updated**: November 13, 2025
+**Deadline**: November 30, 2025 (17 days)
+**Status**: Sprint 1.1-1.3 migrations applied, test infrastructure in progress
 **Goal**: Production-ready single-org system with multi-user RBAC
+
+---
+
+## 📋 Active Changelog
+
+### November 13, 2025 - Test Infrastructure & Database Initialization
+
+**Commits:**
+- ✅ `fix(tests): comprehensive test suite and CI workflow` (7c8faa1)
+- ✅ `fix(tests): improve test utilities and authentication` (e51b081)
+- ✅ Merged `feat/add-tests-ci` branch to `dev`
+
+**Database:**
+- ✅ Initialized `database/longweekend.db` from 0 bytes
+- ✅ Applied 8 migrations in correct order:
+  - `schema-v2.sql` (base tables)
+  - `migration-single-org.sql` (users table)
+  - `migration-2fa.sql` (sessions, 2FA infrastructure)
+  - `migration-rbac-sprint-1-1.sql` (audit logging, RBAC)
+  - `migration-sprint-1-2-event-management.sql` (event status lifecycle)
+  - `migration-subscriptions.sql` (email subscriptions)
+  - `migration-metrics.sql` (analytics)
+  - `migration-events-theming.sql` (visual customization)
+- ✅ Created default admin user: `admin@pinklemonaderecords.com` / `admin123`
+- ✅ Database now has 17 tables, ready for Sprint 1.1-1.3 features
+
+**Test Results:**
+- **Current:** 58 passing / 7 failing / 6 todo (71 total tests)
+- **Progress:** Up from 49 passing / 13 failing (68 total)
+- **Fixes Applied:**
+  - ✅ Added missing columns to test schema (last_login, is_active, name)
+  - ✅ Added email_subscriptions, sessions, audit_log tables to test DB
+  - ✅ Added password_reset_tokens and auth_audit tables
+  - ✅ Fixed D1 API compatibility (return meta.last_row_id format)
+  - ✅ Created valid sessions in createTestEnv for auth testing
+  - ✅ Extended tokens.js with generatePasswordResetToken, generateSessionToken
+  - ✅ Fixed import path in reset-password.js
+
+**Remaining Test Failures (7):**
+- 2 reset-password tests (validation/workflow issues)
+- 2 analytics subscription tests (likely missing test data)
+- 1 signup test (session creation issue)
+- 2 user update/delete tests (soft delete/deactivation)
+
+**Next Steps:**
+- Debug remaining 7 test failures
+- Fix CI workflow to ensure tests run on PR
+- Complete Sprint 1.1 RBAC features
 
 ---
 

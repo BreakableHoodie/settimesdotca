@@ -51,8 +51,38 @@
 
 **Next Steps:**
 - ✅ **DONE:** All tests passing - test infrastructure complete
+- ✅ **DONE:** UI/UX redesign added to roadmap (Sprint 2.0)
 - 🔄 Verify CI workflow runs successfully on GitHub
 - 🔄 Begin Sprint 1.1 RBAC UI implementation
+
+---
+
+### November 13, 2025 - UI/UX Redesign Prioritization ✅ COMPLETE
+
+**Changes:**
+- ✅ Added Sprint 2.0: UI/UX Redesign & Design System (1.5 days)
+- ✅ Elevated design system from "Nice to Have" to HIGH priority
+- ✅ Positioned as foundation sprint before implementation sprints 2.1-2.3
+
+**Scope:**
+- **Design System Foundation**: Color palette, typography, spacing, component primitives
+- **Visual Identity**: Logo, branding, icons, image treatment, transitions
+- **UX Patterns**: Navigation, hierarchy, feedback, responsive breakpoints
+- **Component Library**: 10+ base accessible components with consistent patterns
+- **Admin Interface Design**: Context-aware layouts, dashboards, tables, forms
+- **Public Interface Design**: Event cards, band profiles, mobile navigation
+
+**Rationale:**
+- User feedback: "redesigning the ui overall isn't off the table, in fact, recommended"
+- Establishes design foundation before implementation (Sprints 2.1-2.3)
+- Ensures consistent design language across admin and public interfaces
+- Builds accessibility into components from the start (WCAG 2.1 AA)
+- Provides reusable component library for faster development
+
+**Timeline Impact:**
+- Week 2 now: Sprint 2.0 (1.5 days) → 2.1 (2 days) → 2.2 (2 days) → 2.3 (2.5 days)
+- Total: 8 days (fits within Week 2: Nov 18-24 + Nov 25-26)
+- No impact to Week 3 testing/docs/demo prep schedule
 
 ---
 
@@ -76,8 +106,9 @@
 - 📊 Basic analytics dashboard (event views, popular bands)
 - 🔔 Email notifications for new events (subscription system)
 - 📱 PWA capabilities (offline schedule viewing)
-- 🎨 Consistent design system across admin/public
 - 📸 Drag-and-drop image uploads (R2 integration)
+
+**Note**: Design system elevated to Sprint 2.0 (HIGH priority)
 
 ### Explicitly Out of Scope
 
@@ -147,7 +178,52 @@
 
 ### Week 2: Frontend & UX (Nov 18-24)
 
-**Goal**: Polished public interface and admin UX
+**Goal**: Polished public interface and admin UX with cohesive design system
+
+#### Sprint 2.0: UI/UX Redesign & Design System (1.5 days)
+
+- [ ] **Design System Foundation**
+  - [ ] Color palette (primary, secondary, accent, semantic colors)
+  - [ ] Typography scale (headings, body, code, labels)
+  - [ ] Spacing system (margins, padding, gaps)
+  - [ ] Component primitives (buttons, inputs, cards, badges)
+- [ ] **Visual Identity**
+  - [ ] Logo and branding assets
+  - [ ] Icon set selection/creation
+  - [ ] Image treatment guidelines
+  - [ ] Loading states and transitions
+- [ ] **UX Patterns**
+  - [ ] Navigation structure (admin vs public)
+  - [ ] Information hierarchy
+  - [ ] User feedback patterns (success, error, warning)
+  - [ ] Mobile-first responsive breakpoints
+- [ ] **Component Library Setup**
+  - [ ] Base component implementations
+  - [ ] Accessible form controls
+  - [ ] Consistent layout containers
+  - [ ] Reusable UI primitives
+- [ ] **Admin Interface Design**
+  - [ ] Context-aware header/navigation
+  - [ ] Dashboard layout patterns
+  - [ ] Data table designs
+  - [ ] Form layouts and validation states
+- [ ] **Public Interface Design**
+  - [ ] Event card/timeline designs
+  - [ ] Band profile layouts
+  - [ ] Mobile navigation patterns
+  - [ ] Performance-optimized image handling
+
+**Acceptance Criteria**:
+
+- Design system documented and reusable
+- All colors, typography, spacing defined in CSS variables
+- Component library has 10+ base components
+- Admin and public interfaces share consistent design language
+- Mobile-responsive patterns established
+- Accessibility built into all components (WCAG 2.1 AA)
+- Visual designs reviewed and approved
+
+**Priority**: HIGH - Establishes foundation for all subsequent UI work
 
 #### Sprint 2.1: Public Event Timeline (2 days)
 
@@ -290,16 +366,17 @@
 
 ### Must Build (Essential for Demo)
 
-| Feature                | Why Essential          | Estimate |
-| ---------------------- | ---------------------- | -------- |
-| RBAC                   | Multi-user requirement | 2 days   |
-| Event Management       | Core workflow          | 2 days   |
-| Band Profiles          | Key differentiator     | 3 days   |
-| Public Timeline        | Demo centerpiece       | 2 days   |
-| Admin Interface Polish | Usability requirement  | 3 days   |
-| Documentation          | Production readiness   | 2 days   |
+| Feature                | Why Essential          | Estimate   |
+| ---------------------- | ---------------------- | ---------- |
+| RBAC                   | Multi-user requirement | 2 days     |
+| Event Management       | Core workflow          | 2 days     |
+| Band Profiles          | Key differentiator     | 3 days     |
+| UI/UX Design System    | Design foundation      | 1.5 days   |
+| Public Timeline        | Demo centerpiece       | 2 days     |
+| Admin Interface Polish | Usability requirement  | 2.5 days   |
+| Documentation          | Production readiness   | 2 days     |
 
-**Total**: 14 days (leaves 5 days buffer)
+**Total**: 15.5 days (leaves 3.5 days buffer)
 
 ### Can Defer (Post-Demo)
 

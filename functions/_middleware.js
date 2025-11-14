@@ -6,13 +6,16 @@ export async function onRequest(context) {
 
   // Allowed origins for CORS (production and development)
   const ALLOWED_ORIGINS = [
-    "https://lwbc.dredre.net",
-    "https://dev.longweekend-bandcrawl.pages.dev",
-    "https://longweekend-bandcrawl.pages.dev",
+    "https://settimes.ca",
+    "https://www.settimes.ca",
+    "https://dev.settimes.pages.dev",
+    "https://settimes.pages.dev",
     "http://localhost:5173",
     "http://localhost:3000",
+    "http://localhost:8788",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
+    "http://127.0.0.1:8788",
   ];
 
   // Check if origin is allowed

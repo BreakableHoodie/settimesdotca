@@ -3,7 +3,7 @@
 // Body: { reason: string } (optional reason for audit log)
 // Returns: { success: true, resetToken: string } or error
 
-import { generateToken } from "../../../utils/tokens.js";
+import { generateToken } from "../../../../utils/tokens.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;

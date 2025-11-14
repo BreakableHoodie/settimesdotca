@@ -82,6 +82,29 @@ export function createTestDB() {
       last_email_sent TEXT,
       UNIQUE(email, city, genre)
     );
+
+    CREATE TABLE password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      expires_at TEXT NOT NULL,
+      used INTEGER DEFAULT 0,
+      used_at TEXT,
+      ip_address TEXT,
+      reason TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE auth_audit (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      action TEXT NOT NULL,
+      success INTEGER NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   const insertUser = db.prepare(

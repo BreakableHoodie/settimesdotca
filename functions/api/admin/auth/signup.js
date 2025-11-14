@@ -94,6 +94,20 @@ export async function onRequestPost(context) {
 
     // Generate session token
     const sessionToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+
+    // Create session in database
+    await DB.prepare(
+      "INSERT INTO sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
+    )
+      .bind(
+        sessionToken,
+        user.id,
+        expiresAt,
+        request.headers.get("CF-Connecting-IP") || "unknown",
+        request.headers.get("User-Agent") || "unknown",
+      )
+      .run();
 
     return new Response(
       JSON.stringify({

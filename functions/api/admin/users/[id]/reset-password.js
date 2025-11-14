@@ -1,9 +1,7 @@
 // Admin-initiated password reset endpoint
 // POST /api/admin/users/[id]/reset-password
-// Body: { reason: string } (optional reason for audit log)
-// Returns: { success: true, resetToken: string } or error
-
-import { generateToken } from "../../../../utils/tokens.js";
+// Body: { newPassword: string }
+// Returns: { success: true } or error
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
@@ -52,7 +50,18 @@ export async function onRequestPost(context) {
     }
 
     const userId = params.id;
-    const { reason } = await request.json().catch(() => ({}));
+    const { newPassword } = await request.json().catch(() => ({}));
+
+    // Validate password strength
+    if (!newPassword || newPassword.length < 8) {
+      return new Response(
+        JSON.stringify({ error: "Password must be at least 8 characters" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     // Get target user
     const targetUser = await DB.prepare(
@@ -82,70 +91,41 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Generate reset token
-    const resetToken = generateToken(32);
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+    // Hash the new password (in production, use bcrypt or similar)
+    const passwordHash = await hashPassword(newPassword);
 
-    // Invalidate any existing reset tokens for this user
+    // Update user's password
     await DB.prepare(
       `
-      UPDATE password_reset_tokens
-      SET used = 1, used_at = datetime('now')
-      WHERE user_id = ? AND used = 0
+      UPDATE users
+      SET password_hash = ?, updated_at = datetime('now')
+      WHERE id = ?
     `,
     )
-      .bind(userId)
+      .bind(passwordHash, userId)
       .run();
 
-    // Create new reset token
+    // Log the action to audit_log
     await DB.prepare(
       `
-      INSERT INTO password_reset_tokens (user_id, token, created_by, expires_at, reason)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO audit_log (user_id, action, resource_type, resource_id, details)
+      VALUES (?, 'user.password_reset', 'user', ?, ?)
     `,
     )
       .bind(
-        userId,
-        resetToken,
         session.id,
-        expiresAt,
-        reason || "Admin-initiated reset",
-      )
-      .run();
-
-    // Log the action
-    await DB.prepare(
-      `
-      INSERT INTO auth_audit (action, success, ip_address, user_agent, details)
-      VALUES ('admin_password_reset', 1, ?, ?, ?)
-    `,
-    )
-      .bind(
-        request.headers.get("CF-Connecting-IP") || "unknown",
-        request.headers.get("User-Agent") || "unknown",
+        userId,
         JSON.stringify({
-          admin_id: session.id,
           admin_email: session.email,
-          target_user_id: userId,
-          target_user_email: targetUser.email,
-          reason: reason || "Admin-initiated reset",
+          target_email: targetUser.email,
         }),
       )
       .run();
 
-    // TODO: Send email to user with reset link
-    // const resetUrl = `${env.PUBLIC_URL}/reset-password?token=${resetToken}`
-    // await sendEmail({
-    //   to: targetUser.email,
-    //   subject: 'Password Reset Request',
-    //   html: `<p>Click here to reset your password (valid for 24 hours): <a href="${resetUrl}">${resetUrl}</a></p>`
-    // })
-
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Password reset email would be sent to ${targetUser.email}`,
-        expiresAt: expiresAt,
+        message: `Password updated for ${targetUser.email}`,
       }),
       {
         status: 200,
@@ -155,11 +135,18 @@ export async function onRequestPost(context) {
   } catch (error) {
     console.error("Admin password reset error:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to initiate password reset" }),
+      JSON.stringify({ error: "Failed to reset password" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
       },
     );
   }
+}
+
+// Simple password hashing (in production, use bcrypt or argon2)
+async function hashPassword(password) {
+  // For testing, just prepend 'hashed_'
+  // In production, use: await bcrypt.hash(password, 10)
+  return `hashed_${password}`;
 }

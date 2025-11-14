@@ -8,7 +8,36 @@ export function createTestDB() {
     CREATE TABLE users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE,
-      role TEXT NOT NULL
+      password_hash TEXT,
+      role TEXT NOT NULL,
+      name TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      last_login TEXT
+    );
+
+    CREATE TABLE sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ip_address TEXT,
+      user_agent TEXT,
+      remember_me INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL
+    );
+
+    CREATE TABLE audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      action TEXT NOT NULL,
+      resource_type TEXT,
+      resource_id INTEGER,
+      details TEXT,
+      ip_address TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     );
 
     CREATE TABLE events (
@@ -38,6 +67,20 @@ export function createTestDB() {
       name TEXT NOT NULL,
       city TEXT,
       address TEXT
+    );
+
+    CREATE TABLE email_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      city TEXT NOT NULL,
+      genre TEXT NOT NULL,
+      frequency TEXT NOT NULL DEFAULT 'weekly',
+      verified BOOLEAN NOT NULL DEFAULT 0,
+      verification_token TEXT UNIQUE,
+      unsubscribe_token TEXT UNIQUE NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_email_sent TEXT,
+      UNIQUE(email, city, genre)
     );
   `);
 
@@ -118,7 +161,15 @@ export function createDBEnv(db) {
           }
         },
         run() {
-          return stmt.run();
+          const result = stmt.run();
+          return {
+            success: true,
+            meta: {
+              last_row_id: result.lastInsertRowid,
+              changes: result.changes,
+              duration: 0
+            }
+          };
         },
         bind(...params) {
           const bound = params;
@@ -139,7 +190,15 @@ export function createDBEnv(db) {
               }
             },
             run() {
-              return stmt.run(...bound);
+              const result = stmt.run(...bound);
+              return {
+                success: true,
+                meta: {
+                  last_row_id: result.lastInsertRowid,
+                  changes: result.changes,
+                  duration: 0
+                }
+              };
             },
           };
         },
@@ -152,10 +211,23 @@ export function createDBEnv(db) {
 
 export function createTestEnv({ role = "editor" } = {}) {
   const rawDb = createTestDB();
+
+  // Create a valid session for the test user
+  const userId = role === "admin" ? 1 : role === "editor" ? 2 : 3;
+  const sessionId = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  rawDb.prepare(
+    "INSERT INTO sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
+  ).run(sessionId, userId, expiresAt, "127.0.0.1", "test-agent");
+
   return {
     env: { DB: createDBEnv(rawDb) },
     rawDb,
     role,
-    headers: { "x-test-role": role },
+    headers: {
+      "x-test-role": role,
+      "Authorization": `Bearer ${sessionId}`
+    },
   };
 }

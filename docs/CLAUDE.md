@@ -4,7 +4,9 @@
 
 A mobile-first web application for the Long Weekend Band Crawl music festival. Provides public event schedules, band profiles with stats, and a full-featured admin panel for event management.
 
-**Current Status**: Production-ready with comprehensive database, admin tools, performer registry, and optimized performance.
+**Current Status**: Sprint 1 infrastructure complete (100% test pass rate). Targeting Nov 30, 2025 demo with RBAC, event management, and comprehensive UI/UX redesign.
+
+**Active Roadmap**: See `ROADMAP_TO_DEMO.md` for 3-week sprint plan and daily progress tracking.
 
 ## Visual Reference
 
@@ -203,51 +205,75 @@ longweekendbandcrawl/
 
 ## Recent Improvements (Nov 2025)
 
-### Performance Optimization
+### Test Infrastructure & Database (Nov 13, 2025) ✅
 
-1. **N+1 Query Fix** (`functions/api/events/timeline.js`)
+1. **Complete Test Suite** - 100% Pass Rate Achieved
+   - 65 passing tests / 0 failing (71 total with 6 todos)
+   - Fixed reset-password endpoint (direct password updates with validation)
+   - Fixed signup endpoint (session creation in database)
+   - Added RBAC protection to analytics endpoints (admin-only)
+   - Test schema aligned with production (all columns and tables)
+   - D1 API compatibility in mock database
+
+2. **Database Initialization**
+   - `database/longweekend.db` initialized from 0 bytes
+   - 8 migrations applied in correct order (schema-v2 → events-theming)
+   - 17 tables ready for Sprint 1.1-1.3 features
+   - Default admin user: `admin@pinklemonaderecords.com` / `admin123`
+   - Full audit logging, RBAC, 2FA infrastructure, metrics
+
+3. **UI/UX Redesign Planning**
+   - Sprint 2.0 added to roadmap (1.5 days)
+   - Design system foundation prioritized before implementation
+   - Comprehensive component library planned (10+ base components)
+   - Accessibility built-in (WCAG 2.1 AA compliance)
+   - See `ROADMAP_TO_DEMO.md` for full scope
+
+### Performance Optimization (Nov 5, 2025)
+
+4. **N+1 Query Fix** (`functions/api/events/timeline.js`)
    - Replaced sequential queries with JOIN-based approach
    - Reduced database calls from O(n) to O(1) per time period
    - Eliminated 100-300ms latency per request
 
-2. **Code Splitting** (`frontend/src/main.jsx`)
+5. **Code Splitting** (`frontend/src/main.jsx`)
    - Lazy loaded BandProfilePage (-9.48 KB from main bundle)
    - AdminApp already lazy loaded
    - Main bundle: 143.88 KB (43.47 KB gzipped)
 
-3. **Console.log Removal** (`frontend/src/utils/performance.js`, `frontend/src/main.jsx`)
+6. **Console.log Removal** (`frontend/src/utils/performance.js`, `frontend/src/main.jsx`)
    - All debug logging wrapped in `import.meta.env.DEV` checks
    - Zero console output in production builds
    - Error logging preserved for monitoring
 
-### Reliability
+### Reliability (Nov 5, 2025)
 
-4. **React Error Boundaries** (`frontend/src/components/ErrorBoundary.jsx`)
+7. **React Error Boundaries** (`frontend/src/components/ErrorBoundary.jsx`)
    - Graceful error handling for entire app
    - Context-specific boundaries for Admin and Band Profiles
    - Dev-mode error details with stack traces
    - User-friendly recovery UI
 
-### Documentation
+### Documentation (Nov 5, 2025)
 
-5. **SQL Safety Guide** (`docs/SQL_SAFETY.md`)
+8. **SQL Safety Guide** (`docs/SQL_SAFETY.md`)
    - Parameterized query patterns
    - Bulk operation safety
    - Input validation examples
    - Security checklist
 
-6. **Session Management** (`docs/SESSION_MANAGEMENT.md`)
+9. **Session Management** (`docs/SESSION_MANAGEMENT.md`)
    - Current 24-hour timeout documented
    - Security features and UX improvements
    - Testing procedures
 
-### Testing
+### Testing Framework (Nov 5, 2025)
 
-7. **Comprehensive Test Suite**
-   - Timeline API tests (19 tests, all passing)
-   - ErrorBoundary component tests (comprehensive coverage)
-   - Performance utilities tests (DEV/production validation)
-   - Framework: Vitest + React Testing Library
+10. **Comprehensive Test Suite**
+    - Timeline API tests (19 tests, all passing)
+    - ErrorBoundary component tests (comprehensive coverage)
+    - Performance utilities tests (DEV/production validation)
+    - Framework: Vitest + React Testing Library
 
 ## Data Model
 
@@ -351,16 +377,163 @@ When working on this project:
 - [ ] Bulk venue operations
 - [ ] Advanced search/filtering on admin pages
 
+## Agent Utilization Strategy
+
+**Priority**: Always leverage specialized agents for complex, multi-step operations to maximize efficiency and quality.
+
+### Primary Agents for This Project
+
+#### 1. **frontend-developer** (UI Implementation)
+**Use For**:
+- React component development (admin panels, event wizards, band profiles)
+- TailwindCSS styling and responsive design
+- Client-side routing and navigation patterns
+- Form validation and error handling
+- Frontend performance optimization
+
+**Triggers**:
+- Sprint 2.0-2.3 UI/UX redesign and implementation
+- Component library creation
+- Admin interface development
+- Public timeline and band profile pages
+
+**Example**: "Use frontend-developer agent to implement Sprint 2.0 design system with TailwindCSS"
+
+#### 2. **deep-research-agent** (Investigation & Analysis)
+**Use For**:
+- Framework/library documentation research (React Router v7, Cloudflare D1 APIs)
+- Best practices investigation (accessibility, performance patterns)
+- Security vulnerability research (OWASP, Cloudflare security)
+- Architecture pattern analysis (RBAC, session management)
+
+**Triggers**:
+- New feature planning requiring external research
+- Security audit preparation
+- Performance optimization investigation
+- Technology upgrade decisions
+
+**Example**: "Use deep-research-agent to investigate React 19 migration path and breaking changes"
+
+#### 3. **refactoring-expert** (Code Quality)
+**Use For**:
+- BandsTab.jsx complexity reduction (currently 800+ lines)
+- Component extraction and modularization
+- Technical debt reduction
+- Code smell elimination
+
+**Triggers**:
+- Code review findings
+- Before major feature additions
+- Performance bottleneck remediation
+
+**Example**: "Use refactoring-expert to refactor BandsTab.jsx using useReducer pattern"
+
+#### 4. **accessibility-specialist** (WCAG Compliance)
+**Use For**:
+- WCAG 2.1 AA compliance validation
+- Keyboard navigation implementation
+- ARIA attribute optimization
+- Screen reader compatibility
+
+**Triggers**:
+- Sprint 2.0 component library creation
+- Before demo (Sprint 3.3)
+- Accessibility audit (Sprint 3.1)
+
+**Example**: "Use accessibility-specialist to audit EventWizard.jsx for keyboard navigation"
+
+#### 5. **debugger** (Error Investigation)
+**Use For**:
+- Test failure investigation
+- Runtime error debugging
+- Performance regression analysis
+- Build failure troubleshooting
+
+**Triggers**:
+- Test failures in CI/CD
+- Production bugs reported
+- Unexpected behavior in admin panel
+
+**Example**: "Use debugger agent to investigate why subscription analytics tests are failing"
+
+### Agent Workflow Patterns
+
+#### Pattern 1: Feature Development
+```
+1. deep-research-agent → Research best practices and patterns
+2. frontend-developer → Implement UI components
+3. accessibility-specialist → Validate WCAG compliance
+4. debugger → Fix any test failures
+5. code-reviewer → Final quality check
+```
+
+#### Pattern 2: Refactoring
+```
+1. refactoring-expert → Analyze code and propose improvements
+2. code-reviewer → Review proposed changes
+3. debugger → Verify tests still pass
+```
+
+#### Pattern 3: UI/UX Redesign (Sprint 2.0)
+```
+1. deep-research-agent → Research design system patterns
+2. ui-ux-designer → Create design specifications
+3. frontend-developer → Implement component library
+4. accessibility-specialist → Validate accessibility
+5. code-reviewer → Review implementation quality
+```
+
+### Agent Selection Guidelines
+
+**✅ DO Use Agents For**:
+- Multi-step operations (>3 steps)
+- Specialized domain knowledge (UI/UX, accessibility, security)
+- Complex debugging requiring systematic investigation
+- Research requiring multiple information sources
+- Code quality improvements across multiple files
+
+**❌ DON'T Use Agents For**:
+- Simple single-file edits
+- Quick bug fixes (<5 lines of code)
+- Basic documentation updates
+- Straightforward configuration changes
+
+### Sprint-Specific Agent Recommendations
+
+**Sprint 1.1-1.3** (RBAC, Event Management, Band Profiles):
+- `refactoring-expert` for auth middleware optimization
+- `debugger` for RBAC permission test failures
+- `code-reviewer` for security validation
+
+**Sprint 2.0** (UI/UX Redesign):
+- `ui-ux-designer` for design system creation
+- `frontend-developer` for component library implementation
+- `accessibility-specialist` for WCAG compliance
+- `deep-research-agent` for modern CSS patterns
+
+**Sprint 2.1-2.3** (Timeline, Profiles, Polish):
+- `frontend-developer` for feature implementation
+- `accessibility-specialist` for mobile navigation
+- `performance-engineer` for bundle optimization
+- `code-reviewer` for quality gates
+
+**Sprint 3.1** (Testing & Bug Fixes):
+- `debugger` for systematic bug investigation
+- `accessibility-specialist` for WCAG audit
+- `performance-engineer` for load time optimization
+- `error-detective` for production error analysis
+
 ## Claude Priorities
 
-1. **Evidence-Based**: All performance claims must be measurable
-2. **Security First**: Never compromise on SQL injection, XSS, or auth
-3. **User Privacy**: No analytics, no trackers, minimal data collection
-4. **Accessibility**: WCAG 2.1 AA compliance, keyboard navigation
-5. **Documentation**: Update this file when architecture changes
-6. **Testing**: Write tests for new features and bug fixes
-7. **Performance**: Measure before optimizing, use profiling tools
-8. **Simplicity**: Prefer boring solutions over clever ones
+1. **Agent-First Approach**: Delegate complex tasks to specialized agents
+2. **Evidence-Based**: All performance claims must be measurable
+3. **Security First**: Never compromise on SQL injection, XSS, or auth
+4. **User Privacy**: No analytics, no trackers, minimal data collection
+5. **Accessibility**: WCAG 2.1 AA compliance, keyboard navigation
+6. **Documentation**: Update this file when architecture changes
+7. **Testing**: Write tests for new features and bug fixes
+8. **Performance**: Measure before optimizing, use profiling tools
+9. **Simplicity**: Prefer boring solutions over clever ones
 
 ## Resources
 
@@ -373,6 +546,7 @@ When working on this project:
 
 ---
 
-**Last Updated**: November 5, 2025
+**Last Updated**: November 13, 2025
 **Version**: 2.0 (Performers/Performances Architecture)
-**Status**: Production-ready with comprehensive test coverage
+**Status**: Sprint 1 complete (100% test pass rate), targeting Nov 30 demo
+**Roadmap**: See `ROADMAP_TO_DEMO.md` for 3-week sprint plan

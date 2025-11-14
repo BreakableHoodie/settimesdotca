@@ -148,7 +148,7 @@ This ensures the app works even if D1 is not set up yet.
 ## File Structure
 
 ```
-longweekendbandcrawl/
+settimes/
 ├── database/
 │   ├── schema.sql                      # D1 table definitions
 │   ├── seed.sql                        # Sample data
@@ -290,10 +290,10 @@ longweekendbandcrawl/
 
 ### Local Development
 
-- [ ] Create D1 database: `wrangler d1 create bandcrawl-db`
+- [ ] Create D1 database: `wrangler d1 create settimes-db`
 - [ ] Update database_id in wrangler.toml
-- [ ] Initialize schema: `wrangler d1 execute bandcrawl-db --file=database/schema.sql --local`
-- [ ] Add seed data: `wrangler d1 execute bandcrawl-db --file=database/seed.sql --local`
+- [ ] Initialize schema: `wrangler d1 execute settimes-db --file=database/schema.sql --local`
+- [ ] Add seed data: `wrangler d1 execute settimes-db --file=database/seed.sql --local`
 - [ ] Create .dev.vars with passwords
 - [ ] Start dev server: `cd frontend && npm run dev`
 - [ ] Access admin: `http://localhost:5173/admin`
@@ -356,10 +356,10 @@ longweekendbandcrawl/
 
    ```bash
    # Local
-   wrangler d1 execute bandcrawl-db --local --file=database/migration.sql
+   wrangler d1 execute settimes-db --local --file=database/migration.sql
 
    # Production
-   wrangler d1 execute bandcrawl-db --file=database/migration.sql
+   wrangler d1 execute settimes-db --file=database/migration.sql
    ```
 
 4. **Verify:**

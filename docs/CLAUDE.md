@@ -51,7 +51,7 @@ Use `docs/schedule.webp` as the design inspiration:
 
 - **Platform:** Cloudflare Pages
 - **Prod URL:** https://lwbc.dredre.net
-- **Dev URL:** https://dev.longweekend-bandcrawl.pages.dev
+- **Dev URL:** https://dev.settimes.pages.dev
 - **Local Dev:** wrangler pages dev on port 8788
 
 ## Core Features
@@ -103,7 +103,7 @@ npm install
 npm run dev
 
 # Full stack with Cloudflare Pages Functions
-cd longweekendbandcrawl
+cd settimes
 npx wrangler pages dev frontend/dist --compatibility-date=2024-01-01 --local
 
 # Remote access (Tailscale VPN)
@@ -165,7 +165,7 @@ npm run quality
 ## Project Structure
 
 ```
-longweekendbandcrawl/
+settimes/
 ├── frontend/src/
 │   ├── admin/              # Admin panel components
 │   │   ├── AdminApp.jsx    # Lazy loaded admin routes

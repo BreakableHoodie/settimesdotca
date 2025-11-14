@@ -504,7 +504,7 @@ Accept: application/vnd.bandcrawl.v2+json
 
 ```bash
 # Before major changes (event duplication, bulk edits)
-wrangler d1 export bandcrawl-db --output=backup-$(date +%Y%m%d).sql
+wrangler d1 export settimes-db --output=backup-$(date +%Y%m%d).sql
 
 # Automated daily backups (via GitHub Actions)
 # Store in secure location (S3, encrypted git repo)
@@ -516,7 +516,7 @@ wrangler d1 export bandcrawl-db --output=backup-$(date +%Y%m%d).sql
 
 ```bash
 node database/migrate-bands-json.js > migration.sql
-wrangler d1 execute bandcrawl-db --file=migration.sql
+wrangler d1 execute settimes-db --file=migration.sql
 ```
 
 **Future: CSV Import/Export**
@@ -580,14 +580,14 @@ export async function onSchedule(event) {
 
 ```bash
 # Delete unpublished events older than 30 days
-wrangler d1 execute bandcrawl-db --command "
+wrangler d1 execute settimes-db --command "
   DELETE FROM events
   WHERE is_published = 0
   AND created_at < datetime('now', '-30 days')
 "
 
 # Clear rate limits for specific IP
-wrangler d1 execute bandcrawl-db --command "
+wrangler d1 execute settimes-db --command "
   DELETE FROM rate_limit
   WHERE ip_address = '1.2.3.4'
 "
@@ -621,8 +621,8 @@ ALTER TABLE events DROP COLUMN name;
 **Migration Workflow:**
 
 1. Create `database/migrations/YYYYMMDD_description.sql`
-2. Test locally: `wrangler d1 execute bandcrawl-db --local --file=migrations/...sql`
-3. Apply to production: `wrangler d1 execute bandcrawl-db --file=migrations/...sql`
+2. Test locally: `wrangler d1 execute settimes-db --local --file=migrations/...sql`
+3. Apply to production: `wrangler d1 execute settimes-db --file=migrations/...sql`
 4. Document in `CHANGELOG.md`
 
 ---
@@ -774,13 +774,13 @@ main (production)
 # Setup
 cd frontend
 npm install
-wrangler d1 create bandcrawl-db
-wrangler d1 execute bandcrawl-db --local --file=../database/schema.sql
+wrangler d1 create settimes-db
+wrangler d1 execute settimes-db --local --file=../database/schema.sql
 
 # Development
 npm run dev  # Vite dev server on :5173
 # OR
-npx wrangler pages dev dist --binding DB=bandcrawl-db  # Full stack
+npx wrangler pages dev dist --binding DB=settimes-db  # Full stack
 
 # Testing
 npm run test        # Vitest unit tests
@@ -956,15 +956,15 @@ d1_databases = [
 
 ```bash
 # Create database
-wrangler d1 create bandcrawl-db
+wrangler d1 create settimes-db
 
 # Execute SQL
-wrangler d1 execute bandcrawl-db --file=schema.sql
-wrangler d1 execute bandcrawl-db --command "SELECT * FROM events"
+wrangler d1 execute settimes-db --file=schema.sql
+wrangler d1 execute settimes-db --command "SELECT * FROM events"
 
 # Export/Import
-wrangler d1 export bandcrawl-db --output=backup.sql
-wrangler d1 execute bandcrawl-db --file=backup.sql
+wrangler d1 export settimes-db --output=backup.sql
+wrangler d1 execute settimes-db --file=backup.sql
 
 # List databases
 wrangler d1 list
@@ -997,7 +997,7 @@ DELETE /api/admin/bands/{id}
 ### File Structure
 
 ```
-longweekendbandcrawl/
+settimes/
 ├── database/
 │   ├── schema.sql           # Table definitions
 │   ├── seed.sql             # Sample data

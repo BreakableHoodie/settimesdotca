@@ -78,14 +78,14 @@ INSERT INTO users (email, password_hash, org_id, role) VALUES
 **Run migration:**
 
 ```bash
-npx wrangler d1 execute bandcrawl-db --local --file=database/migration-multi-org.sql
+npx wrangler d1 execute settimes-db --local --file=database/migration-multi-org.sql
 ```
 
 **Testing:**
 
 ```bash
 # Verify tables created
-npx wrangler d1 execute bandcrawl-db --local --command="SELECT name FROM sqlite_master WHERE type='table'"
+npx wrangler d1 execute settimes-db --local --command="SELECT name FROM sqlite_master WHERE type='table'"
 
 # Should see: organizations, users
 ```
@@ -1078,7 +1078,7 @@ export default function MetricsDashboard({ eventId }) {
 1. **Run migration:**
 
    ```bash
-   npx wrangler d1 execute bandcrawl-db --local --file=database/migration-multi-org.sql
+   npx wrangler d1 execute settimes-db --local --file=database/migration-multi-org.sql
    ```
 
 2. **Install bcrypt:**
@@ -1096,14 +1096,14 @@ export default function MetricsDashboard({ eventId }) {
 4. **Test locally:**
 
    ```bash
-   npx wrangler pages dev frontend/dist --binding DB=bandcrawl-db --local
+   npx wrangler pages dev frontend/dist --binding DB=settimes-db --local
    ```
 
 5. **Deploy to production:**
 
    ```bash
    # Run migration on production D1
-   npx wrangler d1 execute bandcrawl-db --file=database/migration-multi-org.sql
+   npx wrangler d1 execute settimes-db --file=database/migration-multi-org.sql
 
    # Deploy
    npx wrangler pages deploy frontend/dist

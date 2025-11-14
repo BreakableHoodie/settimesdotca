@@ -81,7 +81,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_unsubscribe_token ON email_subscrip
 **Run migration:**
 
 ```bash
-npx wrangler d1 execute bandcrawl-db --local --file=database/migration-subscriptions.sql
+npx wrangler d1 execute settimes-db --local --file=database/migration-subscriptions.sql
 ```
 
 ---
@@ -962,7 +962,7 @@ export async function onRequestGet(context) {
 1. **Run migration:**
 
    ```bash
-   npx wrangler d1 execute bandcrawl-db --local --file=database/migration-subscriptions.sql
+   npx wrangler d1 execute settimes-db --local --file=database/migration-subscriptions.sql
    ```
 
 2. **Set environment variables:**
@@ -980,7 +980,7 @@ export async function onRequestGet(context) {
 
    ```bash
    cd frontend && npm run build
-   npx wrangler pages dev dist --binding DB=bandcrawl-db --local
+   npx wrangler pages dev dist --binding DB=settimes-db --local
    ```
 
 4. **Test subscription flow:**
@@ -1007,7 +1007,7 @@ export async function onRequestGet(context) {
 
    ```bash
    # Run migration on production D1
-   npx wrangler d1 execute bandcrawl-db --file=database/migration-subscriptions.sql
+   npx wrangler d1 execute settimes-db --file=database/migration-subscriptions.sql
 
    # Deploy
    npx wrangler pages deploy frontend/dist

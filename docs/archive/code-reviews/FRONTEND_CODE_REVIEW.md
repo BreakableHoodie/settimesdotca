@@ -12,7 +12,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 
 ### Main App Structure ✓ WELL-DESIGNED
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/main.jsx` (104 lines)
+**File**: `/home/user/settimes/frontend/src/main.jsx` (104 lines)
 
 **Strengths:**
 
@@ -28,7 +28,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 
 ---
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/App.jsx` (229 lines)
+**File**: `/home/user/settimes/frontend/src/App.jsx` (229 lines)
 
 **Strengths:**
 
@@ -73,7 +73,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 
 #### 1. **BandsTab.jsx** - 814 Lines
 
-**Location**: `/home/user/longweekend-bandcrawl/frontend/src/admin/BandsTab.jsx`
+**Location**: `/home/user/settimes/frontend/src/admin/BandsTab.jsx`
 
 **Issues:**
 
@@ -124,7 +124,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 
 #### 2. **EventsTab.jsx** - 1,063 Lines
 
-**Location**: `/home/user/longweekend-bandcrawl/frontend/src/admin/EventsTab.jsx`
+**Location**: `/home/user/settimes/frontend/src/admin/EventsTab.jsx`
 
 **Critical Issues:**
 
@@ -162,7 +162,7 @@ The codebase demonstrates good React patterns and thoughtful features (accessibi
 
 #### 3. **MySchedule.jsx** - 526 Lines
 
-**Location**: `/home/user/longweekend-bandcrawl/frontend/src/components/MySchedule.jsx`
+**Location**: `/home/user/settimes/frontend/src/components/MySchedule.jsx`
 
 **Issues:**
 
@@ -282,7 +282,7 @@ BandForm.propTypes = {
 
 ### Issue #3: Unused Imports
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/components/ScheduleView.jsx`
+**File**: `/home/user/settimes/frontend/src/components/ScheduleView.jsx`
 
 Line 3 imports `useState` but never uses it - only uses `useState` indirectly via props and `faCheck, faCopy` icons are imported but used correctly.
 
@@ -342,7 +342,7 @@ export const storage = {
 
 ### Issue #5: Error Handling - Empty Catch Blocks
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/components/ScheduleView.jsx`
+**File**: `/home/user/settimes/frontend/src/components/ScheduleView.jsx`
 
 Lines 77-100 have catch blocks with only comments:
 
@@ -375,7 +375,7 @@ catch (err) {
 }
 ```
 
-Similar issue in `/home/user/longweekend-bandcrawl/frontend/src/components/MySchedule.jsx` lines 275-298.
+Similar issue in `/home/user/settimes/frontend/src/components/MySchedule.jsx` lines 275-298.
 
 ---
 
@@ -470,7 +470,7 @@ const [formData, setFormData] = useState(INITIAL_FORM);
 
 ### Assessment: ✓ Well-Structured
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/main.jsx`
+**File**: `/home/user/settimes/frontend/src/main.jsx`
 
 Routes are clean and logical:
 
@@ -494,7 +494,7 @@ No issues found with routing.
 
 ### ErrorBoundary.jsx ✓ WELL-IMPLEMENTED
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/components/ErrorBoundary.jsx` (94 lines)
+**File**: `/home/user/settimes/frontend/src/components/ErrorBoundary.jsx` (94 lines)
 
 **Strengths**:
 
@@ -513,7 +513,7 @@ No issues found with routing.
 
 ### performance.js ⚠️ INCOMPLETE
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/utils/performance.js` (56 lines)
+**File**: `/home/user/settimes/frontend/src/utils/performance.js` (56 lines)
 
 **Issues**:
 
@@ -568,7 +568,7 @@ const metrics = {
 
 ### validation.js ✓ WELL-DESIGNED
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/utils/validation.js` (102 lines)
+**File**: `/home/user/settimes/frontend/src/utils/validation.js` (102 lines)
 
 **Strengths**:
 
@@ -586,7 +586,7 @@ const metrics = {
 
 ### adminApi.js ✓ GOOD PATTERN
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/utils/adminApi.js` (first 100 lines shown)
+**File**: `/home/user/settimes/frontend/src/utils/adminApi.js` (first 100 lines shown)
 
 **Strengths**:
 
@@ -607,7 +607,7 @@ const metrics = {
 
 ### Issue #1: Unnecessary Re-renders
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/components/MySchedule.jsx`
+**File**: `/home/user/settimes/frontend/src/components/MySchedule.jsx`
 
 Lines 120-124 create new array every render:
 
@@ -634,7 +634,7 @@ const sortedBands = useMemo(
 );
 ```
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/admin/BandsTab.jsx`
+**File**: `/home/user/settimes/frontend/src/admin/BandsTab.jsx`
 
 Line 384 already does this correctly:
 
@@ -646,7 +646,7 @@ const sortedBands = useMemo(() => sortBandsByStart(bands), [bands]); // GOOD
 
 ### Issue #2: Inline Objects in Props
 
-**File**: `/home/user/longweekend-bandcrawl/frontend/src/components/BandCard.jsx` (line 26)
+**File**: `/home/user/settimes/frontend/src/components/BandCard.jsx` (line 26)
 
 ```jsx
 const baseClasses = `w-full p-4 rounded-xl transition-transform duration-150 ${

@@ -7,16 +7,16 @@
 
 ## GitHub Repository
 
-The canonical repository lives at `git@github.com:BreakableHoodie/longweekend-bandcrawl.git`.
+The canonical repository lives at `git@github.com:BreakableHoodie/settimes.git`.
 
 1. Ensure your local remotes point to GitHub:
    ```bash
    git remote -v
-   # origin should be git@github.com:BreakableHoodie/longweekend-bandcrawl.git
+   # origin should be git@github.com:BreakableHoodie/settimes.git
    ```
    If not, update it with:
    ```bash
-   git remote set-url origin git@github.com:BreakableHoodie/longweekend-bandcrawl.git
+   git remote set-url origin git@github.com:BreakableHoodie/settimes.git
    ```
 2. Keep both long-lived branches in sync:
    ```bash
@@ -30,11 +30,11 @@ The canonical repository lives at `git@github.com:BreakableHoodie/longweekend-ba
 
 ### Connect GitHub to Cloudflare Pages
 
-1. In the Cloudflare dashboard, open **Workers & Pages → longweekend-bandcrawl**.
+1. In the Cloudflare dashboard, open **Workers & Pages → settimes**.
 2. Go to **Settings → Builds & deployments → Git integration** and choose **Connect to Git provider** (or **Disconnect** from Direct Upload first, if that option is shown).
 3. Authorize GitHub, select the new repository, and set **Production branch** to `main`.
 4. Under **Preview branches**, add `dev` so Cloudflare builds preview deployments automatically.
-5. Trigger a test deployment by pushing to `dev` and confirm the `dev.longweekend-bandcrawl.pages.dev` alias updates.
+5. Trigger a test deployment by pushing to `dev` and confirm the `dev.settimes.pages.dev` alias updates.
 
 Cloudflare Pages works with private GitHub repositories. When authorizing, grant the Cloudflare Pages GitHub app access to the private repo (either “All repositories” or the specific one) so Cloudflare can read the code during builds.
 
@@ -48,10 +48,10 @@ git checkout dev
 
 # Build and deploy to dev
 npm run build
-npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch dev
+npx wrangler pages deploy dist --project-name settimes --branch dev
 ```
 
-**Dev URL:** Will be at a subdomain like `dev.longweekend-bandcrawl.pages.dev`
+**Dev URL:** Will be at a subdomain like `dev.settimes.pages.dev`
 
 After the deployment finishes, capture a quick PageSpeed snapshot:
 
@@ -65,11 +65,11 @@ The helper script defaults to both mobile and desktop runs; anonymous usage is h
 ### Enable the dev preview in Cloudflare Pages
 
 1. Sign in to the Cloudflare dashboard and open **Workers & Pages**.
-2. Select the `longweekend-bandcrawl` project.
+2. Select the `settimes` project.
 3. In the left nav choose **Settings → Builds & deployments → Git integration**.
 4. Confirm `main` is the production branch, then add `dev` under **Preview branches** so pushes to `dev` auto-build.
 
-If the project is set up as a direct upload (no Git integration connected), the **Preview branches** UI will not appear. Use `npx wrangler pages deploy ... --branch dev` (shown above) to publish the dev build—Cloudflare automatically serves it at `dev.longweekend-bandcrawl.pages.dev`.
+If the project is set up as a direct upload (no Git integration connected), the **Preview branches** UI will not appear. Use `npx wrangler pages deploy ... --branch dev` (shown above) to publish the dev build—Cloudflare automatically serves it at `dev.settimes.pages.dev`.
 
 ## Deploy to Production
 
@@ -84,7 +84,7 @@ git merge dev
 
 # Build and deploy to prod
 npm run build
-npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch main
+npx wrangler pages deploy dist --project-name settimes --branch main
 ```
 
 **Production URL:** lwbc.dredre.net (via custom domain)
@@ -93,11 +93,11 @@ npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch mai
 
 ```bash
 # Deploy current branch
-npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch $(git branch --show-current)
+npm run build && npx wrangler pages deploy dist --project-name settimes --branch $(git branch --show-current)
 
 # Or add to package.json:
-# "deploy:dev": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch dev"
-# "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name longweekend-bandcrawl --branch main"
+# "deploy:dev": "npm run build && npx wrangler pages deploy dist --project-name settimes --branch dev"
+# "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name settimes --branch main"
 ```
 
 ## Testing Safari Cache Issues

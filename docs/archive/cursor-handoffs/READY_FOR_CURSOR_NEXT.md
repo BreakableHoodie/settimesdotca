@@ -30,7 +30,7 @@
 **1. Open Cursor**
 
 ```bash
-cursor /Users/andrelevesque/Projects/longweekendbandcrawl/longweekendbandcrawl
+cursor /Users/andrelevesque/Projects/settimes/settimes
 ```
 
 **2. Copy This Prompt**

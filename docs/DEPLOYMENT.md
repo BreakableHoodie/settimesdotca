@@ -21,7 +21,7 @@ No environment variables required for this static build.
    - Log in to Cloudflare Dashboard
    - Go to Pages → Create a project
    - Connect your GitHub account
-   - Select the repository: `BreakableHoodie/longweekend-bandcrawl`
+   - Select the repository: `BreakableHoodie/settimes`
    - Set `main` as the production branch and add `dev` under preview branches
 
 2. **Configure Build Settings**
@@ -120,4 +120,4 @@ To update the band schedule after deployment:
 
 **Event Date:** October 12, 2025
 **Deployment Domain:** <https://lwbc.dredre.net>
-**Repository:** BreakableHoodie/longweekend-bandcrawl
+**Repository:** BreakableHoodie/settimes

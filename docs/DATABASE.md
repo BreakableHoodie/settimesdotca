@@ -586,8 +586,8 @@ WHERE ip_address = ?;
 
 ```bash
 # Apply schema to D1 database
-npx wrangler d1 execute bandcrawl-db --file=database/schema.sql --local
-npx wrangler d1 execute bandcrawl-db --file=database/schema.sql --remote
+npx wrangler d1 execute settimes-db --file=database/schema.sql --local
+npx wrangler d1 execute settimes-db --file=database/schema.sql --remote
 ```
 
 ### Future Migrations

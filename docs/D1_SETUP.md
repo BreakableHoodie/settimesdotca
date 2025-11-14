@@ -28,7 +28,7 @@ Complete setup instructions for the Long Weekend Band Crawl admin panel with Clo
 
 ```bash
 # Create the database
-wrangler d1 create bandcrawl-db
+wrangler d1 create settimes-db
 
 # Output will show:
 # database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
@@ -43,7 +43,7 @@ Edit `wrangler.toml` and replace `YOUR_DATABASE_ID_HERE` with your actual databa
 ```toml
 [[d1_databases]]
 binding = "DB"
-database_name = "bandcrawl-db"
+database_name = "settimes-db"
 database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Your actual ID
 ```
 
@@ -51,10 +51,10 @@ database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Your actual ID
 
 ```bash
 # Create tables
-wrangler d1 execute bandcrawl-db --file=database/schema.sql --local
+wrangler d1 execute settimes-db --file=database/schema.sql --local
 
 # Add sample data (optional)
-wrangler d1 execute bandcrawl-db --file=database/seed.sql --local
+wrangler d1 execute settimes-db --file=database/seed.sql --local
 ```
 
 ### 4. Set Up Environment Variables
@@ -84,7 +84,7 @@ If you have existing `bands.json` data:
 node database/migrate-bands-json.js > database/migration.sql
 
 # Execute migration
-wrangler d1 execute bandcrawl-db --local --file=database/migration.sql
+wrangler d1 execute settimes-db --local --file=database/migration.sql
 ```
 
 ### 6. Run Local Development Server
@@ -92,7 +92,7 @@ wrangler d1 execute bandcrawl-db --local --file=database/migration.sql
 ```bash
 # Start Wrangler dev server (includes Pages Functions + D1)
 cd frontend
-npx wrangler pages dev dist --binding DB=bandcrawl-db --local
+npx wrangler pages dev dist --binding DB=settimes-db --local
 
 # Or use Vite dev server (API calls will proxy to port 3000)
 npm run dev
@@ -111,7 +111,7 @@ Access the app:
 
 ```bash
 # Create production database (different from local)
-wrangler d1 create bandcrawl-db-production
+wrangler d1 create settimes-db-production
 
 # Note the database_id for production
 ```
@@ -131,14 +131,14 @@ In Cloudflare dashboard:
 
 ```bash
 # Execute schema on production database
-wrangler d1 execute bandcrawl-db-production --file=database/schema.sql
+wrangler d1 execute settimes-db-production --file=database/schema.sql
 
 # Optionally add seed data
-wrangler d1 execute bandcrawl-db-production --file=database/seed.sql
+wrangler d1 execute settimes-db-production --file=database/seed.sql
 
 # Or migrate existing bands.json
 node database/migrate-bands-json.js > database/migration.sql
-wrangler d1 execute bandcrawl-db-production --file=database/migration.sql
+wrangler d1 execute settimes-db-production --file=database/migration.sql
 ```
 
 ### 4. Set Environment Variables in Cloudflare Pages
@@ -319,13 +319,13 @@ Monitor for:
 1. Check that at least one event is published:
 
    ```bash
-   wrangler d1 execute bandcrawl-db --command "SELECT * FROM events WHERE is_published = 1"
+   wrangler d1 execute settimes-db --command "SELECT * FROM events WHERE is_published = 1"
    ```
 
 2. Publish an event via admin panel or SQL:
 
    ```bash
-   wrangler d1 execute bandcrawl-db --command "UPDATE events SET is_published = 1 WHERE id = 1"
+   wrangler d1 execute settimes-db --command "UPDATE events SET is_published = 1 WHERE id = 1"
    ```
 
 ### "Database error" in admin panel
@@ -361,13 +361,13 @@ Monitor for:
 1. Run schema creation:
 
    ```bash
-   wrangler d1 execute bandcrawl-db --file=database/schema.sql
+   wrangler d1 execute settimes-db --file=database/schema.sql
    ```
 
 2. Add seed data or migrate:
 
    ```bash
-   wrangler d1 execute bandcrawl-db --file=database/seed.sql
+   wrangler d1 execute settimes-db --file=database/seed.sql
    ```
 
 ### "IP locked out" message
@@ -380,7 +380,7 @@ Monitor for:
 2. Or manually reset in database:
 
    ```bash
-   wrangler d1 execute bandcrawl-db --command "DELETE FROM rate_limit WHERE ip_address = 'your.ip.here'"
+   wrangler d1 execute settimes-db --command "DELETE FROM rate_limit WHERE ip_address = 'your.ip.here'"
    ```
 
 3. Use master password to retrieve admin password if forgotten
@@ -404,7 +404,7 @@ Monitor for:
 3. Check that D1 binding is correct:
 
    ```bash
-   npx wrangler pages dev dist --binding DB=bandcrawl-db --local
+   npx wrangler pages dev dist --binding DB=settimes-db --local
    ```
 
 ---
@@ -458,10 +458,10 @@ ORDER BY last_attempt DESC;
 
 ```bash
 # Production
-wrangler d1 execute bandcrawl-db --command "YOUR SQL HERE"
+wrangler d1 execute settimes-db --command "YOUR SQL HERE"
 
 # Local
-wrangler d1 execute bandcrawl-db --local --command "YOUR SQL HERE"
+wrangler d1 execute settimes-db --local --command "YOUR SQL HERE"
 ```
 
 ---
@@ -496,7 +496,7 @@ This ensures the app works even if:
 ### File Structure
 
 ```
-longweekendbandcrawl/
+settimes/
 ├── database/
 │   ├── schema.sql              # D1 table definitions
 │   ├── seed.sql                # Sample data

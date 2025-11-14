@@ -1,11 +1,21 @@
+import { checkPermission } from "../_middleware.js";
+
 export async function onRequestPost(context) {
   const { request, env } = context;
+
+  // RBAC: Require editor role or higher (preview is for bulk edit operations)
+  const permCheck = await checkPermission(request, env, "editor");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
   const { band_ids, action, ...params } = await request.json();
 
   // Validate inputs
   if (!Array.isArray(band_ids) || band_ids.length === 0) {
     return new Response(JSON.stringify({ error: "Invalid band_ids" }), {
       status: 400,
+      headers: { "Content-Type": "application/json" },
     });
   }
 

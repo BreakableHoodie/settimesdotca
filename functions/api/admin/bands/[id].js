@@ -2,6 +2,8 @@
 // PUT /api/admin/bands/{id} - Update band
 // DELETE /api/admin/bands/{id} - Delete band
 
+import { checkPermission, auditLog } from "../_middleware.js";
+
 // Helper to extract band ID from path
 function getBandId(request) {
   const url = new URL(request.url);
@@ -63,6 +65,18 @@ async function checkConflicts(
 export async function onRequestPut(context) {
   const { request, env } = context;
   const { DB } = env;
+
+  // RBAC: Require editor role or higher
+  const permCheck = await checkPermission(request, env, "editor");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
 
   try {
     const bandId = getBandId(request);
@@ -278,6 +292,21 @@ export async function onRequestPut(context) {
       .bind(...params)
       .first();
 
+    // Audit log the update
+    await auditLog(
+      env,
+      user.userId,
+      "band.updated",
+      "band",
+      bandId,
+      {
+        bandName: result.name,
+        changedFields: Object.keys(body).filter((k) => body[k] !== undefined),
+        hasConflicts: conflicts.length > 0,
+      },
+      ipAddress,
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -313,6 +342,18 @@ export async function onRequestPut(context) {
 export async function onRequestDelete(context) {
   const { request, env } = context;
   const { DB } = env;
+
+  // RBAC: Require editor role or higher
+  const permCheck = await checkPermission(request, env, "editor");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
 
   try {
     const bandId = getBandId(request);
@@ -351,6 +392,23 @@ export async function onRequestDelete(context) {
         },
       );
     }
+
+    // Audit log before deletion
+    await auditLog(
+      env,
+      user.userId,
+      "band.deleted",
+      "band",
+      bandId,
+      {
+        bandName: band.name,
+        eventId: band.event_id,
+        venueId: band.venue_id,
+        startTime: band.start_time,
+        endTime: band.end_time,
+      },
+      ipAddress,
+    );
 
     // Delete band
     await DB.prepare(

@@ -2,10 +2,18 @@
 // GET /api/admin/venues - List all venues
 // POST /api/admin/venues - Create new venue
 
+import { checkPermission, auditLog } from "./_middleware.js";
+
 // GET - List all venues
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { request, env } = context;
   const { DB } = env;
+
+  // RBAC: Require viewer role or higher
+  const permCheck = await checkPermission(request, env, "viewer");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
 
   try {
     const result = await DB.prepare(
@@ -49,6 +57,18 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
+
+  // RBAC: Require admin role (venues are structural)
+  const permCheck = await checkPermission(request, env, "admin");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -100,6 +120,20 @@ export async function onRequestPost(context) {
     )
       .bind(name, address || null)
       .first();
+
+    // Audit log the creation
+    await auditLog(
+      env,
+      user.userId,
+      "venue.created",
+      "venue",
+      result.id,
+      {
+        venueName: name,
+        address,
+      },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({

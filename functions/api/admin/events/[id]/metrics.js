@@ -1,13 +1,17 @@
+import { checkPermission } from "../../_middleware.js";
+
 export async function onRequestGet(context) {
   const { request, env, params } = context;
   const { DB } = env;
   const eventId = params.id;
 
-  try {
-    // Verify user owns this event (check org_id)
-    // For now, we'll skip auth verification since we don't have session management yet
-    // In production, you'd verify the user's session token and check org_id
+  // RBAC: Require viewer role or higher (read-only metrics)
+  const permCheck = await checkPermission(request, env, "viewer");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
 
+  try {
     // Get event metrics
     const metrics = await DB.prepare(
       `

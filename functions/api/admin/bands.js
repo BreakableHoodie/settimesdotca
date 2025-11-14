@@ -2,6 +2,8 @@
 // GET /api/admin/bands?event_id={id} - List bands for an event
 // POST /api/admin/bands - Create new band
 
+import { checkPermission, auditLog } from "./_middleware.js";
+
 // Helper to check for time conflicts
 async function checkConflicts(
   DB,
@@ -59,6 +61,13 @@ async function checkConflicts(
 export async function onRequestGet(context) {
   const { request, env } = context;
   const { DB } = env;
+
+  // RBAC: Require viewer role or higher
+  const permCheck = await checkPermission(request, env, "viewer");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
   const url = new URL(request.url);
   const eventId = url.searchParams.get("event_id");
 
@@ -127,6 +136,18 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
+
+  // RBAC: Require editor role or higher
+  const permCheck = await checkPermission(request, env, "editor");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -293,6 +314,24 @@ export async function onRequestPost(context) {
     )
       .bind(eventId, venueId, name, startTime, endTime, url || null)
       .first();
+
+    // Audit log the creation
+    await auditLog(
+      env,
+      user.userId,
+      "band.created",
+      "band",
+      result.id,
+      {
+        bandName: name,
+        eventId,
+        venueId,
+        startTime,
+        endTime,
+        hasConflicts: conflicts.length > 0,
+      },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({

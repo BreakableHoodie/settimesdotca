@@ -2,6 +2,8 @@
 // PUT /api/admin/venues/{id} - Update venue
 // DELETE /api/admin/venues/{id} - Delete venue
 
+import { checkPermission, auditLog } from "../_middleware.js";
+
 // Helper to extract venue ID from path
 function getVenueId(request) {
   const url = new URL(request.url);
@@ -14,6 +16,18 @@ function getVenueId(request) {
 export async function onRequestPut(context) {
   const { request, env } = context;
   const { DB } = env;
+
+  // RBAC: Require admin role (venues are structural)
+  const permCheck = await checkPermission(request, env, "admin");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
 
   try {
     const venueId = getVenueId(request);
@@ -106,6 +120,22 @@ export async function onRequestPut(context) {
       .bind(name, address || null, venueId)
       .first();
 
+    // Audit log the update
+    await auditLog(
+      env,
+      user.userId,
+      "venue.updated",
+      "venue",
+      venueId,
+      {
+        oldName: venue.name,
+        newName: name,
+        oldAddress: venue.address,
+        newAddress: address,
+      },
+      ipAddress,
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -136,6 +166,18 @@ export async function onRequestPut(context) {
 export async function onRequestDelete(context) {
   const { request, env } = context;
   const { DB } = env;
+
+  // RBAC: Require admin role (venues are structural)
+  const permCheck = await checkPermission(request, env, "admin");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
 
   try {
     const venueId = getVenueId(request);
@@ -196,6 +238,20 @@ export async function onRequestDelete(context) {
         },
       );
     }
+
+    // Audit log before deletion
+    await auditLog(
+      env,
+      user.userId,
+      "venue.deleted",
+      "venue",
+      venueId,
+      {
+        venueName: venue.name,
+        address: venue.address,
+      },
+      ipAddress,
+    );
 
     // Delete venue
     await DB.prepare(

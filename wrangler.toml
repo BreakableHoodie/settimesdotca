@@ -1,11 +1,11 @@
-# Cloudflare Pages Configuration for Long Weekend Band Crawl
+# Cloudflare Pages Configuration for SetTimes.ca
 #
 # This configuration is used for:
 # - Local development with Wrangler
 # - D1 database bindings
 # - Environment variables (secrets set via Cloudflare dashboard)
 
-name = "longweekend-bandcrawl"
+name = "settimes"
 compatibility_date = "2025-10-08"
 pages_build_output_dir = "frontend/dist"
 # Note: Cloudflare Pages ignores wrangler [build] configs and expects the final
@@ -17,15 +17,15 @@ pages_build_output_dir = "frontend/dist"
 # The database will be available in Pages Functions as `env.DB`
 #
 # Setup instructions:
-# 1. Create the database: wrangler d1 create bandcrawl-db
+# 1. Create the database: wrangler d1 create settimes-db
 # 2. Note the database_id from the output
 # 3. Update the database_id below
-# 4. Initialize schema: wrangler d1 execute bandcrawl-db --file=database/schema.sql
-# 5. Add sample data: wrangler d1 execute bandcrawl-db --file=database/seed.sql
+# 4. Initialize schema: wrangler d1 execute settimes-db --file=database/schema.sql
+# 5. Add sample data: wrangler d1 execute settimes-db --file=database/seed.sql
 
 [[d1_databases]]
 binding = "DB"
-database_name = "bandcrawl-db"
+database_name = "settimes-db"
 database_id = "6a1fca7d-22e2-4384-8277-5aecd0c97f2f"
 
 # For local development, Wrangler will create a local SQLite database

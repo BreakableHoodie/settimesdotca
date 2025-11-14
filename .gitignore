@@ -40,3 +40,9 @@ psi_report*.json
 # Temporary files
 *.tmp
 *.temp
+
+# Task tracking
+.todo.json
+
+# Local database (use migrations instead)
+database/*.db

@@ -2,51 +2,25 @@
 // POST /api/admin/users/[id]/toggle-status
 // Returns: { success: true } or error
 
+import { checkPermission, auditLog } from "../../_middleware.js";
+
 export async function onRequestPost(context) {
   const { request, env, params } = context;
   const { DB } = env;
 
+  // RBAC: Require admin role
+  const permCheck = await checkPermission(request, env, "admin");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
+
   try {
-    // Get admin session from Authorization header
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const sessionToken = authHeader.substring(7);
-
-    // Verify admin session
-    const session = await DB.prepare(
-      `
-      SELECT u.id, u.email, u.role, u.name
-      FROM sessions s
-      JOIN users u ON s.user_id = u.id
-      WHERE s.id = ? AND s.expires_at > datetime('now') AND u.is_active = 1
-    `,
-    )
-      .bind(sessionToken)
-      .first();
-
-    if (!session) {
-      return new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Check if admin has permission
-    if (session.role !== "admin") {
-      return new Response(
-        JSON.stringify({ error: "Insufficient permissions" }),
-        {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
 
     const userId = params.id;
 
@@ -69,7 +43,7 @@ export async function onRequestPost(context) {
     }
 
     // Prevent admin from deactivating themselves
-    if (targetUser.id === session.id) {
+    if (targetUser.id === user.userId) {
       return new Response(
         JSON.stringify({ error: "Cannot deactivate your own account" }),
         {
@@ -103,26 +77,20 @@ export async function onRequestPost(context) {
         .run();
     }
 
-    // Log the action
-    await DB.prepare(
-      `
-      INSERT INTO auth_audit (action, success, ip_address, user_agent, details)
-      VALUES (?, 1, ?, ?, ?)
-    `,
-    )
-      .bind(
-        newStatus === 1 ? "user_activated" : "user_deactivated",
-        request.headers.get("CF-Connecting-IP") || "unknown",
-        request.headers.get("User-Agent") || "unknown",
-        JSON.stringify({
-          admin_id: session.id,
-          admin_email: session.email,
-          target_user_id: userId,
-          target_user_email: targetUser.email,
-          new_status: newStatus === 1 ? "active" : "inactive",
-        }),
-      )
-      .run();
+    // Audit log the action
+    await auditLog(
+      env,
+      user.userId,
+      newStatus === 1 ? "user.activated" : "user.deactivated",
+      "user",
+      userId,
+      {
+        adminEmail: user.email,
+        targetEmail: targetUser.email,
+        newStatus: newStatus === 1 ? "active" : "inactive",
+      },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({

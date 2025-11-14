@@ -3,51 +3,25 @@
 // Body: { newPassword: string }
 // Returns: { success: true } or error
 
+import { checkPermission, auditLog } from "../../_middleware.js";
+
 export async function onRequestPost(context) {
   const { request, env, params } = context;
   const { DB } = env;
 
+  // RBAC: Require admin role
+  const permCheck = await checkPermission(request, env, "admin");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
+
   try {
-    // Get admin session from Authorization header
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const sessionToken = authHeader.substring(7);
-
-    // Verify admin session
-    const session = await DB.prepare(
-      `
-      SELECT u.id, u.email, u.role, u.name
-      FROM sessions s
-      JOIN users u ON s.user_id = u.id
-      WHERE s.id = ? AND s.expires_at > datetime('now') AND u.is_active = 1
-    `,
-    )
-      .bind(sessionToken)
-      .first();
-
-    if (!session) {
-      return new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Check if admin has permission
-    if (session.role !== "admin") {
-      return new Response(
-        JSON.stringify({ error: "Insufficient permissions" }),
-        {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
 
     const userId = params.id;
     const { newPassword } = await request.json().catch(() => ({}));
@@ -105,22 +79,19 @@ export async function onRequestPost(context) {
       .bind(passwordHash, userId)
       .run();
 
-    // Log the action to audit_log
-    await DB.prepare(
-      `
-      INSERT INTO audit_log (user_id, action, resource_type, resource_id, details)
-      VALUES (?, 'user.password_reset', 'user', ?, ?)
-    `,
-    )
-      .bind(
-        session.id,
-        userId,
-        JSON.stringify({
-          admin_email: session.email,
-          target_email: targetUser.email,
-        }),
-      )
-      .run();
+    // Audit log the action
+    await auditLog(
+      env,
+      user.userId,
+      "user.password_reset",
+      "user",
+      userId,
+      {
+        adminEmail: user.email,
+        targetEmail: targetUser.email,
+      },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({

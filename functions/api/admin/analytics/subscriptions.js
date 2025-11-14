@@ -1,51 +1,25 @@
 // Subscription analytics (privacy-preserving)
 // No PII exposed, aggregate metrics only
 
+import { checkPermission, auditLog } from "../_middleware.js";
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const { DB } = env;
 
+  // RBAC: Require admin role (viewer+ would also be acceptable for read-only analytics)
+  const permCheck = await checkPermission(request, env, "admin");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
+  const user = permCheck.user;
+  const ipAddress =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+    "unknown";
+
   try {
-    // Get admin session from Authorization header
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const sessionToken = authHeader.substring(7);
-
-    // Verify admin session
-    const session = await DB.prepare(
-      `
-      SELECT u.id, u.email, u.role, u.name
-      FROM sessions s
-      JOIN users u ON s.user_id = u.id
-      WHERE s.id = ? AND s.expires_at > datetime('now') AND u.is_active = 1
-    `,
-    )
-      .bind(sessionToken)
-      .first();
-
-    if (!session) {
-      return new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Check if admin has permission
-    if (session.role !== "admin") {
-      return new Response(
-        JSON.stringify({ error: "Insufficient permissions" }),
-        {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
 
     // Total subscriptions
     const { results: total } = await DB.prepare(
@@ -104,6 +78,20 @@ export async function onRequestGet(context) {
       SELECT COUNT(*) as count FROM subscription_unsubscribes
     `,
     ).all();
+
+    // Audit log analytics access
+    await auditLog(
+      env,
+      user.userId,
+      "analytics.subscriptions.viewed",
+      "analytics",
+      null,
+      {
+        totalSubscribers: total[0].count,
+        totalUnsubscribes: unsubscribes[0].count,
+      },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({

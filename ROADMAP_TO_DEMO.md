@@ -1,13 +1,69 @@
 # Production Roadmap to Demo (Nov 30, 2025)
 
-**Last Updated**: November 13, 2025
-**Deadline**: November 30, 2025 (17 days)
-**Status**: Sprint 1.1-1.3 migrations applied, test infrastructure in progress
+**Last Updated**: November 14, 2025
+**Deadline**: November 30, 2025 (16 days)
+**Status**: Sprint 1.1 RBAC complete ✅, Sprint 1.2-1.3 in progress
 **Goal**: Production-ready single-org system with multi-user RBAC
 
 ---
 
 ## 📋 Active Changelog
+
+### November 14, 2025 - Sprint 1.1 RBAC Implementation ✅ COMPLETE
+
+**Commits:**
+- ✅ `security(rbac): fix P0 critical security gaps - add auth to all endpoints` (1c98a1d)
+- ✅ `test(rbac): fix test failures - add auth headers and admin roles` (d419417)
+- ✅ `refactor(rbac): standardize auth with checkPermission() - P1 fixes complete` (b8d3f1d)
+
+**Security Fixes:**
+- ✅ **P0 Critical Gaps Closed**: Added authentication to 11 previously unprotected endpoints
+  - Bands endpoints: GET (viewer), POST/PUT/DELETE (editor) + audit logging
+  - Bands bulk operations: PATCH/preview (editor) + audit logging
+  - Venues endpoints: GET (viewer), POST/PUT/DELETE (admin) + audit logging
+  - Events metrics: GET (viewer)
+- ✅ **P1 Refactoring Complete**: Standardized 3 endpoints with inline auth checks
+  - toggle-status.js: Replaced 40 lines → centralized checkPermission()
+  - reset-password.js: Replaced 40 lines → centralized checkPermission()
+  - subscriptions.js: Replaced 40 lines → centralized checkPermission() + added audit logging
+  - **Code reduction**: ~120 lines removed, 80% reduction in auth code
+
+**Role Hierarchy Implemented:**
+- **Admin (level 3)**: Full access - user management, venues (structural data)
+- **Editor (level 2)**: Content management - bands, events, publishing
+- **Viewer (level 1)**: Read-only - analytics, metrics, event viewing
+
+**Audit Logging:**
+- ✅ All write operations logged to audit_log table
+- ✅ IP address tracking for security forensics
+- ✅ Changed fields tracked for update operations
+- ✅ Analytics access logged for compliance
+
+**Test Results:**
+- **All tests passing**: 65/65 tests (6 skipped) 🎉
+- ✅ Bands tests: 4/4 passing (with auth headers)
+- ✅ Venues tests: 3/3 passing (admin role)
+- ✅ User management tests: 5/5 passing
+- ✅ Analytics tests: 2/2 passing
+- ✅ Reset password tests: 3/3 passing
+
+**Git Configuration:**
+- ✅ Updated remote URL to new repository location: `settimesdotca.git`
+- ✅ Eliminated "repository moved" warnings
+
+**Sprint 1.1 Status:**
+- ✅ RBAC implementation complete (admin/editor/viewer roles)
+- ✅ Permission checks on all 11+ admin endpoints
+- ✅ Audit logging for all security events
+- ✅ Tests for RBAC enforcement passing
+- ⏳ User management UI (pending - Sprint 1.1b)
+
+**Next Steps:**
+- 🔄 User management UI implementation (add/edit/remove users, assign roles)
+- 🔄 Begin Sprint 1.2: Event Management Complete
+- 🔄 Documentation updates with RBAC implementation details
+
+---
 
 ### November 13, 2025 - Test Infrastructure & Database Initialization ✅ COMPLETE
 
@@ -126,20 +182,28 @@
 
 **Goal**: Complete backend functionality and RBAC
 
-#### Sprint 1.1: RBAC & User Management (2 days)
+#### Sprint 1.1: RBAC & User Management (2 days) ✅ COMPLETE
 
-- [ ] Implement role-based access control (admin, editor, viewer)
-- [ ] User management UI (add/edit/remove users, assign roles)
-- [ ] Permission checks on all admin endpoints
-- [ ] Audit logging for security events
-- [ ] Tests for RBAC enforcement
+- [x] Implement role-based access control (admin, editor, viewer)
+- [ ] User management UI (add/edit/remove users, assign roles) - **Moved to Sprint 1.1b**
+- [x] Permission checks on all admin endpoints
+- [x] Audit logging for security events
+- [x] Tests for RBAC enforcement
 
 **Acceptance Criteria**:
 
-- Admin can create users with different roles
-- Editor can manage events/bands but not users
-- Viewer has read-only access
-- All API endpoints enforce permissions
+- [x] Admin can create users with different roles (API complete, UI pending)
+- [x] Editor can manage events/bands but not users (enforced at API level)
+- [x] Viewer has read-only access (enforced at API level)
+- [x] All API endpoints enforce permissions (11 endpoints protected)
+
+**Implementation Details**:
+- ✅ Role hierarchy: admin (3) > editor (2) > viewer (1)
+- ✅ Centralized checkPermission() in _middleware.js
+- ✅ Comprehensive audit logging with auditLog() helper
+- ✅ IP address tracking for security forensics
+- ✅ 80% code reduction through refactoring
+- ⏳ User management UI deferred to Sprint 1.1b (backend complete)
 
 #### Sprint 1.2: Event Management Complete (2 days)
 

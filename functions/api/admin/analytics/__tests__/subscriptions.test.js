@@ -4,7 +4,24 @@ import * as subscriptionsHandler from "../subscriptions.js";
 
 describe("Admin analytics subscriptions API", () => {
   test("admin can retrieve subscription analytics aggregates", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+
+    // Insert test subscription data
+    rawDb.prepare(
+      "INSERT INTO email_subscriptions (email, city, genre, unsubscribe_token, verified) VALUES (?, ?, ?, ?, ?)"
+    ).run("user1@test.com", "Portland", "punk", "token1", 1);
+
+    rawDb.prepare(
+      "INSERT INTO email_subscriptions (email, city, genre, unsubscribe_token, verified) VALUES (?, ?, ?, ?, ?)"
+    ).run("user2@test.com", "Seattle", "indie", "token2", 1);
+
+    // Get the second subscription ID to unsubscribe
+    const sub2 = rawDb.prepare("SELECT id FROM email_subscriptions WHERE email = ?").get("user2@test.com");
+
+    // Add an unsubscribe record
+    rawDb.prepare(
+      "INSERT INTO subscription_unsubscribes (subscription_id, reason) VALUES (?, ?)"
+    ).run(sub2.id, "Test unsubscribe");
 
     const request = new Request(
       "https://example.test/api/admin/analytics/subscriptions",

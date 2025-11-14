@@ -2,18 +2,60 @@
 // No PII exposed, aggregate metrics only
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { request, env } = context;
+  const { DB } = env;
 
   try {
+    // Get admin session from Authorization header
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const sessionToken = authHeader.substring(7);
+
+    // Verify admin session
+    const session = await DB.prepare(
+      `
+      SELECT u.id, u.email, u.role, u.name
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.id = ? AND s.expires_at > datetime('now') AND u.is_active = 1
+    `,
+    )
+      .bind(sessionToken)
+      .first();
+
+    if (!session) {
+      return new Response(JSON.stringify({ error: "Invalid session" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if admin has permission
+    if (session.role !== "admin") {
+      return new Response(
+        JSON.stringify({ error: "Insufficient permissions" }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     // Total subscriptions
-    const { results: total } = await env.DB.prepare(
+    const { results: total } = await DB.prepare(
       `
       SELECT COUNT(*) as count FROM email_subscriptions WHERE verified = 1
     `,
     ).all();
 
     // By city
-    const { results: byCity } = await env.DB.prepare(
+    const { results: byCity } = await DB.prepare(
       `
       SELECT city, COUNT(*) as count
       FROM email_subscriptions
@@ -24,7 +66,7 @@ export async function onRequestGet(context) {
     ).all();
 
     // By genre
-    const { results: byGenre } = await env.DB.prepare(
+    const { results: byGenre } = await DB.prepare(
       `
       SELECT genre, COUNT(*) as count
       FROM email_subscriptions
@@ -35,7 +77,7 @@ export async function onRequestGet(context) {
     ).all();
 
     // By frequency
-    const { results: byFrequency } = await env.DB.prepare(
+    const { results: byFrequency } = await DB.prepare(
       `
       SELECT frequency, COUNT(*) as count
       FROM email_subscriptions
@@ -45,7 +87,7 @@ export async function onRequestGet(context) {
     ).all();
 
     // Growth over time (last 30 days)
-    const { results: growth } = await env.DB.prepare(
+    const { results: growth } = await DB.prepare(
       `
       SELECT DATE(created_at) as date, COUNT(*) as count
       FROM email_subscriptions
@@ -57,7 +99,7 @@ export async function onRequestGet(context) {
     ).all();
 
     // Unsubscribe rate
-    const { results: unsubscribes } = await env.DB.prepare(
+    const { results: unsubscribes } = await DB.prepare(
       `
       SELECT COUNT(*) as count FROM subscription_unsubscribes
     `,

@@ -14,7 +14,11 @@ export function createTestDB() {
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
-      last_login TEXT
+      last_login TEXT,
+      deactivated_at TEXT,
+      deactivated_by INTEGER,
+      deleted_at TEXT,
+      deleted_by INTEGER
     );
 
     CREATE TABLE sessions (
@@ -104,6 +108,22 @@ export function createTestDB() {
       user_agent TEXT,
       details TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE subscription_verifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      subscription_id INTEGER NOT NULL,
+      verified_at TEXT NOT NULL DEFAULT (datetime('now')),
+      ip_address TEXT,
+      FOREIGN KEY (subscription_id) REFERENCES email_subscriptions(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE subscription_unsubscribes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      subscription_id INTEGER NOT NULL,
+      unsubscribed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      reason TEXT,
+      FOREIGN KEY (subscription_id) REFERENCES email_subscriptions(id) ON DELETE CASCADE
     );
   `);
 

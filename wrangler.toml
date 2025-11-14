@@ -6,7 +6,7 @@
 # - Environment variables (secrets set via Cloudflare dashboard)
 
 name = "longweekend-bandcrawl"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-10-08"
 pages_build_output_dir = "frontend/dist"
 # Note: Cloudflare Pages ignores wrangler [build] configs and expects the final
 # artifacts to be present in pages_build_output_dir. The GitHub Actions workflow

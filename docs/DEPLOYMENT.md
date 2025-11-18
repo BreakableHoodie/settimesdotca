@@ -1,8 +1,8 @@
 # Deployment Instructions for Cloudflare Pages
 
-## Deploying to lwbc.dredre.net
+## Deploying to settimes.ca
 
-This project is configured to deploy to Cloudflare Pages at **lwbc.dredre.net**.
+This project is configured to deploy to Cloudflare Pages at **settimes.ca**.
 
 ### Build Configuration
 
@@ -21,7 +21,7 @@ No environment variables required for this static build.
    - Log in to Cloudflare Dashboard
    - Go to Pages → Create a project
    - Connect your GitHub account
-   - Select the repository: `BreakableHoodie/settimes`
+   - Select the repository: `BreakableHoodie/settimesdotca`
    - Set `main` as the production branch and add `dev` under preview branches
 
 2. **Configure Build Settings**
@@ -35,7 +35,7 @@ No environment variables required for this static build.
 
 3. **Configure Custom Domain**
    - After initial deployment, go to Pages → Your Project → Custom domains
-   - Add custom domain: `lwbc.dredre.net`
+   - Add custom domain: `settimes.ca`
    - Follow DNS configuration instructions (likely a CNAME record)
 
 4. **Deploy**

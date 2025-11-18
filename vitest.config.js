@@ -5,6 +5,11 @@ export default defineConfig({
     globals: true,
     environment: "node",
     testTimeout: 10000,
+    server: {
+      deps: {
+        inline: ["better-sqlite3"]
+      }
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -23,3 +28,4 @@ export default defineConfig({
     include: ["functions/**/__tests__/**/*.test.js"],
   },
 });
+

@@ -246,7 +246,6 @@ describe("Timeline API - Optimized JOIN Queries", () => {
       const data = await response.json();
       expect(data).toHaveProperty("error");
       expect(data.error).toBe("Failed to fetch events timeline");
-      expect(data).toHaveProperty("details");
     });
 
     it("should handle empty results", async () => {

@@ -1,14 +1,14 @@
--- Long Weekend Band Crawl - D1 Database Schema v2
+-- SetTimes - D1 Database Schema v2
 --
 -- BREAKING CHANGE: This replaces the bands table with a band profile system
 -- that separates band identity (reusable) from performances (event-specific).
 --
 -- Migration: See migration.sql for upgrade path from v1
 
--- Events table: stores each band crawl event (UNCHANGED)
+-- Events table: stores each music event (UNCHANGED)
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,                    -- e.g., "Long Weekend Band Crawl Vol. 5"
+  name TEXT NOT NULL,                    -- e.g., "Summer Music Festival 2025"
   date TEXT NOT NULL,                    -- Event date in YYYY-MM-DD format
   slug TEXT NOT NULL UNIQUE,             -- URL-friendly identifier, e.g., "vol-5"
   is_published INTEGER NOT NULL DEFAULT 0, -- 0 = draft, 1 = published (visible to public)

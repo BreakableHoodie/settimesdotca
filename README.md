@@ -78,6 +78,10 @@ For detailed security documentation, see [SECURITY.md](SECURITY.md) and the [SQL
 - **Auth:** Session-based with secure token management
 - **CDN:** Cloudflare global network (190+ cities)
 
+**Current Focus**: Production-ready platform launch
+
+See **[ROADMAP_TO_DEMO.md](/ROADMAP_TO_DEMO.md)** for the complete development roadmap.
+
 ## Quick Start
 
 ### Prerequisites

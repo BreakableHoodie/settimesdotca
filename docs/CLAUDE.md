@@ -1,8 +1,8 @@
-# CLAUDE.md — Long Weekend Band Crawl
+# CLAUDE.md — SetTimes
 
 ## Project Summary
 
-A mobile-first web application for the Long Weekend Band Crawl music festival. Provides public event schedules, band profiles with stats, and a full-featured admin panel for event management.
+A mobile-first web application for live music event management. Provides public event schedules, band profiles with stats, and a full-featured admin panel for event management.
 
 **Current Status**: Sprint 1.3 complete - RBAC ✅, Band Performance History ✅ (88 passing tests, 100% pass rate). Sprint 1.2 Event Management ready to start. Targeting Nov 30, 2025 demo with comprehensive UI/UX redesign.
 

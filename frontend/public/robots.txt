@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://lwbc.dredre.net/sitemap.xml
+Sitemap: https://settimes.ca/sitemap.xml

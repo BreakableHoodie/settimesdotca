@@ -190,25 +190,23 @@ export function insertEvent(
     .get(info.lastInsertRowid);
 }
 
-export function insertBand(db, { name = "Test Band", event_id = null } = {}) {
-  const stmt = db.prepare("INSERT INTO bands (name, event_id) VALUES (?, ?)");
-  const info = stmt.run(name, event_id);
-  return db
-    .prepare("SELECT * FROM bands WHERE id = ?")
-    .get(info.lastInsertRowid);
+export function insertBand(db, {
+  name = 'Test Band',
+  event_id = null,
+  venue_id = null,
+  start_time = '18:00',
+  end_time = '19:00',
+  url = null
+} = {}) {
+  const stmt = db.prepare('INSERT INTO bands (name, event_id, venue_id, start_time, end_time, url) VALUES (?, ?, ?, ?, ?, ?)')
+  const info = stmt.run(name, event_id, venue_id, start_time, end_time, url)
+  return db.prepare('SELECT * FROM bands WHERE id = ?').get(info.lastInsertRowid)
 }
 
-export function insertVenue(
-  db,
-  { name = "Test Venue", city = "Portland", address = null } = {}
-) {
-  const stmt = db.prepare(
-    "INSERT INTO venues (name, city, address) VALUES (?, ?, ?)"
-  );
-  const info = stmt.run(name, city, address);
-  return db
-    .prepare("SELECT * FROM venues WHERE id = ?")
-    .get(info.lastInsertRowid);
+export function insertVenue(db, { name = 'Test Venue', city = 'Portland', address = null } = {}) {
+  const stmt = db.prepare('INSERT INTO venues (name, city, address) VALUES (?, ?, ?)')
+  const info = stmt.run(name, city, address)
+  return db.prepare('SELECT * FROM venues WHERE id = ?').get(info.lastInsertRowid)
 }
 
 export function createDBEnv(db) {

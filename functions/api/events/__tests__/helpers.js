@@ -48,3 +48,4 @@ export function seedMockData(mockDB, events = [], venues = [], bands = []) {
   mockDB.data.venues = venues;
   mockDB.data.bands = bands;
 }
+

@@ -4,6 +4,8 @@
 // Returns: { success: true, user: object, sessionToken: string } or error
 
 import { verifyPassword } from "../../../utils/crypto.js";
+import { setSessionCookie } from "../../../utils/cookies.js";
+import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 
 // Get client IP from request
 function getClientIP(request) {
@@ -188,6 +190,16 @@ export async function onRequestPost(context) {
       .bind(user.id, email, ipAddress, userAgent)
       .run();
 
+    // Generate CSRF token
+    const csrfToken = generateCSRFToken();
+
+    // Set secure HTTPOnly session cookie and CSRF cookie
+    const headers = new Headers({
+      "Content-Type": "application/json",
+    });
+    headers.append("Set-Cookie", setSessionCookie(sessionToken, false));
+    headers.append("Set-Cookie", setCSRFCookie(csrfToken));
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -197,11 +209,11 @@ export async function onRequestPost(context) {
           name: user.name,
           role: user.role,
         },
-        sessionToken,
+        csrfToken, // Send CSRF token so client can include it in headers
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers,
       },
     );
   } catch (error) {

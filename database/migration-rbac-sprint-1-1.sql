@@ -94,22 +94,24 @@ BEGIN
 END;
 
 -- ============================================================================
--- DEFAULT ADMIN USER
+-- ADMIN USER SETUP
 -- ============================================================================
-
--- Check if there's at least one admin user
--- If no users exist, insert a default admin
--- Password: admin123 (hashed with bcrypt, should be changed immediately)
--- Note: This uses a bcrypt hash for 'admin123' with cost factor 10
-
-INSERT OR IGNORE INTO users (email, password_hash, role, name, is_active)
-SELECT
-  'admin@pinklemonaderecords.com',
-  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',  -- bcrypt hash of 'admin123'
-  'admin',
-  'System Administrator',
-  1
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin');
+-- SECURITY: Default admin credentials removed from migration
+--
+-- To create the initial admin user, use one of these methods:
+--
+-- Option 1: Create invite code via SQL (recommended for first setup):
+-- INSERT INTO invite_codes (code, role, expires_at, is_active)
+-- VALUES ('YOUR-SECRET-CODE-HERE', 'admin', datetime('now', '+7 days'), 1);
+--
+-- Then use the signup endpoint with this invite code to create your admin account.
+--
+-- Option 2: Direct SQL insert (only for initial setup):
+-- First, generate a password hash using the hashPassword function, then:
+-- INSERT INTO users (email, password_hash, role, name, is_active)
+-- VALUES ('your-email@example.com', 'PBKDF2_HASH_HERE', 'admin', 'Your Name', 1);
+--
+-- WARNING: Never commit actual credentials to version control!
 
 -- ============================================================================
 -- NOTES

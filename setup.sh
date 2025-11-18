@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Long Weekend Band Crawl - Setup Script
+# SetTimes - Setup Script
 set -e
 
-echo "🎸 Setting up Long Weekend Band Crawl..."
+echo "🎸 Setting up SetTimes..."
 
 # Install frontend dependencies
 echo "📦 Installing frontend dependencies..."

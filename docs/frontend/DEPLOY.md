@@ -2,21 +2,21 @@
 
 ## Branches
 
-- `main` - Production branch (lwbc.dredre.net)
+- `main` - Production branch (settimes.ca)
 - `dev` - Development/testing branch
 
 ## GitHub Repository
 
-The canonical repository lives at `git@github.com:BreakableHoodie/settimes.git`.
+The canonical repository lives at `git@github.com:BreakableHoodie/settimesdotca.git`.
 
 1. Ensure your local remotes point to GitHub:
    ```bash
    git remote -v
-   # origin should be git@github.com:BreakableHoodie/settimes.git
+   # origin should be git@github.com:BreakableHoodie/settimesdotca.git
    ```
    If not, update it with:
    ```bash
-   git remote set-url origin git@github.com:BreakableHoodie/settimes.git
+   git remote set-url origin git@github.com:BreakableHoodie/settimesdotca.git
    ```
 2. Keep both long-lived branches in sync:
    ```bash

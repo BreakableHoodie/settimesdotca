@@ -1,6 +1,6 @@
 # D1 Database and Admin Panel Setup Guide
 
-Complete setup instructions for the Long Weekend Band Crawl admin panel with Cloudflare D1 database.
+Complete setup instructions for the SetTimes admin panel with Cloudflare D1 database.
 
 ## Table of Contents
 

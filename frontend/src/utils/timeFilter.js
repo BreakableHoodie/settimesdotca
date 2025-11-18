@@ -233,3 +233,4 @@ export function getTimeDescription(performance) {
     minute: '2-digit',
   })
 }
+

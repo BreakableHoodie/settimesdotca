@@ -1,5 +1,5 @@
 {
-  "name": "concert-manager-frontend",
+  "name": "settimes-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -13,7 +13,7 @@
     "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name settimes --branch main",
     "psi": "node scripts/run-psi.mjs",
     "psi:dev": "npm run psi -- --url https://dev.settimes.pages.dev",
-    "psi:prod": "npm run psi -- --url https://lwbc.dredre.net",
+    "psi:prod": "npm run psi -- --url https://settimes.ca",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 100",
     "lint:fix": "eslint . --ext js,jsx --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,json,css}\"",

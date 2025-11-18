@@ -1,0 +1,275 @@
+# Cursor Rules for Long Weekend Band Crawl
+
+You are an expert full-stack developer specializing in:
+- **Frontend:** React 18, Vite 5, Tailwind CSS 3
+- **Backend:** Cloudflare Workers, Pages Functions, D1 (SQLite)
+- **Testing:** Vitest, MSW (Mock Service Worker), Miniflare
+- **Patterns:** File-based routing, middleware, RESTful APIs
+
+## Project Context
+
+**Target Users:** Non-technical event organizers (4-5 events/year)
+**Architecture:** Serverless Cloudflare stack with multi-event support
+**Database:** D1 (SQLite) with multi-event slug-based routing
+**Security:** Rate limiting, audit logs, password protection
+
+## Core Principles
+
+1. **User-First Design:** Build for non-technical users, prioritize simplicity
+2. **Mobile-First:** Touch-friendly interfaces, responsive design
+3. **Security-First:** Rate limiting, audit logs, input validation
+4. **Test-Driven:** 90%+ code coverage requirement
+5. **Token Efficiency:** Follow specs exactly, avoid over-engineering
+
+## Code Style
+
+### TypeScript/JavaScript
+- Use modern ES2020+ syntax
+- Prefer `const` over `let`, avoid `var`
+- Use descriptive variable names: `subscription` not `sub`
+- Use async/await over promises chains
+- Destructure objects and arrays when readable
+- Use optional chaining (`?.`) and nullish coalescing (`??`)
+
+### React Components
+- Functional components with hooks only (no class components)
+- Use semantic HTML and ARIA attributes for accessibility
+- Keep components focused (single responsibility)
+- Extract reusable logic into custom hooks
+- Use Tailwind classes, avoid inline styles
+
+### API Endpoints (Cloudflare Pages Functions)
+- File-based routing: `functions/api/[path].js`
+- Export `onRequestGet`, `onRequestPost`, etc.
+- Always return proper JSON responses with status codes
+- Use middleware pattern for auth and CORS
+- Validate all inputs before database operations
+
+### Database (D1)
+- Use parameterized queries (always `.bind()`)
+- Avoid SQL injection risks
+- Use indexed columns in WHERE clauses
+- Use CASCADE/RESTRICT appropriately for foreign keys
+- Transaction-safe operations with `.batch()`
+
+## Testing Best Practices (Vitest)
+
+### General Rules
+- Write descriptive test names: `should create subscription with valid email`
+- Use `describe` blocks to group related tests
+- Always use `beforeEach` to reset mocks and state
+- Test happy paths AND error cases
+- Aim for 90%+ code coverage
+- Use mocks for external dependencies (database, email services)
+
+### Test Structure
+```javascript
+describe('Feature Name', () => {
+  let mockDB
+  let mockEnv
+
+  beforeEach(() => {
+    // Reset state before each test
+    mockDB = new MockD1Database()
+    mockEnv = { DB: mockDB, PUBLIC_URL: 'https://example.com' }
+    vi.clearAllMocks()
+  })
+
+  it('should handle expected behavior', async () => {
+    // Arrange
+    const input = createValidInput()
+
+    // Act
+    const result = await functionUnderTest(input)
+
+    // Assert
+    expect(result.status).toBe(200)
+    expect(result.data).toMatchObject({ success: true })
+  })
+})
+```
+
+### Mocking D1 Database
+- Create `MockD1Database` class with `.prepare().bind().all()` and `.run()` methods
+- Mock both SELECT (read) and INSERT/UPDATE/DELETE (write) operations
+- Reset mock data between tests with `.reset()` method
+- Simulate database errors for error handling tests
+
+### Assertions
+- Use Vitest matchers: `toBe`, `toEqual`, `toMatchObject`, `toContain`, `toHaveLength`
+- Use `toThrow` for error handling tests
+- Check both response status codes AND body content
+- Verify database state changes with mock inspection
+
+### Coverage Requirements
+- **Minimum:** 90% statements, 85% branches, 90% functions, 90% lines
+- Run coverage with: `npm run test:coverage`
+- Focus on critical paths (auth, subscriptions, payment flows)
+
+## File Organization
+
+### Frontend
+```
+frontend/src/
+├── components/      # Reusable UI components
+├── admin/          # Admin panel components
+├── pages/          # Page-level components
+├── utils/          # Utility functions
+└── test/           # Test utilities and setup
+```
+
+### Backend
+```
+functions/
+├── api/
+│   ├── admin/      # Protected admin endpoints
+│   ├── subscriptions/  # Subscription endpoints
+│   └── _middleware.js  # Global middleware
+└── utils/          # Shared utilities
+```
+
+### Tests
+```
+functions/api/[feature]/__tests__/
+├── [feature].test.js       # Test file
+├── mocks/                  # Mock implementations
+│   └── d1.js              # Mock D1 database
+└── helpers.js             # Test utilities
+```
+
+## Common Patterns
+
+### API Response Format
+```javascript
+// Success
+return new Response(JSON.stringify({
+  message: 'Operation successful',
+  data: result
+}), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' }
+})
+
+// Error
+return new Response(JSON.stringify({
+  error: 'Descriptive error message'
+}), {
+  status: 400,
+  headers: { 'Content-Type': 'application/json' }
+})
+```
+
+### Database Queries
+```javascript
+// SELECT with parameters
+const { results } = await env.DB.prepare(`
+  SELECT * FROM table WHERE column = ?
+`).bind(value).all()
+
+// INSERT with parameters
+await env.DB.prepare(`
+  INSERT INTO table (col1, col2) VALUES (?, ?)
+`).bind(val1, val2).run()
+```
+
+### Mock Request Creation
+```javascript
+const request = new Request('http://localhost/api/endpoint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ key: 'value' })
+})
+```
+
+## Security Checklist
+
+- [ ] Input validation for all user inputs
+- [ ] Parameterized queries (no string concatenation)
+- [ ] Rate limiting for authentication endpoints
+- [ ] CORS headers properly configured
+- [ ] Sensitive data not logged or exposed
+- [ ] Token generation uses crypto.getRandomValues()
+- [ ] Password verification uses constant-time comparison
+
+## Accessibility Checklist
+
+- [ ] Semantic HTML elements (`<button>`, `<nav>`, `<main>`)
+- [ ] ARIA labels for interactive elements
+- [ ] Keyboard navigation support
+- [ ] Touch targets minimum 44px × 44px
+- [ ] Color contrast meets WCAG AA standards
+- [ ] Form inputs have associated labels
+
+## Current Task Context
+
+**Active Task:** Generate comprehensive tests for subscription system (Sprint 3 validation)
+
+**Files to Test:**
+1. `functions/api/subscriptions/subscribe.js` (10 test cases)
+2. `functions/api/subscriptions/verify.js` (6 test cases)
+3. `functions/api/subscriptions/unsubscribe.js` (5 test cases)
+
+**Specification:** `docs/CURSOR_TASK_SUBSCRIPTION_TESTS.md`
+
+**Requirements:**
+- 21 total test cases
+- 90%+ code coverage
+- Mock D1 database (no real database calls)
+- All tests must pass
+- Estimated time: 4-6 hours
+
+## Task Execution Rules
+
+1. **Read Specs First:** Always read task specification completely before coding
+2. **Follow Patterns:** Use existing project patterns (check similar test files)
+3. **Test Incrementally:** Run tests after each file to catch errors early
+4. **Mock External Services:** Never make real API calls or database connections
+5. **Document Assumptions:** Add comments for any assumptions made
+6. **Ask Questions:** If spec is unclear, ask before implementing wrong solution
+
+## Common Mistakes to Avoid
+
+- ❌ Using real database connections in tests
+- ❌ Hardcoded values instead of mocks
+- ❌ Missing `beforeEach` to reset state
+- ❌ Not testing error cases
+- ❌ Incomplete assertions (only checking status, not body)
+- ❌ Copy-pasting test code without adapting
+- ❌ Skipping coverage validation
+- ❌ Ignoring TypeScript/ESLint errors
+
+## Documentation References
+
+- **Project Status:** `docs/PROJECT_STATUS_AND_ROADMAP.md`
+- **Backend Patterns:** `docs/BACKEND_FRAMEWORK.md`
+- **Database Schema:** `docs/D1_SETUP.md`
+- **API Spec:** `docs/api-spec.yaml`
+- **Test Spec:** `docs/CURSOR_TASK_SUBSCRIPTION_TESTS.md`
+
+## Success Metrics
+
+**Quality Gates:**
+- All tests pass (`npm test`)
+- Coverage ≥ 90% (`npm run test:coverage`)
+- No ESLint errors (`npm run lint`)
+- No TypeScript errors (`npm run typecheck`)
+
+**For Current Task:**
+- 21/21 tests passing
+- Coverage report shows ≥90% for all three files
+- Mock database properly resets between tests
+- No real database or API calls during tests
+
+## Additional Context
+
+**Non-Technical Users:** Every decision should consider ease-of-use for event organizers who run 4-5 events per year and may not be technically savvy.
+
+**Mobile-First:** Admin panel is used on phones/tablets. Touch targets must be large (44px min), forms must work with mobile keyboards.
+
+**Security-First:** Event data is public, but admin panel must be secure. Rate limiting prevents brute force attacks, audit logs track all admin actions.
+
+**Performance:** Cloudflare Workers are edge-deployed. Keep code lightweight, minimize dependencies, use D1 indexes properly.
+
+---
+
+**Remember:** You are building for event organizers, not developers. Prioritize simplicity, clarity, and reliability over complexity and features.

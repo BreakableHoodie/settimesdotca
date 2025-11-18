@@ -28,7 +28,12 @@ CREATE TABLE IF NOT EXISTS bands (
   name TEXT NOT NULL,                    -- Band name
   start_time TEXT NOT NULL,              -- Format: HH:MM (24-hour)
   end_time TEXT NOT NULL,                -- Format: HH:MM (24-hour)
-  url TEXT,                              -- Optional URL to band info/social media
+  url TEXT,                              -- Optional URL to band info/social media (deprecated - use social_links)
+  photo_url TEXT,                        -- Band photo (R2 bucket URL or external URL)
+  description TEXT,                      -- Band bio/description (supports markdown)
+  genre TEXT,                            -- Music genre (e.g., "Rock", "Electronic")
+  origin TEXT,                           -- City/region of origin (e.g., "Ottawa, ON")
+  social_links TEXT,                     -- JSON object: {instagram, bandcamp, facebook, spotify, website}
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
 
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,

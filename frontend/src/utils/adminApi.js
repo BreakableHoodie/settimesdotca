@@ -212,4 +212,11 @@ export const bandsApi = {
     })
     return handleResponse(response)
   },
+
+  async getStats(bandName) {
+    const response = await fetch(`${API_BASE}/bands/stats/${encodeURIComponent(bandName)}`, {
+      headers: getHeaders(),
+    })
+    return handleResponse(response)
+  },
 }

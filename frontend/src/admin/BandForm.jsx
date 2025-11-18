@@ -1,4 +1,6 @@
 import PropTypes from 'prop-types'
+import PhotoUpload from './components/PhotoUpload'
+import MarkdownEditor from './components/MarkdownEditor'
 
 export default function BandForm({
   events,
@@ -79,35 +81,31 @@ export default function BandForm({
             </div>
 
             <div className="sm:col-span-2">
-              <label htmlFor="band-photo-url" className="block text-white mb-2 text-sm">
-                Photo URL <span className="text-gray-400 text-xs">(optional)</span>
-              </label>
-              <input
-                id="band-photo-url"
-                type="url"
-                name="photo_url"
-                value={formData.photo_url || ''}
-                onChange={onChange}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
-                placeholder="https://example.com/band-photo.jpg"
+              <PhotoUpload
+                currentPhoto={formData.photo_url}
+                onPhotoChange={(url) => {
+                  onChange({ target: { name: 'photo_url', value: url } })
+                }}
+                bandId={mode === 'edit' && formData.id ? formData.id : null}
+                bandName={formData.name}
               />
-              <p className="text-white/60 text-xs mt-2">URL to the band&apos;s photo/image</p>
             </div>
 
             <div className="sm:col-span-2">
               <label htmlFor="band-description" className="block text-white mb-2 text-sm">
                 Description <span className="text-gray-400 text-xs">(optional)</span>
               </label>
-              <textarea
-                id="band-description"
-                name="description"
+              <MarkdownEditor
                 value={formData.description || ''}
-                onChange={onChange}
-                rows={4}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                onChange={(value) => {
+                  onChange({ target: { name: 'description', value } })
+                }}
                 placeholder="Band bio, description, press quote..."
+                minHeight={200}
               />
-              <p className="text-white/60 text-xs mt-2">Short bio or description about the band</p>
+              <p className="text-white/60 text-xs mt-2">
+                Short bio or description about the band. Supports markdown formatting.
+              </p>
             </div>
           </>
         )}

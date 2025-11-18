@@ -6,6 +6,7 @@ import BulkPreviewModal from './BulkPreviewModal'
 import BandForm from './BandForm'
 import HelpPanel from './components/HelpPanel'
 import PerformerPicker from './components/PerformerPicker'
+import PerformanceHistory from './components/PerformanceHistory'
 import {
   calculateEndTimeFromDuration,
   deriveDurationMinutes,
@@ -110,6 +111,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
   const [editingId, setEditingId] = useState(null)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [formData, setFormData] = useState(() => ({
+    id: null,
     name: '',
     event_id: selectedEventId ? selectedEventId.toString() : '',
     venue_id: '',
@@ -121,9 +123,14 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     photo_url: '',
     genre: '',
     origin: '',
+    website: '',
+    instagram: '',
+    bandcamp: '',
+    facebook: '',
   }))
   const [submitting, setSubmitting] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [historyBandName, setHistoryBandName] = useState(null)
 
   // Ref for scrolling to edit form
   const editFormRef = useRef(null)
@@ -194,6 +201,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
 
   const resetForm = () => {
     setFormData({
+      id: null,
       name: '',
       event_id: selectedEventId ? selectedEventId.toString() : '',
       venue_id: '',
@@ -205,6 +213,10 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       photo_url: '',
       genre: '',
       origin: '',
+      website: '',
+      instagram: '',
+      bandcamp: '',
+      facebook: '',
     })
     setShowAddForm(false)
     setEditingId(null)
@@ -290,6 +302,14 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
 
       const eventId = formData.event_id ? Number(formData.event_id) : null
 
+      // Serialize social links into JSON
+      const socialLinks = {
+        website: formData.website || '',
+        instagram: formData.instagram || '',
+        bandcamp: formData.bandcamp || '',
+        facebook: formData.facebook || '',
+      }
+
       const result = await bandsApi.create({
         eventId,
         venueId: formData.venue_id ? Number(formData.venue_id) : null,
@@ -301,6 +321,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
         photo_url: formData.photo_url,
         genre: formData.genre,
         origin: formData.origin,
+        social_links: JSON.stringify(socialLinks),
       })
 
       // If the API returns an error about duplicate names, show that error
@@ -353,6 +374,14 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
 
       const eventId = formData.event_id ? Number(formData.event_id) : null
 
+      // Serialize social links into JSON
+      const socialLinks = {
+        website: formData.website || '',
+        instagram: formData.instagram || '',
+        bandcamp: formData.bandcamp || '',
+        facebook: formData.facebook || '',
+      }
+
       const result = await bandsApi.update(editingId, {
         eventId,
         venueId: formData.venue_id ? Number(formData.venue_id) : null,
@@ -364,6 +393,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
         photo_url: formData.photo_url,
         genre: formData.genre,
         origin: formData.origin,
+        social_links: JSON.stringify(socialLinks),
       })
 
       // If the API returns an error about duplicate names, show that error
@@ -408,7 +438,21 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
   const startEdit = band => {
     setEditingId(band.id)
     const durationMinutes = deriveDurationMinutes(band.start_time, band.end_time)
+
+    // Parse social_links JSON if it exists
+    let socialLinks = {}
+    if (band.social_links) {
+      try {
+        socialLinks = typeof band.social_links === 'string'
+          ? JSON.parse(band.social_links)
+          : band.social_links
+      } catch (e) {
+        console.error('Failed to parse social_links:', e)
+      }
+    }
+
     setFormData({
+      id: band.id,
       name: band.name,
       event_id: band.event_id != null ? band.event_id.toString() : '',
       venue_id: band.venue_id != null ? band.venue_id.toString() : '',
@@ -420,6 +464,10 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       photo_url: band.photo_url || '',
       genre: band.genre || '',
       origin: band.origin || '',
+      website: socialLinks.website || '',
+      instagram: socialLinks.instagram || '',
+      bandcamp: socialLinks.bandcamp || '',
+      facebook: socialLinks.facebook || '',
     })
     setShowAddForm(false)
   }
@@ -771,6 +819,13 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
                                 title="View public profile"
                               >
                                 📄 View
+                              </button>
+                              <button
+                                onClick={() => setHistoryBandName(bandName)}
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors min-h-[44px]"
+                                title="View performance history"
+                              >
+                                📊 History
                               </button>
                               <button
                                 onClick={() => startEdit(bandOccurrences)}
@@ -1485,6 +1540,14 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
           isProcessing={isProcessing}
           onConfirm={handleConfirmBulk}
           onCancel={() => setShowPreviewModal(false)}
+        />
+      )}
+
+      {/* Performance History modal */}
+      {historyBandName && (
+        <PerformanceHistory
+          bandName={historyBandName}
+          onClose={() => setHistoryBandName(null)}
         />
       )}
     </div>

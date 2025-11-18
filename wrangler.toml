@@ -46,6 +46,21 @@ database_id = "6a1fca7d-22e2-4384-8277-5aecd0c97f2f"
 # MASTER_PASSWORD=your-even-stronger-master-password-here
 # DEVELOPER_CONTACT=555-123-4567
 
+# R2 Bucket Binding
+#
+# The R2 bucket will be available in Pages Functions as `env.BAND_PHOTOS`
+#
+# Setup instructions:
+# 1. Create the bucket: wrangler r2 bucket create settimes-band-photos
+# 2. Bind to Pages project in Cloudflare dashboard:
+#    Settings > Functions > R2 bucket bindings > Add binding
+#    Variable name: BAND_PHOTOS
+#    R2 bucket: settimes-band-photos
+
+[[r2_buckets]]
+binding = "BAND_PHOTOS"
+bucket_name = "settimes-band-photos"
+
 # Custom routes (optional - Pages handles this automatically)
 # Uncomment if you need custom routing behavior
 # [[routes]]

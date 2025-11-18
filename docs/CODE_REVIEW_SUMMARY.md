@@ -131,7 +131,7 @@ Added 11 security and quality rules:
 
 ```
 Test Files:  12 passed (12)
-Tests:       100 passed | 6 todo (106)
+Tests:       88 passed | 6 skipped (94)
 Duration:    1.80s
 Coverage:    90%+ (as documented)
 ```

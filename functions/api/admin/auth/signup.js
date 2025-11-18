@@ -237,6 +237,7 @@ export async function onRequestPost(context) {
           name: user.name,
           role: user.role,
         },
+        sessionToken, // COMPATIBILITY: Include for legacy Authorization header usage
         csrfToken, // Send CSRF token so client can include it in headers
       }),
       {

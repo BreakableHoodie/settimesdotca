@@ -63,6 +63,12 @@ export const authApi = {
       window.localStorage.setItem('userRole', data.user.role)
     }
 
+    // COMPATIBILITY: Store sessionToken for legacy Authorization header usage
+    // Some parts of the UI still use Authorization: Bearer <token>
+    if (data.sessionToken) {
+      window.sessionStorage.setItem('sessionToken', data.sessionToken)
+    }
+
     return data
   },
 
@@ -82,6 +88,12 @@ export const authApi = {
       window.localStorage.setItem('userEmail', data.user.email)
       window.localStorage.setItem('userName', data.user.name || '')
       window.localStorage.setItem('userRole', data.user.role)
+    }
+
+    // COMPATIBILITY: Store sessionToken for legacy Authorization header usage
+    // Some parts of the UI still use Authorization: Bearer <token>
+    if (data.sessionToken) {
+      window.sessionStorage.setItem('sessionToken', data.sessionToken)
     }
 
     return data
@@ -104,6 +116,8 @@ export const authApi = {
     window.localStorage.removeItem('userEmail')
     window.localStorage.removeItem('userName')
     window.localStorage.removeItem('userRole')
+    // COMPATIBILITY: Clear sessionToken from sessionStorage
+    window.sessionStorage.removeItem('sessionToken')
   },
 
   getCurrentUser() {

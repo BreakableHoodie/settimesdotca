@@ -30,6 +30,13 @@ describe("admin signup", () => {
     const payload = await response.json();
     expect(payload.user).toBeDefined();
     expect(payload.user.email).toBe("new.user@example.com");
+    
+    // Verify sessionToken is returned for compatibility with legacy Authorization headers
+    expect(payload.sessionToken).toBeDefined();
+    expect(payload.sessionToken).toBeTypeOf("string");
+    
+    // Verify CSRF token is returned
+    expect(payload.csrfToken).toBeDefined();
 
     // Verify the invite code was marked as used
     const usedInvite = rawDb

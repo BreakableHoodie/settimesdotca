@@ -8,6 +8,20 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
+ * UUID validation regex (RFC 4122 compliant)
+ * Validates UUID v1-5 format
+ */
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * ISO 8601 date format regex
+ * Matches YYYY-MM-DD and full ISO datetime formats
+ */
+const ISO_DATE_REGEX =
+  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/;
+
+/**
  * Validate email format
  * @param {string} email - Email address to validate
  * @returns {boolean} True if valid email format
@@ -123,9 +137,7 @@ export function isValidUUID(uuid) {
   if (!uuid || typeof uuid !== "string") {
     return false;
   }
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(uuid);
+  return UUID_REGEX.test(uuid);
 }
 
 /**
@@ -173,14 +185,21 @@ export function isValidURL(url) {
 
 /**
  * Validate date string (ISO 8601 format)
+ * Strictly validates ISO 8601 format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.sssZ
  * @param {string} dateString - Date string to validate
- * @returns {boolean} True if valid ISO date
+ * @returns {boolean} True if valid ISO date format
  */
 export function isValidISODate(dateString) {
   if (!dateString || typeof dateString !== "string") {
     return false;
   }
 
+  // First check if format matches ISO 8601
+  if (!ISO_DATE_REGEX.test(dateString)) {
+    return false;
+  }
+
+  // Then verify it's a valid date that can be parsed
   const date = new Date(dateString);
   return !isNaN(date.getTime());
 }

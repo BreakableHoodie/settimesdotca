@@ -106,3 +106,27 @@ describe("Role Validation", () => {
     expect(isValidRole("")).toBe(false);
   });
 });
+
+describe("ISO Date Validation", () => {
+  it("should validate correct ISO date strings", () => {
+    expect(isValidISODate("2025-11-18T14:00:00Z")).toBe(true);
+    expect(isValidISODate("2025-11-18")).toBe(true);
+    expect(isValidISODate(new Date().toISOString())).toBe(true);
+    expect(isValidISODate("2025-11-18T14:00:00.123Z")).toBe(true);
+    expect(isValidISODate("2025-11-18T14:00:00+00:00")).toBe(true);
+  });
+
+  it("should reject invalid date strings", () => {
+    expect(isValidISODate("not a date")).toBe(false);
+    expect(isValidISODate("2025-13-45")).toBe(false);
+    expect(isValidISODate("")).toBe(false);
+    expect(isValidISODate(null)).toBe(false);
+  });
+
+  it("should reject non-ISO formats", () => {
+    // These are valid dates but not ISO format
+    expect(isValidISODate("1/1/2023")).toBe(false);
+    expect(isValidISODate("Jan 1, 2023")).toBe(false);
+    expect(isValidISODate("2023/01/01")).toBe(false);
+  });
+});

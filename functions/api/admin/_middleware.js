@@ -49,7 +49,7 @@ async function verifySession(DB, sessionToken) {
     }
   } catch (error) {
     // Sessions table doesn't exist yet - fall back to simple check
-    console.log("Sessions table not yet created, using fallback auth");
+    console.warn("Sessions table not yet created, using fallback auth");
     return null;
   }
 

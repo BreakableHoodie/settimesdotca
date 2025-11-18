@@ -50,7 +50,13 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // API requests: Network-first with cache fallback
+  // SECURITY: Never cache admin API requests (sensitive data)
+  if (url.pathname.startsWith('/api/admin/')) {
+    event.respondWith(fetch(request)) // Network only, no caching
+    return
+  }
+
+  // Public API requests: Network-first with cache fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstStrategy(request))
     return

@@ -18,20 +18,32 @@ export async function onRequest(context) {
     "http://127.0.0.1:8788",
   ];
 
-  // Check if origin is allowed
+  // SECURITY: Check if origin is allowed
   const origin = request.headers.get("Origin");
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin)
-    ? origin
-    : ALLOWED_ORIGINS[0];
 
-  // Add CORS headers for API requests
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Max-Age": "86400",
-    "Access-Control-Allow-Credentials": "true",
-  };
+  // Only set CORS headers if origin is explicitly allowed
+  const corsHeaders = {};
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    corsHeaders["Access-Control-Allow-Origin"] = origin;
+    corsHeaders["Access-Control-Allow-Methods"] =
+      "GET, POST, PUT, DELETE, OPTIONS";
+    corsHeaders["Access-Control-Allow-Headers"] =
+      "Content-Type, Authorization, X-CSRF-Token";
+    corsHeaders["Access-Control-Max-Age"] = "86400";
+    corsHeaders["Access-Control-Allow-Credentials"] = "true";
+  } else if (!origin) {
+    // Same-origin request (no Origin header) - allow
+    // Browser will handle same-origin policy
+  } else {
+    // Origin provided but not in allowed list - reject
+    return new Response(
+      JSON.stringify({ error: "Origin not allowed" }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
 
   // Handle preflight requests
   if (request.method === "OPTIONS") {

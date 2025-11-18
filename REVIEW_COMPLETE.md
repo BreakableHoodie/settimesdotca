@@ -155,7 +155,7 @@ The SetTimes.ca dev branch demonstrates **strong engineering practices** with pa
 
 ## Files Modified
 
-1. `eslint.config.js` - Enhanced with 11 rules
+1. `eslint.config.js` - Enhanced with 10 rules (removed deprecated rule)
 2. `functions/utils/validation.js` - New validation library
 3. `functions/utils/__tests__/validation.test.js` - 15 tests
 4. `functions/api/admin/_middleware.js` - Fixed logging
@@ -164,8 +164,9 @@ The SetTimes.ca dev branch demonstrates **strong engineering practices** with pa
 7. `docs/PERFORMANCE_RECOMMENDATIONS.md` - Performance guide
 8. `docs/CODE_REVIEW_SUMMARY.md` - Executive summary
 9. `REVIEW_COMPLETE.md` - This file
+10. `package-lock.json` - Updated dependencies
 
-**Total:** 9 files (4 new, 5 modified)
+**Total:** 10 files (5 new, 5 modified)
 
 ---
 

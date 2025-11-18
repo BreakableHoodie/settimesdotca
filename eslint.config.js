@@ -68,7 +68,6 @@ export default [
       "no-throw-literal": "error",
       "prefer-promise-reject-errors": "error",
       // Best practices
-      "no-return-await": "warn",
       "require-await": "warn",
       "no-async-promise-executor": "error",
     },

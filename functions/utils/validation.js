@@ -3,9 +3,10 @@
 
 /**
  * Email validation regex
- * Matches most common email formats
+ * Improved pattern: prevents consecutive dots and leading dot in domain
+ * Matches most common email formats, not fully RFC 5322 compliant
  */
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[^\s@]+@([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
 
 /**
  * UUID validation regex (RFC 4122 compliant)
@@ -160,6 +161,9 @@ export function isValidUUID(uuid) {
  * @returns {boolean} True if valid role
  */
 export function isValidRole(role) {
+  if (!role || typeof role !== "string") {
+    return false;
+  }
   return VALID_ROLES.includes(role);
 }
 

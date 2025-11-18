@@ -250,17 +250,46 @@ Access your admin panel at: `https://yourdomain.com/admin`
 
 ## Security Best Practices
 
+### Invite-Only Signup System
+
+**NEW:** The platform now uses an invite-only signup system to prevent unauthorized account creation.
+
+**Creating Admin Invite Codes:**
+
+```bash
+# For local development
+node scripts/create-admin-invite.js --local
+
+# For production
+node scripts/create-admin-invite.js --prod
+```
+
+**Invite Code Best Practices:**
+
+- Generate unique invite codes for each new user
+- Set appropriate expiration times (default: 7 days)
+- Store invite codes securely (password manager)
+- Never share via unsecured channels (email, SMS)
+- Invite codes are single-use only
+- Revoke unused codes if needed via `/api/admin/invite-codes/:code` (DELETE)
+
+**First Admin Setup:**
+
+1. Run migration: `wrangler d1 execute settimes-db --local --file=database/migration-invite-codes.sql`
+2. Generate admin invite: `node scripts/create-admin-invite.js --local`
+3. Insert code into database using the provided command
+4. Use the code during signup at `/admin`
+
 ### Password Management
 
-**ADMIN_PASSWORD:**
+**User Passwords:**
 
-- 16+ characters minimum
-- Mix of letters, numbers, symbols
-- Share only with trusted organizers via secure channel (password manager share, encrypted message)
-- Rotate every 3-6 months
-- Change immediately if compromise suspected
+- 8+ characters minimum (enforced)
+- Mix of letters, numbers, symbols recommended
+- Password strength validation during signup
+- PBKDF2 hashing with 100,000 iterations
 
-**MASTER_PASSWORD:**
+**MASTER_PASSWORD (if configured):**
 
 - 20+ characters minimum
 - ONLY stored in developer's password manager

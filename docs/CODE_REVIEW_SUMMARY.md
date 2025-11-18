@@ -16,7 +16,7 @@ The SetTimes.ca dev branch has been thoroughly reviewed and is **production-read
 
 - ✅ **Security:** Strong (8/10)
 - ✅ **Code Quality:** Good (8/10)
-- ✅ **Performance:** Good (8/10)
+- ✅ **Performance:** Good (7/10)
 - ✅ **Testing:** Excellent (9/10)
 - ✅ **Documentation:** Good (7/10)
 

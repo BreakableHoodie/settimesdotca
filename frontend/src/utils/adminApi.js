@@ -7,11 +7,6 @@ const API_BASE = '/api/admin'
 // CSRF token is stored in memory and sent with each request
 let csrfToken = null
 
-// Get CSRF token from memory
-function getCSRFToken() {
-  return csrfToken
-}
-
 // Set CSRF token in memory
 function setCSRFToken(token) {
   csrfToken = token
@@ -105,7 +100,7 @@ export const authApi = {
       await fetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
         headers: getHeaders(),
-      credentials: 'include',
+        credentials: 'include',
       })
     } catch (error) {
       console.error('Logout error:', error)

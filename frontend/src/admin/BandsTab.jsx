@@ -443,9 +443,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
     let socialLinks = {}
     if (band.social_links) {
       try {
-        socialLinks = typeof band.social_links === 'string'
-          ? JSON.parse(band.social_links)
-          : band.social_links
+        socialLinks = typeof band.social_links === 'string' ? JSON.parse(band.social_links) : band.social_links
       } catch (e) {
         console.error('Failed to parse social_links:', e)
       }
@@ -1544,12 +1542,7 @@ export default function BandsTab({ selectedEventId, selectedEvent, events, showT
       )}
 
       {/* Performance History modal */}
-      {historyBandName && (
-        <PerformanceHistory
-          bandName={historyBandName}
-          onClose={() => setHistoryBandName(null)}
-        />
-      )}
+      {historyBandName && <PerformanceHistory bandName={historyBandName} onClose={() => setHistoryBandName(null)} />}
     </div>
   )
 }

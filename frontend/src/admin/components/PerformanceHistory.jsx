@@ -60,11 +60,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
         <div className="bg-band-navy rounded-lg p-8 max-w-4xl w-full mx-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-white">Error</h2>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-band-orange transition"
-              aria-label="Close"
-            >
+            <button onClick={onClose} className="text-white hover:text-band-orange transition" aria-label="Close">
               <FontAwesomeIcon icon={faTimes} className="text-2xl" />
             </button>
           </div>
@@ -97,11 +93,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
             <FontAwesomeIcon icon={faMusic} className="text-band-orange" />
             Performance History
           </h2>
-          <button
-            onClick={onClose}
-            className="text-white hover:text-band-orange transition"
-            aria-label="Close"
-          >
+          <button onClick={onClose} className="text-white hover:text-band-orange transition" aria-label="Close">
             <FontAwesomeIcon icon={faTimes} className="text-2xl" />
           </button>
         </div>
@@ -112,11 +104,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
           <div className="bg-band-dark rounded-lg p-6 mb-6">
             <div className="flex gap-6 items-start">
               {profile.photo_url && (
-                <img
-                  src={profile.photo_url}
-                  alt={profile.name}
-                  className="w-32 h-32 object-cover rounded-lg"
-                />
+                <img src={profile.photo_url} alt={profile.name} className="w-32 h-32 object-cover rounded-lg" />
               )}
               <div className="flex-1">
                 <h3 className="text-2xl font-bold text-white mb-2">{profile.name}</h3>
@@ -126,12 +114,8 @@ export default function PerformanceHistory({ bandName, onClose }) {
                     {profile.origin}
                   </p>
                 )}
-                {profile.genre && (
-                  <p className="text-white/80 mb-3">{profile.genre}</p>
-                )}
-                {profile.description && (
-                  <p className="text-white/70 text-sm leading-relaxed">{profile.description}</p>
-                )}
+                {profile.genre && <p className="text-white/80 mb-3">{profile.genre}</p>}
+                {profile.description && <p className="text-white/70 text-sm leading-relaxed">{profile.description}</p>}
               </div>
             </div>
           </div>
@@ -156,11 +140,8 @@ export default function PerformanceHistory({ bandName, onClose }) {
           <div>
             <h4 className="text-xl font-bold text-white mb-4">All Performances</h4>
             <div className="space-y-3">
-              {performances.map((performance) => (
-                <div
-                  key={performance.id}
-                  className="bg-band-dark rounded-lg p-4 hover:bg-band-dark/80 transition"
-                >
+              {performances.map(performance => (
+                <div key={performance.id} className="bg-band-dark rounded-lg p-4 hover:bg-band-dark/80 transition">
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
                       {performance.event ? (
@@ -203,11 +184,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
                   </div>
                 </div>
               ))}
-              {performances.length === 0 && (
-                <div className="text-center text-white/50 py-8">
-                  No performances found
-                </div>
-              )}
+              {performances.length === 0 && <div className="text-center text-white/50 py-8">No performances found</div>}
             </div>
           </div>
         </div>

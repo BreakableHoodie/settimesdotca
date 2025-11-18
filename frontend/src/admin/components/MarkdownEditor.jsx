@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
-import SimpleMDE from 'react-simplemde-editor';
-import 'easymde/dist/easymde.min.css';
-import './MarkdownEditor.css';
+import { useMemo } from 'react'
+import SimpleMDE from 'react-simplemde-editor'
+import 'easymde/dist/easymde.min.css'
+import './MarkdownEditor.css'
 
 /**
  * MarkdownEditor Component
@@ -19,55 +19,55 @@ export default function MarkdownEditor({
   value,
   onChange,
   placeholder = 'Write your description using markdown...',
-  minHeight = 200
+  minHeight = 200,
 }) {
-  const options = useMemo(() => ({
-    placeholder,
-    spellChecker: false,
-    minHeight: `${minHeight}px`,
-    status: false, // Hide status bar
-    toolbar: [
-      'bold',
-      'italic',
-      'heading',
-      '|',
-      'quote',
-      'unordered-list',
-      'ordered-list',
-      '|',
-      'link',
-      '|',
-      'preview',
-      'side-by-side',
-      'fullscreen',
-      '|',
-      'guide'
-    ],
-    shortcuts: {
-      toggleBold: 'Cmd-B',
-      toggleItalic: 'Cmd-I',
-      toggleHeadingSmaller: 'Cmd-H',
-      togglePreview: 'Cmd-P',
-      toggleSideBySide: 'F9',
-      toggleFullScreen: 'F11'
-    },
-    previewClass: ['editor-preview', 'prose'],
-    renderingConfig: {
-      singleLineBreaks: false,
-      codeSyntaxHighlighting: false
-    }
-  }), [placeholder, minHeight]);
+  const options = useMemo(
+    () => ({
+      placeholder,
+      spellChecker: false,
+      minHeight: `${minHeight}px`,
+      status: false, // Hide status bar
+      toolbar: [
+        'bold',
+        'italic',
+        'heading',
+        '|',
+        'quote',
+        'unordered-list',
+        'ordered-list',
+        '|',
+        'link',
+        '|',
+        'preview',
+        'side-by-side',
+        'fullscreen',
+        '|',
+        'guide',
+      ],
+      shortcuts: {
+        toggleBold: 'Cmd-B',
+        toggleItalic: 'Cmd-I',
+        toggleHeadingSmaller: 'Cmd-H',
+        togglePreview: 'Cmd-P',
+        toggleSideBySide: 'F9',
+        toggleFullScreen: 'F11',
+      },
+      previewClass: ['editor-preview', 'prose'],
+      renderingConfig: {
+        singleLineBreaks: false,
+        codeSyntaxHighlighting: false,
+      },
+    }),
+    [placeholder, minHeight]
+  )
 
   return (
     <div className="markdown-editor-wrapper">
-      <SimpleMDE
-        value={value}
-        onChange={onChange}
-        options={options}
-      />
+      <SimpleMDE value={value} onChange={onChange} options={options} />
       <div className="text-white/50 text-xs mt-2">
-        Supports <strong>bold</strong>, <em>italic</em>, headings, lists, and links. Use the toolbar or keyboard shortcuts.
+        Supports <strong>bold</strong>, <em>italic</em>, headings, lists, and links. Use the toolbar or keyboard
+        shortcuts.
       </div>
     </div>
-  );
+  )
 }

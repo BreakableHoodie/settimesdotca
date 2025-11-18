@@ -83,7 +83,7 @@ export default function BandForm({
             <div className="sm:col-span-2">
               <PhotoUpload
                 currentPhoto={formData.photo_url}
-                onPhotoChange={(url) => {
+                onPhotoChange={url => {
                   onChange({ target: { name: 'photo_url', value: url } })
                 }}
                 bandId={mode === 'edit' && formData.id ? formData.id : null}
@@ -97,7 +97,7 @@ export default function BandForm({
               </label>
               <MarkdownEditor
                 value={formData.description || ''}
-                onChange={(value) => {
+                onChange={value => {
                   onChange({ target: { name: 'description', value } })
                 }}
                 placeholder="Band bio, description, press quote..."

@@ -28,6 +28,9 @@ export default [
         Response: "readonly",
         Headers: "readonly",
         URL: "readonly",
+        File: "readonly",
+        Blob: "readonly",
+        FormData: "readonly",
         structuredClone: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
@@ -53,6 +56,20 @@ export default [
       eqeqeq: "error",
       "prefer-const": "warn",
       "no-undef": "error",
+      // Security best practices
+      "no-eval": "error",
+      "no-implied-eval": "error",
+      "no-new-func": "error",
+      "no-script-url": "error",
+      "no-unsafe-negation": "error",
+      // Code quality
+      "no-var": "error",
+      "prefer-arrow-callback": "warn",
+      "no-throw-literal": "error",
+      "prefer-promise-reject-errors": "error",
+      // Best practices
+      "require-await": "warn",
+      "no-async-promise-executor": "error",
     },
   },
   {

@@ -109,8 +109,8 @@ async function sendVerificationEmail(env, email, city, genre, token) {
   const verifyUrl = `${env.PUBLIC_URL}/verify?token=${token}`;
 
   // TODO: Integrate with email service (SendGrid, Mailgun, etc.)
-  // For now, just log
-  console.log(`Verification email for ${email}: ${verifyUrl}`);
+  // For now, just log (development only)
+  console.info(`Verification email for ${email}: ${verifyUrl}`);
 
   // In production, send actual email:
   // await env.EMAIL_SERVICE.send({

@@ -22,6 +22,18 @@ const ISO_DATE_REGEX =
   /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/;
 
 /**
+ * Valid user roles in the system
+ * Update this array when adding new roles
+ */
+const VALID_ROLES = ["admin", "editor", "viewer"];
+
+/**
+ * Control characters to remove during sanitization
+ * Removes: null bytes (\x00), control characters except tab/newline (\x0B-\x1F), and DEL (\x7F)
+ */
+const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g;
+
+/**
  * Validate email format
  * @param {string} email - Email address to validate
  * @returns {boolean} True if valid email format
@@ -76,6 +88,8 @@ export function validatePassword(password, options = {}) {
     errors.push("Password must contain at least one number");
   }
 
+  // Matches any character that is NOT alphanumeric (letters or numbers)
+  // This includes symbols, punctuation, and special characters
   if (requireSpecial && !/[^A-Za-z0-9]/.test(password)) {
     errors.push("Password must contain at least one special character");
   }
@@ -146,8 +160,7 @@ export function isValidUUID(uuid) {
  * @returns {boolean} True if valid role
  */
 export function isValidRole(role) {
-  const validRoles = ["admin", "editor", "viewer"];
-  return validRoles.includes(role);
+  return VALID_ROLES.includes(role);
 }
 
 /**
@@ -161,8 +174,8 @@ export function sanitizeString(input) {
     return "";
   }
 
-  // Remove null bytes and control characters
-  return input.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, "").trim();
+  // Remove null bytes (\x00), control characters except tab/newline (\x0B-\x1F), and DEL (\x7F)
+  return input.replace(CONTROL_CHARS_REGEX, "").trim();
 }
 
 /**

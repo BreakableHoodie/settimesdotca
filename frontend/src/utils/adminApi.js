@@ -3,18 +3,28 @@
 
 const API_BASE = '/api/admin'
 
-// Get session token from sessionStorage
-function getSessionToken() {
-  return window.sessionStorage.getItem('sessionToken')
+// SECURITY: Session token is now stored in HTTPOnly cookie (not accessible to JavaScript)
+// CSRF token is stored in memory and sent with each request
+let csrfToken = null
+
+// Set CSRF token in memory
+function setCSRFToken(token) {
+  csrfToken = token
 }
 
-// Create headers with session token
+// Create headers with CSRF token
+// Session token is automatically sent via HTTPOnly cookie by browser
 function getHeaders() {
-  const sessionToken = getSessionToken()
-  return {
+  const headers = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${sessionToken || ''}`,
   }
+
+  // Add CSRF token to headers for state-changing requests
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken
+  }
+
+  return headers
 }
 
 // Handle API responses
@@ -30,20 +40,28 @@ async function handleResponse(response) {
 
 // Auth API
 export const authApi = {
-  async signup(email, password, name) {
+  async signup(email, password, name, inviteCode) {
     const response = await fetch(`${API_BASE}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, name, role: 'admin' }),
+      credentials: 'include', // IMPORTANT: Include cookies in request
+      body: JSON.stringify({ email, password, name, inviteCode }),
     })
     const data = await handleResponse(response)
 
-    // Store session token and user data
+    // SECURITY: Session token is now in HTTPOnly cookie
+    // Store CSRF token and user data in memory/localStorage
+    if (data.csrfToken) {
+      setCSRFToken(data.csrfToken)
+      window.localStorage.setItem('userEmail', data.user.email)
+      window.localStorage.setItem('userName', data.user.name || '')
+      window.localStorage.setItem('userRole', data.user.role)
+    }
+
+    // COMPATIBILITY: Store sessionToken for legacy Authorization header usage
+    // Some parts of the UI still use Authorization: Bearer <token>
     if (data.sessionToken) {
       window.sessionStorage.setItem('sessionToken', data.sessionToken)
-      window.sessionStorage.setItem('userEmail', data.user.email)
-      window.sessionStorage.setItem('userName', data.user.name || '')
-      window.sessionStorage.setItem('userRole', data.user.role)
     }
 
     return data
@@ -53,33 +71,59 @@ export const authApi = {
     const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // IMPORTANT: Include cookies in request
       body: JSON.stringify({ email, password }),
     })
     const data = await handleResponse(response)
 
-    // Store session token and user data
+    // SECURITY: Session token is now in HTTPOnly cookie
+    // Store CSRF token and user data in memory/localStorage
+    if (data.csrfToken) {
+      setCSRFToken(data.csrfToken)
+      window.localStorage.setItem('userEmail', data.user.email)
+      window.localStorage.setItem('userName', data.user.name || '')
+      window.localStorage.setItem('userRole', data.user.role)
+    }
+
+    // COMPATIBILITY: Store sessionToken for legacy Authorization header usage
+    // Some parts of the UI still use Authorization: Bearer <token>
     if (data.sessionToken) {
       window.sessionStorage.setItem('sessionToken', data.sessionToken)
-      window.sessionStorage.setItem('userEmail', data.user.email)
-      window.sessionStorage.setItem('userName', data.user.name || '')
-      window.sessionStorage.setItem('userRole', data.user.role)
     }
 
     return data
   },
 
   async logout() {
-    window.sessionStorage.clear()
+    // Call logout endpoint to clear session cookie
+    try {
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+        headers: getHeaders(),
+        credentials: 'include',
+      })
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+
+    // Clear local data
+    setCSRFToken(null)
+    window.localStorage.removeItem('userEmail')
+    window.localStorage.removeItem('userName')
+    window.localStorage.removeItem('userRole')
+    // COMPATIBILITY: Clear sessionToken from sessionStorage
+    window.sessionStorage.removeItem('sessionToken')
   },
 
   getCurrentUser() {
-    const sessionToken = window.sessionStorage.getItem('sessionToken')
-    if (!sessionToken) return null
+    // Check if user data exists (session cookie is HTTPOnly, can't check directly)
+    const userEmail = window.localStorage.getItem('userEmail')
+    if (!userEmail) return null
 
     return {
-      email: window.sessionStorage.getItem('userEmail'),
-      name: window.sessionStorage.getItem('userName'),
-      role: window.sessionStorage.getItem('userRole'),
+      email: userEmail,
+      name: window.localStorage.getItem('userName'),
+      role: window.localStorage.getItem('userRole'),
     }
   },
 }
@@ -89,6 +133,7 @@ export const eventsApi = {
   async getAll() {
     const response = await fetch(`${API_BASE}/events`, {
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -97,6 +142,7 @@ export const eventsApi = {
     const response = await fetch(`${API_BASE}/events`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(eventData),
     })
     return handleResponse(response)
@@ -106,6 +152,7 @@ export const eventsApi = {
     const response = await fetch(`${API_BASE}/events/${eventId}/publish`, {
       method: 'PUT',
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -114,6 +161,7 @@ export const eventsApi = {
     const response = await fetch(`${API_BASE}/events/${eventId}/duplicate`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(newEventData),
     })
     return handleResponse(response)
@@ -123,6 +171,7 @@ export const eventsApi = {
     const response = await fetch(`${API_BASE}/events/${eventId}`, {
       method: 'DELETE',
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -130,6 +179,7 @@ export const eventsApi = {
   async getMetrics(eventId) {
     const response = await fetch(`${API_BASE}/events/${eventId}/metrics`, {
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -140,6 +190,7 @@ export const venuesApi = {
   async getAll() {
     const response = await fetch(`${API_BASE}/venues`, {
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -148,6 +199,7 @@ export const venuesApi = {
     const response = await fetch(`${API_BASE}/venues`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(venueData),
     })
     return handleResponse(response)
@@ -157,6 +209,7 @@ export const venuesApi = {
     const response = await fetch(`${API_BASE}/venues/${venueId}`, {
       method: 'PUT',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(venueData),
     })
     return handleResponse(response)
@@ -166,6 +219,7 @@ export const venuesApi = {
     const response = await fetch(`${API_BASE}/venues/${venueId}`, {
       method: 'DELETE',
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -176,6 +230,7 @@ export const bandsApi = {
   async getAll() {
     const response = await fetch(`${API_BASE}/bands`, {
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -183,6 +238,7 @@ export const bandsApi = {
   async getByEvent(eventId) {
     const response = await fetch(`${API_BASE}/bands?event_id=${eventId}`, {
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -191,6 +247,7 @@ export const bandsApi = {
     const response = await fetch(`${API_BASE}/bands`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(bandData),
     })
     return handleResponse(response)
@@ -200,6 +257,7 @@ export const bandsApi = {
     const response = await fetch(`${API_BASE}/bands/${bandId}`, {
       method: 'PUT',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(bandData),
     })
     return handleResponse(response)
@@ -209,6 +267,7 @@ export const bandsApi = {
     const response = await fetch(`${API_BASE}/bands/${bandId}`, {
       method: 'DELETE',
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },
@@ -216,6 +275,7 @@ export const bandsApi = {
   async getStats(bandName) {
     const response = await fetch(`${API_BASE}/bands/stats/${encodeURIComponent(bandName)}`, {
       headers: getHeaders(),
+      credentials: 'include',
     })
     return handleResponse(response)
   },

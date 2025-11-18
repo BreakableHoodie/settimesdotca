@@ -1,6 +1,9 @@
 // Admin authentication middleware
 // Applies to all /api/admin/* endpoints except /api/admin/auth/*
 
+import { getCookie } from "../../utils/cookies.js";
+import { validateCSRFMiddleware } from "../../utils/csrf.js";
+
 // Get client IP from request
 function getClientIP(request) {
   return (
@@ -56,9 +59,11 @@ async function verifySession(DB, sessionToken) {
 // Check if user has required permission based on role hierarchy
 // Role hierarchy: admin (3) > editor (2) > viewer (1)
 export async function checkPermission(request, env, requiredRole) {
+  // SECURITY: Read session token from HTTPOnly cookie
   const sessionToken =
-    request.headers.get("Authorization")?.replace("Bearer ", "") ||
-    request.headers.get("X-Session-Token");
+    getCookie(request, "session_token") ||
+    request.headers.get("Authorization")?.replace("Bearer ", "") || // Fallback for migration
+    request.headers.get("X-Session-Token"); // Fallback for migration
 
   if (!sessionToken) {
     return {
@@ -143,14 +148,21 @@ export async function onRequest(context) {
     return next();
   }
 
+  // SECURITY: Validate CSRF token for state-changing requests
+  const csrfError = validateCSRFMiddleware(request);
+  if (csrfError) {
+    return csrfError;
+  }
+
   const { DB } = env;
   const ipAddress = getClientIP(request);
 
   try {
-    // Get session token from header or cookie
+    // SECURITY: Read session token from HTTPOnly cookie
     const sessionToken =
-      request.headers.get("Authorization")?.replace("Bearer ", "") ||
-      request.headers.get("X-Session-Token");
+      getCookie(request, "session_token") ||
+      request.headers.get("Authorization")?.replace("Bearer ", "") || // Fallback for migration
+      request.headers.get("X-Session-Token"); // Fallback for migration
 
     // Verify session
     const user = await verifySession(DB, sessionToken);

@@ -125,6 +125,34 @@ export function createTestDB() {
       reason TEXT,
       FOREIGN KEY (subscription_id) REFERENCES email_subscriptions(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE invite_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      email TEXT,
+      role TEXT NOT NULL DEFAULT 'editor',
+      created_by_user_id INTEGER,
+      used_by_user_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      used_at TEXT,
+      expires_at TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (used_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE auth_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      email TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      attempt_type TEXT NOT NULL,
+      success INTEGER NOT NULL,
+      failure_reason TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
   `);
 
   const insertUser = db.prepare(

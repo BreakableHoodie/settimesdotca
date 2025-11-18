@@ -48,12 +48,18 @@ See [ROADMAP_TO_DEMO.md](ROADMAP_TO_DEMO.md) for the complete 3-week sprint plan
 
 ### Security & Compliance
 
+- **Invite-only signup system** - Prevents unauthorized account creation
+- **HTTPOnly session cookies** - Protection against XSS attacks
+- **CSRF token protection** - Prevents cross-site request forgery
+- **Content Security Policy** - Strict CSP headers with HSTS
+- **Strict CORS validation** - Rejects unauthorized origins
 - Rate limiting and brute force protection
 - Comprehensive audit logging (GDPR-compliant)
 - Master password recovery system
 - Role-based access control (admin/editor/viewer)
-- Password-protected endpoints with JWT-like sessions
 - IP tracking and user agent logging
+
+For detailed security documentation, see [SECURITY.md](SECURITY.md) and the [SQL Injection Audit Report](docs/security/SQL_INJECTION_AUDIT.md).
 
 ### Discovery Features
 
@@ -116,10 +122,15 @@ npx wrangler d1 execute settimes-db --local --file=database/migration-sprint-1-2
 npx wrangler d1 execute settimes-db --local --file=database/migration-subscriptions.sql
 npx wrangler d1 execute settimes-db --local --file=database/migration-metrics.sql
 npx wrangler d1 execute settimes-db --local --file=database/migration-events-theming.sql
+npx wrangler d1 execute settimes-db --local --file=database/migration-invite-codes.sql
 
 # Apply to production database
 npx wrangler d1 execute settimes-db --remote --file=database/schema-v2.sql
-# ... repeat for other migrations
+# ... repeat for other migrations (include migration-invite-codes.sql)
+
+# Create first admin invite code
+node scripts/create-admin-invite.js --local  # For local dev
+node scripts/create-admin-invite.js --prod   # For production
 ```
 
 See [docs/D1_SETUP.md](docs/D1_SETUP.md) for complete database setup instructions.

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import EventStatusBadge from './components/EventStatusBadge'
+import { Button, Input, Alert } from '../components/ui'
 
 /**
  * EventFormModal - Modal for creating and editing events
@@ -284,20 +285,18 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
 
             {/* Actions */}
             <div className="flex gap-3 pt-4">
-              <button
+              <Button
                 type="submit"
+                variant="primary"
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-band-orange text-white rounded font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                loading={loading}
+                fullWidth
               >
-                {loading ? 'Saving...' : isEditing ? 'Update Event' : 'Create Event'}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-3 bg-gray-600 text-white rounded font-medium hover:bg-gray-700 transition-colors"
-              >
+                {isEditing ? 'Update Event' : 'Create Event'}
+              </Button>
+              <Button type="button" variant="secondary" onClick={onClose}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </div>

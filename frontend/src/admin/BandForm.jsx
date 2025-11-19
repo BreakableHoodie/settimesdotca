@@ -1,6 +1,9 @@
 import PropTypes from 'prop-types'
 import PhotoUpload from './components/PhotoUpload'
 import MarkdownEditor from './components/MarkdownEditor'
+import { Input, Button, Tooltip, Alert } from '../components/ui'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
 
 export default function BandForm({
   events,
@@ -31,53 +34,66 @@ export default function BandForm({
     <form onSubmit={onSubmit}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div className="sm:col-span-2">
-          <label htmlFor="band-name" className="block text-white mb-2 text-sm">
-            Band Name *
-          </label>
-          <input
+          <div className="flex items-center gap-2 mb-2">
+            <label htmlFor="band-name" className="block text-text-primary text-sm font-medium">
+              Band Name *
+            </label>
+            <Tooltip content="Full name of the band or artist as it should appear publicly">
+              <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+            </Tooltip>
+          </div>
+          <Input
             id="band-name"
             type="text"
             name="name"
             value={formData.name}
             onChange={onChange}
-            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
             required
             placeholder="The Replacements"
+            fullWidth
           />
         </div>
 
         {globalView && (
           <>
             <div className="sm:col-span-2">
-              <label htmlFor="band-origin" className="block text-white mb-2 text-sm">
-                Origin <span className="text-gray-400 text-xs">(optional)</span>
-              </label>
-              <input
+              <div className="flex items-center gap-2 mb-2">
+                <label htmlFor="band-origin" className="block text-text-primary text-sm font-medium">
+                  Origin <span className="text-text-tertiary text-xs">(optional)</span>
+                </label>
+                <Tooltip content="Where the band/artist is from (city, region, country)">
+                  <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+                </Tooltip>
+              </div>
+              <Input
                 id="band-origin"
                 type="text"
                 name="origin"
                 value={formData.origin || ''}
                 onChange={onChange}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 placeholder="Toronto, ON"
+                fullWidth
               />
-              <p className="text-white/60 text-xs mt-2">Where the band/artist is from (city, region, etc.)</p>
             </div>
 
             <div className="sm:col-span-2">
-              <label htmlFor="band-genre" className="block text-white mb-2 text-sm">
-                Genre <span className="text-gray-400 text-xs">(optional)</span>
-              </label>
-              <input
+              <div className="flex items-center gap-2 mb-2">
+                <label htmlFor="band-genre" className="block text-text-primary text-sm font-medium">
+                  Genre <span className="text-text-tertiary text-xs">(optional)</span>
+                </label>
+                <Tooltip content="Musical genres, comma-separated (e.g., 'punk, indie rock')">
+                  <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+                </Tooltip>
+              </div>
+              <Input
                 id="band-genre"
                 type="text"
                 name="genre"
                 value={formData.genre || ''}
                 onChange={onChange}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 placeholder="punk, indie rock, etc."
+                fullWidth
               />
-              <p className="text-white/60 text-xs mt-2">Comma-separated list of genres</p>
             </div>
 
             <div className="sm:col-span-2">
@@ -287,20 +303,18 @@ export default function BandForm({
       )}
 
       <div className="flex gap-2">
-        <button
+        <Button
           type="submit"
+          variant="primary"
           disabled={submitting}
-          className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors min-h-[48px] flex-1 font-medium flex items-center justify-center"
+          loading={submitting}
+          fullWidth
         >
           {submitLabel}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors min-h-[44px] flex-1 font-medium flex items-center justify-center"
-        >
+        </Button>
+        <Button type="button" variant="secondary" onClick={onCancel} fullWidth>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   )

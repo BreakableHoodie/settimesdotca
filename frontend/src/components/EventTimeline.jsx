@@ -1,16 +1,28 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { Button, Badge, Card, Alert, Loading } from './ui'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faCircle,
+  faCalendarDays,
+  faClockRotateLeft,
+  faFilter,
+  faXmark,
+} from '@fortawesome/free-solid-svg-icons'
 
 /**
  * EventTimeline - Main timeline showing Now, Upcoming, and Past events
- * Replaces single-event focus with comprehensive event discovery
+ * Sprint 2.1: Enhanced with design system, filtering, and real-time updates
  */
 export default function EventTimeline() {
   const [timeline, setTimeline] = useState({ now: [], upcoming: [], past: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showPast, setShowPast] = useState(false)
+  const [filters, setFilters] = useState({ venue: null, month: null })
+  const [showFilters, setShowFilters] = useState(false)
 
+  // Fetch timeline data
   useEffect(() => {
     const fetchTimeline = async () => {
       try {
@@ -34,98 +46,267 @@ export default function EventTimeline() {
     }
 
     fetchTimeline()
+
+    // Real-time updates: refresh every 60 seconds for "Now Playing"
+    const interval = setInterval(() => {
+      fetchTimeline()
+    }, 60000)
+
+    return () => clearInterval(interval)
   }, [])
 
-  if (loading) {
-    return (
-      <div className="py-16 text-center">
-        <div className="text-band-orange text-xl">Loading events...</div>
-      </div>
+  // Filter events
+  const filterEvents = (events) => {
+    if (!events) return []
+
+    return events.filter(event => {
+      if (filters.venue && !event.venues.some(v => v.id === filters.venue)) {
+        return false
+      }
+      if (filters.month) {
+        const eventMonth = new Date(event.date).toISOString().slice(0, 7)
+        if (eventMonth !== filters.month) {
+          return false
+        }
+      }
+      return true
+    })
+  }
+
+  // Get unique venues and months for filters
+  const allVenues = Array.from(
+    new Set(
+      [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
+        .flatMap(event => event.venues || [])
+        .map(v => JSON.stringify({ id: v.id, name: v.name }))
     )
+  ).map(v => JSON.parse(v))
+
+  const allMonths = Array.from(
+    new Set(
+      [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
+        .map(event => new Date(event.date).toISOString().slice(0, 7))
+    )
+  ).sort().reverse()
+
+  const clearFilters = () => {
+    setFilters({ venue: null, month: null })
+  }
+
+  const hasActiveFilters = filters.venue !== null || filters.month !== null
+
+  if (loading) {
+    return <Loading size="lg" text="Loading events..." fullScreen={false} />
   }
 
   if (error) {
     return (
-      <div className="py-16 text-center">
-        <div className="text-red-400 text-xl mb-4">Failed to load events</div>
-        <p className="text-white/70">{error}</p>
+      <div className="container mx-auto px-4 py-16">
+        <Alert variant="error" dismissible onClose={() => setError(null)}>
+          <h4 className="font-bold mb-2">Failed to load events</h4>
+          <p>{error}</p>
+        </Alert>
       </div>
     )
   }
 
-  const hasNow = timeline.now && timeline.now.length > 0
-  const hasUpcoming = timeline.upcoming && timeline.upcoming.length > 0
-  const hasPast = timeline.past && timeline.past.length > 0
+  // Apply filters
+  const filteredNow = filterEvents(timeline.now || [])
+  const filteredUpcoming = filterEvents(timeline.upcoming || [])
+  const filteredPast = filterEvents(timeline.past || [])
+
+  const hasNow = filteredNow.length > 0
+  const hasUpcoming = filteredUpcoming.length > 0
+  const hasPast = filteredPast.length > 0
 
   return (
-    <div className="space-y-12">
-      {/* Now Playing Section */}
-      {hasNow && (
-        <section>
-          <h2 className="text-3xl font-bold text-band-orange mb-6 flex items-center gap-3">
-            <span className="animate-pulse">🔴</span>
-            Happening Now
-          </h2>
-          <div className="space-y-6">
-            {timeline.now.map(event => (
-              <EventCard key={event.id} event={event} isLive={true} />
-            ))}
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Header with Filters */}
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-4xl font-bold text-text-primary mb-2">Events</h1>
+            <p className="text-text-secondary">
+              Discover upcoming band crawls and music events
+            </p>
           </div>
-        </section>
-      )}
 
-      {/* Upcoming Events Section */}
-      {hasUpcoming && (
-        <section>
-          <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
-            📅 Coming Up
-          </h2>
-          <div className="space-y-6">
-            {timeline.upcoming.map(event => (
-              <EventCard key={event.id} event={event} isUpcoming={true} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Past Events Section */}
-      {hasPast && (
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-bold text-white/70 flex items-center gap-3">
-              📚 Past Events
-            </h2>
-            <button
-              onClick={() => setShowPast(!showPast)}
-              className="px-4 py-2 bg-band-purple hover:bg-band-purple/80 text-white rounded-lg transition-colors"
+          <div className="flex items-center gap-3">
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                icon={<FontAwesomeIcon icon={faXmark} />}
+              >
+                Clear Filters
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              icon={<FontAwesomeIcon icon={faFilter} />}
             >
-              {showPast ? 'Hide' : 'Show'} History
-            </button>
+              {showFilters ? 'Hide' : 'Show'} Filters
+            </Button>
           </div>
+        </div>
 
-          {showPast && (
+        {/* Filter Panel */}
+        {showFilters && (
+          <Card className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Venue Filter */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Filter by Venue
+                </label>
+                <select
+                  value={filters.venue || ''}
+                  onChange={(e) => setFilters({ ...filters, venue: e.target.value ? parseInt(e.target.value) : null })}
+                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
+                >
+                  <option value="">All Venues</option>
+                  {allVenues.map(venue => (
+                    <option key={venue.id} value={venue.id}>
+                      {venue.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Month Filter */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Filter by Month
+                </label>
+                <select
+                  value={filters.month || ''}
+                  onChange={(e) => setFilters({ ...filters, month: e.target.value || null })}
+                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
+                >
+                  <option value="">All Months</option>
+                  {allMonths.map(month => (
+                    <option key={month} value={month}>
+                      {new Date(month + '-01').toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long'
+                      })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-sm text-text-tertiary">
+                  Showing {filteredNow.length + filteredUpcoming.length + filteredPast.length} filtered event(s)
+                </p>
+              </div>
+            )}
+          </Card>
+        )}
+      </div>
+
+      <div className="space-y-12">
+        {/* Now Playing Section */}
+        {hasNow && (
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <FontAwesomeIcon
+                icon={faCircle}
+                className="text-error-500 animate-pulse text-sm"
+              />
+              <h2 className="text-3xl font-bold text-accent-500">
+                Happening Now
+              </h2>
+              <Badge variant="error" size="sm">LIVE</Badge>
+            </div>
             <div className="space-y-6">
-              {timeline.past.map(event => (
-                <EventCard key={event.id} event={event} isPast={true} />
+              {filteredNow.map(event => (
+                <EventCard key={event.id} event={event} isLive={true} />
               ))}
             </div>
-          )}
-        </section>
-      )}
+          </section>
+        )}
 
-      {/* Empty State */}
-      {!hasNow && !hasUpcoming && !hasPast && (
-        <div className="py-16 text-center">
-          <div className="text-white/50 text-xl mb-4">No events found</div>
-          <p className="text-white/30">Check back soon for upcoming band crawls!</p>
-        </div>
-      )}
+        {/* Upcoming Events Section */}
+        {hasUpcoming && (
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <FontAwesomeIcon
+                icon={faCalendarDays}
+                className="text-primary-500 text-xl"
+              />
+              <h2 className="text-3xl font-bold text-text-primary">
+                Coming Up
+              </h2>
+            </div>
+            <div className="space-y-6">
+              {filteredUpcoming.map(event => (
+                <EventCard key={event.id} event={event} isUpcoming={true} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Past Events Section */}
+        {hasPast && (
+          <section>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                <FontAwesomeIcon
+                  icon={faClockRotateLeft}
+                  className="text-text-tertiary text-xl"
+                />
+                <h2 className="text-3xl font-bold text-text-secondary">
+                  Past Events
+                </h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPast(!showPast)}
+              >
+                {showPast ? 'Hide' : 'Show'} History ({filteredPast.length})
+              </Button>
+            </div>
+
+            {showPast && (
+              <div className="space-y-6 opacity-75">
+                {filteredPast.map(event => (
+                  <EventCard key={event.id} event={event} isPast={true} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Empty State */}
+        {!hasNow && !hasUpcoming && !hasPast && (
+          <div className="py-16 text-center">
+            <Alert variant="info">
+              <div className="text-center">
+                <h3 className="text-lg font-bold mb-2">No events found</h3>
+                <p className="text-text-secondary">
+                  {hasActiveFilters
+                    ? 'Try adjusting your filters to see more events'
+                    : 'Check back soon for upcoming band crawls!'}
+                </p>
+              </div>
+            </Alert>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 /**
  * EventCard - Displays event info with bands and venues
+ * Sprint 2.1: Updated with design system components
  */
 function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }) {
   const [expanded, setExpanded] = useState(isLive) // Auto-expand live events
@@ -141,38 +322,50 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
   }
 
   // Get featured bands (top 5)
-  const featuredBands = event.bands.slice(0, 5)
-  const moreBandsCount = Math.max(0, event.band_count - 5)
+  const featuredBands = event.bands?.slice(0, 5) || []
+  const moreBandsCount = Math.max(0, (event.band_count || 0) - 5)
 
   return (
-    <div
+    <Card
+      hoverable={!expanded}
       className={`
-        rounded-xl border overflow-hidden transition-all
-        ${isLive ? 'bg-band-orange/10 border-band-orange shadow-lg shadow-band-orange/20' : ''}
-        ${isUpcoming ? 'bg-band-purple border-band-orange/20' : ''}
-        ${isPast ? 'bg-band-navy border-white/10' : ''}
+        transition-all overflow-hidden
+        ${isLive ? 'ring-2 ring-error-500/50 shadow-glow-accent' : ''}
+        ${isUpcoming ? 'border-primary-500/20' : ''}
+        ${isPast ? 'opacity-75' : ''}
       `}
+      padding="none"
     >
       {/* Event Header */}
       <div className="p-6">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
           <div className="flex-1">
-            <h3 className="text-2xl font-bold text-band-orange mb-2">
-              {event.name}
-            </h3>
-            <p className="text-white/70 text-sm mb-3">
-              📅 {formatDate(event.date)}
+            <div className="flex flex-wrap items-start gap-2 mb-2">
+              <h3 className="text-2xl font-bold text-accent-500 flex-1">
+                {event.name}
+              </h3>
+              {isLive && <Badge variant="error" size="md">LIVE NOW</Badge>}
+              {event.is_published === false && <Badge variant="warning">Draft</Badge>}
+            </div>
+
+            <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
+              <FontAwesomeIcon icon={faCalendarDays} className="text-xs" />
+              {formatDate(event.date)}
             </p>
 
             {/* Event Stats */}
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2 text-white/90">
-                <span className="font-semibold">{event.band_count}</span>
-                <span className="text-white/60">Bands</span>
+            <div className="flex flex-wrap gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-text-primary">{event.band_count}</span>
+                <span className="text-text-tertiary">
+                  {event.band_count === 1 ? 'Band' : 'Bands'}
+                </span>
               </div>
-              <div className="flex items-center gap-2 text-white/90">
-                <span className="font-semibold">{event.venue_count}</span>
-                <span className="text-white/60">Venues</span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-text-primary">{event.venue_count}</span>
+                <span className="text-text-tertiary">
+                  {event.venue_count === 1 ? 'Venue' : 'Venues'}
+                </span>
               </div>
             </div>
           </div>
@@ -180,42 +373,48 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2">
             {event.ticket_url && (
-              <a
+              <Button
+                as="a"
                 href={event.ticket_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 bg-band-orange hover:bg-orange-600 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
+                variant="primary"
+                size="md"
               >
                 🎫 Get Tickets
-              </a>
+              </Button>
             )}
-            <button
+            <Button
+              variant="secondary"
+              size="md"
               onClick={() => setExpanded(!expanded)}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors font-medium"
             >
-              {expanded ? 'Hide Details' : 'Show Details'}
-            </button>
+              {expanded ? 'Hide Details' : 'View Details'}
+            </Button>
           </div>
         </div>
 
         {/* Featured Bands Preview (when collapsed) */}
         {!expanded && featuredBands.length > 0 && (
-          <div className="mt-4">
-            <p className="text-white/50 text-sm mb-2">Featured performers:</p>
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="text-text-tertiary text-sm mb-3">Featured performers:</p>
             <div className="flex flex-wrap gap-2">
               {featuredBands.map(band => (
-                <Link
+                <Badge
                   key={band.id}
-                  to={`/band/${band.id}`}
-                  className="px-3 py-1 bg-band-navy/50 hover:bg-band-navy text-white rounded-full text-sm transition-colors"
+                  as={Link}
+                  to={`/band/${band.name}`}
+                  variant="default"
+                  size="md"
+                  className="hover:bg-primary-500/20 cursor-pointer transition-colors"
                 >
                   {band.name}
-                </Link>
+                </Badge>
               ))}
               {moreBandsCount > 0 && (
-                <span className="px-3 py-1 text-white/50 text-sm">
+                <Badge variant="default" size="md">
                   +{moreBandsCount} more
-                </span>
+                </Badge>
               )}
             </div>
           </div>
@@ -224,74 +423,85 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
 
       {/* Expanded Details */}
       {expanded && (
-        <div className="border-t border-white/10">
+        <div className="border-t border-white/10 bg-white/5">
           {/* Venues */}
-          <div className="p-6 bg-band-navy/30">
-            <h4 className="text-lg font-bold text-white mb-3">Venues</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {event.venues.map(venue => (
-                <div
-                  key={venue.id}
-                  className="p-3 bg-band-purple/50 rounded-lg border border-white/10"
-                >
-                  <div className="font-semibold text-white mb-1">{venue.name}</div>
-                  <div className="text-white/60 text-sm">
-                    {venue.band_count} {venue.band_count === 1 ? 'band' : 'bands'}
-                  </div>
-                  {venue.address && (
-                    <div className="text-white/40 text-xs mt-1">{venue.address}</div>
-                  )}
-                </div>
-              ))}
+          {event.venues && event.venues.length > 0 && (
+            <div className="p-6 border-b border-white/10">
+              <h4 className="text-lg font-bold text-text-primary mb-4">Venues</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {event.venues.map(venue => (
+                  <Card key={venue.id} padding="sm" variant="elevated">
+                    <div className="font-semibold text-text-primary mb-1">{venue.name}</div>
+                    <div className="text-text-secondary text-sm">
+                      {venue.band_count} {venue.band_count === 1 ? 'band' : 'bands'}
+                    </div>
+                    {venue.address && (
+                      <div className="text-text-tertiary text-xs mt-1">{venue.address}</div>
+                    )}
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* All Bands */}
-          <div className="p-6">
-            <h4 className="text-lg font-bold text-white mb-3">
-              All Performers ({event.band_count})
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {event.bands.map(band => (
-                <Link
-                  key={band.id}
-                  to={`/band/${band.id}`}
-                  className="p-3 bg-band-navy/50 hover:bg-band-navy rounded-lg border border-white/10 transition-all group"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="font-semibold text-white group-hover:text-band-orange transition-colors flex-1">
-                      {band.name}
-                    </div>
-                    {band.photo_url && (
-                      <div className="w-10 h-10 rounded-full bg-band-purple overflow-hidden flex-shrink-0">
-                        <img
-                          src={band.photo_url}
-                          alt={band.name}
-                          className="w-full h-full object-cover"
-                        />
+          {event.bands && event.bands.length > 0 && (
+            <div className="p-6">
+              <h4 className="text-lg font-bold text-text-primary mb-4">
+                All Performers ({event.band_count})
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {event.bands.map(band => (
+                  <Card
+                    key={band.id}
+                    as={Link}
+                    to={`/band/${band.name}`}
+                    padding="sm"
+                    hoverable
+                    className="group"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="font-semibold text-text-primary group-hover:text-accent-500 transition-colors flex-1">
+                        {band.name}
                       </div>
-                    )}
-                  </div>
-
-                  <div className="text-white/60 text-sm mb-1">
-                    📍 {band.venue_name}
-                  </div>
-
-                  <div className="text-white/40 text-xs">
-                    🕐 {band.start_time} - {band.end_time}
-                  </div>
-
-                  {band.genre && (
-                    <div className="mt-2 text-white/50 text-xs">
-                      {band.genre}
+                      {band.photo_url && (
+                        <div className="w-12 h-12 rounded-full bg-bg-darker overflow-hidden flex-shrink-0 ring-2 ring-white/10">
+                          <img
+                            src={band.photo_url}
+                            alt={band.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </Link>
-              ))}
+
+                    <div className="space-y-1 text-sm">
+                      <div className="text-text-secondary flex items-center gap-2">
+                        <span>📍</span>
+                        <span>{band.venue_name}</span>
+                      </div>
+
+                      <div className="text-text-tertiary flex items-center gap-2">
+                        <span>🕐</span>
+                        <span>{band.start_time} - {band.end_time}</span>
+                      </div>
+
+                      {band.genre && (
+                        <div className="pt-2">
+                          <Badge variant="default" size="sm">
+                            {band.genre}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

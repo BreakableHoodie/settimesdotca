@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types'
-import { Card, Badge } from './ui'
+import { Card } from './ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChartLine } from '@fortawesome/free-solid-svg-icons'
 

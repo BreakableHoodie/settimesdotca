@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import EventStatusBadge from './components/EventStatusBadge'
-import { Button, Input, Alert } from '../components/ui'
+import { Button } from '../components/ui'
 
 /**
  * EventFormModal - Modal for creating and editing events

@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types'
 import PhotoUpload from './components/PhotoUpload'
 import MarkdownEditor from './components/MarkdownEditor'
-import { Input, Button, Tooltip, Alert } from '../components/ui'
+import { Input, Button, Tooltip } from '../components/ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
 

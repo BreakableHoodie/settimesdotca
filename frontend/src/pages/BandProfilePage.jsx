@@ -4,7 +4,6 @@ import { Helmet } from 'react-helmet-async'
 import { Button, Badge, Card, Alert, Loading } from '../components/ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-  faMusic,
   faLocationDot,
   faCalendarDays,
   faClock,
@@ -16,7 +15,6 @@ import {
   faInstagram,
   faFacebook,
   faBandcamp,
-  faSpotify,
 } from '@fortawesome/free-brands-svg-icons'
 import BandStats from '../components/BandStats'
 import BandFacts from '../components/BandFacts'

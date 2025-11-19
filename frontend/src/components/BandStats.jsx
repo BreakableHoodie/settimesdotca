@@ -1,4 +1,7 @@
 import PropTypes from 'prop-types'
+import { Card, Badge } from './ui'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faChartLine } from '@fortawesome/free-solid-svg-icons'
 
 function formatLabel(key) {
   return key.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase())
@@ -22,25 +25,31 @@ export default function BandStats({ stats }) {
 
   if (entries.length === 0) {
     return (
-      <section className="bg-white/5 rounded-2xl border border-white/10 p-4">
-        <h3 className="text-lg font-semibold text-white mb-2">Performance Stats</h3>
-        <p className="text-sm text-white/70">No performance data yet. Check back after the next show.</p>
-      </section>
+      <Card variant="elevated">
+        <h3 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
+          <FontAwesomeIcon icon={faChartLine} className="text-accent-500" />
+          Performance Stats
+        </h3>
+        <p className="text-sm text-text-secondary">No performance data yet. Check back after the next show.</p>
+      </Card>
     )
   }
 
   return (
-    <section className="bg-white/5 rounded-2xl border border-white/10 p-4">
-      <h3 className="text-lg font-semibold text-white mb-4">Performance Stats</h3>
+    <Card variant="elevated">
+      <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <FontAwesomeIcon icon={faChartLine} className="text-accent-500" />
+        Performance Stats
+      </h3>
       <div className="grid grid-cols-2 gap-3">
         {entries.map(([key, value]) => (
-          <div key={key} className="bg-white/5 rounded-xl border border-white/10 p-3">
-            <p className="text-xs uppercase tracking-wide text-white/60 mb-1">{formatLabel(key)}</p>
-            <p className="text-2xl font-bold text-white">{formatValue(value)}</p>
-          </div>
+          <Card key={key} padding="sm" variant="outline" className="text-center">
+            <p className="text-xs uppercase tracking-wide text-text-secondary mb-1">{formatLabel(key)}</p>
+            <p className="text-2xl font-bold text-text-primary">{formatValue(value)}</p>
+          </Card>
         ))}
       </div>
-    </section>
+    </Card>
   )
 }
 

@@ -1,4 +1,7 @@
 import PropTypes from 'prop-types'
+import { Card } from './ui'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faLightbulb } from '@fortawesome/free-solid-svg-icons'
 
 function buildFacts(band = {}, stats = {}) {
   const facts = []
@@ -46,16 +49,20 @@ export default function BandFacts({ band, stats }) {
   }
 
   return (
-    <section className="bg-white/5 rounded-2xl border border-white/10 p-4">
-      <h3 className="text-lg font-semibold text-white mb-3">Fast Facts</h3>
+    <Card variant="elevated">
+      <h3 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
+        <FontAwesomeIcon icon={faLightbulb} className="text-accent-500" />
+        Fast Facts
+      </h3>
       <ul className="space-y-2">
         {facts.map((fact, index) => (
-          <li key={index} className="text-white/80 text-sm leading-relaxed">
-            • {fact}
+          <li key={index} className="text-text-secondary text-sm leading-relaxed flex items-start gap-2">
+            <span className="text-accent-500 mt-0.5">•</span>
+            <span>{fact}</span>
           </li>
         ))}
       </ul>
-    </section>
+    </Card>
   )
 }
 

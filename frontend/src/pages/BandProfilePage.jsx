@@ -260,23 +260,29 @@ export default function BandProfilePage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Upcoming Shows */}
             {profile.upcoming && profile.upcoming.length > 0 && (
-              <div className="bg-band-purple rounded-xl border-2 border-band-orange/30 overflow-hidden">
-                <div className="px-6 py-4 bg-band-purple/50 border-b border-white/10">
-                  <h2 className="text-2xl font-bold text-band-orange flex items-center gap-2">
-                    <span>🎯</span>
-                    <span>Upcoming Shows ({profile.upcoming.length})</span>
+              <Card variant="elevated" className="border-2 border-accent-500/30">
+                <div className="pb-4 mb-4 border-b border-white/10">
+                  <h2 className="text-2xl font-bold text-accent-500 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faCalendarDays} />
+                    <span>Upcoming Shows</span>
+                    <Badge variant="accent" className="ml-2">{profile.upcoming.length}</Badge>
                   </h2>
                 </div>
-                <div className="divide-y divide-white/10">
+                <div className="space-y-4">
                   {profile.upcoming.map((performance, idx) => (
-                    <div key={idx} className="p-6 hover:bg-band-navy/30 transition-colors">
+                    <Card
+                      key={idx}
+                      variant="outline"
+                      hoverable
+                      className="p-4"
+                    >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-band-orange mb-2">{performance.event_name}</h3>
-                          <div className="flex flex-wrap gap-3 text-sm text-white/70">
+                          <h3 className="text-xl font-semibold text-accent-500 mb-2">{performance.event_name}</h3>
+                          <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
                             {performance.event_date && (
-                              <span className="flex items-center gap-1">
-                                📅{' '}
+                              <span className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faCalendarDays} className="text-accent-500" />
                                 {new Date(performance.event_date).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'long',
@@ -285,49 +291,61 @@ export default function BandProfilePage() {
                               </span>
                             )}
                             {performance.venue_name && (
-                              <span className="flex items-center gap-1">📍 {performance.venue_name}</span>
+                              <span className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faLocationDot} className="text-accent-500" />
+                                {performance.venue_name}
+                              </span>
                             )}
                             {performance.start_time && performance.end_time && (
-                              <span className="flex items-center gap-1">
-                                🕐 {performance.start_time} - {performance.end_time}
+                              <span className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faClock} className="text-accent-500" />
+                                {performance.start_time} - {performance.end_time}
                               </span>
                             )}
                           </div>
                         </div>
                         {performance.event_slug && (
-                          <Link
+                          <Button
+                            as={Link}
                             to={`/embed/${performance.event_slug}`}
-                            className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium whitespace-nowrap"
+                            variant="primary"
+                            size="sm"
                           >
                             View Event →
-                          </Link>
+                          </Button>
                         )}
                       </div>
-                    </div>
+                    </Card>
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
 
             {/* Past Performance History */}
             {profile.past && profile.past.length > 0 && (
-              <div className="bg-band-purple rounded-xl border border-band-orange/20 overflow-hidden">
-                <div className="px-6 py-4 border-b border-white/10">
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <span>📜</span>
-                    <span>Performance History ({profile.past.length})</span>
+              <Card variant="elevated">
+                <div className="pb-4 mb-4 border-b border-white/10">
+                  <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+                    <FontAwesomeIcon icon={faChartLine} />
+                    <span>Performance History</span>
+                    <Badge variant="secondary" className="ml-2">{profile.past.length}</Badge>
                   </h2>
                 </div>
-                <div className="divide-y divide-white/10">
+                <div className="space-y-4">
                   {profile.past.map((performance, idx) => (
-                    <div key={idx} className="p-6 hover:bg-band-navy/30 transition-colors">
+                    <Card
+                      key={idx}
+                      variant="outline"
+                      hoverable
+                      className="p-4"
+                    >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-band-orange mb-2">{performance.event_name}</h3>
-                          <div className="flex flex-wrap gap-3 text-sm text-white/70">
+                          <h3 className="text-xl font-semibold text-accent-500 mb-2">{performance.event_name}</h3>
+                          <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
                             {performance.event_date && (
-                              <span className="flex items-center gap-1">
-                                📅{' '}
+                              <span className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faCalendarDays} className="text-text-tertiary" />
                                 {new Date(performance.event_date).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'long',
@@ -336,40 +354,49 @@ export default function BandProfilePage() {
                               </span>
                             )}
                             {performance.venue_name && (
-                              <span className="flex items-center gap-1">📍 {performance.venue_name}</span>
+                              <span className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faLocationDot} className="text-text-tertiary" />
+                                {performance.venue_name}
+                              </span>
                             )}
                             {performance.start_time && performance.end_time && (
-                              <span className="flex items-center gap-1">
-                                🕐 {performance.start_time} - {performance.end_time}
+                              <span className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faClock} className="text-text-tertiary" />
+                                {performance.start_time} - {performance.end_time}
                               </span>
                             )}
                           </div>
                         </div>
                         {performance.event_slug && (
-                          <Link
+                          <Button
+                            as={Link}
                             to={`/embed/${performance.event_slug}`}
-                            className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium whitespace-nowrap"
+                            variant="secondary"
+                            size="sm"
                           >
                             View Event →
-                          </Link>
+                          </Button>
                         )}
                       </div>
-                    </div>
+                    </Card>
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
           </div>
         </div>
 
         {/* Back to Events */}
         <div className="mt-6 text-center">
-          <Link
+          <Button
+            as={Link}
             to="/"
-            className="inline-block px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors font-medium"
+            variant="secondary"
+            icon={<FontAwesomeIcon icon={faArrowLeft} />}
+            iconPosition="left"
           >
-            ← Back to Events
-          </Link>
+            Back to Events
+          </Button>
         </div>
       </div>
     </div>

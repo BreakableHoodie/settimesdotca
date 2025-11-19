@@ -1,7 +1,11 @@
+import { Button, Badge } from '../../components/ui'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faCalendarDays, faArrowLeft, faBullseye } from '@fortawesome/free-solid-svg-icons'
 import EventStatusBadge from './EventStatusBadge'
 
 /**
  * ContextBanner - Visual indicator showing current event context
+ * Sprint 2.3: Enhanced with design system components
  *
  * Provides clear distinction between global view and event-filtered view.
  * Shows event information and prominent "Back to All Events" button.
@@ -24,30 +28,36 @@ export default function ContextBanner({ event, onClear }) {
   }
 
   return (
-    <div className="bg-band-orange/20 border-l-4 border-band-orange px-4 py-3 mb-4 rounded-r animate-slide-down">
+    <div className="bg-accent-500/10 border-l-4 border-accent-500 px-4 py-3 mb-4 rounded-r animate-slide-down shadow-md">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="text-2xl">🎯</span>
+          <FontAwesomeIcon icon={faBullseye} className="text-accent-500 text-2xl" />
           <div>
-            <div className="text-white/70 text-sm">Working on event:</div>
+            <div className="text-text-secondary text-sm">Working on event:</div>
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-band-orange font-bold text-lg">{event.name}</span>
-              <span className="text-white/50 text-sm">
-                ({event.band_count || 0} performers
-                {event.date && ` • ${formatDate(event.date)}`})
-              </span>
+              <span className="text-accent-500 font-bold text-lg">{event.name}</span>
+              <Badge variant="secondary" className="text-xs">
+                {event.band_count || 0} performers
+              </Badge>
+              {event.date && (
+                <span className="text-text-secondary text-sm flex items-center gap-1">
+                  <FontAwesomeIcon icon={faCalendarDays} className="text-accent-500" />
+                  {formatDate(event.date)}
+                </span>
+              )}
               <EventStatusBadge status={event.status} />
             </div>
           </div>
         </div>
-        <button
+        <Button
           onClick={onClear}
-          className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded font-medium transition-colors min-h-[48px] flex items-center justify-center gap-2 whitespace-nowrap border border-white/20 hover:border-white/40"
-          title="Return to global view (all events, venues, and performers)"
+          variant="secondary"
+          icon={<FontAwesomeIcon icon={faArrowLeft} />}
+          iconPosition="left"
+          className="whitespace-nowrap"
         >
-          <span className="text-lg">←</span>
-          <span>Back to All Events</span>
-        </button>
+          Back to All Events
+        </Button>
       </div>
     </div>
   )

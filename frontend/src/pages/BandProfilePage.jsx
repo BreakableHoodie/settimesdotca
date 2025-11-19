@@ -1,17 +1,36 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import Header from '../components/Header'
+import { Helmet } from 'react-helmet-async'
+import { Button, Badge, Card, Alert, Loading } from '../components/ui'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faMusic,
+  faLocationDot,
+  faCalendarDays,
+  faClock,
+  faChartLine,
+  faArrowLeft,
+  faGlobe,
+} from '@fortawesome/free-solid-svg-icons'
+import {
+  faInstagram,
+  faFacebook,
+  faBandcamp,
+  faSpotify,
+} from '@fortawesome/free-brands-svg-icons'
 import BandStats from '../components/BandStats'
 import BandFacts from '../components/BandFacts'
 
 /**
- * BandProfilePage - Sports card-inspired band profile
+ * BandProfilePage - Enhanced band profile with design system
+ * Sprint 2.2: SEO optimization, design system integration, performance history
  *
  * Features:
  * - Trading card aesthetic with photo and badges
- * - Performance statistics grid
- * - Upcoming shows and past performance history
- * - Auto-generated facts and trivia
+ * - Performance statistics and visualizations
+ * - Upcoming shows and comprehensive performance history
+ * - Social media integration
+ * - SEO meta tags and structured data
  */
 export default function BandProfilePage() {
   const { id } = useParams()
@@ -48,10 +67,8 @@ export default function BandProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-band-navy">
-        <div className="container mx-auto px-4 py-12">
-          <div className="text-band-orange text-lg text-center">Loading band profile...</div>
-        </div>
+      <div className="min-h-screen bg-band-navy flex items-center justify-center">
+        <Loading size="lg" text="Loading band profile..." />
       </div>
     )
   }
@@ -59,17 +76,21 @@ export default function BandProfilePage() {
   if (error || !profile) {
     return (
       <div className="min-h-screen bg-band-navy">
-        <Header />
-        <div className="container mx-auto px-4 py-12">
+        <div className="container mx-auto px-4 py-12 max-w-2xl">
+          <Alert variant="error" className="mb-6">
+            <h2 className="text-xl font-bold mb-2">Band Not Found</h2>
+            <p>We couldn&apos;t find a profile for this band. {error && `Error: ${error}`}</p>
+          </Alert>
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-white mb-4">Band Not Found</h1>
-            <p className="text-gray-400 mb-6">We couldn&apos;t find a profile for this band.</p>
-            <Link
+            <Button
+              as={Link}
               to="/"
-              className="inline-block px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium"
+              variant="secondary"
+              icon={<FontAwesomeIcon icon={faArrowLeft} />}
+              iconPosition="left"
             >
               Back to Schedule
-            </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -78,7 +99,54 @@ export default function BandProfilePage() {
 
   return (
     <div className="min-h-screen bg-band-navy">
-      <Header />
+      {/* SEO Meta Tags */}
+      <Helmet>
+        <title>{profile.name} - Band Profile | SetTimes</title>
+        <meta
+          name="description"
+          content={
+            profile.description
+              ? `${profile.description.slice(0, 155)}...`
+              : `${profile.name} profile on SetTimes. ${profile.genre ? `Genre: ${profile.genre}. ` : ''}${profile.stats ? `${profile.stats.total_performances} performances.` : ''}`
+          }
+        />
+        <meta name="keywords" content={`${profile.name}, ${profile.genre || 'music'}, ${profile.origin || 'band'}, live music, SetTimes`} />
+
+        {/* OpenGraph */}
+        <meta property="og:title" content={`${profile.name} - Band Profile`} />
+        <meta property="og:description" content={profile.description || `${profile.name} on SetTimes`} />
+        <meta property="og:type" content="profile" />
+        {profile.photo_url && <meta property="og:image" content={profile.photo_url} />}
+        <meta property="og:url" content={`https://settimes.ca/band/${id}`} />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${profile.name} - Band Profile`} />
+        <meta name="twitter:description" content={profile.description || `${profile.name} on SetTimes`} />
+        {profile.photo_url && <meta name="twitter:image" content={profile.photo_url} />}
+
+        {/* Structured Data (JSON-LD) */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'MusicGroup',
+            name: profile.name,
+            genre: profile.genre,
+            description: profile.description,
+            image: profile.photo_url,
+            url: `https://settimes.ca/band/${id}`,
+            ...(profile.origin && { foundingLocation: profile.origin }),
+            ...(profile.social && {
+              sameAs: [
+                profile.social.website,
+                profile.social.instagram && `https://instagram.com/${profile.social.instagram.replace('@', '')}`,
+                profile.social.facebook,
+                profile.social.bandcamp,
+              ].filter(Boolean),
+            }),
+          })}
+        </script>
+      </Helmet>
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Sports Card Hero Section */}
@@ -135,9 +203,10 @@ export default function BandProfilePage() {
                       href={profile.social.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-sm font-medium"
+                      className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
                     >
-                      🌐 Website
+                      <FontAwesomeIcon icon={faGlobe} />
+                      Website
                     </a>
                   )}
                   {profile.social.instagram && (
@@ -145,9 +214,10 @@ export default function BandProfilePage() {
                       href={`https://instagram.com/${profile.social.instagram.replace('@', '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium"
+                      className="px-4 py-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
                     >
-                      📷 Instagram
+                      <FontAwesomeIcon icon={faInstagram} />
+                      Instagram
                     </a>
                   )}
                   {profile.social.bandcamp && (
@@ -155,9 +225,10 @@ export default function BandProfilePage() {
                       href={profile.social.bandcamp}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium"
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
                     >
-                      🎵 Bandcamp
+                      <FontAwesomeIcon icon={faBandcamp} />
+                      Bandcamp
                     </a>
                   )}
                   {profile.social.facebook && (
@@ -165,9 +236,10 @@ export default function BandProfilePage() {
                       href={profile.social.facebook}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
                     >
-                      📘 Facebook
+                      <FontAwesomeIcon icon={faFacebook} />
+                      Facebook
                     </a>
                   )}
                 </div>

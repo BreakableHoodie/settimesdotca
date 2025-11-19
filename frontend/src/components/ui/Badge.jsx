@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import PropTypes from 'prop-types'
 
 /**
@@ -5,13 +6,14 @@ import PropTypes from 'prop-types'
  *
  * Status indicator badge with semantic color variants.
  * Used for showing status, categories, or labels.
+ * Memoized for performance optimization.
  *
  * @example
  * <Badge variant="success">Published</Badge>
  * <Badge variant="warning">Draft</Badge>
  * <Badge variant="error">Archived</Badge>
  */
-export default function Badge({
+const Badge = memo(function Badge({
   children,
   variant = 'default',
   size = 'md',
@@ -52,7 +54,7 @@ export default function Badge({
       {children}
     </span>
   )
-}
+})
 
 Badge.propTypes = {
   children: PropTypes.node.isRequired,
@@ -60,3 +62,5 @@ Badge.propTypes = {
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   className: PropTypes.string,
 }
+
+export default Badge

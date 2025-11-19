@@ -104,7 +104,12 @@ export default function PerformanceHistory({ bandName, onClose }) {
           <div className="bg-band-dark rounded-lg p-6 mb-6">
             <div className="flex gap-6 items-start">
               {profile.photo_url && (
-                <img src={profile.photo_url} alt={profile.name} className="w-32 h-32 object-cover rounded-lg" />
+                <img
+                  src={profile.photo_url}
+                  alt={profile.name}
+                  loading="lazy"
+                  className="w-32 h-32 object-cover rounded-lg"
+                />
               )}
               <div className="flex-1">
                 <h3 className="text-2xl font-bold text-white mb-2">{profile.name}</h3>

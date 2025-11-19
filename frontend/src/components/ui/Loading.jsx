@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import PropTypes from 'prop-types'
 
 /**
@@ -5,11 +6,12 @@ import PropTypes from 'prop-types'
  *
  * Loading spinner with size variants and optional text.
  * Used to indicate loading states throughout the application.
+ * Memoized for performance optimization.
  *
  * @example
  * <Loading size="lg" text="Loading events..." />
  */
-export default function Loading({
+const Loading = memo(function Loading({
   size = 'md',
   text = '',
   className = '',
@@ -88,7 +90,7 @@ export default function Loading({
       {content}
     </div>
   )
-}
+})
 
 Loading.propTypes = {
   size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl']),
@@ -96,3 +98,5 @@ Loading.propTypes = {
   className: PropTypes.string,
   fullScreen: PropTypes.bool,
 }
+
+export default Loading

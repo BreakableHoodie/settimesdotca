@@ -154,7 +154,12 @@ export default function BandProfilePage() {
           {/* Band Photo with Overlay */}
           {profile.photo_url ? (
             <div className="relative h-80 bg-gradient-to-b from-band-navy via-band-purple to-band-navy overflow-hidden">
-              <img src={profile.photo_url} alt={profile.name} className="w-full h-full object-cover opacity-60" />
+              <img
+                src={profile.photo_url}
+                alt={profile.name}
+                loading="lazy"
+                className="w-full h-full object-cover opacity-60"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-band-purple via-transparent to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-6">
                 <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-3">{profile.name}</h1>

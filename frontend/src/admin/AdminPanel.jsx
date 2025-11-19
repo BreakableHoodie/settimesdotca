@@ -115,6 +115,14 @@ export default function AdminPanel({ onLogout }) {
 
   return (
     <div className="min-h-screen bg-band-navy">
+      {/* Skip Navigation Link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-6 focus:py-3 focus:bg-accent-500 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-bg-navy"
+      >
+        Skip to main content
+      </a>
+
       {/* Header */}
       <header className="bg-band-purple border-b border-band-orange/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -192,7 +200,7 @@ export default function AdminPanel({ onLogout }) {
       </div>
 
       {/* Tab Content */}
-      <div className="container mx-auto px-4 py-6 pb-24 md:pb-6">
+      <div id="main-content" className="container mx-auto px-4 py-6 pb-24 md:pb-6">
         {/* Context Banner - Shows when event is selected */}
         <ContextBanner event={selectedEvent} onClear={() => setSelectedEventId(null)} />
 

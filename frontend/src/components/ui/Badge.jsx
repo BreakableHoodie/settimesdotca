@@ -13,16 +13,9 @@ import PropTypes from 'prop-types'
  * <Badge variant="warning">Draft</Badge>
  * <Badge variant="error">Archived</Badge>
  */
-const Badge = memo(function Badge({
-  children,
-  variant = 'default',
-  size = 'md',
-  className = '',
-  ...props
-}) {
+const Badge = memo(function Badge({ children, variant = 'default', size = 'md', className = '', ...props }) {
   // Base classes
-  const baseClasses =
-    'inline-flex items-center font-medium rounded-full uppercase tracking-wide'
+  const baseClasses = 'inline-flex items-center font-medium rounded-full uppercase tracking-wide'
 
   // Variant styles
   const variantClasses = {
@@ -47,7 +40,9 @@ const Badge = memo(function Badge({
     ${variantClasses[variant] || variantClasses.default}
     ${sizeClasses[size] || sizeClasses.md}
     ${className}
-  `.trim().replace(/\s+/g, ' ')
+  `
+    .trim()
+    .replace(/\s+/g, ' ')
 
   return (
     <span className={classes} {...props}>

@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types'
 import PhotoUpload from './components/PhotoUpload'
 import MarkdownEditor from './components/MarkdownEditor'
-import { Input, Button, Tooltip, Alert } from '../components/ui'
+import { Input, Button, Tooltip } from '../components/ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
 
@@ -303,13 +303,7 @@ export default function BandForm({
       )}
 
       <div className="flex gap-2">
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={submitting}
-          loading={submitting}
-          fullWidth
-        >
+        <Button type="submit" variant="primary" disabled={submitting} loading={submitting} fullWidth>
           {submitLabel}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel} fullWidth>

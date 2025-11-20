@@ -4,7 +4,6 @@ import { Helmet } from 'react-helmet-async'
 import { Button, Badge, Card, Alert, Loading } from '../components/ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-  faMusic,
   faLocationDot,
   faCalendarDays,
   faClock,
@@ -12,12 +11,7 @@ import {
   faArrowLeft,
   faGlobe,
 } from '@fortawesome/free-solid-svg-icons'
-import {
-  faInstagram,
-  faFacebook,
-  faBandcamp,
-  faSpotify,
-} from '@fortawesome/free-brands-svg-icons'
+import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
 import BandStats from '../components/BandStats'
 import BandFacts from '../components/BandFacts'
 
@@ -110,7 +104,10 @@ export default function BandProfilePage() {
               : `${profile.name} profile on SetTimes. ${profile.genre ? `Genre: ${profile.genre}. ` : ''}${profile.stats ? `${profile.stats.total_performances} performances.` : ''}`
           }
         />
-        <meta name="keywords" content={`${profile.name}, ${profile.genre || 'music'}, ${profile.origin || 'band'}, live music, SetTimes`} />
+        <meta
+          name="keywords"
+          content={`${profile.name}, ${profile.genre || 'music'}, ${profile.origin || 'band'}, live music, SetTimes`}
+        />
 
         {/* OpenGraph */}
         <meta property="og:title" content={`${profile.name} - Band Profile`} />
@@ -270,17 +267,14 @@ export default function BandProfilePage() {
                   <h2 className="text-2xl font-bold text-accent-500 flex items-center gap-2">
                     <FontAwesomeIcon icon={faCalendarDays} />
                     <span>Upcoming Shows</span>
-                    <Badge variant="accent" className="ml-2">{profile.upcoming.length}</Badge>
+                    <Badge variant="accent" className="ml-2">
+                      {profile.upcoming.length}
+                    </Badge>
                   </h2>
                 </div>
                 <div className="space-y-4">
                   {profile.upcoming.map((performance, idx) => (
-                    <Card
-                      key={idx}
-                      variant="outline"
-                      hoverable
-                      className="p-4"
-                    >
+                    <Card key={idx} variant="outline" hoverable className="p-4">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
                           <h3 className="text-xl font-semibold text-accent-500 mb-2">{performance.event_name}</h3>
@@ -310,12 +304,7 @@ export default function BandProfilePage() {
                           </div>
                         </div>
                         {performance.event_slug && (
-                          <Button
-                            as={Link}
-                            to={`/embed/${performance.event_slug}`}
-                            variant="primary"
-                            size="sm"
-                          >
+                          <Button as={Link} to={`/embed/${performance.event_slug}`} variant="primary" size="sm">
                             View Event →
                           </Button>
                         )}
@@ -333,17 +322,14 @@ export default function BandProfilePage() {
                   <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
                     <FontAwesomeIcon icon={faChartLine} />
                     <span>Performance History</span>
-                    <Badge variant="secondary" className="ml-2">{profile.past.length}</Badge>
+                    <Badge variant="secondary" className="ml-2">
+                      {profile.past.length}
+                    </Badge>
                   </h2>
                 </div>
                 <div className="space-y-4">
                   {profile.past.map((performance, idx) => (
-                    <Card
-                      key={idx}
-                      variant="outline"
-                      hoverable
-                      className="p-4"
-                    >
+                    <Card key={idx} variant="outline" hoverable className="p-4">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
                           <h3 className="text-xl font-semibold text-accent-500 mb-2">{performance.event_name}</h3>
@@ -373,12 +359,7 @@ export default function BandProfilePage() {
                           </div>
                         </div>
                         {performance.event_slug && (
-                          <Button
-                            as={Link}
-                            to={`/embed/${performance.event_slug}`}
-                            variant="secondary"
-                            size="sm"
-                          >
+                          <Button as={Link} to={`/embed/${performance.event_slug}`} variant="secondary" size="sm">
                             View Event →
                           </Button>
                         )}

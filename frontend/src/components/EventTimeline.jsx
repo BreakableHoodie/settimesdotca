@@ -2,13 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Badge, Card, Alert, Loading } from './ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import {
-  faCircle,
-  faCalendarDays,
-  faClockRotateLeft,
-  faFilter,
-  faXmark,
-} from '@fortawesome/free-solid-svg-icons'
+import { faCircle, faCalendarDays, faClockRotateLeft, faFilter, faXmark } from '@fortawesome/free-solid-svg-icons'
 
 /**
  * EventTimeline - Main timeline showing Now, Upcoming, and Past events
@@ -56,7 +50,7 @@ export default function EventTimeline() {
   }, [])
 
   // Filter events
-  const filterEvents = (events) => {
+  const filterEvents = events => {
     if (!events) return []
 
     return events.filter(event => {
@@ -84,10 +78,13 @@ export default function EventTimeline() {
 
   const allMonths = Array.from(
     new Set(
-      [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
-        .map(event => new Date(event.date).toISOString().slice(0, 7))
+      [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])].map(event =>
+        new Date(event.date).toISOString().slice(0, 7)
+      )
     )
-  ).sort().reverse()
+  )
+    .sort()
+    .reverse()
 
   const clearFilters = () => {
     setFilters({ venue: null, month: null })
@@ -126,19 +123,12 @@ export default function EventTimeline() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-4xl font-bold text-text-primary mb-2">Events</h1>
-            <p className="text-text-secondary">
-              Discover upcoming band crawls and music events
-            </p>
+            <p className="text-text-secondary">Discover upcoming band crawls and music events</p>
           </div>
 
           <div className="flex items-center gap-3">
             {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                icon={<FontAwesomeIcon icon={faXmark} />}
-              >
+              <Button variant="ghost" size="sm" onClick={clearFilters} icon={<FontAwesomeIcon icon={faXmark} />}>
                 Clear Filters
               </Button>
             )}
@@ -159,12 +149,10 @@ export default function EventTimeline() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Venue Filter */}
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Filter by Venue
-                </label>
+                <label className="block text-sm font-medium text-text-secondary mb-2">Filter by Venue</label>
                 <select
                   value={filters.venue || ''}
-                  onChange={(e) => setFilters({ ...filters, venue: e.target.value ? parseInt(e.target.value) : null })}
+                  onChange={e => setFilters({ ...filters, venue: e.target.value ? parseInt(e.target.value) : null })}
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
                 >
                   <option value="">All Venues</option>
@@ -178,12 +166,10 @@ export default function EventTimeline() {
 
               {/* Month Filter */}
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Filter by Month
-                </label>
+                <label className="block text-sm font-medium text-text-secondary mb-2">Filter by Month</label>
                 <select
                   value={filters.month || ''}
-                  onChange={(e) => setFilters({ ...filters, month: e.target.value || null })}
+                  onChange={e => setFilters({ ...filters, month: e.target.value || null })}
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
                 >
                   <option value="">All Months</option>
@@ -191,7 +177,7 @@ export default function EventTimeline() {
                     <option key={month} value={month}>
                       {new Date(month + '-01').toLocaleDateString('en-US', {
                         year: 'numeric',
-                        month: 'long'
+                        month: 'long',
                       })}
                     </option>
                   ))}
@@ -215,14 +201,11 @@ export default function EventTimeline() {
         {hasNow && (
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <FontAwesomeIcon
-                icon={faCircle}
-                className="text-error-500 animate-pulse text-sm"
-              />
-              <h2 className="text-3xl font-bold text-accent-500">
-                Happening Now
-              </h2>
-              <Badge variant="error" size="sm">LIVE</Badge>
+              <FontAwesomeIcon icon={faCircle} className="text-error-500 animate-pulse text-sm" />
+              <h2 className="text-3xl font-bold text-accent-500">Happening Now</h2>
+              <Badge variant="error" size="sm">
+                LIVE
+              </Badge>
             </div>
             <div className="space-y-6">
               {filteredNow.map(event => (
@@ -236,13 +219,8 @@ export default function EventTimeline() {
         {hasUpcoming && (
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <FontAwesomeIcon
-                icon={faCalendarDays}
-                className="text-primary-500 text-xl"
-              />
-              <h2 className="text-3xl font-bold text-text-primary">
-                Coming Up
-              </h2>
+              <FontAwesomeIcon icon={faCalendarDays} className="text-primary-500 text-xl" />
+              <h2 className="text-3xl font-bold text-text-primary">Coming Up</h2>
             </div>
             <div className="space-y-6">
               {filteredUpcoming.map(event => (
@@ -257,19 +235,10 @@ export default function EventTimeline() {
           <section>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
-                <FontAwesomeIcon
-                  icon={faClockRotateLeft}
-                  className="text-text-tertiary text-xl"
-                />
-                <h2 className="text-3xl font-bold text-text-secondary">
-                  Past Events
-                </h2>
+                <FontAwesomeIcon icon={faClockRotateLeft} className="text-text-tertiary text-xl" />
+                <h2 className="text-3xl font-bold text-text-secondary">Past Events</h2>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowPast(!showPast)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setShowPast(!showPast)}>
                 {showPast ? 'Hide' : 'Show'} History ({filteredPast.length})
               </Button>
             </div>
@@ -311,13 +280,13 @@ export default function EventTimeline() {
 function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }) {
   const [expanded, setExpanded] = useState(isLive) // Auto-expand live events
 
-  const formatDate = (dateStr) => {
+  const formatDate = dateStr => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     })
   }
 
@@ -341,10 +310,12 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
           <div className="flex-1">
             <div className="flex flex-wrap items-start gap-2 mb-2">
-              <h3 className="text-2xl font-bold text-accent-500 flex-1">
-                {event.name}
-              </h3>
-              {isLive && <Badge variant="error" size="md">LIVE NOW</Badge>}
+              <h3 className="text-2xl font-bold text-accent-500 flex-1">{event.name}</h3>
+              {isLive && (
+                <Badge variant="error" size="md">
+                  LIVE NOW
+                </Badge>
+              )}
               {event.is_published === false && <Badge variant="warning">Draft</Badge>}
             </div>
 
@@ -357,15 +328,11 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
             <div className="flex flex-wrap gap-6 text-sm">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-text-primary">{event.band_count}</span>
-                <span className="text-text-tertiary">
-                  {event.band_count === 1 ? 'Band' : 'Bands'}
-                </span>
+                <span className="text-text-tertiary">{event.band_count === 1 ? 'Band' : 'Bands'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-text-primary">{event.venue_count}</span>
-                <span className="text-text-tertiary">
-                  {event.venue_count === 1 ? 'Venue' : 'Venues'}
-                </span>
+                <span className="text-text-tertiary">{event.venue_count === 1 ? 'Venue' : 'Venues'}</span>
               </div>
             </div>
           </div>
@@ -384,11 +351,7 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
                 🎫 Get Tickets
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => setExpanded(!expanded)}
-            >
+            <Button variant="secondary" size="md" onClick={() => setExpanded(!expanded)}>
               {expanded ? 'Hide Details' : 'View Details'}
             </Button>
           </div>
@@ -435,9 +398,7 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
                     <div className="text-text-secondary text-sm">
                       {venue.band_count} {venue.band_count === 1 ? 'band' : 'bands'}
                     </div>
-                    {venue.address && (
-                      <div className="text-text-tertiary text-xs mt-1">{venue.address}</div>
-                    )}
+                    {venue.address && <div className="text-text-tertiary text-xs mt-1">{venue.address}</div>}
                   </Card>
                 ))}
               </div>
@@ -447,19 +408,10 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
           {/* All Bands */}
           {event.bands && event.bands.length > 0 && (
             <div className="p-6">
-              <h4 className="text-lg font-bold text-text-primary mb-4">
-                All Performers ({event.band_count})
-              </h4>
+              <h4 className="text-lg font-bold text-text-primary mb-4">All Performers ({event.band_count})</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {event.bands.map(band => (
-                  <Card
-                    key={band.id}
-                    as={Link}
-                    to={`/band/${band.name}`}
-                    padding="sm"
-                    hoverable
-                    className="group"
-                  >
+                  <Card key={band.id} as={Link} to={`/band/${band.name}`} padding="sm" hoverable className="group">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="font-semibold text-text-primary group-hover:text-accent-500 transition-colors flex-1">
                         {band.name}
@@ -484,7 +436,9 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
 
                       <div className="text-text-tertiary flex items-center gap-2">
                         <span>🕐</span>
-                        <span>{band.start_time} - {band.end_time}</span>
+                        <span>
+                          {band.start_time} - {band.end_time}
+                        </span>
                       </div>
 
                       {band.genre && (

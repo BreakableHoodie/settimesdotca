@@ -1,4 +1,4 @@
-import { useEffect } from 'prop-types'
+import { useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
@@ -34,7 +34,7 @@ export default function Modal({
   useEffect(() => {
     if (!isOpen) return
 
-    const handleEscape = (e) => {
+    const handleEscape = e => {
       if (e.key === 'Escape') {
         onClose()
       }
@@ -68,7 +68,7 @@ export default function Modal({
     full: 'max-w-[95vw]',
   }
 
-  const handleBackdropClick = (e) => {
+  const handleBackdropClick = e => {
     if (closeOnBackdropClick && e.target === e.currentTarget) {
       onClose()
     }
@@ -88,17 +88,16 @@ export default function Modal({
           max-h-[90vh] overflow-y-auto
           ${sizeClasses[size] || sizeClasses.md}
           ${className}
-        `.trim().replace(/\s+/g, ' ')}
-        onClick={(e) => e.stopPropagation()}
+        `
+          .trim()
+          .replace(/\s+/g, ' ')}
+        onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         {(title || showCloseButton) && (
           <div className="flex items-center justify-between p-6 border-b border-white/10">
             {title && (
-              <h2
-                id="modal-title"
-                className="text-2xl font-bold text-text-primary"
-              >
+              <h2 id="modal-title" className="text-2xl font-bold text-text-primary">
                 {title}
               </h2>
             )}
@@ -115,15 +114,11 @@ export default function Modal({
         )}
 
         {/* Content */}
-        <div className="p-6">
-          {children}
-        </div>
+        <div className="p-6">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10 bg-white/5">
-            {footer}
-          </div>
+          <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10 bg-white/5">{footer}</div>
         )}
       </div>
     </div>

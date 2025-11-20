@@ -81,4 +81,3 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
     </div>
   )
 }
-

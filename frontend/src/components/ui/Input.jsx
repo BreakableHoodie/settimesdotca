@@ -44,32 +44,34 @@ export default function Input({
     transition-colors duration-base
     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
     disabled:opacity-50 disabled:cursor-not-allowed
-    ${hasError
-      ? 'border-error-500 focus:border-error-500 focus:ring-error-500'
-      : 'border-white/10 focus:border-primary-500 focus:ring-primary-500/50'
+    ${
+      hasError
+        ? 'border-error-500 focus:border-error-500 focus:ring-error-500'
+        : 'border-white/10 focus:border-primary-500 focus:ring-primary-500/50'
     }
     ${icon && iconPosition === 'left' ? 'pl-10' : ''}
     ${icon && iconPosition === 'right' ? 'pr-10' : ''}
     ${className}
-  `.trim().replace(/\s+/g, ' ')
+  `
+    .trim()
+    .replace(/\s+/g, ' ')
 
   return (
     <div className="space-y-2">
       {label && (
-        <label
-          htmlFor={inputId}
-          className="block text-sm font-medium text-text-secondary"
-        >
+        <label htmlFor={inputId} className="block text-sm font-medium text-text-secondary">
           {label}
-          {required && <span className="text-error-400 ml-1" aria-label="required">*</span>}
+          {required && (
+            <span className="text-error-400 ml-1" aria-label="required">
+              *
+            </span>
+          )}
         </label>
       )}
 
       <div className="relative">
         {icon && iconPosition === 'left' && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
-            {icon}
-          </div>
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{icon}</div>
         )}
 
         <input
@@ -82,39 +84,24 @@ export default function Input({
           required={required}
           disabled={disabled}
           aria-invalid={hasError}
-          aria-describedby={
-            hasError
-              ? `${inputId}-error`
-              : helperText
-                ? `${inputId}-helper`
-                : undefined
-          }
+          aria-describedby={hasError ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
           className={inputClasses}
           {...props}
         />
 
         {icon && iconPosition === 'right' && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
-            {icon}
-          </div>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{icon}</div>
         )}
       </div>
 
       {error && (
-        <p
-          id={`${inputId}-error`}
-          className="text-sm text-error-400"
-          role="alert"
-        >
+        <p id={`${inputId}-error`} className="text-sm text-error-400" role="alert">
           {error}
         </p>
       )}
 
       {!error && helperText && (
-        <p
-          id={`${inputId}-helper`}
-          className="text-sm text-text-tertiary"
-        >
+        <p id={`${inputId}-helper`} className="text-sm text-text-tertiary">
           {helperText}
         </p>
       )}

@@ -1,4 +1,4 @@
-import { useState } from 'prop-types'
+import { useState } from 'react'
 import PropTypes from 'prop-types'
 
 /**
@@ -26,10 +26,12 @@ export default function Tooltip({ children, content, position = 'top' }) {
   }
 
   const arrowClasses = {
-    top: 'top-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-b-transparent border-t-bg-elevated',
-    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-t-transparent border-b-bg-elevated',
-    left: 'left-full top-1/2 -translate-y-1/2 border-t-transparent border-b-transparent border-r-transparent border-l-bg-elevated',
-    right: 'right-full top-1/2 -translate-y-1/2 border-t-transparent border-b-transparent border-l-transparent border-r-bg-elevated',
+    top: 'top-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-b-transparent border-t-bg-dark',
+    bottom:
+      'bottom-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-t-transparent border-b-bg-dark',
+    left: 'left-full top-1/2 -translate-y-1/2 border-t-transparent border-b-transparent border-r-transparent border-l-bg-dark',
+    right:
+      'right-full top-1/2 -translate-y-1/2 border-t-transparent border-b-transparent border-l-transparent border-r-bg-dark',
   }
 
   return (
@@ -43,18 +45,12 @@ export default function Tooltip({ children, content, position = 'top' }) {
       {children}
 
       {isVisible && content && (
-        <div
-          role="tooltip"
-          className={`absolute z-50 ${positionClasses[position]} animate-fade-in`}
-        >
-          <div className="bg-bg-elevated text-text-primary text-sm px-3 py-2 rounded-lg shadow-lg border border-white/10 max-w-xs whitespace-normal">
+        <div role="tooltip" className={`absolute z-50 ${positionClasses[position]} animate-fade-in`}>
+          <div className="bg-bg-dark text-text-primary text-sm px-3 py-2 rounded-lg shadow-lg border border-white/10 max-w-xs whitespace-normal">
             {content}
           </div>
           {/* Arrow */}
-          <div
-            className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`}
-            aria-hidden="true"
-          />
+          <div className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`} aria-hidden="true" />
         </div>
       )}
     </div>

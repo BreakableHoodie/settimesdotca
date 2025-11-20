@@ -74,4 +74,3 @@ HelpPanel.propTypes = {
   isOpen: PropTypes.bool,
   onClose: PropTypes.func,
 }
-

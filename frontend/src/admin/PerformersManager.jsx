@@ -277,14 +277,10 @@ export default function PerformersManager() {
                     {performer.genre && <span>{performer.genre}</span>}
                     {performer.origin && <span>{performer.origin}</span>}
                     {performer.performance_count > 0 && (
-                      <span className="text-green-400">
-                        {performer.performance_count} performance(s)
-                      </span>
+                      <span className="text-green-400">{performer.performance_count} performance(s)</span>
                     )}
                   </div>
-                  {performer.description && (
-                    <p className="text-gray-300 text-sm mt-2">{performer.description}</p>
-                  )}
+                  {performer.description && <p className="text-gray-300 text-sm mt-2">{performer.description}</p>}
                   <div className="flex gap-3 mt-2">
                     {performer.url && (
                       <a

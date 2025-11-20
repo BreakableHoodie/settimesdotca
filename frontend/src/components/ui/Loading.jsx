@@ -11,12 +11,7 @@ import PropTypes from 'prop-types'
  * @example
  * <Loading size="lg" text="Loading events..." />
  */
-const Loading = memo(function Loading({
-  size = 'md',
-  text = '',
-  className = '',
-  fullScreen = false,
-}) {
+const Loading = memo(function Loading({ size = 'md', text = '', className = '', fullScreen = false }) {
   // Size styles
   const sizeClasses = {
     sm: 'w-4 h-4',
@@ -40,14 +35,7 @@ const Loading = memo(function Loading({
       viewBox="0 0 24 24"
       aria-hidden="true"
     >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      ></circle>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
       <path
         className="opacity-75"
         fill="currentColor"
@@ -59,11 +47,7 @@ const Loading = memo(function Loading({
   const content = (
     <div className={`flex flex-col items-center justify-center gap-4 text-text-secondary ${className}`}>
       {spinner}
-      {text && (
-        <p className={`${textSizeClasses[size] || textSizeClasses.md} font-medium`}>
-          {text}
-        </p>
-      )}
+      {text && <p className={`${textSizeClasses[size] || textSizeClasses.md} font-medium`}>{text}</p>}
     </div>
   )
 

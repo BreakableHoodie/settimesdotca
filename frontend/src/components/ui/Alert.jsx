@@ -39,19 +39,14 @@ export default function Alert({
   const icon = customIcon || icons[variant]
 
   // Base classes
-  const baseClasses =
-    'flex items-start gap-3 p-4 rounded-lg border'
+  const baseClasses = 'flex items-start gap-3 p-4 rounded-lg border'
 
   // Variant styles
   const variantClasses = {
-    success:
-      'bg-success-500/10 border-success-500/20 text-success-400',
-    warning:
-      'bg-warning-500/10 border-warning-500/20 text-warning-400',
-    error:
-      'bg-error-500/10 border-error-500/20 text-error-400',
-    info:
-      'bg-info-500/10 border-info-500/20 text-info-400',
+    success: 'bg-success-500/10 border-success-500/20 text-success-400',
+    warning: 'bg-warning-500/10 border-warning-500/20 text-warning-400',
+    error: 'bg-error-500/10 border-error-500/20 text-error-400',
+    info: 'bg-info-500/10 border-info-500/20 text-info-400',
   }
 
   // Combined classes
@@ -59,26 +54,15 @@ export default function Alert({
     ${baseClasses}
     ${variantClasses[variant] || variantClasses.info}
     ${className}
-  `.trim().replace(/\s+/g, ' ')
+  `
+    .trim()
+    .replace(/\s+/g, ' ')
 
   return (
-    <div
-      className={classes}
-      role="alert"
-      aria-live={variant === 'error' ? 'assertive' : 'polite'}
-      {...props}
-    >
-      {icon && (
-        <FontAwesomeIcon
-          icon={icon}
-          className="text-xl flex-shrink-0 mt-0.5"
-          aria-hidden="true"
-        />
-      )}
+    <div className={classes} role="alert" aria-live={variant === 'error' ? 'assertive' : 'polite'} {...props}>
+      {icon && <FontAwesomeIcon icon={icon} className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true" />}
 
-      <div className="flex-1 text-text-primary">
-        {children}
-      </div>
+      <div className="flex-1 text-text-primary">{children}</div>
 
       {dismissible && onClose && (
         <button

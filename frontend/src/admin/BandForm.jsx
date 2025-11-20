@@ -303,13 +303,7 @@ export default function BandForm({
       )}
 
       <div className="flex gap-2">
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={submitting}
-          loading={submitting}
-          fullWidth
-        >
+        <Button type="submit" variant="primary" disabled={submitting} loading={submitting} fullWidth>
           {submitLabel}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel} fullWidth>

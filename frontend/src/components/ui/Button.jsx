@@ -32,15 +32,11 @@ export default function Button({
   const variantClasses = {
     primary:
       'bg-accent-500 text-white hover:bg-accent-600 focus:ring-accent-500 shadow-sm hover:shadow-md active:scale-95',
-    secondary:
-      'border-2 border-text-secondary text-text-primary hover:bg-white/10 focus:ring-primary-500',
-    danger:
-      'bg-error-500 text-white hover:bg-error-600 focus:ring-error-500 shadow-sm hover:shadow-md active:scale-95',
+    secondary: 'border-2 border-text-secondary text-text-primary hover:bg-white/10 focus:ring-primary-500',
+    danger: 'bg-error-500 text-white hover:bg-error-600 focus:ring-error-500 shadow-sm hover:shadow-md active:scale-95',
     ghost: 'text-text-primary hover:bg-white/5 focus:ring-primary-500',
-    success:
-      'bg-success-500 text-white hover:bg-success-600 focus:ring-success-500 shadow-sm hover:shadow-md',
-    warning:
-      'bg-warning-500 text-white hover:bg-warning-600 focus:ring-warning-500 shadow-sm hover:shadow-md',
+    success: 'bg-success-500 text-white hover:bg-success-600 focus:ring-success-500 shadow-sm hover:shadow-md',
+    warning: 'bg-warning-500 text-white hover:bg-warning-600 focus:ring-warning-500 shadow-sm hover:shadow-md',
   }
 
   // Size styles
@@ -58,15 +54,12 @@ export default function Button({
     ${fullWidth ? 'w-full' : ''}
     ${loading ? 'cursor-wait' : ''}
     ${className}
-  `.trim().replace(/\s+/g, ' ')
+  `
+    .trim()
+    .replace(/\s+/g, ' ')
 
   return (
-    <button
-      type={type}
-      className={classes}
-      disabled={disabled || loading}
-      {...props}
-    >
+    <button type={type} className={classes} disabled={disabled || loading} {...props}>
       {loading && (
         <svg
           className="animate-spin -ml-1 mr-3 h-5 w-5"
@@ -75,14 +68,7 @@ export default function Button({
           viewBox="0 0 24 24"
           aria-hidden="true"
         >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          ></circle>
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
           <path
             className="opacity-75"
             fill="currentColor"
@@ -91,11 +77,15 @@ export default function Button({
         </svg>
       )}
       {icon && iconPosition === 'left' && !loading && (
-        <span className="mr-2" aria-hidden="true">{icon}</span>
+        <span className="mr-2" aria-hidden="true">
+          {icon}
+        </span>
       )}
       <span>{children}</span>
       {icon && iconPosition === 'right' && !loading && (
-        <span className="ml-2" aria-hidden="true">{icon}</span>
+        <span className="ml-2" aria-hidden="true">
+          {icon}
+        </span>
       )}
     </button>
   )

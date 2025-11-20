@@ -22,8 +22,7 @@ export default function Card({
   ...props
 }) {
   // Base classes
-  const baseClasses =
-    'bg-bg-dark border border-white/10 rounded-xl shadow-base transition-all duration-base'
+  const baseClasses = 'bg-bg-dark border border-white/10 rounded-xl shadow-base transition-all duration-base'
 
   // Variant styles
   const variantClasses = {
@@ -42,9 +41,7 @@ export default function Card({
   }
 
   // Hover styles
-  const hoverClasses = hoverable
-    ? 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'
-    : ''
+  const hoverClasses = hoverable ? 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer' : ''
 
   // Combined classes
   const classes = `
@@ -53,7 +50,9 @@ export default function Card({
     ${paddingClasses[padding] || paddingClasses.md}
     ${hoverClasses}
     ${className}
-  `.trim().replace(/\s+/g, ' ')
+  `
+    .trim()
+    .replace(/\s+/g, ' ')
 
   return (
     <Component className={classes} {...props}>

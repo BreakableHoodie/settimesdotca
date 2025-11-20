@@ -285,13 +285,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
 
             {/* Actions */}
             <div className="flex gap-3 pt-4">
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={loading}
-                loading={loading}
-                fullWidth
-              >
+              <Button type="submit" variant="primary" disabled={loading} loading={loading} fullWidth>
                 {isEditing ? 'Update Event' : 'Create Event'}
               </Button>
               <Button type="button" variant="secondary" onClick={onClose}>

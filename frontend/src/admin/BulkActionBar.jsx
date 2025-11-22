@@ -76,4 +76,3 @@ function BulkActionBar({ count, action, params, venues, onActionChange, onParams
 }
 
 export default BulkActionBar
-

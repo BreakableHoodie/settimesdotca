@@ -8,6 +8,7 @@ import EventWizard from './EventWizard'
 import BottomNav from './BottomNav'
 import ContextBanner from './components/ContextBanner'
 import Breadcrumbs from './components/Breadcrumbs'
+import { Button, Loading, Alert, ConfirmDialog } from '../components/ui'
 
 /**
  * AdminPanel - Main container for admin panel with tab navigation
@@ -26,6 +27,7 @@ export default function AdminPanel({ onLogout }) {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
   const [showWizard, setShowWizard] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const loadEvents = useCallback(async () => {
     try {
@@ -84,9 +86,12 @@ export default function AdminPanel({ onLogout }) {
   }
 
   const handleLogout = () => {
-    if (window.confirm('Are you sure you want to logout?')) {
-      onLogout()
-    }
+    setShowLogoutConfirm(true)
+  }
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false)
+    onLogout()
   }
 
   const handleWizardComplete = event => {
@@ -110,6 +115,14 @@ export default function AdminPanel({ onLogout }) {
 
   return (
     <div className="min-h-screen bg-band-navy">
+      {/* Skip Navigation Link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-6 focus:py-3 focus:bg-accent-500 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-bg-navy"
+      >
+        Skip to main content
+      </a>
+
       {/* Header */}
       <header className="bg-band-purple border-b border-band-orange/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -153,19 +166,13 @@ export default function AdminPanel({ onLogout }) {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowWizard(true)}
-                className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-base sm:text-lg font-medium min-h-[48px] flex items-center justify-center"
-              >
+              <Button onClick={() => setShowWizard(true)} variant="primary" size="lg">
                 Create Event
-              </button>
+              </Button>
 
-              <button
-                onClick={handleLogout}
-                className="px-6 py-3 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-base font-medium min-h-[44px] flex items-center justify-center"
-              >
+              <Button onClick={handleLogout} variant="danger">
                 Logout
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -193,7 +200,7 @@ export default function AdminPanel({ onLogout }) {
       </div>
 
       {/* Tab Content */}
-      <div className="container mx-auto px-4 py-6 pb-24 md:pb-6">
+      <div id="main-content" className="container mx-auto px-4 py-6 pb-24 md:pb-6">
         {/* Context Banner - Shows when event is selected */}
         <ContextBanner event={selectedEvent} onClear={() => setSelectedEventId(null)} />
 
@@ -206,8 +213,8 @@ export default function AdminPanel({ onLogout }) {
         />
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="text-band-orange text-lg">Loading...</div>
+          <div className="flex items-center justify-center py-12">
+            <Loading size="lg" text="Loading admin panel..." />
           </div>
         ) : (
           <>
@@ -250,19 +257,24 @@ export default function AdminPanel({ onLogout }) {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 md:bottom-4 right-4 z-50 animate-slide-up" style={{ bottom: '90px' }}>
-          <div
-            className={`px-6 py-3 rounded-lg shadow-xl max-w-md ${
-              toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{toast.type === 'error' ? '✕' : '✓'}</span>
-              <span>{toast.message}</span>
-            </div>
-          </div>
+        <div className="fixed bottom-4 md:bottom-4 right-4 z-50 animate-slide-up max-w-md" style={{ bottom: '90px' }}>
+          <Alert variant={toast.type === 'error' ? 'error' : 'success'} className="shadow-xl">
+            {toast.message}
+          </Alert>
         </div>
       )}
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+        title="Confirm Logout"
+        message="Are you sure you want to logout? Any unsaved changes will be lost."
+        confirmText="Logout"
+        cancelText="Cancel"
+        variant="danger"
+      />
 
       {/* Bottom Navigation (Mobile Only) */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />

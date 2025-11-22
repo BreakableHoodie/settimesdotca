@@ -1,5 +1,9 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faChevronRight } from '@fortawesome/free-solid-svg-icons'
+
 /**
  * Breadcrumbs - Navigation hierarchy indicator
+ * Sprint 2.3: Enhanced with design system components and icons
  *
  * Shows the current navigation path:
  * - All Events (root)
@@ -24,7 +28,7 @@ export default function Breadcrumbs({ selectedEvent, onClearEvent, activeTab, ta
       {/* Root: All Events */}
       <button
         onClick={onClearEvent}
-        className="text-white/70 hover:text-band-orange transition-colors focus:outline-none focus:text-band-orange"
+        className="text-text-secondary hover:text-accent-500 transition-colors focus:outline-none focus:text-accent-500 focus:ring-2 focus:ring-accent-500/50 rounded px-2 py-1"
         aria-label="Return to all events view"
       >
         All Events
@@ -33,20 +37,16 @@ export default function Breadcrumbs({ selectedEvent, onClearEvent, activeTab, ta
       {/* Event Name (if selected) */}
       {selectedEvent && (
         <>
-          <span className="text-white/40" aria-hidden="true">
-            ›
-          </span>
-          <span className="text-band-orange font-semibold">{selectedEvent.name}</span>
+          <FontAwesomeIcon icon={faChevronRight} className="text-text-tertiary text-xs" aria-hidden="true" />
+          <span className="text-accent-500 font-semibold">{selectedEvent.name}</span>
         </>
       )}
 
       {/* Tab Name (if not on Events tab) */}
       {activeTab !== 'events' && currentTab && (
         <>
-          <span className="text-white/40" aria-hidden="true">
-            ›
-          </span>
-          <span className="text-white">{currentTab.label}</span>
+          <FontAwesomeIcon icon={faChevronRight} className="text-text-tertiary text-xs" aria-hidden="true" />
+          <span className="text-text-primary">{currentTab.label}</span>
         </>
       )}
     </nav>

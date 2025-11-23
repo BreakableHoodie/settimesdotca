@@ -5,6 +5,19 @@ const SALT_LENGTH = 16;
 const ITERATIONS = 100000;
 const KEY_LENGTH = 32;
 
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a[i] ^ b[i];
+  }
+
+  return diff === 0;
+}
+
 /**
  * Hash a password using PBKDF2
  * @param {string} password - Plain text password
@@ -90,11 +103,13 @@ export async function verifyPassword(password, storedHash) {
       KEY_LENGTH * 8,
     );
 
-    // Compare hashes
     const hashArray = new Uint8Array(derivedBits);
-    const computedHash = btoa(String.fromCharCode(...hashArray));
+    const storedHashArray = Uint8Array.from(
+      atob(hashBase64),
+      (c) => c.charCodeAt(0),
+    );
 
-    return computedHash === hashBase64;
+    return timingSafeEqual(hashArray, storedHashArray);
   } catch (error) {
     console.error("Password verification error:", error);
     return false;

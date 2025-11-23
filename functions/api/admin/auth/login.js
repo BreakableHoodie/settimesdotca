@@ -18,10 +18,12 @@ function getClientIP(request) {
 
 // Rate limiting: check failed login attempts
 async function checkRateLimit(DB, email, ipAddress) {
-  const windowStart = new Date(Date.now() - 10 * 60000).toISOString(); // 10 min window
+  const windowMs = 10 * 60 * 1000;
+  const windowStart = new Date(Date.now() - windowMs).toISOString();
 
   const attempts = await DB.prepare(
-    `SELECT COUNT(*) as count FROM auth_attempts
+    `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
+     FROM auth_attempts
      WHERE (email = ? OR ip_address = ?)
      AND attempt_type = 'login'
      AND success = 0
@@ -30,12 +32,17 @@ async function checkRateLimit(DB, email, ipAddress) {
     .bind(email, ipAddress, windowStart)
     .first();
 
-  if (attempts.count >= 5) {
+  if (Number(attempts.count) >= 5) {
+    const earliestTs = attempts.earliest_attempt
+      ? new Date(attempts.earliest_attempt).getTime()
+      : Date.now();
+    const elapsed = Date.now() - earliestTs;
+    const remainingMs = Math.max(0, windowMs - elapsed);
+    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+
     return {
       allowed: false,
-      remaining: Math.ceil(
-        (new Date(windowStart) - Date.now() + 10 * 60000) / 60000,
-      ),
+      remainingMinutes,
     };
   }
 
@@ -71,7 +78,7 @@ export async function onRequestPost(context) {
       return new Response(
         JSON.stringify({
           error: "Too many attempts",
-          message: `Too many failed login attempts. Please try again in ${rateCheck.remaining} minutes.`,
+          message: `Too many failed login attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
         }),
         {
           status: 429,

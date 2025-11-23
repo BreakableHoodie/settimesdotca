@@ -37,18 +37,29 @@ const FALLBACK_BANDS = (() => {
 })()
 const HAS_FALLBACK = FALLBACK_BANDS.length > 0
 
+const getStoredSelection = () => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return []
+  }
+
+  try {
+    const saved = window.localStorage.getItem('selectedBands')
+    if (!saved) return []
+    const parsed = JSON.parse(saved)
+    return Array.isArray(parsed) ? parsed : []
+  } catch (error) {
+    console.warn('[App] Failed to parse stored selectedBands', error)
+    return []
+  }
+}
+
 function App() {
   const [bands, setBands] = useState(FALLBACK_BANDS)
   const [eventData, setEventData] = useState(null)
-  const [selectedBands, setSelectedBands] = useState(() => {
-    const saved = localStorage.getItem('selectedBands')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [selectedBands, setSelectedBands] = useState(() => getStoredSelection())
   const [view, setView] = useState(() => {
-    // If user has selected bands, default to 'mine' view
-    const saved = localStorage.getItem('selectedBands')
-    const hasBands = saved && JSON.parse(saved).length > 0
-    return hasBands ? 'mine' : 'all'
+    const saved = getStoredSelection()
+    return saved.length > 0 ? 'mine' : 'all'
   })
   const [timeFilter, setTimeFilter] = useState('all')
   const [loading, setLoading] = useState(!HAS_FALLBACK)
@@ -126,8 +137,15 @@ function App() {
   }, [])
 
   useEffect(() => {
-    // Persist selected bands to localStorage
-    localStorage.setItem('selectedBands', JSON.stringify(selectedBands))
+    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+      return
+    }
+
+    try {
+      window.localStorage.setItem('selectedBands', JSON.stringify(selectedBands))
+    } catch (error) {
+      console.warn('[App] Failed to persist selectedBands', error)
+    }
   }, [selectedBands])
 
   const toggleBand = bandId => {

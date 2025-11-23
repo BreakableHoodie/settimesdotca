@@ -25,8 +25,23 @@ export async function onRequestPatch(context) {
     });
   }
 
+  const allowedActions = new Set(["move_venue", "change_time", "delete"]);
+  if (!allowedActions.has(action)) {
+    return new Response(
+      JSON.stringify({
+        error: "Invalid action",
+        message: `Action must be one of: ${Array.from(allowedActions).join(", ")}`,
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
   try {
     let result;
+    let rowsAffected = 0;
 
     if (action === "move_venue") {
       const { venue_id } = params;
@@ -40,6 +55,10 @@ export async function onRequestPatch(context) {
       );
 
       result = await env.DB.batch(statements);
+      rowsAffected = result.reduce(
+        (total, res) => total + (res.meta?.changes ?? 0),
+        0,
+      );
     } else if (action === "change_time") {
       const { start_time } = params;
 
@@ -57,6 +76,10 @@ export async function onRequestPatch(context) {
       );
 
       result = await env.DB.batch(statements);
+      rowsAffected = result.reduce(
+        (total, res) => total + (res.meta?.changes ?? 0),
+        0,
+      );
     } else if (action === "delete") {
       const placeholders = band_ids.map(() => "?").join(",");
       result = await env.DB.prepare(
@@ -64,6 +87,7 @@ export async function onRequestPatch(context) {
       )
         .bind(...band_ids)
         .run();
+      rowsAffected = result.meta?.changes ?? 0;
     }
 
     // Audit log the bulk operation
@@ -85,7 +109,7 @@ export async function onRequestPatch(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        updated: band_ids.length,
+        updated: rowsAffected,
         action: action,
       }),
       {

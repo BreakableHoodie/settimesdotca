@@ -6,7 +6,7 @@
  * Supports image validation, optimization, and secure file storage.
  */
 
-import { verifyAuth } from '../../auth/verify.js';
+import { checkPermission } from '../_middleware.js';
 
 // Maximum file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -24,22 +24,11 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    // Verify authentication and admin/editor role
-    const authResult = await verifyAuth(request, env);
-    if (!authResult.success) {
-      return new Response(JSON.stringify({ error: authResult.error }), {
-        status: authResult.status || 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const permCheck = await checkPermission(request, env, 'editor');
+    if (permCheck.error) {
+      return permCheck.response;
     }
-
-    // Require admin or editor role for photo uploads
-    if (authResult.user.role !== 'admin' && authResult.user.role !== 'editor') {
-      return new Response(
-        JSON.stringify({ error: 'Insufficient permissions' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    const { user } = permCheck;
 
     // Parse multipart form data
     const formData = await request.formData();
@@ -78,16 +67,15 @@ export async function onRequestPost(context) {
     const sanitizedName = file.name
       .replace(/[^a-zA-Z0-9.-]/g, '_')
       .toLowerCase();
-    const extension = sanitizedName.split('.').pop();
     const filename = `band-photos/${timestamp}-${sanitizedName}`;
 
     // Upload to R2 bucket
-    await env.BAND_PHOTOS.put(filename, file.stream(), {
+      await env.BAND_PHOTOS.put(filename, file.stream(), {
       httpMetadata: {
         contentType: file.type
       },
       customMetadata: {
-        uploadedBy: authResult.user.email,
+          uploadedBy: user.email,
         uploadedAt: new Date().toISOString(),
         originalName: file.name,
         ...(bandId && { bandId: bandId.toString() })
@@ -142,36 +130,32 @@ export async function onRequestDelete(context) {
   const { request, env } = context;
 
   try {
-    // Verify authentication and admin/editor role
-    const authResult = await verifyAuth(request, env);
-    if (!authResult.success) {
-      return new Response(JSON.stringify({ error: authResult.error }), {
-        status: authResult.status || 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (authResult.user.role !== 'admin' && authResult.user.role !== 'editor') {
-      return new Response(
-        JSON.stringify({ error: 'Insufficient permissions' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      );
+    const permCheck = await checkPermission(request, env, 'editor');
+    if (permCheck.error) {
+      return permCheck.response;
     }
 
     // Extract filename from URL path
     const url = new URL(request.url);
     const pathParts = url.pathname.split('/');
-    const filename = pathParts[pathParts.length - 1];
-
-    if (!filename || filename === 'photos') {
+    const encodedSegment = pathParts[pathParts.length - 1];
+    if (!encodedSegment || encodedSegment === 'photos') {
       return new Response(
         JSON.stringify({ error: 'Filename required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    const objectKey = decodeURIComponent(encodedSegment);
+    if (!objectKey.startsWith('band-photos/')) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid key' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Delete from R2 bucket
-    await env.BAND_PHOTOS.delete(`band-photos/${filename}`);
+    await env.BAND_PHOTOS.delete(objectKey);
 
     return new Response(
       JSON.stringify({ success: true }),

@@ -1,0 +1,176 @@
+@import '../../styles/tokens.css';
+
+/* Container */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  width: 100%;
+}
+
+/* Label */
+.label {
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-primary);
+}
+
+.required {
+  margin-left: var(--spacing-1);
+  color: var(--color-error);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Select Wrapper - Position relative for arrow */
+.selectWrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* Base Select Styles */
+.select {
+  /* Layout */
+  display: block;
+  width: 100%;
+  appearance: none;
+  cursor: pointer;
+
+  /* Typography */
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-normal);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-primary);
+
+  /* Box Model */
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+
+  /* Account for custom arrow */
+  padding-right: calc(var(--spacing-8) + var(--spacing-3));
+
+  /* Transitions */
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+/* Custom Dropdown Arrow */
+.arrow {
+  position: absolute;
+  right: var(--spacing-3);
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--color-text-secondary);
+  transition: border-top-color var(--transition-fast);
+}
+
+/* Hover State */
+.select:hover:not(:disabled) {
+  border-color: var(--color-border-hover);
+}
+
+.select:hover:not(:disabled) + .arrow {
+  border-top-color: var(--color-text-primary);
+}
+
+/* Focus State - WCAG 2.1 AA */
+.select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.select:focus + .arrow {
+  border-top-color: var(--color-border-focus);
+}
+
+/* Disabled State */
+.select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-neutral-100);
+}
+
+.select:disabled + .arrow {
+  opacity: 0.5;
+}
+
+/* Size Variants */
+.sm {
+  height: var(--input-height-sm);
+  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y) var(--input-padding-x);
+  font-size: var(--font-size-sm);
+}
+
+.md {
+  height: var(--input-height-md);
+  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y) var(--input-padding-x);
+  font-size: var(--font-size-base);
+}
+
+.lg {
+  height: var(--input-height-lg);
+  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y) var(--input-padding-x);
+  font-size: var(--font-size-lg);
+}
+
+/* Error State */
+.error {
+  border-color: var(--color-error);
+}
+
+.error:focus {
+  border-color: var(--color-error);
+  box-shadow: var(--shadow-focus-error);
+}
+
+.error + .arrow {
+  border-top-color: var(--color-error);
+}
+
+.errorText {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-error);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Success State */
+.success {
+  border-color: var(--color-success);
+}
+
+.success:focus {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-light);
+}
+
+.success + .arrow {
+  border-top-color: var(--color-success);
+}
+
+/* Helper Text */
+.helperText {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-secondary);
+}
+
+/* Mobile Optimization - Touch Targets */
+@media (max-width: 640px) {
+  .select {
+    min-height: 44px; /* iOS accessibility guideline */
+  }
+}

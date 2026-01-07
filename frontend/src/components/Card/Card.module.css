@@ -1,0 +1,172 @@
+@import '../../styles/tokens.css';
+
+/* Base Card Styles */
+.card {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-background);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition:
+    box-shadow var(--transition-normal),
+    transform var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+/* Variant Styles */
+.elevated {
+  box-shadow: var(--shadow-md);
+  border: none;
+}
+
+.outlined {
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+
+.flat {
+  border: none;
+  box-shadow: none;
+  background-color: var(--color-neutral-50);
+}
+
+/* Interactive State */
+.interactive {
+  cursor: pointer;
+  user-select: none;
+}
+
+.interactive:hover {
+  transform: translateY(-2px);
+}
+
+.interactive.elevated:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.interactive.outlined:hover {
+  border-color: var(--color-border-hover);
+}
+
+.interactive.flat:hover {
+  background-color: var(--color-neutral-100);
+}
+
+.interactive:active {
+  transform: translateY(0);
+}
+
+.interactive.elevated:active {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Focus State - WCAG 2.1 AA */
+.interactive:focus {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.interactive.elevated:focus {
+  box-shadow: var(--shadow-focus), var(--shadow-md);
+}
+
+/* Padding Variants */
+.padding-none {
+  padding: 0;
+}
+
+.padding-sm {
+  padding: var(--spacing-3);
+}
+
+.padding-md {
+  padding: var(--spacing-4);
+}
+
+.padding-lg {
+  padding: var(--spacing-6);
+}
+
+/* Card Header */
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  padding-bottom: var(--spacing-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.card.padding-none .cardHeader {
+  padding: var(--spacing-4);
+  padding-bottom: var(--spacing-3);
+}
+
+.cardTitle {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.cardSubtitle {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Card Body */
+.cardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card.padding-none .cardBody {
+  padding: var(--spacing-4);
+}
+
+/* Card Footer */
+.cardFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.card.padding-none .cardFooter {
+  padding: var(--spacing-4);
+  padding-top: var(--spacing-3);
+}
+
+/* Mobile Optimization */
+@media (max-width: 640px) {
+  .padding-sm {
+    padding: var(--spacing-2);
+  }
+
+  .padding-md {
+    padding: var(--spacing-3);
+  }
+
+  .padding-lg {
+    padding: var(--spacing-4);
+  }
+
+  .card.padding-none .cardHeader,
+  .card.padding-none .cardBody,
+  .card.padding-none .cardFooter {
+    padding-left: var(--spacing-3);
+    padding-right: var(--spacing-3);
+  }
+
+  /* Ensure interactive cards have adequate touch targets */
+  .interactive {
+    min-height: 44px;
+  }
+}

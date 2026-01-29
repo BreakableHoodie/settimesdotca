@@ -1,0 +1,45 @@
+name: DAST - ZAP Baseline
+
+on:
+  pull_request:
+    branches: [main, dev]
+  schedule:
+    - cron: "0 7 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Start Pages Functions (wrangler)
+        run: |
+          ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
+          for i in {1..30}; do
+            if curl -sSf http://localhost:8788/ > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: http://localhost:8788

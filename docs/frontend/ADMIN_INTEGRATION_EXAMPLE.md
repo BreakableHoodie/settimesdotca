@@ -241,10 +241,10 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/admin";
 
 ## Security Considerations
 
-1. **Password Storage**: Admin password stored in sessionStorage (cleared on tab close)
+1. **Session Storage**: HTTPOnly cookies for auth + `X-CSRF-Token` header for state changes
 2. **HTTPS Required**: Use HTTPS in production
 3. **Rate Limiting**: Backend implements login attempt limiting
-4. **Session Timeout**: Consider adding session expiration
+4. **Session Timeout**: Enforce idle timeout and server-side session expiry
 5. **CSP Headers**: Configure Content Security Policy headers
 6. **Admin Route**: Consider obscuring admin route path in production
 
@@ -262,7 +262,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/admin";
 - Verify backend is running
 - Check API endpoint paths match backend routes
 - Inspect network tab for error details
-- Verify admin password is stored in sessionStorage
+- Verify session cookies are set and `X-CSRF-Token` is sent
 
 ### Routing not working
 

@@ -338,8 +338,9 @@ function BandsTab({ selectedEvent }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Password": sessionStorage.getItem("adminPassword"),
+          "X-CSRF-Token": getCSRFToken(),
         },
+        credentials: "include",
         body: JSON.stringify({
           band_ids: Array.from(selectedBands),
           action: bulkAction,
@@ -362,8 +363,9 @@ function BandsTab({ selectedEvent }) {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Password": sessionStorage.getItem("adminPassword"),
+          "X-CSRF-Token": getCSRFToken(),
         },
+        credentials: "include",
         body: JSON.stringify({
           band_ids: Array.from(selectedBands),
           action: bulkAction,

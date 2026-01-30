@@ -120,7 +120,7 @@
 - **No archival** - Old events accumulate without cleanup strategy
 - **No analytics** - No insights into popular bands or venue conflicts
 - **No automation** - No scheduled tasks (cleanup, notifications)
-- **No multi-tenancy** - Single admin password for all organizers
+- **No multi-tenancy** - Single organization, per-user RBAC
 
 ---
 
@@ -282,7 +282,7 @@ Request
 **Middleware Responsibilities:**
 
 - **Global**: CORS headers, error boundaries, logging
-- **Admin**: Password verification, IP rate limiting, audit logging
+- **Admin**: Session verification, IP rate limiting, audit logging
 - **Route**: Business logic, database queries, validation
 
 ### 3. Security Model
@@ -290,12 +290,12 @@ Request
 **Authentication Flow:**
 
 ```
-1. Admin enters password → frontend
-2. Frontend sends X-Admin-Password header
-3. Middleware checks password vs env.ADMIN_PASSWORD
-4. Rate limit: 5 failed attempts in 10min = 1hr lockout
-5. Audit log: All attempts logged with IP, timestamp, success
-6. On success: Reset rate limit, proceed to handler
+1. Admin logs in with email + password
+2. Server verifies credentials and creates session record
+3. Server sets HTTPOnly `session_token` cookie
+4. Server sets non-HttpOnly `csrf_token` cookie
+5. Frontend sends `X-CSRF-Token` on state-changing requests
+6. Middleware validates session + CSRF for admin routes
 ```
 
 **Rate Limiting Logic:**
@@ -620,7 +620,7 @@ ALTER TABLE events DROP COLUMN name;
 
 **Migration Workflow:**
 
-1. Create `database/migrations/YYYYMMDD_description.sql`
+1. Create `migrations/YYYYMMDD_description.sql`
 2. Test locally: `wrangler d1 execute settimes-db --local --file=migrations/...sql`
 3. Apply to production: `wrangler d1 execute settimes-db --file=migrations/...sql`
 4. Document in `CHANGELOG.md`
@@ -976,7 +976,7 @@ wrangler d1 list
 PUBLIC:
 GET  /api/schedule?event={slug|current}
 
-ADMIN (requires X-Admin-Password header):
+ADMIN (requires session cookie + X-CSRF-Token for state changes):
 GET    /api/admin/events
 POST   /api/admin/events
 PUT    /api/admin/events/{id}

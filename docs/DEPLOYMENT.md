@@ -108,6 +108,14 @@ dist/assets/index-abc123.js      456.78 kB
 
 ### 1. Create Production Database
 
+Run the setup script which guides you through the process:
+
+```bash
+./scripts/setup-prod-db.sh
+```
+
+Or manually:
+
 ```bash
 # Create production D1 database
 wrangler d1 create settimes-production-db
@@ -164,14 +172,16 @@ database_name = "settimes-dev-db"
 database_id = "YOUR_DEV_DB_ID_HERE"  # From step 2 (optional)
 ```
 
-### 4. Run Database Migrations
+### 4. Run Database Migrations & Seed Data
+
+If you didn't use the setup script, run:
 
 ```bash
 # Apply migrations to production
 wrangler d1 migrations apply settimes-production-db --env production
 
-# Apply migrations to development (optional)
-wrangler d1 migrations apply settimes-dev-db --env development
+# Seed with Long Weekend Band Crawl seasonal data
+wrangler d1 execute settimes-production-db --env production --file=database/seed-production.sql
 ```
 
 **Expected output:**
@@ -223,6 +233,12 @@ DATABASE_ID = your-production-db-id
 ENVIRONMENT = production
 SESSION_SECRET = random-64-char-string  # Generate securely
 ADMIN_EMAIL = admin@settimes.ca
+PUBLIC_DATA_PUBLISH_ENABLED = false
+CSP_ENFORCE = true  # optional override (defaults to true in production)
+EMAIL_PROVIDER = postmark
+EMAIL_FROM = no-reply@settimes.ca
+POSTMARK_API_TOKEN = <secret>
+PUBLIC_URL = https://settimes.ca
 ```
 
 **Preview (optional):**
@@ -241,6 +257,24 @@ openssl rand -base64 48
 ---
 
 ## First Deployment
+
+## Promote Local Data to Production (one-time)
+
+1. Build + run local Pages dev so the local D1 contains your latest data:
+   ```bash
+   npm --prefix frontend run build
+   npx wrangler pages dev frontend/dist --port 8788
+   ```
+2. Export local data to a production seed file:
+   ```bash
+   ./scripts/export-local-data.sh
+   ```
+3. Commit `database/seed-production.sql`, then push to `origin/main`.
+4. Import into production D1 (one-time):
+   ```bash
+   ./scripts/import-production-data.sh
+   ```
+5. Keep `PUBLIC_DATA_PUBLISH_ENABLED=false` until you’re ready to go live.
 
 ### Option 1: Deploy via Cloudflare Dashboard (Recommended for first deploy)
 
@@ -702,9 +736,9 @@ curl -w "@curl-format.txt" -o /dev/null -s https://settimes.ca/api/schedule
 
 ---
 
-**Version:** 2.0
-**Last Updated:** November 2025
-**For:** SetTimes Platform (settimes.ca)
+**Version:** 2.1
+**Last Updated:** January 2026
+**Target Event:** Long Weekend Band Crawl (Feb 15, 2026)
 
 ---
 

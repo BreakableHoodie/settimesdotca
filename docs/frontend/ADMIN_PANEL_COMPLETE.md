@@ -11,14 +11,14 @@ I've successfully created all admin panel UI components for the Long Weekend Ban
 1. **AdminApp.jsx** (56 lines)
    - Root component for admin interface
    - Manages authentication state
-   - Session persistence via sessionStorage
+   - Session persistence via HTTPOnly cookies + localStorage user info
    - Auto-checks for existing sessions on mount
 
 2. **AdminLogin.jsx** (254 lines)
    - Secure password-based authentication
    - Lockout protection after failed attempts
    - Master password recovery system
-   - Session storage integration
+   - Cookie-based session integration
    - Mobile-responsive login form
 
 3. **AdminPanel.jsx** (186 lines)
@@ -205,7 +205,7 @@ All components use the existing `adminApi.js` utilities:
 - **venuesApi**: CRUD operations for venues
 - **bandsApi**: CRUD operations for bands
 
-All requests include the admin password from sessionStorage in the `X-Admin-Password` header.
+All requests use HTTPOnly session cookies; state-changing requests include an `X-CSRF-Token` header.
 
 ## Testing Checklist
 
@@ -309,7 +309,7 @@ Tested and compatible with:
 
 1. **Test the integration**: Follow one of the three integration options above
 2. **Configure backend**: Ensure API endpoints match `/api/admin/*`
-3. **Set admin password**: Configure backend admin password
+3. **Create admin user**: Generate an invite code and create the first admin account
 4. **Test all CRUD operations**: Use the testing checklist above
 5. **Deploy**: Build and deploy with `npm run build`
 
@@ -317,7 +317,7 @@ Tested and compatible with:
 
 Before going live:
 
-- [ ] Change default admin password
+- [ ] Rotate admin credentials and enforce strong password policy
 - [ ] Enable HTTPS
 - [ ] Configure CSP headers
 - [ ] Set up error logging

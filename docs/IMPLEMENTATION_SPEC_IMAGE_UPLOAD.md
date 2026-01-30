@@ -80,7 +80,7 @@ bucket_name = "event-images"
 
 #### 2.1 Create Migration File
 
-**File**: `database/migrations/20251112_add_event_posters.sql`
+**File**: `migrations/legacy/20251112_add_event_posters.sql`
 
 ```sql
 -- Add poster_url field to events table
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_events_poster ON events(poster_url);
 
 **Local Development**:
 ```bash
-sqlite3 .wrangler/state/v3/d1/*.sqlite < database/migrations/20251112_add_event_posters.sql
+sqlite3 .wrangler/state/v3/d1/*.sqlite < migrations/legacy/20251112_add_event_posters.sql
 ```
 
 **Production** (via Cloudflare Dashboard):

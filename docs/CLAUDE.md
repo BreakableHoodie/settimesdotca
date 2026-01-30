@@ -111,7 +111,7 @@ npx wrangler pages dev frontend/dist --ip 0.0.0.0
 # Access at: http://100.73.43.62:8788 (or local IP)
 
 # Database migrations
-sqlite3 .wrangler/state/v3/d1/*.sqlite < database/migration-file.sql
+sqlite3 .wrangler/state/v3/d1/*.sqlite < migrations/legacy/migration-file.sql
 ```
 
 ### Testing
@@ -249,7 +249,7 @@ settimes/
    - `database/longweekend.db` initialized from 0 bytes
    - 8 migrations applied in correct order (schema-v2 → events-theming)
    - 17 tables ready for Sprint 1.1-1.3 features
-   - Default admin user: `admin@pinklemonaderecords.com` / `admin123`
+   - Default admin user: `admin@settimes.ca` / `LOCAL_ADMIN_PASSWORD`
    - Full audit logging, RBAC, 2FA infrastructure, metrics
 
 3. **UI/UX Redesign Planning**
@@ -329,7 +329,7 @@ settimes/
 ### Migration System
 
 **Active Schema**: `database/schema-v2.sql` (performers/performances architecture)
-**Migrations**: Located in `database/migrations/` with timestamps
+**Migrations**: Located in `migrations/legacy/` with timestamps
 **Apply**: `sqlite3 .wrangler/state/v3/d1/*.sqlite < migration.sql`
 **Validate**: `npm run validate:schema`
 
@@ -380,7 +380,7 @@ When working on this project:
 ## Admin Credentials (Development)
 
 **Username**: admin
-**Password**: admin123
+**Password**: LOCAL_ADMIN_PASSWORD
 **Access**: http://localhost:8788/admin
 
 ⚠️ **Production**: Change credentials immediately on first deployment.

@@ -4,67 +4,85 @@ This directory contains historical documents that have been superseded or comple
 
 **Last Cleaned:** 2026-01-29
 
-## Archived Roadmaps
+---
 
-- **PROJECT_STATUS_AND_ROADMAP.md** (Oct 26, 2025) - Original status document
-- **IMPLEMENTATION_ROADMAP.md** (Oct 25, 2025) - Backend-focused roadmap
-- **GENERALIZATION_PLAN.md** - Multi-org vision (moved to GENERALIZATION_PLAN_FUTURE.md)
-- **NEXT_STEPS_SUMMARY.md** (Oct 26, 2025) - Outdated next steps
+## Directory Structure
 
-## Archived Sprint Specs (Completed)
-
-- **CURSOR_SPRINT_1_SPEC.md** - Initial admin panel implementation
-- **CURSOR_SPRINT_2_SPEC.md** - Performance optimization sprint
-- **CURSOR_SPRINT_3_SPEC.md** - Discovery features (subscriptions, API, iCal)
-- **CURSOR_TASK_MOBILE_OPTIMIZATION.md** - Mobile optimization plan
-- **CURSOR_TASK_SPRINT3_REMAINING_TESTS.md** - Sprint 3 testing tasks
-
-## Archived Cursor Tasks (`cursor-tasks/`)
-
-- **CURSOR_HANDOFF_INSTRUCTIONS.md** - Original handoff instructions
-- **CURSOR_TASK_SUBSCRIPTION_TESTS.md** - Subscription testing task (completed)
-
-## Archived Status Reports (`status-reports/`)
-
-Sprint completion status reports from 2025:
-
-- **STATUS_MOBILE_OPTIMIZATION_COMPLETE_2025_01.md**
-- **STATUS_MOBILE_OPTIMIZATION_PHASE1_2025_10_26.md**
-- **STATUS_MOBILE_OPTIMIZATION_PHASE1_AND_2_2025_10_26.md**
-- **STATUS_SPRINT3_COMPLETE_TESTS_2025_10_26.md**
-- **STATUS_SUBSCRIPTION_TESTS_2025_10_26.md**
-
-## Archived Code Reviews (`code-reviews/`)
-
-- **CODE_REVIEW.md** (Nov 19, 2025)
-- **CODE_REVIEW_FINDINGS.md** (Nov 18, 2025)
-- **CODE_REVIEW_SUMMARY.md** (Nov 18, 2025)
-- **CODE_REVIEW_SUMMARY.txt**
-- **FRONTEND_CODE_REVIEW.md**
-- **FRONTEND_CODE_REVIEW_QUICK_REFERENCE.md**
-
-## Archived UX/Feature Docs (Completed)
-
-- **ADD_ACTION_SCOPE_UX_DESIGN.md** - Bulk operations UX
-- **CONTEXT_SWITCHING_IMPROVEMENTS.md** - Context switching implementation
-- **CONTEXT_SWITCHING_UX_DESIGN.md** - Context switching design
-- **OLD_EVENTS_PROTECTION_UX_DESIGN.md** - Event archival feature
-- **IMPLEMENTATION_SUMMARY.md** - Historical implementation notes
-
-## Reference Docs (Historical)
-
-See `reference/` subdirectory:
-
-- **FAN_FIRST_SPEC.md** - Early product spec
-- **RBAC_MODEL.md** - Initial RBAC design thoughts
-
-## Current Documentation
-
-**Active Roadmap**: `/ROADMAP_TO_DEMO.md`
-**Active Specs**: `/docs/specs/` directory
-**Technical Docs**: Core docs remain in `/docs/` (D1_SETUP, DATABASE, etc.)
-**Current Code Review**: `/claudedocs/CODE_REVIEW_2026-01-28_UPDATED.md`
+```text
+archive/
+├── audits-2025/          # Security/accessibility audits from Nov 2025
+├── code-reviews/         # Historical code review documents
+├── cursor-handoffs/      # AI handoff instructions
+├── cursor-tasks/         # Completed AI task specifications
+├── demo-2025/            # Nov 2025 demo preparation materials
+├── reference/            # Early specs and design docs
+├── specs-completed/      # Implemented feature specifications
+└── status-reports/       # Sprint completion reports
+```
 
 ---
 
-These files are preserved for historical context and lessons learned, but should NOT be used for current planning or development decisions.
+## Archived by Category
+
+### Demo 2025 (`demo-2025/`)
+
+Pre-demo preparation for November 30, 2025 demo:
+
+- **DEMO_ASSETS_GUIDE.md** - Media checklist
+- **DEMO_BACKUP_PLAN.md** - Fallback procedures
+- **VISUAL_DESIGN_POLISH.md** - UI polish checklist
+
+### Audits 2025 (`audits-2025/`)
+
+Point-in-time audits from November 2025 (need refresh):
+
+- **ACCESSIBILITY_AUDIT.md** - WCAG 2.1 AA review
+- **SECURITY_AUDIT.md** - Security controls review
+- **TECH_DEBT_ANALYSIS.md** - Code quality analysis
+
+### Completed Specs (`specs-completed/`)
+
+Implemented feature specifications:
+
+- **BULK_OPERATIONS_SPEC.md** - Multi-select bulk actions
+- **TEST_SPEC_SUBSCRIPTIONS.md** - Email subscription tests
+- **SPRINT_1.1_RBAC.md** - Role-based access control
+- **SPRINT_1.2_COMPLETION.md** - Event management integration
+- **SPRINT_1.2_EVENT_MANAGEMENT.md** - Event lifecycle
+
+### Cursor Tasks (`cursor-tasks/`)
+
+Completed AI coder task specifications:
+
+- **CURSOR_HANDOFF_INSTRUCTIONS.md** - Original handoff docs
+- **CURSOR_TASK_SUBSCRIPTION_TESTS.md** - Subscription testing
+- **CURSOR_TASK_IMAGE_UPLOAD.md** - Image upload implementation
+
+### Status Reports (`status-reports/`)
+
+Sprint completion reports from 2025
+
+### Code Reviews (`code-reviews/`)
+
+Historical code reviews (superseded by `claudedocs/CODE_REVIEW_2026-01-28_UPDATED.md`)
+
+### Roadmaps (root)
+
+- **GENERALIZATION_PLAN_FUTURE.md** - Multi-org vision (post-MVP)
+- **NEXT_STEPS_SUMMARY.md** (Oct 2025) - Outdated
+- **PROJECT_STATUS_AND_ROADMAP.md** (Oct 2025) - Outdated
+- **IMPLEMENTATION_ROADMAP.md** (Oct 2025) - Outdated
+
+---
+
+## Current Documentation
+
+| Document             | Location                                       |
+| -------------------- | ---------------------------------------------- |
+| Active Roadmap       | `/ROADMAP_TO_DEMO.md`                          |
+| Current Code Review  | `/claudedocs/CODE_REVIEW_2026-01-28_UPDATED.md`|
+| Technical Docs       | `/docs/` (DATABASE, DEPLOYMENT, etc.)          |
+
+---
+
+*These files are preserved for historical context. Do NOT use for current development decisions.*

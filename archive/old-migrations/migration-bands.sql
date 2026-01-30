@@ -1,1 +1,0 @@
-Event name (e.g., "Long Weekend Band Crawl - October 2025"): Event slug (e.g., "october-2025"): 

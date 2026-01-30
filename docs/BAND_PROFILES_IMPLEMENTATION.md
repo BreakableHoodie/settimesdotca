@@ -16,7 +16,7 @@ Implemented a comprehensive band profile system that allows bands to have rich p
 
 ### 1. Database Migration ✅
 
-**File:** `database/migration-add-band-profiles.sql`
+**File:** `migrations/legacy/migration-add-band-profiles.sql`
 
 Adds four new fields to the `bands` table:
 - `description` - Band bio/description (TEXT)
@@ -197,7 +197,7 @@ All fields are NULLABLE for backward compatibility.
 ## Files Modified
 
 ### New Files (6)
-1. `database/migration-add-band-profiles.sql`
+1. `migrations/legacy/migration-add-band-profiles.sql`
 2. `functions/api/bands/[name].js`
 3. `frontend/src/pages/BandProfilePage.jsx`
 4. `docs/BAND_PROFILES_IMPLEMENTATION.md`
@@ -293,10 +293,10 @@ To apply the new profile fields to your database:
 
 ```bash
 # Read the migration file
-cat database/migration-add-band-profiles.sql
+cat migrations/legacy/migration-add-band-profiles.sql
 
 # Apply to your database (adjust for your setup)
-npx wrangler d1 execute DB_NAME --file=database/migration-add-band-profiles.sql
+npx wrangler d1 execute DB_NAME --file=migrations/legacy/migration-add-band-profiles.sql
 
 # Or for local development with miniflare
 # (run this in your functions directory or appropriate context)

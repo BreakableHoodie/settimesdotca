@@ -46,7 +46,7 @@ The SetTimes.ca application demonstrates good performance practices with efficie
 **Solution:** Add a cleanup migration to run periodically:
 
 ```sql
--- database/migration-session-cleanup.sql
+-- migrations/legacy/migration-session-cleanup.sql
 -- Run this manually or via cron job weekly
 
 DELETE FROM sessions 

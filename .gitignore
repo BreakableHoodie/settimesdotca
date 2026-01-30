@@ -7,6 +7,8 @@ yarn-error.log*
 # Production
 /frontend/dist
 /backend/dist
+frontend/.vite/
+frontend/.cache/
 
 # Environment variables
 .env
@@ -27,22 +29,63 @@ Thumbs.db
 # Reports
 psi_raw.txt
 psi_report*.json
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+e2e/.auth/
+e2e/visual-regression.spec.js-snapshots/
+*.lcov
+.nyc_output/
 
 # Docker
 .dockerignore
 
 # Cloudflare Wrangler
 .wrangler/
+.wrangler/state/
 
-# Claude AI
+# AI assistants (developer-specific)
 .claude/
+.serena/
+chatmodes/
+claudedocs/
+instructions/
+prompts/
+plugins/
+.github/chatmodes/
+.github/prompts/
+.github/agents/
+
+# Session notes and dev archives (developer-specific)
+archive/session-notes/
+archive/old-migrations/
 
 # Temporary files
 *.tmp
 *.temp
+.dev/
+cookies.txt
+DEV_CREDENTIALS.txt
+TEST_ACCOUNTS.md
+CODE_REVIEW_REPORT.md
+REVIEW_COMPLETE.md
+PLUGIN_STRATEGY.md
+PR_DESCRIPTION.md
+*.session
+*.token
+*.key
+*.pem
+scripts/update-admin-password.sql
+*.sqlite-journal
 
 # Task tracking
 .todo.json
 
 # Local database (use migrations instead)
 database/*.db
+database/migrations/
+database/migration-*.sql
+
+# Confidential local data
+band_crawl_schedule.json

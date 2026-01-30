@@ -275,7 +275,7 @@ node scripts/create-admin-invite.js --prod
 
 **First Admin Setup:**
 
-1. Run migration: `wrangler d1 execute settimes-db --local --file=database/migration-invite-codes.sql`
+1. Run migration: `wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-invite-codes.sql`
 2. Generate admin invite: `node scripts/create-admin-invite.js --local`
 3. Insert code into database using the provided command
 4. Use the code during signup at `/admin`

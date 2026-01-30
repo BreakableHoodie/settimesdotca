@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Long Weekend Band Crawl API
+  title: SetTimes API
   version: 1.0.0
   description: |
-    API for managing and accessing Long Weekend Band Crawl event schedules.
+    API for managing and accessing SetTimes event schedules.
 
     The API provides:
     - Public schedule access for attendees
@@ -11,10 +11,10 @@ info:
     - Rate-limited authentication with audit logging
     - Conflict detection for overlapping performances
 
-    **Base URL:** https://your-domain.pages.dev
+    **Base URL:** https://settimes.ca
 
   contact:
-    name: Long Weekend Band Crawl
+    name: SetTimes
   license:
     name: MIT
 
@@ -37,7 +37,7 @@ tags:
     description: Band/performance management with conflict detection
 
 security:
-  - AdminPassword: []
+  - AdminSession: []
 
 paths:
   /api/schedule:
@@ -573,17 +573,17 @@ paths:
 
 components:
   securitySchemes:
-    AdminPassword:
+    AdminSession:
       type: apiKey
-      in: header
-      name: X-Admin-Password
+      in: cookie
+      name: session_token
       description: |
-        Admin password for authentication. Stored in environment variable ADMIN_PASSWORD.
+        HTTPOnly session cookie issued by /api/admin/auth/login and /api/admin/auth/signup.
         Required for all /api/admin/* endpoints (except auth endpoints).
 
-        **Rate Limiting:**
-        - 5 failed attempts in 10 minutes → 1 hour IP lockout
-        - All attempts logged with IP address and timestamp
+        **CSRF Protection:**
+        - State-changing requests must include `X-CSRF-Token` header.
+        - Token is provided via a non-HttpOnly `csrf_token` cookie.
 
   schemas:
     ScheduleBand:

@@ -1,6 +1,6 @@
 # Session Management and Timeout Policy
 
-This document describes session handling, authentication, and timeout policies for the Long Weekend Band Crawl application.
+This document describes session handling, authentication, and timeout policies for the SetTimes application.
 
 ## Current Implementation
 

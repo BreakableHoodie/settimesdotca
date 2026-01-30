@@ -1,6 +1,6 @@
 # Admin Panel Components
 
-Complete admin panel UI for managing the Long Weekend Band Crawl events, venues, and bands.
+Complete admin panel UI for managing the SetTimes events, venues, and bands.
 
 ## Components Overview
 
@@ -165,7 +165,7 @@ All components use the `adminApi.js` utilities for API communication:
 - `venuesApi` - Venue CRUD operations
 - `bandsApi` - Band CRUD operations
 
-All API calls include the admin password from `sessionStorage` in request headers.
+All API calls use HTTPOnly session cookies and include an `X-CSRF-Token` header (managed by `adminApi.js`).
 
 ## Validation & Edge Cases
 

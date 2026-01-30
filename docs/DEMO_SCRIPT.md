@@ -12,7 +12,8 @@
 **30 minutes before:**
 - [ ] Seed database with demo data (`demo-data-seed.sql`)
 - [ ] Verify all services running (frontend, functions, D1)
-- [ ] Test admin login (demo.admin@settimes.ca)
+- [ ] Test admin login (admin@settimes.ca)
+- [ ] Confirm local passwords from `scripts/setup-local-db.sh` (or `LOCAL_*_PASSWORD` env vars)
 - [ ] Test public timeline loading
 - [ ] Clear browser cache
 - [ ] Open demo URLs in tabs:
@@ -107,7 +108,7 @@
 **"First, I'll log in as an event organizer."**
 
 **Actions:**
-- Enter credentials: `demo.editor@settimes.ca` / `editor123`
+- Enter credentials: `editor@settimes.ca` / `LOCAL_EDITOR_PASSWORD`
 - Click "Sign In"
 - (System redirects to admin dashboard)
 
@@ -280,7 +281,7 @@
 
 **Actions:**
 - Click user menu → Logout
-- Log in as: `demo.viewer@settimes.ca` / `viewer123`
+- Log in as: `viewer@settimes.ca` / `LOCAL_VIEWER_PASSWORD`
 - Navigate to Venues tab
 - Try to click "Add Venue" - **button is disabled or hidden**
 - Try to edit existing venue - **edit button disabled**

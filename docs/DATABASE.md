@@ -1,13 +1,19 @@
 # Database Schema Documentation
 
-**Database:** Long Weekend Band Crawl
+**Database:** SetTimes
 **Type:** SQLite (Cloudflare D1)
 **Version:** 2.0 (Band Profile System)
 **Last Updated:** 2025-10-25
 
 ## Overview
 
-The Long Weekend Band Crawl database supports **multi-event management** with a **band profile system** that separates band identity (reusable across events) from performance scheduling (event-specific).
+The SetTimes database supports **multi-event management** with a **band profile system** that separates band identity (reusable across events) from performance scheduling (event-specific).
+
+## Source of Truth
+
+- **Canonical schema:** `database/schema-final.sql`
+- **Active migrations:** `migrations/`
+- **Legacy migrations:** `migrations/legacy/` (kept for historical reference only; do not add new migrations here)
 
 ### Key Features
 
@@ -134,7 +140,7 @@ When creating a band that matches an existing normalized name:
 
 ### Migration from v1
 
-See `database/migration-v1-to-v2.sql` for complete migration script.
+See `migrations/legacy/migration-v1-to-v2.sql` for complete migration script.
 
 **Summary:**
 
@@ -595,7 +601,7 @@ npx wrangler d1 execute settimes-db --file=database/schema.sql --remote
 For schema changes, create timestamped migration files:
 
 ```bash
-database/migrations/
+migrations/legacy/
   001_initial_schema.sql           # Current schema
   002_add_band_genre.sql           # Future: Add genre field
   003_add_event_description.sql    # Future: Add event description
@@ -607,6 +613,15 @@ database/migrations/
 -- 002_add_band_genre.sql
 ALTER TABLE bands ADD COLUMN genre TEXT;
 CREATE INDEX idx_bands_genre ON bands(genre);
+```
+
+### One-Off Ops Migrations
+
+If a production database still has legacy `schedule_builds.band_id`, use the one-time script to rename it to `performance_id`:
+
+```bash
+# Only run if PRAGMA table_info(schedule_builds) shows band_id and no performance_id.
+npx wrangler d1 execute settimes-db --file=scripts/migrate-schedule-builds-performance-id.sql --remote
 ```
 
 ### Data Seeding

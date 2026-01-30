@@ -2,6 +2,8 @@
 **Pre-Demo Quality Assurance**
 
 **Goal:** Test demo flow 3+ times to ensure flawless presentation
+
+**Note:** Local passwords are set by `scripts/setup-local-db.sh` (or via `LOCAL_*_PASSWORD` env vars). Use the values printed during setup.
 **Deadline:** Before November 30, 2025
 
 ---
@@ -30,9 +32,9 @@
 - [ ] Have demo script open on second monitor/phone
 
 **User Accounts:**
-- [ ] Test admin login: `demo.admin@settimes.ca` / `admin123`
-- [ ] Test editor login: `demo.editor@settimes.ca` / `editor123`
-- [ ] Test viewer login: `demo.viewer@settimes.ca` / `viewer123`
+- [ ] Test admin login: `admin@settimes.ca` / `LOCAL_ADMIN_PASSWORD`
+- [ ] Test editor login: `editor@settimes.ca` / `LOCAL_EDITOR_PASSWORD`
+- [ ] Test viewer login: `viewer@settimes.ca` / `LOCAL_VIEWER_PASSWORD`
 
 **URLs to Test:**
 - [ ] `https://settimes.ca` (public timeline)
@@ -89,8 +91,8 @@
 
 - [ ] Navigate to `https://settimes.ca/admin`
 - [ ] Login form appears
-- [ ] Enter email: `demo.editor@settimes.ca`
-- [ ] Enter password: `editor123`
+- [ ] Enter email: `editor@settimes.ca`
+- [ ] Enter password: `LOCAL_EDITOR_PASSWORD`
 - [ ] Click "Sign In" button
 - [ ] Redirects to admin dashboard (no errors)
 - [ ] Dashboard loads correctly
@@ -223,7 +225,7 @@
 
 **As Viewer:**
 - [ ] Log out
-- [ ] Log in as: `demo.viewer@settimes.ca` / `viewer123`
+- [ ] Log in as: `viewer@settimes.ca` / `LOCAL_VIEWER_PASSWORD`
 - [ ] Go to Venues tab
 - [ ] "Add Venue" button is disabled or hidden
 - [ ] Edit buttons are disabled or hidden
@@ -233,7 +235,7 @@
 
 **As Admin:**
 - [ ] Log out
-- [ ] Log in as: `demo.admin@settimes.ca` / `admin123`
+- [ ] Log in as: `admin@settimes.ca` / `LOCAL_ADMIN_PASSWORD`
 - [ ] All buttons enabled
 - [ ] Can access user management (if UI exists)
 - [ ] Can delete venues

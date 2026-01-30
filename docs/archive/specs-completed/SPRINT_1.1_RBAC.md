@@ -15,7 +15,7 @@ Implement role-based access control (RBAC) supporting three roles: Admin, Editor
 ### New Table: `users`
 
 ```sql
--- database/migrations/001_add_rbac.sql
+-- migrations/legacy/001_add_rbac.sql
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +48,7 @@ CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_audit_log_user ON audit_log(user_id);
 CREATE INDEX idx_audit_log_created ON audit_log(created_at);
 
--- Insert default admin user (password: admin123)
+-- Insert default admin user (password: LOCAL_ADMIN_PASSWORD)
 INSERT INTO users (email, password_hash, role, display_name)
 VALUES (
   'admin@example.com',
@@ -617,8 +617,8 @@ describe("RBAC Integration", () => {
 
 ### Start Here:
 
-1. Create `database/migrations/001_add_rbac.sql` with schema above
-2. Run migration: `sqlite3 .wrangler/state/v3/d1/*.sqlite < database/migrations/001_add_rbac.sql`
+1. Create `migrations/legacy/001_add_rbac.sql` with schema above
+2. Run migration: `sqlite3 .wrangler/state/v3/d1/*.sqlite < migrations/legacy/001_add_rbac.sql`
 3. Create `functions/api/admin/users.js` with all CRUD operations
 4. Update `functions/_middleware.js` with permission functions
 5. Create `frontend/src/admin/UsersTab.jsx` component
@@ -626,7 +626,7 @@ describe("RBAC Integration", () => {
 
 ### Key Files to Create:
 
-- `database/migrations/001_add_rbac.sql`
+- `migrations/legacy/001_add_rbac.sql`
 - `functions/api/admin/users.js`
 - `functions/api/admin/users/[id].js`
 - `functions/api/admin/audit-log.js`

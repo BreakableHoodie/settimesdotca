@@ -115,7 +115,7 @@ This project uses:
 
 #### 2.1 Create Migration File
 
-**File:** `database/migrations/20251112_add_event_posters.sql`
+**File:** `migrations/legacy/20251112_add_event_posters.sql`
 
 ```sql
 -- Add poster_url field to events table
@@ -128,7 +128,7 @@ CREATE INDEX IF NOT EXISTS idx_events_poster ON events(poster_url);
 #### 2.2 Apply Migration Locally
 
 ```bash
-sqlite3 .wrangler/state/v3/d1/*.sqlite < database/migrations/20251112_add_event_posters.sql
+sqlite3 .wrangler/state/v3/d1/*.sqlite < migrations/legacy/20251112_add_event_posters.sql
 ```
 
 #### 2.3 Apply to Production
@@ -734,7 +734,7 @@ sqlite3 .wrangler/state/v3/d1/*.sqlite "SELECT id, name, photo_url FROM band_pro
 ## Files to Create/Modify
 
 ### New Files:
-- `database/migrations/20251112_add_event_posters.sql`
+- `migrations/legacy/20251112_add_event_posters.sql`
 - `functions/api/upload/presigned.js`
 - `frontend/src/admin/components/ImageUploader.jsx`
 

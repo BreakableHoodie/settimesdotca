@@ -1,0 +1,207 @@
+@import '../../styles/tokens.css';
+
+/* Base Badge Styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+  border-radius: var(--radius-md);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+/* Size Variants */
+.sm {
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-1) var(--spacing-2);
+  height: 1.25rem;
+}
+
+.md {
+  font-size: var(--font-size-sm);
+  padding: calc(var(--spacing-1) + 2px) var(--spacing-3);
+  height: 1.5rem;
+}
+
+.lg {
+  font-size: var(--font-size-base);
+  padding: var(--spacing-2) var(--spacing-4);
+  height: 2rem;
+}
+
+/* Pill Variant - Fully Rounded */
+.pill {
+  border-radius: 100px;
+}
+
+/* Dot Indicator */
+.dotIndicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  flex-shrink: 0;
+}
+
+.dot.sm .dotIndicator {
+  width: 4px;
+  height: 4px;
+}
+
+.dot.lg .dotIndicator {
+  width: 8px;
+  height: 8px;
+}
+
+/* Content */
+.content {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Removable Badge */
+.removable {
+  padding-right: calc(var(--spacing-1) + 2px);
+}
+
+.removeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  margin: 0;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  opacity: 0.7;
+  transition:
+    opacity var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.removeButton:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.removeButton:focus {
+  outline: none;
+  opacity: 1;
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.removeButton:active {
+  opacity: 0.8;
+}
+
+.removeIcon {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.sm .removeIcon {
+  width: 10px;
+  height: 10px;
+}
+
+.lg .removeIcon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Color Variants */
+.primary {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-700);
+}
+
+.primary .removeButton:hover {
+  background-color: var(--color-primary-200);
+}
+
+.secondary {
+  background-color: var(--color-secondary-100);
+  color: var(--color-secondary-700);
+}
+
+.secondary .removeButton:hover {
+  background-color: var(--color-secondary-200);
+}
+
+.success {
+  background-color: var(--color-success-light);
+  color: var(--color-success-dark);
+}
+
+.success .removeButton:hover {
+  background-color: var(--color-success);
+}
+
+.warning {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning-dark);
+}
+
+.warning .removeButton:hover {
+  background-color: var(--color-warning);
+}
+
+.danger {
+  background-color: var(--color-error-light);
+  color: var(--color-error-dark);
+}
+
+.danger .removeButton:hover {
+  background-color: var(--color-error);
+}
+
+.info {
+  background-color: var(--color-accent-light);
+  color: var(--color-accent-dark);
+}
+
+.info .removeButton:hover {
+  background-color: var(--color-accent);
+}
+
+.neutral {
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-700);
+}
+
+.neutral .removeButton:hover {
+  background-color: var(--color-neutral-200);
+}
+
+/* Ensure badges don't wrap awkwardly */
+.badge {
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Mobile Optimization */
+@media (max-width: 640px) {
+  /* Ensure touch targets for removable badges */
+  .removeButton {
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  .sm .removeButton {
+    min-width: 20px;
+    min-height: 20px;
+  }
+
+  .lg .removeButton {
+    min-width: 28px;
+    min-height: 28px;
+  }
+}

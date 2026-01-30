@@ -1,14 +1,15 @@
 name: Quality Checks
 
 on:
-  push:
-    branches: [main, dev]
   pull_request:
     branches: [main, dev]
 
+# These checks only run on PRs and focus on quality gates
+# not covered by the main build-and-deploy workflow
+
 jobs:
-  lint-and-format:
-    name: Lint & Format
+  format-check:
+    name: Format Check
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,9 +27,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Run ESLint
-        run: npm run lint
 
       - name: Check code formatting
         run: npm run format:check
@@ -83,6 +81,7 @@ jobs:
         run: npm run lighthouse
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          CI: true
 
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v4
@@ -91,33 +90,3 @@ jobs:
           name: lighthouse-results
           path: frontend/.lighthouseci
           retention-days: 30
-
-  build-check:
-    name: Build Check
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Check bundle size
-        run: |
-          echo "## Bundle Size Report" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          du -sh dist/assets/* | sort -hr >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,174 @@
+@import '../../styles/tokens.css';
+
+/* Base Button Styles */
+.button {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+
+  /* Typography */
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+
+  /* Box Model */
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+
+  /* Transitions */
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+/* Prevent text shifting on loading */
+.button:active {
+  transform: translateY(1px);
+}
+
+/* Focus State - WCAG 2.1 AA */
+.button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* Disabled State */
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Size Variants */
+.sm {
+  height: var(--button-height-sm);
+  padding: 0 var(--button-padding-x-sm);
+  font-size: var(--font-size-sm);
+}
+
+.md {
+  height: var(--button-height-md);
+  padding: 0 var(--button-padding-x-md);
+  font-size: var(--font-size-base);
+}
+
+.lg {
+  height: var(--button-height-lg);
+  padding: 0 var(--button-padding-x-lg);
+  font-size: var(--font-size-lg);
+}
+
+/* Primary Variant - Pink Lemonade Brand */
+.primary {
+  background-color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  color: var(--color-text-inverse);
+}
+
+.primary:hover:not(:disabled) {
+  background-color: var(--color-primary-700);
+  border-color: var(--color-primary-700);
+}
+
+.primary:active:not(:disabled) {
+  background-color: var(--color-primary-800);
+  border-color: var(--color-primary-800);
+}
+
+/* Secondary Variant - Neutral */
+.secondary {
+  background-color: var(--color-neutral-100);
+  border-color: var(--color-neutral-300);
+  color: var(--color-text-primary);
+}
+
+.secondary:hover:not(:disabled) {
+  background-color: var(--color-neutral-200);
+  border-color: var(--color-neutral-400);
+}
+
+.secondary:active:not(:disabled) {
+  background-color: var(--color-neutral-300);
+  border-color: var(--color-neutral-500);
+}
+
+/* Danger Variant - Destructive Actions */
+.danger {
+  background-color: var(--color-error);
+  border-color: var(--color-error);
+  color: var(--color-text-inverse);
+}
+
+.danger:hover:not(:disabled) {
+  background-color: var(--color-error-dark);
+  border-color: var(--color-error-dark);
+}
+
+.danger:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus-error);
+}
+
+/* Ghost Variant - Minimal Styling */
+.ghost {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--color-text-primary);
+}
+
+.ghost:hover:not(:disabled) {
+  background-color: var(--color-neutral-100);
+}
+
+.ghost:active:not(:disabled) {
+  background-color: var(--color-neutral-200);
+}
+
+/* Loading State */
+.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.loadingText {
+  visibility: hidden;
+}
+
+/* Spinner Animation */
+.spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Mobile Optimization - Touch Targets */
+@media (max-width: 640px) {
+  .button {
+    min-height: 44px; /* iOS accessibility guideline */
+    min-width: 44px;
+  }
+}

@@ -1,0 +1,23 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    # Continue on error - requires Dependency Graph to be enabled in repo settings
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          # Only fail on high/critical severity vulnerabilities
+          fail-on-severity: high

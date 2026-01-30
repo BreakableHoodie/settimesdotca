@@ -1,0 +1,136 @@
+@import '../../styles/tokens.css';
+
+/* Container */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  width: 100%;
+}
+
+/* Label */
+.label {
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-primary);
+}
+
+.required {
+  margin-left: var(--spacing-1);
+  color: var(--color-error);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Base Input Styles */
+.input {
+  /* Layout */
+  display: block;
+  width: 100%;
+
+  /* Typography */
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-normal);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-primary);
+
+  /* Box Model */
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+
+  /* Transitions */
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+/* Placeholder */
+.input::placeholder {
+  color: var(--color-text-tertiary);
+  opacity: 1;
+}
+
+/* Hover State */
+.input:hover:not(:disabled) {
+  border-color: var(--color-border-hover);
+}
+
+/* Focus State - WCAG 2.1 AA */
+.input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Disabled State */
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-neutral-100);
+}
+
+/* Size Variants */
+.sm {
+  height: var(--input-height-sm);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  font-size: var(--font-size-sm);
+}
+
+.md {
+  height: var(--input-height-md);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  font-size: var(--font-size-base);
+}
+
+.lg {
+  height: var(--input-height-lg);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  font-size: var(--font-size-lg);
+}
+
+/* Error State */
+.error {
+  border-color: var(--color-error);
+}
+
+.error:focus {
+  border-color: var(--color-error);
+  box-shadow: var(--shadow-focus-error);
+}
+
+.errorText {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-error);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Success State */
+.success {
+  border-color: var(--color-success);
+}
+
+.success:focus {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-light);
+}
+
+/* Helper Text */
+.helperText {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-secondary);
+}
+
+/* Mobile Optimization - Touch Targets */
+@media (max-width: 640px) {
+  .input {
+    min-height: 44px; /* iOS accessibility guideline */
+  }
+}

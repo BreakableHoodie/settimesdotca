@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { axe, toHaveNoViolations } from 'jest-axe'
+import { describe, expect, it, vi } from 'vitest'
 import App from '../App'
 
 expect.extend(toHaveNoViolations)
@@ -27,28 +28,46 @@ global.fetch = vi.fn(() =>
   })
 )
 
+const waitForAppToSettle = async () => {
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 100))
+  })
+}
+
 describe('Accessibility Tests', () => {
   it('App should have no accessibility violations', async () => {
-    const { container } = render(<App />)
+    const { container } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
 
     // Wait for data to load
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await waitForAppToSettle()
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   }, 10000) // Increase timeout for axe
 
   it('should have proper heading hierarchy', async () => {
-    const { container } = render(<App />)
-    await new Promise(resolve => setTimeout(resolve, 100))
+    const { container } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
+    await waitForAppToSettle()
 
     const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6')
     expect(headings.length).toBeGreaterThan(0)
   })
 
   it('should have alt text for images', async () => {
-    const { container } = render(<App />)
-    await new Promise(resolve => setTimeout(resolve, 100))
+    const { container } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
+    await waitForAppToSettle()
 
     const images = container.querySelectorAll('img')
     images.forEach(img => {
@@ -57,8 +76,12 @@ describe('Accessibility Tests', () => {
   })
 
   it('should have accessible buttons', async () => {
-    const { container } = render(<App />)
-    await new Promise(resolve => setTimeout(resolve, 100))
+    const { container } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
+    await waitForAppToSettle()
 
     const buttons = container.querySelectorAll('button')
     buttons.forEach(button => {

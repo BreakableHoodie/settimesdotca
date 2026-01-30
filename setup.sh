@@ -1,9 +1,13 @@
 #!/bin/bash
 
-# Long Weekend Band Crawl - Setup Script
+# SetTimes - Setup Script
 set -e
 
-echo "🎸 Setting up Long Weekend Band Crawl..."
+echo "🎸 Setting up SetTimes..."
+
+# Install dependencies
+echo "📦 Installing dependencies..."
+npm install
 
 # Install frontend dependencies
 echo "📦 Installing frontend dependencies..."
@@ -11,14 +15,10 @@ cd frontend
 npm install
 cd ..
 
-# Install backend dependencies
-echo "📦 Installing backend dependencies..."
-cd backend
-npm install
-cd ..
-
 echo "✅ Setup complete!"
 echo ""
 echo "To run the app:"
-echo "  Development (frontend only): cd frontend && npm run dev"
-echo "  Full stack (Docker):         docker-compose up --build"
+echo "  Development:  npm run dev"
+echo "  With DB:      ./init-dev-db.sh"
+echo ""
+echo "See README.md for more details."

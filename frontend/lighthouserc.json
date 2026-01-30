@@ -1,8 +1,10 @@
 {
   "ci": {
     "collect": {
-      "staticDistDir": "./dist",
-      "numberOfRuns": 3
+      "url": ["http://localhost:5000"],
+      "numberOfRuns": 3,
+      "startServerCommand": "npx serve dist -l 5000",
+      "wait": "3000"
     },
     "assert": {
       "assertions": {

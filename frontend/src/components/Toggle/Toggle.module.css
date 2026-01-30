@@ -1,0 +1,186 @@
+@import '../../styles/tokens.css';
+
+/* Container */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  width: 100%;
+}
+
+.containerError {
+  /* Container level error styling if needed */
+}
+
+/* Toggle Wrapper - Horizontal layout */
+.toggleWrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  position: relative;
+}
+
+/* Base Toggle Styles - Hidden checkbox */
+.toggle {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  cursor: pointer;
+}
+
+/* Slider - The visible switch track */
+.slider {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  cursor: pointer;
+  background-color: var(--color-neutral-300);
+  border-radius: 100px;
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+/* Slider circle - The moving toggle button */
+.slider::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  background-color: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition:
+    transform var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+/* Checked State - Move slider and change colors */
+.toggle:checked + .slider {
+  background-color: var(--color-primary-600);
+}
+
+.toggle:checked + .slider::before {
+  transform: translateX(100%);
+}
+
+/* Hover State */
+.toggle:hover:not(:disabled) + .slider {
+  background-color: var(--color-neutral-400);
+}
+
+.toggle:checked:hover:not(:disabled) + .slider {
+  background-color: var(--color-primary-700);
+}
+
+/* Focus State - WCAG 2.1 AA */
+.toggle:focus + .slider {
+  box-shadow: var(--shadow-focus);
+}
+
+/* Disabled State */
+.toggle:disabled + .slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-neutral-200);
+}
+
+.toggle:disabled ~ .label {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Size Variants */
+/* Small */
+.sm + .slider {
+  width: 2rem;
+  height: 1rem;
+}
+
+.sm + .slider::before {
+  width: calc(1rem - 4px);
+  height: calc(1rem - 4px);
+}
+
+/* Medium */
+.md + .slider {
+  width: 2.5rem;
+  height: 1.25rem;
+}
+
+.md + .slider::before {
+  width: calc(1.25rem - 4px);
+  height: calc(1.25rem - 4px);
+}
+
+/* Large */
+.lg + .slider {
+  width: 3rem;
+  height: 1.5rem;
+}
+
+.lg + .slider::before {
+  width: calc(1.5rem - 4px);
+  height: calc(1.5rem - 4px);
+}
+
+/* Label */
+.label {
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-normal);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.required {
+  margin-left: var(--spacing-1);
+  color: var(--color-error);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Error State */
+.error + .slider {
+  background-color: var(--color-error-light);
+}
+
+.error:checked + .slider {
+  background-color: var(--color-error);
+}
+
+.error:focus + .slider {
+  box-shadow: var(--shadow-focus-error);
+}
+
+.errorText {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-error);
+  font-weight: var(--font-weight-medium);
+  margin-left: calc(2.5rem + var(--spacing-2)); /* Align with label */
+}
+
+/* Helper Text */
+.helperText {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-secondary);
+  margin-left: calc(2.5rem + var(--spacing-2)); /* Align with label */
+}
+
+/* Mobile Optimization - Touch Targets */
+@media (max-width: 640px) {
+  .slider {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .toggleWrapper {
+    min-height: 44px; /* iOS accessibility guideline */
+  }
+}

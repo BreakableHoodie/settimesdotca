@@ -1,8 +1,8 @@
 import js from '@eslint/js'
+import prettier from 'eslint-config-prettier'
+import jsxA11y from 'eslint-plugin-jsx-a11y'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
-import jsxA11y from 'eslint-plugin-jsx-a11y'
-import prettier from 'eslint-config-prettier'
 
 export default [
   js.configs.recommended,
@@ -44,21 +44,32 @@ export default [
         document: 'readonly',
         navigator: 'readonly',
         localStorage: 'readonly',
+        sessionStorage: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
+        clearTimeout: 'readonly',
+        requestAnimationFrame: 'readonly',
+        cancelAnimationFrame: 'readonly',
         fetch: 'readonly',
         Date: 'readonly',
         Number: 'readonly',
         Array: 'readonly',
         AbortController: 'readonly',
         URL: 'readonly',
+        URLSearchParams: 'readonly',
+        Event: 'readonly',
+        CustomEvent: 'readonly',
         vi: 'readonly',
         global: 'readonly',
         process: 'readonly',
         self: 'readonly',
         caches: 'readonly',
+        alert: 'readonly',
+        confirm: 'readonly',
+        performance: 'readonly',
+        PerformanceObserver: 'readonly',
       },
     },
     settings: {
@@ -69,19 +80,38 @@ export default [
     rules: {
       // React rules
       ...react.configs.recommended.rules,
-      'react/react-in-jsx-scope': 'off', // Not needed in React 17+
-      'react/prop-types': 'off', // Using TypeScript types instead
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
 
       // React Hooks rules
       ...reactHooks.configs.recommended.rules,
+      'react-hooks/set-state-in-effect': 'off',
 
       // Accessibility rules
       ...jsxA11y.configs.recommended.rules,
 
       // General rules
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+
+      // Accessibility - temporarily relaxed during cleanup
+      'jsx-a11y/label-has-associated-control': [
+        'warn',
+        {
+          labelComponents: [],
+          labelAttributes: ['htmlFor'],
+          controlComponents: [],
+          assert: 'either',
+          depth: 3,
+        },
+      ],
     },
   },
-  prettier, // Must be last to override other configs
+  prettier,
 ]

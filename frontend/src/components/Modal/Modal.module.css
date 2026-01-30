@@ -1,0 +1,245 @@
+@import '../../styles/tokens.css';
+
+/* Overlay */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--spacing-4);
+  animation: fadeIn var(--transition-base) ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Container */
+.modal {
+  background-color: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn var(--transition-base) ease-out;
+  position: relative;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal:focus {
+  outline: none;
+}
+
+/* Size Variants */
+.sm {
+  width: 100%;
+  max-width: 400px;
+}
+
+.md {
+  width: 100%;
+  max-width: 600px;
+}
+
+.lg {
+  width: 100%;
+  max-width: 800px;
+}
+
+.xl {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.full {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-6);
+  border-bottom: 1px solid var(--color-neutral-200);
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+  line-height: var(--line-height-tight);
+}
+
+/* Close Button */
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.closeButton:hover {
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-700);
+}
+
+.closeButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+  background-color: var(--color-neutral-100);
+}
+
+.closeButton:active {
+  background-color: var(--color-neutral-200);
+}
+
+.closeIcon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+/* Content */
+.content {
+  padding: var(--spacing-6);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Composite Component Sections */
+.modalHeader {
+  padding: var(--spacing-6);
+  border-bottom: 1px solid var(--color-neutral-200);
+  flex-shrink: 0;
+}
+
+.modalBody {
+  padding: var(--spacing-6);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modalFooter {
+  padding: var(--spacing-6);
+  border-top: 1px solid var(--color-neutral-200);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+  flex-shrink: 0;
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .overlay {
+    padding: var(--spacing-2);
+  }
+
+  .modal {
+    max-height: 95vh;
+  }
+
+  .header {
+    padding: var(--spacing-4);
+  }
+
+  .title {
+    font-size: var(--font-size-lg);
+  }
+
+  .content {
+    padding: var(--spacing-4);
+  }
+
+  .modalHeader {
+    padding: var(--spacing-4);
+  }
+
+  .modalBody {
+    padding: var(--spacing-4);
+  }
+
+  .modalFooter {
+    padding: var(--spacing-4);
+    gap: var(--spacing-2);
+  }
+
+  /* Full size takes entire viewport on mobile */
+  .sm,
+  .md,
+  .lg,
+  .xl {
+    max-width: none;
+    max-height: 95vh;
+    border-radius: var(--radius-md);
+  }
+
+  .full {
+    border-radius: 0;
+    max-height: 100vh;
+  }
+}
+
+/* Accessibility - High Contrast Mode */
+@media (prefers-contrast: high) {
+  .modal {
+    border: 2px solid var(--color-neutral-900);
+  }
+
+  .closeButton:focus {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .modal {
+    animation: none;
+  }
+
+  .closeButton {
+    transition: none;
+  }
+}

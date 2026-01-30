@@ -1,10 +1,25 @@
 # Security headers applied to ALL files first
 /*
+  # Prevent clickjacking
   X-Frame-Options: DENY
+
+  # Prevent MIME type sniffing
   X-Content-Type-Options: nosniff
+
+  # Referrer policy for privacy
   Referrer-Policy: strict-origin-when-cross-origin
-  Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
-  Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+  # Force HTTPS (HSTS)
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+  # Legacy XSS protection
+  X-XSS-Protection: 1; mode=block
+
+  # Content Security Policy
+  Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; connect-src 'self' https://*.settimes.ca https://*.pages.dev https://cloudflareinsights.com https://static.cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+
+  # Permissions policy (disable unnecessary features)
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
 
 # Cache control for static assets (versioned JS/CSS bundles)
 /assets/*

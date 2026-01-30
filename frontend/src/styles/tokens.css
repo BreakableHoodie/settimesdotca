@@ -1,0 +1,264 @@
+/**
+ * Design System Tokens
+ * Sprint 2.0 - Design System Foundation
+ *
+ * CSS Custom Properties for theming and consistency
+ * Mobile-first responsive design with WCAG 2.1 AA compliance
+ */
+
+:root {
+  /* ===== Color Palette ===== */
+
+  /* Primary - Pink Lemonade Brand Colors */
+  --color-primary-50: #fdf2f8;
+  --color-primary-100: #fce7f3;
+  --color-primary-200: #fbcfe8;
+  --color-primary-300: #f9a8d4;
+  --color-primary-400: #f472b6;
+  --color-primary-500: #ec4899;
+  --color-primary-600: #db2777;
+  --color-primary-700: #be185d;
+  --color-primary-800: #9d174d;
+  --color-primary-900: #831843;
+  --color-primary: var(--color-primary-600);
+
+  /* Secondary - Complementary Warm Tones */
+  --color-secondary-50: #fffbeb;
+  --color-secondary-100: #fef3c7;
+  --color-secondary-200: #fde68a;
+  --color-secondary-300: #fcd34d;
+  --color-secondary-400: #fbbf24;
+  --color-secondary-500: #f59e0b;
+  --color-secondary-600: #d97706;
+  --color-secondary-700: #b45309;
+  --color-secondary-800: #92400e;
+  --color-secondary-900: #78350f;
+  --color-secondary: var(--color-secondary-500);
+
+  /* Accent - Cool Contrast */
+  --color-accent-50: #f0f9ff;
+  --color-accent-100: #e0f2fe;
+  --color-accent-200: #bae6fd;
+  --color-accent-300: #7dd3fc;
+  --color-accent-400: #38bdf8;
+  --color-accent-500: #0369a1; /* Updated for WCAG AA contrast (4.51:1 with white) */
+  --color-accent-600: #0284c7;
+  --color-accent-700: #0369a1;
+  --color-accent-800: #075985;
+  --color-accent-900: #0c4a6e;
+  --color-accent: var(--color-accent-500);
+
+  /* Neutral - Grays */
+  --color-neutral-50: #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+  --color-neutral: var(--color-neutral-500);
+
+  /* Semantic Colors - WCAG AA compliant */
+  --color-success-light: #d1fae5;
+  --color-success: #047857; /* Updated for WCAG AA contrast (5.48:1 with white) */
+  --color-success-dark: #047857;
+
+  --color-error-light: #fee2e2;
+  --color-error: #ef4444;
+  --color-error-dark: #b91c1c;
+
+  --color-warning-light: #fef3c7;
+  --color-warning: #b45309; /* Updated for WCAG AA contrast (5.02:1 with white) */
+  --color-warning-dark: #92400e;
+
+  --color-info-light: #dbeafe;
+  --color-info: #3b82f6;
+  --color-info-dark: #1e40af;
+
+  /* Surface Colors */
+  --color-background: #ffffff;
+  --color-surface: var(--color-neutral-50);
+  --color-surface-elevated: #ffffff;
+  --color-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Text Colors - WCAG AA contrast ratios */
+  --color-text-primary: var(--color-neutral-900);
+  --color-text-secondary: var(--color-neutral-600);
+  --color-text-tertiary: var(--color-neutral-500);
+  --color-text-inverse: #ffffff;
+  --color-text-link: var(--color-primary-700);
+  --color-text-link-hover: var(--color-primary-800);
+
+  /* Border Colors */
+  --color-border: var(--color-neutral-300);
+  --color-border-hover: var(--color-neutral-400);
+  --color-border-focus: var(--color-primary-500);
+
+  /* ===== Typography Scale ===== */
+
+  /* Font Families */
+  --font-family-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: 'Courier New', Courier, monospace;
+
+  /* Font Sizes - Modular Scale (1.25 ratio) */
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-base: 1rem; /* 16px */
+  --font-size-lg: 1.125rem; /* 18px */
+  --font-size-xl: 1.25rem; /* 20px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.875rem; /* 30px */
+  --font-size-4xl: 2.25rem; /* 36px */
+  --font-size-5xl: 3rem; /* 48px */
+
+  /* Font Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Line Heights */
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 2;
+
+  /* Letter Spacing */
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+
+  /* ===== Spacing System ===== */
+
+  /* Base unit: 4px for 8px grid system */
+  --spacing-base: 0.25rem; /* 4px */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem; /* 4px */
+  --spacing-2: 0.5rem; /* 8px */
+  --spacing-3: 0.75rem; /* 12px */
+  --spacing-4: 1rem; /* 16px */
+  --spacing-5: 1.25rem; /* 20px */
+  --spacing-6: 1.5rem; /* 24px */
+  --spacing-8: 2rem; /* 32px */
+  --spacing-10: 2.5rem; /* 40px */
+  --spacing-12: 3rem; /* 48px */
+  --spacing-16: 4rem; /* 64px */
+  --spacing-20: 5rem; /* 80px */
+  --spacing-24: 6rem; /* 96px */
+  --spacing-32: 8rem; /* 128px */
+
+  /* ===== Border Radius ===== */
+
+  --radius-none: 0;
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.5rem; /* 8px */
+  --radius-lg: 0.75rem; /* 12px */
+  --radius-xl: 1rem; /* 16px */
+  --radius-2xl: 1.5rem; /* 24px */
+  --radius-full: 9999px;
+
+  /* ===== Shadows ===== */
+
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+
+  /* Focus Ring - Accessibility */
+  --shadow-focus: 0 0 0 3px var(--color-primary-200);
+  --shadow-focus-error: 0 0 0 3px var(--color-error-light);
+
+  /* ===== Transitions ===== */
+
+  --transition-fast: 150ms ease-in-out;
+  --transition-normal: 250ms ease-in-out;
+  --transition-slow: 350ms ease-in-out;
+
+  /* Easing Functions */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ===== Z-Index Scale ===== */
+
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  --z-index-toast: 1080;
+
+  /* ===== Breakpoints (Reference Only) ===== */
+
+  /* These are documented for component developers */
+  /* Use in media queries as needed */
+  /*
+    --breakpoint-mobile: 0px;
+    --breakpoint-tablet: 640px;
+    --breakpoint-desktop: 1024px;
+    --breakpoint-wide: 1280px;
+  */
+
+  /* ===== Component-Specific Tokens ===== */
+
+  /* Button Sizes */
+  --button-height-sm: 2rem; /* 32px */
+  --button-height-md: 2.5rem; /* 40px */
+  --button-height-lg: 3rem; /* 48px */
+
+  --button-padding-x-sm: var(--spacing-3);
+  --button-padding-x-md: var(--spacing-4);
+  --button-padding-x-lg: var(--spacing-6);
+
+  /* Input Sizes */
+  --input-height-sm: 2rem; /* 32px */
+  --input-height-md: 2.5rem; /* 40px */
+  --input-height-lg: 3rem; /* 48px */
+
+  --input-padding-x: var(--spacing-3);
+  --input-padding-y: var(--spacing-2);
+
+  /* Card */
+  --card-padding: var(--spacing-6);
+  --card-radius: var(--radius-lg);
+
+  /* Modal */
+  --modal-max-width-sm: 28rem; /* 448px */
+  --modal-max-width-md: 32rem; /* 512px */
+  --modal-max-width-lg: 48rem; /* 768px */
+  --modal-max-width-xl: 64rem; /* 1024px */
+
+  /* ===== Animation Durations ===== */
+
+  --duration-instant: 0ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+  --duration-slower: 500ms;
+}
+
+/* ===== Dark Mode Support (Future) ===== */
+
+/*
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--color-neutral-900);
+    --color-surface: var(--color-neutral-800);
+    --color-surface-elevated: var(--color-neutral-700);
+    --color-text-primary: var(--color-neutral-50);
+    --color-text-secondary: var(--color-neutral-300);
+    --color-text-tertiary: var(--color-neutral-400);
+    --color-border: var(--color-neutral-700);
+    --color-border-hover: var(--color-neutral-600);
+  }
+}
+*/

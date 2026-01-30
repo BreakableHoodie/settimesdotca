@@ -1,100 +1,143 @@
-// Service Worker for offline support
-// IMPORTANT: Increment version number with each deployment to force cache refresh
-const CACHE_NAME = 'bandcrawl-v7'
-// Only cache static assets, NOT HTML files (to preserve CSP headers)
-const urlsToCache = [
-  '/manifest.json',
-  '/favicon.svg'
-]
+const CACHE_VERSION = 'v2'
+const CACHE_NAME = `schedule-${CACHE_VERSION}`
 
-// Install event - cache assets and take control immediately
+// Assets to cache immediately on install
+const STATIC_ASSETS = ['/', '/index.html', '/assets/index.css', '/assets/index.js', '/manifest.json']
+
+// Install: cache static assets
 self.addEventListener('install', event => {
-  console.log('[SW] Installing version', CACHE_NAME)
+  console.log('[SW] Installing service worker', CACHE_VERSION)
+
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .then(() => {
-        console.log('[SW] Skip waiting')
-        return self.skipWaiting()
-      })
+    caches.open(CACHE_NAME).then(cache => {
+      console.log('[SW] Caching static assets')
+      return cache.addAll(STATIC_ASSETS)
+    })
   )
+
+  // Force activation immediately
+  self.skipWaiting()
 })
 
-// Activate event - clean up old caches aggressively
+// Activate: clean up old caches
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating version', CACHE_NAME)
+  console.log('[SW] Activating service worker', CACHE_VERSION)
+
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName)
-            return caches.delete(cacheName)
-          }
-        })
+        cacheNames
+          .filter(name => name.startsWith('schedule-') && name !== CACHE_NAME)
+          .map(name => {
+            console.log('[SW] Deleting old cache:', name)
+            return caches.delete(name)
+          })
       )
-    }).then(() => {
-      console.log('[SW] Claiming clients')
-      return self.clients.claim()
-    }).then(() => {
-      // Force reload all clients to ensure they get the new version
-      return self.clients.matchAll().then(clients => {
-        clients.forEach(client => {
-          client.postMessage({ type: 'CACHE_UPDATED' })
-        })
-      })
     })
   )
+
+  // Take control of all pages immediately
+  self.clients.claim()
 })
 
-// Fetch event - NEVER cache HTML, always fetch from network
+// Fetch: Cache-first with network fallback
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url)
+  const { request } = event
+  const url = new URL(request.url)
 
-  // NEVER cache HTML files - always fetch from network to preserve CSP headers
-  if (event.request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/') {
-    console.log('[SW] Fetching HTML from network:', url.pathname)
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        // Only use cache as last resort for offline support
-        return caches.match(event.request)
-      })
-    )
+  // Only cache same-origin requests
+  if (url.origin !== self.location.origin) {
     return
   }
 
-  // NEVER cache data files - always fetch fresh
-  if (url.pathname.includes('bands.json')) {
-    console.log('[SW] Fetching data from network:', url.pathname)
-    event.respondWith(fetch(event.request))
+  // SECURITY: Never cache admin API requests (sensitive data)
+  if (url.pathname.startsWith('/api/admin/')) {
+    event.respondWith(fetch(request)) // Network only, no caching
     return
   }
 
-  // Cache-first ONLY for static assets (JS, CSS, fonts, images)
-  if (url.pathname.startsWith('/assets/') || url.pathname.endsWith('.css') || url.pathname.endsWith('.js')) {
-    event.respondWith(
-      caches.match(event.request).then(response => {
-        if (response) {
-          console.log('[SW] Serving from cache:', url.pathname)
-          return response
-        }
-
-        console.log('[SW] Fetching and caching:', url.pathname)
-        return fetch(event.request).then(response => {
-          // Only cache successful responses
-          if (response && response.status === 200) {
-            const responseToCache = response.clone()
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache)
-            })
-          }
-          return response
-        })
-      })
-    )
+  // Public API requests: Network-first with cache fallback
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(networkFirstStrategy(request))
     return
   }
 
-  // For everything else, just fetch from network
-  event.respondWith(fetch(event.request))
+  // Static assets: Cache-first with network fallback
+  event.respondWith(cacheFirstStrategy(request))
 })
+
+// Cache-first strategy (for static assets)
+async function cacheFirstStrategy(request) {
+  const cached = await caches.match(request)
+
+  if (cached) {
+    // Return cached version immediately
+    // Update cache in background
+    updateCache(request)
+    return cached
+  }
+
+  // Not in cache, fetch from network
+  try {
+    const response = await fetch(request)
+
+    // Cache successful responses
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME)
+      cache.put(request, response.clone())
+    }
+
+    return response
+  } catch (error) {
+    console.error('[SW] Fetch failed:', error)
+
+    // Return offline page if available
+    const offlinePage = await caches.match('/offline.html')
+    if (offlinePage) return offlinePage
+
+    // Return basic error response
+    return new Response('Offline - content not cached', {
+      status: 503,
+      statusText: 'Service Unavailable',
+    })
+  }
+}
+
+// Network-first strategy (for API requests)
+async function networkFirstStrategy(request) {
+  try {
+    const response = await fetch(request)
+
+    // Cache successful GET requests
+    if (response.ok && request.method === 'GET') {
+      const cache = await caches.open(CACHE_NAME)
+      cache.put(request, response.clone())
+    }
+
+    return response
+  } catch (error) {
+    // Network failed, try cache
+    const cached = await caches.match(request)
+
+    if (cached) {
+      console.log('[SW] Serving cached API response:', request.url)
+      return cached
+    }
+
+    throw error
+  }
+}
+
+// Update cache in background
+async function updateCache(request) {
+  try {
+    const response = await fetch(request)
+
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME)
+      await cache.put(request, response)
+    }
+  } catch (error) {
+    // Silent fail for background updates
+  }
+}

@@ -185,9 +185,17 @@ export function sanitizeVenueAddress(address) {
       .replace(/on\w+=/gi, '') // Remove event handlers
   } while (sanitized !== previous)
 
-  return sanitized.substring(0, 200) // Limit to reasonable length
-    .replace(/on\w+=/gi, '') // Remove event handlers
-    .substring(0, 200) // Limit to reasonable length
+  // Enforce length limit first, then re-sanitize until the truncated string stabilizes
+  sanitized = sanitized.substring(0, 200) // Limit to reasonable length
+  do {
+    previous = sanitized
+    sanitized = sanitized
+      .replace(/[<>]/g, '') // Remove HTML angle brackets
+      .replace(/javascript:/gi, '') // Remove script protocols
+      .replace(/on\w+=/gi, '') // Remove event handlers
+  } while (sanitized !== previous)
+
+  return sanitized.substring(0, 200) // Final length enforcement
 }
 
 /**

@@ -43,15 +43,27 @@ export const FIELD_LIMITS = {
  * @param {number} maxLength - Maximum allowed length
  * @returns {string} Sanitized string
  */
+function repeatReplace(str, regex, replacement) {
+  let previous
+  let current = str
+  do {
+    previous = current
+    current = current.replace(regex, replacement)
+  } while (current !== previous)
+  return current
+}
+
 export function sanitizeString(input, maxLength = 1000) {
   if (!input) return ''
 
-  return String(input)
+  let sanitized = String(input)
     .trim()
     .replace(/[<>]/g, '') // Remove < and > to prevent HTML injection
     .replace(/(?:javascript|data|vbscript):/gi, '') // Remove dangerous URL-like protocols
-    .replace(/on\w+=/gi, '') // Remove event handlers (onclick=, etc.)
-    .substring(0, maxLength)
+
+  sanitized = repeatReplace(sanitized, /on\w+=/gi, '') // Remove event handlers (onclick=, etc.) robustly
+
+  return sanitized.substring(0, maxLength)
 }
 
 /**

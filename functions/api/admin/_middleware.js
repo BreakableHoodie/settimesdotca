@@ -243,7 +243,7 @@ export async function onRequest(context) {
   }
 
   // SECURITY: Validate CSRF token for state-changing requests
-  const csrfError = validateCSRFMiddleware(request);
+  const csrfError = validateCSRFMiddleware(request, env);
   if (csrfError) {
     return csrfError;
   }
@@ -293,7 +293,7 @@ export async function onRequest(context) {
     // Refresh CSRF token cookie if missing (keeps long sessions working)
     const csrfCookie = getCookie(request, "csrf_token");
     if (!csrfCookie) {
-      const csrfToken = generateCSRFToken();
+      const csrfToken = generateCSRFToken(request, env, sessionToken);
       const csrfCookieHeader = setCSRFCookie(csrfToken, request);
       context.data = {
         ...context.data,

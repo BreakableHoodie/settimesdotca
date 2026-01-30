@@ -261,7 +261,7 @@ export async function onRequestPost(context) {
       .bind(challenge.user_id, challenge.email, ipAddress, userAgent)
       .run();
 
-    const csrfToken = generateCSRFToken();
+    const csrfToken = generateCSRFToken(request, env, sessionToken);
     const headers = new Headers({
       "Content-Type": "application/json",
     });

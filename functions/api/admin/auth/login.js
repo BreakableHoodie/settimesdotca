@@ -277,7 +277,7 @@ export async function onRequestPost(context) {
       .run();
 
     // Generate CSRF token
-    const csrfToken = generateCSRFToken();
+    const csrfToken = generateCSRFToken(request, env, sessionToken);
 
     // Set secure HTTPOnly session cookie and CSRF cookie
     const headers = new Headers({

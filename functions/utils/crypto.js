@@ -1,6 +1,10 @@
-// Web Crypto API password hashing utilities for Cloudflare Workers
-// Uses PBKDF2 instead of bcrypt (which requires Node.js)
+// PBKDF2 password hashing utilities for Cloudflare Workers
+// Uses @noble/hashes for consistent runtime support.
 // NOTE: Cloudflare Workers limits PBKDF2 to 100,000 iterations max
+
+import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { randomBytes } from "@noble/hashes/utils.js";
 
 const SALT_LENGTH = 16;
 const LEGACY_ITERATIONS = 100000;
@@ -27,35 +31,19 @@ function timingSafeEqual(a, b) {
  */
 export async function hashPassword(password) {
   // Generate random salt
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  const salt = randomBytes(SALT_LENGTH);
 
   // Convert password to bytes
   const encoder = new TextEncoder();
   const passwordBytes = encoder.encode(password);
 
-  // Import key
-  const key = await crypto.subtle.importKey(
-    "raw",
-    passwordBytes,
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits"]
-  );
-
   // Derive key using PBKDF2
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: salt,
-      iterations: DEFAULT_ITERATIONS,
-      hash: "SHA-256",
-    },
-    key,
-    KEY_LENGTH * 8
-  );
+  const hashArray = pbkdf2(sha256, passwordBytes, salt, {
+    c: DEFAULT_ITERATIONS,
+    dkLen: KEY_LENGTH,
+  });
 
   // Convert to base64 for storage
-  const hashArray = new Uint8Array(derivedBits);
   const saltBase64 = btoa(String.fromCharCode(...salt));
   const hashBase64 = btoa(String.fromCharCode(...hashArray));
 
@@ -103,28 +91,11 @@ export async function verifyPassword(password, storedHash) {
     const encoder = new TextEncoder();
     const passwordBytes = encoder.encode(password);
 
-    // Import key
-    const key = await crypto.subtle.importKey(
-      "raw",
-      passwordBytes,
-      { name: "PBKDF2" },
-      false,
-      ["deriveBits"]
-    );
-
     // Derive key using same parameters
-    const derivedBits = await crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        salt: salt,
-        iterations: iterations,
-        hash: "SHA-256",
-      },
-      key,
-      KEY_LENGTH * 8
-    );
-
-    const hashArray = new Uint8Array(derivedBits);
+    const hashArray = pbkdf2(sha256, passwordBytes, salt, {
+      c: iterations,
+      dkLen: KEY_LENGTH,
+    });
     const storedHashArray = Uint8Array.from(atob(hashBase64), (c) =>
       c.charCodeAt(0)
     );

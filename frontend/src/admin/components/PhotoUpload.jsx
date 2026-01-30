@@ -21,7 +21,30 @@ import { getAdminFormDataHeaders } from '../../utils/adminApi'
  * @param {string} props.bandName - Optional band name for display
  */
 export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null, bandName = '' }) {
-  const [preview, setPreview] = useState(currentPhoto || null)
+  const sanitizeImageSrc = (value) => {
+    if (!value || typeof value !== 'string') return null
+    const trimmed = value.trim()
+    if (!trimmed) return null
+
+    // Disallow obvious dangerous schemes like javascript:
+    const lower = trimmed.toLowerCase()
+    if (lower.startsWith('javascript:')) {
+      return null
+    }
+
+    // Allow http(s), blob, data (for images), or relative URLs (no scheme)
+    const schemeMatch = trimmed.match(/^([a-z0-9+.-]+):/i)
+    if (schemeMatch) {
+      const scheme = schemeMatch[1].toLowerCase()
+      if (!['http', 'https', 'blob', 'data'].includes(scheme)) {
+        return null
+      }
+    }
+
+    return trimmed
+  }
+
+  const [preview, setPreview] = useState(sanitizeImageSrc(currentPhoto))
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const [dragActive, setDragActive] = useState(false)

@@ -58,8 +58,7 @@ plugins/
 .github/agents/
 
 # Session notes and dev archives (developer-specific)
-archive/session-notes/
-archive/old-migrations/
+archive/
 
 # Temporary files
 *.tmp

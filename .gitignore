@@ -71,6 +71,7 @@ CODE_REVIEW_REPORT.md
 REVIEW_COMPLETE.md
 PLUGIN_STRATEGY.md
 PR_DESCRIPTION.md
+reactjs.instructions.md
 *.session
 *.token
 *.key

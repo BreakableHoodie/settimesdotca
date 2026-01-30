@@ -42,16 +42,17 @@ Before you start, make sure you have:
 
 1. Click the orange **"Create Event"** button at the top
 2. Fill in the event details:
-   - **Event Name:** e.g., "Summer Music Fest 2025"
+   - **Event Name:** e.g., "Summer Music Fest 2026"
    - **Event Date:** Select the date (use date picker)
-   - **URL Slug:** e.g., "summer-fest-2025" (lowercase, hyphens only)
+   - **URL Slug:** e.g., "summer-fest-2026" (lowercase, hyphens only)
    - **Description** (optional): Brief overview
 
 **Example:**
-```
-Event Name: Long Weekend Band Crawl Vol. 8
-Date: May 17, 2025
-Slug: vol-8
+
+```text
+Event Name: Long Weekend Band Crawl Vol. 16
+Date: May 16, 2026
+Slug: lwbc16
 Description: Annual music crawl featuring 20+ bands across downtown
 ```
 

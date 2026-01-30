@@ -156,7 +156,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         
         // Pre-fill form with existing profile data
         let socialLinks = {}
-        try { socialLinks = JSON.parse(artist.social_links || '{}') } catch(e){}
+        try { socialLinks = JSON.parse(artist.social_links || '{}') } catch { /* Invalid JSON, use empty object */ }
         
         setFormData({
             ...formData,
@@ -259,7 +259,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     setSelectedProfile(null) // Editing existing performance implies we have the data
     const durationMinutes = deriveDurationMinutes(band.start_time, band.end_time)
     let socialLinks = {}
-    try { socialLinks = JSON.parse(band.social_links || '{}') } catch(e){}
+    try { socialLinks = JSON.parse(band.social_links || '{}') } catch { /* Invalid JSON, use empty object */ }
 
     setFormData({
         id: band.id,

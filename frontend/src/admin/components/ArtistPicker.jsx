@@ -1,8 +1,14 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 
 export default function ArtistPicker({ artists, onSelect, onCancel, loading }) {
   const [query, setQuery] = useState('')
+  const inputRef = useRef(null)
+  
+  useEffect(() => {
+    // Focus input on mount using ref instead of autoFocus prop
+    inputRef.current?.focus()
+  }, [])
 
   // Deduplicate artists just in case, though the API should handle it
   const uniqueArtists = useMemo(() => {
@@ -34,7 +40,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel, loading }) {
       </div>
       
       <input
-        autoFocus
+        ref={inputRef}
         type="text"
         placeholder="Search for an artist..."
         className="w-full min-h-[44px] px-4 py-3 bg-band-navy border border-white/20 rounded text-white focus:border-band-orange focus:outline-none text-lg"
@@ -72,12 +78,12 @@ export default function ArtistPicker({ artists, onSelect, onCancel, loading }) {
         ))}
         {filtered.length === 0 && query && !loading && (
            <div className="p-8 text-center">
-              <p className="text-white/50 mb-4">No artist found named "{query}"</p>
+              <p className="text-white/50 mb-4">No artist found named &quot;{query}&quot;</p>
               <button 
                 onClick={() => onSelect(null, query)} // Pass query as name for new artist
                 className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition"
               >
-                + Create "{query}"
+                + Create &quot;{query}&quot;
               </button>
            </div>
         )}

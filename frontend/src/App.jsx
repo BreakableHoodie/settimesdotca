@@ -343,7 +343,7 @@ function App() {
           <section className="bg-band-purple/80 border border-band-orange/30 rounded-lg p-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <h3 className="text-white font-semibold">Realtime Test Time</h3>
+                <h2 className="text-white font-semibold text-lg">Realtime Test Time</h2>
                 <p className="text-white/60 text-sm">
                   Use this to simulate &ldquo;Now Playing&rdquo; and upcoming sets before event day.
                 </p>

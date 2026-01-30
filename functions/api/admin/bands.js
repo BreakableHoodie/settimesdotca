@@ -190,7 +190,7 @@ export async function onRequestGet(context) {
   } catch (error) {
     console.error("Failed to fetch bands:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to fetch bands", message: error.message, details: error.stack }),
+      JSON.stringify({ error: "Failed to fetch bands" }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

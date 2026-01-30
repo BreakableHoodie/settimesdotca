@@ -4,7 +4,7 @@ A comprehensive event management platform for organizing multi-venue music event
 
 ## Overview
 
-SetTimes.ca is designed to streamline the management of multi-venue music events (like the Long Weekend Band Crawl) while providing powerful discovery tools for attendees. The platform supports:
+SetTimes.ca is designed to streamline the management of multi-venue music events (like music festivals and band crawls) while providing powerful discovery tools for attendees. The platform supports:
 
 - **Multi-user RBAC** with admin, editor, and viewer roles
 - **Band profile management** with photos, bios, and social links
@@ -16,11 +16,16 @@ SetTimes.ca is designed to streamline the management of multi-venue music events
 
 ## Current Status
 
-**Version:** 1.0.0 (Demo-Ready)
-**Target:** Production demo by November 30, 2025
-**Sprint:** 1.1 - RBAC Implementation ✅ COMPLETE
+**Version:** 1.0.0 (Production)
+**Next Event:** Long Weekend Band Crawl (February 15, 2026)
 
-See [ROADMAP_TO_DEMO.md](ROADMAP_TO_DEMO.md) for the complete 3-week sprint plan and implementation status.
+Core features complete:
+- ✅ RBAC Implementation (Admin/Editor/Viewer)
+- ✅ Event Management & Scheduling
+- ✅ Band Profiles with Photos
+- ✅ Public Discovery API
+- ✅ Email Subscriptions
+- ✅ Security Hardening
 
 ## Features
 
@@ -74,13 +79,11 @@ For detailed security documentation, see [SECURITY.md](SECURITY.md) and the [SQL
 - **Backend:** Cloudflare Pages Functions (serverless edge)
 - **Database:** Cloudflare D1 (distributed SQLite)
 - **Testing:** Vitest with 65+ tests, 90%+ coverage
-- **Build:** Multi-stage Docker (optional), GitHub Actions CI/CD
+- **Build:** GitHub Actions CI/CD
 - **Auth:** Session-based with secure token management
 - **CDN:** Cloudflare global network (190+ cities)
 
-**Current Focus**: Production-ready platform launch
-
-See **[ROADMAP_TO_DEMO.md](/ROADMAP_TO_DEMO.md)** for the complete development roadmap.
+**Current Focus**: Production operations and February 2026 event support.
 
 ## Quick Start
 
@@ -119,18 +122,25 @@ wrangler d1 create settimes-db
 
 # Apply migrations to local database
 npx wrangler d1 execute settimes-db --local --file=database/schema-v2.sql
-npx wrangler d1 execute settimes-db --local --file=database/migration-single-org.sql
-npx wrangler d1 execute settimes-db --local --file=database/migration-2fa.sql
-npx wrangler d1 execute settimes-db --local --file=database/migration-rbac-sprint-1-1.sql
-npx wrangler d1 execute settimes-db --local --file=database/migration-sprint-1-2-event-management.sql
-npx wrangler d1 execute settimes-db --local --file=database/migration-subscriptions.sql
-npx wrangler d1 execute settimes-db --local --file=database/migration-metrics.sql
-npx wrangler d1 execute settimes-db --local --file=database/migration-events-theming.sql
-npx wrangler d1 execute settimes-db --local --file=database/migration-invite-codes.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-single-org.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-2fa.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-password-reset-reason.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-rbac-sprint-1-1.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-sprint-1-2-event-management.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-subscriptions.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-metrics.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-events-theming.sql
+npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-invite-codes.sql
+
+# One-off upgrade (only if schedule_builds has band_id, not performance_id)
+./scripts/run-migrate-schedule-builds-performance-id.sh --local
 
 # Apply to production database
 npx wrangler d1 execute settimes-db --remote --file=database/schema-v2.sql
 # ... repeat for other migrations (include migration-invite-codes.sql)
+
+# One-off upgrade (only if schedule_builds has band_id, not performance_id)
+./scripts/run-migrate-schedule-builds-performance-id.sh --remote
 
 # Create first admin invite code
 node scripts/create-admin-invite.js --local  # For local dev
@@ -258,17 +268,6 @@ See `.dev.vars.test-users` for credentials. Default users:
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.
 
-### Docker (Optional)
-
-```bash
-# Build and run locally
-docker-compose up --build
-
-# Production build
-docker build -t settimes .
-docker run -p 3000:3000 settimes
-```
-
 ## Development Commands
 
 ```bash
@@ -328,24 +327,18 @@ This is a private project for SetTimes.ca. For issues or questions:
 
 ## Roadmap
 
-**Sprint 1.1** (Nov 11-14, 2025): ✅ COMPLETE
-- RBAC implementation with admin/editor/viewer roles
-- Permission checks on all 11+ admin endpoints
-- Audit logging for security events
-- Test coverage for RBAC enforcement
+**Completed (2025):**
+- ✅ RBAC with admin/editor/viewer roles
+- ✅ Event management with conflict detection
+- ✅ Band profiles with photos and bios
+- ✅ Public discovery API & iCal feeds
+- ✅ Email subscriptions with preferences
+- ✅ Security hardening (HTTPOnly cookies, CSRF, CSP)
+- ✅ Mobile-responsive design
 
-**Sprint 1.2** (Nov 15-21, 2025): 🔄 IN PROGRESS
-- Complete event management workflow
-- Band profiles with photos and bios
-- Public timeline (current/upcoming/past)
-
-**Sprint 1.3** (Nov 22-30, 2025): ⏳ PLANNED
-- Polished admin interface
-- Production documentation
-- Performance optimization
-- Demo preparation
-
-See [ROADMAP_TO_DEMO.md](ROADMAP_TO_DEMO.md) for detailed sprint breakdown.
+**Current (2026):**
+- Production operations for February 2026 event
+- Performance monitoring and optimization
 
 ## Design
 

@@ -1,7 +1,7 @@
 # Security Documentation - SetTimes.ca
 
-**Last Updated:** 2025-11-18
-**Version:** 2.0 (Post-Security Hardening)
+**Last Updated:** 2026-01-29
+**Version:** 2.1 (January 2026 Review)
 
 ---
 
@@ -69,9 +69,9 @@ POST /api/admin/auth/signup
 
 ### P0-2: Removed Hardcoded Credentials
 
-**Problem:** Default admin credentials (`admin123`) hardcoded in migration file, publicly visible in Git.
+**Problem:** Default admin credentials were hardcoded in migration files and docs.
 
-**Solution:** Removed hardcoded credentials. First admin account must be created via invite code.
+**Solution:** Removed plaintext credentials. Demo passwords are now set locally via environment variables during setup.
 
 **Files Changed:**
 - `database/migration-rbac-sprint-1-1.sql` - Removed default admin
@@ -277,7 +277,7 @@ All endpoints validate:
 
 ### Configuration
 
-Location: `backend/server.js`
+Location: `frontend/public/_headers` (Cloudflare Pages)
 
 ```javascript
 helmet({

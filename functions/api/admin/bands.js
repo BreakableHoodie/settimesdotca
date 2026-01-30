@@ -353,7 +353,7 @@ export async function onRequestPost(context) {
   } catch (error) {
     console.error("Failed to create band:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to create band", message: error.message, details: error.stack }),
+      JSON.stringify({ success: false, error: "Failed to create band" }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

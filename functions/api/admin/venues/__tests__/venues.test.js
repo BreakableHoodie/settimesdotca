@@ -57,7 +57,7 @@ describe('Admin venues API - CRUD operations', () => {
     expect(putRes.status).toBe(200)
     const data = await putRes.json()
     expect(data.venue.name).toBe('New Name')
-    expect(data.venue.address).toBe('55 Road')
+    expect(data.venue.address).toBe('55 Road, Portland')
   })
 
   it('DELETE /api/admin/venues/{id} removes venue without bands', async () => {

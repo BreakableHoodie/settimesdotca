@@ -11,6 +11,8 @@ export function createTestDB() {
       password_hash TEXT,
       role TEXT NOT NULL,
       name TEXT,
+      first_name TEXT,
+      last_name TEXT,
       totp_secret TEXT,
       totp_enabled INTEGER DEFAULT 0,
       webauthn_enabled INTEGER DEFAULT 0,

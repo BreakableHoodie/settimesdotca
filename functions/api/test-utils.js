@@ -364,6 +364,14 @@ export function createDBEnv(db) {
 
       return wrapper;
     },
+    // Cloudflare D1 batch() method
+    async batch(statements) {
+      const results = [];
+      for (const stmt of statements) {
+        results.push(await stmt.run());
+      }
+      return results;
+    },
   };
 }
 

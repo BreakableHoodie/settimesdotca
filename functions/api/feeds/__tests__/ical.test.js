@@ -148,4 +148,56 @@ describe('GET /api/feeds/ical', () => {
     expect(icalData).toContain('\\;') // Escaped semicolon
     expect(icalData).toContain('\\n') // Escaped newline
   })
+
+  it('should generate unique UIDs for multiple bands at the same event', async () => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const dateStr = tomorrow.toISOString().split('T')[0]
+    
+    // Create one event
+    const event = createMockEvent({ id: 1, date: dateStr })
+    const venue = createMockVenue({ id: 1 })
+    
+    // Create two bands performing at the same event
+    const band1 = createMockBand({ 
+      id: 101, 
+      performance_id: 1,
+      event_id: 1, 
+      venue_id: 1,
+      name: 'Band One', 
+      start_time: '20:00', 
+      end_time: '21:00' 
+    })
+    const band2 = createMockBand({ 
+      id: 102, 
+      performance_id: 2,
+      event_id: 1, 
+      venue_id: 1,
+      name: 'Band Two', 
+      start_time: '21:30', 
+      end_time: '22:30' 
+    })
+    
+    seedMockData(mockDB, [event], [venue], [band1, band2])
+
+    const request = new Request('http://localhost/api/feeds/ical')
+    const context = { request, env: mockEnv }
+
+    const response = await onRequestGet(context)
+    const icalData = await response.text()
+
+    expect(response.status).toBe(200)
+    
+    // Both bands should appear in the calendar
+    expect(icalData).toContain('SUMMARY:Band One')
+    expect(icalData).toContain('SUMMARY:Band Two')
+    
+    // UIDs should be unique (using performance IDs)
+    expect(icalData).toContain(`UID:performance-1-${dateStr}@concertschedule.app`)
+    expect(icalData).toContain(`UID:performance-2-${dateStr}@concertschedule.app`)
+    
+    // Count VEVENT blocks - should be 2
+    const vevents = icalData.split('BEGIN:VEVENT').length - 1
+    expect(vevents).toBe(2)
+  })
 })

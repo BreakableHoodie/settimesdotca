@@ -4,7 +4,12 @@ on:
   pull_request:
     branches: [main, dev]
   schedule:
+    # Weekly scan on Monday at 7 AM UTC
     - cron: "0 7 * * 1"
+  workflow_run:
+    workflows: ["Deploy to Cloudflare Pages"]
+    types: [completed]
+    branches: [dev]
 
 permissions:
   contents: read
@@ -13,37 +18,62 @@ permissions:
 jobs:
   zap-baseline:
     runs-on: ubuntu-latest
-    # Continue on error - ZAP requires issues write permission
-    continue-on-error: true
+    # Only run if deployment succeeded (for workflow_run trigger)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-
-      - name: Start Pages Functions (wrangler)
+      - name: Determine target URL
+        id: target
         run: |
-          ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
+          # For PRs, scan the dev environment
+          # For scheduled runs, scan production
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "url=https://settimes.ca" >> $GITHUB_OUTPUT
+            echo "Scanning production: https://settimes.ca"
+          else
+            echo "url=https://dev.settimes.pages.dev" >> $GITHUB_OUTPUT
+            echo "Scanning dev: https://dev.settimes.pages.dev"
+          fi
+
+      - name: Wait for deployment to be ready
+        run: |
+          TARGET="${{ steps.target.outputs.url }}"
+          echo "Waiting for $TARGET to be accessible..."
+
           for i in {1..30}; do
-            if curl -sSf http://localhost:8788/ > /dev/null; then
-              break
+            if curl -sSf "$TARGET" > /dev/null 2>&1; then
+              echo "Target is ready"
+              exit 0
             fi
-            sleep 1
+            echo "Attempt $i/30 - waiting..."
+            sleep 10
           done
 
+          echo "Target not accessible after 5 minutes"
+          exit 1
+
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.10.0
+        uses: zaproxy/action-baseline@v0.14.0
         with:
-          target: http://localhost:8788
-          artifact_name: zapscan
+          target: ${{ steps.target.outputs.url }}
+          artifact_name: zap-baseline-report
+          # Don't fail the action on alerts - we review manually
+          fail_action: false
+          # Create an issue with the results
+          allow_issue_writing: true
+          issue_title: "ZAP Baseline Scan Report"
+          # Rules file for tuning alerts
+          rules_file_name: ".zap/rules.tsv"
+
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: |
+            report_*.html
+            report_*.json
+            report_*.md
+          retention-days: 30

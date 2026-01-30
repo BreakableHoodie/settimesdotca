@@ -67,7 +67,7 @@ export async function onRequestPost(context) {
     if (newStatus === 0) {
       await DB.prepare(
         `
-        DELETE FROM sessions
+        DELETE FROM lucia_sessions
         WHERE user_id = ?
       `,
       )

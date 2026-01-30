@@ -6,7 +6,7 @@ describe("GET /api/admin/me", () => {
     const request = new Request("https://example.test/api/admin/me");
     const user = { id: 1, email: "admin@test", role: "admin" };
     const session = {
-      id: 10,
+      id: "session-token",
       session_token: "session-token",
       user_id: 1,
       expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),

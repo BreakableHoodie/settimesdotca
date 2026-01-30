@@ -76,6 +76,8 @@ export default function AdminPanel({ onLogout }) {
   }, [])
 
   const isAdmin = currentUser?.role === 'admin'
+  const isViewer = currentUser?.role === 'viewer'
+  const canEdit = !isViewer
   const canManageUsers = isAdmin
 
   // Listen for custom filter events from event detail view
@@ -227,9 +229,11 @@ export default function AdminPanel({ onLogout }) {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setShowWizard(true)} variant="primary" size="sm">
-                Create Event
-              </Button>
+              {canEdit && (
+                <Button onClick={() => setShowWizard(true)} variant="primary" size="sm">
+                  Create Event
+                </Button>
+              )}
 
               <Button onClick={handleLogout} variant="danger" size="sm">
                 Logout
@@ -287,10 +291,11 @@ export default function AdminPanel({ onLogout }) {
                 selectedEventId={selectedEventId}
                 selectedEvent={selectedEvent}
                 onEventFilterChange={setSelectedEventId}
+                readOnly={!canEdit}
               />
             )}
 
-            {activeTab === 'venues' && <VenuesTab showToast={showToast} />}
+            {activeTab === 'venues' && <VenuesTab showToast={showToast} readOnly={!canEdit} />}
 
             {activeTab === 'lineup' && selectedEventId && (
               <LineupTab
@@ -299,10 +304,11 @@ export default function AdminPanel({ onLogout }) {
                 events={events}
                 showToast={showToast}
                 onEventFilterChange={setSelectedEventId}
+                readOnly={!canEdit}
               />
             )}
 
-            {activeTab === 'roster' && <RosterTab showToast={showToast} />}
+            {activeTab === 'roster' && <RosterTab showToast={showToast} readOnly={!canEdit} />}
 
             {activeTab === 'users' && canManageUsers && <UserManagement />}
 

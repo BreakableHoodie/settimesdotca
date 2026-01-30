@@ -14,6 +14,8 @@ export default function AdminLogin({ onLoginSuccess }) {
   const [mfaToken, setMfaToken] = useState(null)
   const [mfaCode, setMfaCode] = useState('')
   const [mfaUser, setMfaUser] = useState(null)
+  const [activationInfo, setActivationInfo] = useState(null)
+  const [resendStatus, setResendStatus] = useState({ loading: false, message: '' })
 
   useEffect(() => {
     const idleLogout = window.sessionStorage.getItem('idleLogout')
@@ -32,6 +34,14 @@ export default function AdminLogin({ onLoginSuccess }) {
 
   const handleError = err => {
     const details = err?.details || {}
+    if (details.requiresActivation) {
+      setActivationInfo({
+        message: details.message || err.message || 'Please activate your account before logging in.',
+      })
+      setResendStatus({ loading: false, message: '' })
+      setError(null)
+      return
+    }
     if (details.locked) {
       setLockoutInfo({
         locked: true,
@@ -47,6 +57,7 @@ export default function AdminLogin({ onLoginSuccess }) {
     e.preventDefault()
     setError(null)
     setLockoutInfo(null)
+    setActivationInfo(null)
     setLoading(true)
 
     try {
@@ -95,6 +106,22 @@ export default function AdminLogin({ onLoginSuccess }) {
     setError(null)
   }
 
+  const handleResend = async () => {
+    setResendStatus({ loading: true, message: '' })
+    try {
+      const response = await authApi.resendActivation(formData.email)
+      setResendStatus({
+        loading: false,
+        message: response.message || 'Activation email sent.',
+      })
+    } catch (err) {
+      setResendStatus({
+        loading: false,
+        message: err.message || 'Failed to resend activation email.',
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
       <div className="bg-gradient-card backdrop-blur-sm p-8 rounded-xl shadow-xl max-w-md w-full border border-white/10">
@@ -140,6 +167,22 @@ export default function AdminLogin({ onLoginSuccess }) {
 
             {idleMessage && (
               <div className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">{idleMessage}</div>
+            )}
+
+            {activationInfo && (
+              <div className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">
+                <p className="font-semibold mb-1">Activate your account</p>
+                <p className="text-sm">{activationInfo.message}</p>
+                {resendStatus.message && <p className="text-sm mt-2">{resendStatus.message}</p>}
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendStatus.loading || !formData.email}
+                  className="mt-3 w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:brightness-110 disabled:opacity-50 transition-all"
+                >
+                  {resendStatus.loading ? 'Sending...' : 'Resend activation email'}
+                </button>
+              </div>
             )}
 
             {error && <div className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}

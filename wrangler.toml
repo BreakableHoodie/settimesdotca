@@ -28,6 +28,14 @@ binding = "DB"
 database_name = "settimes-production-db"
 database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b"
 
+# Analytics Engine binding (privacy-first metrics)
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "settimes_metrics"
+
+[triggers]
+crons = ["0 * * * *"]
+
 # For local development, Wrangler will create a local SQLite database
 # Local DB path: .wrangler/state/v3/d1/miniflare-D1DatabaseObject/
 

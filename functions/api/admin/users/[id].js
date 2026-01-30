@@ -23,8 +23,8 @@ export async function onRequestPatch(context) {
 
     // Parse request body
     const body = await request.json().catch(() => ({}));
-    const { role, name, isActive } = body;
-    const allowedFields = new Set(["role", "name", "isActive"]);
+    const { role, name, firstName, lastName, isActive } = body;
+    const allowedFields = new Set(["role", "name", "firstName", "lastName", "isActive"]);
     const unknownFields = Object.keys(body || {}).filter(
       key => !allowedFields.has(key),
     );
@@ -44,7 +44,7 @@ export async function onRequestPatch(context) {
     // Check if user exists
     const user = await DB.prepare(
       `
-      SELECT id, email, role, name, is_active
+      SELECT id, email, role, name, first_name, last_name, is_active
       FROM users
       WHERE id = ?
     `,
@@ -111,9 +111,48 @@ export async function onRequestPatch(context) {
       values.push(role);
     }
 
-    if (name !== undefined) {
-      // Validate name length
-      if (name.length < 2) {
+    if (firstName !== undefined || lastName !== undefined) {
+      const nextFirstName =
+        firstName !== undefined ? String(firstName).trim() : user.first_name || "";
+      const nextLastName =
+        lastName !== undefined ? String(lastName).trim() : user.last_name || "";
+
+      if (!nextFirstName) {
+        return new Response(
+          JSON.stringify({
+            error: "Invalid first name",
+            message: "First name is required",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (!nextLastName) {
+        return new Response(
+          JSON.stringify({
+            error: "Invalid last name",
+            message: "Last name is required",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const mergedName = `${nextFirstName} ${nextLastName}`.trim();
+      updates.push("first_name = ?");
+      values.push(nextFirstName);
+      updates.push("last_name = ?");
+      values.push(nextLastName);
+      updates.push("name = ?");
+      values.push(mergedName);
+    } else if (name !== undefined) {
+      const trimmed = String(name).trim();
+      if (trimmed.length < 2) {
         return new Response(
           JSON.stringify({
             error: "Invalid name",
@@ -127,7 +166,7 @@ export async function onRequestPatch(context) {
       }
 
       updates.push("name = ?");
-      values.push(name);
+      values.push(trimmed);
     }
 
     if (isActive !== undefined) {
@@ -201,7 +240,7 @@ export async function onRequestPatch(context) {
       "user",
       userId,
       {
-        changes: { role, name, isActive },
+        changes: { role, name, firstName, lastName, isActive },
       },
       ipAddress,
     );
@@ -209,7 +248,7 @@ export async function onRequestPatch(context) {
     // Fetch updated user
     const updatedUser = await DB.prepare(
       `
-      SELECT id, email, name, role, is_active, created_at, last_login, updated_at
+      SELECT id, email, name, first_name, last_name, role, is_active, created_at, last_login, updated_at
       FROM users
       WHERE id = ?
     `,
@@ -220,6 +259,12 @@ export async function onRequestPatch(context) {
     return new Response(
       JSON.stringify({
         ...updatedUser,
+        name:
+          updatedUser.name ||
+          [updatedUser.first_name, updatedUser.last_name].filter(Boolean).join(" ") ||
+          null,
+        firstName: updatedUser.first_name || null,
+        lastName: updatedUser.last_name || null,
         isActive: updatedUser.is_active === 1,
       }),
       {
@@ -326,7 +371,7 @@ export async function onRequestDelete(context) {
     // Also invalidate all sessions for this user
     await DB.prepare(
       `
-      DELETE FROM sessions WHERE user_id = ?
+      DELETE FROM lucia_sessions WHERE user_id = ?
     `,
     )
       .bind(userId)

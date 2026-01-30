@@ -10,13 +10,47 @@ import { getClientIP } from "../../utils/request.js";
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
+  const debugId = crypto.randomUUID();
+
+  const withDebug = (payload) => {
+    if (env?.RESET_DEBUG === "true") {
+      return { ...payload, debugId };
+    }
+    return payload;
+  };
+
+  const logDebug = (stage, details) => {
+    console.info("[ResetPassword]", stage, { debugId, ...details });
+  };
+  const logFailure = async (code, details = {}) => {
+    try {
+      await DB.prepare(
+        `
+        INSERT INTO auth_audit (action, success, ip_address, user_agent, details)
+        VALUES ('password_reset_failed', 0, ?, ?, ?)
+      `,
+      )
+        .bind(
+          getClientIP(request),
+          request.headers.get("User-Agent") || "unknown",
+          JSON.stringify({ code, debugId, ...details }),
+        )
+        .run();
+    } catch (error) {
+      console.error("Password reset failure audit error:", { debugId, error });
+    }
+  };
 
   try {
     const { token, newPassword } = await request.json();
 
     if (!token || !newPassword) {
+      logDebug("missing_fields", { hasToken: Boolean(token) });
+      await logFailure("MISSING_FIELDS", { hasToken: Boolean(token) });
       return new Response(
-        JSON.stringify({ error: "Token and new password are required" }),
+        JSON.stringify(
+          withDebug({ error: "Token and new password are required", code: "MISSING_FIELDS" })
+        ),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -33,9 +67,14 @@ export async function onRequestPost(context) {
       requireSpecial: true,
     });
     if (!passwordCheck.valid) {
+      logDebug("password_invalid", { reason: passwordCheck.errors[0] });
+      await logFailure("PASSWORD_INVALID", { reason: passwordCheck.errors[0] });
       return new Response(
         JSON.stringify({
-          error: passwordCheck.errors[0],
+          ...withDebug({
+            error: passwordCheck.errors[0],
+            code: "PASSWORD_INVALID",
+          }),
         }),
         {
           status: 400,
@@ -58,8 +97,12 @@ export async function onRequestPost(context) {
       .first();
 
     if (!resetToken) {
+      logDebug("token_invalid", {});
+      await logFailure("TOKEN_INVALID");
       return new Response(
-        JSON.stringify({ error: "Invalid or expired reset token" }),
+        JSON.stringify(
+          withDebug({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" })
+        ),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -69,8 +112,12 @@ export async function onRequestPost(context) {
 
     // Check if token is expired
     if (new Date(resetToken.expires_at) < new Date()) {
+      logDebug("token_expired", { expiresAt: resetToken.expires_at });
+      await logFailure("TOKEN_EXPIRED", { expiresAt: resetToken.expires_at });
       return new Response(
-        JSON.stringify({ error: "Reset token has expired" }),
+        JSON.stringify(
+          withDebug({ error: "Reset token has expired", code: "TOKEN_EXPIRED" })
+        ),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -80,8 +127,12 @@ export async function onRequestPost(context) {
 
     // Check if user is active
     if (resetToken.is_active === 0) {
+      logDebug("user_inactive", { userId: resetToken.user_id });
+      await logFailure("USER_INACTIVE", { userId: resetToken.user_id });
       return new Response(
-        JSON.stringify({ error: "User account is inactive" }),
+        JSON.stringify(
+          withDebug({ error: "User account is inactive", code: "USER_INACTIVE" })
+        ),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -96,9 +147,14 @@ export async function onRequestPost(context) {
         resetToken.password_hash,
       );
       if (samePassword) {
+        logDebug("password_reuse", { userId: resetToken.user_id });
+        await logFailure("PASSWORD_REUSE", { userId: resetToken.user_id });
         return new Response(
           JSON.stringify({
-            error: "New password must be different from the current password",
+            ...withDebug({
+              error: "New password must be different from the current password",
+              code: "PASSWORD_REUSE",
+            }),
           }),
           {
             status: 400,
@@ -109,7 +165,9 @@ export async function onRequestPost(context) {
     }
 
     // Hash new password
+    logDebug("hash_start", { userId: resetToken.user_id });
     const passwordHash = await hashPassword(newPassword);
+    logDebug("hash_complete", { userId: resetToken.user_id });
 
     // Update user password
     await DB.prepare(
@@ -136,7 +194,7 @@ export async function onRequestPost(context) {
     // Invalidate all existing sessions for this user
     await DB.prepare(
       `
-      DELETE FROM sessions
+      DELETE FROM lucia_sessions
       WHERE user_id = ?
     `,
     )
@@ -173,8 +231,9 @@ export async function onRequestPost(context) {
       },
     );
   } catch (error) {
-    console.error("Password reset completion error:", error);
-    return new Response(JSON.stringify({ error: "Failed to reset password" }), {
+    console.error("Password reset completion error:", { debugId, error });
+    await logFailure("RESET_FAILED", { error: String(error?.message || error) });
+    return new Response(JSON.stringify(withDebug({ error: "Failed to reset password", code: "RESET_FAILED" })), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

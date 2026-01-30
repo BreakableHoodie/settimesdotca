@@ -1,8 +1,8 @@
-import { setSessionCookie } from "../../../utils/cookies.js";
 import { hashPassword } from "../../../utils/crypto.js";
-import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { isValidEmail, validatePassword, FIELD_LIMITS } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
+import { isEmailConfigured, sendEmail } from "../../../utils/email.js";
+import { buildActivationEmail } from "../../../utils/emailTemplates.js";
 
 // Rate limiting: check failed signup attempts
 async function checkRateLimit(DB, email, ipAddress) {
@@ -43,21 +43,8 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const signupEnabled = env?.ALLOW_ADMIN_SIGNUP === "true";
-    if (!signupEnabled) {
-      return new Response(
-        JSON.stringify({
-          error: "Signup disabled",
-          message: "Self-serve signup is not available at this time.",
-        }),
-        {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const { email, password, name, role, inviteCode } = await request.json();
+    const { email, password, name, firstName, lastName, role, inviteCode } =
+      await request.json();
 
     // SECURITY: Require invite code for all signups
     if (!inviteCode) {
@@ -225,14 +212,64 @@ export async function onRequestPost(context) {
       );
     }
 
+    const fallbackName =
+      name !== undefined && name !== null ? String(name).trim() : "";
+    let resolvedFirstName =
+      firstName !== undefined && firstName !== null
+        ? String(firstName).trim()
+        : "";
+    let resolvedLastName =
+      lastName !== undefined && lastName !== null ? String(lastName).trim() : "";
+
+    if ((!resolvedFirstName || !resolvedLastName) && fallbackName) {
+      const parts = fallbackName.split(/\s+/).filter(Boolean);
+      if (!resolvedFirstName) {
+        resolvedFirstName = parts[0] || "";
+      }
+      if (!resolvedLastName) {
+        resolvedLastName = parts.slice(1).join(" ");
+      }
+    }
+
+    if (!resolvedFirstName || !resolvedLastName) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "First name and last name are required",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const resolvedName = `${resolvedFirstName} ${resolvedLastName}`.trim();
+
     // Hash password
     const passwordHash = await hashPassword(password);
 
-    // Create user
+    const activationToken =
+      crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+    const activationExpires = new Date(
+      Date.now() + 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    // Create user (inactive until activation)
     const user = await DB.prepare(
-      "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?) RETURNING id, email, name, role"
+      "INSERT INTO users (email, password_hash, name, first_name, last_name, role, is_active, activation_token, activation_token_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, email, name, first_name, last_name, role"
     )
-      .bind(email, passwordHash, name || null, userRole)
+      .bind(
+        email,
+        passwordHash,
+        resolvedName || null,
+        resolvedFirstName || null,
+        resolvedLastName || null,
+        userRole,
+        0,
+        activationToken,
+        activationExpires
+      )
       .first();
 
     // Mark invite code as used
@@ -255,49 +292,39 @@ export async function onRequestPost(context) {
       )
       .run();
 
-    // Generate session token
-    const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    const activationUrl = new URL("/activate", baseUrl);
+    activationUrl.searchParams.set("token", activationToken);
 
-    // Create session in database
-    await DB.prepare(
-      "INSERT INTO sessions (session_token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
-    )
-      .bind(
-        sessionToken,
-        user.id,
-        expiresAt,
-        ipAddress,
-        request.headers.get("User-Agent") || "unknown"
-      )
-      .run();
+    let emailResult = { delivered: false, reason: "not_configured" };
+    if (isEmailConfigured(env)) {
+      const emailPayload = buildActivationEmail({
+        activationUrl: activationUrl.toString(),
+        recipientName: resolvedName || null,
+      });
 
-    // Generate CSRF token
-    const csrfToken = generateCSRFToken();
-
-    // Set secure HTTPOnly session cookie and CSRF cookie
-    const headers = new Headers({
-      "Content-Type": "application/json",
-    });
-    headers.append(
-      "Set-Cookie",
-      setSessionCookie(sessionToken, false, request)
-    );
-    headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
+      emailResult = await sendEmail(env, {
+        to: email,
+        subject: emailPayload.subject,
+        text: emailPayload.text,
+        html: emailPayload.html,
+      });
+    } else {
+      console.info(`[Email] Activation link for ${email}: ${activationUrl}`);
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
+        message:
+          "Account created. Please check your email to activate your account.",
+        requiresActivation: true,
+        activationUrl: isEmailConfigured(env) ? null : activationUrl.toString(),
+        email: emailResult,
       }),
       {
         status: 201,
-        headers,
+        headers: { "Content-Type": "application/json" },
       }
     );
   } catch (error) {

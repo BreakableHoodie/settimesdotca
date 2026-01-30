@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faKey, faUserSlash, faUserCheck, faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons'
 import RoleBadge from './components/RoleBadge'
@@ -14,10 +14,84 @@ export default function UserManagement() {
   const [editingUser, setEditingUser] = useState(null)
   const [resetReason, setResetReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   useEffect(() => {
     fetchUsers()
   }, [])
+
+  const resolveDisplayName = user => {
+    if (user?.firstName || user?.lastName) {
+      return [user.firstName, user.lastName].filter(Boolean).join(' ')
+    }
+    return user?.name || ''
+  }
+
+  const filteredUsers = useMemo(() => {
+    let list = users
+    if (searchTerm.trim()) {
+      const query = searchTerm.trim().toLowerCase()
+      list = list.filter(user => {
+        const name = resolveDisplayName(user).toLowerCase()
+        const email = (user.email || '').toLowerCase()
+        return name.includes(query) || email.includes(query)
+      })
+    }
+    if (roleFilter !== 'all') {
+      list = list.filter(user => user.role === roleFilter)
+    }
+    if (statusFilter !== 'all') {
+      const shouldBeActive = statusFilter === 'active'
+      list = list.filter(user => Boolean(user.isActive) === shouldBeActive)
+    }
+    return list
+  }, [users, searchTerm, roleFilter, statusFilter])
+
+  const sortedUsers = useMemo(() => {
+    if (!sortConfig.key) return filteredUsers
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+    return [...filteredUsers].sort((a, b) => {
+      if (sortConfig.key === 'status') {
+        const aVal = a.isActive ? 1 : 0
+        const bVal = b.isActive ? 1 : 0
+        return (aVal - bVal) * direction
+      }
+      if (sortConfig.key === 'last_login') {
+        const aVal = a.last_login ? new Date(a.last_login).getTime() : 0
+        const bVal = b.last_login ? new Date(b.last_login).getTime() : 0
+        return (aVal - bVal) * direction
+      }
+      if (sortConfig.key === 'role') {
+        const order = { admin: 3, editor: 2, viewer: 1 }
+        const aVal = order[a.role] || 0
+        const bVal = order[b.role] || 0
+        return (aVal - bVal) * direction
+      }
+      if (sortConfig.key === 'email') {
+        return (a.email || '').localeCompare(b.email || '') * direction
+      }
+
+      const aVal = resolveDisplayName(a).toLowerCase()
+      const bVal = resolveDisplayName(b).toLowerCase()
+      return aVal.localeCompare(bVal) * direction
+    })
+  }, [filteredUsers, sortConfig])
+
+  const handleSort = key => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const SortIcon = ({ col }) => (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
 
   const fetchUsers = async () => {
     try {
@@ -34,14 +108,24 @@ export default function UserManagement() {
   const handleCreateUser = async userData => {
     setActionLoading(true)
     try {
-      await usersApi.create(userData)
-      alert(`User ${userData.email} created successfully`)
+      const data = await usersApi.create(userData)
+      const inviteUrl = data?.inviteUrl
+      const delivered = data?.email?.delivered
+      if (inviteUrl) {
+        if (delivered) {
+          alert(`Invite sent to ${userData.email}`)
+        } else {
+          alert(`Invite created for ${userData.email}.\nShare this link:\n${inviteUrl}`)
+        }
+      } else {
+        alert(`Invite created for ${userData.email}`)
+      }
       setShowUserModal(false)
       setEditingUser(null)
       fetchUsers() // Refresh list
     } catch (error) {
       console.error('Failed to create user:', error)
-      alert('Failed to create user')
+      alert('Failed to send invite')
     } finally {
       setActionLoading(false)
     }
@@ -54,7 +138,8 @@ export default function UserManagement() {
     try {
       await usersApi.update(editingUser.id, {
         role: userData.role,
-        name: userData.name,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
         isActive: userData.isActive,
       })
       alert(`User ${userData.email} updated successfully`)
@@ -93,15 +178,12 @@ export default function UserManagement() {
     setActionLoading(true)
     try {
       const data = await usersApi.resetPassword(selectedUser.id, { reason: resetReason })
-
-      if (data?.resetUrl) {
-        alert(`Password reset initiated for ${selectedUser.email}.\nReset URL: ${data.resetUrl}`)
-        setShowResetModal(false)
-        setResetReason('')
-        setSelectedUser(null)
-      }
+      alert(data?.message || `Password reset email sent to ${selectedUser.email}`)
+      setShowResetModal(false)
+      setResetReason('')
+      setSelectedUser(null)
     } catch {
-      alert('Failed to initiate password reset')
+      alert('Failed to send password reset email')
     } finally {
       setActionLoading(false)
     }
@@ -146,16 +228,44 @@ export default function UserManagement() {
           <h2 className="text-2xl font-bold text-white">User Management</h2>
           <p className="text-sm text-white/70 mt-1">Manage user accounts, roles, and permissions.</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingUser(null)
-            setShowUserModal(true)
-          }}
-          className="bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
-        >
-          <FontAwesomeIcon icon={faPlus} />
-          Add User
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search name or email"
+            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+          />
+          <select
+            value={roleFilter}
+            onChange={e => setRoleFilter(e.target.value)}
+            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+          >
+            <option value="all">All roles</option>
+            <option value="admin">Admin</option>
+            <option value="editor">Editor</option>
+            <option value="viewer">Viewer</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <button
+            onClick={() => {
+              setEditingUser(null)
+              setShowUserModal(true)
+            }}
+            className="bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
+          >
+            <FontAwesomeIcon icon={faPlus} />
+            Invite User
+          </button>
+        </div>
       </div>
 
       <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 overflow-hidden">
@@ -163,32 +273,50 @@ export default function UserManagement() {
           <table className="w-full">
             <thead className="bg-white/5">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Status
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
+                  onClick={() => handleSort('name')}
+                >
+                  User <SortIcon col="name" />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Last Login
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
+                  onClick={() => handleSort('role')}
+                >
+                  Role <SortIcon col="role" />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
+                  onClick={() => handleSort('status')}
+                >
+                  Status <SortIcon col="status" />
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
+                  onClick={() => handleSort('last_login')}
+                >
+                  Last Login <SortIcon col="last_login" />
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {users.length === 0 ? (
+              {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="px-6 py-8 text-center text-gray-300">
-                    No users found. Click &ldquo;Add User&rdquo; to create one.
+                    {users.length === 0
+                      ? 'No users found. Click “Invite User” to add one.'
+                      : 'No users match your filters.'}
                   </td>
                 </tr>
               ) : (
-                users.map(user => (
+                sortedUsers.map(user => (
                   <tr key={user.id} className="hover:bg-white/5">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-white">{user.name}</div>
+                        <div className="text-sm font-medium text-white">{resolveDisplayName(user)}</div>
                         <div className="text-sm text-gray-300">{user.email}</div>
                       </div>
                     </td>
@@ -207,8 +335,8 @@ export default function UserManagement() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                      <div className="flex justify-end space-x-2">
                         <button
                           onClick={() => {
                             setEditingUser(user)
@@ -260,14 +388,16 @@ export default function UserManagement() {
           </table>
         </div>
         <div className="md:hidden divide-y divide-white/10">
-          {users.length === 0 ? (
-            <div className="px-6 py-8 text-center text-gray-300">No users found. Tap “Add User” to create one.</div>
+          {filteredUsers.length === 0 ? (
+            <div className="px-6 py-8 text-center text-gray-300">
+              {users.length === 0 ? 'No users found. Tap “Invite User” to add one.' : 'No users match your filters.'}
+            </div>
           ) : (
-            users.map(user => (
+            sortedUsers.map(user => (
               <div key={user.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium text-white">{user.name}</div>
+                    <div className="text-sm font-medium text-white">{resolveDisplayName(user)}</div>
                     <div className="text-sm text-gray-300">{user.email}</div>
                   </div>
                   <RoleBadge role={user.role} />

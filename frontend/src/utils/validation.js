@@ -49,7 +49,7 @@ export function sanitizeString(input, maxLength = 1000) {
   return String(input)
     .trim()
     .replace(/[<>]/g, '') // Remove < and > to prevent HTML injection
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/(?:javascript|data|vbscript):/gi, '') // Remove dangerous URL-like protocols
     .replace(/on\w+=/gi, '') // Remove event handlers (onclick=, etc.)
     .substring(0, maxLength)
 }

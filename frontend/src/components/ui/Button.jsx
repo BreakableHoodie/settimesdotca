@@ -105,7 +105,16 @@ export default function Button({
 
 Button.propTypes = {
   children: PropTypes.node.isRequired,
-  variant: PropTypes.oneOf(['primary', 'primary-gradient', 'secondary', 'danger', 'ghost', 'success', 'warning', 'link']),
+  variant: PropTypes.oneOf([
+    'primary',
+    'primary-gradient',
+    'secondary',
+    'danger',
+    'ghost',
+    'success',
+    'warning',
+    'link',
+  ]),
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   fullWidth: PropTypes.bool,
   disabled: PropTypes.bool,

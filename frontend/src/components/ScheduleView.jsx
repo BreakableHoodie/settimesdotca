@@ -58,12 +58,12 @@ function ScheduleView({
   })
 
   // Helper function to group bands by time slot
-  const groupByTime = (bands) => {
+  const groupByTime = bands => {
     const timeGroups = new Map()
     const grouped = []
 
     bands.forEach(band => {
-      const slot = (!band.startTime || band.startTime === 'TBD') ? 'TBD' : band.startTime
+      const slot = !band.startTime || band.startTime === 'TBD' ? 'TBD' : band.startTime
       if (!timeGroups.has(slot)) {
         const group = { time: slot, bands: [] }
         timeGroups.set(slot, group)

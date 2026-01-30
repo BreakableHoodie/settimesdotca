@@ -108,19 +108,22 @@
 /* Size Variants */
 .sm {
   height: var(--input-height-sm);
-  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y) var(--input-padding-x);
+  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y)
+    var(--input-padding-x);
   font-size: var(--font-size-sm);
 }
 
 .md {
   height: var(--input-height-md);
-  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y) var(--input-padding-x);
+  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y)
+    var(--input-padding-x);
   font-size: var(--font-size-base);
 }
 
 .lg {
   height: var(--input-height-lg);
-  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y) var(--input-padding-x);
+  padding: var(--input-padding-y) calc(var(--spacing-8) + var(--spacing-3)) var(--input-padding-y)
+    var(--input-padding-x);
   font-size: var(--font-size-lg);
 }
 

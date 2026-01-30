@@ -162,7 +162,7 @@ export default function AdminApp() {
   // Listen for unauthorized events (401) from API
   useEffect(() => {
     const handleUnauthorized = () => {
-      console.error('AdminApp received auth:unauthorized event, logging out...');
+      console.error('AdminApp received auth:unauthorized event, logging out...')
       handleLogout()
     }
 

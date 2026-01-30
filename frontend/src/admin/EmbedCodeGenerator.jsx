@@ -21,7 +21,10 @@ export default function EmbedCodeGenerator({ event }) {
 
       <pre className="bg-band-navy p-3 rounded text-sm text-white overflow-x-auto mb-4">{embedCode}</pre>
 
-      <button onClick={handleCopy} className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600">
+      <button
+        onClick={handleCopy}
+        className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
+      >
         Copy Code
       </button>
 

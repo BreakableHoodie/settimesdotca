@@ -194,7 +194,6 @@ export default function ResetPasswordPage() {
             </div>
           )}
         </form>
-
       </div>
     </div>
   )

@@ -21,7 +21,7 @@ import { getAdminFormDataHeaders } from '../../utils/adminApi'
  * @param {string} props.bandName - Optional band name for display
  */
 export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null, bandName = '' }) {
-  const sanitizeImageSrc = (value) => {
+  const sanitizeImageSrc = value => {
     if (!value || typeof value !== 'string') return null
     const trimmed = value.trim()
     if (!trimmed) return null

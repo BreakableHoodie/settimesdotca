@@ -8,17 +8,12 @@ function Footer() {
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="text-center space-y-4">
           <div className="flex justify-center gap-6 text-sm flex-wrap">
-            <Link
-              to="/"
-              className="text-accent-400 hover:text-accent-500 transition-colors font-medium"
-            >
+            <Link to="/" className="text-accent-400 hover:text-accent-500 transition-colors font-medium">
               All Events
             </Link>
           </div>
 
-          <p className="text-text-tertiary text-xs">
-            Times are subject to change - late starts happen!
-          </p>
+          <p className="text-text-tertiary text-xs">Times are subject to change - late starts happen!</p>
 
           <p className="text-text-tertiary text-xs">
             Website by{' '}

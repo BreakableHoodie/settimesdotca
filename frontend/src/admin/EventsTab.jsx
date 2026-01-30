@@ -137,7 +137,7 @@ const buildScheduleSummary = eventBands => {
     }
 
     sortedBandsByVenue[venueName] = [...venueBands].sort(
-      (a, b) => getSortableTimeMinutes(a.start_time) - getSortableTimeMinutes(b.start_time),
+      (a, b) => getSortableTimeMinutes(a.start_time) - getSortableTimeMinutes(b.start_time)
     )
     venueTotals[venueName] = venueBands.reduce((sum, band) => {
       return sum + getDurationMinutes(band.start_time, band.end_time)
@@ -178,15 +178,7 @@ const areEventPropsEqual = (prevProps, nextProps) => {
   )
 }
 
-const EventRow = memo(function EventRow({
-  event,
-  onFilter,
-  onEdit,
-  onTogglePublish,
-  onArchive,
-  onDelete,
-  showToast,
-}) {
+const EventRow = memo(function EventRow({ event, onFilter, onEdit, onTogglePublish, onArchive, onDelete, showToast }) {
   return (
     <tr className="hover:bg-band-navy/30 transition-colors">
       <td className="px-4 py-3">
@@ -271,13 +263,7 @@ const EventRow = memo(function EventRow({
   )
 }, areEventPropsEqual)
 
-const EventCard = memo(function EventCard({
-  event,
-  onEdit,
-  onTogglePublish,
-  onArchive,
-  onDelete,
-}) {
+const EventCard = memo(function EventCard({ event, onEdit, onTogglePublish, onArchive, onDelete }) {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-start justify-between">
@@ -800,9 +786,7 @@ export default function EventsTab({
                               <td className="px-4 py-2 text-band-orange font-semibold" colSpan="2">
                                 {venueName} Total
                               </td>
-                              <td className="px-4 py-2 text-band-orange font-semibold">
-                                {formatMinutes(venueTotal)}
-                              </td>
+                              <td className="px-4 py-2 text-band-orange font-semibold">{formatMinutes(venueTotal)}</td>
                             </tr>
                           </tbody>
                         </table>

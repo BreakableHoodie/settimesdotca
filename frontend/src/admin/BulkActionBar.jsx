@@ -1,4 +1,14 @@
-function BulkActionBar({ count, action, params, venues, onActionChange, onParamsChange, onSubmit, onCancel, isGlobalView }) {
+function BulkActionBar({
+  count,
+  action,
+  params,
+  venues,
+  onActionChange,
+  onParamsChange,
+  onSubmit,
+  onCancel,
+  isGlobalView,
+}) {
   const isActionReady = () => {
     if (action === 'move_venue') return params.venue_id != null
     if (action === 'change_time') return params.start_time != null
@@ -27,7 +37,7 @@ function BulkActionBar({ count, action, params, venues, onActionChange, onParams
                 <option value="change_time">Change start time</option>
               </select>
             )}
-            
+
             <button
               onClick={() => onActionChange('delete')}
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 min-h-[44px] rounded-lg font-medium transition-colors"
@@ -63,9 +73,9 @@ function BulkActionBar({ count, action, params, venues, onActionChange, onParams
         )}
 
         {action === 'delete' && (
-           <div className="flex items-center gap-2 text-orange-300 bg-orange-900/20 px-3 py-2 rounded">
-             <span>Warning: Permanently delete {count} bands?</span>
-           </div>
+          <div className="flex items-center gap-2 text-orange-300 bg-orange-900/20 px-3 py-2 rounded">
+            <span>Warning: Permanently delete {count} bands?</span>
+          </div>
         )}
 
         {/* Action buttons */}
@@ -77,7 +87,9 @@ function BulkActionBar({ count, action, params, venues, onActionChange, onParams
             <button
               onClick={onSubmit}
               className={`flex-1 md:flex-none px-4 py-2 min-h-[44px] rounded-lg font-medium transition-colors ${
-                action === 'delete' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-band-orange hover:bg-orange-600 text-white'
+                action === 'delete'
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-band-orange hover:bg-orange-600 text-white'
               }`}
               disabled={action !== 'delete' && !isActionReady()}
             >

@@ -31,9 +31,7 @@ export default function BottomNav({ activeTab, onTabChange, showLineup, showUser
             type="button"
             onClick={() => onTabChange(item.id)}
             className={`bottom-nav-button flex flex-col items-center justify-center py-3 text-xs font-medium transition-all min-h-[56px] ${
-              activeTab === item.id
-                ? 'text-accent-500 bg-accent-500/10'
-                : 'text-text-tertiary hover:text-white'
+              activeTab === item.id ? 'text-accent-500 bg-accent-500/10' : 'text-text-tertiary hover:text-white'
             }`}
           >
             <FontAwesomeIcon icon={item.icon} className="text-lg mb-1" />

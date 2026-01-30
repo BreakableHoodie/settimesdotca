@@ -178,7 +178,7 @@ export const authApi = {
         headers: getHeaders(),
         credentials: 'include',
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         // Update local storage with fresh data
@@ -256,12 +256,7 @@ export const eventsApi = {
     if (data?.events?.length) {
       data.events = data.events.map(event => {
         const isPublished = Number(event.is_published) === 1
-        const normalizedStatus =
-          event.status === 'archived'
-            ? 'archived'
-            : isPublished
-              ? 'published'
-              : 'draft'
+        const normalizedStatus = event.status === 'archived' ? 'archived' : isPublished ? 'published' : 'draft'
         return {
           ...event,
           status: normalizedStatus,

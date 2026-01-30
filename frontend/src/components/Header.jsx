@@ -48,9 +48,7 @@ function Header({ view, setView }) {
       style={headerStyle}
     >
       <div className="container mx-auto px-4 max-w-6xl">
-        <div
-          className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 sm:gap-4 min-h-[44px] transition-all duration-500 ease-out"
-        >
+        <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 sm:gap-4 min-h-[44px] transition-all duration-500 ease-out">
           <h1
             className="font-bold text-white font-display tracking-tight text-3xl md:text-4xl text-center sm:text-left leading-tight w-full transition-transform duration-300 ease-out"
             style={{ transform: `scale(${titleScale})` }}
@@ -59,7 +57,6 @@ function Header({ view, setView }) {
               <span className="text-accent-500">Set</span>Times
             </Link>
           </h1>
-
         </div>
 
         <p

@@ -6,9 +6,7 @@ import DOMPurify from 'dompurify'
 
 const stripHtml = value => {
   if (!value) return ''
-  return DOMPurify.sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
-    .replace(/\s+/g, ' ')
-    .trim()
+  return DOMPurify.sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).replace(/\s+/g, ' ').trim()
 }
 
 function buildFacts(band = {}, stats = {}) {
@@ -26,7 +24,10 @@ function buildFacts(band = {}, stats = {}) {
     facts.push(`Has played ${stats.total_performances} listed shows so far.`)
   }
 
-  if ((stats.average_set_minutes || stats.average_set_length || stats.avg_duration_minutes) && stats.total_performances >= 3) {
+  if (
+    (stats.average_set_minutes || stats.average_set_length || stats.avg_duration_minutes) &&
+    stats.total_performances >= 3
+  ) {
     const minutes = stats.average_set_minutes ?? stats.average_set_length ?? stats.avg_duration_minutes
     if (minutes) {
       facts.push(`Typical set lasts about ${Math.round(minutes)} minutes.`)

@@ -181,9 +181,7 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
             <div className="space-y-5">
               <div className="bg-emerald-900/20 border border-emerald-500/40 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-emerald-200 mb-1">MFA is enabled</h3>
-                <p className="text-emerald-100/80 text-sm">
-                  Your account requires an authenticator code at sign in.
-                </p>
+                <p className="text-emerald-100/80 text-sm">Your account requires an authenticator code at sign in.</p>
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-lg p-4">

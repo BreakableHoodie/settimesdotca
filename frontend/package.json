@@ -23,6 +23,7 @@
     "test:ui": "vitest --ui",
     "test:a11y": "vitest run src/test/a11y.test.jsx",
     "test:coverage": "vitest run --coverage",
+    "lighthouse": "lhci autorun",
     "quality": "npm run lint && npm run format:check && npm run test && npm run build"
   },
   "dependencies": {
@@ -51,6 +52,7 @@
     "@vitejs/plugin-react": "^5.0.2",
     "autoprefixer": "^10.4.16",
     "axe-core": "^4.11.0",
+    "@lhci/cli": "^0.14.0",
     "baseline-browser-mapping": "^2.9.18",
     "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.1.8",

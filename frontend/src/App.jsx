@@ -341,10 +341,7 @@ function App() {
   }
 
   // Breadcrumb navigation
-  const breadcrumbs = [
-    { label: 'Events', href: '/' },
-    { label: eventData?.name || 'Event Schedule' }
-  ]
+  const breadcrumbs = [{ label: 'Events', href: '/' }, { label: eventData?.name || 'Event Schedule' }]
 
   return (
     <div className="min-h-screen pb-20">

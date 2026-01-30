@@ -31,7 +31,9 @@ export default function PasswordStrength({ password }) {
   return (
     <div className="mt-3 space-y-2">
       <div className="flex items-center justify-between text-xs text-white/70">
-        <span>Strength: <span className="text-white">{label}</span></span>
+        <span>
+          Strength: <span className="text-white">{label}</span>
+        </span>
         <span>{percent}%</span>
       </div>
       <div className="h-2 w-full rounded-full bg-white/10">
@@ -40,9 +42,7 @@ export default function PasswordStrength({ password }) {
       <div className="grid gap-1 text-xs text-white/70 sm:grid-cols-2">
         {checks.map(check => (
           <div key={check.label} className="flex items-center gap-2">
-            <span
-              className={`inline-block h-2 w-2 rounded-full ${check.ok ? 'bg-green-400' : 'bg-white/20'}`}
-            />
+            <span className={`inline-block h-2 w-2 rounded-full ${check.ok ? 'bg-green-400' : 'bg-white/20'}`} />
             <span className={check.ok ? 'text-white' : ''}>{check.label}</span>
           </div>
         ))}

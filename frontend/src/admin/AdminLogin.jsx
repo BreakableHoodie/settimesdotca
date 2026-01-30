@@ -99,7 +99,8 @@ export default function AdminLogin({ onLoginSuccess }) {
     <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
       <div className="bg-gradient-card backdrop-blur-sm p-8 rounded-xl shadow-xl max-w-md w-full border border-white/10">
         <h1 className="text-2xl font-bold font-display mb-6 text-center">
-          <span className="text-accent-500">Set</span><span className="text-white">Times</span>
+          <span className="text-accent-500">Set</span>
+          <span className="text-white">Times</span>
           <span className="block text-text-tertiary text-base font-normal mt-1">Admin Login</span>
         </h1>
 
@@ -138,9 +139,7 @@ export default function AdminLogin({ onLoginSuccess }) {
             </div>
 
             {idleMessage && (
-              <div className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">
-                {idleMessage}
-              </div>
+              <div className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">{idleMessage}</div>
             )}
 
             {error && <div className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}
@@ -168,9 +167,7 @@ export default function AdminLogin({ onLoginSuccess }) {
               <p className="text-text-tertiary text-sm mb-2">
                 Enter the 6-digit code from your authenticator app or a backup code.
               </p>
-              {mfaUser?.email && (
-                <p className="text-text-secondary text-sm mb-4">Signing in as {mfaUser.email}</p>
-              )}
+              {mfaUser?.email && <p className="text-text-secondary text-sm mb-4">Signing in as {mfaUser.email}</p>}
               <label htmlFor="mfa-code" className="block text-white mb-2">
                 Authentication Code
               </label>
@@ -208,9 +205,7 @@ export default function AdminLogin({ onLoginSuccess }) {
           </form>
         )}
 
-        <p className="text-text-tertiary text-sm text-center">
-          Need access? Contact an administrator.
-        </p>
+        <p className="text-text-tertiary text-sm text-center">Need access? Contact an administrator.</p>
       </div>
     </div>
   )

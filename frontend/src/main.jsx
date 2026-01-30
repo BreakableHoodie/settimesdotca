@@ -54,7 +54,7 @@ if ('serviceWorker' in navigator) {
       registrations.forEach(registration => {
         registration.unregister().then(() => {
           console.warn('Service worker unregistered - ensuring fresh content')
-          // Optional: Force reload if we just killed a SW? 
+          // Optional: Force reload if we just killed a SW?
           // window.location.reload()
         })
       })
@@ -96,7 +96,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route
               path="/admin/*"
               element={
-                <ErrorBoundary title="Admin Panel Error" message="An error occurred in the admin panel. Please refresh.">
+                <ErrorBoundary
+                  title="Admin Panel Error"
+                  message="An error occurred in the admin panel. Please refresh."
+                >
                   <Suspense fallback={<LoadingFallback />}>
                     <AdminApp />
                   </Suspense>

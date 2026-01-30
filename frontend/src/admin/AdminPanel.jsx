@@ -45,7 +45,7 @@ export default function AdminPanel({ onLogout }) {
       // User can optionally select an event from the dropdown
       setSelectedEventId(null)
     } catch (err) {
-      console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message);
+      console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message)
       if (err.status === 401 || err.message?.includes('Valid session required')) {
         onLogout()
         return
@@ -186,7 +186,8 @@ export default function AdminPanel({ onLogout }) {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex-1">
               <h1 className="text-xl sm:text-2xl font-bold font-display mb-2">
-                <span className="text-accent-500">Set</span><span className="text-white">Times</span>
+                <span className="text-accent-500">Set</span>
+                <span className="text-white">Times</span>
                 <span className="text-text-tertiary text-base font-normal ml-2">Admin</span>
               </h1>
 
@@ -226,11 +227,7 @@ export default function AdminPanel({ onLogout }) {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => setShowWizard(true)}
-                variant="primary"
-                size="sm"
-              >
+              <Button onClick={() => setShowWizard(true)} variant="primary" size="sm">
                 Create Event
               </Button>
 
@@ -309,9 +306,7 @@ export default function AdminPanel({ onLogout }) {
 
             {activeTab === 'users' && canManageUsers && <UserManagement />}
 
-            {activeTab === 'settings' && (
-              <UserSettings user={currentUser} onOpenMfa={() => setShowMfaModal(true)} />
-            )}
+            {activeTab === 'settings' && <UserSettings user={currentUser} onOpenMfa={() => setShowMfaModal(true)} />}
 
             {activeTab === 'platform' && <PlatformSettings isAdmin={isAdmin} />}
           </>

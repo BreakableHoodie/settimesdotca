@@ -126,7 +126,9 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               placeholder="user@example.com"
             />
             {errors.email && <p className="mt-1 text-sm text-red-400">{errors.email}</p>}
-            <p className="mt-1 text-xs text-gray-400">{formData.email.length}/{FIELD_LIMITS.email.max}</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {formData.email.length}/{FIELD_LIMITS.email.max}
+            </p>
           </div>
 
           {/* Password (only in create mode or if explicitly changing) */}
@@ -149,7 +151,9 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               />
               <PasswordStrength password={formData.password} />
               {errors.password && <p className="mt-1 text-sm text-red-400">{errors.password}</p>}
-              <p className="mt-1 text-xs text-gray-400">{formData.password.length}/{FIELD_LIMITS.password.max}</p>
+              <p className="mt-1 text-xs text-gray-400">
+                {formData.password.length}/{FIELD_LIMITS.password.max}
+              </p>
             </div>
           )}
 
@@ -171,7 +175,9 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               placeholder="John Doe"
             />
             {errors.name && <p className="mt-1 text-sm text-red-400">{errors.name}</p>}
-            <p className="mt-1 text-xs text-gray-400">{formData.name.length}/{FIELD_LIMITS.userName.max}</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {formData.name.length}/{FIELD_LIMITS.userName.max}
+            </p>
           </div>
 
           {/* Role */}

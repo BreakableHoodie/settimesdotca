@@ -31,8 +31,8 @@ function BandCard({ band, isSelected, onToggle, showVenue = true, clickable = tr
     isSelected
       ? 'bg-gradient-accent text-white shadow-lg scale-[1.02] ring-2 ring-warning-400 ring-offset-2 ring-offset-bg-navy'
       : isPlaying
-      ? 'bg-gradient-accent text-white shadow-glow-accent playing-now'
-      : 'bg-gradient-card text-white hover:bg-bg-purple/80 hover:scale-[1.01] shadow-md border border-white/10'
+        ? 'bg-gradient-accent text-white shadow-glow-accent playing-now'
+        : 'bg-gradient-card text-white hover:bg-bg-purple/80 hover:scale-[1.01] shadow-md border border-white/10'
   } relative`
 
   const labelBase = isSelected ? `Remove ${band.name} from my schedule` : `Add ${band.name} to my schedule`

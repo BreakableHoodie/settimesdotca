@@ -22,9 +22,9 @@ export default function BandForm({
 }) {
   // In global view, we're editing band profile, not event-specific performance details
   const requireSchedule = globalView ? false : Boolean(formData.event_id)
-  
+
   const isSchedulingExisting = !globalView && selectedProfile != null
-  
+
   const submitLabel = submitting
     ? 'Saving...'
     : mode === 'edit'
@@ -33,59 +33,58 @@ export default function BandForm({
         : 'Update Performance'
       : globalView
         ? 'Add Artist'
-        : isSchedulingExisting 
-          ? 'Add to Lineup' 
+        : isSchedulingExisting
+          ? 'Add to Lineup'
           : 'Create & Add Artist'
 
   return (
     <form onSubmit={onSubmit}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        
         {/* If scheduling existing artist, show summary instead of name input */}
         {isSchedulingExisting ? (
-           <div className="sm:col-span-2 bg-white/5 border border-white/10 rounded-lg p-4 flex items-center gap-4 mb-2">
-              {selectedProfile.photo_url ? (
-                 <img src={selectedProfile.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
-              ) : (
-                 <div className="w-16 h-16 rounded-full bg-band-orange/20 flex items-center justify-center text-band-orange text-xl font-bold">
-                    {selectedProfile.name.charAt(0)}
-                 </div>
-              )}
-              <div>
-                 <h3 className="text-xl font-bold text-white">{selectedProfile.name}</h3>
-                 <div className="text-white/60 text-sm">
-                    {[selectedProfile.origin, selectedProfile.genre].filter(Boolean).join(' • ')}
-                 </div>
-                 <div className="text-band-orange text-xs mt-1">Adding to lineup</div>
+          <div className="sm:col-span-2 bg-white/5 border border-white/10 rounded-lg p-4 flex items-center gap-4 mb-2">
+            {selectedProfile.photo_url ? (
+              <img src={selectedProfile.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-band-orange/20 flex items-center justify-center text-band-orange text-xl font-bold">
+                {selectedProfile.name.charAt(0)}
               </div>
-           </div>
-        ) : (
-           <div className="sm:col-span-2">
-              <div className="flex items-center gap-2 mb-2">
-                <label htmlFor="band-name" className="block text-text-primary text-sm font-medium">
-                  Artist Name *
-                </label>
-
-            <Tooltip content="Full name of the band or artist as it should appear publicly">
-              <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
-            </Tooltip>
+            )}
+            <div>
+              <h3 className="text-xl font-bold text-white">{selectedProfile.name}</h3>
+              <div className="text-white/60 text-sm">
+                {[selectedProfile.origin, selectedProfile.genre].filter(Boolean).join(' • ')}
+              </div>
+              <div className="text-band-orange text-xs mt-1">Adding to lineup</div>
+            </div>
           </div>
-          <Input
-            id="band-name"
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={onChange}
-            required
-            minLength={FIELD_LIMITS.bandName.min}
-            maxLength={FIELD_LIMITS.bandName.max}
-            placeholder="The Replacements"
-            fullWidth
-          />
-          <span className="text-xs text-white/50 mt-1 block">
-            {formData.name.length}/{FIELD_LIMITS.bandName.max}
-          </span>
-        </div>
+        ) : (
+          <div className="sm:col-span-2">
+            <div className="flex items-center gap-2 mb-2">
+              <label htmlFor="band-name" className="block text-text-primary text-sm font-medium">
+                Artist Name *
+              </label>
+
+              <Tooltip content="Full name of the band or artist as it should appear publicly">
+                <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+              </Tooltip>
+            </div>
+            <Input
+              id="band-name"
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={onChange}
+              required
+              minLength={FIELD_LIMITS.bandName.min}
+              maxLength={FIELD_LIMITS.bandName.max}
+              placeholder="The Replacements"
+              fullWidth
+            />
+            <span className="text-xs text-white/50 mt-1 block">
+              {formData.name.length}/{FIELD_LIMITS.bandName.max}
+            </span>
+          </div>
         )}
 
         {(globalView || !isSchedulingExisting) && (

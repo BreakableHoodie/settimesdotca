@@ -13,17 +13,10 @@ function Breadcrumbs({ items }) {
         {items.map((item, index) => (
           <li key={index} className="flex items-center gap-2">
             {index > 0 && (
-              <FontAwesomeIcon
-                icon={faChevronRight}
-                className="text-xs text-text-tertiary"
-                aria-hidden="true"
-              />
+              <FontAwesomeIcon icon={faChevronRight} className="text-xs text-text-tertiary" aria-hidden="true" />
             )}
             {item.href && index !== items.length - 1 ? (
-              <Link
-                to={item.href}
-                className="text-accent-400 hover:text-accent-500 transition-colors"
-              >
+              <Link to={item.href} className="text-accent-400 hover:text-accent-500 transition-colors">
                 {item.label}
               </Link>
             ) : (

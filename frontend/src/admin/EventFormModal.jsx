@@ -22,8 +22,7 @@ import { FIELD_LIMITS } from '../utils/validation'
  */
 export default function EventFormModal({ isOpen, onClose, event = null, onSave }) {
   const isEditing = !!event
-  const isPublished =
-    event?.status === 'published' || Number(event?.is_published) === 1
+  const isPublished = event?.status === 'published' || Number(event?.is_published) === 1
   const canEditSlug = !isEditing || !isPublished
 
   const [formData, setFormData] = useState({
@@ -69,9 +68,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
       youtube: currentFormData.social_youtube.trim(),
     }
 
-    const cleaned = Object.fromEntries(
-      Object.entries(links).filter(([, value]) => value),
-    )
+    const cleaned = Object.fromEntries(Object.entries(links).filter(([, value]) => value))
 
     if (!Object.keys(cleaned).length) {
       return null

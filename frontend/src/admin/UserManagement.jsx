@@ -35,10 +35,10 @@ export default function UserManagement() {
     setActionLoading(true)
     try {
       await usersApi.create(userData)
-        alert(`User ${userData.email} created successfully`)
-        setShowUserModal(false)
-        setEditingUser(null)
-        fetchUsers() // Refresh list
+      alert(`User ${userData.email} created successfully`)
+      setShowUserModal(false)
+      setEditingUser(null)
+      fetchUsers() // Refresh list
     } catch (error) {
       console.error('Failed to create user:', error)
       alert('Failed to create user')
@@ -57,10 +57,10 @@ export default function UserManagement() {
         name: userData.name,
         isActive: userData.isActive,
       })
-        alert(`User ${userData.email} updated successfully`)
-        setShowUserModal(false)
-        setEditingUser(null)
-        fetchUsers() // Refresh list
+      alert(`User ${userData.email} updated successfully`)
+      setShowUserModal(false)
+      setEditingUser(null)
+      fetchUsers() // Refresh list
     } catch (error) {
       console.error('Failed to update user:', error)
       alert('Failed to update user')
@@ -77,8 +77,8 @@ export default function UserManagement() {
     setActionLoading(true)
     try {
       await usersApi.remove(user.id)
-        alert(`User ${user.email} deleted successfully`)
-        fetchUsers() // Refresh list
+      alert(`User ${user.email} deleted successfully`)
+      fetchUsers() // Refresh list
     } catch (error) {
       console.error('Failed to delete user:', error)
       alert('Failed to delete user')
@@ -115,7 +115,7 @@ export default function UserManagement() {
     setActionLoading(true)
     try {
       await usersApi.update(user.id, { isActive: !user.isActive })
-        fetchUsers() // Refresh the list
+      fetchUsers() // Refresh the list
     } catch {
       alert('Failed to update user status')
     } finally {
@@ -261,9 +261,7 @@ export default function UserManagement() {
         </div>
         <div className="md:hidden divide-y divide-white/10">
           {users.length === 0 ? (
-            <div className="px-6 py-8 text-center text-gray-300">
-              No users found. Tap “Add User” to create one.
-            </div>
+            <div className="px-6 py-8 text-center text-gray-300">No users found. Tap “Add User” to create one.</div>
           ) : (
             users.map(user => (
               <div key={user.id} className="p-4 space-y-3">
@@ -278,10 +276,7 @@ export default function UserManagement() {
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-white/10 text-white">
                     {user.isActive ? 'Active' : 'Inactive'}
                   </span>
-                  <span>
-                    Last Login:{' '}
-                    {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
-                  </span>
+                  <span>Last Login: {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button

@@ -11,20 +11,12 @@ export default function RichTextEditor({
 }) {
   const modules = useMemo(
     () => ({
-      toolbar: [
-        ['bold', 'italic', 'underline'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        ['link'],
-        ['clean'],
-      ],
+      toolbar: [['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet' }], ['link'], ['clean']],
     }),
     []
   )
 
-  const formats = useMemo(
-    () => ['bold', 'italic', 'underline', 'list', 'bullet', 'link'],
-    []
-  )
+  const formats = useMemo(() => ['bold', 'italic', 'underline', 'list', 'bullet', 'link'], [])
 
   return (
     <div className="rich-text-editor" style={{ '--rich-text-min-height': `${minHeight}px` }}>
@@ -36,9 +28,7 @@ export default function RichTextEditor({
         modules={modules}
         formats={formats}
       />
-      <div className="text-white/50 text-xs mt-2">
-        Rich text enabled. Use the toolbar for basic formatting.
-      </div>
+      <div className="text-white/50 text-xs mt-2">Rich text enabled. Use the toolbar for basic formatting.</div>
     </div>
   )
 }

@@ -561,7 +561,14 @@ function EventCard({
               <h4 className="text-lg font-bold text-text-primary mb-4">All Performers ({allBandCount})</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {allBands.map(band => (
-                  <Card key={band.id} as={Link} to={`/band/${slugifyBandName(band.name)}`} padding="sm" hoverable className="group">
+                  <Card
+                    key={band.id}
+                    as={Link}
+                    to={`/band/${slugifyBandName(band.name)}`}
+                    padding="sm"
+                    hoverable
+                    className="group"
+                  >
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="font-semibold text-text-primary group-hover:text-accent-500 transition-colors flex-1">
                         {band.name}
@@ -586,9 +593,7 @@ function EventCard({
 
                       <div className="text-text-tertiary flex items-center gap-2">
                         <FontAwesomeIcon icon={faClock} aria-hidden="true" />
-                        <span>
-                          {formatTimeRange(band.start_time, band.end_time)}
-                        </span>
+                        <span>{formatTimeRange(band.start_time, band.end_time)}</span>
                       </div>
 
                       {band.genre && (
@@ -605,9 +610,7 @@ function EventCard({
             </div>
           )}
 
-          {detailsLoading && (
-            <div className="p-6 text-text-tertiary text-sm">Loading event details...</div>
-          )}
+          {detailsLoading && <div className="p-6 text-text-tertiary text-sm">Loading event details...</div>}
         </div>
       )}
     </Card>

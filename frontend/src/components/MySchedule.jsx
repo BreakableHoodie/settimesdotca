@@ -176,7 +176,9 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     return (
       <div className="py-12 text-center">
         <p className="text-white text-xl mb-2">Your schedule is empty</p>
-        <p className="text-accent-400">Tap on performances from &ldquo;All Performances&rdquo; to build your schedule</p>
+        <p className="text-accent-400">
+          Tap on performances from &ldquo;All Performances&rdquo; to build your schedule
+        </p>
       </div>
     )
   }

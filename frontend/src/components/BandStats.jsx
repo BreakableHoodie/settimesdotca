@@ -59,8 +59,7 @@ export default function BandStats({ stats }) {
     return null
   }
 
-  const entries = ORDER
-    .map(key => [key, stats?.[key]])
+  const entries = ORDER.map(key => [key, stats?.[key]])
     .filter(([, value]) => value !== null && value !== undefined)
     .filter(([key]) => {
       if (key === 'average_set_minutes' && totalShows < 3) return false

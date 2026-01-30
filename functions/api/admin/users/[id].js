@@ -371,7 +371,7 @@ export async function onRequestDelete(context) {
     // Also invalidate all sessions for this user
     await DB.prepare(
       `
-      DELETE FROM sessions WHERE user_id = ?
+      DELETE FROM lucia_sessions WHERE user_id = ?
     `,
     )
       .bind(userId)

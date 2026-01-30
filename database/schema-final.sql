@@ -78,11 +78,28 @@ CREATE TABLE IF NOT EXISTS band_profiles (
   origin_region TEXT,
   contact_email TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
+  total_views INTEGER DEFAULT 0,
+  total_social_clicks INTEGER DEFAULT 0,
+  popularity_score REAL DEFAULT 0,
   social_links TEXT, -- JSON
   created_by_user_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+);
+
+-- Artist daily stats (privacy-first, aggregated)
+CREATE TABLE IF NOT EXISTS artist_daily_stats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  band_profile_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  page_views INTEGER DEFAULT 0,
+  profile_clicks INTEGER DEFAULT 0,
+  social_clicks INTEGER DEFAULT 0,
+  share_count INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(band_profile_id, date),
+  FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE CASCADE
 );
 
 -- Performances (v2 + created_by)
@@ -174,6 +191,18 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Lucia sessions table
+CREATE TABLE IF NOT EXISTS lucia_sessions (
+  id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at INTEGER NOT NULL,
+  ip_address TEXT,
+  user_agent TEXT,
+  remember_me INTEGER DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_activity_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ============================================================================
 -- 3. INDEXES & TRIGGERS
 -- ============================================================================
@@ -192,6 +221,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_band_profiles_normalized ON band_profiles(
 CREATE INDEX IF NOT EXISTS idx_band_profiles_genre ON band_profiles(genre);
 CREATE INDEX IF NOT EXISTS idx_band_profiles_name ON band_profiles(name);
 
+-- Artist Daily Stats
+CREATE INDEX IF NOT EXISTS idx_artist_stats_date ON artist_daily_stats(date);
+CREATE INDEX IF NOT EXISTS idx_artist_stats_band ON artist_daily_stats(band_profile_id);
+
 -- Performances
 CREATE INDEX IF NOT EXISTS idx_performances_event ON performances(event_id);
 CREATE INDEX IF NOT EXISTS idx_performances_band ON performances(band_profile_id);
@@ -206,6 +239,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_invite_codes_code ON invite_codes(code);
 CREATE INDEX IF NOT EXISTS idx_password_reset_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_lucia_sessions_user_id ON lucia_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_lucia_sessions_expires_at ON lucia_sessions(expires_at);
 
 -- Triggers for updated_at
 CREATE TRIGGER IF NOT EXISTS update_band_profile_timestamp AFTER UPDATE ON band_profiles BEGIN UPDATE band_profiles SET updated_at = datetime('now') WHERE id = NEW.id; END;

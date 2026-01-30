@@ -77,7 +77,7 @@ export async function onRequestPost(context) {
     // Revoke existing sessions to force re-authentication
     await DB.prepare(
       `
-      DELETE FROM sessions
+      DELETE FROM lucia_sessions
       WHERE user_id = ?
     `,
     )

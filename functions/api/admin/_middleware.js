@@ -1,14 +1,10 @@
 // Admin authentication middleware
 // Applies to all /api/admin/* endpoints except /api/admin/auth/*
 
-import { getCookie, setSessionCookie } from "../../utils/cookies.js";
-import { generateCSRFToken, setCSRFCookie } from "../../utils/csrf.js";
-import { validateCSRFMiddleware } from "../../utils/csrf.js";
+import { getCookie } from "../../utils/cookies.js";
+import { generateCSRFToken, setCSRFCookie, validateCSRFMiddleware } from "../../utils/csrf.js";
 import { getClientIP } from "../../utils/request.js";
-
-// Verify session token and get user
-const SESSION_IDLE_MINUTES = 30;
-const SESSION_REFRESH_THRESHOLD_SECONDS = 60;
+import { initializeLucia, SESSION_CONFIG } from "../../utils/auth.js";
 
 function parseSessionDate(value) {
   if (!value) return null;
@@ -17,116 +13,136 @@ function parseSessionDate(value) {
   return new Date(value.replace(" ", "T") + "Z");
 }
 
-async function verifySession(DB, sessionToken) {
-  if (!sessionToken) {
-    return null;
+function normalizeUser(user) {
+  if (!user) return null;
+  const displayName =
+    user.name || [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+  return {
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    name: displayName,
+    firstName: user.firstName || null,
+    lastName: user.lastName || null,
+    isActive: user.isActive,
+  };
+}
+
+async function resolveSession(request, env) {
+  const lucia = initializeLucia(env.DB, request);
+  const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true";
+  const sessionId =
+    lucia.readSessionCookie(request.headers.get("Cookie") ?? "") ||
+    (allowHeaderAuth
+      ? request.headers.get("Authorization")?.replace("Bearer ", "")
+      : null);
+
+  if (!sessionId) {
+    return { lucia, sessionId: null, session: null, user: null, sessionMeta: null };
   }
 
-  // Check if sessions table exists (will be created by 2FA migration)
   try {
-    const session = await DB.prepare(
-      `
-      SELECT s.id as session_id,
-             s.session_token,
-             s.expires_at,
-             s.last_activity_at,
-             u.id as user_id,
-             u.email,
-             u.role,
-             u.name,
-             u.first_name,
-             u.last_name,
-             u.is_active
-      FROM sessions s
-      INNER JOIN users u ON s.user_id = u.id
-      WHERE s.session_token = ? AND s.expires_at > datetime('now')
-    `
+    const { session, user } = await lucia.validateSession(sessionId);
+    if (!session || !user) {
+      return { lucia, sessionId, session: null, user: null, sessionMeta: null };
+    }
+
+    const sessionMeta = await env.DB.prepare(
+      "SELECT created_at, last_activity_at FROM lucia_sessions WHERE id = ?"
     )
-      .bind(sessionToken)
+      .bind(sessionId)
       .first();
 
-    if (session && session.is_active === 1) {
-      const now = new Date();
-      const lastActivity = parseSessionDate(session.last_activity_at) || now;
-      const expiresAtDate = parseSessionDate(session.expires_at) || now;
-      const secondsSinceActivity = Math.floor(
-        (now.getTime() - lastActivity.getTime()) / 1000
-      );
-      const secondsUntilExpiry = Math.floor(
-        (expiresAtDate.getTime() - now.getTime()) / 1000
-      );
-      let expiresAt = session.expires_at;
-      let lastActivityAt = session.last_activity_at;
-      let refreshed = false;
-
-      if (
-        secondsSinceActivity >= SESSION_REFRESH_THRESHOLD_SECONDS ||
-        secondsUntilExpiry <= SESSION_REFRESH_THRESHOLD_SECONDS
-      ) {
-        const refreshedExpiry = new Date(
-          now.getTime() + SESSION_IDLE_MINUTES * 60 * 1000
-        ).toISOString();
-
-        await DB.prepare(
-          `
-          UPDATE sessions
-          SET last_activity_at = datetime('now'),
-              expires_at = ?
-          WHERE session_token = ?
-        `
-        )
-          .bind(refreshedExpiry, sessionToken)
-          .run();
-
-        expiresAt = refreshedExpiry;
-        lastActivityAt = now.toISOString();
-        refreshed = true;
-      }
-
-      return {
-        user: {
-          userId: session.user_id,
-          email: session.email,
-          role: session.role,
-          name:
-            session.name ||
-            [session.first_name, session.last_name].filter(Boolean).join(" ") ||
-            null,
-          firstName: session.first_name || null,
-          lastName: session.last_name || null,
-        },
-        session: {
-          sessionToken: session.session_token,
-          expiresAt,
-          lastActivityAt,
-        },
-        sessionRefreshed: refreshed,
-      };
-    }
+    return { lucia, sessionId, session, user, sessionMeta };
   } catch (error) {
-    // Log the actual error for debugging
-    console.error("Session verification error:", error.message);
+    console.error("Session validation error:", error);
+    return { lucia, sessionId, session: null, user: null, sessionMeta: null };
+  }
+}
 
-    // Check if it's a missing table error
-    if (error.message?.includes("no such table")) {
-      console.error(
-        "CRITICAL: Required auth tables missing. Run database migrations."
-      );
+async function enforceSession(request, env) {
+  const result = await resolveSession(request, env);
+  const { lucia, sessionId, session, user, sessionMeta } = result;
+
+  if (!session || !user) {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    if (sessionId) {
+      headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
     }
-
-    return null;
+    return {
+      response: new Response(
+        JSON.stringify({ error: "Unauthorized", message: "Valid session required" }),
+        { status: 401, headers }
+      ),
+      result,
+    };
   }
 
-  return null;
+  if (!user.isActive) {
+    return {
+      response: new Response(
+        JSON.stringify({ error: "Account deactivated" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      ),
+      result,
+    };
+  }
+
+  const now = new Date();
+  const createdAt = parseSessionDate(sessionMeta?.created_at) || now;
+  const lastActivityAt = parseSessionDate(sessionMeta?.last_activity_at) || createdAt;
+
+  const idleTimeout =
+    user.role === "admin"
+      ? SESSION_CONFIG.adminIdleTimeout
+      : SESSION_CONFIG.idleTimeout;
+  const absoluteTimeout =
+    user.role === "admin"
+      ? SESSION_CONFIG.adminAbsoluteTimeout
+      : SESSION_CONFIG.absoluteTimeout;
+
+  const idleElapsed = now.getTime() - lastActivityAt.getTime();
+  const absoluteElapsed = now.getTime() - createdAt.getTime();
+
+  if (idleElapsed > idleTimeout || absoluteElapsed > absoluteTimeout) {
+    await lucia.invalidateSession(sessionId);
+    const headers = new Headers({ "Content-Type": "application/json" });
+    headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
+
+    return {
+      response: new Response(
+        JSON.stringify({
+          error: "Session expired",
+          reason: idleElapsed > idleTimeout ? "inactivity" : "absolute",
+        }),
+        { status: 401, headers }
+      ),
+      result,
+    };
+  }
+
+  await env.DB.prepare(
+    "UPDATE lucia_sessions SET last_activity_at = datetime('now') WHERE id = ?"
+  )
+    .bind(sessionId)
+    .run();
+
+  const idleRemaining = Math.max(0, idleTimeout - idleElapsed);
+  const absoluteRemaining = Math.max(0, absoluteTimeout - absoluteElapsed);
+  const timeRemaining = Math.min(idleRemaining, absoluteRemaining);
+
+  return {
+    result,
+    pendingCookie: session.fresh ? lucia.createSessionCookie(session.id).serialize() : null,
+    timing: { idleRemaining, absoluteRemaining, timeRemaining },
+  };
 }
 
 // Check if user has required permission based on role hierarchy
 // Role hierarchy: admin (3) > editor (2) > viewer (1)
 export async function checkPermission(context, requiredRole) {
-  // console.log('checkPermission context:', context);
   const { request, env, data } = context;
 
-  // Optimization: Use user from context if available (set by onRequest)
   if (data && data.user) {
     const user = data.user;
     const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
@@ -149,40 +165,14 @@ export async function checkPermission(context, requiredRole) {
     return { error: false, user };
   }
 
-  // Fallback: Verify session manually (if middleware didn't run or for testing)
-  const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true";
-  // SECURITY: Read session token from HTTPOnly cookie
-  const sessionToken =
-    getCookie(request, "session_token") ||
-    (allowHeaderAuth
-      ? request.headers.get("Authorization")?.replace("Bearer ", "")
-      : null);
-
-  if (!sessionToken) {
-    return {
-      error: true,
-      response: new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      }),
-    };
+  const auth = await enforceSession(request, env);
+  if (auth.response) {
+    return { error: true, response: auth.response };
   }
 
-  const sessionData = await verifySession(env.DB, sessionToken);
-
-  if (!sessionData) {
-    return {
-      error: true,
-      response: new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      }),
-    };
-  }
-
-  const user = sessionData.user;
+  const normalizedUser = normalizeUser(auth.result.user);
   const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
-  const userLevel = roleHierarchy[user.role] || 0;
+  const userLevel = roleHierarchy[normalizedUser.role] || 0;
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 
   if (userLevel < requiredLevel) {
@@ -198,7 +188,7 @@ export async function checkPermission(context, requiredRole) {
     };
   }
 
-  return { error: false, user, session: sessionData.session };
+  return { error: false, user: normalizedUser, lucia: auth.result.lucia, session: auth.result.session };
 }
 
 // Audit log function - logs all admin actions
@@ -248,83 +238,65 @@ export async function onRequest(context) {
     return csrfError;
   }
 
-  const { DB } = env;
   const ipAddress = getClientIP(request);
 
   try {
-    // SECURITY: Read session token from HTTPOnly cookie
-    const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true";
-    const sessionToken =
-      getCookie(request, "session_token") ||
-      (allowHeaderAuth
-        ? request.headers.get("Authorization")?.replace("Bearer ", "")
-        : null);
-
-    // Verify session
-    const sessionData = await verifySession(DB, sessionToken);
-
-    if (!sessionData) {
-      return new Response(
-        JSON.stringify({
-          error: "Unauthorized",
-          message: "Valid session required",
-        }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    const auth = await enforceSession(request, env);
+    if (auth.response) {
+      return auth.response;
     }
 
-    // Refresh session cookie when expiry is extended in the DB
-    if (sessionData?.sessionRefreshed) {
-      const currentCookie = getCookie(request, "session_token");
-      if (currentCookie) {
-        const cookieHeader = setSessionCookie(currentCookie, false, request);
-        context.data = {
-          ...context.data,
-          pendingSetCookie: context.data?.pendingSetCookie
-            ? [...context.data.pendingSetCookie, cookieHeader]
-            : [cookieHeader],
-        };
-      }
+    const { result, pendingCookie, timing } = auth;
+    const { session, user, sessionId, sessionMeta, lucia } = result;
+
+    const normalizedUser = normalizeUser(user);
+
+    const sessionData = {
+      id: session.id,
+      session_token: session.id,
+      user_id: normalizedUser.userId,
+      expires_at: session.expiresAt?.toISOString?.() || null,
+      created_at: sessionMeta?.created_at || null,
+      last_activity_at: sessionMeta?.last_activity_at || new Date().toISOString(),
+    };
+
+    const pendingCookies = [];
+    if (pendingCookie) {
+      pendingCookies.push(pendingCookie);
     }
 
-    // Refresh CSRF token cookie if missing (keeps long sessions working)
     const csrfCookie = getCookie(request, "csrf_token");
     if (!csrfCookie) {
-      const csrfToken = generateCSRFToken(request, env, sessionToken);
-      const csrfCookieHeader = setCSRFCookie(csrfToken, request);
-      context.data = {
-        ...context.data,
-        pendingSetCookie: context.data?.pendingSetCookie
-          ? [...context.data.pendingSetCookie, csrfCookieHeader]
-          : [csrfCookieHeader],
-      };
+      const csrfToken = generateCSRFToken(request, env, sessionId || session.id);
+      pendingCookies.push(setCSRFCookie(csrfToken, request));
     }
 
-    // Store auth info in context for handlers to use
     context.data = {
       ...context.data,
       authenticated: true,
-      user: sessionData.user,
-      session: sessionData.session,
+      user: normalizedUser,
+      session: sessionData,
       ipAddress,
+      lucia,
     };
 
     const response = await next();
 
-    if (context.data?.pendingSetCookie) {
-      const headers = new Headers(response.headers);
-      context.data.pendingSetCookie.forEach((cookie) => headers.append("Set-Cookie", cookie));
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
+    const headers = new Headers(response.headers);
+    pendingCookies.forEach((cookie) => headers.append("Set-Cookie", cookie));
+
+    if (timing) {
+      headers.set("X-Session-Expires-In", Math.floor(timing.timeRemaining / 1000).toString());
+      headers.set("X-Session-Idle-Expires-In", Math.floor(timing.idleRemaining / 1000).toString());
+      headers.set("X-Session-Absolute-Expires-In", Math.floor(timing.absoluteRemaining / 1000).toString());
+      headers.set("X-Session-Warning", timing.timeRemaining < 5 * 60 * 1000 ? "true" : "false");
     }
 
-    return response;
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
   } catch (error) {
     console.error("Auth middleware error:", error);
 

@@ -44,6 +44,17 @@ export function createTestDB() {
       expires_at TEXT NOT NULL
     );
 
+    CREATE TABLE lucia_sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      remember_me INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_activity_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE mfa_challenges (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       token TEXT NOT NULL UNIQUE,
@@ -98,11 +109,27 @@ export function createTestDB() {
       origin_region TEXT,
       contact_email TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
+      total_views INTEGER DEFAULT 0,
+      total_social_clicks INTEGER DEFAULT 0,
+      popularity_score REAL DEFAULT 0,
       description TEXT,
       photo_url TEXT,
       social_links TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE artist_daily_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      band_profile_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      page_views INTEGER DEFAULT 0,
+      profile_clicks INTEGER DEFAULT 0,
+      social_clicks INTEGER DEFAULT 0,
+      share_count INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(band_profile_id, date),
+      FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE CASCADE
     );
 
     CREATE TABLE performances (
@@ -435,10 +462,10 @@ export function createTestEnv({ role = "editor" } = {}) {
   // Create a valid session for the test user
   const userId = role === "admin" ? 1 : role === "editor" ? 2 : 3;
   const sessionId = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
 
   rawDb.prepare(
-    "INSERT INTO sessions (session_token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
   ).run(sessionId, userId, expiresAt, "127.0.0.1", "test-agent");
 
   return {

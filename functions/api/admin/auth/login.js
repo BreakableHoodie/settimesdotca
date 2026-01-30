@@ -3,10 +3,10 @@
 // Body: { email: string, password: string }
 // Returns: { success: true, user: object } or error
 
-import { setSessionCookie } from "../../../utils/cookies.js";
 import { verifyPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
+import { initializeLucia } from "../../../utils/auth.js";
 
 // Rate limiting: check failed login attempts
 async function checkRateLimit(DB, email, ipAddress) {
@@ -249,16 +249,15 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Generate session token
-    const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 30 * 60000).toISOString(); // 30 min default
+    const lucia = initializeLucia(DB, request);
+    const session = await lucia.createSession(user.id, {});
 
-    // Create session
     await DB.prepare(
-      `INSERT INTO sessions (session_token, user_id, ip_address, user_agent, expires_at)
-       VALUES (?, ?, ?, ?, ?)`
+      `UPDATE lucia_sessions
+       SET ip_address = ?, user_agent = ?, remember_me = ?
+       WHERE id = ?`
     )
-      .bind(sessionToken, user.id, ipAddress, userAgent, expiresAt)
+      .bind(ipAddress, userAgent, 0, session.id)
       .run();
 
     // Update last login
@@ -277,16 +276,13 @@ export async function onRequestPost(context) {
       .run();
 
     // Generate CSRF token
-    const csrfToken = generateCSRFToken(request, env, sessionToken);
+    const csrfToken = generateCSRFToken(request, env, session.id);
 
     // Set secure HTTPOnly session cookie and CSRF cookie
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append(
-      "Set-Cookie",
-      setSessionCookie(sessionToken, false, request)
-    );
+    headers.append("Set-Cookie", lucia.createSessionCookie(session.id).serialize());
     headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     return new Response(

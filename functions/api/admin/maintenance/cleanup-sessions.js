@@ -15,11 +15,11 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const now = new Date().toISOString();
+    const now = Math.floor(Date.now() / 1000);
 
     // Delete expired sessions
     const result = await DB.prepare(
-      "DELETE FROM sessions WHERE expires_at < ?"
+      "DELETE FROM lucia_sessions WHERE expires_at < ?"
     )
       .bind(now)
       .run();
@@ -28,7 +28,7 @@ export async function onRequestPost(context) {
       env,
       auth.user.userId,
       "sessions.cleanup",
-      "sessions",
+      "lucia_sessions",
       null,
       { deleted_count: result.meta.changes },
       getClientIP(request),

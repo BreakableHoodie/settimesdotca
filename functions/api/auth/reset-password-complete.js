@@ -194,7 +194,7 @@ export async function onRequestPost(context) {
     // Invalidate all existing sessions for this user
     await DB.prepare(
       `
-      DELETE FROM sessions
+      DELETE FROM lucia_sessions
       WHERE user_id = ?
     `,
     )

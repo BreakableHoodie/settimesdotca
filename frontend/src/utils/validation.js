@@ -1,6 +1,8 @@
 // Input validation and sanitization utilities
 // Security: Prevent XSS and injection attacks
 
+import DOMPurify from 'isomorphic-dompurify'
+
 /**
  * Centralized field length limits - MUST match backend limits
  */
@@ -56,27 +58,30 @@ export const FIELD_LIMITS = {
  * @param {number} maxLength - Maximum allowed length
  * @returns {string} Sanitized string
  */
-function repeatReplace(str, regex, replacement) {
-  let previous
-  let current = str
-  do {
-    previous = current
-    current = current.replace(regex, replacement)
-  } while (current !== previous)
-  return current
+export function sanitizeInput(input, maxLength = 1000) {
+  if (typeof input !== 'string') return ''
+  const sanitized = DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: [],
+  })
+  return sanitized.trim().substring(0, maxLength)
 }
 
 export function sanitizeString(input, maxLength = 1000) {
-  if (!input) return ''
+  return sanitizeInput(input, maxLength)
+}
 
-  let sanitized = String(input)
-    .trim()
-    .replace(/[<>]/g, '') // Remove < and > to prevent HTML injection
-    .replace(/(?:javascript|data|vbscript):/gi, '') // Remove dangerous URL-like protocols
-
-  sanitized = repeatReplace(sanitized, /on\w+=/gi, '') // Remove event handlers (onclick=, etc.) robustly
-
-  return sanitized.substring(0, maxLength)
+export function sanitizeUrl(url) {
+  if (!url) return ''
+  const sanitized = DOMPurify.sanitize(String(url), {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: [],
+  }).trim()
+  if (!sanitized) return ''
+  if (!/^https?:\/\//i.test(sanitized)) {
+    return `https://${sanitized}`
+  }
+  return sanitized
 }
 
 /**
@@ -87,14 +92,8 @@ export function sanitizeString(input, maxLength = 1000) {
 export function validateUrl(url) {
   if (!url) return null
 
-  const sanitized = sanitizeString(url)
+  const sanitized = sanitizeUrl(url)
   if (!sanitized) return null
-
-  // Must start with http:// or https://
-  if (!sanitized.match(/^https?:\/\//i)) {
-    // Auto-add https:// if missing
-    return `https://${sanitized}`
-  }
 
   return sanitized
 }
@@ -196,31 +195,7 @@ export function validateSlug(slug) {
  * @returns {string}
  */
 export function sanitizeVenueAddress(address) {
-  if (!address) return ''
-
-  let sanitized = String(address).trim()
-  let previous
-
-  // Repeatedly apply multi-character replacements until the string stabilizes
-  do {
-    previous = sanitized
-    sanitized = sanitized
-      .replace(/[<>]/g, '') // Remove HTML angle brackets
-      .replace(/javascript:/gi, '') // Remove script protocols
-      .replace(/on\w+=/gi, '') // Remove event handlers
-  } while (sanitized !== previous)
-
-  // Enforce length limit first, then re-sanitize until the truncated string stabilizes
-  sanitized = sanitized.substring(0, 200) // Limit to reasonable length
-  do {
-    previous = sanitized
-    sanitized = sanitized
-      .replace(/[<>]/g, '') // Remove HTML angle brackets
-      .replace(/javascript:/gi, '') // Remove script protocols
-      .replace(/on\w+=/gi, '') // Remove event handlers
-  } while (sanitized !== previous)
-
-  return sanitized.substring(0, 200) // Final length enforcement
+  return sanitizeInput(address, 200)
 }
 
 /**

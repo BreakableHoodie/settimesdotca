@@ -1,12 +1,7 @@
 // Input validation utilities for Cloudflare Workers
 // Provides reusable validation functions for API endpoints
 
-/**
- * Email validation regex
- * Improved pattern: prevents consecutive dots and leading dot in domain
- * Matches most common email formats, not fully RFC 5322 compliant
- */
-const EMAIL_REGEX = /^[^\s@]+@([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
+import { validate as validateEmail } from "email-validator";
 
 /**
  * UUID validation regex (RFC 4122 compliant)
@@ -109,7 +104,7 @@ export function isValidEmail(email) {
   if (!email || typeof email !== "string") {
     return false;
   }
-  return EMAIL_REGEX.test(email.trim());
+  return validateEmail(email.trim());
 }
 
 /**
@@ -560,7 +555,16 @@ export function validateEntity(data, schema) {
         errors[field] = `${rules.label || field} must be a valid email address`;
         continue;
       }
-      sanitized[field] = value.trim().toLowerCase();
+      const sanitizedEmail = value.trim().toLowerCase();
+      if (rules.min !== undefined && sanitizedEmail.length < rules.min) {
+        errors[field] = `${rules.label || field} must be at least ${rules.min} characters`;
+        continue;
+      }
+      if (rules.max !== undefined && sanitizedEmail.length > rules.max) {
+        errors[field] = `${rules.label || field} must be no more than ${rules.max} characters`;
+        continue;
+      }
+      sanitized[field] = sanitizedEmail;
     } else if (rules.type === "url") {
       if (typeof value !== "string") {
         errors[field] = `${rules.label || field} must be a string`;
@@ -709,13 +713,11 @@ export const VALIDATION_SCHEMAS = {
       default: null,
     },
     contact_email: {
-      type: "string",
+      type: "email",
       required: false,
       label: "Contact email",
       min: FIELD_LIMITS.venueContactEmail.min,
       max: FIELD_LIMITS.venueContactEmail.max,
-      pattern: EMAIL_REGEX,
-      patternError: "Contact email must be a valid email address",
       default: null,
     },
   },
@@ -773,12 +775,10 @@ export const VALIDATION_SCHEMAS = {
       max: FIELD_LIMITS.bandOriginRegion.max,
     },
     contact_email: {
-      type: "string",
+      type: "email",
       required: false,
       label: "Contact email",
       max: FIELD_LIMITS.bandContactEmail.max,
-      pattern: EMAIL_REGEX,
-      patternError: "Contact email must be a valid email address",
     },
     genre: {
       type: "string",

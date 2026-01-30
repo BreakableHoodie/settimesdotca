@@ -44,9 +44,26 @@ CREATE TABLE IF NOT EXISTS band_profiles (
   origin_region TEXT,
   contact_email TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
+  total_views INTEGER DEFAULT 0,
+  total_social_clicks INTEGER DEFAULT 0,
+  popularity_score REAL DEFAULT 0,
   social_links TEXT,                     -- JSON: {"bandcamp": "url", "instagram": "@handle", ...}
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Artist daily stats (privacy-first, aggregated)
+CREATE TABLE IF NOT EXISTS artist_daily_stats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  band_profile_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  page_views INTEGER DEFAULT 0,
+  profile_clicks INTEGER DEFAULT 0,
+  social_clicks INTEGER DEFAULT 0,
+  share_count INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(band_profile_id, date),
+  FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE CASCADE
 );
 
 -- Performances: when/where a band played (replaces old bands table)
@@ -98,6 +115,10 @@ CREATE INDEX IF NOT EXISTS idx_events_slug ON events(slug);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_band_profiles_normalized ON band_profiles(name_normalized);
 CREATE INDEX IF NOT EXISTS idx_band_profiles_genre ON band_profiles(genre);
 CREATE INDEX IF NOT EXISTS idx_band_profiles_name ON band_profiles(name);
+
+-- Artist daily stats indexes
+CREATE INDEX IF NOT EXISTS idx_artist_stats_date ON artist_daily_stats(date);
+CREATE INDEX IF NOT EXISTS idx_artist_stats_band ON artist_daily_stats(band_profile_id);
 
 -- Performance indexes (replaces old band indexes)
 CREATE INDEX IF NOT EXISTS idx_performances_event ON performances(event_id);

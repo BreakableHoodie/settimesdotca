@@ -173,12 +173,19 @@ export function validateSlug(slug) {
 export function sanitizeVenueAddress(address) {
   if (!address) return ''
 
-  return String(address)
-    .trim()
-    .replace(/[<>]/g, '') // Remove HTML tags
-    .replace(/javascript:/gi, '') // Remove JavaScript protocol
-    .replace(/data:/gi, '') // Remove data protocol
-    .replace(/vbscript:/gi, '') // Remove VBScript protocol
+  let sanitized = String(address).trim()
+  let previous
+
+  // Repeatedly apply multi-character replacements until the string stabilizes
+  do {
+    previous = sanitized
+    sanitized = sanitized
+      .replace(/[<>]/g, '') // Remove HTML angle brackets
+      .replace(/javascript:/gi, '') // Remove script protocols
+      .replace(/on\w+=/gi, '') // Remove event handlers
+  } while (sanitized !== previous)
+
+  return sanitized.substring(0, 200) // Limit to reasonable length
     .replace(/on\w+=/gi, '') // Remove event handlers
     .substring(0, 200) // Limit to reasonable length
 }

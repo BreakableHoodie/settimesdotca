@@ -98,6 +98,9 @@ CREATE TABLE IF NOT EXISTS users (
   first_name TEXT,
   last_name TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
+  activation_token TEXT,
+  activation_token_expires_at TEXT,
+  activated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_login TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
@@ -230,6 +233,7 @@ CREATE INDEX IF NOT EXISTS idx_bands_venue ON bands(venue_id);
 CREATE INDEX IF NOT EXISTS idx_performances_event ON performances(event_id);
 CREATE INDEX IF NOT EXISTS idx_performances_venue ON performances(venue_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_activation_token ON users(activation_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_auth_attempts_email ON auth_attempts(email);
@@ -242,7 +246,7 @@ CREATE INDEX IF NOT EXISTS idx_rate_limit_ip ON rate_limit(ip_address);
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================
 
-INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active) VALUES
-(1, 'admin@settimes.ca', 'Admin', 'LMdE99cXULbK/0Sljsj5Ew==:URyOncHwAcdAfHWrHilKVm/wqh1990VFLF2esF7uFNM=', 'admin', 1),
-(2, 'editor@settimes.ca', 'Editor', '6xX0ohzMf1PumBFMY2Z+/w==:EKlNs262pgHEwd3JLrg0Q7fuUea+gNU+LxmXVsQPUZY=', 'editor', 1),
-(3, 'viewer@settimes.ca', 'Viewer', 'xVcJyrdL5oF4cB9J9iFxZA==:84JeF551+ZCfXsEb+g9d+btTs8hPxdiPZ7yunFbVfYM=', 'viewer', 1);
+INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active, activated_at) VALUES
+(1, 'admin@settimes.ca', 'Admin', 'LMdE99cXULbK/0Sljsj5Ew==:URyOncHwAcdAfHWrHilKVm/wqh1990VFLF2esF7uFNM=', 'admin', 1, datetime('now')),
+(2, 'editor@settimes.ca', 'Editor', '6xX0ohzMf1PumBFMY2Z+/w==:EKlNs262pgHEwd3JLrg0Q7fuUea+gNU+LxmXVsQPUZY=', 'editor', 1, datetime('now')),
+(3, 'viewer@settimes.ca', 'Viewer', 'xVcJyrdL5oF4cB9J9iFxZA==:84JeF551+ZCfXsEb+g9d+btTs8hPxdiPZ7yunFbVfYM=', 'viewer', 1, datetime('now'));

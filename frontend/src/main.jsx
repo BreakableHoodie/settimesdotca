@@ -7,6 +7,7 @@ import EventsPage from './pages/EventsPage.jsx'
 import EmbedPage from './pages/EmbedPage.jsx'
 import SubscribePage from './pages/SubscribePage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
+import ActivatePage from './pages/ActivatePage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
 import './index.css'
@@ -85,6 +86,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/embed/:slug" element={<EmbedPage />} />
             <Route path="/subscribe" element={<SubscribePage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/activate" element={<ActivatePage />} />
 
             {/* Band profiles: Lazy loaded */}
             <Route

@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT,
   first_name TEXT,
   last_name TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  activation_token TEXT,
+  activation_token_expires_at TEXT,
+  activated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   last_login TEXT
@@ -177,6 +181,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 -- Users
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_activation_token ON users(activation_token);
 
 -- Events
 CREATE INDEX IF NOT EXISTS idx_events_published ON events(is_published);

@@ -156,7 +156,7 @@ export const authApi = {
 
     // SECURITY: Session token and CSRF token are now in cookies
     // Store user data in localStorage for UI display
-    if (data.user) {
+    if (data.user && !data.requiresActivation) {
       window.localStorage.setItem('userEmail', data.user.email)
       window.localStorage.setItem('userName', resolveFullName(data.user))
       if (data.user.firstName || data.user.lastName) {
@@ -167,6 +167,15 @@ export const authApi = {
     }
 
     return data
+  },
+
+  async resendActivation(email) {
+    const response = await fetch('/api/auth/resend-activation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    return handleResponse(response)
   },
 
   async login(email, password) {

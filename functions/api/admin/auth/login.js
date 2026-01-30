@@ -83,6 +83,7 @@ export async function onRequestPost(context) {
     const user = await DB.prepare(
       `
       SELECT id, email, password_hash, name, first_name, last_name, role, is_active,
+             activation_token, activation_token_expires_at, activated_at,
              totp_enabled, totp_secret
       FROM users
       WHERE email = ?
@@ -112,7 +113,30 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Check if account is active
+    // Check if account is activated
+    if (user.is_active === 0 && !user.activated_at) {
+      await DB.prepare(
+        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+         VALUES (?, ?, ?, ?, 'login', 0, 'activation_required')`
+      )
+        .bind(user.id, email, ipAddress, userAgent)
+        .run();
+
+      return new Response(
+        JSON.stringify({
+          error: "Account not activated",
+          message:
+            "Please check your email and activate your account before logging in.",
+          requiresActivation: true,
+        }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Check if account is active (deactivated)
     if (user.is_active === 0) {
       // Log failed attempt (account disabled)
       await DB.prepare(

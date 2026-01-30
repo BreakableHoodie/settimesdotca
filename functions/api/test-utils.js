@@ -13,6 +13,9 @@ export function createTestDB() {
       name TEXT,
       first_name TEXT,
       last_name TEXT,
+      activation_token TEXT,
+      activation_token_expires_at TEXT,
+      activated_at TEXT,
       totp_secret TEXT,
       totp_enabled INTEGER DEFAULT 0,
       webauthn_enabled INTEGER DEFAULT 0,
@@ -220,7 +223,7 @@ export function createTestDB() {
   `);
 
   const insertUser = db.prepare(
-    "INSERT INTO users (email, role) VALUES (?, ?)"
+    "INSERT INTO users (email, role, activated_at) VALUES (?, ?, datetime('now'))"
   );
   insertUser.run("admin@test", "admin");
   insertUser.run("editor@test", "editor");

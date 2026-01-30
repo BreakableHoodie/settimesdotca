@@ -153,3 +153,35 @@ export function buildResetPasswordEmail({ resetUrl, recipientName }) {
     }),
   };
 }
+
+export function buildActivationEmail({ activationUrl, recipientName }) {
+  const intro = recipientName
+    ? `Hi ${recipientName}, welcome to SetTimes!`
+    : "Welcome to SetTimes!";
+
+  const bodyHtml = `
+    <p style="margin:0 0 12px;">Click the button above to activate your account and start managing events.</p>
+    <p style="margin:0;">This link expires in 24 hours.</p>
+  `;
+
+  return {
+    subject: "Activate your SetTimes account",
+    text: [
+      intro,
+      "",
+      `Activate your account: ${activationUrl}`,
+      "",
+      "This link expires in 24 hours.",
+      "",
+      "If you did not create this account, you can ignore this email.",
+    ].join("\n"),
+    html: renderEmail({
+      title: "Activate your account",
+      preheader: "Complete your SetTimes registration",
+      intro,
+      ctaLabel: "Activate Account",
+      ctaUrl: activationUrl,
+      bodyHtml,
+    }),
+  };
+}

@@ -8,6 +8,7 @@ import { generatePasswordResetToken } from "../../../../utils/tokens.js";
 import { sanitizeString } from "../../../../utils/validation.js";
 import { getClientIP } from "../../../../utils/request.js";
 import { sendEmail, isEmailConfigured } from "../../../../utils/email.js";
+import { buildResetPasswordEmail } from "../../../../utils/emailTemplates.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
@@ -86,24 +87,41 @@ export async function onRequestPost(context) {
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
     const resetUrl = `${baseUrl}/reset-password?token=${resetToken.token}`;
 
-    if (isEmailConfigured(env)) {
-      const subject = "Reset your SetTimes password";
-      const text = `A password reset was requested for your account.\n\nReset your password: ${resetUrl}\n\nIf you didn't request this, you can ignore this email.`;
-      const html = `
-        <p>A password reset was requested for your account.</p>
-        <p><a href="${resetUrl}">Reset your password</a></p>
-        <p>If you didn't request this, you can ignore this email.</p>
-      `.trim();
+    if (!isEmailConfigured(env)) {
+      return new Response(
+        JSON.stringify({
+          error: "Email not configured",
+          message: "Email delivery is not configured. Unable to send reset email.",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
-      await sendEmail(env, {
-        to: targetUser.email,
-        subject,
-        text,
-        html,
-      });
-    } else {
-      console.info(
-        `[Email] Password reset link for ${targetUser.email}: ${resetUrl}`,
+    const emailPayload = buildResetPasswordEmail({
+      resetUrl,
+      recipientName: targetUser.name,
+    });
+
+    const emailResult = await sendEmail(env, {
+      to: targetUser.email,
+      subject: emailPayload.subject,
+      text: emailPayload.text,
+      html: emailPayload.html,
+    });
+
+    if (!emailResult.delivered) {
+      return new Response(
+        JSON.stringify({
+          error: "Email delivery failed",
+          message: "Unable to send reset email. Please try again or check email settings.",
+        }),
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -126,8 +144,7 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        resetUrl,
-        message: `Password reset link generated for ${targetUser.email}`,
+        message: `Password reset email sent to ${targetUser.email}`,
       }),
       {
         status: 200,

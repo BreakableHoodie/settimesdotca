@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AdminLogin from './AdminLogin'
 import AdminPanel from './AdminPanel'
+import SignupPage from './SignupPage'
 import { authApi } from '../utils/adminApi'
 import { EventProvider } from '../contexts/EventContext'
 import { ConfirmDialog } from '../components/ui'
@@ -193,6 +194,10 @@ export default function AdminApp() {
           element={
             isAuthenticated ? <Navigate to="/admin" replace /> : <AdminLogin onLoginSuccess={handleLoginSuccess} />
           }
+        />
+        <Route
+          path="signup"
+          element={isAuthenticated ? <Navigate to="/admin" replace /> : <SignupPage />}
         />
         <Route
           path="*"

@@ -10,6 +10,14 @@ import {
 } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
 
+function formatVenueAddress(venue) {
+  if (!venue) return "";
+  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+  const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
+  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+  return [line1, line2, line3].filter(Boolean).join(", ");
+}
+
 // GET - List all venues
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -34,15 +42,18 @@ export async function onRequestGet(context) {
     `,
     ).all();
 
-    return new Response(
-      JSON.stringify({
-        venues: result.results || [],
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    const venues = (result.results || []).map((venue) => {
+      const formattedAddress = formatVenueAddress(venue);
+      return {
+        ...venue,
+        address: venue.address || formattedAddress || null,
+      };
+    });
+
+    return new Response(JSON.stringify({ venues }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Error fetching venues:", error);
 
@@ -83,7 +94,31 @@ export async function onRequestPost(context) {
       return validationErrorResponse(firstError, { fields: validation.errors });
     }
 
-    const { name, address } = validation.sanitized;
+    const {
+      name,
+      address,
+      address_line1,
+      address_line2,
+      city,
+      region,
+      postal_code,
+      country,
+      phone,
+      contact_email,
+    } = validation.sanitized;
+
+    const formattedAddress =
+      formatVenueAddress({
+        address_line1,
+        address_line2,
+        city,
+        region,
+        postal_code,
+        country,
+      }) || address || null;
+
+    const resolvedAddressLine1 =
+      address_line1 || (address ? address.trim() : null);
 
     // Check if venue already exists
     const existingVenue = await DB.prepare(
@@ -110,12 +145,34 @@ export async function onRequestPost(context) {
     // Create venue
     const result = await DB.prepare(
       `
-      INSERT INTO venues (name, address)
-      VALUES (?, ?)
+      INSERT INTO venues (
+        name,
+        address,
+        address_line1,
+        address_line2,
+        city,
+        region,
+        postal_code,
+        country,
+        phone,
+        contact_email
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
-      .bind(name, address || null)
+      .bind(
+        name,
+        formattedAddress,
+        resolvedAddressLine1,
+        address_line2 || null,
+        city || null,
+        region || null,
+        postal_code || null,
+        country || null,
+        phone || null,
+        contact_email || null,
+      )
       .first();
 
     // Audit log the creation
@@ -127,7 +184,7 @@ export async function onRequestPost(context) {
       result.id,
       {
         venueName: name,
-        address,
+        address: formattedAddress,
       },
       ipAddress,
     );
@@ -135,7 +192,10 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        venue: result,
+        venue: {
+          ...result,
+          address: result.address || formattedAddress,
+        },
       }),
       {
         status: 201,

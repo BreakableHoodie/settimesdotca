@@ -233,7 +233,7 @@ export default function BandProfilePage() {
               <div className="p-6 bg-band-purple/50 border-t border-white/10">
                 {profile.description && (
                   <div
-                    className="text-white/90 mb-4 leading-relaxed rich-text-content"
+                    className="text-white/90 mb-4 leading-relaxed rich-text-content break-words whitespace-pre-wrap max-w-full"
                     dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
                   />
                 )}

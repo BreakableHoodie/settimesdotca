@@ -54,14 +54,20 @@ export async function sendEmail(env, { to, subject, html, text }) {
       TextBody: text || undefined,
     };
 
-    const response = await fetch("https://api.postmarkapp.com/email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Postmark-Server-Token": token,
-      },
-      body: JSON.stringify(payload),
-    });
+    let response;
+    try {
+      response = await fetch("https://api.postmarkapp.com/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Postmark-Server-Token": token,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      console.error("[Email] Postmark fetch error:", error);
+      return { delivered: false, reason: "postmark_fetch_error" };
+    }
 
     if (!response.ok) {
       const details = await response.text().catch(() => "");
@@ -83,11 +89,17 @@ export async function sendEmail(env, { to, subject, html, text }) {
       ],
     };
 
-    const response = await fetch("https://api.mailchannels.net/tx/v1/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    let response;
+    try {
+      response = await fetch("https://api.mailchannels.net/tx/v1/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      console.error("[Email] MailChannels fetch error:", error);
+      return { delivered: false, reason: "mailchannels_fetch_error" };
+    }
 
     if (!response.ok) {
       const details = await response.text().catch(() => "");
@@ -112,14 +124,20 @@ export async function sendEmail(env, { to, subject, html, text }) {
       text: text || undefined,
     };
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-    });
+    let response;
+    try {
+      response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      console.error("[Email] Resend fetch error:", error);
+      return { delivered: false, reason: "resend_fetch_error" };
+    }
 
     if (!response.ok) {
       const details = await response.text().catch(() => "");

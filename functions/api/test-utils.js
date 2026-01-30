@@ -89,6 +89,10 @@ export function createTestDB() {
       name_normalized TEXT UNIQUE NOT NULL,
       genre TEXT,
       origin TEXT,
+      origin_city TEXT,
+      origin_region TEXT,
+      contact_email TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
       description TEXT,
       photo_url TEXT,
       social_links TEXT,
@@ -120,7 +124,14 @@ export function createTestDB() {
     CREATE TABLE venues (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      address_line1 TEXT,
+      address_line2 TEXT,
       city TEXT,
+      region TEXT,
+      postal_code TEXT,
+      country TEXT,
+      phone TEXT,
+      contact_email TEXT,
       address TEXT
     );
 
@@ -292,9 +303,47 @@ export function insertBand(db, {
   ).get(perfInfo.lastInsertRowid);
 }
 
-export function insertVenue(db, { name = 'Test Venue', city = 'Portland', address = null } = {}) {
-  const stmt = db.prepare('INSERT INTO venues (name, city, address) VALUES (?, ?, ?)')
-  const info = stmt.run(name, city, address)
+export function insertVenue(
+  db,
+  {
+    name = 'Test Venue',
+    city = 'Portland',
+    region = null,
+    address_line1 = null,
+    address_line2 = null,
+    postal_code = null,
+    country = null,
+    phone = null,
+    contact_email = null,
+    address = null,
+  } = {}
+) {
+  const stmt = db.prepare(
+    `INSERT INTO venues (
+      name,
+      address_line1,
+      address_line2,
+      city,
+      region,
+      postal_code,
+      country,
+      phone,
+      contact_email,
+      address
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+  const info = stmt.run(
+    name,
+    address_line1,
+    address_line2,
+    city,
+    region,
+    postal_code,
+    country,
+    phone,
+    contact_email,
+    address,
+  )
   return db.prepare('SELECT * FROM venues WHERE id = ?').get(info.lastInsertRowid)
 }
 

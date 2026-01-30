@@ -8,10 +8,17 @@ export { onRequestPost } from "./reset-password-complete.js";
 export async function onRequestGet(context) {
   const { request, env } = context;
   const { DB } = env;
+  const debugId = crypto.randomUUID();
+  const withDebug = (payload) =>
+    env?.RESET_DEBUG === "true" ? { ...payload, debugId } : payload;
+  const logDebug = (stage, details) => {
+    console.info("[ResetPassword]", stage, { debugId, ...details });
+  };
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
 
   if (!token) {
+    logDebug("missing_token", {});
     return new Response(JSON.stringify({ error: "Missing reset token" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -33,8 +40,11 @@ export async function onRequestGet(context) {
       .first();
 
     if (!resetToken) {
+      logDebug("token_invalid", {});
       return new Response(
-        JSON.stringify({ error: "Invalid or expired reset token" }),
+        JSON.stringify(
+          withDebug({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" })
+        ),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -44,8 +54,11 @@ export async function onRequestGet(context) {
 
     // Check if token is expired
     if (new Date(resetToken.expires_at) < new Date()) {
+      logDebug("token_expired", { expiresAt: resetToken.expires_at });
       return new Response(
-        JSON.stringify({ error: "Reset token has expired" }),
+        JSON.stringify(
+          withDebug({ error: "Reset token has expired", code: "TOKEN_EXPIRED" })
+        ),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -55,8 +68,11 @@ export async function onRequestGet(context) {
 
     // Check if user is active
     if (resetToken.is_active === 0) {
+      logDebug("user_inactive", { userId: resetToken.user_id });
       return new Response(
-        JSON.stringify({ error: "User account is inactive" }),
+        JSON.stringify(
+          withDebug({ error: "User account is inactive", code: "USER_INACTIVE" })
+        ),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -79,9 +95,9 @@ export async function onRequestGet(context) {
       },
     );
   } catch (error) {
-    console.error("Reset token verification error:", error);
+    console.error("Reset token verification error:", { debugId, error });
     return new Response(
-      JSON.stringify({ error: "Failed to verify reset token" }),
+      JSON.stringify(withDebug({ error: "Failed to verify reset token", code: "TOKEN_VERIFY_FAILED" })),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },

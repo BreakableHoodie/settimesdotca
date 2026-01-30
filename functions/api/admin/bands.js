@@ -3,10 +3,20 @@
 // POST /api/admin/bands - Create new band (and performance)
 
 import { checkPermission } from "./_middleware.js";
+import { isValidEmail } from "../../utils/validation.js";
 
 // Helper to normalize band name
 function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function parseOrigin(origin) {
+  if (!origin) return { city: null, region: null };
+  const [city, region] = origin.split(',').map(part => part.trim());
+  return {
+    city: city || null,
+    region: region || null,
+  };
 }
 
 // Helper to unpack social links
@@ -18,8 +28,12 @@ function unpackSocialLinks(band) {
   } catch (_e) {
     social = {};
   }
+  const origin = [band.origin_city, band.origin_region]
+    .filter(Boolean)
+    .join(', ') || band.origin || '';
   return {
     ...band,
+    origin,
     url: social.website || '',
     instagram: social.instagram || '',
     bandcamp: social.bandcamp || '',
@@ -133,6 +147,10 @@ export async function onRequestGet(context) {
           bp.name,
           bp.genre,
           bp.origin,
+          bp.origin_city,
+          bp.origin_region,
+          bp.contact_email,
+          bp.is_active,
           bp.description,
           bp.photo_url,
           bp.social_links,
@@ -166,6 +184,10 @@ export async function onRequestGet(context) {
           bp.name,
           bp.genre,
           bp.origin,
+          bp.origin_city,
+          bp.origin_region,
+          bp.contact_email,
+          bp.is_active,
           bp.description,
           bp.photo_url,
           bp.social_links,
@@ -220,8 +242,22 @@ export async function onRequestPost(context) {
       photo_url,
       genre,
       origin,
+      origin_city,
+      origin_region,
+      contact_email,
+      is_active,
       social_links, // JSON string from frontend
     } = body;
+
+    if (contact_email && !isValidEmail(contact_email)) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Contact email must be a valid email address",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     // If we are in global view (no eventId), we just create/update the profile
     const isGlobalAdd = !eventId;
@@ -299,6 +335,15 @@ export async function onRequestPost(context) {
 
     // 1. Find or Create Band Profile
     const nameNormalized = normalizeName(name);
+    const parsedOrigin = parseOrigin(origin?.trim());
+    const trimmedOriginCity = origin_city ? origin_city.trim() : parsedOrigin.city;
+    const trimmedOriginRegion = origin_region ? origin_region.trim() : parsedOrigin.region;
+    const computedOrigin =
+      origin?.trim() ||
+      [trimmedOriginCity, trimmedOriginRegion].filter(Boolean).join(", ") ||
+      null;
+    const resolvedIsActive =
+      is_active === undefined ? 1 : Number(is_active) === 1 ? 1 : 0;
     let bandProfile = await DB.prepare(
       "SELECT id FROM band_profiles WHERE name_normalized = ?"
     )
@@ -314,15 +359,31 @@ export async function onRequestPost(context) {
       }
 
       bandProfile = await DB.prepare(
-        `INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO band_profiles (
+          name,
+          name_normalized,
+          genre,
+          origin,
+          origin_city,
+          origin_region,
+          contact_email,
+          is_active,
+          description,
+          photo_url,
+          social_links
+        )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING id`
       )
         .bind(
           name.trim(),
           nameNormalized,
           genre || null,
-          origin || null,
+          computedOrigin,
+          trimmedOriginCity,
+          trimmedOriginRegion,
+          contact_email || null,
+          resolvedIsActive,
           description || null,
           photo_url || null,
           socialLinksJson || null

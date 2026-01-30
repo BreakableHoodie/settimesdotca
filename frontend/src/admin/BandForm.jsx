@@ -5,6 +5,7 @@ import { Input, Button, Tooltip } from '../components/ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
 import { FIELD_LIMITS } from '../utils/validation'
+import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 
 export default function BandForm({
   events,
@@ -19,6 +20,9 @@ export default function BandForm({
   conflicts,
   globalView = false,
   selectedProfile = null, // If provided, we are scheduling this specific existing artist
+  originCitySuggestions = [],
+  originRegionSuggestions = [],
+  genreSuggestions = [],
 }) {
   // In global view, we're editing band profile, not event-specific performance details
   const requireSchedule = globalView ? false : Boolean(formData.event_id)
@@ -33,9 +37,84 @@ export default function BandForm({
         : 'Update Performance'
       : globalView
         ? 'Add Artist'
-        : isSchedulingExisting
+      : isSchedulingExisting
           ? 'Add to Lineup'
           : 'Create & Add Artist'
+
+  const defaultRegions = [
+    'AB',
+    'BC',
+    'MB',
+    'NB',
+    'NL',
+    'NS',
+    'NT',
+    'NU',
+    'ON',
+    'PE',
+    'QC',
+    'SK',
+    'YT',
+    'AL',
+    'AK',
+    'AZ',
+    'AR',
+    'CA',
+    'CO',
+    'CT',
+    'DE',
+    'FL',
+    'GA',
+    'HI',
+    'IA',
+    'ID',
+    'IL',
+    'IN',
+    'KS',
+    'KY',
+    'LA',
+    'MA',
+    'MD',
+    'ME',
+    'MI',
+    'MN',
+    'MO',
+    'MS',
+    'MT',
+    'NC',
+    'ND',
+    'NE',
+    'NH',
+    'NJ',
+    'NM',
+    'NV',
+    'NY',
+    'OH',
+    'OK',
+    'OR',
+    'PA',
+    'RI',
+    'SC',
+    'SD',
+    'TN',
+    'TX',
+    'UT',
+    'VA',
+    'VT',
+    'WA',
+    'WI',
+    'WV',
+    'WY',
+  ]
+
+  const mergedGenreSuggestions = getNormalizedGenreSuggestions(
+    [...DEFAULT_GENRES, ...genreSuggestions],
+    DEFAULT_GENRES
+  )
+  const mergedOriginCitySuggestions = Array.from(new Set(originCitySuggestions)).filter(Boolean)
+  const mergedOriginRegionSuggestions = Array.from(
+    new Set([...defaultRegions, ...originRegionSuggestions])
+  ).filter(Boolean)
 
   return (
     <form onSubmit={onSubmit}>
@@ -91,23 +170,51 @@ export default function BandForm({
           <>
             <div className="sm:col-span-2">
               <div className="flex items-center gap-2 mb-2">
-                <label htmlFor="band-origin" className="block text-text-primary text-sm font-medium">
+                <label className="block text-text-primary text-sm font-medium">
                   Origin <span className="text-text-tertiary text-xs">(optional)</span>
                 </label>
-                <Tooltip content="Where the band/artist is from (city, region, country)">
+                <Tooltip content="Where the band/artist is from (city and province/state)">
                   <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
                 </Tooltip>
               </div>
-              <Input
-                id="band-origin"
-                type="text"
-                name="origin"
-                value={formData.origin || ''}
-                onChange={onChange}
-                maxLength={FIELD_LIMITS.bandOrigin.max}
-                placeholder="Toronto, ON"
-                fullWidth
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Input
+                    id="band-origin-city"
+                    type="text"
+                    name="origin_city"
+                    value={formData.origin_city || ''}
+                    onChange={onChange}
+                    maxLength={FIELD_LIMITS.bandOriginCity.max}
+                    placeholder="City"
+                    list="band-origin-city-list"
+                    fullWidth
+                  />
+                </div>
+                <div>
+                  <Input
+                    id="band-origin-region"
+                    type="text"
+                    name="origin_region"
+                    value={formData.origin_region || ''}
+                    onChange={onChange}
+                    maxLength={FIELD_LIMITS.bandOriginRegion.max}
+                    placeholder="Province/State"
+                    list="band-origin-region-list"
+                    fullWidth
+                  />
+                </div>
+              </div>
+              <datalist id="band-origin-city-list">
+                {mergedOriginCitySuggestions.map(city => (
+                  <option key={city} value={city} />
+                ))}
+              </datalist>
+              <datalist id="band-origin-region-list">
+                {mergedOriginRegionSuggestions.map(region => (
+                  <option key={region} value={region} />
+                ))}
+              </datalist>
             </div>
 
             <div className="sm:col-span-2">
@@ -127,8 +234,14 @@ export default function BandForm({
                 onChange={onChange}
                 maxLength={FIELD_LIMITS.bandGenre.max}
                 placeholder="punk, indie rock, etc."
+                list="band-genre-list"
                 fullWidth
               />
+              <datalist id="band-genre-list">
+                {mergedGenreSuggestions.map(genre => (
+                  <option key={genre} value={genre} />
+                ))}
+              </datalist>
             </div>
 
             <div className="sm:col-span-2">
@@ -157,6 +270,41 @@ export default function BandForm({
               <p className="text-white/60 text-xs mt-2">
                 Short bio or description about the band. Supports markdown formatting.
               </p>
+            </div>
+          </>
+        )}
+
+        {(globalView || !isSchedulingExisting) && (
+          <>
+            <div>
+              <label htmlFor="band-contact-email" className="block text-white mb-2 text-sm">
+                Contact Email <span className="text-gray-400 text-xs ml-2">(optional)</span>
+              </label>
+              <input
+                id="band-contact-email"
+                type="email"
+                name="contact_email"
+                value={formData.contact_email || ''}
+                onChange={onChange}
+                maxLength={FIELD_LIMITS.bandContactEmail.max}
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                placeholder="contact@artist.com"
+              />
+            </div>
+            <div>
+              <label htmlFor="band-status" className="block text-white mb-2 text-sm">
+                Status <span className="text-gray-400 text-xs ml-2">(optional)</span>
+              </label>
+              <select
+                id="band-status"
+                name="is_active"
+                value={formData.is_active ?? 1}
+                onChange={onChange}
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+              >
+                <option value={1}>Active</option>
+                <option value={0}>Inactive</option>
+              </select>
             </div>
           </>
         )}
@@ -365,6 +513,8 @@ BandForm.propTypes = {
     duration: PropTypes.string,
     url: PropTypes.string,
     origin: PropTypes.string,
+    origin_city: PropTypes.string,
+    origin_region: PropTypes.string,
     genre: PropTypes.string,
     photo_url: PropTypes.string,
     description: PropTypes.string,
@@ -372,6 +522,8 @@ BandForm.propTypes = {
     instagram: PropTypes.string,
     bandcamp: PropTypes.string,
     facebook: PropTypes.string,
+    contact_email: PropTypes.string,
+    is_active: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
   }).isRequired,
   submitting: PropTypes.bool.isRequired,
   mode: PropTypes.oneOf(['create', 'edit']).isRequired,
@@ -382,6 +534,9 @@ BandForm.propTypes = {
   conflicts: PropTypes.arrayOf(PropTypes.string),
   globalView: PropTypes.bool,
   selectedProfile: PropTypes.object,
+  originCitySuggestions: PropTypes.arrayOf(PropTypes.string),
+  originRegionSuggestions: PropTypes.arrayOf(PropTypes.string),
+  genreSuggestions: PropTypes.arrayOf(PropTypes.string),
 }
 
 BandForm.defaultProps = {

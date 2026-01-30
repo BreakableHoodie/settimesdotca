@@ -2,6 +2,7 @@
 // Applies to all /api/admin/* endpoints except /api/admin/auth/*
 
 import { getCookie, setSessionCookie } from "../../utils/cookies.js";
+import { generateCSRFToken, setCSRFCookie } from "../../utils/csrf.js";
 import { validateCSRFMiddleware } from "../../utils/csrf.js";
 import { getClientIP } from "../../utils/request.js";
 
@@ -33,6 +34,8 @@ async function verifySession(DB, sessionToken) {
              u.email,
              u.role,
              u.name,
+             u.first_name,
+             u.last_name,
              u.is_active
       FROM sessions s
       INNER JOIN users u ON s.user_id = u.id
@@ -85,7 +88,12 @@ async function verifySession(DB, sessionToken) {
           userId: session.user_id,
           email: session.email,
           role: session.role,
-          name: session.name,
+          name:
+            session.name ||
+            [session.first_name, session.last_name].filter(Boolean).join(" ") ||
+            null,
+          firstName: session.first_name || null,
+          lastName: session.last_name || null,
         },
         session: {
           sessionToken: session.session_token,
@@ -275,9 +283,24 @@ export async function onRequest(context) {
         const cookieHeader = setSessionCookie(currentCookie, false, request);
         context.data = {
           ...context.data,
-          pendingSetCookie: cookieHeader,
+          pendingSetCookie: context.data?.pendingSetCookie
+            ? [...context.data.pendingSetCookie, cookieHeader]
+            : [cookieHeader],
         };
       }
+    }
+
+    // Refresh CSRF token cookie if missing (keeps long sessions working)
+    const csrfCookie = getCookie(request, "csrf_token");
+    if (!csrfCookie) {
+      const csrfToken = generateCSRFToken();
+      const csrfCookieHeader = setCSRFCookie(csrfToken, request);
+      context.data = {
+        ...context.data,
+        pendingSetCookie: context.data?.pendingSetCookie
+          ? [...context.data.pendingSetCookie, csrfCookieHeader]
+          : [csrfCookieHeader],
+      };
     }
 
     // Store auth info in context for handlers to use
@@ -293,7 +316,7 @@ export async function onRequest(context) {
 
     if (context.data?.pendingSetCookie) {
       const headers = new Headers(response.headers);
-      headers.append("Set-Cookie", context.data.pendingSetCookie);
+      context.data.pendingSetCookie.forEach((cookie) => headers.append("Set-Cookie", cookie));
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,

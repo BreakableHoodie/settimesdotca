@@ -121,6 +121,12 @@ export function validateCSRFMiddleware(request) {
   }
 
   if (!validateCSRFToken(request)) {
+    const csrfToken = generateCSRFToken();
+    const headers = new Headers({
+      "Content-Type": "application/json",
+    });
+    headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
+
     return new Response(
       JSON.stringify({
         error: "CSRF validation failed",
@@ -128,7 +134,7 @@ export function validateCSRFMiddleware(request) {
       }),
       {
         status: 403,
-        headers: { "Content-Type": "application/json" },
+        headers,
       }
     );
   }

@@ -23,6 +23,17 @@ const ISO_DATE_REGEX =
   /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/;
 
 /**
+ * Postal code regex (supports US ZIP and Canadian postal codes)
+ */
+const POSTAL_CODE_REGEX =
+  /^(?:\d{5}(?:-\d{4})?|[A-Za-z]\d[A-Za-z][ ]?\d[A-Za-z]\d)$/;
+
+/**
+ * Phone number regex (permissive, digits + formatting)
+ */
+const PHONE_REGEX = /^\+?[\d\s().-]{7,20}$/;
+
+/**
  * Valid user roles in the system
  * Update this array when adding new roles
  */
@@ -47,18 +58,31 @@ export const FIELD_LIMITS = {
   email: { min: 5, max: 255 },
   password: { min: 12, max: 128 },
   userName: { min: 2, max: 100 },
+  userFirstName: { min: 1, max: 60 },
+  userLastName: { min: 1, max: 60 },
 
   // Venue fields
   venueName: { min: 1, max: 200 },
   venueAddress: { min: 0, max: 200 },
+  venueAddressLine1: { min: 0, max: 200 },
+  venueAddressLine2: { min: 0, max: 200 },
+  venueCity: { min: 0, max: 100 },
+  venueRegion: { min: 0, max: 100 },
+  venuePostal: { min: 0, max: 20 },
+  venueCountry: { min: 0, max: 100 },
+  venuePhone: { min: 0, max: 25 },
+  venueContactEmail: { min: 0, max: 255 },
 
   // Band fields
   bandName: { min: 1, max: 200 },
   bandOrigin: { min: 0, max: 100 },
+  bandOriginCity: { min: 0, max: 100 },
+  bandOriginRegion: { min: 0, max: 100 },
   bandGenre: { min: 0, max: 100 },
   bandDescription: { min: 0, max: 5000 },
   bandUrl: { min: 0, max: 500 },
   socialHandle: { min: 0, max: 100 },
+  bandContactEmail: { min: 0, max: 255 },
 
   // Event fields
   eventName: { min: 3, max: 200 },
@@ -240,6 +264,30 @@ export function isValidURL(url) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Validate phone number format (permissive)
+ * @param {string} phone - Phone number to validate
+ * @returns {boolean} True if valid or empty
+ */
+export function isValidPhone(phone) {
+  if (!phone || typeof phone !== "string") {
+    return true;
+  }
+  return PHONE_REGEX.test(phone.trim());
+}
+
+/**
+ * Validate postal code format (US ZIP or Canadian postal)
+ * @param {string} postalCode - Postal code to validate
+ * @returns {boolean} True if valid or empty
+ */
+export function isValidPostalCode(postalCode) {
+  if (!postalCode || typeof postalCode !== "string") {
+    return true;
+  }
+  return POSTAL_CODE_REGEX.test(postalCode.trim());
 }
 
 /**
@@ -600,6 +648,76 @@ export const VALIDATION_SCHEMAS = {
       max: FIELD_LIMITS.venueAddress.max,
       default: null,
     },
+    address_line1: {
+      type: "string",
+      required: false,
+      label: "Street address",
+      min: FIELD_LIMITS.venueAddressLine1.min,
+      max: FIELD_LIMITS.venueAddressLine1.max,
+      default: null,
+    },
+    address_line2: {
+      type: "string",
+      required: false,
+      label: "Address line 2",
+      min: FIELD_LIMITS.venueAddressLine2.min,
+      max: FIELD_LIMITS.venueAddressLine2.max,
+      default: null,
+    },
+    city: {
+      type: "string",
+      required: false,
+      label: "City",
+      min: FIELD_LIMITS.venueCity.min,
+      max: FIELD_LIMITS.venueCity.max,
+      default: null,
+    },
+    region: {
+      type: "string",
+      required: false,
+      label: "Province/State",
+      min: FIELD_LIMITS.venueRegion.min,
+      max: FIELD_LIMITS.venueRegion.max,
+      default: null,
+    },
+    postal_code: {
+      type: "string",
+      required: false,
+      label: "Postal code",
+      min: FIELD_LIMITS.venuePostal.min,
+      max: FIELD_LIMITS.venuePostal.max,
+      pattern: POSTAL_CODE_REGEX,
+      patternError: "Postal code must be a valid US ZIP or Canadian postal code",
+      default: null,
+    },
+    country: {
+      type: "string",
+      required: false,
+      label: "Country",
+      min: FIELD_LIMITS.venueCountry.min,
+      max: FIELD_LIMITS.venueCountry.max,
+      default: null,
+    },
+    phone: {
+      type: "string",
+      required: false,
+      label: "Phone",
+      min: FIELD_LIMITS.venuePhone.min,
+      max: FIELD_LIMITS.venuePhone.max,
+      pattern: PHONE_REGEX,
+      patternError: "Phone number must contain only digits and formatting characters",
+      default: null,
+    },
+    contact_email: {
+      type: "string",
+      required: false,
+      label: "Contact email",
+      min: FIELD_LIMITS.venueContactEmail.min,
+      max: FIELD_LIMITS.venueContactEmail.max,
+      pattern: EMAIL_REGEX,
+      patternError: "Contact email must be a valid email address",
+      default: null,
+    },
   },
 
   band: {
@@ -641,6 +759,26 @@ export const VALIDATION_SCHEMAS = {
       required: false,
       label: "Origin",
       max: FIELD_LIMITS.bandOrigin.max,
+    },
+    origin_city: {
+      type: "string",
+      required: false,
+      label: "Origin city",
+      max: FIELD_LIMITS.bandOriginCity.max,
+    },
+    origin_region: {
+      type: "string",
+      required: false,
+      label: "Origin region",
+      max: FIELD_LIMITS.bandOriginRegion.max,
+    },
+    contact_email: {
+      type: "string",
+      required: false,
+      label: "Contact email",
+      max: FIELD_LIMITS.bandContactEmail.max,
+      pattern: EMAIL_REGEX,
+      patternError: "Contact email must be a valid email address",
     },
     genre: {
       type: "string",
@@ -795,12 +933,46 @@ export const VALIDATION_SCHEMAS = {
           : { valid: false, error: result.errors[0] };
       },
     },
-    name: {
+    firstName: {
       type: "string",
       required: true,
-      label: "Display name",
-      min: FIELD_LIMITS.userName.min,
-      max: FIELD_LIMITS.userName.max,
+      label: "First name",
+      min: FIELD_LIMITS.userFirstName.min,
+      max: FIELD_LIMITS.userFirstName.max,
+    },
+    lastName: {
+      type: "string",
+      required: true,
+      label: "Last name",
+      min: FIELD_LIMITS.userLastName.min,
+      max: FIELD_LIMITS.userLastName.max,
+    },
+    role: {
+      type: "enum",
+      required: true,
+      label: "Role",
+      values: VALID_ROLES,
+    },
+  },
+  userInvite: {
+    email: {
+      type: "email",
+      required: true,
+      label: "Email",
+    },
+    firstName: {
+      type: "string",
+      required: true,
+      label: "First name",
+      min: FIELD_LIMITS.userFirstName.min,
+      max: FIELD_LIMITS.userFirstName.max,
+    },
+    lastName: {
+      type: "string",
+      required: true,
+      label: "Last name",
+      min: FIELD_LIMITS.userLastName.min,
+      max: FIELD_LIMITS.userLastName.max,
     },
     role: {
       type: "enum",

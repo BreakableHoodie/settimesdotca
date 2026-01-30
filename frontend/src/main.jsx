@@ -27,6 +27,12 @@ if (robotsMeta) {
   document.head.appendChild(meta)
 }
 
+const BUILD_ID = '2026-01-30-1605'
+if (typeof window !== 'undefined') {
+  // Helps confirm which build is running in production.
+  window.__SETTIMES_BUILD_ID__ = BUILD_ID
+}
+
 function LoadingFallback() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-band-navy to-band-purple">

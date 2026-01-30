@@ -43,21 +43,8 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const signupEnabled = env?.ALLOW_ADMIN_SIGNUP === "true";
-    if (!signupEnabled) {
-      return new Response(
-        JSON.stringify({
-          error: "Signup disabled",
-          message: "Self-serve signup is not available at this time.",
-        }),
-        {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const { email, password, name, role, inviteCode } = await request.json();
+    const { email, password, name, firstName, lastName, role, inviteCode } =
+      await request.json();
 
     // SECURITY: Require invite code for all signups
     if (!inviteCode) {
@@ -225,14 +212,55 @@ export async function onRequestPost(context) {
       );
     }
 
+    const fallbackName =
+      name !== undefined && name !== null ? String(name).trim() : "";
+    let resolvedFirstName =
+      firstName !== undefined && firstName !== null
+        ? String(firstName).trim()
+        : "";
+    let resolvedLastName =
+      lastName !== undefined && lastName !== null ? String(lastName).trim() : "";
+
+    if ((!resolvedFirstName || !resolvedLastName) && fallbackName) {
+      const parts = fallbackName.split(/\s+/).filter(Boolean);
+      if (!resolvedFirstName) {
+        resolvedFirstName = parts[0] || "";
+      }
+      if (!resolvedLastName) {
+        resolvedLastName = parts.slice(1).join(" ");
+      }
+    }
+
+    if (!resolvedFirstName || !resolvedLastName) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "First name and last name are required",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const resolvedName = `${resolvedFirstName} ${resolvedLastName}`.trim();
+
     // Hash password
     const passwordHash = await hashPassword(password);
 
     // Create user
     const user = await DB.prepare(
-      "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?) RETURNING id, email, name, role"
+      "INSERT INTO users (email, password_hash, name, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?) RETURNING id, email, name, first_name, last_name, role"
     )
-      .bind(email, passwordHash, name || null, userRole)
+      .bind(
+        email,
+        passwordHash,
+        resolvedName || null,
+        resolvedFirstName || null,
+        resolvedLastName || null,
+        userRole
+      )
       .first();
 
     // Mark invite code as used
@@ -291,7 +319,12 @@ export async function onRequestPost(context) {
         user: {
           id: user.id,
           email: user.email,
-          name: user.name,
+          name:
+            user.name ||
+            [user.first_name, user.last_name].filter(Boolean).join(" ") ||
+            null,
+          firstName: user.first_name || null,
+          lastName: user.last_name || null,
           role: user.role,
         },
       }),

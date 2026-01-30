@@ -82,7 +82,7 @@ export async function onRequestPost(context) {
     // Find user with all needed fields
     const user = await DB.prepare(
       `
-      SELECT id, email, password_hash, name, role, is_active,
+      SELECT id, email, password_hash, name, first_name, last_name, role, is_active,
              totp_enabled, totp_secret
       FROM users
       WHERE email = ?
@@ -209,7 +209,12 @@ export async function onRequestPost(context) {
           mfaToken,
           user: {
             email: user.email,
-            name: user.name,
+            name:
+              user.name ||
+              [user.first_name, user.last_name].filter(Boolean).join(" ") ||
+              null,
+            firstName: user.first_name || null,
+            lastName: user.last_name || null,
             role: user.role,
           },
         }),
@@ -266,7 +271,12 @@ export async function onRequestPost(context) {
         user: {
           id: user.id,
           email: user.email,
-          name: user.name,
+          name:
+            user.name ||
+            [user.first_name, user.last_name].filter(Boolean).join(" ") ||
+            null,
+          firstName: user.first_name || null,
+          lastName: user.last_name || null,
           role: user.role,
         },
       }),

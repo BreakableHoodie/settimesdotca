@@ -14,6 +14,20 @@ function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function formatOrigin(profile) {
+  if (!profile) return null;
+  const parts = [profile.origin_city, profile.origin_region].filter(Boolean);
+  return parts.length ? parts.join(", ") : profile.origin || null;
+}
+
+function formatVenueAddress(venue) {
+  if (!venue) return null;
+  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+  const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
+  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+  return [line1, line2, line3].filter(Boolean).join(", ");
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const gate = getPublicDataGateResponse(env);
@@ -86,6 +100,12 @@ export async function onRequestGet(context) {
         v.id as venue_id,
         v.name as venue_name,
         v.address as venue_address,
+        v.address_line1,
+        v.address_line2,
+        v.city,
+        v.region,
+        v.postal_code,
+        v.country,
         e.id as event_id,
         e.name as event_name,
         e.slug as event_slug,
@@ -193,7 +213,7 @@ export async function onRequestGet(context) {
       photo_url: bandProfile.photo_url,
       description: bandProfile.description,
       genre: bandProfile.genre,
-      origin: bandProfile.origin,
+      origin: formatOrigin(bandProfile),
       social: {
         website: socialLinks.website || null,
         instagram: socialLinks.instagram || null,
@@ -223,7 +243,7 @@ export async function onRequestGet(context) {
         event_date: p.event_date,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
-        venue_address: p.venue_address,
+        venue_address: p.venue_address || formatVenueAddress(p),
         start_time: p.start_time,
         end_time: p.end_time,
       })),
@@ -235,7 +255,7 @@ export async function onRequestGet(context) {
         event_date: p.event_date,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
-        venue_address: p.venue_address,
+        venue_address: p.venue_address || formatVenueAddress(p),
         start_time: p.start_time,
         end_time: p.end_time,
       })),

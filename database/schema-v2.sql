@@ -19,7 +19,15 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS venues (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,             -- Venue name, e.g., "Room 47"
-  address TEXT                           -- Optional venue address
+  address TEXT,                          -- Optional venue address (legacy)
+  address_line1 TEXT,
+  address_line2 TEXT,
+  city TEXT,
+  region TEXT,
+  postal_code TEXT,
+  country TEXT,
+  phone TEXT,
+  contact_email TEXT
 );
 
 -- Band profiles: reusable band identity across all events
@@ -31,6 +39,11 @@ CREATE TABLE IF NOT EXISTS band_profiles (
   description TEXT,                      -- Band bio/description (markdown supported)
   photo_url TEXT,                        -- Hero image URL (uploaded or external)
   genre TEXT,                            -- Genre tags (comma-separated for MVP)
+  origin TEXT,                           -- Legacy origin string
+  origin_city TEXT,
+  origin_region TEXT,
+  contact_email TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
   social_links TEXT,                     -- JSON: {"bandcamp": "url", "instagram": "@handle", ...}
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))

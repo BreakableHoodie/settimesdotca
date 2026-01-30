@@ -138,12 +138,7 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                   <div className="space-y-4">
                     <div className="flex justify-center">
                       <div className="bg-white p-3 rounded-lg">
-                        <QRCodeSVG
-                          value={setupData.otpauthUrl}
-                          size={180}
-                          level="M"
-                          includeMargin={false}
-                        />
+                        <QRCodeSVG value={setupData.otpauthUrl} size={180} level="M" includeMargin={false} />
                       </div>
                     </div>
                     <p className="text-center text-text-secondary text-sm">

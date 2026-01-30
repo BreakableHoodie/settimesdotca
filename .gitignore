@@ -98,3 +98,4 @@ database/migration-*.sql
 
 # Confidential local data
 band_crawl_schedule.json
+database/exports/

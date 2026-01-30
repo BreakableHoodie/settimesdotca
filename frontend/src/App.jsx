@@ -38,6 +38,20 @@ const SCHEDULE_SESSION_KEY = 'scheduleSessionId'
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const LEGACY_SELECTED_BANDS_KEY = 'selectedBands'
 
+const generateSecureSessionId = () => {
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+    const bytes = new Uint8Array(16)
+    window.crypto.getRandomValues(bytes)
+    const hex = Array.from(bytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+    return `sched_${hex}`
+  }
+
+  // Fallback without Math.random; uniqueness is based on timestamp only.
+  return `sched_${Date.now()}`
+}
+
 const getStoredSelection = slug => {
   if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
     return []
@@ -74,7 +88,7 @@ const getScheduleSessionId = () => {
     if (window.crypto?.randomUUID) {
       sessionId = window.crypto.randomUUID()
     } else {
-      sessionId = `sched_${Date.now()}_${Math.random().toString(16).slice(2)}`
+      sessionId = generateSecureSessionId()
     }
     window.localStorage.setItem(SCHEDULE_SESSION_KEY, sessionId)
   }

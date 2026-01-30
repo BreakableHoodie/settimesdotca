@@ -15,6 +15,7 @@ frontend/.cache/
 .env.local
 .env.production
 .dev.vars
+.dev.vars.*
 
 # IDE
 .vscode/

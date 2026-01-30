@@ -1,0 +1,193 @@
+@import '../../styles/tokens.css';
+
+/* Base Alert Styles */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  border-radius: var(--radius-md);
+  border: 1px solid;
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  position: relative;
+  animation: slideIn var(--transition-base) ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Icon Wrapper */
+.iconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+/* Content */
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
+  margin-bottom: var(--spacing-1);
+  line-height: var(--line-height-tight);
+}
+
+.message {
+  line-height: var(--line-height-relaxed);
+}
+
+/* Close Button */
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+  transition:
+    opacity var(--transition-fast),
+    background-color var(--transition-fast);
+  flex-shrink: 0;
+  margin-top: -2px;
+  margin-right: -2px;
+}
+
+.closeButton:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.closeButton:focus {
+  outline: none;
+  opacity: 1;
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.closeButton:active {
+  opacity: 0.8;
+}
+
+.closeIcon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* Color Variants */
+.success {
+  background-color: var(--color-success-light);
+  border-color: var(--color-success);
+  color: var(--color-success-dark);
+}
+
+.success .closeButton:hover {
+  background-color: rgba(34, 139, 34, 0.1);
+}
+
+.warning {
+  background-color: var(--color-warning-light);
+  border-color: var(--color-warning);
+  color: var(--color-warning-dark);
+}
+
+.warning .closeButton:hover {
+  background-color: rgba(180, 83, 9, 0.1); /* Updated to match WCAG AA warning color #b45309 */
+}
+
+.error {
+  background-color: var(--color-error-light);
+  border-color: var(--color-error);
+  color: var(--color-error-dark);
+}
+
+.error .closeButton:hover {
+  background-color: rgba(220, 20, 60, 0.1);
+}
+
+.info {
+  background-color: var(--color-accent-light);
+  border-color: var(--color-accent);
+  color: var(--color-accent-dark);
+}
+
+.info .closeButton:hover {
+  background-color: rgba(30, 144, 255, 0.1);
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .alert {
+    padding: var(--spacing-3);
+    gap: var(--spacing-2);
+  }
+
+  .title {
+    font-size: var(--font-size-sm);
+  }
+
+  .message {
+    font-size: var(--font-size-xs);
+  }
+
+  .icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Ensure touch targets */
+  .closeButton {
+    min-width: 32px;
+    min-height: 32px;
+  }
+}
+
+/* Accessibility - High Contrast Mode */
+@media (prefers-contrast: high) {
+  .alert {
+    border-width: 2px;
+  }
+
+  .closeButton:focus {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .alert {
+    animation: none;
+  }
+
+  .closeButton {
+    transition: none;
+  }
+}

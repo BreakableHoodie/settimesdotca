@@ -1,7 +1,7 @@
 {
-  "name": "Long Weekend Band Crawl Mobile Schedule",
-  "short_name": "Band Crawl",
-  "description": "Build your personalized schedule for Long Weekend Band Crawl",
+  "name": "SetTimes - Live Music Schedule",
+  "short_name": "SetTimes",
+  "description": "Build your personalized schedule for live music events",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1845",

@@ -7,11 +7,15 @@ yarn-error.log*
 # Production
 /frontend/dist
 /backend/dist
+frontend/.vite/
+frontend/.cache/
 
 # Environment variables
 .env
 .env.local
 .env.production
+.dev.vars
+.dev.vars.*
 
 # IDE
 .vscode/
@@ -26,6 +30,72 @@ Thumbs.db
 # Reports
 psi_raw.txt
 psi_report*.json
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+e2e/.auth/
+e2e/visual-regression.spec.js-snapshots/
+*.lcov
+.nyc_output/
 
 # Docker
 .dockerignore
+
+# Cloudflare Wrangler
+.wrangler/
+.wrangler/state/
+
+# AI assistants (developer-specific)
+.claude/
+.serena/
+chatmodes/
+claudedocs/
+instructions/
+prompts/
+plugins/
+.github/chatmodes/
+.github/prompts/
+.github/agents/
+
+# Session notes and dev archives (developer-specific)
+archive/
+
+# Temporary files
+*.tmp
+*.temp
+.dev/
+cookies.txt
+DEV_CREDENTIALS.txt
+TEST_ACCOUNTS.md
+CODE_REVIEW_REPORT.md
+REVIEW_COMPLETE.md
+PLUGIN_STRATEGY.md
+PR_DESCRIPTION.md
+reactjs.instructions.md
+*.session
+*.token
+*.key
+*.pem
+*.sqlite-journal
+
+# One-off scripts (keep reusable utilities only)
+scripts/update-admin-password.sql
+scripts/update-*.sql
+scripts/unpublish-*.sql
+scripts/seed-*.sql
+scripts/migrate-*.sql
+scripts/run-migrate-*.sh
+scripts/install_awesome_copilot_collections.sh
+
+# Task tracking
+.todo.json
+
+# Local database (use migrations instead)
+database/*.db
+database/migrations/
+database/migration-*.sql
+
+# Confidential local data
+band_crawl_schedule.json
+database/exports/

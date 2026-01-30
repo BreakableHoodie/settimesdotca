@@ -1,0 +1,75 @@
+# Cloudflare Pages Configuration for SetTimes.ca
+#
+# This configuration is used for:
+# - Local development with Wrangler
+# - D1 database bindings
+# - Environment variables (secrets set via Cloudflare dashboard)
+
+name = "settimesdotca"
+compatibility_date = "2025-10-08"
+pages_build_output_dir = "frontend/dist"
+# Note: Cloudflare Pages ignores wrangler [build] configs and expects the final
+# artifacts to be present in pages_build_output_dir. The GitHub Actions workflow
+# handles installing dependencies and running `npm run build` before deploying.
+
+# D1 Database Binding
+#
+# The database will be available in Pages Functions as `env.DB`
+#
+# Setup instructions:
+# 1. Create the database: wrangler d1 create settimes-db
+# 2. Note the database_id from the output
+# 3. Update the database_id below
+# 4. Initialize schema: wrangler d1 execute settimes-db --file=database/schema.sql
+# 5. Add sample data: wrangler d1 execute settimes-db --file=database/seed.sql
+
+[[d1_databases]]
+binding = "DB"
+database_name = "settimes-production-db"
+database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b"
+
+# For local development, Wrangler will create a local SQLite database
+# Local DB path: .wrangler/state/v3/d1/miniflare-D1DatabaseObject/
+
+# Environment Variables
+#
+# These should be set in Cloudflare Pages dashboard under Settings > Environment Variables
+#
+# Required variables:
+# - ADMIN_PASSWORD: Regular password for organizers (16+ characters)
+# - MASTER_PASSWORD: Recovery password (different from ADMIN_PASSWORD, 20+ characters)
+# - DEVELOPER_CONTACT: Phone number shown on forgot password screen
+# - PUBLIC_DATA_PUBLISH_ENABLED: Set "true" to publish public event data
+# - CSP_ENFORCE: Set "true" to enforce CSP (report-only when false/omitted)
+# - EMAIL_PROVIDER: "postmark", "mailchannels", or "resend"
+# - EMAIL_FROM: Sender address for transactional email
+# - POSTMARK_API_TOKEN: Required when EMAIL_PROVIDER="postmark"
+# - RESEND_API_KEY: Required when EMAIL_PROVIDER="resend"
+# - PUBLIC_URL: Base URL used in email links (e.g., https://settimes.ca)
+#
+# For local development, create a .dev.vars file (NOT committed to git):
+#
+# ADMIN_PASSWORD=your-strong-admin-password-here
+# MASTER_PASSWORD=your-even-stronger-master-password-here
+# DEVELOPER_CONTACT=555-123-4567
+
+# R2 Bucket Binding
+#
+# The R2 bucket will be available in Pages Functions as `env.BAND_PHOTOS`
+#
+# Setup instructions:
+# 1. Create the bucket: wrangler r2 bucket create settimes-band-photos
+# 2. Bind to Pages project in Cloudflare dashboard:
+#    Settings > Functions > R2 bucket bindings > Add binding
+#    Variable name: BAND_PHOTOS
+#    R2 bucket: settimes-band-photos
+
+# [[r2_buckets]]
+# binding = "BAND_PHOTOS"
+# bucket_name = "settimes-band-photos"
+
+# Custom routes (optional - Pages handles this automatically)
+# Uncomment if you need custom routing behavior
+# [[routes]]
+# pattern = "/api/*"
+# custom_domain = false

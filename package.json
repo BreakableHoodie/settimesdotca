@@ -1,0 +1,22 @@
+{
+  "name": "settimes",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SetTimes.ca - Event Schedule & Performance Management Platform",
+  "scripts": {
+    "migrate:local": "bash scripts/migrate-local-db.sh",
+    "validate:schema": "node scripts/validate-db-schema.js",
+    "prebuild": "npm run validate:schema",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
+    "@playwright/test": "^1.57.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "baseline-browser-mapping": "^2.9.18",
+    "better-sqlite3": "^11.10.0",
+    "vitest": "^4.0.18"
+  }
+}

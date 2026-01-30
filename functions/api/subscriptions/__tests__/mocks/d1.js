@@ -305,6 +305,7 @@ export class MockD1Database {
         description: event.description,
         city: event.city,
         band_name: band.name,
+        performance_id: perf.id,
         start_time: perf.start_time,
         end_time: perf.end_time,
         genre: band.genre,

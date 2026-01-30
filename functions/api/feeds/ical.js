@@ -30,6 +30,7 @@ export async function onRequestGet(context) {
         e.description,
         e.city,
         bp.name as band_name,
+        p.id as performance_id,
         p.start_time,
         p.end_time,
         v.name as venue_name,
@@ -101,8 +102,8 @@ function generateICal(bands, city, genre) {
     const dtstart = `${eventDate.replace(/-/g, "")}T${startTime.replace(/:/g, "")}00`;
     const dtend = `${eventDate.replace(/-/g, "")}T${endTime.replace(/:/g, "")}00`;
 
-    // Generate unique ID
-    const uid = `band-${band.id}-${eventDate}@concertschedule.app`;
+    // Generate unique ID using performance ID to ensure uniqueness per band
+    const uid = `performance-${band.performance_id}-${eventDate}@concertschedule.app`;
 
     // Location
     const location = band.venue_name

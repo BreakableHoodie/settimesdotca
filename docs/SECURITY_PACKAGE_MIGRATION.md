@@ -6,14 +6,14 @@ This document outlines the migration from custom security implementations to bat
 
 | Priority | Area | Current | Target Package | Status |
 |----------|------|---------|----------------|--------|
-| 🔴 HIGH | Password Hashing | Custom PBKDF2 | `@noble/hashes` | Pending |
-| 🔴 HIGH | TOTP/MFA | Custom Base32 + HMAC | `otplib` | Pending |
-| 🔴 HIGH | CSRF Protection | Custom double-submit | `csrf-csrf` | Pending |
-| 🟡 MED | Email Validation | Custom regex | `email-validator` | Pending |
-| 🟡 MED | Input Sanitization | Regex removal | `isomorphic-dompurify` | Pending |
-| 🟢 NEW | Account Activation | None | Custom + email | Pending |
-| 🟢 NEW | Privacy-First Metrics | None | CF Analytics Engine + D1 | Pending |
-| 🟡 MED | Session Management | Custom D1 sessions | `lucia` | Pending |
+| 🔴 HIGH | Password Hashing | Custom PBKDF2 | `@noble/hashes` | ✅ Done |
+| 🔴 HIGH | TOTP/MFA | Custom Base32 + HMAC | `otplib` | ✅ Done |
+| 🔴 HIGH | CSRF Protection | Custom double-submit | `csrf-csrf` | ✅ Done |
+| 🟡 MED | Email Validation | Custom regex | `email-validator` | ✅ Done |
+| 🟡 MED | Input Sanitization | Regex removal | `isomorphic-dompurify` | ✅ Done |
+| 🟢 NEW | Account Activation | None | Custom + email | ✅ Done |
+| 🟢 NEW | Privacy-First Metrics | None | CF Analytics Engine + D1 | ✅ Done |
+| 🟡 MED | Session Management | Custom D1 sessions | `lucia` | ✅ Done |
 
 ---
 

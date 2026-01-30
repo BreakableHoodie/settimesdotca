@@ -176,7 +176,9 @@ export function sanitizeVenueAddress(address) {
   return String(address)
     .trim()
     .replace(/[<>]/g, '') // Remove HTML tags
-    .replace(/javascript:/gi, '') // Remove script protocols
+    .replace(/javascript:/gi, '') // Remove JavaScript protocol
+    .replace(/data:/gi, '') // Remove data protocol
+    .replace(/vbscript:/gi, '') // Remove VBScript protocol
     .replace(/on\w+=/gi, '') // Remove event handlers
     .substring(0, 200) // Limit to reasonable length
 }

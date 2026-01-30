@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import PasswordStrength from '../components/PasswordStrength'
+import { validatePasswordStrength, FIELD_LIMITS } from '../utils/validation'
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -26,9 +28,9 @@ export default function ResetPasswordPage() {
 
     // Verify reset token
     fetch(`/api/auth/reset-password?token=${token}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.valid) {
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (response.ok && data.valid) {
           setUser(data.user)
           setStatus('ready')
         } else {
@@ -50,8 +52,9 @@ export default function ResetPasswordPage() {
       return
     }
 
-    if (formData.newPassword.length < 8) {
-      setMessage('Password must be at least 8 characters long')
+    const passwordError = validatePasswordStrength(formData.newPassword)
+    if (passwordError) {
+      setMessage(passwordError)
       return
     }
 
@@ -146,12 +149,14 @@ export default function ResetPasswordPage() {
               type="password"
               id="newPassword"
               required
-              minLength={8}
+              minLength={FIELD_LIMITS.password.min}
+              maxLength={FIELD_LIMITS.password.max}
               value={formData.newPassword}
               onChange={e => setFormData({ ...formData, newPassword: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
               placeholder="Enter new password"
             />
+            <PasswordStrength password={formData.newPassword} />
           </div>
 
           <div>
@@ -162,7 +167,8 @@ export default function ResetPasswordPage() {
               type="password"
               id="confirmPassword"
               required
-              minLength={8}
+              minLength={FIELD_LIMITS.password.min}
+              maxLength={FIELD_LIMITS.password.max}
               value={formData.confirmPassword}
               onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
@@ -189,9 +195,6 @@ export default function ResetPasswordPage() {
           )}
         </form>
 
-        <div className="mt-6 pt-6 border-t border-white/10">
-          <p className="text-sm text-gray-400 text-center">Password must be at least 8 characters long</p>
-        </div>
       </div>
     </div>
   )

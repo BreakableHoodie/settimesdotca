@@ -2,15 +2,7 @@
 // POST /api/admin/events/{id}/archive
 
 import { checkPermission, auditLog } from "../../_middleware.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import { getClientIP } from "../../../../utils/request.js";
 
 // Helper to extract event ID from path
 function getEventId(request) {
@@ -28,7 +20,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(request, env, "admin");
+    const permCheck = await checkPermission(context, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }

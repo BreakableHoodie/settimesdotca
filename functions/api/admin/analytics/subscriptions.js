@@ -2,22 +2,20 @@
 // No PII exposed, aggregate metrics only
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { getClientIP } from "../../../utils/request.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
   const { DB } = env;
 
   // RBAC: Require admin role (viewer+ would also be acceptable for read-only analytics)
-  const permCheck = await checkPermission(request, env, "admin");
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
   }
 
   const user = permCheck.user;
-  const ipAddress =
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown";
+  const ipAddress = getClientIP(request);
 
   try {
 

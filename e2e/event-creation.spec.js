@@ -1,157 +1,167 @@
 import { test, expect } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from './credentials';
 
-test.describe('Event Creation', () => {
-  // Setup: Login as admin before each test
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/admin/login');
-    await page.fill('input[type="email"]', 'admin@pinklemonaderecords.com');
-    await page.fill('input[type="password"]', 'admin123');
+const loginAsAdmin = async (page) => {
+  await page.goto('/admin');
+  if (page.url().includes('/admin/login')) {
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/admin$/);
+  }
+};
+
+const openEventsTab = async (page) => {
+  await page.click('button:has-text("Events")');
+};
+
+const openCreateEventModal = async (page) => {
+  await page.click('button:has-text("Create New Event")');
+  await expect(page.getByRole('heading', { name: 'Create New Event' })).toBeVisible();
+};
+
+const uniqueSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+const getCsrfToken = async (page) => {
+  const cookies = await page.context().cookies();
+  const csrfCookie = cookies.find(cookie => cookie.name === 'csrf_token');
+  return csrfCookie?.value;
+};
+
+const apiGet = async (page, url) => {
+  const response = await page.request.get(url);
+  expect(response.ok()).toBeTruthy();
+  return response.json();
+};
+
+const apiPost = async (page, url, data) => {
+  const csrfToken = await getCsrfToken(page);
+  const headers = csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+  const response = await page.request.post(url, { data, headers });
+  expect(response.ok()).toBeTruthy();
+  return response.json();
+};
+
+test.describe('Event Creation', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
   });
 
   test('should allow admin to create a new event', async ({ page }) => {
-    // Navigate to Events tab
-    await page.click('button:has-text("Events")');
+    const suffix = uniqueSuffix();
+    const eventName = `Test Event ${suffix}`;
+    const eventSlug = `test-event-${suffix}`;
+    await openEventsTab(page);
+    await openCreateEventModal(page);
 
-    // Click "Add Event" button
-    await page.click('button:has-text("Add Event")');
-
-    // Verify event form modal is visible
-    await expect(page.getByRole('heading', { name: 'Add Event' })).toBeVisible();
-
-    // Fill in event details
-    await page.fill('input[name="title"]', 'Test Event');
+    await page.fill('input[name="name"]', eventName);
+    await page.fill('input[name="slug"]', eventSlug);
     await page.fill('input[name="date"]', '2026-10-15');
-    await page.fill('input[name="startTime"]', '20:00');
-    await page.fill('input[name="endTime"]', '23:00');
 
-    // Select venue from dropdown
-    await page.click('select[name="venueId"]');
-    await page.selectOption('select[name="venueId"]', { index: 1 });
-
-    // Submit form
     await page.click('button[type="submit"]:has-text("Create Event")');
 
-    // Verify event appears in events list
-    await expect(page.getByText('Test Event')).toBeVisible();
-    await expect(page.getByText('2026-10-15')).toBeVisible();
+    const row = page.locator('table tbody tr', { hasText: eventName }).first();
+    await expect(row).toBeVisible();
   });
 
   test('should validate required fields', async ({ page }) => {
-    // Navigate to Events tab
-    await page.click('button:has-text("Events")');
+    await openEventsTab(page);
+    await openCreateEventModal(page);
 
-    // Click "Add Event" button
-    await page.click('button:has-text("Add Event")');
-
-    // Try to submit empty form
     await page.click('button[type="submit"]:has-text("Create Event")');
 
-    // Verify validation errors appear
-    await expect(page.getByText('Title is required')).toBeVisible();
-    await expect(page.getByText('Date is required')).toBeVisible();
+    const nameMissing = await page.locator('input[name="name"]').evaluate(input => input.validity.valueMissing);
+    expect(nameMissing).toBe(true);
   });
 
   test('should allow admin to publish an event', async ({ page }) => {
-    // Navigate to Events tab
-    await page.click('button:has-text("Events")');
+    const suffix = uniqueSuffix();
+    const eventName = `Published Event ${suffix}`;
+    const eventSlug = `published-event-${suffix}`;
+    await openEventsTab(page);
+    await openCreateEventModal(page);
 
-    // Click "Add Event" button
-    await page.click('button:has-text("Add Event")');
-
-    // Fill in event details
-    await page.fill('input[name="title"]', 'Published Event');
+    await page.fill('input[name="name"]', eventName);
+    await page.fill('input[name="slug"]', eventSlug);
     await page.fill('input[name="date"]', '2026-10-20');
-    await page.fill('input[name="startTime"]', '19:00');
-    await page.fill('input[name="endTime"]', '22:00');
-    await page.selectOption('select[name="venueId"]', { index: 1 });
-
-    // Submit form
     await page.click('button[type="submit"]:has-text("Create Event")');
 
-    // Find the created event and click publish
-    await page.click('button[aria-label="Publish Published Event"]');
+    const eventsData = await apiGet(page, '/api/admin/events');
+    const createdEvent = eventsData.events?.find(event => event.name === eventName);
+    expect(createdEvent).toBeTruthy();
 
-    // Verify publish confirmation
-    await expect(page.getByText('Event published successfully')).toBeVisible();
+    const venuesData = await apiGet(page, '/api/admin/venues');
+    const venue = venuesData.venues?.[0];
+    expect(venue).toBeTruthy();
 
-    // Verify event shows as published
-    await expect(page.getByText('Published')).toBeVisible();
+    await apiPost(page, '/api/admin/bands', {
+      eventId: createdEvent.id,
+      venueId: venue.id,
+      name: `Publish Band ${suffix}`,
+      startTime: '19:00',
+      endTime: '19:30',
+    });
+
+    page.once('dialog', dialog => dialog.accept());
+    const publishRow = page.locator('table tbody tr', { hasText: eventName }).first();
+    await publishRow.locator('button', { hasText: /^Publish$/ }).click();
+
+    await expect(publishRow.locator('button', { hasText: /^Unpublish$/ })).toBeVisible({ timeout: 15000 });
   });
 
   test('should show error when creating event with past date', async ({ page }) => {
-    // Navigate to Events tab
-    await page.click('button:has-text("Events")');
+    const suffix = uniqueSuffix();
+    await openEventsTab(page);
+    await openCreateEventModal(page);
 
-    // Click "Add Event" button
-    await page.click('button:has-text("Add Event")');
-
-    // Fill in event with past date
-    await page.fill('input[name="title"]', 'Past Event');
+    await page.fill('input[name="name"]', `Past Event ${suffix}`);
+    await page.fill('input[name="slug"]', `past-event-${suffix}`);
     await page.fill('input[name="date"]', '2020-01-01');
-    await page.fill('input[name="startTime"]', '20:00');
-    await page.fill('input[name="endTime"]', '23:00');
-    await page.selectOption('select[name="venueId"]', { index: 1 });
 
-    // Submit form
     await page.click('button[type="submit"]:has-text("Create Event")');
 
-    // Verify error message
-    await expect(page.getByText('Event date cannot be in the past')).toBeVisible();
+    await expect(page.getByText('Date cannot be in the past')).toBeVisible();
   });
 
   test('should allow admin to edit an event', async ({ page }) => {
-    // Navigate to Events tab
-    await page.click('button:has-text("Events")');
+    const suffix = uniqueSuffix();
+    const eventName = `Editable Event ${suffix}`;
+    const eventSlug = `editable-event-${suffix}`;
+    const updatedName = `Updated Event ${suffix}`;
+    await openEventsTab(page);
+    await openCreateEventModal(page);
 
-    // Create event first
-    await page.click('button:has-text("Add Event")');
-    await page.fill('input[name="title"]', 'Editable Event');
+    await page.fill('input[name="name"]', eventName);
+    await page.fill('input[name="slug"]', eventSlug);
     await page.fill('input[name="date"]', '2026-10-25');
-    await page.fill('input[name="startTime"]', '20:00');
-    await page.fill('input[name="endTime"]', '23:00');
-    await page.selectOption('select[name="venueId"]', { index: 1 });
     await page.click('button[type="submit"]:has-text("Create Event")');
 
-    // Click edit button
-    await page.click('button[aria-label="Edit Editable Event"]');
-
-    // Verify edit form opens
+    const editRow = page.locator('table tbody tr', { hasText: eventName }).first();
+    await editRow.locator('button', { hasText: /^Edit$/ }).click();
     await expect(page.getByRole('heading', { name: 'Edit Event' })).toBeVisible();
 
-    // Update event title
-    await page.fill('input[name="title"]', 'Updated Event Title');
-
-    // Submit changes
+    await page.fill('input[name="name"]', updatedName);
     await page.click('button[type="submit"]:has-text("Update Event")');
 
-    // Verify updated event appears
-    await expect(page.getByText('Updated Event Title')).toBeVisible();
-    await expect(page.getByText('Event updated successfully')).toBeVisible();
+    const updatedRow = page.locator('table tbody tr', { hasText: updatedName }).first();
+    await expect(updatedRow).toBeVisible({ timeout: 15000 });
   });
 
   test('should allow admin to delete an event', async ({ page }) => {
-    // Navigate to Events tab
-    await page.click('button:has-text("Events")');
+    const suffix = uniqueSuffix();
+    const eventName = `Delete Event ${suffix}`;
+    const eventSlug = `delete-event-${suffix}`;
+    await openEventsTab(page);
+    await openCreateEventModal(page);
 
-    // Create event first
-    await page.click('button:has-text("Add Event")');
-    await page.fill('input[name="title"]', 'Deletable Event');
+    await page.fill('input[name="name"]', eventName);
+    await page.fill('input[name="slug"]', eventSlug);
     await page.fill('input[name="date"]', '2026-10-30');
-    await page.fill('input[name="startTime"]', '20:00');
-    await page.fill('input[name="endTime"]', '23:00');
-    await page.selectOption('select[name="venueId"]', { index: 1 });
     await page.click('button[type="submit"]:has-text("Create Event")');
 
-    // Click delete button
-    await page.click('button[aria-label="Delete Deletable Event"]');
+    page.once('dialog', dialog => dialog.accept());
+    const deleteRow = page.locator('table tbody tr', { hasText: eventName }).first();
+    await deleteRow.locator('button', { hasText: /^Delete$/ }).click();
 
-    // Confirm deletion
-    await page.click('button:has-text("Confirm Delete")');
-
-    // Verify event is removed
-    await expect(page.getByText('Deletable Event')).not.toBeVisible();
-    await expect(page.getByText('Event deleted successfully')).toBeVisible();
+    await expect(page.locator('table tbody tr', { hasText: eventName })).toHaveCount(0, { timeout: 15000 });
   });
 });

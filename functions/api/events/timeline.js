@@ -1,3 +1,5 @@
+import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+
 /**
  * Public API: Get events timeline (now, upcoming, past)
  *
@@ -10,6 +12,10 @@
 
 export async function onRequestGet(context) {
   const { request, env } = context;
+  const gate = getPublicDataGateResponse(env);
+  if (gate) {
+    return gate;
+  }
   const { DB } = env;
 
   try {
@@ -17,6 +23,7 @@ export async function onRequestGet(context) {
     const includeNow = url.searchParams.get("now") !== "false"; // default true
     const includeUpcoming = url.searchParams.get("upcoming") !== "false"; // default true
     const includePast = url.searchParams.get("past") !== "false"; // default true
+    const includeBands = url.searchParams.get("includeBands") !== "false"; // default true
     const pastLimit = parseInt(url.searchParams.get("pastLimit") || "10");
 
     const response = {
@@ -38,7 +45,9 @@ export async function onRequestGet(context) {
             name: row.event_name,
             slug: row.event_slug,
             date: row.event_date,
-            bands: [],
+            ticket_url: row.ticket_url || null,
+            bands: includeBands ? [] : null,
+            bandIds: new Set(),
             venues: new Map(),
           });
         }
@@ -47,18 +56,30 @@ export async function onRequestGet(context) {
 
         // Add band if it exists
         if (row.band_id) {
-          event.bands.push({
-            id: row.band_id,
-            name: row.band_name,
-            start_time: row.start_time,
-            end_time: row.end_time,
-            url: row.url,
-            genre: row.genre,
-            origin: row.origin,
-            photo_url: row.photo_url,
-            venue_id: row.venue_id,
-            venue_name: row.venue_name,
-          });
+          event.bandIds.add(row.band_id);
+          if (includeBands) {
+            let url = row.url;
+            // Try to extract URL from social_links if url is missing
+            if (!url && row.social_links) {
+              try {
+                const links = JSON.parse(row.social_links);
+                url = links.website || links.bandcamp || links.instagram || null;
+              } catch (_) {}
+            }
+
+            event.bands.push({
+              id: row.band_id,
+              name: row.band_name,
+              start_time: row.start_time,
+              end_time: row.end_time,
+              url: url,
+              genre: row.genre,
+              origin: row.origin || null,
+              photo_url: row.photo_url,
+              venue_id: row.venue_id,
+              venue_name: row.venue_name,
+            });
+          }
 
           // Track venue
           if (!event.venues.has(row.venue_id)) {
@@ -78,9 +99,10 @@ export async function onRequestGet(context) {
         name: event.name,
         slug: event.slug,
         date: event.date,
-        band_count: event.bands.length,
+        ticket_url: event.ticket_url,
+        band_count: event.bandIds.size,
         venue_count: event.venues.size,
-        bands: event.bands,
+        bands: includeBands ? event.bands : undefined,
         venues: Array.from(event.venues.values()),
       }));
     }
@@ -94,23 +116,25 @@ export async function onRequestGet(context) {
           e.name as event_name,
           e.slug as event_slug,
           e.date as event_date,
-          b.id as band_id,
+          e.ticket_url as ticket_url,
+          p.band_profile_id as band_id,
           b.name as band_name,
-          b.start_time,
-          b.end_time,
-          b.url,
+          p.start_time,
+          p.end_time,
+          b.social_links,
           b.genre,
-          b.origin,
+          NULL as origin,
           b.photo_url,
           v.id as venue_id,
           v.name as venue_name,
           v.address as venue_address
         FROM events e
-        LEFT JOIN bands b ON e.id = b.event_id
-        LEFT JOIN venues v ON b.venue_id = v.id
+        LEFT JOIN performances p ON p.event_id = e.id
+        LEFT JOIN band_profiles b ON p.band_profile_id = b.id
+        LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1
         AND e.date = ?
-        ORDER BY e.date DESC, b.start_time, v.name
+        ORDER BY e.date DESC, p.start_time, v.name
       `,
       )
         .bind(today)
@@ -128,20 +152,22 @@ export async function onRequestGet(context) {
           e.name as event_name,
           e.slug as event_slug,
           e.date as event_date,
-          b.id as band_id,
+          e.ticket_url as ticket_url,
+          p.band_profile_id as band_id,
           b.name as band_name,
-          b.start_time,
-          b.end_time,
-          b.url,
+          p.start_time,
+          p.end_time,
+          b.social_links,
           b.genre,
-          b.origin,
+          NULL as origin,
           b.photo_url,
           v.id as venue_id,
           v.name as venue_name,
           v.address as venue_address
         FROM events e
-        LEFT JOIN bands b ON e.id = b.event_id
-        LEFT JOIN venues v ON b.venue_id = v.id
+        LEFT JOIN performances p ON p.event_id = e.id
+        LEFT JOIN band_profiles b ON p.band_profile_id = b.id
+        LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1
         AND e.date > ?
         AND e.date <= date(?, '+30 days')
@@ -153,7 +179,7 @@ export async function onRequestGet(context) {
           ORDER BY date ASC
           LIMIT 10
         )
-        ORDER BY e.date ASC, b.start_time, v.name
+        ORDER BY e.date ASC, p.start_time, v.name
       `,
       )
         .bind(today, today, today, today)
@@ -171,20 +197,22 @@ export async function onRequestGet(context) {
           e.name as event_name,
           e.slug as event_slug,
           e.date as event_date,
-          b.id as band_id,
+          e.ticket_url as ticket_url,
+          p.band_profile_id as band_id,
           b.name as band_name,
-          b.start_time,
-          b.end_time,
-          b.url,
+          p.start_time,
+          p.end_time,
+          b.social_links,
           b.genre,
-          b.origin,
+          NULL as origin,
           b.photo_url,
           v.id as venue_id,
           v.name as venue_name,
           v.address as venue_address
         FROM events e
-        LEFT JOIN bands b ON e.id = b.event_id
-        LEFT JOIN venues v ON b.venue_id = v.id
+        LEFT JOIN performances p ON p.event_id = e.id
+        LEFT JOIN band_profiles b ON p.band_profile_id = b.id
+        LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1
         AND e.date < ?
         AND e.id IN (
@@ -194,7 +222,7 @@ export async function onRequestGet(context) {
           ORDER BY date DESC
           LIMIT ?
         )
-        ORDER BY e.date DESC, b.start_time, v.name
+        ORDER BY e.date DESC, p.start_time, v.name
       `,
       )
         .bind(today, today, pastLimit)

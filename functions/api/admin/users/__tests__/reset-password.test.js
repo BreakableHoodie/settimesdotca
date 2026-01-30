@@ -3,7 +3,7 @@ import { createTestEnv } from "../../../test-utils.js";
 import * as resetHandler from "../[id]/reset-password.js";
 
 describe("Admin user password reset API", () => {
-  test("admin resets password successfully and logs action", async () => {
+  test("admin generates reset token and logs action", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     rawDb
       .prepare(
@@ -18,19 +18,23 @@ describe("Admin user password reset API", () => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ newPassword: "supersecurePASS123" }),
+        body: JSON.stringify({ reason: "User forgot password" }),
       }
     );
     const response = await resetHandler.onRequestPost({
       request,
       env,
-      params: { id: String(user.id) },
+      params: { id: String(user.id) }, data: { user: { userId: 1, role: "admin", email: "admin@test" } },
     });
     expect(response.status).toBe(200);
-    const updated = rawDb
-      .prepare("SELECT password_hash FROM users WHERE id = ?")
+    const payload = await response.json();
+    expect(payload.resetUrl).toContain("reset-password?token=");
+    const resetToken = rawDb
+      .prepare(
+        "SELECT * FROM password_reset_tokens WHERE user_id = ? ORDER BY created_at DESC"
+      )
       .get(user.id);
-    expect(updated.password_hash).not.toBe("oldhash");
+    expect(resetToken).toBeTruthy();
     const audit = rawDb
       .prepare(
         "SELECT * FROM audit_log WHERE action = 'user.password_reset' AND resource_id = ?"
@@ -52,37 +56,39 @@ describe("Admin user password reset API", () => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ newPassword: "supersecurePASS123" }),
+        body: JSON.stringify({ reason: "Not authorized" }),
       }
     );
     const response = await resetHandler.onRequestPost({
       request,
       env,
-      params: { id: String(user.id) },
+      params: { id: String(user.id) }, data: { user: { userId: 2, role: "editor", email: "editor@test" } },
     });
     expect(response.status).toBe(403);
   });
 
-  test("rejects weak password", async () => {
+  test("rejects reset for inactive user", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     rawDb
-      .prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
-      .run("weak@test.com", "viewer", "Weak");
+      .prepare(
+        "INSERT INTO users (email, role, name, is_active) VALUES (?, ?, ?, ?)"
+      )
+      .run("inactive@test.com", "viewer", "Inactive", 0);
     const user = rawDb
       .prepare("SELECT * FROM users WHERE email = ?")
-      .get("weak@test.com");
+      .get("inactive@test.com");
     const request = new Request(
       `https://example.test/api/admin/users/${user.id}/reset-password`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ newPassword: "short" }),
+        body: JSON.stringify({ reason: "Account inactive" }),
       }
     );
     const response = await resetHandler.onRequestPost({
       request,
       env,
-      params: { id: String(user.id) },
+      params: { id: String(user.id) }, data: { user: { userId: 1, role: "admin", email: "admin@test" } },
     });
     expect(response.status).toBe(400);
   });

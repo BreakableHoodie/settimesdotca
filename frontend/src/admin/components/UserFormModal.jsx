@@ -7,6 +7,8 @@
 // - loading: boolean
 
 import { useState, useEffect } from 'react'
+import PasswordStrength from '../../components/PasswordStrength'
+import { FIELD_LIMITS, validatePasswordStrength } from '../../utils/validation'
 
 export default function UserFormModal({ isOpen, onClose, user, onSave, loading }) {
   const isEditMode = Boolean(user)
@@ -56,20 +58,27 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
       newErrors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Invalid email format'
+    } else if (formData.email.length > FIELD_LIMITS.email.max) {
+      newErrors.email = `Email must be no more than ${FIELD_LIMITS.email.max} characters`
     }
 
     // Password validation (only for create mode)
-    if (!isEditMode && !formData.password) {
-      newErrors.password = 'Password is required'
-    } else if (!isEditMode && formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters'
+    if (!isEditMode) {
+      const passwordError = validatePasswordStrength(formData.password)
+      if (passwordError) {
+        newErrors.password = passwordError
+      } else if (formData.password.length > FIELD_LIMITS.password.max) {
+        newErrors.password = `Password must be no more than ${FIELD_LIMITS.password.max} characters`
+      }
     }
 
     // Name validation
     if (!formData.name) {
       newErrors.name = 'Display name is required'
-    } else if (formData.name.length < 2) {
-      newErrors.name = 'Display name must be at least 2 characters'
+    } else if (formData.name.length < FIELD_LIMITS.userName.min) {
+      newErrors.name = `Display name must be at least ${FIELD_LIMITS.userName.min} characters`
+    } else if (formData.name.length > FIELD_LIMITS.userName.max) {
+      newErrors.name = `Display name must be no more than ${FIELD_LIMITS.userName.max} characters`
     }
 
     // Role validation
@@ -110,12 +119,14 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               value={formData.email}
               onChange={e => setFormData({ ...formData, email: e.target.value })}
               disabled={isEditMode} // Can't change email in edit mode
-              className={`w-full px-3 py-2 rounded-lg bg-white/10 text-white border ${
+              maxLength={FIELD_LIMITS.email.max}
+              className={`w-full min-h-[44px] px-3 py-2 rounded-lg bg-white/10 text-white border ${
                 errors.email ? 'border-red-500' : 'border-white/20'
               } focus:border-band-orange focus:outline-none placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed`}
               placeholder="user@example.com"
             />
             {errors.email && <p className="mt-1 text-sm text-red-400">{errors.email}</p>}
+            <p className="mt-1 text-xs text-gray-400">{formData.email.length}/{FIELD_LIMITS.email.max}</p>
           </div>
 
           {/* Password (only in create mode or if explicitly changing) */}
@@ -129,12 +140,16 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
                 id="password"
                 value={formData.password}
                 onChange={e => setFormData({ ...formData, password: e.target.value })}
-                className={`w-full px-3 py-2 rounded-lg bg-white/10 text-white border ${
+                minLength={FIELD_LIMITS.password.min}
+                maxLength={FIELD_LIMITS.password.max}
+                className={`w-full min-h-[44px] px-3 py-2 rounded-lg bg-white/10 text-white border ${
                   errors.password ? 'border-red-500' : 'border-white/20'
                 } focus:border-band-orange focus:outline-none placeholder-gray-400`}
-                placeholder="Minimum 8 characters"
+                placeholder={`${FIELD_LIMITS.password.min}-${FIELD_LIMITS.password.max} characters`}
               />
+              <PasswordStrength password={formData.password} />
               {errors.password && <p className="mt-1 text-sm text-red-400">{errors.password}</p>}
+              <p className="mt-1 text-xs text-gray-400">{formData.password.length}/{FIELD_LIMITS.password.max}</p>
             </div>
           )}
 
@@ -148,12 +163,15 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               id="name"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              className={`w-full px-3 py-2 rounded-lg bg-white/10 text-white border ${
+              minLength={FIELD_LIMITS.userName.min}
+              maxLength={FIELD_LIMITS.userName.max}
+              className={`w-full min-h-[44px] px-3 py-2 rounded-lg bg-white/10 text-white border ${
                 errors.name ? 'border-red-500' : 'border-white/20'
               } focus:border-band-orange focus:outline-none placeholder-gray-400`}
               placeholder="John Doe"
             />
             {errors.name && <p className="mt-1 text-sm text-red-400">{errors.name}</p>}
+            <p className="mt-1 text-xs text-gray-400">{formData.name.length}/{FIELD_LIMITS.userName.max}</p>
           </div>
 
           {/* Role */}
@@ -165,7 +183,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               id="role"
               value={formData.role}
               onChange={e => setFormData({ ...formData, role: e.target.value })}
-              className={`w-full px-3 py-2 rounded-lg bg-white/10 text-white border ${
+              className={`w-full min-h-[44px] px-3 py-2 rounded-lg bg-white/10 text-white border ${
                 errors.role ? 'border-red-500' : 'border-white/20'
               } focus:border-band-orange focus:outline-none`}
             >
@@ -187,7 +205,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
                   type="checkbox"
                   checked={formData.isActive}
                   onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="mr-2"
+                  className="h-5 w-5 mr-2"
                 />
                 <span className="text-white font-medium">Active</span>
               </label>
@@ -196,11 +214,11 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
           )}
 
           {/* Buttons */}
-          <div className="flex space-x-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+              className="min-h-[44px] flex-1 bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
             >
               {loading ? 'Saving...' : isEditMode ? 'Update User' : 'Create User'}
             </button>
@@ -208,7 +226,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+              className="min-h-[44px] flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
             >
               Cancel
             </button>

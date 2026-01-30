@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { eventsApi } from '../utils/adminApi'
 
 const EventContext = createContext()
 
@@ -24,49 +25,38 @@ export function EventProvider({ children }) {
   const [currentEvent, setCurrentEvent] = useState(null)
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const currentEventIdRef = useRef(currentEventId)
+
+  useEffect(() => {
+    currentEventIdRef.current = currentEventId
+  }, [currentEventId])
 
   // Fetch events list
   const fetchEvents = useCallback(async () => {
     try {
-      const token = sessionStorage.getItem('sessionToken')
-      if (!token) {
-        setLoading(false)
-        return
-      }
+      setError(null)
+      const data = await eventsApi.getAll()
+      setEvents(data.events || [])
 
-      const response = await fetch('/api/admin/events', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setEvents(data.events || [])
-
-        // Update current event if we have a currentEventId
-        if (currentEventId) {
-          const event = (data.events || []).find(e => e.id === currentEventId)
-          setCurrentEvent(event || null)
-
-          // Clear currentEventId if event no longer exists
-          if (!event) {
-            setCurrentEventId(null)
-            localStorage.removeItem('currentEventId')
-          }
-        }
+      // Update current event if we have a currentEventId
+      const activeEventId = currentEventIdRef.current
+      if (activeEventId) {
+        const event = (data.events || []).find(e => e.id === activeEventId)
+        setCurrentEvent(event || null)
       }
     } catch (error) {
       console.error('Failed to fetch events:', error)
+      setError(error)
     } finally {
       setLoading(false)
     }
-  }, [currentEventId])
+  }, [])
 
-  // Fetch events on mount and when currentEventId changes
+  // Initial load
   useEffect(() => {
     fetchEvents()
-  }, [currentEventId, fetchEvents])
+  }, [fetchEvents])
 
   // Switch to a different event
   const switchEvent = eventId => {
@@ -95,6 +85,7 @@ export function EventProvider({ children }) {
         currentEvent,
         events,
         loading,
+        error,
         switchEvent,
         refreshEvents,
       }}

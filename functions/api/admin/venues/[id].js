@@ -3,6 +3,7 @@
 // DELETE /api/admin/venues/{id} - Delete venue
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { getClientIP } from "../../../utils/request.js";
 
 // Helper to extract venue ID from path
 function getVenueId(request) {
@@ -18,16 +19,13 @@ export async function onRequestPut(context) {
   const { DB } = env;
 
   // RBAC: Require admin role (venues are structural)
-  const permCheck = await checkPermission(request, env, "admin");
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
   }
 
   const user = permCheck.user;
-  const ipAddress =
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown";
+  const ipAddress = getClientIP(request);
 
   try {
     const venueId = getVenueId(request);
@@ -168,16 +166,13 @@ export async function onRequestDelete(context) {
   const { DB } = env;
 
   // RBAC: Require admin role (venues are structural)
-  const permCheck = await checkPermission(request, env, "admin");
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
   }
 
   const user = permCheck.user;
-  const ipAddress =
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown";
+  const ipAddress = getClientIP(request);
 
   try {
     const venueId = getVenueId(request);
@@ -220,7 +215,7 @@ export async function onRequestDelete(context) {
     // Check if venue is used by any bands
     const bandCount = await DB.prepare(
       `
-      SELECT COUNT(*) as count FROM bands WHERE venue_id = ?
+      SELECT COUNT(*) as count FROM performances WHERE venue_id = ?
     `,
     )
       .bind(venueId)
@@ -279,6 +274,7 @@ export async function onRequestDelete(context) {
       JSON.stringify({
         error: "Database error",
         message: "Failed to delete venue",
+        details: error.message
       }),
       {
         status: 500,

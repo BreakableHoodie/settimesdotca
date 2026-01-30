@@ -1,14 +1,40 @@
-import { hashPassword } from "../../../utils/crypto.js";
 import { setSessionCookie } from "../../../utils/cookies.js";
+import { hashPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
+import { isValidEmail, validatePassword, FIELD_LIMITS } from "../../../utils/validation.js";
+import { getClientIP } from "../../../utils/request.js";
 
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
+// Rate limiting: check failed signup attempts
+async function checkRateLimit(DB, email, ipAddress) {
+  const windowMs = 10 * 60 * 1000;
+  const windowStart = new Date(Date.now() - windowMs).toISOString();
+
+  const attempts = await DB.prepare(
+    `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
+     FROM auth_attempts
+     WHERE (email = ? OR ip_address = ?)
+     AND attempt_type = 'signup'
+     AND success = 0
+     AND created_at > ?`
+  )
+    .bind(email, ipAddress, windowStart)
+    .first();
+
+  if (Number(attempts.count) >= 5) {
+    const earliestTs = attempts.earliest_attempt
+      ? new Date(attempts.earliest_attempt).getTime()
+      : Date.now();
+    const elapsed = Date.now() - earliestTs;
+    const remainingMs = Math.max(0, windowMs - elapsed);
+    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+
+    return {
+      allowed: false,
+      remainingMinutes,
+    };
+  }
+
+  return { allowed: true };
 }
 
 export async function onRequestPost(context) {
@@ -17,6 +43,20 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
+    const signupEnabled = env?.ALLOW_ADMIN_SIGNUP === "true";
+    if (!signupEnabled) {
+      return new Response(
+        JSON.stringify({
+          error: "Signup disabled",
+          message: "Self-serve signup is not available at this time.",
+        }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { email, password, name, role, inviteCode } = await request.json();
 
     // SECURITY: Require invite code for all signups
@@ -29,7 +69,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
@@ -43,13 +83,12 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
     // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!isValidEmail(email)) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -58,21 +97,43 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
-    // Password strength validation (min 8 chars)
-    if (password.length < 8) {
+    // Check rate limit
+    const rateCheck = await checkRateLimit(DB, email, ipAddress);
+    if (!rateCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "Too many attempts",
+          message: `Too many failed signup attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Password strength validation
+    const passwordCheck = validatePassword(password, {
+      minLength: FIELD_LIMITS.password.min,
+      requireUppercase: true,
+      requireLowercase: true,
+      requireNumber: true,
+      requireSpecial: true,
+    });
+    if (!passwordCheck.valid) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
-          message: "Password must be at least 8 characters",
+          message: passwordCheck.errors[0],
         }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
@@ -84,7 +145,7 @@ export async function onRequestPost(context) {
       AND is_active = 1
       AND expires_at > datetime('now')
       AND used_by_user_id IS NULL
-    `,
+    `
     )
       .bind(inviteCode)
       .first();
@@ -93,13 +154,9 @@ export async function onRequestPost(context) {
       // Log failed signup attempt
       await DB.prepare(
         `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, 'signup', 0, 'invalid_invite_code')`,
+         VALUES (?, ?, ?, 'signup', 0, 'invalid_invite_code')`
       )
-        .bind(
-          email,
-          ipAddress,
-          request.headers.get("User-Agent") || "unknown",
-        )
+        .bind(email, ipAddress, request.headers.get("User-Agent") || "unknown")
         .run();
 
       return new Response(
@@ -111,7 +168,7 @@ export async function onRequestPost(context) {
         {
           status: 403,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
@@ -119,24 +176,21 @@ export async function onRequestPost(context) {
     if (invite.email && invite.email.toLowerCase() !== email.toLowerCase()) {
       await DB.prepare(
         `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, 'signup', 0, 'email_mismatch')`,
+         VALUES (?, ?, ?, 'signup', 0, 'email_mismatch')`
       )
-        .bind(
-          email,
-          ipAddress,
-          request.headers.get("User-Agent") || "unknown",
-        )
+        .bind(email, ipAddress, request.headers.get("User-Agent") || "unknown")
         .run();
 
       return new Response(
         JSON.stringify({
           error: "Email mismatch",
-          message: "This invite code is restricted to a different email address",
+          message:
+            "This invite code is restricted to a different email address",
         }),
         {
           status: 403,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
@@ -147,13 +201,13 @@ export async function onRequestPost(context) {
     // Ignore any role parameter passed by client to prevent privilege escalation
     if (role === "admin") {
       console.warn(
-        `Signup attempt with admin role blocked for email: ${email}`,
+        `Signup attempt with admin role blocked for email: ${email}`
       );
     }
 
     // Check if user already exists
     const existingUser = await DB.prepare(
-      "SELECT id FROM users WHERE email = ?",
+      "SELECT id FROM users WHERE email = ?"
     )
       .bind(email)
       .first();
@@ -167,7 +221,7 @@ export async function onRequestPost(context) {
         {
           status: 409,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
@@ -176,14 +230,14 @@ export async function onRequestPost(context) {
 
     // Create user
     const user = await DB.prepare(
-      "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?) RETURNING id, email, name, role",
+      "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?) RETURNING id, email, name, role"
     )
       .bind(email, passwordHash, name || null, userRole)
       .first();
 
     // Mark invite code as used
     await DB.prepare(
-      "UPDATE invite_codes SET used_by_user_id = ?, used_at = datetime('now') WHERE code = ?",
+      "UPDATE invite_codes SET used_by_user_id = ?, used_at = datetime('now') WHERE code = ?"
     )
       .bind(user.id, inviteCode)
       .run();
@@ -191,13 +245,13 @@ export async function onRequestPost(context) {
     // Log successful signup
     await DB.prepare(
       `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-       VALUES (?, ?, ?, ?, 'signup', 1)`,
+       VALUES (?, ?, ?, ?, 'signup', 1)`
     )
       .bind(
         user.id,
         email,
         ipAddress,
-        request.headers.get("User-Agent") || "unknown",
+        request.headers.get("User-Agent") || "unknown"
       )
       .run();
 
@@ -207,14 +261,14 @@ export async function onRequestPost(context) {
 
     // Create session in database
     await DB.prepare(
-      "INSERT INTO sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO sessions (session_token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
     )
       .bind(
         sessionToken,
         user.id,
         expiresAt,
         ipAddress,
-        request.headers.get("User-Agent") || "unknown",
+        request.headers.get("User-Agent") || "unknown"
       )
       .run();
 
@@ -225,8 +279,11 @@ export async function onRequestPost(context) {
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", setSessionCookie(sessionToken, false));
-    headers.append("Set-Cookie", setCSRFCookie(csrfToken));
+    headers.append(
+      "Set-Cookie",
+      setSessionCookie(sessionToken, false, request)
+    );
+    headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     return new Response(
       JSON.stringify({
@@ -237,13 +294,11 @@ export async function onRequestPost(context) {
           name: user.name,
           role: user.role,
         },
-        sessionToken, // COMPATIBILITY: Include for legacy Authorization header usage
-        csrfToken, // Send CSRF token so client can include it in headers
       }),
       {
         status: 201,
         headers,
-      },
+      }
     );
   } catch (error) {
     console.error("Signup error:", error);
@@ -255,7 +310,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      },
+      }
     );
   }
 }

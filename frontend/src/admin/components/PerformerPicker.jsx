@@ -1,61 +1,99 @@
+import React, { useState, useMemo } from 'react'
 import PropTypes from 'prop-types'
 
-export default function PerformerPicker({ eventId, eventVenues }) {
-  const venues = eventVenues?.slice(0, 3) || []
+export default function ArtistPicker({ artists, onSelect, onCancel }) {
+  const [query, setQuery] = useState('')
+
+  // Deduplicate artists just in case, though the API should handle it
+  const uniqueArtists = useMemo(() => {
+    const map = new Map()
+    artists.forEach(a => {
+      // Use ID if available, otherwise name as key
+      const key = a.id || a.name
+      if (!map.has(key)) {
+        map.set(key, a)
+      }
+    })
+    return Array.from(map.values())
+  }, [artists])
+
+  const filtered = useMemo(() => {
+    if (!query) return uniqueArtists.slice(0, 10) // Show top 10 initially
+    const lower = query.toLowerCase()
+    return uniqueArtists.filter(a => a.name.toLowerCase().includes(lower))
+  }, [query, uniqueArtists])
 
   return (
-    <section className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20 space-y-4">
+      <div className="flex justify-between items-start">
         <div>
-          <p className="text-xs uppercase tracking-widest text-white/60">Quick Scheduling</p>
-          <h3 className="text-xl font-semibold text-white">Pick a performer</h3>
+           <h3 className="text-lg font-bold text-white">Add to Lineup</h3>
+           <p className="text-white/60 text-sm">Search the Global Artist Roster to add an existing artist, or create a new one.</p>
         </div>
-        <span className="px-3 py-1 text-xs font-medium rounded-full bg-band-orange/20 text-band-orange">
-          Event #{eventId}
-        </span>
+        <button onClick={onCancel} className="text-white/40 hover:text-white">✕</button>
+      </div>
+      
+      <input
+        autoFocus
+        type="text"
+        placeholder="Search for an artist..."
+        className="w-full min-h-[44px] px-4 py-3 bg-band-navy border border-white/20 rounded text-white focus:border-band-orange focus:outline-none text-lg"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+      />
+      
+      <div className="max-h-60 overflow-y-auto border border-white/10 rounded bg-black/20">
+        {filtered.map(artist => (
+          <button
+            key={artist.id || artist.name} 
+            onClick={() => onSelect(artist)}
+            className="w-full text-left p-3 hover:bg-white/10 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-0"
+          >
+            <div className="flex items-center gap-3">
+              {artist.photo_url ? (
+                 <img src={artist.photo_url} alt="" className="w-10 h-10 rounded-full object-cover bg-white/10" />
+              ) : (
+                 <div className="w-10 h-10 rounded-full bg-band-orange/20 flex items-center justify-center text-band-orange font-bold">
+                    {artist.name.charAt(0)}
+                 </div>
+              )}
+              <div>
+                <div className="font-bold text-white">{artist.name}</div>
+                <div className="text-xs text-white/60">
+                   {[artist.origin, artist.genre].filter(Boolean).join(' • ')}
+                </div>
+              </div>
+            </div>
+            <span className="px-3 py-1 bg-band-navy border border-band-orange/30 text-band-orange rounded text-xs uppercase font-medium">Select</span>
+          </button>
+        ))}
+        {filtered.length === 0 && query && (
+           <div className="p-8 text-center">
+              <p className="text-white/50 mb-4">No artist found named "{query}"</p>
+              <button 
+                onClick={() => onSelect(null, query)} // Pass query as name for new artist
+                className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition"
+              >
+                + Create "{query}"
+              </button>
+           </div>
+        )}
       </div>
 
-      <p className="text-white/70 text-sm mt-3">
-        This panel will evolve into a bulk importer that lets you drop an existing performer onto an open slot in just a
-        few clicks. For now, use the <strong>Add Band</strong> button above to create performances manually.
-      </p>
-
-      {venues.length > 0 && (
-        <div className="mt-4 text-sm text-white/60">
-          <p className="font-medium text-white mb-2">Venues in this event:</p>
-          <div className="flex flex-wrap gap-2">
-            {venues.map(venue => (
-              <span key={venue.id} className="px-3 py-1 rounded-full bg-white/10 border border-white/15">
-                {venue.name}
-              </span>
-            ))}
-            {eventVenues.length > venues.length && (
-              <span className="px-3 py-1 rounded-full bg-white/5 border border-dashed border-white/20">
-                +{eventVenues.length - venues.length} more
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      <a
-        href="https://github.com/BreakableHoodie/longweekend-bandcrawl/tree/dev/docs"
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex mt-4 px-4 py-2 rounded-lg bg-band-orange text-white font-medium hover:bg-orange-500 transition"
-      >
-        View scheduling guide
-      </a>
-    </section>
+      <div className="flex justify-end pt-2 border-t border-white/10">
+         <button 
+           onClick={() => onSelect(null)} 
+           className="text-band-orange hover:text-orange-400 text-sm font-medium"
+         >
+           + Create New Artist manually
+         </button>
+      </div>
+    </div>
   )
 }
 
-PerformerPicker.propTypes = {
-  eventId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  eventVenues: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-      name: PropTypes.string,
-    })
-  ),
+ArtistPicker.propTypes = {
+  artists: PropTypes.array.isRequired,
+  onSelect: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired
 }

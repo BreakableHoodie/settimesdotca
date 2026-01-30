@@ -1,5 +1,7 @@
-
 import { test, expect } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from './credentials';
+
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Admin Login', () => {
   test('should allow admin to login', async ({ page }) => {
@@ -9,9 +11,9 @@ test.describe('Admin Login', () => {
     // Check if we are on the login page
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible();
 
-    // Fill in credentials (using default admin credentials from seed/docs)
-    await page.fill('input[type="email"]', 'admin@pinklemonaderecords.com');
-    await page.fill('input[type="password"]', 'admin123');
+    // Fill in credentials (from environment)
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
 
     // Click login button
     await page.click('button[type="submit"]');
@@ -27,7 +29,7 @@ test.describe('Admin Login', () => {
   test('should show error for invalid credentials', async ({ page }) => {
     await page.goto('/admin/login');
 
-    await page.fill('input[type="email"]', 'admin@pinklemonaderecords.com');
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', 'wrongpassword');
     await page.click('button[type="submit"]');
 

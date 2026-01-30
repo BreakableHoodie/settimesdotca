@@ -34,9 +34,9 @@ describe("Password Validation", () => {
   it("should validate password length", () => {
     const result1 = validatePassword("short");
     expect(result1.valid).toBe(false);
-    expect(result1.errors).toContain("Password must be at least 8 characters");
+    expect(result1.errors).toContain("Password must be at least 12 characters");
 
-    const result2 = validatePassword("longenough");
+    const result2 = validatePassword("LongEnough12!");
     expect(result2.valid).toBe(true);
     expect(result2.errors).toHaveLength(0);
   });

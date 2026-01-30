@@ -34,6 +34,9 @@ class ErrorBoundary extends Component {
 
   render() {
     if (this.state.hasError) {
+      const showDevDetails =
+        import.meta.env.DEV ||
+        (typeof window !== 'undefined' && window.location.hostname === 'localhost')
       // Use custom fallback if provided
       if (this.props.fallback) {
         return this.props.fallback
@@ -50,7 +53,7 @@ class ErrorBoundary extends Component {
             </p>
 
             {/* Show error details in development */}
-            {import.meta.env.DEV && this.state.error && (
+            {showDevDetails && this.state.error && (
               <details className="mb-6 text-left">
                 <summary className="cursor-pointer text-band-orange hover:text-orange-400 mb-2">
                   Error Details (Dev Only)

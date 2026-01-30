@@ -1,6 +1,7 @@
 import { act, render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { axe, toHaveNoViolations } from 'jest-axe'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import App from '../App'
 
 expect.extend(toHaveNoViolations)
@@ -35,7 +36,11 @@ const waitForAppToSettle = async () => {
 
 describe('Accessibility Tests', () => {
   it('App should have no accessibility violations', async () => {
-    const { container } = render(<App />)
+    const { container } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
 
     // Wait for data to load
     await waitForAppToSettle()
@@ -45,7 +50,11 @@ describe('Accessibility Tests', () => {
   }, 10000) // Increase timeout for axe
 
   it('should have proper heading hierarchy', async () => {
-    const { container } = render(<App />)
+    const { container } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
     await waitForAppToSettle()
 
     const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6')
@@ -53,7 +62,11 @@ describe('Accessibility Tests', () => {
   })
 
   it('should have alt text for images', async () => {
-    const { container } = render(<App />)
+    const { container } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
     await waitForAppToSettle()
 
     const images = container.querySelectorAll('img')
@@ -63,7 +76,11 @@ describe('Accessibility Tests', () => {
   })
 
   it('should have accessible buttons', async () => {
-    const { container } = render(<App />)
+    const { container } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
     await waitForAppToSettle()
 
     const buttons = container.querySelectorAll('button')

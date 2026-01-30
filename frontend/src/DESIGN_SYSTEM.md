@@ -97,28 +97,31 @@ Layered elevation system for depth hierarchy:
 
 ## Component Library
 
-### Base Components (13+)
+### Base Components (11)
 
 **Form Controls**:
-- `<Button>` - Primary, secondary, outline, ghost variants
+- `<Button>` - Primary, secondary, danger, ghost, success, warning, link variants
 - `<Input>` - Text, email, password, number inputs with validation states
-- `<Checkbox>` - Accessible checkbox with indeterminate state
-- `<Radio>` - Radio button groups with keyboard navigation
-- `<Select>` - Custom select with native fallback
-- `<Toggle>` - Switch component for boolean values
+- `<Select>` - Dropdown select with options, placeholder, and validation
+- `<Textarea>` - Multi-line text input with character counting and resize options
 
 **Feedback & Overlays**:
-- `<Alert>` - Success, warning, error, info notifications
-- `<Modal>` - Dialog with focus trap and escape handling
-- `<ConfirmDialog>` - Confirmation modal with action buttons
-- `<Loading>` - Loading spinner with size variants
-- `<Tooltip>` - Accessible tooltip with arrow positioning
+- `<Alert>` - Success, warning, error, info notifications with icons
+- `<Modal>` - Dialog with focus trap, escape handling, backdrop click
+- `<ConfirmDialog>` - Confirmation modal for destructive actions
+- `<Loading>` - Loading spinner with size variants and fullscreen mode
+- `<Tooltip>` - Accessible tooltip with arrow positioning (top/bottom/left/right)
 
 **Data Display**:
-- `<Card>` - Content container with header/body/footer
-- `<Badge>` - Status indicators and labels
+- `<Card>` - Content container with variants (default, elevated, gradient, glow)
+- `<Badge>` - Status indicators with semantic colors (memoized)
 
-All components available in `/frontend/src/components/[ComponentName]/`
+All components available in `/frontend/src/components/ui/`
+
+**Component Architecture**:
+- **Tailwind Components (11)**: Use utility classes with prop-based variants
+- **Responsive Strategy**: Mobile-first with consumer-level breakpoints (sm:, md:, lg:, xl:, 2xl:)
+- **Accessibility**: All components include proper ARIA attributes, focus management, and keyboard support
 
 ### Component Usage Examples
 
@@ -156,13 +159,46 @@ import { Modal } from '@/components/Modal';
 
 #### Alert Component
 ```jsx
-import { Alert } from '@/components/Alert';
+import Alert from '@/components/ui/Alert';
 
 <Alert
   variant="success"
-  title="Success!"
-  message="Band created successfully"
   dismissible
+  onClose={handleClose}
+>
+  Band created successfully!
+</Alert>
+```
+
+#### Select Component
+```jsx
+import Select from '@/components/ui/Select';
+
+<Select
+  label="Venue"
+  value={selectedVenue}
+  onChange={(e) => setSelectedVenue(e.target.value)}
+  options={[
+    { value: 'venue-1', label: 'The Warehouse' },
+    { value: 'venue-2', label: 'Club Nova' },
+  ]}
+  placeholder="Select a venue"
+  required
+/>
+```
+
+#### Textarea Component
+```jsx
+import Textarea from '@/components/ui/Textarea';
+
+<Textarea
+  label="Band Bio"
+  value={bio}
+  onChange={(e) => setBio(e.target.value)}
+  placeholder="Tell us about the band..."
+  rows={4}
+  maxLength={500}
+  showCount
 />
 ```
 
@@ -235,30 +271,112 @@ All components use mobile-first responsive patterns with progressive enhancement
 /* Wide: 1280px+ */
 ```
 
-### Responsive Patterns
+### Responsive Implementation Strategy
 
-**10 Components with Responsive CSS**:
-- Alert - Adjusted padding, font sizes, touch targets
-- Modal - Size variants adapt to viewport
-- Badge - Compact sizing on mobile
-- Card - Stacked layouts on mobile
-- Toggle - Larger touch targets
-- Radio/Checkbox - Enhanced mobile tap areas
-- Select - Native fallback on mobile
-- Input - Touch-optimized sizing
-- Button - Minimum 32px touch target
+**Component-Level Responsive CSS (1 Component)**:
+- **Modal** (CSS Modules) - True @media queries for mobile (@media max-width: 640px), high contrast (@media prefers-contrast: high), reduced motion (@media prefers-reduced-motion: reduce)
+
+**Touch Target Compliance (All Interactive Components)**:
+- Button, Input, ConfirmDialog - All use `min-h-[44px]` for WCAG 2.1 AAA compliance
+
+**Consumer-Level Responsive Behavior**:
+- **ScheduleView.jsx** - Grid: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4`
+- **Header.jsx** - Layout: `flex-col md:flex-row`, text scaling: `text-lg sm:text-xl md:text-2xl`
+- **BandCard.jsx** - Typography: `text-base md:text-lg`, `text-xs md:text-sm`
+
+**Architecture Rationale**:
+Base components use Tailwind with fixed classes and prop-based variants for simplicity. Responsive behavior happens at the page/consumer level using Tailwind's breakpoint prefixes (sm:, md:, lg:, xl:, 2xl:), allowing flexible layouts while maintaining component simplicity.
 
 **Touch Target Compliance**:
-All interactive elements meet minimum 32px touch target on mobile:
+All interactive elements meet minimum 44px touch target on mobile (WCAG 2.1 Level AAA):
 
 ```css
-@media (max-width: 640px) {
-  .closeButton {
-    min-width: 32px;
-    min-height: 32px;
-  }
+/* Tailwind utility approach */
+.button {
+  min-height: 44px; /* min-h-[44px] */
+}
+
+/* Direct sizing approach */
+.iconButton {
+  height: 44px; /* h-11 (11 × 4px = 44px) */
+  width: 44px;  /* w-11 */
 }
 ```
+
+### Responsive Pattern Examples
+
+**Touch Target Implementation**:
+```jsx
+// Tailwind utility approach (Button.jsx)
+<button className="min-h-[44px] px-6 py-3">
+  Click Me
+</button>
+
+// Grid-based sizing (BandCard.jsx)
+<button className="h-11 w-11 flex items-center justify-center">
+  <FontAwesomeIcon icon={faPlus} />
+</button>
+```
+
+**Typography Scaling** (mobile-first progressive enhancement):
+```jsx
+// BandCard.jsx - Progressive text sizing
+<h3 className="text-base md:text-lg leading-snug">
+  {band.name}
+</h3>
+
+<p className="text-xs md:text-sm">
+  {band.venue}
+</p>
+```
+
+**Layout Switching** (column to row transitions):
+```jsx
+// Header.jsx - Responsive layout changes
+<div className="flex flex-col md:flex-row items-center gap-3">
+  {/* Stacks vertically on mobile, horizontal on tablet+ */}
+</div>
+
+// ScheduleView.jsx - Responsive grid
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+  {/* 1 column mobile, 2 tablet, 3 desktop, 4 wide screens */}
+</div>
+```
+
+**State-Based Responsive Behavior**:
+```jsx
+// Header.jsx - Scroll-triggered responsive changes
+const [scrolled, setScrolled] = useState(false)
+
+useEffect(() => {
+  const onScroll = () => setScrolled(window.scrollY > 50)
+  window.addEventListener('scroll', onScroll, { passive: true })
+  return () => window.removeEventListener('scroll', onScroll)
+}, [])
+
+return (
+  <header className={`transition-all duration-300 ${
+    scrolled
+      ? 'py-2 shadow-lg backdrop-blur-sm bg-bg-navy/85'
+      : 'py-4 bg-gradient-to-b from-bg-navy to-bg-purple'
+  }`}>
+    <h1 className={`font-bold transition-all ${
+      scrolled
+        ? 'text-lg sm:text-xl md:text-2xl'
+        : 'text-3xl md:text-4xl'
+    }`}>
+      {title}
+    </h1>
+  </header>
+)
+```
+
+**Breakpoint Best Practices**:
+- **sm: 640px** - Minor adjustments, text size bumps
+- **md: 768px** - Layout changes (column → row), component visibility
+- **lg: 1024px** - Grid column increases, sidebar additions
+- **xl: 1280px** - Wide layouts, max-width constraints
+- **2xl: 1536px** - Maximum density layouts, 4+ column grids
 
 ### Reduced Motion Support
 
@@ -421,15 +539,33 @@ npm test
 
 ## Changelog
 
-### Sprint 2.0 (Current)
+### Sprint 2.0 (Current) - January 2026
 - ✅ Established design token system with CSS custom properties
-- ✅ Created 13+ base components with TypeScript
+- ✅ Created 11 base components with consistent patterns
 - ✅ Achieved WCAG 2.1 AA compliance (34/34 tests passing)
-- ✅ Implemented mobile-responsive patterns across 10 components
+- ✅ Implemented touch target compliance (44px minimum) across all interactive components
+- ✅ Mobile-first responsive architecture with Tailwind breakpoints
 - ✅ Built admin interface with 19 specialized components
-- ✅ Added focus trap implementation for modal accessibility
+- ✅ **Added focus trap implementation to Modal** - Tab/Shift+Tab cycles within modal, focus restoration on close
+- ✅ **Added Select component** - Dropdown with options, placeholder, validation states
+- ✅ **Added Textarea component** - Multi-line input with character counting, resize control
 - ✅ Updated semantic colors for WCAG AA contrast compliance
-- ✅ Documented complete design system for reusability
+- ✅ Documented accurate design system reflecting current implementation
+
+### Component Summary
+| Component | Features | Accessibility |
+|-----------|----------|---------------|
+| Button | 8 variants, 3 sizes, loading state | Focus ring, disabled state |
+| Input | Validation, icons, helper text | Label association, aria-invalid |
+| Select | Options, placeholder, validation | Label association, aria-invalid |
+| Textarea | Character count, resize, validation | Label association, aria-invalid |
+| Alert | 4 variants, dismissible, icons | role="alert", aria-live |
+| Modal | Focus trap, backdrop click, sizes | aria-modal, focus management |
+| ConfirmDialog | Danger/primary variants | ESC to close, aria-modal |
+| Loading | 4 sizes, fullscreen, text | role="status", aria-live |
+| Tooltip | 4 positions, arrow | role="tooltip", keyboard |
+| Card | 6 variants, hoverable | Semantic structure |
+| Badge | 6 variants, 3 sizes | Memoized for performance |
 
 ---
 

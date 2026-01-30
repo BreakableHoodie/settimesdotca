@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import PropTypes from 'prop-types'
 import Button from './Button'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -33,24 +34,26 @@ export default function ConfirmDialog({
   cancelText = 'Cancel',
   variant = 'danger',
 }) {
-  if (!isOpen) return null
-
   // Handle ESC key press
-  const handleKeyDown = e => {
-    if (e.key === 'Escape') {
-      onCancel()
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleEscape = e => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
     }
-  }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isOpen, onCancel])
+
+  if (!isOpen) return null
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
-      onClick={onCancel}
-      onKeyDown={handleKeyDown}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
-      aria-describedby="confirm-dialog-message"
+      role="presentation"
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
@@ -58,7 +61,10 @@ export default function ConfirmDialog({
       {/* Dialog */}
       <div
         className="relative bg-bg-elevated rounded-lg shadow-xl max-w-md w-full border border-white/10 animate-scale-in"
-        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-message"
       >
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-white/10">
@@ -92,7 +98,7 @@ export default function ConfirmDialog({
           <Button variant="secondary" onClick={onCancel}>
             {cancelText}
           </Button>
-          <Button variant={variant} onClick={onConfirm} autoFocus>
+          <Button variant={variant} onClick={onConfirm}>
             {confirmText}
           </Button>
         </div>

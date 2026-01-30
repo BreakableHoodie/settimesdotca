@@ -7,7 +7,8 @@ export class MockD1Database {
       subscription_unsubscribes: [],
       events: [],
       venues: [],
-      bands: []
+      band_profiles: [],
+      performances: []
     }
     this.idCounter = 1
   }
@@ -93,16 +94,11 @@ export class MockD1Database {
     // SELECT from events (check if it's for bands/iCal feed by looking for band_name)
     if (queryLower.includes('select') && queryLower.includes('from events')) {
       // If query asks for band_name, it's for iCal feed
-      if (queryLower.includes('b.name as band_name') || queryLower.includes('b.start_time')) {
+      if (queryLower.includes('bp.name as band_name') || queryLower.includes('p.start_time') || queryLower.includes('b.name as band_name') || queryLower.includes('b.start_time')) {
         return this._handleBandsQuery(queryLower, params)
       }
       // Otherwise it's for public API
       return this._handleEventsQuery(queryLower, params)
-    }
-    
-    // SELECT from bands (legacy - rarely used)
-    if (queryLower.includes('select') && queryLower.includes('from bands')) {
-      return this._handleBandsQuery(queryLower, params)
     }
     
     return { results: [] }
@@ -195,42 +191,49 @@ export class MockD1Database {
     // This is a complex query with JOINs - return aggregated data
     let results = []
     
-    // Get unique events
-    const uniqueEventIds = new Set()
-    this.data.bands.forEach(band => {
-      if (band.event_id) uniqueEventIds.add(band.event_id)
-    })
-    
-    uniqueEventIds.forEach(eventId => {
-      const event = this.data.events.find(e => e.id === eventId)
-      const eventBands = this.data.bands.filter(b => b.event_id === eventId)
-      const uniqueVenueIds = new Set(eventBands.map(b => b.venue_id).filter(Boolean))
-      
-      if (event) {
-        results.push({
-          id: event.id,
-          name: event.name,
-          slug: event.slug || `event-${event.id}`,
-          date: event.date,
-          description: event.description,
-          city: event.city,
-          band_count: eventBands.length,
-          venue_count: uniqueVenueIds.size
-        })
+    results = this.data.events.map(event => {
+      const eventPerformances = this.data.performances.filter(p => p.event_id === event.id)
+      const uniqueBandIds = new Set(eventPerformances.map(p => p.band_profile_id))
+      const uniqueVenueIds = new Set(eventPerformances.map(p => p.venue_id).filter(Boolean))
+
+      return {
+        id: event.id,
+        name: event.name,
+        slug: event.slug || `event-${event.id}`,
+        date: event.date,
+        description: event.description,
+        city: event.city,
+        ticket_url: event.ticket_url,
+        band_count: uniqueBandIds.size,
+        venue_count: uniqueVenueIds.size,
+        is_published: event.is_published,
+        published: event.published
       }
     })
     
     // Apply WHERE filters
-    if (queryLower.includes('published = 1')) {
-      results = results.filter(e => e.published !== false)
+    if (queryLower.includes('published = 1') || queryLower.includes('is_published = 1')) {
+      results = results.filter(e => e.is_published !== 0 && e.published !== false)
     }
     
+    let paramIndex = 0
     if (queryLower.includes("where city = ?") || queryLower.includes('lower(e.city) = lower(?)')) {
-      const [city] = params
+      const city = params[paramIndex++]
       results = results.filter(e => e.city?.toLowerCase() === city.toLowerCase())
     }
-    
-    if (queryLower.includes("where date >= date('now')")) {
+
+    if (queryLower.includes('lower(bp.genre) = lower(?)') || queryLower.includes('lower(b.genre) = lower(?)')) {
+      const genre = params[paramIndex++]
+      results = results.filter(event => {
+        const performances = this.data.performances.filter(p => p.event_id === event.id)
+        return performances.some(perf => {
+          const band = this.data.band_profiles.find(bp => bp.id === perf.band_profile_id)
+          return band?.genre?.toLowerCase() === genre.toLowerCase()
+        })
+      })
+    }
+
+    if (queryLower.includes("where date >= date('now')") || queryLower.includes("e.date >= date('now'")) {
       const today = new Date().toISOString().split('T')[0]
       results = results.filter(e => e.date >= today)
     }
@@ -238,6 +241,13 @@ export class MockD1Database {
     // Sort
     if (queryLower.includes('order by e.date asc')) {
       results.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+    }
+
+    if (queryLower.includes('limit ?')) {
+      const limit = params[params.length - 1]
+      if (Number.isFinite(limit)) {
+        results = results.slice(0, limit)
+      }
     }
     
     return { results }
@@ -254,23 +264,24 @@ export class MockD1Database {
     let genreFilter = null
     
     // Simple param extraction - check query structure
-    if (queryLower.includes('lower(e.city) = lower(?)') && queryLower.includes('lower(b.genre) = lower(?)')) {
+    if (queryLower.includes('lower(e.city) = lower(?)') && (queryLower.includes('lower(b.genre) = lower(?)') || queryLower.includes('lower(bp.genre) = lower(?)'))) {
       // Both filters present
       cityFilter = params[0]
       genreFilter = params[1]
     } else if (queryLower.includes('lower(e.city) = lower(?)')) {
       // Only city filter
       cityFilter = params[0]
-    } else if (queryLower.includes('lower(b.genre) = lower(?)')) {
+    } else if (queryLower.includes('lower(b.genre) = lower(?)') || queryLower.includes('lower(bp.genre) = lower(?)')) {
       // Only genre filter
       genreFilter = params[0]
     }
     
-    for (const band of this.data.bands) {
-      const event = this.data.events.find(e => e.id === band.event_id)
-      const venue = this.data.venues.find(v => v.id === band.venue_id)
+    for (const perf of this.data.performances) {
+      const event = this.data.events.find(e => e.id === perf.event_id)
+      const band = this.data.band_profiles.find(bp => bp.id === perf.band_profile_id)
+      const venue = this.data.venues.find(v => v.id === perf.venue_id)
       
-      if (!event) continue
+      if (!event || !band) continue
       
       // Check future events only
       const today = new Date().toISOString().split('T')[0]
@@ -287,23 +298,33 @@ export class MockD1Database {
       }
       
       results.push({
-        id: band.id,
+        id: event.id,
         name: event.name,
         slug: event.slug || `event-${event.id}`,
         date: event.date,
         description: event.description,
         city: event.city,
         band_name: band.name,
-        start_time: band.start_time,
-        end_time: band.end_time,
+        start_time: perf.start_time,
+        end_time: perf.end_time,
         genre: band.genre,
+        origin: band.origin,
+        photo_url: band.photo_url,
+        social_links: band.social_links,
         venue_name: venue?.name,
-        address: venue?.address
+        address: venue?.address,
+        event_id: event.id,
+        event_name: event.name,
+        event_slug: event.slug || `event-${event.id}`,
+        event_date: event.date,
+        band_id: band.id,
+        venue_id: venue?.id,
+        venue_address: venue?.address
       })
     }
     
     // Sort
-    if (queryLower.includes('order by e.date asc, b.start_time asc')) {
+    if (queryLower.includes('order by e.date asc, b.start_time asc') || queryLower.includes('order by e.date asc, p.start_time asc')) {
       results.sort((a, b) => {
         const dateCompare = (a.date || '').localeCompare(b.date || '')
         if (dateCompare !== 0) return dateCompare
@@ -321,7 +342,8 @@ export class MockD1Database {
       subscription_unsubscribes: [],
       events: [],
       venues: [],
-      bands: []
+      band_profiles: [],
+      performances: []
     }
     this.idCounter = 1
   }

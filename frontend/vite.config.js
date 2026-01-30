@@ -16,19 +16,6 @@ export default defineConfig({
       },
     },
 
-    rollupOptions: {
-      output: {
-        // Manual chunk splitting
-        manualChunks: {
-          // Vendor chunk (React, ReactDOM)
-          vendor: ['react', 'react-dom'],
-
-          // Admin panel (lazy loaded)
-          admin: ['./src/admin/AdminPanel.jsx', './src/admin/BandsTab.jsx', './src/admin/EventsTab.jsx'],
-        },
-      },
-    },
-
     // Warnings for large chunks
     chunkSizeWarningLimit: 100, // KB
   },
@@ -43,7 +30,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:8788',
         changeOrigin: true,
       },
     },

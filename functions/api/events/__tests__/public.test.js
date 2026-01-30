@@ -41,7 +41,7 @@ describe("GET /api/events/public", () => {
     expect(data.events).toHaveLength(1);
     expect(data.events[0]).toMatchObject({
       id: 1,
-      name: "Long Weekend Band Crawl 2024",
+      name: "Summer Music Festival 2024",
       city: "portland",
     });
     expect(data.events[0].band_count).toBeGreaterThan(0);

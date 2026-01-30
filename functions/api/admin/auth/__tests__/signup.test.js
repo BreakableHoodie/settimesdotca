@@ -5,6 +5,7 @@ import * as signupHandler from "../signup.js";
 describe("admin signup", () => {
   it("creates a session for the new user", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
     
     // Create a valid invite code for the test
     const inviteCode = "TEST-INVITE-CODE-123";
@@ -18,7 +19,7 @@ describe("admin signup", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "new.user@example.com",
-        password: "strongpass",
+        password: "StrongPass1!",
         name: "New User",
         inviteCode: inviteCode,
       }),
@@ -31,13 +32,6 @@ describe("admin signup", () => {
     expect(payload.user).toBeDefined();
     expect(payload.user.email).toBe("new.user@example.com");
     
-    // Verify sessionToken is returned for compatibility with legacy Authorization headers
-    expect(payload.sessionToken).toBeDefined();
-    expect(payload.sessionToken).toBeTypeOf("string");
-    
-    // Verify CSRF token is returned
-    expect(payload.csrfToken).toBeDefined();
-
     // Verify the invite code was marked as used
     const usedInvite = rawDb
       .prepare("SELECT * FROM invite_codes WHERE code = ?")

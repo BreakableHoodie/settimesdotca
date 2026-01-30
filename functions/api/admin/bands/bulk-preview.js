@@ -4,7 +4,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   // RBAC: Require editor role or higher (preview is for bulk edit operations)
-  const permCheck = await checkPermission(request, env, "editor");
+  const permCheck = await checkPermission(context, "editor");
   if (permCheck.error) {
     return permCheck.response;
   }
@@ -25,7 +25,11 @@ export async function onRequestPost(context) {
   // Get current band data
   const placeholders = band_ids.map(() => "?").join(",");
   const bands = await env.DB.prepare(
-    `SELECT * FROM bands WHERE id IN (${placeholders})`,
+    `SELECT p.*, bp.name, v.name as venue_name
+     FROM performances p
+     JOIN band_profiles bp ON p.band_profile_id = bp.id
+     JOIN venues v ON p.venue_id = v.id
+     WHERE p.id IN (${placeholders})`,
   )
     .bind(...band_ids)
     .all();
@@ -51,14 +55,15 @@ export async function onRequestPost(context) {
     for (const band of bands.results) {
       const overlaps = await env.DB.prepare(
         `
-        SELECT name, start_time, end_time
-        FROM bands
-        WHERE venue_id = ?
-          AND event_id = ?
-          AND id NOT IN (${placeholders})
+        SELECT bp.name, p.start_time, p.end_time
+        FROM performances p
+        JOIN band_profiles bp ON p.band_profile_id = bp.id
+        WHERE p.venue_id = ?
+          AND p.event_id = ?
+          AND p.id NOT IN (${placeholders})
           AND (
-            (start_time < ? AND end_time > ?) OR
-            (start_time >= ? AND start_time < ?)
+            (p.start_time < ? AND p.end_time > ?) OR
+            (p.start_time >= ? AND p.start_time < ?)
           )
       `,
       )
@@ -98,14 +103,15 @@ export async function onRequestPost(context) {
     for (const band of bands.results) {
       const overlaps = await env.DB.prepare(
         `
-        SELECT name, start_time, end_time
-        FROM bands
-        WHERE venue_id = ?
-          AND event_id = ?
-          AND id NOT IN (${placeholders})
+        SELECT bp.name, p.start_time, p.end_time
+        FROM performances p
+        JOIN band_profiles bp ON p.band_profile_id = bp.id
+        WHERE p.venue_id = ?
+          AND p.event_id = ?
+          AND p.id NOT IN (${placeholders})
           AND (
-            (start_time < ? AND end_time > ?) OR
-            (start_time >= ? AND start_time < ?)
+            (p.start_time < ? AND p.end_time > ?) OR
+            (p.start_time >= ? AND p.start_time < ?)
           )
       `,
       )

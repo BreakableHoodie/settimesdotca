@@ -16,11 +16,6 @@ import { faChevronRight } from '@fortawesome/free-solid-svg-icons'
  * @param {Array} tabs - Array of tab objects with id and label
  */
 export default function Breadcrumbs({ selectedEvent, onClearEvent, activeTab, tabs }) {
-  // Don't show breadcrumbs if we're in global view on Events tab
-  const showBreadcrumbs = selectedEvent || activeTab !== 'events'
-
-  if (!showBreadcrumbs) return null
-
   const currentTab = tabs.find(t => t.id === activeTab)
 
   return (

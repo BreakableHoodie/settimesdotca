@@ -1,13 +1,26 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef, memo } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Badge, Card, Alert, Loading } from './ui'
+import { slugifyBandName } from '../utils/slugify'
+import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCircle, faCalendarDays, faClockRotateLeft, faFilter, faXmark } from '@fortawesome/free-solid-svg-icons'
+import {
+  faCircle,
+  faCalendarDays,
+  faClock,
+  faClockRotateLeft,
+  faFilter,
+  faLocationDot,
+  faTicketSimple,
+  faXmark,
+} from '@fortawesome/free-solid-svg-icons'
 
 /**
  * EventTimeline - Main timeline showing Now, Upcoming, and Past events
  * Sprint 2.1: Enhanced with design system, filtering, and real-time updates
  */
+const MemoizedEventCard = memo(EventCard)
+
 export default function EventTimeline() {
   const [timeline, setTimeline] = useState({ now: [], upcoming: [], past: [] })
   const [loading, setLoading] = useState(true)
@@ -15,12 +28,18 @@ export default function EventTimeline() {
   const [showPast, setShowPast] = useState(false)
   const [filters, setFilters] = useState({ venue: null, month: null })
   const [showFilters, setShowFilters] = useState(false)
+  const [detailsById, setDetailsById] = useState({})
+  const [detailsLoading, setDetailsLoading] = useState({})
 
   // Fetch timeline data
+  const pollRef = useRef(null)
+
   useEffect(() => {
-    const fetchTimeline = async () => {
+    const fetchTimeline = async (isSilent = false) => {
       try {
-        setLoading(true)
+        if (!isSilent) {
+          setLoading(true)
+        }
         setError(null)
 
         const response = await fetch('/api/events/timeline')
@@ -33,21 +52,71 @@ export default function EventTimeline() {
         setTimeline(data)
       } catch (err) {
         console.error('Error fetching timeline:', err)
-        setError(err.message)
+        if (!isSilent) {
+          setError(err.message)
+        }
       } finally {
-        setLoading(false)
+        if (!isSilent) {
+          setLoading(false)
+        }
       }
     }
 
     fetchTimeline()
 
     // Real-time updates: refresh every 60 seconds for "Now Playing"
-    const interval = setInterval(() => {
-      fetchTimeline()
-    }, 60000)
+    const startPolling = () => {
+      if (pollRef.current) return
+      pollRef.current = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchTimeline(true)
+        }
+      }, 60000)
+    }
+    const stopPolling = () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
 
-    return () => clearInterval(interval)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTimeline(true)
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
+
+  const loadDetails = async eventId => {
+    if (!eventId || detailsLoading[eventId] || detailsById[eventId]) {
+      return
+    }
+
+    try {
+      setDetailsLoading(prev => ({ ...prev, [eventId]: true }))
+      const response = await fetch(`/api/events/${eventId}/details`)
+      if (!response.ok) {
+        throw new Error('Failed to load event details')
+      }
+      const data = await response.json()
+      setDetailsById(prev => ({ ...prev, [eventId]: data }))
+    } catch (err) {
+      console.error('Error fetching event details:', err)
+    } finally {
+      setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
+    }
+  }
 
   // Filter events
   const filterEvents = events => {
@@ -58,7 +127,7 @@ export default function EventTimeline() {
         return false
       }
       if (filters.month) {
-        const eventMonth = new Date(event.date).toISOString().slice(0, 7)
+        const eventMonth = event.date?.slice(0, 7)
         if (eventMonth !== filters.month) {
           return false
         }
@@ -68,23 +137,27 @@ export default function EventTimeline() {
   }
 
   // Get unique venues and months for filters
-  const allVenues = Array.from(
-    new Set(
-      [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
-        .flatMap(event => event.venues || [])
-        .map(v => JSON.stringify({ id: v.id, name: v.name }))
-    )
-  ).map(v => JSON.parse(v))
+  const allVenues = useMemo(() => {
+    return Array.from(
+      new Set(
+        [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
+          .flatMap(event => event.venues || [])
+          .map(v => JSON.stringify({ id: v.id, name: v.name }))
+      )
+    ).map(v => JSON.parse(v))
+  }, [timeline])
 
-  const allMonths = Array.from(
-    new Set(
-      [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])].map(event =>
-        new Date(event.date).toISOString().slice(0, 7)
+  const allMonths = useMemo(() => {
+    return Array.from(
+      new Set(
+        [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])].map(event =>
+          event.date?.slice(0, 7)
+        )
       )
     )
-  )
-    .sort()
-    .reverse()
+      .sort()
+      .reverse()
+  }, [timeline])
 
   const clearFilters = () => {
     setFilters({ venue: null, month: null })
@@ -175,7 +248,7 @@ export default function EventTimeline() {
                   <option value="">All Months</option>
                   {allMonths.map(month => (
                     <option key={month} value={month}>
-                      {new Date(month + '-01').toLocaleDateString('en-US', {
+                      {(parseLocalDate(`${month}-01`) || new Date(`${month}-01`)).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                       })}
@@ -209,7 +282,14 @@ export default function EventTimeline() {
             </div>
             <div className="space-y-6">
               {filteredNow.map(event => (
-                <EventCard key={event.id} event={event} isLive={true} />
+                <MemoizedEventCard
+                  key={event.id}
+                  event={event}
+                  isLive={true}
+                  details={detailsById[event.id]}
+                  detailsLoading={detailsLoading[event.id]}
+                  onLoadDetails={loadDetails}
+                />
               ))}
             </div>
           </section>
@@ -224,7 +304,14 @@ export default function EventTimeline() {
             </div>
             <div className="space-y-6">
               {filteredUpcoming.map(event => (
-                <EventCard key={event.id} event={event} isUpcoming={true} />
+                <MemoizedEventCard
+                  key={event.id}
+                  event={event}
+                  isUpcoming={true}
+                  details={detailsById[event.id]}
+                  detailsLoading={detailsLoading[event.id]}
+                  onLoadDetails={loadDetails}
+                />
               ))}
             </div>
           </section>
@@ -246,7 +333,14 @@ export default function EventTimeline() {
             {showPast && (
               <div className="space-y-6 opacity-75">
                 {filteredPast.map(event => (
-                  <EventCard key={event.id} event={event} isPast={true} />
+                  <MemoizedEventCard
+                    key={event.id}
+                    event={event}
+                    isPast={true}
+                    details={detailsById[event.id]}
+                    detailsLoading={detailsLoading[event.id]}
+                    onLoadDetails={loadDetails}
+                  />
                 ))}
               </div>
             )}
@@ -277,11 +371,19 @@ export default function EventTimeline() {
  * EventCard - Displays event info with bands and venues
  * Sprint 2.1: Updated with design system components
  */
-function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }) {
+function EventCard({
+  event,
+  isLive = false,
+  isUpcoming = false,
+  isPast = false,
+  details,
+  detailsLoading = false,
+  onLoadDetails,
+}) {
   const [expanded, setExpanded] = useState(isLive) // Auto-expand live events
 
   const formatDate = dateStr => {
-    const date = new Date(dateStr)
+    const date = parseLocalDate(dateStr) || new Date(dateStr)
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -290,9 +392,18 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
     })
   }
 
-  // Get featured bands (top 5)
-  const featuredBands = event.bands?.slice(0, 5) || []
-  const moreBandsCount = Math.max(0, (event.band_count || 0) - 5)
+  const featuredBands = event.bands || []
+  const resolvedDetails = details
+  const venueList = resolvedDetails?.venues || event.venues || []
+  const allBands = resolvedDetails?.bands || []
+  const allBandCount = resolvedDetails?.band_count ?? event.band_count
+  const allVenueCount = resolvedDetails?.venue_count ?? event.venue_count
+
+  useEffect(() => {
+    if (expanded && !resolvedDetails && !detailsLoading) {
+      onLoadDetails?.(event.id)
+    }
+  }, [expanded, resolvedDetails, detailsLoading, event.id, onLoadDetails])
 
   return (
     <Card
@@ -304,13 +415,25 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
         ${isPast ? 'opacity-75' : ''}
       `}
       padding="none"
+      data-testid="event-card"
     >
       {/* Event Header */}
       <div className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
           <div className="flex-1">
             <div className="flex flex-wrap items-start gap-2 mb-2">
-              <h3 className="text-2xl font-bold text-accent-500 flex-1">{event.name}</h3>
+              {event.slug ? (
+                <h3 className="text-2xl font-bold text-accent-500 flex-1">
+                  <Link
+                    to={`/event/${event.slug}`}
+                    className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/70 rounded-sm"
+                  >
+                    {event.name}
+                  </Link>
+                </h3>
+              ) : (
+                <h3 className="text-2xl font-bold text-accent-500 flex-1">{event.name}</h3>
+              )}
               {isLive && (
                 <Badge variant="error" size="md">
                   LIVE NOW
@@ -327,18 +450,32 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
             {/* Event Stats */}
             <div className="flex flex-wrap gap-6 text-sm">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-text-primary">{event.band_count}</span>
-                <span className="text-text-tertiary">{event.band_count === 1 ? 'Band' : 'Bands'}</span>
+                <span className="font-bold text-text-primary">{allBandCount}</span>
+                <span className="text-text-tertiary">{allBandCount === 1 ? 'Band' : 'Bands'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-text-primary">{event.venue_count}</span>
-                <span className="text-text-tertiary">{event.venue_count === 1 ? 'Venue' : 'Venues'}</span>
+                <span className="font-bold text-text-primary">{allVenueCount}</span>
+                <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
+            <Button
+              as={Link}
+              to={event.slug ? `/event/${event.slug}` : '#'}
+              variant="primary"
+              size="md"
+              fullWidth
+              onClick={() => {
+                if (!event.slug) {
+                  return
+                }
+              }}
+            >
+              Build Schedule
+            </Button>
             {event.ticket_url && (
               <Button
                 as="a"
@@ -347,11 +484,23 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
                 rel="noopener noreferrer"
                 variant="primary"
                 size="md"
+                fullWidth
               >
-                🎫 Get Tickets
+                Get Tickets
               </Button>
             )}
-            <Button variant="secondary" size="md" onClick={() => setExpanded(!expanded)}>
+            <Button
+              variant="primary"
+              size="md"
+              fullWidth
+              onClick={() => {
+                const nextExpanded = !expanded
+                setExpanded(nextExpanded)
+                if (nextExpanded && !resolvedDetails && !detailsLoading) {
+                  onLoadDetails?.(event.id)
+                }
+              }}
+            >
               {expanded ? 'Hide Details' : 'View Details'}
             </Button>
           </div>
@@ -360,13 +509,13 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
         {/* Featured Bands Preview (when collapsed) */}
         {!expanded && featuredBands.length > 0 && (
           <div className="mt-4 pt-4 border-t border-white/10">
-            <p className="text-text-tertiary text-sm mb-3">Featured performers:</p>
+            <p className="text-text-tertiary text-sm mb-3">Performers:</p>
             <div className="flex flex-wrap gap-2">
               {featuredBands.map(band => (
                 <Badge
                   key={band.id}
-                  as={Link}
-                  to={`/band/${band.name}`}
+                  as="a"
+                  href={`/band/${slugifyBandName(band.name)}`}
                   variant="default"
                   size="md"
                   className="hover:bg-primary-500/20 cursor-pointer transition-colors"
@@ -374,12 +523,13 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
                   {band.name}
                 </Badge>
               ))}
-              {moreBandsCount > 0 && (
-                <Badge variant="default" size="md">
-                  +{moreBandsCount} more
-                </Badge>
-              )}
             </div>
+          </div>
+        )}
+
+        {!expanded && featuredBands.length === 0 && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="text-text-tertiary text-sm">Expand to load performers and venues.</p>
           </div>
         )}
       </div>
@@ -388,11 +538,11 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
       {expanded && (
         <div className="border-t border-white/10 bg-white/5">
           {/* Venues */}
-          {event.venues && event.venues.length > 0 && (
+          {venueList && venueList.length > 0 && (
             <div className="p-6 border-b border-white/10">
               <h4 className="text-lg font-bold text-text-primary mb-4">Venues</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {event.venues.map(venue => (
+                {venueList.map(venue => (
                   <Card key={venue.id} padding="sm" variant="elevated">
                     <div className="font-semibold text-text-primary mb-1">{venue.name}</div>
                     <div className="text-text-secondary text-sm">
@@ -406,12 +556,12 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
           )}
 
           {/* All Bands */}
-          {event.bands && event.bands.length > 0 && (
+          {allBands && allBands.length > 0 && (
             <div className="p-6">
-              <h4 className="text-lg font-bold text-text-primary mb-4">All Performers ({event.band_count})</h4>
+              <h4 className="text-lg font-bold text-text-primary mb-4">All Performers ({allBandCount})</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {event.bands.map(band => (
-                  <Card key={band.id} as={Link} to={`/band/${band.name}`} padding="sm" hoverable className="group">
+                {allBands.map(band => (
+                  <Card key={band.id} as={Link} to={`/band/${slugifyBandName(band.name)}`} padding="sm" hoverable className="group">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="font-semibold text-text-primary group-hover:text-accent-500 transition-colors flex-1">
                         {band.name}
@@ -430,14 +580,14 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
 
                     <div className="space-y-1 text-sm">
                       <div className="text-text-secondary flex items-center gap-2">
-                        <span>📍</span>
+                        <FontAwesomeIcon icon={faLocationDot} aria-hidden="true" />
                         <span>{band.venue_name}</span>
                       </div>
 
                       <div className="text-text-tertiary flex items-center gap-2">
-                        <span>🕐</span>
+                        <FontAwesomeIcon icon={faClock} aria-hidden="true" />
                         <span>
-                          {band.start_time} - {band.end_time}
+                          {formatTimeRange(band.start_time, band.end_time)}
                         </span>
                       </div>
 
@@ -453,6 +603,10 @@ function EventCard({ event, isLive = false, isUpcoming = false, isPast = false }
                 ))}
               </div>
             </div>
+          )}
+
+          {detailsLoading && (
+            <div className="p-6 text-text-tertiary text-sm">Loading event details...</div>
           )}
         </div>
       )}

@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faKey, faUserSlash, faUserCheck, faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
+import { usersApi } from '../utils/adminApi'
 
 export default function UserManagement() {
   const [users, setUsers] = useState([])
@@ -20,19 +21,8 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/admin/users', {
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data.users)
-      } else {
-        const error = await response.json()
-        alert(`Error fetching users: ${error.message || error.error}`)
-      }
+      const data = await usersApi.getAll()
+      setUsers(data.users)
     } catch (error) {
       console.error('Failed to fetch users:', error)
       alert('Failed to fetch users')
@@ -44,25 +34,11 @@ export default function UserManagement() {
   const handleCreateUser = async userData => {
     setActionLoading(true)
     try {
-      const response = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
-        },
-        body: JSON.stringify(userData),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
+      await usersApi.create(userData)
         alert(`User ${userData.email} created successfully`)
         setShowUserModal(false)
         setEditingUser(null)
         fetchUsers() // Refresh list
-      } else {
-        alert(`Error: ${data.message || data.error}`)
-      }
     } catch (error) {
       console.error('Failed to create user:', error)
       alert('Failed to create user')
@@ -76,29 +52,15 @@ export default function UserManagement() {
 
     setActionLoading(true)
     try {
-      const response = await fetch(`/api/admin/users/${editingUser.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
-        },
-        body: JSON.stringify({
-          role: userData.role,
-          name: userData.name,
-          isActive: userData.isActive,
-        }),
+      await usersApi.update(editingUser.id, {
+        role: userData.role,
+        name: userData.name,
+        isActive: userData.isActive,
       })
-
-      const data = await response.json()
-
-      if (response.ok) {
         alert(`User ${userData.email} updated successfully`)
         setShowUserModal(false)
         setEditingUser(null)
         fetchUsers() // Refresh list
-      } else {
-        alert(`Error: ${data.message || data.error}`)
-      }
     } catch (error) {
       console.error('Failed to update user:', error)
       alert('Failed to update user')
@@ -114,21 +76,9 @@ export default function UserManagement() {
 
     setActionLoading(true)
     try {
-      const response = await fetch(`/api/admin/users/${user.id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
-        },
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
+      await usersApi.remove(user.id)
         alert(`User ${user.email} deleted successfully`)
         fetchUsers() // Refresh list
-      } else {
-        alert(`Error: ${data.message || data.error}`)
-      }
     } catch (error) {
       console.error('Failed to delete user:', error)
       alert('Failed to delete user')
@@ -142,24 +92,13 @@ export default function UserManagement() {
 
     setActionLoading(true)
     try {
-      const response = await fetch(`/api/admin/users/${selectedUser.id}/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
-        },
-        body: JSON.stringify({ reason: resetReason }),
-      })
+      const data = await usersApi.resetPassword(selectedUser.id, { reason: resetReason })
 
-      const data = await response.json()
-
-      if (response.ok) {
+      if (data?.resetUrl) {
         alert(`Password reset initiated for ${selectedUser.email}.\nReset URL: ${data.resetUrl}`)
         setShowResetModal(false)
         setResetReason('')
         setSelectedUser(null)
-      } else {
-        alert(`Error: ${data.error}`)
       }
     } catch {
       alert('Failed to initiate password reset')
@@ -175,21 +114,8 @@ export default function UserManagement() {
 
     setActionLoading(true)
     try {
-      const response = await fetch(`/api/admin/users/${user.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
-        },
-        body: JSON.stringify({ isActive: !user.isActive }),
-      })
-
-      if (response.ok) {
+      await usersApi.update(user.id, { isActive: !user.isActive })
         fetchUsers() // Refresh the list
-      } else {
-        const data = await response.json()
-        alert(`Error: ${data.error}`)
-      }
     } catch {
       alert('Failed to update user status')
     } finally {
@@ -214,18 +140,18 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex flex-col items-start sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">User Management</h2>
-          <p className="text-gray-300">Manage user accounts, roles, and permissions</p>
+          <h2 className="text-2xl font-bold text-white">User Management</h2>
+          <p className="text-sm text-white/70 mt-1">Manage user accounts, roles, and permissions.</p>
         </div>
         <button
           onClick={() => {
             setEditingUser(null)
             setShowUserModal(true)
           }}
-          className="bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 rounded-lg transition flex items-center gap-2"
+          className="bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
         >
           <FontAwesomeIcon icon={faPlus} />
           Add User
@@ -233,7 +159,7 @@ export default function UserManagement() {
       </div>
 
       <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-white/5">
               <tr>
@@ -288,7 +214,7 @@ export default function UserManagement() {
                             setEditingUser(user)
                             setShowUserModal(true)
                           }}
-                          className="text-blue-400 hover:text-blue-300 transition"
+                          className="text-blue-400 hover:text-blue-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="Edit User"
                           disabled={actionLoading}
                         >
@@ -299,7 +225,7 @@ export default function UserManagement() {
                             setSelectedUser(user)
                             setShowResetModal(true)
                           }}
-                          className="text-band-orange hover:text-band-orange/80 transition"
+                          className="text-band-orange hover:text-band-orange/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="Reset Password"
                           disabled={actionLoading}
                         >
@@ -311,7 +237,7 @@ export default function UserManagement() {
                             user.isActive
                               ? 'text-yellow-400 hover:text-yellow-300'
                               : 'text-green-400 hover:text-green-300'
-                          }`}
+                          } min-h-[44px] min-w-[44px] flex items-center justify-center`}
                           title={user.isActive ? 'Deactivate User' : 'Activate User'}
                           disabled={actionLoading}
                         >
@@ -319,7 +245,7 @@ export default function UserManagement() {
                         </button>
                         <button
                           onClick={() => handleDeleteUser(user)}
-                          className="text-red-400 hover:text-red-300 transition"
+                          className="text-red-400 hover:text-red-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="Delete User"
                           disabled={actionLoading}
                         >
@@ -332,6 +258,74 @@ export default function UserManagement() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="md:hidden divide-y divide-white/10">
+          {users.length === 0 ? (
+            <div className="px-6 py-8 text-center text-gray-300">
+              No users found. Tap “Add User” to create one.
+            </div>
+          ) : (
+            users.map(user => (
+              <div key={user.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-white">{user.name}</div>
+                    <div className="text-sm text-gray-300">{user.email}</div>
+                  </div>
+                  <RoleBadge role={user.role} />
+                </div>
+                <div className="flex flex-wrap gap-3 text-sm text-gray-300">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-white/10 text-white">
+                    {user.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                  <span>
+                    Last Login:{' '}
+                    {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingUser(user)
+                      setShowUserModal(true)
+                    }}
+                    className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                    disabled={actionLoading}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedUser(user)
+                      setShowResetModal(true)
+                    }}
+                    className="px-4 py-2 min-h-[44px] bg-band-orange/80 hover:bg-band-orange text-white rounded text-sm"
+                    disabled={actionLoading}
+                  >
+                    Reset Password
+                  </button>
+                  <button
+                    onClick={() => handleToggleUserStatus(user)}
+                    className={`px-4 py-2 min-h-[44px] rounded text-sm ${
+                      user.isActive
+                        ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                        : 'bg-green-600 hover:bg-green-700 text-white'
+                    }`}
+                    disabled={actionLoading}
+                  >
+                    {user.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(user)}
+                    className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                    disabled={actionLoading}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -365,17 +359,17 @@ export default function UserManagement() {
                 id="resetReason"
                 value={resetReason}
                 onChange={e => setResetReason(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
+                className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
                 placeholder="Reason for password reset..."
                 rows={3}
               />
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleResetPassword}
                 disabled={actionLoading}
-                className="flex-1 bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+                className="flex-1 min-h-[44px] bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
               >
                 {actionLoading ? 'Sending...' : 'Send Reset Link'}
               </button>
@@ -386,7 +380,7 @@ export default function UserManagement() {
                   setResetReason('')
                 }}
                 disabled={actionLoading}
-                className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+                className="flex-1 min-h-[44px] bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
               >
                 Cancel
               </button>

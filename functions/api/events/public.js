@@ -2,8 +2,14 @@
 // No authentication required
 // Rate limited to prevent abuse
 
+import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+
 export async function onRequestGet(context) {
   const { request, env } = context;
+  const gate = getPublicDataGateResponse(env);
+  if (gate) {
+    return gate;
+  }
   const url = new URL(request.url);
 
   // Query parameters
@@ -14,6 +20,7 @@ export async function onRequestGet(context) {
 
   try {
     // Build query
+    // V2 Schema: events -> performances -> band_profiles
     let query = `
       SELECT
         e.id,
@@ -22,11 +29,12 @@ export async function onRequestGet(context) {
         e.date,
         e.description,
         e.city,
-        COUNT(DISTINCT b.id) as band_count,
-        COUNT(DISTINCT v.id) as venue_count
+        e.ticket_url,
+        CASE WHEN e.date >= date('now', '-6 hours') THEN 1 ELSE 0 END as is_upcoming,
+        COUNT(DISTINCT p.band_profile_id) as band_count,
+        COUNT(DISTINCT p.venue_id) as venue_count
       FROM events e
-      LEFT JOIN bands b ON b.event_id = e.id
-      LEFT JOIN venues v ON v.id IN (SELECT DISTINCT venue_id FROM bands WHERE event_id = e.id)
+      LEFT JOIN performances p ON p.event_id = e.id
       WHERE e.is_published = 1
     `;
 
@@ -41,16 +49,19 @@ export async function onRequestGet(context) {
     // Filter by genre (optimized to avoid N+1 queries)
     if (genre !== "all") {
       query += ` AND EXISTS (
-        SELECT 1 FROM bands
-        WHERE bands.event_id = e.id
-        AND LOWER(bands.genre) = LOWER(?)
+        SELECT 1 FROM performances p2
+        JOIN band_profiles bp ON p2.band_profile_id = bp.id
+        WHERE p2.event_id = e.id
+        AND LOWER(bp.genre) = LOWER(?)
       )`;
       params.push(genre);
     }
 
     // Filter by upcoming (future events only)
+    // Use -6 hours offset to account for ET timezone (UTC-5/UTC-4)
+    // This prevents events from disappearing while still ongoing
     if (upcoming) {
-      query += ` AND e.date >= date('now')`;
+      query += ` AND e.date >= date('now', '-6 hours')`;
     }
 
     query += `

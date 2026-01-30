@@ -16,47 +16,24 @@ import EventStatusBadge from './EventStatusBadge'
 export default function ContextBanner({ event, onClear }) {
   if (!event) return null
 
-  // Format date for display
-  const formatDate = dateString => {
-    if (!dateString) return ''
-    const date = new Date(dateString + 'T00:00:00')
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
-
   return (
-    <div className="bg-accent-500/10 border-l-4 border-accent-500 px-4 py-3 mb-4 rounded-r animate-slide-down shadow-md">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <FontAwesomeIcon icon={faBullseye} className="text-accent-500 text-2xl" />
-          <div>
-            <div className="text-text-secondary text-sm">Working on event:</div>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-accent-500 font-bold text-lg">{event.name}</span>
-              <Badge variant="secondary" className="text-xs">
-                {event.band_count || 0} performers
-              </Badge>
-              {event.date && (
-                <span className="text-text-secondary text-sm flex items-center gap-1">
-                  <FontAwesomeIcon icon={faCalendarDays} className="text-accent-500" />
-                  {formatDate(event.date)}
-                </span>
-              )}
-              <EventStatusBadge status={event.status} />
-            </div>
-          </div>
+    <div className="bg-accent-500/10 border-l-2 border-accent-500 px-4 py-2 mb-4 rounded-r animate-slide-down shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FontAwesomeIcon icon={faBullseye} className="text-accent-500 text-lg" />
+          <span className="text-text-secondary text-xs uppercase tracking-wide">Event</span>
+          <span className="text-accent-500 font-semibold text-sm">{event.name}</span>
+          <EventStatusBadge status={event.status} />
         </div>
         <Button
           onClick={onClear}
           variant="secondary"
+          size="sm"
           icon={<FontAwesomeIcon icon={faArrowLeft} />}
           iconPosition="left"
           className="whitespace-nowrap"
         >
-          Back to All Events
+          All Events
         </Button>
       </div>
     </div>

@@ -2,15 +2,7 @@
 // POST /api/admin/events/{id}/publish
 
 import { checkPermission, auditLog } from "../../_middleware.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import { getClientIP } from "../../../../utils/request.js";
 
 // Helper to extract event ID from path
 function getEventId(request) {
@@ -28,7 +20,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, "editor");
+    const permCheck = await checkPermission(context, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -76,7 +68,7 @@ export async function onRequestPost(context) {
     // If publishing, check that event has at least 1 band
     if (publish) {
       const bandCount = await DB.prepare(
-        `SELECT COUNT(*) as count FROM bands WHERE event_id = ?`,
+        `SELECT COUNT(*) as count FROM performances WHERE event_id = ?`,
       )
         .bind(eventId)
         .first();

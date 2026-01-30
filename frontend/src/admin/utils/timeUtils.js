@@ -59,6 +59,30 @@ export const calculateEndTimeFromDuration = (startTime, durationMinutes) => {
   return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`
 }
 
+export const calculateStartTimeFromDuration = (endTime, durationMinutes) => {
+  if (!endTime || durationMinutes === '' || durationMinutes == null) {
+    return ''
+  }
+
+  const duration = Number(durationMinutes)
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return ''
+  }
+
+  const [hours, minutes] = endTime.split(':').map(Number)
+  if (!isNumber(hours) || !isNumber(minutes)) {
+    return ''
+  }
+
+  const endTotalMinutes = hours * 60 + minutes
+  const totalMinutes = endTotalMinutes - duration
+  const normalizedMinutes = ((totalMinutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY
+  const startHours = Math.floor(normalizedMinutes / 60)
+  const startMins = normalizedMinutes % 60
+
+  return `${String(startHours).padStart(2, '0')}:${String(startMins).padStart(2, '0')}`
+}
+
 export const deriveDurationMinutes = (startTime, endTime) => {
   const startMinutes = parseTimeToMinutes(startTime)
   const endMinutes = parseTimeToMinutes(endTime)

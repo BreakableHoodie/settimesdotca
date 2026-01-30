@@ -3,6 +3,7 @@ import PropTypes from 'prop-types'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTimes, faCalendar, faMapMarkerAlt, faClock, faMusic } from '@fortawesome/free-solid-svg-icons'
 import { bandsApi } from '../../utils/adminApi'
+import { formatTimeRange } from '../../utils/timeFormat'
 
 /**
  * PerformanceHistory Component
@@ -183,7 +184,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
                     {performance.startTime && performance.endTime && (
                       <div className="text-white/60 text-sm whitespace-nowrap">
                         <FontAwesomeIcon icon={faClock} className="mr-2" />
-                        {performance.startTime} - {performance.endTime}
+                        {formatTimeRange(performance.startTime, performance.endTime)}
                       </div>
                     )}
                   </div>

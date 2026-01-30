@@ -11,7 +11,7 @@ export async function onRequestGet(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(request, env, "admin");
+    const permCheck = await checkPermission(context, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }

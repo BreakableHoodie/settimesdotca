@@ -18,7 +18,7 @@ describe('Admin bands API - CRUD operations', () => {
       body: JSON.stringify(body),
     });
 
-    const res = await bandsHandler.onRequestPost({ request, env })
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(201)
     const data = await res.json()
     expect(data.band).toHaveProperty('id')
@@ -31,8 +31,8 @@ describe('Admin bands API - CRUD operations', () => {
     const venue = insertVenue(rawDb, { name: 'List Venue' })
     const band = insertBand(rawDb, { name: 'List Band', event_id: ev.id, venue_id: venue.id })
 
-    const getReq = new Request(`https://example.test/api/admin/bands?event_id=${ev.id}`)
-    const getRes = await bandsHandler.onRequestGet({ request: getReq, env })
+    const getReq = new Request(`https://example.test/api/admin/bands?event_id=${ev.id}`, { headers })
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: 'editor' } } })
     expect(getRes.status).toBe(200)
     const list = await getRes.json()
     expect(list.bands.length).toBeGreaterThan(0)
@@ -53,7 +53,7 @@ describe('Admin bands API - CRUD operations', () => {
       body: JSON.stringify(body),
     })
 
-    const res = await bandIdHandler.onRequestPut({ request, env })
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.band.name).toBe('New Name')
@@ -70,7 +70,7 @@ describe('Admin bands API - CRUD operations', () => {
       headers: { ...headers },
     })
 
-    const res = await bandIdHandler.onRequestDelete({ request, env })
+    const res = await bandIdHandler.onRequestDelete({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.success).toBeTruthy()
@@ -90,10 +90,10 @@ describe('Admin bands API - Validation', () => {
       body: JSON.stringify(body),
     })
 
-    const res = await bandsHandler.onRequestPost({ request, env })
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(400)
     const data = await res.json()
-    expect(data.error).toBe('Validation error')
+    expect(data.error).toBe('Missing required fields')
   })
 
   it('create validation fails when event band missing venue/times', async () => {
@@ -107,10 +107,10 @@ describe('Admin bands API - Validation', () => {
       body: JSON.stringify(body),
     })
 
-    const res = await bandsHandler.onRequestPost({ request, env })
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(400)
     const data = await res.json()
-    expect(data.message).toContain('venueId, startTime, and endTime are required')
+    expect(data.error).toBe('Missing required fields')
   })
 
   it('create validation fails with invalid time format', async () => {
@@ -125,10 +125,10 @@ describe('Admin bands API - Validation', () => {
       body: JSON.stringify(body),
     })
 
-    const res = await bandsHandler.onRequestPost({ request, env })
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(400)
     const data = await res.json()
-    expect(data.message).toContain('Invalid start time format')
+    expect(data.message).toContain('Time must be in HH:MM format')
   })
 
   it('create validation fails when end time before start time', async () => {
@@ -143,7 +143,7 @@ describe('Admin bands API - Validation', () => {
       body: JSON.stringify(body),
     })
 
-    const res = await bandsHandler.onRequestPost({ request, env })
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(400)
     const data = await res.json()
     expect(data.message).toContain('End time must be after start time')
@@ -166,7 +166,7 @@ describe('Admin bands API - Validation', () => {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     })
-    const r1 = await bandsHandler.onRequestPost({ request: req1, env })
+    const r1 = await bandsHandler.onRequestPost({ request: req1, env, data: { user: { role: 'editor' } } })
     expect(r1.status).toBe(201)
 
     const req2 = new Request("https://example.test/api/admin/bands", {
@@ -174,7 +174,7 @@ describe('Admin bands API - Validation', () => {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     })
-    const r2 = await bandsHandler.onRequestPost({ request: req2, env })
+    const r2 = await bandsHandler.onRequestPost({ request: req2, env, data: { user: { role: 'editor' } } })
     expect(r2.status).toBe(409)
   })
 
@@ -188,7 +188,7 @@ describe('Admin bands API - Validation', () => {
       body: JSON.stringify(body),
     })
 
-    const res = await bandIdHandler.onRequestPut({ request, env })
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(404)
   })
 
@@ -200,7 +200,7 @@ describe('Admin bands API - Validation', () => {
       headers: { ...headers },
     })
 
-    const res = await bandIdHandler.onRequestDelete({ request, env })
+    const res = await bandIdHandler.onRequestDelete({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(404)
   })
 })
@@ -219,8 +219,8 @@ describe('Admin bands API - Conflicts', () => {
     const req2 = new Request('https://example.test/api/admin/bands', {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body2)
     })
-    const r2 = await bandsHandler.onRequestPost({ request: req2, env })
-    expect(r2.status).toBe(201)
+    const r2 = await bandsHandler.onRequestPost({ request: req2, env, data: { user: { role: 'editor' } } })
+    expect(r2.status).toBe(409)
     const data2 = await r2.json()
     expect(data2.conflicts).toBeDefined()
     expect(data2.conflicts.length).toBeGreaterThan(0)
@@ -242,7 +242,7 @@ describe('Admin bands API - Bulk operations', () => {
       body: JSON.stringify(body),
     })
 
-    const res = await bulkHandler.onRequestPatch({ request, env })
+    const res = await bulkHandler.onRequestPatch({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.success).toBeTruthy()
@@ -262,7 +262,7 @@ describe('Admin bands API - Bulk operations', () => {
       body: JSON.stringify(body),
     })
 
-    const res = await bulkPreviewHandler.onRequestPost({ request, env })
+    const res = await bulkPreviewHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.changes).toBeDefined()

@@ -2,6 +2,7 @@
 // POST /api/subscriptions/subscribe
 
 import { generateToken } from "../../utils/tokens";
+import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -106,19 +107,19 @@ export async function onRequestPost(context) {
 }
 
 async function sendVerificationEmail(env, email, city, genre, token) {
-  const verifyUrl = `${env.PUBLIC_URL}/verify?token=${token}`;
+  const baseUrl = env.PUBLIC_URL || "http://localhost:5173";
+  const verifyUrl = `${baseUrl}/verify?token=${token}`;
+  const subject = "Confirm your SetTimes subscription";
+  const text = `Please confirm your subscription.\n\nVerify: ${verifyUrl}\n\nCity: ${city}\nGenre: ${genre}`;
+  const html = `
+    <p>Please confirm your subscription.</p>
+    <p><a href="${verifyUrl}">Verify your email</a></p>
+    <p>City: ${city}<br/>Genre: ${genre}</p>
+  `.trim();
 
-  // TODO: Integrate with email service (SendGrid, Mailgun, etc.)
-  // For now, just log (development only)
-  console.info(`Verification email for ${email}: ${verifyUrl}`);
-
-  // In production, send actual email:
-  // await env.EMAIL_SERVICE.send({
-  //   to: email,
-  //   subject: `Verify your subscription to ${city} ${genre} shows`,
-  //   html: `
-  //     <p>Thanks for subscribing!</p>
-  //     <p>Click to verify: <a href="${verifyUrl}">${verifyUrl}</a></p>
-  //   `
-  // })
+  if (isEmailConfigured(env)) {
+    await sendEmail(env, { to: email, subject, text, html });
+  } else {
+    console.info(`[Email] Verification link for ${email}: ${verifyUrl}`);
+  }
 }

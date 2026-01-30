@@ -339,11 +339,11 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
 
   return (
     <div className="space-y-6">
-       <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Event Lineup</h2>
-            <p className="text-white/70 text-sm mt-1">{selectedEvent?.name}</p>
-          </div>
+       <div className="flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-3">
+       <div>
+         <h2 className="text-2xl font-bold text-white">Event Lineup</h2>
+          <p className="text-sm text-white/70 mt-1">Manage performances, times, and venues for the selected event.</p>
+        </div>
           {viewMode === 'list' && (
              <button
                onClick={() => {
@@ -352,7 +352,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                    loadRoster()
                  }
                }}
-               className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium"
+               className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium min-h-[44px]"
              >
                + Add to Lineup
              </button>
@@ -413,12 +413,13 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                ) : bands.length === 0 ? (
                   <div className="p-8 text-center text-white/50">No performances scheduled yet.</div>
                ) : (
-                  <div className="overflow-x-auto">
+                  <>
+                  <div className="hidden md:block overflow-x-auto">
                      <table className="w-full">
                         <thead className="bg-band-navy/50 border-b border-band-orange/20">
                            <tr>
                               <th className="px-4 py-3 w-12">
-                                 <input type="checkbox" className="w-5 h-5 cursor-pointer" 
+                                 <input type="checkbox" className="h-5 w-5 cursor-pointer" 
                                     onChange={e => handleSelectAll(e.target.checked)}
                                     checked={selectedIds.size === bands.length && bands.length > 0}
                                  />
@@ -436,7 +437,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                               return (
                                  <tr key={band.id} className={`hover:bg-band-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}>
                                     <td className="px-4 py-3">
-                                       <input type="checkbox" className="w-5 h-5 cursor-pointer" 
+                                       <input type="checkbox" className="h-5 w-5 cursor-pointer" 
                                           checked={selectedIds.has(band.id)}
                                           onChange={e => handleSelect(band.id, e.target.checked)}
                                        />
@@ -448,8 +449,8 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                        {conflicts.length ? <span className="text-red-400 font-bold">CONFLICT</span> : formatDurationLabel(band.start_time, band.end_time)}
                                     </td>
                                     <td className="px-4 py-3 flex justify-end gap-2">
-                                       <button onClick={() => startEdit(band)} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Edit</button>
-                                       <button onClick={() => handleDelete(band.id, band.name)} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Delete</button>
+                                       <button onClick={() => startEdit(band)} className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Edit</button>
+                                       <button onClick={() => handleDelete(band.id, band.name)} className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm">Delete</button>
                                     </td>
                                  </tr>
                               )
@@ -457,6 +458,67 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                         </tbody>
                      </table>
                   </div>
+                  <div className="md:hidden divide-y divide-band-orange/10">
+                    <div className="px-4 py-3 flex items-center justify-between">
+                      <label className="flex items-center gap-3 text-white">
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5 cursor-pointer"
+                          onChange={e => handleSelectAll(e.target.checked)}
+                          checked={selectedIds.size === bands.length && bands.length > 0}
+                        />
+                        <span>Select all</span>
+                      </label>
+                      <span className="text-xs text-text-tertiary">{bands.length} performances</span>
+                    </div>
+                    {sortedBands.map(band => {
+                      const conflicts = detectConflicts(band, bands)
+                      return (
+                        <div
+                          key={band.id}
+                          className={`px-4 py-3 space-y-2 ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <label className="flex items-center gap-3 text-white">
+                              <input
+                                type="checkbox"
+                                className="h-5 w-5 cursor-pointer"
+                                checked={selectedIds.has(band.id)}
+                                onChange={e => handleSelect(band.id, e.target.checked)}
+                              />
+                              <span className="font-medium">{band.name}</span>
+                            </label>
+                            {conflicts.length ? (
+                              <span className="text-xs font-bold text-red-400">CONFLICT</span>
+                            ) : (
+                              <span className="text-xs text-text-tertiary">
+                                {formatDurationLabel(band.start_time, band.end_time)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-text-secondary space-y-1">
+                            <div>Venue: {getVenueName(band.venue_id)}</div>
+                            <div>Time: {formatTimeRangeLabel(band.start_time, band.end_time)}</div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => startEdit(band)}
+                              className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(band.id, band.name)}
+                              className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  </>
                )}
             </div>
          </>

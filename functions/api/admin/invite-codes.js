@@ -4,15 +4,13 @@
 // DELETE /api/admin/invite-codes/[code] - Revoke invite code (admin only)
 
 import { checkPermission, auditLog } from "./_middleware.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import {
+  isValidEmail,
+  isValidRole,
+  validationErrorResponse,
+  FIELD_LIMITS,
+} from "../../utils/validation.js";
+import { getClientIP } from "../../utils/request.js";
 
 // GET - List all invite codes
 export async function onRequestGet(context) {
@@ -20,7 +18,7 @@ export async function onRequestGet(context) {
   const { DB } = env;
 
   // RBAC: Require admin role
-  const permCheck = await checkPermission(request, env, "admin");
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
   }
@@ -72,7 +70,7 @@ export async function onRequestPost(context) {
   const { DB } = env;
 
   // RBAC: Require admin role
-  const permCheck = await checkPermission(request, env, "admin");
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
   }
@@ -88,47 +86,22 @@ export async function onRequestPost(context) {
       expiresInDays = 7,
     } = body;
 
-    // Validation
-    if (!["admin", "editor", "viewer"].includes(role)) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Role must be admin, editor, or viewer",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    // Validation using centralized utilities
+    if (!isValidRole(role)) {
+      return validationErrorResponse("Role must be admin, editor, or viewer");
     }
 
-    if (expiresInDays < 1 || expiresInDays > 365) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Expiry must be between 1 and 365 days",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    if (typeof expiresInDays !== "number" || expiresInDays < 1 || expiresInDays > 365) {
+      return validationErrorResponse("Expiry must be between 1 and 365 days");
     }
 
     if (email) {
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: "Invalid email format",
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
+      // Validate email format and length
+      if (!isValidEmail(email)) {
+        return validationErrorResponse("Invalid email format");
+      }
+      if (email.length > FIELD_LIMITS.email.max) {
+        return validationErrorResponse(`Email must be no more than ${FIELD_LIMITS.email.max} characters`);
       }
 
       // Check if email already registered

@@ -9,13 +9,22 @@
  * @returns {string} Set-Cookie header value
  */
 export function setSecureCookie(name, value, options = {}) {
-  const {
-    maxAge = 1800, // 30 minutes default
-    path = "/",
-    httpOnly = true,
-    secure = true,
-    sameSite = "Strict",
-  } = options;
+  // Detect development environment (localhost or wrangler dev)
+  const isDev = options.isDev !== undefined ? options.isDev : false;
+
+  // Extract options with defaults
+  const maxAge = options.maxAge !== undefined ? options.maxAge : 1800;
+  const path = options.path !== undefined ? options.path : "/";
+  const httpOnly = options.httpOnly !== undefined ? options.httpOnly : true;
+
+  // Apply dev-specific defaults
+  const secure = options.secure !== undefined ? options.secure : !isDev;
+  const sameSite =
+    options.sameSite !== undefined
+      ? options.sameSite
+      : isDev
+      ? "Lax"
+      : "Strict";
 
   const parts = [`${name}=${value}`];
 
@@ -45,11 +54,34 @@ export function setSecureCookie(name, value, options = {}) {
 /**
  * Delete a cookie by setting it to expire immediately
  * @param {string} name - Cookie name
- * @param {string} path - Cookie path (must match the path used when setting)
+ * @param {Object} options - Cookie options
  * @returns {string} Set-Cookie header value
  */
-export function deleteCookie(name, path = "/") {
-  return `${name}=; Path=${path}; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Strict`;
+export function deleteCookie(name, options = {}) {
+  const path = options.path !== undefined ? options.path : "/";
+  const isDev = options.isDev !== undefined ? options.isDev : false;
+  const secure = options.secure !== undefined ? options.secure : !isDev;
+  const sameSite =
+    options.sameSite !== undefined
+      ? options.sameSite
+      : isDev
+      ? "Lax"
+      : "Strict";
+
+  const parts = [`${name}=`];
+  if (path) {
+    parts.push(`Path=${path}`);
+  }
+  parts.push("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  parts.push("HttpOnly");
+  if (secure) {
+    parts.push("Secure");
+  }
+  if (sameSite) {
+    parts.push(`SameSite=${sameSite}`);
+  }
+
+  return parts.join("; ");
 }
 
 /**
@@ -91,17 +123,27 @@ export function getCookie(request, name) {
  * Set session cookie with security defaults
  * @param {string} sessionToken - Session token
  * @param {boolean} rememberMe - Whether to extend expiry
+ * @param {Request} request - Request object to detect environment
  * @returns {string} Set-Cookie header value
  */
-export function setSessionCookie(sessionToken, rememberMe = false) {
+export function setSessionCookie(
+  sessionToken,
+  rememberMe = false,
+  request = null
+) {
   const maxAge = rememberMe ? 7 * 24 * 60 * 60 : 30 * 60; // 7 days or 30 minutes
+
+  // Detect dev environment from request origin
+  const isDev = request
+    ? (request.headers.get("Origin") || "").includes("localhost") ||
+      (request.url || "").includes("localhost")
+    : false;
 
   return setSecureCookie("session_token", sessionToken, {
     maxAge,
     path: "/",
     httpOnly: true,
-    secure: true,
-    sameSite: "Strict",
+    isDev, // Pass development flag
   });
 }
 
@@ -109,6 +151,11 @@ export function setSessionCookie(sessionToken, rememberMe = false) {
  * Delete session cookie
  * @returns {string} Set-Cookie header value
  */
-export function deleteSessionCookie() {
-  return deleteCookie("session_token");
+export function deleteSessionCookie(request = null) {
+  const isDev = request
+    ? (request.headers.get("Origin") || "").includes("localhost") ||
+      (request.url || "").includes("localhost")
+    : false;
+
+  return deleteCookie("session_token", { path: "/", isDev });
 }

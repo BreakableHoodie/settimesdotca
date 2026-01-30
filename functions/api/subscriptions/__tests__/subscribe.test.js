@@ -12,8 +12,9 @@ describe('POST /api/subscriptions/subscribe', () => {
     mockDB = new MockD1Database()
     mockContext = createMockContext(mockDB)
     
-    // Mock console.log to suppress verification email logs
+    // Mock console.log and info to suppress logs
     vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
@@ -125,7 +126,7 @@ describe('POST /api/subscriptions/subscribe', () => {
     expect(mockDB.data.email_subscriptions).toHaveLength(1)
     // Note: The actual implementation has a bug - it doesn't select verification_token in the query,
     // so the token will be undefined in the email URL. This test validates current behavior.
-    expect(console.log).toHaveBeenCalled()
+    expect(console.info).toHaveBeenCalled()
   })
 
   it('should generate unique verification and unsubscribe tokens', async () => {

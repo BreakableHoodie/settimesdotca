@@ -37,11 +37,11 @@ DB_COUNT=$(echo "$DB_FILES" | wc -l | tr -d ' ')
 echo "📦 Found $DB_COUNT local database file(s)"
 echo ""
 
-# Get all migration files
-MIGRATION_FILES=$(find "$PROJECT_ROOT/database/migrations" -name "*.sql" -type f | sort)
+# Get all migration files (exclude legacy/rollback and destructive local resets)
+MIGRATION_FILES=$(find "$PROJECT_ROOT/migrations" -maxdepth 1 -name "*.sql" -type f | sort | grep -v "0002_migration-single-org.sql")
 
 if [ -z "$MIGRATION_FILES" ]; then
-    echo "❌ No migration files found in database/migrations/"
+    echo "❌ No migration files found in migrations/"
     exit 1
 fi
 

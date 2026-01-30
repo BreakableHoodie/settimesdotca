@@ -5,15 +5,8 @@
 // DELETE /api/admin/events/{id} - Delete event
 
 import { checkPermission, auditLog } from "../_middleware.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import { FIELD_LIMITS, isValidURL, sanitizeString } from "../../../utils/validation.js";
+import { getClientIP } from "../../../utils/request.js";
 
 // Helper to extract event ID from path
 function getEventId(request) {
@@ -21,6 +14,35 @@ function getEventId(request) {
   const parts = url.pathname.split("/");
   const idIndex = parts.indexOf("events") + 1;
   return parts[idIndex];
+}
+
+function parseJsonField(value, label) {
+  if (value === undefined) {
+    return { value: undefined };
+  }
+
+  if (value === null || value === "") {
+    return { value: null };
+  }
+
+  if (typeof value === "string") {
+    try {
+      JSON.parse(value);
+      return { value };
+    } catch {
+      return { error: `${label} must be valid JSON` };
+    }
+  }
+
+  if (typeof value === "object") {
+    try {
+      return { value: JSON.stringify(value) };
+    } catch {
+      return { error: `${label} must be valid JSON` };
+    }
+  }
+
+  return { error: `${label} must be valid JSON` };
 }
 
 // PATCH - Update event details (editor and admin only)
@@ -31,7 +53,7 @@ export async function onRequestPatch(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, "editor");
+    const permCheck = await checkPermission(context, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -71,14 +93,30 @@ export async function onRequestPatch(context) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { name, date, status } = body;
+    if (body.ticketLink && !body.ticket_url) {
+      body.ticket_url = body.ticketLink;
+    }
+    const {
+      name,
+      date,
+      status,
+      description,
+      city,
+      ticket_url,
+      venue_info,
+      social_links,
+      theme_colors,
+    } = body;
 
-    // Validate: cannot change slug
-    if (body.slug && body.slug !== event.slug) {
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const params = [];
+
+    if (body.slug !== undefined && body.slug !== event.slug) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
-          message: "Cannot change slug (would break URLs)",
+          message: "Slug cannot be changed after creation",
         }),
         {
           status: 400,
@@ -86,10 +124,6 @@ export async function onRequestPatch(context) {
         },
       );
     }
-
-    // Build update query dynamically based on provided fields
-    const updates = [];
-    const params = [];
 
     if (name !== undefined) {
       if (name.trim().length < 3) {
@@ -146,6 +180,159 @@ export async function onRequestPatch(context) {
       params.push(status === "published" ? 1 : 0);
     }
 
+    if (description !== undefined) {
+      if (description !== null && typeof description !== "string") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Description must be a string",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      const sanitized = description ? sanitizeString(description) : "";
+      if (sanitized.length > FIELD_LIMITS.eventDescription.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Description must be no more than ${FIELD_LIMITS.eventDescription.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("description = ?");
+      params.push(sanitized || null);
+    }
+
+    if (city !== undefined) {
+      if (city !== null && typeof city !== "string") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "City must be a string",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      const sanitized = city ? sanitizeString(city) : "";
+      if (sanitized.length > FIELD_LIMITS.eventCity.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `City must be no more than ${FIELD_LIMITS.eventCity.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("city = ?");
+      params.push(sanitized || null);
+    }
+
+    if (ticket_url !== undefined) {
+      if (ticket_url !== null && typeof ticket_url !== "string") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Ticket link must be a string",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      const trimmed = ticket_url ? ticket_url.trim() : "";
+      if (trimmed && !isValidURL(trimmed)) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Ticket link must be a valid URL",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (trimmed.length > FIELD_LIMITS.ticketLink.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Ticket link must be no more than ${FIELD_LIMITS.ticketLink.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("ticket_url = ?");
+      params.push(trimmed || null);
+    }
+
+    if (venue_info !== undefined) {
+      const parsed = parseJsonField(venue_info, "Venue info");
+      if (parsed.error) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: parsed.error,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (typeof parsed.value === "string" && parsed.value.length > FIELD_LIMITS.eventVenueInfo.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Venue info must be no more than ${FIELD_LIMITS.eventVenueInfo.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("venue_info = ?");
+      params.push(parsed.value ?? null);
+    }
+
+    if (social_links !== undefined) {
+      const parsed = parseJsonField(social_links, "Social links");
+      if (parsed.error) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: parsed.error,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (typeof parsed.value === "string" && parsed.value.length > FIELD_LIMITS.eventSocialLinks.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Social links must be no more than ${FIELD_LIMITS.eventSocialLinks.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("social_links = ?");
+      params.push(parsed.value ?? null);
+    }
+
+    if (theme_colors !== undefined) {
+      const parsed = parseJsonField(theme_colors, "Theme colors");
+      if (parsed.error) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: parsed.error,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (typeof parsed.value === "string" && parsed.value.length > FIELD_LIMITS.eventThemeColors.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Theme colors must be no more than ${FIELD_LIMITS.eventThemeColors.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("theme_colors = ?");
+      params.push(parsed.value ?? null);
+    }
+
     // Always update updated_by_user_id
     updates.push("updated_by_user_id = ?");
     params.push(currentUser.userId);
@@ -183,7 +370,7 @@ export async function onRequestPatch(context) {
       eventId,
       {
         name: name || event.name,
-        changes: { name, date, status },
+        changes: { name, date, status, slug: body.slug },
       },
       ipAddress,
     );
@@ -224,7 +411,7 @@ export async function onRequestPut(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, "editor");
+    const permCheck = await checkPermission(context, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -271,15 +458,16 @@ export async function onRequestPut(context) {
 
       // Toggle publish status
       const newStatus = event.is_published === 1 ? 0 : 1;
+      const nextStatus = newStatus === 1 ? "published" : "draft";
       const result = await DB.prepare(
         `
         UPDATE events
-        SET is_published = ?, updated_by_user_id = ?
+        SET is_published = ?, status = ?, updated_by_user_id = ?
         WHERE id = ?
         RETURNING *
       `,
       )
-        .bind(newStatus, currentUser.userId, eventId)
+        .bind(newStatus, nextStatus, currentUser.userId, eventId)
         .first();
 
       // Audit log
@@ -343,7 +531,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, 'editor');
+    const permCheck = await checkPermission(context, 'editor');
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -430,20 +618,45 @@ export async function onRequestPost(context) {
       // Create new event (unpublished by default)
       const newEvent = await DB.prepare(
         `
-        INSERT INTO events (name, date, slug, is_published)
-        VALUES (?, ?, ?, 0)
+        INSERT INTO events (
+          name,
+          date,
+          slug,
+          status,
+          is_published,
+          description,
+          city,
+          ticket_url,
+          venue_info,
+          social_links,
+          theme_colors,
+          created_by_user_id
+        )
+        VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
         RETURNING *
       `,
       )
-        .bind(name, date, slug)
+        .bind(
+          name,
+          date,
+          slug,
+          "draft",
+          originalEvent.description || null,
+          originalEvent.city || null,
+          originalEvent.ticket_url || null,
+          originalEvent.venue_info || null,
+          originalEvent.social_links || null,
+          originalEvent.theme_colors || null,
+          currentUser.userId,
+        )
         .first();
 
       // Copy all bands from original event
       await DB.prepare(
         `
-        INSERT INTO bands (event_id, venue_id, name, start_time, end_time, url)
-        SELECT ?, venue_id, name, start_time, end_time, url
-        FROM bands
+        INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes)
+        SELECT ?, venue_id, band_profile_id, start_time, end_time, notes
+        FROM performances
         WHERE event_id = ?
       `,
       )
@@ -453,7 +666,7 @@ export async function onRequestPost(context) {
       // Get band count
       const bandCount = await DB.prepare(
         `
-        SELECT COUNT(*) as count FROM bands WHERE event_id = ?
+        SELECT COUNT(*) as count FROM performances WHERE event_id = ?
       `,
       )
         .bind(newEvent.id)
@@ -522,7 +735,7 @@ export async function onRequestDelete(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(request, env, "admin");
+    const permCheck = await checkPermission(context, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -552,7 +765,7 @@ export async function onRequestDelete(context) {
 
     // Check if event has any bands (for informational message)
     const bandCount = await DB.prepare(
-      "SELECT COUNT(*) as count FROM bands WHERE event_id = ?",
+      "SELECT COUNT(*) as count FROM performances WHERE event_id = ?",
     )
       .bind(eventIdNum)
       .first();

@@ -267,15 +267,15 @@ export default function RosterTab({ showToast }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-white">Global Artist Roster</h2>
-          <p className="text-white/70 text-sm mt-1">Master database of all artists and performers.</p>
+          <p className="text-sm text-white/70 mt-1">Master database of all artists and performers.</p>
         </div>
         {!showAddForm && !editingId && (
           <button
             onClick={() => setShowAddForm(true)}
-            className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium"
+            className="px-6 py-3 min-h-[44px] bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium"
           >
             + New Artist
           </button>
@@ -284,11 +284,11 @@ export default function RosterTab({ showToast }) {
 
       {/* Bulk Actions */}
       {selectedIds.size > 0 && (
-         <div className="bg-band-navy/80 p-4 rounded border border-band-orange/30 flex items-center justify-between sticky top-20 z-10 backdrop-blur-md">
+         <div className="bg-band-navy/80 p-4 rounded border border-band-orange/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky top-20 z-10 backdrop-blur-md">
             <span className="text-white font-medium">{selectedIds.size} selected</span>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
                 <select 
-                  className="bg-black/30 border border-white/20 rounded px-3 py-1 text-white"
+                  className="bg-black/30 border border-white/20 rounded px-3 py-2 min-h-[44px] text-white"
                   value={bulkAction || ''}
                   onChange={e => setBulkAction(e.target.value)}
                 >
@@ -298,7 +298,7 @@ export default function RosterTab({ showToast }) {
                 <button 
                   disabled={!bulkAction}
                   onClick={handleBulkSubmit}
-                  className="px-4 py-1 bg-red-600 disabled:opacity-50 text-white rounded"
+                  className="px-4 py-2 min-h-[44px] bg-red-600 disabled:opacity-50 text-white rounded"
                 >
                   Apply
                 </button>
@@ -332,14 +332,15 @@ export default function RosterTab({ showToast }) {
         ) : bands.length === 0 ? (
            <div className="p-8 text-center text-white/50">Roster is empty.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-band-navy/50 border-b border-band-orange/20">
                 <tr>
                   <th className="px-4 py-3 w-12">
                     <input 
                       type="checkbox" 
-                      className="cursor-pointer w-5 h-5"
+                      className="cursor-pointer h-5 w-5"
                       onChange={e => handleSelectAll(e.target.checked)}
                       checked={selectedIds.size === bands.length && bands.length > 0}
                     />
@@ -362,7 +363,7 @@ export default function RosterTab({ showToast }) {
                     <td className="px-4 py-3">
                       <input 
                         type="checkbox" 
-                        className="cursor-pointer w-5 h-5"
+                        className="cursor-pointer h-5 w-5"
                         checked={selectedIds.has(band.id)}
                         onChange={e => handleSelect(band.id, e.target.checked)}
                       />
@@ -373,13 +374,13 @@ export default function RosterTab({ showToast }) {
                     <td className="px-4 py-3 flex justify-end gap-2">
                        <button 
                          onClick={() => startEdit(band)}
-                         className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                         className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
                        >
                          Edit
                        </button>
                        <button 
                          onClick={() => handleDelete(band.id, band.name)}
-                         className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                         className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
                        >
                          Delete
                        </button>
@@ -389,6 +390,57 @@ export default function RosterTab({ showToast }) {
               </tbody>
             </table>
           </div>
+          <div className="md:hidden divide-y divide-band-orange/10">
+            <div className="px-4 py-3 flex items-center justify-between">
+              <label className="flex items-center gap-3 text-white">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 cursor-pointer"
+                  onChange={e => handleSelectAll(e.target.checked)}
+                  checked={selectedIds.size === bands.length && bands.length > 0}
+                />
+                <span>Select all</span>
+              </label>
+              <span className="text-xs text-text-tertiary">{bands.length} artists</span>
+            </div>
+            {sortedBands.map(band => (
+              <div
+                key={band.id}
+                className={`px-4 py-3 space-y-2 ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <label className="flex items-center gap-3 text-white">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 cursor-pointer"
+                      checked={selectedIds.has(band.id)}
+                      onChange={e => handleSelect(band.id, e.target.checked)}
+                    />
+                    <span className="font-medium">{band.name}</span>
+                  </label>
+                </div>
+                <div className="text-sm text-text-secondary space-y-1">
+                  <div>Origin: {band.origin || '-'}</div>
+                  <div>Genre: {band.genre || '-'}</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => startEdit(band)}
+                    className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(band.id, band.name)}
+                    className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
       </div>
     </div>

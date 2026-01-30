@@ -17,7 +17,8 @@ import * as publishHandler from "../[id]/publish.js";
 
 // Mock the middleware module used by the handler
 vi.mock("../../_middleware.js", () => ({
-  checkPermission: async (request, env, level) => {
+  checkPermission: async (context, level) => {
+    const { request } = context;
     // Read a header we set in tests to control the role
     const role = request.headers.get("x-test-role") || "editor";
     const userId = role === "admin" ? 1 : role === "editor" ? 2 : 3;
@@ -91,7 +92,7 @@ describe("Event API - handler integration", () => {
     const body = {
       name: "Integration Event",
       slug: "integration-event",
-      date: "2025-12-20",
+      date: "2026-06-20",
     };
     const request = new Request("https://example.test/api/admin/events", {
       method: "POST",
@@ -382,7 +383,7 @@ describe("Event API - handler integration", () => {
     expect(data.success).toBeTruthy();
   });
 
-  it("delete actually orphans bands (event_id set to NULL)", async () => {
+  it("delete cascades performances for the event", async () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
 
     // Create event with band
@@ -405,9 +406,9 @@ describe("Event API - handler integration", () => {
     const data = await res.json();
     expect(data.success).toBeTruthy();
 
-    // Check band now has event_id NULL
-    const row = rawDb.prepare("SELECT * FROM bands WHERE id = ?").get(b.id);
-    expect(row.event_id === null || row.event_id === undefined).toBeTruthy();
+    // Check performance was removed by cascade
+    const row = rawDb.prepare("SELECT * FROM performances WHERE id = ?").get(b.id);
+    expect(row).toBeUndefined();
   });
 
   it("PATCH can update date and status to published", async () => {

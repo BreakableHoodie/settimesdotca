@@ -2,7 +2,8 @@
 // Uses PBKDF2 instead of bcrypt (which requires Node.js)
 
 const SALT_LENGTH = 16;
-const ITERATIONS = 100000;
+const LEGACY_ITERATIONS = 100000;
+const DEFAULT_ITERATIONS = 600000;
 const KEY_LENGTH = 32;
 
 function timingSafeEqual(a, b) {
@@ -37,7 +38,7 @@ export async function hashPassword(password) {
     passwordBytes,
     { name: "PBKDF2" },
     false,
-    ["deriveBits"],
+    ["deriveBits"]
   );
 
   // Derive key using PBKDF2
@@ -45,11 +46,11 @@ export async function hashPassword(password) {
     {
       name: "PBKDF2",
       salt: salt,
-      iterations: ITERATIONS,
+      iterations: DEFAULT_ITERATIONS,
       hash: "SHA-256",
     },
     key,
-    KEY_LENGTH * 8,
+    KEY_LENGTH * 8
   );
 
   // Convert to base64 for storage
@@ -57,8 +58,8 @@ export async function hashPassword(password) {
   const saltBase64 = btoa(String.fromCharCode(...salt));
   const hashBase64 = btoa(String.fromCharCode(...hashArray));
 
-  // Return format: salt:hash
-  return `${saltBase64}:${hashBase64}`;
+  // Return format: pbkdf2$iterations$salt$hash
+  return `pbkdf2$${DEFAULT_ITERATIONS}$${saltBase64}$${hashBase64}`;
 }
 
 /**
@@ -69,10 +70,29 @@ export async function hashPassword(password) {
  */
 export async function verifyPassword(password, storedHash) {
   try {
-    // Parse stored hash
-    const [saltBase64, hashBase64] = storedHash.split(":");
-    if (!saltBase64 || !hashBase64) {
-      return false;
+    let iterations = LEGACY_ITERATIONS;
+    let saltBase64;
+    let hashBase64;
+
+    if (storedHash.startsWith("pbkdf2$")) {
+      const parts = storedHash.split("$");
+      if (parts.length !== 4) {
+        return false;
+      }
+      iterations = Number(parts[1]);
+      saltBase64 = parts[2];
+      hashBase64 = parts[3];
+      if (!iterations || !saltBase64 || !hashBase64) {
+        return false;
+      }
+    } else {
+      // Legacy format: salt:hash
+      const legacyParts = storedHash.split(":");
+      if (legacyParts.length !== 2) {
+        return false;
+      }
+      saltBase64 = legacyParts[0];
+      hashBase64 = legacyParts[1];
     }
 
     // Decode salt
@@ -88,7 +108,7 @@ export async function verifyPassword(password, storedHash) {
       passwordBytes,
       { name: "PBKDF2" },
       false,
-      ["deriveBits"],
+      ["deriveBits"]
     );
 
     // Derive key using same parameters
@@ -96,17 +116,16 @@ export async function verifyPassword(password, storedHash) {
       {
         name: "PBKDF2",
         salt: salt,
-        iterations: ITERATIONS,
+        iterations: iterations,
         hash: "SHA-256",
       },
       key,
-      KEY_LENGTH * 8,
+      KEY_LENGTH * 8
     );
 
     const hashArray = new Uint8Array(derivedBits);
-    const storedHashArray = Uint8Array.from(
-      atob(hashBase64),
-      (c) => c.charCodeAt(0),
+    const storedHashArray = Uint8Array.from(atob(hashBase64), (c) =>
+      c.charCodeAt(0)
     );
 
     return timingSafeEqual(hashArray, storedHashArray);

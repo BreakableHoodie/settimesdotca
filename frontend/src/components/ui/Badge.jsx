@@ -13,7 +13,14 @@ import PropTypes from 'prop-types'
  * <Badge variant="warning">Draft</Badge>
  * <Badge variant="error">Archived</Badge>
  */
-const Badge = memo(function Badge({ children, variant = 'default', size = 'md', className = '', ...props }) {
+const Badge = memo(function Badge({
+  children,
+  variant = 'default',
+  size = 'md',
+  className = '',
+  as: Component = 'span',
+  ...props
+}) {
   // Base classes
   const baseClasses = 'inline-flex items-center font-medium rounded-full uppercase tracking-wide'
 
@@ -45,9 +52,9 @@ const Badge = memo(function Badge({ children, variant = 'default', size = 'md', 
     .replace(/\s+/g, ' ')
 
   return (
-    <span className={classes} {...props}>
+    <Component className={classes} {...props}>
       {children}
-    </span>
+    </Component>
   )
 })
 
@@ -56,6 +63,7 @@ Badge.propTypes = {
   variant: PropTypes.oneOf(['default', 'primary', 'success', 'warning', 'error', 'info']),
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   className: PropTypes.string,
+  as: PropTypes.elementType,
 }
 
 export default Badge

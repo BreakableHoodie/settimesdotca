@@ -2,11 +2,19 @@
  * Time filtering utilities for concert performances
  */
 
+const DEBUG_TIME_KEY = '__debugScheduleTime'
+
 /**
  * Get current date/time in the event's timezone
  * For now, using local timezone - can be made configurable later
  */
 export function getCurrentDateTime() {
+  if (typeof globalThis !== 'undefined' && globalThis[DEBUG_TIME_KEY]) {
+    const parsed = new Date(globalThis[DEBUG_TIME_KEY])
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed
+    }
+  }
   return new Date()
 }
 
@@ -176,7 +184,7 @@ export function filterPerformancesByTime(performances, timeFilter) {
  */
 export function getTimeFilterOptions() {
   return [
-    { value: 'all', label: 'All Performances', description: 'Show all performances' },
+    { value: 'all', label: 'Any Time', description: 'Show all performances' },
     { value: 'now', label: 'Happening Now', description: 'Currently performing or starting soon' },
     { value: 'today', label: 'Today', description: 'Performances happening today' },
     { value: 'this-week', label: 'This Week', description: 'Performances this week' },
@@ -184,6 +192,29 @@ export function getTimeFilterOptions() {
     { value: 'this-month', label: 'This Month', description: 'Performances this month' },
     { value: 'next-month', label: 'Next Month', description: 'Performances next month' },
   ]
+}
+
+/**
+ * Calculate duration in minutes between start and end times
+ */
+function getDurationMinutes(startMs, endMs) {
+  if (!startMs || !endMs) return null
+  let durationMs = endMs - startMs
+  if (durationMs < 0) {
+    durationMs += 24 * 60 * 60 * 1000
+  }
+  return Math.round(durationMs / (1000 * 60))
+}
+
+/**
+ * Format duration as human-readable string
+ */
+function formatDuration(minutes) {
+  if (!minutes) return ''
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
 }
 
 /**
@@ -196,40 +227,42 @@ export function getTimeDescription(performance) {
   const startTime = performance.startMs
   const endTime = performance.endMs
 
+  // Calculate duration if end time is available
+  const duration = getDurationMinutes(startTime, endTime)
+  const durationStr = duration ? ` (${formatDuration(duration)})` : ''
+
   // If performance is happening now
   if (isHappeningNow(performance)) {
     if (startTime <= now && endTime >= now) {
-      return 'Happening Now'
+      return `Happening Now${durationStr}`
     } else if (startTime > now) {
       const minutesUntil = Math.ceil((startTime - now) / (1000 * 60))
-      return `Starting in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}`
+      return `Starting in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}${durationStr}`
     }
   }
 
   // If performance is today
   if (isHappeningToday(performance)) {
     const startDate = new Date(startTime)
-    return `Today at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    return `Today at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // If performance is this week
   if (isHappeningThisWeek(performance)) {
     const startDate = new Date(startTime)
-    return startDate.toLocaleDateString([], { weekday: 'long', hour: '2-digit', minute: '2-digit' })
+    return `${startDate.toLocaleDateString([], { weekday: 'long' })} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // If performance is next week
   if (isHappeningNextWeek(performance)) {
     const startDate = new Date(startTime)
-    return `Next ${startDate.toLocaleDateString([], { weekday: 'long' })} at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    return `Next ${startDate.toLocaleDateString([], { weekday: 'long' })} at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // Default to formatted date and time
   const startDate = new Date(startTime)
-  return startDate.toLocaleDateString([], {
+  return `${startDate.toLocaleDateString([], {
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  })} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
 }

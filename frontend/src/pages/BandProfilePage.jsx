@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Helmet, HelmetProvider } from 'react-helmet-async'
 import { Button, Badge, Card, Alert, Loading } from '../components/ui'
+import DOMPurify from 'dompurify'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faLocationDot,
@@ -10,10 +11,12 @@ import {
   faChartLine,
   faArrowLeft,
   faGlobe,
+  faGuitar,
 } from '@fortawesome/free-solid-svg-icons'
 import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
 import BandStats from '../components/BandStats'
 import BandFacts from '../components/BandFacts'
+import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 
 /**
  * BandProfilePage - Enhanced band profile with design system
@@ -28,9 +31,31 @@ import BandFacts from '../components/BandFacts'
  */
 export default function BandProfilePage() {
   const { id } = useParams()
+  const navigate = useNavigate()
+  const hasRedirectedRef = useRef(false)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const isNumericId = useMemo(() => /^\d+$/.test(id || ''), [id])
+
+  const sanitizedDescription = useMemo(() => {
+    if (!profile?.description) return ''
+    return DOMPurify.sanitize(profile.description, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a'],
+      ALLOWED_ATTR: ['href', 'target', 'rel'],
+    })
+  }, [profile?.description])
+
+  const plainDescription = useMemo(() => {
+    if (!profile?.description) return ''
+    return DOMPurify.sanitize(profile.description, {
+      ALLOWED_TAGS: [],
+      ALLOWED_ATTR: [],
+    })
+      .replace(/\s+/g, ' ')
+      .trim()
+  }, [profile?.description])
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -46,6 +71,11 @@ export default function BandProfilePage() {
 
         const data = await response.json()
         setProfile(data)
+
+        if (!isNumericId && data?.id && !hasRedirectedRef.current) {
+          hasRedirectedRef.current = true
+          navigate(`/band/${data.id}`, { replace: true })
+        }
       } catch (err) {
         console.error('Failed to load band profile:', err)
         setError(err.message)
@@ -57,7 +87,7 @@ export default function BandProfilePage() {
     if (id) {
       loadProfile()
     }
-  }, [id])
+  }, [id, isNumericId, navigate])
 
   if (loading) {
     return (
@@ -92,58 +122,60 @@ export default function BandProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-band-navy">
-      {/* SEO Meta Tags */}
-      <Helmet>
-        <title>{profile.name} - Band Profile | SetTimes</title>
-        <meta
-          name="description"
-          content={
-            profile.description
-              ? `${profile.description.slice(0, 155)}...`
-              : `${profile.name} profile on SetTimes. ${profile.genre ? `Genre: ${profile.genre}. ` : ''}${profile.stats ? `${profile.stats.total_performances} performances.` : ''}`
-          }
-        />
-        <meta
-          name="keywords"
-          content={`${profile.name}, ${profile.genre || 'music'}, ${profile.origin || 'band'}, live music, SetTimes`}
-        />
+    <HelmetProvider>
+      <div className="min-h-screen bg-band-navy">
+        {/* SEO Meta Tags */}
+        <Helmet>
+          <title>{profile.name} - Band Profile | SetTimes</title>
+          <meta
+            name="description"
+            content={
+              plainDescription
+                ? `${plainDescription.slice(0, 155)}...`
+                : `${profile.name} profile on SetTimes. ${profile.genre ? `Genre: ${profile.genre}. ` : ''}${profile.stats ? `${profile.stats.total_performances} performances.` : ''}`
+            }
+          />
+          <meta
+            name="keywords"
+            content={`${profile.name}, ${profile.genre || 'music'}, ${profile.origin || 'band'}, live music, SetTimes`}
+          />
 
-        {/* OpenGraph */}
-        <meta property="og:title" content={`${profile.name} - Band Profile`} />
-        <meta property="og:description" content={profile.description || `${profile.name} on SetTimes`} />
-        <meta property="og:type" content="profile" />
-        {profile.photo_url && <meta property="og:image" content={profile.photo_url} />}
-        <meta property="og:url" content={`https://settimes.ca/band/${id}`} />
+          {/* OpenGraph */}
+          <meta property="og:title" content={`${profile.name} - Band Profile`} />
+          <meta property="og:description" content={plainDescription || `${profile.name} on SetTimes`} />
+          <meta property="og:type" content="profile" />
+          {profile.photo_url && <meta property="og:image" content={profile.photo_url} />}
+          <meta property="og:url" content={`https://settimes.ca/band/${profile?.id || id}`} />
+          <link rel="canonical" href={`https://settimes.ca/band/${profile?.id || id}`} />
 
-        {/* Twitter Card */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={`${profile.name} - Band Profile`} />
-        <meta name="twitter:description" content={profile.description || `${profile.name} on SetTimes`} />
-        {profile.photo_url && <meta name="twitter:image" content={profile.photo_url} />}
+          {/* Twitter Card */}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={`${profile.name} - Band Profile`} />
+          <meta name="twitter:description" content={plainDescription || `${profile.name} on SetTimes`} />
+          {profile.photo_url && <meta name="twitter:image" content={profile.photo_url} />}
 
-        {/* Structured Data (JSON-LD) */}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'MusicGroup',
-            name: profile.name,
-            genre: profile.genre,
-            description: profile.description,
-            image: profile.photo_url,
-            url: `https://settimes.ca/band/${id}`,
-            ...(profile.origin && { foundingLocation: profile.origin }),
-            ...(profile.social && {
-              sameAs: [
-                profile.social.website,
-                profile.social.instagram && `https://instagram.com/${profile.social.instagram.replace('@', '')}`,
-                profile.social.facebook,
-                profile.social.bandcamp,
-              ].filter(Boolean),
-            }),
-          })}
-        </script>
-      </Helmet>
+          {/* Structured Data (JSON-LD) */}
+          <script type="application/ld+json">
+            {JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'MusicGroup',
+              name: profile.name,
+              genre: profile.genre,
+              description: plainDescription,
+              image: profile.photo_url,
+              url: `https://settimes.ca/band/${profile?.id || id}`,
+              ...(profile.origin && { foundingLocation: profile.origin }),
+              ...(profile.social && {
+                sameAs: [
+                  profile.social.website,
+                  profile.social.instagram && `https://instagram.com/${profile.social.instagram.replace('@', '')}`,
+                  profile.social.facebook,
+                  profile.social.bandcamp,
+                ].filter(Boolean),
+              }),
+            })}
+          </script>
+        </Helmet>
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Sports Card Hero Section */}
@@ -163,12 +195,14 @@ export default function BandProfilePage() {
                 <div className="flex flex-wrap gap-3">
                   {profile.genre && (
                     <span className="px-4 py-2 bg-band-orange text-white rounded-lg font-bold text-sm shadow-lg">
-                      🎸 {profile.genre}
+                      <FontAwesomeIcon icon={faGuitar} className="mr-2" aria-hidden="true" />
+                      {profile.genre}
                     </span>
                   )}
                   {profile.origin && (
                     <span className="px-4 py-2 bg-band-purple border-2 border-white/30 text-white rounded-lg font-bold text-sm shadow-lg">
-                      📍 {profile.origin}
+                      <FontAwesomeIcon icon={faLocationDot} className="mr-2" aria-hidden="true" />
+                      {profile.origin}
                     </span>
                   )}
                 </div>
@@ -180,12 +214,14 @@ export default function BandProfilePage() {
               <div className="flex flex-wrap gap-3">
                 {profile.genre && (
                   <span className="px-4 py-2 bg-band-orange text-white rounded-lg font-bold text-sm">
-                    🎸 {profile.genre}
+                    <FontAwesomeIcon icon={faGuitar} className="mr-2" aria-hidden="true" />
+                    {profile.genre}
                   </span>
                 )}
                 {profile.origin && (
                   <span className="px-4 py-2 bg-band-navy border-2 border-white/30 text-white rounded-lg font-bold text-sm">
-                    📍 {profile.origin}
+                    <FontAwesomeIcon icon={faLocationDot} className="mr-2" aria-hidden="true" />
+                    {profile.origin}
                   </span>
                 )}
               </div>
@@ -196,7 +232,10 @@ export default function BandProfilePage() {
           {(profile.description || profile.social) && (
             <div className="p-6 bg-band-purple/50 border-t border-white/10">
               {profile.description && (
-                <p className="text-white/90 mb-4 leading-relaxed whitespace-pre-wrap">{profile.description}</p>
+                <div
+                  className="text-white/90 mb-4 leading-relaxed rich-text-content"
+                  dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
+                />
               )}
               {profile.social && (
                 <div className="flex flex-wrap gap-3">
@@ -267,7 +306,7 @@ export default function BandProfilePage() {
                   <h2 className="text-2xl font-bold text-accent-500 flex items-center gap-2">
                     <FontAwesomeIcon icon={faCalendarDays} />
                     <span>Upcoming Shows</span>
-                    <Badge variant="accent" className="ml-2">
+                    <Badge variant="primary" className="ml-2">
                       {profile.upcoming.length}
                     </Badge>
                   </h2>
@@ -282,7 +321,7 @@ export default function BandProfilePage() {
                             {performance.event_date && (
                               <span className="flex items-center gap-2">
                                 <FontAwesomeIcon icon={faCalendarDays} className="text-accent-500" />
-                                {new Date(performance.event_date).toLocaleDateString('en-US', {
+                                {(parseLocalDate(performance.event_date) || new Date(performance.event_date)).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'long',
                                   day: 'numeric',
@@ -298,13 +337,13 @@ export default function BandProfilePage() {
                             {performance.start_time && performance.end_time && (
                               <span className="flex items-center gap-2">
                                 <FontAwesomeIcon icon={faClock} className="text-accent-500" />
-                                {performance.start_time} - {performance.end_time}
+                                {formatTimeRange(performance.start_time, performance.end_time)}
                               </span>
                             )}
                           </div>
                         </div>
                         {performance.event_slug && (
-                          <Button as={Link} to={`/embed/${performance.event_slug}`} variant="primary" size="sm">
+                          <Button as={Link} to={`/event/${performance.event_slug}`} variant="primary" size="sm">
                             View Event →
                           </Button>
                         )}
@@ -337,7 +376,7 @@ export default function BandProfilePage() {
                             {performance.event_date && (
                               <span className="flex items-center gap-2">
                                 <FontAwesomeIcon icon={faCalendarDays} className="text-text-tertiary" />
-                                {new Date(performance.event_date).toLocaleDateString('en-US', {
+                                {(parseLocalDate(performance.event_date) || new Date(performance.event_date)).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'long',
                                   day: 'numeric',
@@ -353,13 +392,13 @@ export default function BandProfilePage() {
                             {performance.start_time && performance.end_time && (
                               <span className="flex items-center gap-2">
                                 <FontAwesomeIcon icon={faClock} className="text-text-tertiary" />
-                                {performance.start_time} - {performance.end_time}
+                                {formatTimeRange(performance.start_time, performance.end_time)}
                               </span>
                             )}
                           </div>
                         </div>
                         {performance.event_slug && (
-                          <Button as={Link} to={`/embed/${performance.event_slug}`} variant="secondary" size="sm">
+                          <Button as={Link} to={`/event/${performance.event_slug}`} variant="secondary" size="sm">
                             View Event →
                           </Button>
                         )}
@@ -386,5 +425,6 @@ export default function BandProfilePage() {
         </div>
       </div>
     </div>
+    </HelmetProvider>
   )
 }

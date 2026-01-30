@@ -26,19 +26,17 @@ export function createTestDB() {
       date TEXT NOT NULL,
       status TEXT DEFAULT 'draft',
       is_published INTEGER DEFAULT 0,
+      description TEXT,
+      city TEXT,
+      ticket_url TEXT,
+      venue_info TEXT,
+      social_links TEXT,
+      theme_colors TEXT,
       archived_at TEXT,
       created_by_user_id INTEGER REFERENCES users(id),
-      updated_by_user_id INTEGER
-    );
-
-    CREATE TABLE bands (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
-      venue_id INTEGER,
-      start_time TEXT,
-      end_time TEXT,
-      url TEXT
+      updated_by_user_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
     );
 
     CREATE TABLE venues (
@@ -46,6 +44,31 @@ export function createTestDB() {
       name TEXT NOT NULL,
       city TEXT,
       address TEXT
+    );
+
+    CREATE TABLE band_profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      name_normalized TEXT UNIQUE NOT NULL,
+      genre TEXT,
+      origin TEXT,
+      description TEXT,
+      photo_url TEXT,
+      social_links TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE performances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+      venue_id INTEGER REFERENCES venues(id) ON DELETE SET NULL,
+      band_profile_id INTEGER REFERENCES band_profiles(id) ON DELETE CASCADE,
+      start_time TEXT,
+      end_time TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
     );
   `);
 
@@ -85,11 +108,19 @@ export function insertEvent(
     .get(info.lastInsertRowid);
 }
 
-export function insertBand(db, { name = "Test Band", event_id = null } = {}) {
-  const stmt = db.prepare("INSERT INTO bands (name, event_id) VALUES (?, ?)");
-  const info = stmt.run(name, event_id);
+export function insertBand(db, { name = "Test Band", event_id = null, venue_id = null, start_time = "20:00", end_time = "21:00" } = {}) {
+  const nameNormalized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const existingProfile = db.prepare("SELECT id FROM band_profiles WHERE name_normalized = ?").get(nameNormalized);
+  const profileId = existingProfile
+    ? existingProfile.id
+    : db.prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)").run(name, nameNormalized).lastInsertRowid;
+
+  const info = db.prepare(
+    "INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time) VALUES (?, ?, ?, ?, ?)"
+  ).run(event_id, venue_id, profileId, start_time, end_time);
+
   return db
-    .prepare("SELECT * FROM bands WHERE id = ?")
+    .prepare("SELECT * FROM performances WHERE id = ?")
     .get(info.lastInsertRowid);
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { eventsApi, venuesApi, bandsApi } from '../utils/adminApi'
+import { formatTimeRange } from '../utils/timeFormat'
 
 const STEPS = ['basics', 'venues', 'bands', 'publish']
 
@@ -38,7 +39,7 @@ function BasicsStep({ eventData, onChange }) {
           type="text"
           value={eventData.name}
           onChange={e => handleNameChange(e.target.value)}
-          className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           placeholder="Long Weekend Band Crawl Vol. 6"
           required
         />
@@ -53,7 +54,7 @@ function BasicsStep({ eventData, onChange }) {
           type="date"
           value={eventData.date}
           onChange={e => handleChange('date', e.target.value)}
-          className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           required
         />
       </div>
@@ -67,7 +68,7 @@ function BasicsStep({ eventData, onChange }) {
           type="text"
           value={eventData.slug}
           onChange={e => handleChange('slug', e.target.value)}
-          className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           placeholder="vol-6"
           required
         />
@@ -82,7 +83,7 @@ function BasicsStep({ eventData, onChange }) {
           id="event-description"
           value={eventData.description}
           onChange={e => handleChange('description', e.target.value)}
-          className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[96px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           rows={3}
           placeholder="Describe your event..."
         />
@@ -146,20 +147,20 @@ function VenuesStep({ eventData: _eventData, onChange }) {
             type="text"
             value={newVenue.name}
             onChange={e => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             placeholder="Venue name"
           />
           <input
             type="text"
             value={newVenue.address}
             onChange={e => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             placeholder="Address (optional)"
           />
           <button
             type="button"
             onClick={handleAddVenue}
-            className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
+            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
           >
             Add Venue
           </button>
@@ -226,7 +227,7 @@ function BandsStep({ eventData, onChange }) {
               <div>
                 <div className="text-white font-medium">{band.name}</div>
                 <div className="text-gray-400 text-sm">
-                  {venue?.name} • {band.startTime} - {band.endTime}
+                  {venue?.name} • {formatTimeRange(band.startTime, band.endTime)}
                 </div>
               </div>
               <button onClick={() => handleRemoveBand(band.id)} className="text-red-400 hover:text-red-300">
@@ -244,14 +245,14 @@ function BandsStep({ eventData, onChange }) {
             type="text"
             value={newBand.name}
             onChange={e => setNewBand(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             placeholder="Band name"
           />
 
           <select
             value={newBand.venueId}
             onChange={e => setNewBand(prev => ({ ...prev, venueId: e.target.value }))}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
           >
             <option value="">Select venue</option>
             {eventData.venues.map(venue => (
@@ -266,14 +267,14 @@ function BandsStep({ eventData, onChange }) {
               type="time"
               value={newBand.startTime}
               onChange={e => setNewBand(prev => ({ ...prev, startTime: e.target.value }))}
-              className="px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
               placeholder="Start time"
             />
             <input
               type="time"
               value={newBand.endTime}
               onChange={e => setNewBand(prev => ({ ...prev, endTime: e.target.value }))}
-              className="px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
               placeholder="End time"
             />
           </div>
@@ -282,14 +283,14 @@ function BandsStep({ eventData, onChange }) {
             type="url"
             value={newBand.url}
             onChange={e => setNewBand(prev => ({ ...prev, url: e.target.value }))}
-            className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             placeholder="Band website/social media (optional)"
           />
 
           <button
             type="button"
             onClick={handleAddBand}
-            className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
+            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
           >
             Add Band
           </button>
@@ -451,10 +452,10 @@ export default function EventWizard({ onComplete, onCancel }) {
       <div className="mb-6">{stepComponents[STEPS[currentStep]]}</div>
 
       {/* Navigation buttons */}
-      <div className="flex justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
         <button
           onClick={currentStep === 0 ? onCancel : handleBack}
-          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          className="min-h-[44px] px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
         >
           {currentStep === 0 ? 'Cancel' : 'Back'}
         </button>
@@ -463,7 +464,7 @@ export default function EventWizard({ onComplete, onCancel }) {
           <button
             onClick={handleNext}
             disabled={!canProceed()}
-            className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50"
+            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50"
           >
             Next
           </button>
@@ -471,7 +472,7 @@ export default function EventWizard({ onComplete, onCancel }) {
           <button
             onClick={handlePublish}
             disabled={loading}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
           >
             {loading ? 'Publishing...' : 'Publish Event'}
           </button>

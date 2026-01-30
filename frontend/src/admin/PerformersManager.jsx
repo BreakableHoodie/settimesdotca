@@ -314,17 +314,17 @@ export default function PerformersManager() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     onClick={() => handleEdit(performer)}
-                    className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm"
+                    className="min-h-[44px] px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(performer.id)}
                     disabled={performer.performance_count > 0}
-                    className="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    className="min-h-[44px] px-4 py-2 bg-red-700 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     title={
                       performer.performance_count > 0
                         ? 'Cannot delete performer with existing performances'

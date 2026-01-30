@@ -11,6 +11,12 @@ export function createTestDB() {
       password_hash TEXT,
       role TEXT NOT NULL,
       name TEXT,
+      totp_secret TEXT,
+      totp_enabled INTEGER DEFAULT 0,
+      webauthn_enabled INTEGER DEFAULT 0,
+      email_otp_enabled INTEGER DEFAULT 0,
+      backup_codes TEXT,
+      require_2fa INTEGER DEFAULT 1,
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
@@ -22,7 +28,8 @@ export function createTestDB() {
     );
 
     CREATE TABLE sessions (
-      id TEXT PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_token TEXT UNIQUE NOT NULL,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       ip_address TEXT,
       user_agent TEXT,
@@ -30,6 +37,18 @@ export function createTestDB() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
       expires_at TEXT NOT NULL
+    );
+
+    CREATE TABLE mfa_challenges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT NOT NULL UNIQUE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ip_address TEXT,
+      user_agent TEXT,
+      expires_at TEXT NOT NULL,
+      used INTEGER DEFAULT 0,
+      used_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE audit_log (
@@ -51,19 +70,51 @@ export function createTestDB() {
       date TEXT NOT NULL,
       status TEXT DEFAULT 'draft',
       is_published INTEGER DEFAULT 0,
+      description TEXT,
+      city TEXT,
+      ticket_url TEXT,
+      venue_info TEXT,
+      social_links TEXT,
+      theme_colors TEXT,
       archived_at TEXT,
       created_by_user_id INTEGER REFERENCES users(id),
-      updated_by_user_id INTEGER
+      updated_by_user_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
     );
 
-    CREATE TABLE bands (
+    CREATE TABLE band_profiles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
-      venue_id INTEGER,
+      name_normalized TEXT UNIQUE NOT NULL,
+      genre TEXT,
+      origin TEXT,
+      description TEXT,
+      photo_url TEXT,
+      social_links TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE performances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+      venue_id INTEGER REFERENCES venues(id) ON DELETE SET NULL,
+      band_profile_id INTEGER REFERENCES band_profiles(id) ON DELETE CASCADE,
       start_time TEXT,
       end_time TEXT,
-      url TEXT
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE schedule_builds (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER NOT NULL,
+      performance_id INTEGER,
+      band_id INTEGER,
+      user_session TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
     );
 
     CREATE TABLE venues (
@@ -196,11 +247,49 @@ export function insertBand(db, {
   venue_id = null,
   start_time = '18:00',
   end_time = '19:00',
-  url = null
+  url = null,
+  genre = null,
+  origin = null,
+  description = null,
+  photo_url = null,
+  social_links = null
 } = {}) {
-  const stmt = db.prepare('INSERT INTO bands (name, event_id, venue_id, start_time, end_time, url) VALUES (?, ?, ?, ?, ?, ?)')
-  const info = stmt.run(name, event_id, venue_id, start_time, end_time, url)
-  return db.prepare('SELECT * FROM bands WHERE id = ?').get(info.lastInsertRowid)
+  // Insert into band_profiles + performances (v2 schema)
+  const nameNormalized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  let profileId;
+  const resolvedSocialLinks = social_links ?? (url ? JSON.stringify({ website: url }) : null);
+  const existingProfile = db.prepare('SELECT * FROM band_profiles WHERE name_normalized = ?').get(nameNormalized);
+  if (existingProfile) {
+    profileId = existingProfile.id;
+    const updates = [];
+    const values = [];
+    if (genre !== null) { updates.push('genre = ?'); values.push(genre); }
+    if (origin !== null) { updates.push('origin = ?'); values.push(origin); }
+    if (description !== null) { updates.push('description = ?'); values.push(description); }
+    if (photo_url !== null) { updates.push('photo_url = ?'); values.push(photo_url); }
+    if (resolvedSocialLinks !== null) { updates.push('social_links = ?'); values.push(resolvedSocialLinks); }
+    if (updates.length > 0) {
+      db.prepare(`UPDATE band_profiles SET ${updates.join(', ')} WHERE id = ?`).run(...values, profileId);
+    }
+  } else {
+    const profileInfo = db.prepare(
+      'INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(name, nameNormalized, genre, origin, description, photo_url, resolvedSocialLinks);
+    profileId = profileInfo.lastInsertRowid;
+  }
+
+  const perfInfo = db.prepare(
+    'INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time) VALUES (?, ?, ?, ?, ?)'
+  ).run(event_id, venue_id, profileId, start_time, end_time);
+
+  return db.prepare(
+    `
+    SELECT p.*, bp.name, bp.id as band_profile_id
+    FROM performances p
+    JOIN band_profiles bp ON p.band_profile_id = bp.id
+    WHERE p.id = ?
+  `
+  ).get(perfInfo.lastInsertRowid);
 }
 
 export function insertVenue(db, { name = 'Test Venue', city = 'Portland', address = null } = {}) {
@@ -287,11 +376,11 @@ export function createTestEnv({ role = "editor" } = {}) {
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   rawDb.prepare(
-    "INSERT INTO sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO sessions (session_token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
   ).run(sessionId, userId, expiresAt, "127.0.0.1", "test-agent");
 
   return {
-    env: { DB: createDBEnv(rawDb) },
+    env: { DB: createDBEnv(rawDb), ALLOW_HEADER_AUTH: "true" },
     rawDb,
     role,
     headers: {

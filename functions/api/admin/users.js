@@ -4,15 +4,12 @@
 
 import { hashPassword } from "../../utils/crypto.js";
 import { checkPermission, auditLog } from "./_middleware.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import {
+  validateEntity,
+  VALIDATION_SCHEMAS,
+  validationErrorResponse,
+} from "../../utils/validation.js";
+import { getClientIP } from "../../utils/request.js";
 
 // GET - List all users (admin only)
 export async function onRequestGet(context) {
@@ -21,12 +18,10 @@ export async function onRequestGet(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(request, env, "admin");
+    const permCheck = await checkPermission(context, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }
-
-    const user = permCheck.user;
 
     // Get all users (excluding password hashes)
     const { results: users } = await DB.prepare(
@@ -74,7 +69,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(request, env, "admin");
+    const permCheck = await checkPermission(context, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -83,78 +78,15 @@ export async function onRequestPost(context) {
 
     // Parse request body
     const body = await request.json().catch(() => ({}));
-    const { email, password, role, name } = body;
 
-    // Validation
-    if (!email || !password || !role || !name) {
-      return new Response(
-        JSON.stringify({
-          error: "Bad request",
-          message: "Email, password, role, and display name are required",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    // Validate input using schema
+    const validation = validateEntity(body, VALIDATION_SCHEMAS.user);
+    if (!validation.valid) {
+      const firstError = Object.values(validation.errors)[0];
+      return validationErrorResponse(firstError, { fields: validation.errors });
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid email",
-          message: "Please provide a valid email address",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Validate password length
-    if (password.length < 8) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid password",
-          message: "Password must be at least 8 characters long",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Validate role
-    if (!["admin", "editor", "viewer"].includes(role)) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid role",
-          message: "Role must be admin, editor, or viewer",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Validate name length
-    if (name.length < 2) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid name",
-          message: "Display name must be at least 2 characters long",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
+    const { email, password, role, name } = validation.sanitized;
 
     // Check if email already exists
     const existingUser = await DB.prepare(

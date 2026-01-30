@@ -1,6 +1,9 @@
-// Password reset verification endpoint
+// Password reset endpoints
 // GET /api/auth/reset-password?token=xxx
+// POST /api/auth/reset-password
 // Returns: { valid: true, user: { email, name } } or error
+
+export { onRequestPost } from "./reset-password-complete.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;

@@ -3,15 +3,8 @@
 // Clears session cookie and invalidates session
 
 import { deleteSessionCookie, getCookie } from "../../../utils/cookies.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import { deleteCSRFCookie } from "../../../utils/csrf.js";
+import { getClientIP } from "../../../utils/request.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -26,13 +19,13 @@ export async function onRequestPost(context) {
     if (sessionToken) {
       // Get user ID from session before deleting
       const session = await DB.prepare(
-        `SELECT user_id FROM sessions WHERE id = ?`,
+        `SELECT user_id FROM sessions WHERE session_token = ?`,
       )
         .bind(sessionToken)
         .first();
 
       // Delete session from database
-      await DB.prepare(`DELETE FROM sessions WHERE id = ?`)
+      await DB.prepare(`DELETE FROM sessions WHERE session_token = ?`)
         .bind(sessionToken)
         .run();
 
@@ -51,7 +44,8 @@ export async function onRequestPost(context) {
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", deleteSessionCookie());
+    headers.append("Set-Cookie", deleteSessionCookie(request));
+    headers.append("Set-Cookie", deleteCSRFCookie(request));
 
     return new Response(
       JSON.stringify({
@@ -70,7 +64,8 @@ export async function onRequestPost(context) {
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", deleteSessionCookie());
+    headers.append("Set-Cookie", deleteSessionCookie(request));
+    headers.append("Set-Cookie", deleteCSRFCookie(request));
 
     return new Response(
       JSON.stringify({

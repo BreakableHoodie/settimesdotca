@@ -2,8 +2,14 @@
 // Format: https://portland.ics?genre=indie
 // Compatible with Google Calendar, Apple Calendar, Outlook
 
+import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+
 export async function onRequestGet(context) {
   const { request, env } = context;
+  const gate = getPublicDataGateResponse(env);
+  if (gate) {
+    return gate;
+  }
   const url = new URL(request.url);
 
   // Extract city from subdomain or path
@@ -14,6 +20,7 @@ export async function onRequestGet(context) {
 
   try {
     // Get events
+    // V2 Schema: events -> performances -> band_profiles
     let query = `
       SELECT DISTINCT
         e.id,
@@ -22,14 +29,15 @@ export async function onRequestGet(context) {
         e.date,
         e.description,
         e.city,
-        b.name as band_name,
-        b.start_time,
-        b.end_time,
+        bp.name as band_name,
+        p.start_time,
+        p.end_time,
         v.name as venue_name,
         v.address
       FROM events e
-      LEFT JOIN bands b ON b.event_id = e.id
-      LEFT JOIN venues v ON v.id = b.venue_id
+      LEFT JOIN performances p ON p.event_id = e.id
+      LEFT JOIN band_profiles bp ON p.band_profile_id = bp.id
+      LEFT JOIN venues v ON v.id = p.venue_id
       WHERE e.is_published = 1
       AND e.date >= date('now')
     `;
@@ -42,11 +50,11 @@ export async function onRequestGet(context) {
     }
 
     if (genre !== "all") {
-      query += ` AND LOWER(b.genre) = LOWER(?)`;
+      query += ` AND LOWER(bp.genre) = LOWER(?)`;
       params.push(genre);
     }
 
-    query += ` ORDER BY e.date ASC, b.start_time ASC`;
+    query += ` ORDER BY e.date ASC, p.start_time ASC`;
 
     const { results: bands } = await env.DB.prepare(query)
       .bind(...params)

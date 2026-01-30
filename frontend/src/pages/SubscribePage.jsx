@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faCalendarDays, faRss } from '@fortawesome/free-solid-svg-icons'
 
 export default function SubscribePage() {
   const [formData, setFormData] = useState({
@@ -161,13 +163,15 @@ export default function SubscribePage() {
               href="/api/feeds/ical?city=portland&genre=all"
               className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition"
             >
-              📅 Subscribe to Calendar
+              <FontAwesomeIcon icon={faCalendarDays} className="mr-2" aria-hidden="true" />
+              Subscribe to Calendar
             </a>
             <a
               href="/api/events/public?city=portland&genre=all"
               className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition"
             >
-              📡 JSON Feed
+              <FontAwesomeIcon icon={faRss} className="mr-2" aria-hidden="true" />
+              JSON Feed
             </a>
           </div>
         </div>

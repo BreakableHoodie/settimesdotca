@@ -59,9 +59,9 @@ export class AdminMockD1Database extends MockD1Database {
     }
 
     // SELECT band count for event
-    if (queryLower.includes('select count(*) as count from bands where event_id = ?')) {
+    if (queryLower.includes('select count(*) as count from performances where event_id = ?')) {
       const [eventId] = params
-      const count = this.data.bands.filter(b => b.event_id === eventId).length
+      const count = this.data.performances.filter(p => p.event_id === eventId).length
       return { results: [{ count }] }
     }
 
@@ -137,12 +137,7 @@ export class AdminMockD1Database extends MockD1Database {
       if (index !== -1) {
         this.data.events.splice(index, 1)
 
-        // Set bands' event_id to null (ON DELETE SET NULL)
-        this.data.bands.forEach(band => {
-          if (band.event_id === id) {
-            band.event_id = null
-          }
-        })
+        this.data.performances = this.data.performances.filter(perf => perf.event_id !== id)
 
         return { success: true, meta: { changes: 1 } }
       }
@@ -180,7 +175,8 @@ export function createTestContext({ role = 'editor', db = null } = {}) {
   return {
     env: {
       DB: mockDB,
-      JWT_SECRET: 'test-secret'
+      JWT_SECRET: 'test-secret',
+      ALLOW_HEADER_AUTH: 'true'
     },
     request: {
       user: mockUser,

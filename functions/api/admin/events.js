@@ -3,15 +3,12 @@
 // POST /api/admin/events - Create new event
 
 import { checkPermission, auditLog } from "./_middleware.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import {
+  validateEntity,
+  VALIDATION_SCHEMAS,
+  validationErrorResponse,
+} from "../../utils/validation.js";
+import { getClientIP } from "../../utils/request.js";
 
 // GET - List all events (all authenticated users can view)
 export async function onRequestGet(context) {
@@ -20,7 +17,7 @@ export async function onRequestGet(context) {
 
   try {
     // Check permission (viewer and above)
-    const permCheck = await checkPermission(request, env, "viewer");
+    const permCheck = await checkPermission(context, "viewer");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -33,9 +30,9 @@ export async function onRequestGet(context) {
     let query = `
       SELECT
         e.*,
-        COUNT(b.id) as band_count
+        COUNT(DISTINCT p.band_profile_id) as band_count
       FROM events e
-      LEFT JOIN bands b ON e.id = b.event_id
+      LEFT JOIN performances p ON e.id = p.event_id
     `;
 
     // Filter by archived status
@@ -83,7 +80,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (editor and above)
-    const permCheck = await checkPermission(request, env, "editor");
+    const permCheck = await checkPermission(context, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -91,94 +88,36 @@ export async function onRequestPost(context) {
     const currentUser = permCheck.user;
 
     const body = await request.json().catch(() => ({}));
-    const { name, date, slug, status = "draft" } = body;
-
-    // Validation
-    if (!name || !date || !slug) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Name, date, and slug are required",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    if (body.ticketLink && !body.ticket_url) {
+      body.ticket_url = body.ticketLink;
     }
 
-    // Validate name (min 3 chars)
-    if (name.trim().length < 3) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Name must be at least 3 characters",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    // Validate input using schema
+    const validation = validateEntity(body, VALIDATION_SCHEMAS.event);
+    if (!validation.valid) {
+      const firstError = Object.values(validation.errors)[0];
+      return validationErrorResponse(firstError, { fields: validation.errors });
     }
 
-    // Validate date format (YYYY-MM-DD)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Date must be in YYYY-MM-DD format",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
+    const {
+      name,
+      date,
+      slug,
+      status,
+      description,
+      city,
+      ticket_url,
+      venue_info,
+      social_links,
+      theme_colors,
+    } = validation.sanitized;
 
     // Validate date is not in past
     const eventDate = new Date(date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (eventDate < today) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Date cannot be in the past",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Validate slug format (URL-friendly)
-    if (!/^[a-z0-9-]+$/.test(slug)) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message:
-            "Slug must contain only lowercase letters, numbers, and hyphens",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Validate status
-    if (!["draft", "published", "archived"].includes(status)) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Status must be: draft, published, or archived",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return validationErrorResponse("Date cannot be in the past");
     }
 
     // Check if slug already exists
@@ -206,8 +145,21 @@ export async function onRequestPost(context) {
     // Create event with creator tracking
     const result = await DB.prepare(
       `
-      INSERT INTO events (name, date, slug, status, is_published, created_by_user_id)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO events (
+        name,
+        date,
+        slug,
+        status,
+        is_published,
+        description,
+        city,
+        ticket_url,
+        venue_info,
+        social_links,
+        theme_colors,
+        created_by_user_id
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
@@ -217,6 +169,12 @@ export async function onRequestPost(context) {
         slug,
         status,
         status === "published" ? 1 : 0,
+        description,
+        city,
+        ticket_url,
+        venue_info,
+        social_links,
+        theme_colors,
         currentUser.userId,
       )
       .first();
@@ -232,6 +190,8 @@ export async function onRequestPost(context) {
         name,
         slug,
         status,
+        city,
+        ticket_url,
       },
       ipAddress,
     );

@@ -232,16 +232,19 @@ test.describe('Band Profile Viewing', () => {
     // Navigate to non-existent band profile
     await page.goto('/band/nonexistent-band-12345');
 
+    await page.waitForLoadState('networkidle');
+
     // Should show 404 or error message, not crash
-    const errorMessage = page.locator('text=/not found|404|doesn\'t exist/i');
+    const errorMessage = page.getByRole('heading', { name: /band not found/i }).or(
+      page.locator('text=/not found|404|doesn\'t exist/i')
+    );
     const homeLink = page.locator('a[href="/"]').or(page.locator('a:has-text("Home")'));
 
     // Either error message OR redirect to home should happen
-    const hasError = await errorMessage.isVisible();
-    const hasHomeLink = await homeLink.isVisible();
     const isOnHome = page.url().includes('/#') || page.url().endsWith('/');
-
-    expect(hasError || hasHomeLink || isOnHome).toBeTruthy();
+    if (!isOnHome) {
+      await expect(errorMessage.or(homeLink).first()).toBeVisible({ timeout: 10000 });
+    }
   });
 
   test('should display band contact information if available', async ({ page }) => {

@@ -13,8 +13,9 @@ import {
 
 // Mock the middleware
 vi.mock("../../_middleware.js", () => ({
-  checkPermission: async (request, env, level) => {
-    const role = request.headers.get("x-test-role");
+  checkPermission: async (context, level) => {
+    const { request, data } = context;
+    const role = data?.user?.role || request?.headers?.get("x-test-role");
 
     if (!role) {
       return {
@@ -69,7 +70,6 @@ function insertBandWithProfile(db, data) {
     venue_id = null,
     start_time = null,
     end_time = null,
-    url = null,
     photo_url = null,
     description = null,
     genre = null,
@@ -77,29 +77,32 @@ function insertBandWithProfile(db, data) {
     social_links = null,
   } = data;
 
-  const stmt = db.prepare(`
-    INSERT INTO bands (
-      name, event_id, venue_id, start_time, end_time, url,
-      photo_url, description, genre, origin, social_links
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  const nameNormalized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const existingProfile = db.prepare("SELECT id FROM band_profiles WHERE name_normalized = ?").get(nameNormalized);
+  const profileId = existingProfile
+    ? existingProfile.id
+    : db.prepare(
+      "INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(name, nameNormalized, genre, origin, description, photo_url, social_links).lastInsertRowid;
 
-  const info = stmt.run(
-    name,
-    event_id,
-    venue_id,
-    start_time,
-    end_time,
-    url,
-    photo_url,
-    description,
-    genre,
-    origin,
-    social_links,
-  );
+  if (existingProfile) {
+    const updates = [];
+    const values = [];
+    if (genre !== null) { updates.push('genre = ?'); values.push(genre); }
+    if (origin !== null) { updates.push('origin = ?'); values.push(origin); }
+    if (description !== null) { updates.push('description = ?'); values.push(description); }
+    if (photo_url !== null) { updates.push('photo_url = ?'); values.push(photo_url); }
+    if (social_links !== null) { updates.push('social_links = ?'); values.push(social_links); }
+    if (updates.length > 0) {
+      db.prepare(`UPDATE band_profiles SET ${updates.join(', ')} WHERE id = ?`).run(...values, profileId);
+    }
+  }
 
-  return db.prepare("SELECT * FROM bands WHERE id = ?").get(info.lastInsertRowid);
+  const info = db.prepare(
+    "INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(event_id, venue_id, profileId, start_time, end_time, null);
+
+  return db.prepare("SELECT * FROM performances WHERE id = ?").get(info.lastInsertRowid);
 }
 
 describe("GET /api/admin/bands/stats/:name", () => {
@@ -109,16 +112,6 @@ describe("GET /api/admin/bands/stats/:name", () => {
   beforeEach(() => {
     db = createTestDB();
     env = { DB: createDBEnv(db) };
-
-    // Extend schema with additional band profile fields
-    db.exec(`
-      ALTER TABLE bands ADD COLUMN photo_url TEXT;
-      ALTER TABLE bands ADD COLUMN description TEXT;
-      ALTER TABLE bands ADD COLUMN genre TEXT;
-      ALTER TABLE bands ADD COLUMN origin TEXT;
-      ALTER TABLE bands ADD COLUMN social_links TEXT;
-      ALTER TABLE events ADD COLUMN location TEXT;
-    `);
   });
 
   // ===================================================================
@@ -679,8 +672,8 @@ describe("GET /api/admin/bands/stats/:name", () => {
         slug: "summer-music-festival",
         date: "2025-07-15",
       });
-      // Update event location
-      db.prepare("UPDATE events SET location = ? WHERE id = ?").run("Central Park", event.id);
+      // Update event city
+      db.prepare("UPDATE events SET city = ? WHERE id = ?").run("Central Park", event.id);
 
       const venue = insertVenue(db, { name: "Main Stage" });
       insertBandWithProfile(db, {
@@ -811,7 +804,7 @@ describe("GET /api/admin/bands/stats/:name", () => {
     it("should match response format specification", async () => {
       // Arrange
       const event = insertEvent(db, { name: "Format Test", slug: "format-test", date: "2025-06-01" });
-      db.prepare("UPDATE events SET location = ? WHERE id = ?").run("Test Location", event.id);
+      db.prepare("UPDATE events SET city = ? WHERE id = ?").run("Test Location", event.id);
 
       const venue = insertVenue(db, {
         name: "Format Venue",

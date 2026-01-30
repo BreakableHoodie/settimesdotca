@@ -1,4 +1,6 @@
 import { getDaysSinceEvent, getGracePeriodHoursRemaining, formatEventState } from '../../utils/eventLifecycle'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faBoxArchive, faClock, faCopy } from '@fortawesome/free-solid-svg-icons'
 
 /**
  * ArchivedEventBanner - Warning banner for archived events
@@ -23,9 +25,7 @@ export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) 
       <div className="bg-yellow-900/30 border-l-4 border-yellow-400 px-4 py-3 mb-4 rounded-r animate-slide-down">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="text-3xl" role="img" aria-label="Clock">
-              ⏰
-            </span>
+            <FontAwesomeIcon icon={faClock} className="text-2xl text-yellow-300" aria-hidden="true" />
             <div>
               <div className="text-yellow-300 font-semibold">
                 {stateInfo.label} - {hoursRemaining}h Remaining
@@ -47,9 +47,7 @@ export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) 
       <div className="bg-gray-900/80 border-l-4 border-gray-500 px-4 py-3 mb-4 rounded-r">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="text-3xl" role="img" aria-label="Archive">
-              🗄️
-            </span>
+            <FontAwesomeIcon icon={faBoxArchive} className="text-2xl text-gray-300" aria-hidden="true" />
             <div>
               <div className="text-gray-300 font-semibold">{stateInfo.label}</div>
               <div className="text-white/60 text-sm mt-1">
@@ -64,9 +62,7 @@ export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) 
               className="px-6 py-3 bg-band-orange hover:bg-orange-600 text-white rounded font-medium transition-colors min-h-[48px] flex items-center justify-center gap-2 whitespace-nowrap"
               title="Create a new event based on this archived event"
             >
-              <span className="text-lg" role="img" aria-label="Copy">
-                📋
-              </span>
+              <FontAwesomeIcon icon={faCopy} aria-hidden="true" />
               <span>Copy as Template for New Event</span>
             </button>
           )}

@@ -30,8 +30,23 @@ jobs:
             - name: Install dependencies
               run: npm install
 
+            - name: Install Frontend dependencies
+              run: |
+                cd frontend
+                npm install
+
             - name: Validate database schema
               run: npm run validate:schema
 
+            - name: Lint Frontend
+              run: |
+                cd frontend
+                npm run lint
+
+            - name: Build Frontend
+              run: |
+                cd frontend
+                npm run build
+
             - name: Run unit tests
-              run: npm test
+              run: npm run test:coverage

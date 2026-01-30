@@ -1,4 +1,4 @@
-import { faCheck, faCopy } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faCopy, faMusic } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useState } from 'react'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
@@ -31,11 +31,24 @@ function ScheduleView({
   const visibleBands = showPast
     ? timeFilteredBands
     : timeFilteredBands.filter(band => {
+        // If no endTime (TBD), always show the band
+        if (!band.endTime || band.endTime === 'TBD') {
+          return true
+        }
         const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
         return bandEndMs > nowMs
       })
 
   const sortedBands = [...visibleBands].sort((a, b) => {
+    // TBD bands go to the end
+    const aTBD = !a.startTime || a.startTime === 'TBD'
+    const bTBD = !b.startTime || b.startTime === 'TBD'
+
+    if (aTBD && !bTBD) return 1
+    if (!aTBD && bTBD) return -1
+    if (aTBD && bTBD) return a.name.localeCompare(b.name)
+
+    // Normal time-based sorting
     const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
     const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
     if (aTime === bTime) {
@@ -44,21 +57,63 @@ function ScheduleView({
     return aTime - bTime
   })
 
-  const timeGroups = new Map()
-  const bandsByTime = []
+  // Helper function to group bands by time slot
+  const groupByTime = (bands) => {
+    const timeGroups = new Map()
+    const grouped = []
+
+    bands.forEach(band => {
+      const slot = (!band.startTime || band.startTime === 'TBD') ? 'TBD' : band.startTime
+      if (!timeGroups.has(slot)) {
+        const group = { time: slot, bands: [] }
+        timeGroups.set(slot, group)
+        grouped.push(group)
+      }
+      timeGroups.get(slot).bands.push(band)
+    })
+
+    grouped.forEach(group => {
+      group.bands.sort((a, b) => a.venue.localeCompare(b.venue))
+    })
+
+    return grouped
+  }
+
+  // Categorize bands into Now Playing, Upcoming, and Past
+  const nowPlaying = []
+  const upcomingBands = []
+  const pastBands = []
+
   sortedBands.forEach(band => {
-    const slot = band.startTime
-    if (!timeGroups.has(slot)) {
-      const group = { time: slot, bands: [] }
-      timeGroups.set(slot, group)
-      bandsByTime.push(group)
+    // TBD or missing times go to upcoming
+    if (!band.startTime || band.startTime === 'TBD' || !band.startMs || !band.endMs) {
+      upcomingBands.push(band)
+      return
     }
-    timeGroups.get(slot).bands.push(band)
+
+    const startMs = band.startMs
+    const endMs = band.endMs
+
+    // Currently performing: started but not finished
+    if (startMs <= nowMs && endMs > nowMs) {
+      nowPlaying.push(band)
+    }
+    // Future performances
+    else if (startMs > nowMs) {
+      upcomingBands.push(band)
+    }
+    // Past performances
+    else if (endMs <= nowMs) {
+      pastBands.push(band)
+    }
   })
 
-  bandsByTime.forEach(group => {
-    group.bands.sort((a, b) => a.venue.localeCompare(b.venue))
-  })
+  // Sort Now Playing by venue only (no time grouping)
+  nowPlaying.sort((a, b) => a.venue.localeCompare(b.venue))
+
+  // Group upcoming and past bands by time
+  const upcomingByTime = groupByTime(upcomingBands)
+  const pastByTime = groupByTime(pastBands).reverse() // Reverse chronological for past events
 
   const allSelected = bands.length > 0 && selectedBands.length === bands.length
   const hiddenFinished = !showPast ? finishedCount : 0
@@ -177,20 +232,19 @@ function ScheduleView({
               : 'No upcoming bands at the moment.'}
         </div>
       ) : (
-        <div className="space-y-8">
-          {bandsByTime.map(({ time, bands: timeBands }) => (
-            <div key={time} className="relative">
-              {/* Time label */}
+        <div className="space-y-12">
+          {/* Now Playing Section */}
+          {nowPlaying.length > 0 && (
+            <div className="relative">
               <div className="flex items-center mb-4">
-                <div className="bg-band-orange text-band-navy font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
-                  {formatTime(time)}
+                <div className="bg-band-orange text-band-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg animate-pulse">
+                  <FontAwesomeIcon icon={faMusic} className="mr-2" aria-hidden="true" />
+                  NOW PLAYING
                 </div>
-                <div className="flex-1 h-0.5 bg-band-orange/30 ml-4"></div>
+                <div className="flex-1 h-1 bg-band-orange ml-4"></div>
               </div>
-
-              {/* Bands at this time - responsive grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
-                {timeBands.map(band => (
+                {nowPlaying.map(band => (
                   <BandCard
                     key={band.id}
                     band={band}
@@ -201,7 +255,73 @@ function ScheduleView({
                 ))}
               </div>
             </div>
-          ))}
+          )}
+
+          {/* Upcoming Section */}
+          {upcomingByTime.length > 0 && (
+            <div className="space-y-8">
+              <div className="flex items-center mb-4">
+                <div className="bg-band-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                  UPCOMING
+                </div>
+                <div className="flex-1 h-0.5 bg-band-purple/30 ml-4"></div>
+              </div>
+              {upcomingByTime.map(({ time, bands: timeBands }) => (
+                <div key={time} className="relative ml-0 sm:ml-4">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-band-navy text-white font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                      {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
+                    </div>
+                    <div className="flex-1 h-0.5 bg-band-navy/20 ml-4"></div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
+                    {timeBands.map(band => (
+                      <BandCard
+                        key={band.id}
+                        band={band}
+                        isSelected={selectedBands.includes(band.id)}
+                        onToggle={onToggleBand}
+                        showVenue={true}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Past Events Section (Collapsible) */}
+          {pastByTime.length > 0 && showPast && (
+            <div className="space-y-8">
+              <div className="flex items-center mb-4">
+                <div className="bg-gray-400 text-gray-700 font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg opacity-75">
+                  PAST EVENTS
+                </div>
+                <div className="flex-1 h-0.5 bg-gray-300 ml-4"></div>
+              </div>
+              {pastByTime.map(({ time, bands: timeBands }) => (
+                <div key={time} className="relative ml-0 sm:ml-4 opacity-60">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-gray-300 text-gray-600 font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                      {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
+                    </div>
+                    <div className="flex-1 h-0.5 bg-gray-200 ml-4"></div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
+                    {timeBands.map(band => (
+                      <BandCard
+                        key={band.id}
+                        band={band}
+                        isSelected={selectedBands.includes(band.id)}
+                        onToggle={onToggleBand}
+                        showVenue={true}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@
 import { useState, useRef } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faUpload, faTrash, faSpinner, faImage } from '@fortawesome/free-solid-svg-icons'
+import { getAdminFormDataHeaders } from '../../utils/adminApi'
 
 /**
  * PhotoUpload Component
@@ -75,9 +76,8 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
 
       const response = await fetch('/api/admin/bands/photos', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('sessionToken')}`,
-        },
+        headers: getAdminFormDataHeaders(),
+        credentials: 'include',
         body: formData,
       })
 
@@ -176,7 +176,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
                 type="button"
                 onClick={handleClick}
                 disabled={uploading}
-                className="bg-band-orange hover:bg-band-orange/90 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+                className="min-h-[44px] bg-band-orange hover:bg-band-orange/90 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
               >
                 <FontAwesomeIcon icon={faUpload} />
                 Change Photo
@@ -185,7 +185,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
                 type="button"
                 onClick={handleRemove}
                 disabled={uploading}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+                className="min-h-[44px] bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
               >
                 <FontAwesomeIcon icon={faTrash} />
                 Remove

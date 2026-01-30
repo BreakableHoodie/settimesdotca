@@ -2,8 +2,14 @@
 // GET /api/schedule?event=current
 // GET /api/schedule?event={slug}
 
+import { getPublicDataGateResponse } from "../utils/publicGate.js";
+
 export async function onRequestGet(context) {
   const { request, env } = context;
+  const gate = getPublicDataGateResponse(env);
+  if (gate) {
+    return gate;
+  }
   const url = new URL(request.url);
   const eventParam = url.searchParams.get("event") || "current";
 
@@ -11,15 +17,16 @@ export async function onRequestGet(context) {
     const { DB } = env;
 
     let event;
-    let bands;
 
     if (eventParam === "current") {
-      // Get the most recent published event
+      // Get the current or next upcoming published event
+      // Note: Using UTC date, adjust with timezone offset if needed
       event = await DB.prepare(
         `
         SELECT * FROM events
         WHERE is_published = 1
-        ORDER BY date DESC
+          AND date >= date('now', '-6 hours')
+        ORDER BY date ASC
         LIMIT 1
       `,
       ).first();
@@ -51,37 +58,69 @@ export async function onRequestGet(context) {
       );
     }
 
-    // Get all bands for this event with venue information
+    // Get all performances for this event with venue and band information
+    // V2 Schema: performances -> band_profiles + venues
     const bandsResult = await DB.prepare(
       `
       SELECT
-        b.id,
+        p.id as performance_id,
+        b.id as band_id,
         b.name,
-        b.start_time as startTime,
-        b.end_time as endTime,
-        b.url,
+        p.start_time as startTime,
+        p.end_time as endTime,
+        b.social_links,
         v.name as venue
-      FROM bands b
-      INNER JOIN venues v ON b.venue_id = v.id
-      WHERE b.event_id = ?
-      ORDER BY b.start_time, v.name
+      FROM performances p
+      INNER JOIN band_profiles b ON p.band_profile_id = b.id
+      INNER JOIN venues v ON p.venue_id = v.id
+      WHERE p.event_id = ?
+      ORDER BY p.start_time, v.name
     `,
     )
       .bind(event.id)
       .all();
 
-    bands = bandsResult.results || [];
+    const bands = bandsResult.results || [];
 
     // Format response to match existing bands.json structure
-    const formattedBands = bands.map((band) => ({
-      id: `${band.name.toLowerCase().replace(/\s+/g, "-")}-${band.id}`,
-      name: band.name,
-      venue: band.venue,
-      date: event.date,
-      startTime: band.startTime,
-      endTime: band.endTime,
-      url: band.url || null,
-    }));
+    const formattedBands = bands.map((band) => {
+      // Extract time from datetime string or time-only format
+      // Handles: "2026-01-17 20:00" -> "20:00" OR "20:00" -> "20:00"
+      const extractTime = (datetime) => {
+        if (!datetime || datetime === 'TBD') return 'TBD';
+        // If it contains a space, it's a full datetime - extract time part
+        if (datetime.includes(' ')) {
+          const timePart = datetime.split(' ')[1];
+          return timePart ? timePart.substring(0, 5) : 'TBD'; // Get HH:MM
+        }
+        // Otherwise, it's already in time format (HH:MM or HH:MM:SS)
+        return datetime.substring(0, 5); // Get HH:MM
+      };
+
+      // Parse social links to find a primary URL
+      let primaryUrl = null;
+      try {
+        if (band.social_links) {
+          const links = JSON.parse(band.social_links);
+          // Prioritize website, then bandcamp, then instagram, etc.
+          primaryUrl = links.website || links.bandcamp || links.instagram || links.facebook || links.spotify || null;
+        }
+      } catch (_) {
+        // Ignore JSON parse errors
+      }
+
+      return {
+        id: `${band.name.toLowerCase().replace(/\s+/g, "-")}-${band.performance_id}`,
+        performance_id: band.performance_id,
+        band_profile_id: band.band_id,
+        name: band.name,
+        venue: band.venue,
+        date: event.date,
+        startTime: extractTime(band.startTime),
+        endTime: extractTime(band.endTime),
+        url: primaryUrl,
+      };
+    });
 
     // Include event metadata for frontend display
     const eventMetadata = {

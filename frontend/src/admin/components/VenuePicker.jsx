@@ -79,7 +79,7 @@ export default function VenuePicker({ eventId, existingVenueIds, onVenueAdded })
                 e.target.value = '' // Reset
               }
             }}
-            className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
             defaultValue=""
           >
             <option value="">Choose a venue...</option>
@@ -100,7 +100,7 @@ export default function VenuePicker({ eventId, existingVenueIds, onVenueAdded })
         {!showCreateForm ? (
           <button
             onClick={() => setShowCreateForm(true)}
-            className="w-full px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm font-medium"
+            className="w-full min-h-[44px] px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm font-medium"
           >
             + Create New Venue
           </button>
@@ -111,21 +111,21 @@ export default function VenuePicker({ eventId, existingVenueIds, onVenueAdded })
               type="text"
               value={newVenue.name}
               onChange={e => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
+              className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
               placeholder="Venue name *"
             />
             <input
               type="text"
               value={newVenue.address}
               onChange={e => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
-              className="w-full px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
+              className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
               placeholder="Address (optional)"
             />
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={handleCreateNew}
                 disabled={!newVenue.name.trim() || loading}
-                className="flex-1 px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 text-sm font-medium"
+                className="min-h-[44px] flex-1 px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 text-sm font-medium"
               >
                 {loading ? 'Creating...' : 'Create & Add'}
               </button>
@@ -134,7 +134,7 @@ export default function VenuePicker({ eventId, existingVenueIds, onVenueAdded })
                   setShowCreateForm(false)
                   setNewVenue({ name: '', address: '' })
                 }}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium"
+                className="min-h-[44px] px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium"
               >
                 Cancel
               </button>

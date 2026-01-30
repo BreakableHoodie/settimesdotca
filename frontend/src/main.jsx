@@ -1,7 +1,9 @@
 import React, { lazy, Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
 import App from './App.jsx'
+import EventsPage from './pages/EventsPage.jsx'
 import EmbedPage from './pages/EmbedPage.jsx'
 import SubscribePage from './pages/SubscribePage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
@@ -44,14 +46,16 @@ function LoadingFallback() {
 //   })
 // }
 
-// Unregister any existing service workers to clear stale cache (dev only)
-if ('serviceWorker' in navigator && import.meta.env.DEV) {
+// Unregister any existing service workers to clear stale cache (production and dev)
+if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     if (registrations.length > 0) {
       console.warn('Unregistering', registrations.length, 'service worker(s)...')
       registrations.forEach(registration => {
         registration.unregister().then(() => {
-          console.warn('Service worker unregistered - Please refresh the page to see latest changes')
+          console.warn('Service worker unregistered - ensuring fresh content')
+          // Optional: Force reload if we just killed a SW? 
+          // window.location.reload()
         })
       })
     }
@@ -66,39 +70,42 @@ if (import.meta.env.DEV) {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
-        <Routes>
-          {/* Fan experience: Load immediately */}
-          <Route path="/" element={<App />} />
-          <Route path="/embed/:slug" element={<EmbedPage />} />
-          <Route path="/subscribe" element={<SubscribePage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <HelmetProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Fan experience: Load immediately */}
+            <Route path="/" element={<EventsPage />} />
+            <Route path="/event/:slug" element={<App />} />
+            <Route path="/embed/:slug" element={<EmbedPage />} />
+            <Route path="/subscribe" element={<SubscribePage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-          {/* Band profiles: Lazy loaded */}
-          <Route
-            path="/band/:id"
-            element={
-              <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
-                <Suspense fallback={<LoadingFallback />}>
-                  <BandProfilePage />
-                </Suspense>
-              </ErrorBoundary>
-            }
-          />
+            {/* Band profiles: Lazy loaded */}
+            <Route
+              path="/band/:id"
+              element={
+                <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <BandProfilePage />
+                  </Suspense>
+                </ErrorBoundary>
+              }
+            />
 
-          {/* Admin panel: Lazy loaded */}
-          <Route
-            path="/admin/*"
-            element={
-              <ErrorBoundary title="Admin Panel Error" message="An error occurred in the admin panel. Please refresh.">
-                <Suspense fallback={<LoadingFallback />}>
-                  <AdminApp />
-                </Suspense>
-              </ErrorBoundary>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
+            {/* Admin panel: Lazy loaded */}
+            <Route
+              path="/admin/*"
+              element={
+                <ErrorBoundary title="Admin Panel Error" message="An error occurred in the admin panel. Please refresh.">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdminApp />
+                  </Suspense>
+                </ErrorBoundary>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </HelmetProvider>
     </ErrorBoundary>
   </React.StrictMode>
 )

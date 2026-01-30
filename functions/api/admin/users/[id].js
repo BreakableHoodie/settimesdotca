@@ -2,17 +2,8 @@
 // PATCH /api/admin/users/:id - Update user
 // DELETE /api/admin/users/:id - Delete user (soft delete)
 
-import { hashPassword } from "../../../utils/crypto.js";
 import { checkPermission, auditLog } from "../_middleware.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import { getClientIP } from "../../../utils/request.js";
 
 // PATCH - Update user (admin only, users can update own name)
 export async function onRequestPatch(context) {
@@ -23,7 +14,7 @@ export async function onRequestPatch(context) {
 
   try {
     // Check permission
-    const permCheck = await checkPermission(request, env, "admin");
+    const permCheck = await checkPermission(context, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -33,6 +24,22 @@ export async function onRequestPatch(context) {
     // Parse request body
     const body = await request.json().catch(() => ({}));
     const { role, name, isActive } = body;
+    const allowedFields = new Set(["role", "name", "isActive"]);
+    const unknownFields = Object.keys(body || {}).filter(
+      key => !allowedFields.has(key),
+    );
+    if (unknownFields.length) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid fields",
+          message: `Unknown fields: ${unknownFields.join(", ")}`,
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     // Check if user exists
     const user = await DB.prepare(
@@ -238,7 +245,7 @@ export async function onRequestDelete(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(request, env, "admin");
+    const permCheck = await checkPermission(context, "admin");
     if (permCheck.error) {
       return permCheck.response;
     }

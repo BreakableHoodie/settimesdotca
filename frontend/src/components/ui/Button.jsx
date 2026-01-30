@@ -21,6 +21,7 @@ export default function Button({
   icon = null,
   iconPosition = 'left',
   type = 'button',
+  as: Component = 'button',
   className = '',
   ...props
 }) {
@@ -32,11 +33,14 @@ export default function Button({
   const variantClasses = {
     primary:
       'bg-accent-500 text-white hover:bg-accent-600 focus:ring-accent-500 shadow-sm hover:shadow-md active:scale-95',
+    'primary-gradient':
+      'bg-gradient-accent text-white hover:brightness-110 focus:ring-accent-500 shadow-sm hover:shadow-md active:scale-95',
     secondary: 'border-2 border-text-secondary text-text-primary hover:bg-white/10 focus:ring-primary-500',
     danger: 'bg-error-500 text-white hover:bg-error-600 focus:ring-error-500 shadow-sm hover:shadow-md active:scale-95',
     ghost: 'text-text-primary hover:bg-white/5 focus:ring-primary-500',
     success: 'bg-success-500 text-white hover:bg-success-600 focus:ring-success-500 shadow-sm hover:shadow-md',
     warning: 'bg-warning-500 text-white hover:bg-warning-600 focus:ring-warning-500 shadow-sm hover:shadow-md',
+    link: 'text-accent-500 hover:text-accent-400 underline-offset-4 hover:underline focus:ring-accent-500 p-0',
   }
 
   // Size styles
@@ -58,8 +62,16 @@ export default function Button({
     .trim()
     .replace(/\s+/g, ' ')
 
+  const isButton = Component === 'button'
+
   return (
-    <button type={type} className={classes} disabled={disabled || loading} {...props}>
+    <Component
+      type={isButton ? type : undefined}
+      className={classes}
+      disabled={isButton ? disabled || loading : undefined}
+      aria-disabled={!isButton && (disabled || loading) ? true : undefined}
+      {...props}
+    >
       {loading && (
         <svg
           className="animate-spin -ml-1 mr-3 h-5 w-5"
@@ -87,13 +99,13 @@ export default function Button({
           {icon}
         </span>
       )}
-    </button>
+    </Component>
   )
 }
 
 Button.propTypes = {
   children: PropTypes.node.isRequired,
-  variant: PropTypes.oneOf(['primary', 'secondary', 'danger', 'ghost', 'success', 'warning']),
+  variant: PropTypes.oneOf(['primary', 'primary-gradient', 'secondary', 'danger', 'ghost', 'success', 'warning', 'link']),
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   fullWidth: PropTypes.bool,
   disabled: PropTypes.bool,
@@ -101,6 +113,7 @@ Button.propTypes = {
   icon: PropTypes.node,
   iconPosition: PropTypes.oneOf(['left', 'right']),
   type: PropTypes.oneOf(['button', 'submit', 'reset']),
+  as: PropTypes.elementType,
   className: PropTypes.string,
   onClick: PropTypes.func,
 }

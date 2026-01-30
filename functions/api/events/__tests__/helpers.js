@@ -5,11 +5,12 @@ export function createMockEvent(overrides = {}) {
 
   return {
     id: 1,
-    slug: "long-weekend-2024",
-    name: "Long Weekend Band Crawl 2024",
+    slug: "summer-fest-2024",
+    name: "Summer Music Festival 2024",
     date: tomorrow.toISOString().split("T")[0],
-    description: "The annual multi-venue music festival",
+    description: "Annual multi-venue music festival",
     city: "portland",
+    is_published: 1,
     published: true,
     ...overrides,
   };
@@ -30,7 +31,7 @@ export function createMockBand(overrides = {}) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  return {
+  const band = {
     id: 1,
     event_id: 1,
     venue_id: 1,
@@ -39,13 +40,50 @@ export function createMockBand(overrides = {}) {
     start_time: "20:00",
     end_time: "21:00",
     description: "80s punk legends",
+    origin: null,
+    photo_url: null,
+    social_links: null,
     ...overrides,
   };
+
+  if (band.band_profile_id == null) {
+    band.band_profile_id = band.id;
+  }
+
+  return band;
 }
 
 export function seedMockData(mockDB, events = [], venues = [], bands = []) {
   mockDB.data.events = events;
   mockDB.data.venues = venues;
-  mockDB.data.bands = bands;
-}
 
+  const profiles = new Map();
+  const performances = [];
+
+  bands.forEach((band) => {
+    const profileId = band.band_profile_id ?? band.id;
+    if (!profiles.has(profileId)) {
+      profiles.set(profileId, {
+        id: profileId,
+        name: band.name,
+        genre: band.genre,
+        origin: band.origin,
+        description: band.description,
+        photo_url: band.photo_url,
+        social_links: band.social_links,
+      });
+    }
+
+    performances.push({
+      id: band.performance_id ?? band.id,
+      event_id: band.event_id,
+      venue_id: band.venue_id,
+      band_profile_id: profileId,
+      start_time: band.start_time,
+      end_time: band.end_time,
+    });
+  });
+
+  mockDB.data.band_profiles = Array.from(profiles.values());
+  mockDB.data.performances = performances;
+}

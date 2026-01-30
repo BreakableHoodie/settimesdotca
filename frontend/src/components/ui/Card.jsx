@@ -30,6 +30,8 @@ export default function Card({
     elevated: 'shadow-md',
     outlined: 'bg-transparent',
     flat: 'shadow-none',
+    gradient: 'bg-gradient-card backdrop-blur-sm',
+    glow: 'bg-gradient-card shadow-glow-accent',
   }
 
   // Padding styles
@@ -63,7 +65,7 @@ export default function Card({
 
 Card.propTypes = {
   children: PropTypes.node.isRequired,
-  variant: PropTypes.oneOf(['default', 'elevated', 'outlined', 'flat']),
+  variant: PropTypes.oneOf(['default', 'elevated', 'outlined', 'flat', 'gradient', 'glow']),
   padding: PropTypes.oneOf(['none', 'sm', 'md', 'lg']),
   hoverable: PropTypes.bool,
   className: PropTypes.string,

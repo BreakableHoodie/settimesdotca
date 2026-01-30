@@ -24,21 +24,28 @@ import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
 
-function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleShowPast }) {
-  const [currentTime, setCurrentTime] = useState(new Date())
+function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleShowPast, nowOverride }) {
+  const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false)
 
   // Update current time every minute
   useEffect(() => {
+    if (nowOverride) {
+      setCurrentTime(new Date(nowOverride))
+      return undefined
+    }
+
     const interval = setInterval(() => {
       setCurrentTime(new Date())
     }, 60000) // Update every minute
 
     return () => clearInterval(interval)
-  }, [])
+  }, [nowOverride])
 
-  const effectiveNow = useMemo(() => currentTime, [currentTime])
+  const effectiveNow = useMemo(() => {
+    return nowOverride ? new Date(nowOverride) : currentTime
+  }, [currentTime, nowOverride])
   const highlightedBandIds = useMemo(() => new Set(HIGHLIGHTED_BANDS), [])
 
   // Calculate time until/since a band
@@ -169,7 +176,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     return (
       <div className="py-12 text-center">
         <p className="text-white text-xl mb-2">Your schedule is empty</p>
-        <p className="text-band-orange">Tap on bands from &ldquo;All Bands&rdquo; to build your schedule</p>
+        <p className="text-accent-400">Tap on performances from &ldquo;All Performances&rdquo; to build your schedule</p>
       </div>
     )
   }
@@ -178,11 +185,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     return (
       <div className="py-12 text-center">
         <p className="text-white text-xl mb-2">All your selected bands have wrapped up</p>
-        <p className="text-band-orange">Tap &ldquo;Show finished sets&rdquo; to revisit what you already caught.</p>
+        <p className="text-accent-400">Tap &ldquo;Show finished sets&rdquo; to revisit what you already caught.</p>
         <div className="mt-4">
           <button
             onClick={onToggleShowPast}
-            className="text-xs px-3 py-1.5 rounded bg-band-orange/20 border border-band-orange/50 text-band-orange hover:bg-band-orange/30 transition-colors"
+            className="text-xs px-3 py-1.5 rounded bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30 transition-colors"
           >
             Show finished sets
           </button>
@@ -210,7 +217,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
   const getScheduleReminder = () => {
     if (sortedBands.length === 0) return null
 
-    const now = new Date()
+    const now = effectiveNow
     const currentHour = now.getHours()
 
     // Find longest break in schedule
@@ -311,12 +318,12 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white text-center">My Schedule</h2>
-            <p className="text-center text-band-orange text-sm">
+            <p className="text-center text-accent-400 text-sm">
               {showPast
                 ? `${sortedBands.length} ${sortedBands.length === 1 ? 'band' : 'bands'} selected`
                 : `${visibleBands.length} upcoming ${visibleBands.length === 1 ? 'band' : 'bands'}`}
               {!showPast && hiddenFinishedCount > 0 && (
-                <span className="block text-xs text-band-orange/80">
+                <span className="block text-xs text-accent-400/80">
                   ({hiddenFinishedCount} finished {hiddenFinishedCount === 1 ? 'set hidden' : 'sets hidden'})
                 </span>
               )}
@@ -328,10 +335,10 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
             {hasFinishedBands && (
               <button
                 onClick={onToggleShowPast}
-                className={`text-xs px-3 py-1.5 rounded border transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
+                className={`text-xs px-3 py-1.5 rounded border transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
                   showPast
-                    ? 'bg-band-orange/20 border-band-orange/50 text-band-orange hover:bg-band-orange/30'
-                    : 'bg-band-purple/50 border-band-orange/50 text-band-orange hover:bg-band-purple'
+                    ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
+                    : 'bg-bg-purple/50 border-accent-500/50 text-accent-400 hover:bg-bg-purple'
                 }`}
                 title={showPast ? 'Hide finished sets' : 'Show finished sets'}
               >
@@ -354,7 +361,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                     setIsCopyingSchedule(false)
                   }
                 }}
-                className="text-xs px-3 py-1.5 rounded bg-band-purple/60 border border-band-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-band-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange min-h-[44px]"
+                className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
                 title={copyButtonLabel === 'Copied!' ? 'Schedule copied to clipboard' : 'Copy your schedule'}
                 disabled={isCopyingSchedule}
               >
@@ -462,17 +469,15 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                 </div>
               )}
               <div className="flex gap-3 items-start">
-                {/* Conflict/Overlap emoji - aligned with center of band card */}
+                {/* Conflict/Overlap icon - aligned with center of band card */}
                 {(hasConflict || hasOverlap) && (
                   <div className="flex-shrink-0 flex items-start justify-center pt-1">
-                    <span
-                      role="img"
+                    <FontAwesomeIcon
+                      icon={hasOverlap ? faBolt : faTriangleExclamation}
+                      className={`${hasOverlap ? 'text-yellow-300' : 'text-red-300'} text-xl`}
                       aria-label={hasOverlap ? 'Simultaneous sets indicator' : 'Overlapping sets indicator'}
                       title={hasOverlap ? 'Happening at the same time' : 'Overlapping times'}
-                      className={`${hasOverlap ? 'text-yellow-300' : 'text-red-300'} text-xl align-middle`}
-                    >
-                      {hasOverlap ? '⚡' : '⚠️'}
-                    </span>
+                    />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">

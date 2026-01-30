@@ -1,9 +1,10 @@
 import PropTypes from 'prop-types'
 import PhotoUpload from './components/PhotoUpload'
-import MarkdownEditor from './components/MarkdownEditor'
+import RichTextEditor from './components/RichTextEditor'
 import { Input, Button, Tooltip } from '../components/ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
+import { FIELD_LIMITS } from '../utils/validation'
 
 export default function BandForm({
   events,
@@ -17,27 +18,54 @@ export default function BandForm({
   onCancel,
   conflicts,
   globalView = false,
+  selectedProfile = null, // If provided, we are scheduling this specific existing artist
 }) {
   // In global view, we're editing band profile, not event-specific performance details
   const requireSchedule = globalView ? false : Boolean(formData.event_id)
+  
+  const isSchedulingExisting = !globalView && selectedProfile != null
+  
   const submitLabel = submitting
     ? 'Saving...'
     : mode === 'edit'
       ? globalView
-        ? 'Update Band'
+        ? 'Update Artist'
         : 'Update Performance'
       : globalView
-        ? 'Add Band'
-        : 'Add Performance'
+        ? 'Add Artist'
+        : isSchedulingExisting 
+          ? 'Add to Lineup' 
+          : 'Create & Add Artist'
 
   return (
     <form onSubmit={onSubmit}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <div className="sm:col-span-2">
-          <div className="flex items-center gap-2 mb-2">
-            <label htmlFor="band-name" className="block text-text-primary text-sm font-medium">
-              Band Name *
-            </label>
+        
+        {/* If scheduling existing artist, show summary instead of name input */}
+        {isSchedulingExisting ? (
+           <div className="sm:col-span-2 bg-white/5 border border-white/10 rounded-lg p-4 flex items-center gap-4 mb-2">
+              {selectedProfile.photo_url ? (
+                 <img src={selectedProfile.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
+              ) : (
+                 <div className="w-16 h-16 rounded-full bg-band-orange/20 flex items-center justify-center text-band-orange text-xl font-bold">
+                    {selectedProfile.name.charAt(0)}
+                 </div>
+              )}
+              <div>
+                 <h3 className="text-xl font-bold text-white">{selectedProfile.name}</h3>
+                 <div className="text-white/60 text-sm">
+                    {[selectedProfile.origin, selectedProfile.genre].filter(Boolean).join(' • ')}
+                 </div>
+                 <div className="text-band-orange text-xs mt-1">Adding to lineup</div>
+              </div>
+           </div>
+        ) : (
+           <div className="sm:col-span-2">
+              <div className="flex items-center gap-2 mb-2">
+                <label htmlFor="band-name" className="block text-text-primary text-sm font-medium">
+                  Artist Name *
+                </label>
+
             <Tooltip content="Full name of the band or artist as it should appear publicly">
               <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
             </Tooltip>
@@ -49,12 +77,18 @@ export default function BandForm({
             value={formData.name}
             onChange={onChange}
             required
+            minLength={FIELD_LIMITS.bandName.min}
+            maxLength={FIELD_LIMITS.bandName.max}
             placeholder="The Replacements"
             fullWidth
           />
+          <span className="text-xs text-white/50 mt-1 block">
+            {formData.name.length}/{FIELD_LIMITS.bandName.max}
+          </span>
         </div>
+        )}
 
-        {globalView && (
+        {(globalView || !isSchedulingExisting) && (
           <>
             <div className="sm:col-span-2">
               <div className="flex items-center gap-2 mb-2">
@@ -71,6 +105,7 @@ export default function BandForm({
                 name="origin"
                 value={formData.origin || ''}
                 onChange={onChange}
+                maxLength={FIELD_LIMITS.bandOrigin.max}
                 placeholder="Toronto, ON"
                 fullWidth
               />
@@ -91,6 +126,7 @@ export default function BandForm({
                 name="genre"
                 value={formData.genre || ''}
                 onChange={onChange}
+                maxLength={FIELD_LIMITS.bandGenre.max}
                 placeholder="punk, indie rock, etc."
                 fullWidth
               />
@@ -111,7 +147,7 @@ export default function BandForm({
               <label htmlFor="band-description" className="block text-white mb-2 text-sm">
                 Description <span className="text-gray-400 text-xs">(optional)</span>
               </label>
-              <MarkdownEditor
+              <RichTextEditor
                 value={formData.description || ''}
                 onChange={value => {
                   onChange({ target: { name: 'description', value } })
@@ -137,7 +173,7 @@ export default function BandForm({
                 name="event_id"
                 value={formData.event_id}
                 onChange={onChange}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
               >
                 <option value="">No event assigned yet</option>
                 {events.map(event => (
@@ -169,7 +205,7 @@ export default function BandForm({
                 name="venue_id"
                 value={formData.venue_id}
                 onChange={onChange}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
               >
                 <option value="">No venue assigned yet</option>
                 {venues.map(venue => (
@@ -194,7 +230,7 @@ export default function BandForm({
                 name="start_time"
                 value={formData.start_time}
                 onChange={onChange}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 required={requireSchedule}
               />
             </div>
@@ -210,7 +246,7 @@ export default function BandForm({
                 name="duration"
                 value={formData.duration}
                 onChange={onChange}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 placeholder="45"
                 min="1"
               />
@@ -227,7 +263,7 @@ export default function BandForm({
                 name="end_time"
                 value={formData.end_time}
                 onChange={onChange}
-                className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
                 required={requireSchedule}
               />
             </div>
@@ -244,7 +280,8 @@ export default function BandForm({
             name="website"
             value={formData.website || ''}
             onChange={onChange}
-            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
             placeholder="https://example.com"
           />
         </div>
@@ -259,7 +296,8 @@ export default function BandForm({
             name="instagram"
             value={formData.instagram || ''}
             onChange={onChange}
-            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            maxLength={FIELD_LIMITS.socialHandle.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
             placeholder="@bandhandle"
           />
         </div>
@@ -274,7 +312,8 @@ export default function BandForm({
             name="bandcamp"
             value={formData.bandcamp || ''}
             onChange={onChange}
-            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
             placeholder="https://bandcamp.com/bandname"
           />
         </div>
@@ -289,7 +328,8 @@ export default function BandForm({
             name="facebook"
             value={formData.facebook || ''}
             onChange={onChange}
-            className="w-full px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
             placeholder="https://facebook.com/bandname"
           />
         </div>
@@ -342,6 +382,7 @@ BandForm.propTypes = {
   onCancel: PropTypes.func.isRequired,
   conflicts: PropTypes.arrayOf(PropTypes.string),
   globalView: PropTypes.bool,
+  selectedProfile: PropTypes.object,
 }
 
 BandForm.defaultProps = {

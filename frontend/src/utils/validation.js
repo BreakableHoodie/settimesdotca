@@ -2,11 +2,48 @@
 // Security: Prevent XSS and injection attacks
 
 /**
+ * Centralized field length limits - MUST match backend limits
+ */
+export const FIELD_LIMITS = {
+  // User fields
+  email: { min: 5, max: 255 },
+  password: { min: 12, max: 128 },
+  userName: { min: 2, max: 100 },
+
+  // Venue fields
+  venueName: { min: 1, max: 200 },
+  venueAddress: { min: 0, max: 200 },
+
+  // Band fields
+  bandName: { min: 1, max: 200 },
+  bandOrigin: { min: 0, max: 100 },
+  bandGenre: { min: 0, max: 100 },
+  bandDescription: { min: 0, max: 5000 },
+  bandUrl: { min: 0, max: 500 },
+  socialHandle: { min: 0, max: 100 },
+
+  // Event fields
+  eventName: { min: 3, max: 200 },
+  eventSlug: { min: 3, max: 100 },
+  ticketLink: { min: 0, max: 500 },
+  eventDescription: { min: 0, max: 5000 },
+  eventCity: { min: 0, max: 100 },
+  eventVenueInfo: { min: 0, max: 5000 },
+  eventSocialLinks: { min: 0, max: 2000 },
+
+  // Generic
+  url: { min: 0, max: 2000 },
+  shortText: { min: 0, max: 255 },
+  longText: { min: 0, max: 10000 },
+}
+
+/**
  * Sanitize string input (remove dangerous characters)
  * @param {string} input - Raw user input
+ * @param {number} maxLength - Maximum allowed length
  * @returns {string} Sanitized string
  */
-export function sanitizeString(input) {
+export function sanitizeString(input, maxLength = 1000) {
   if (!input) return ''
 
   return String(input)
@@ -14,7 +51,7 @@ export function sanitizeString(input) {
     .replace(/[<>]/g, '') // Remove < and > to prevent HTML injection
     .replace(/javascript:/gi, '') // Remove javascript: protocol
     .replace(/on\w+=/gi, '') // Remove event handlers (onclick=, etc.)
-    .substring(0, 1000) // Limit length
+    .substring(0, maxLength)
 }
 
 /**
@@ -46,6 +83,31 @@ export function validateEmail(email) {
   if (!email) return false
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(email)
+}
+
+/**
+ * Validate password strength with enterprise-grade policy.
+ * @param {string} password
+ * @returns {string|null} Error message or null if valid
+ */
+export function validatePasswordStrength(password) {
+  if (!password) return 'Password is required'
+  if (password.length < FIELD_LIMITS.password.min) {
+    return `Password must be at least ${FIELD_LIMITS.password.min} characters`
+  }
+  if (!/[A-Z]/.test(password)) {
+    return 'Password must contain at least one uppercase letter'
+  }
+  if (!/[a-z]/.test(password)) {
+    return 'Password must contain at least one lowercase letter'
+  }
+  if (!/\d/.test(password)) {
+    return 'Password must contain at least one number'
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return 'Password must contain at least one special character'
+  }
+  return null
 }
 
 /**

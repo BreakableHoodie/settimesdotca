@@ -40,7 +40,7 @@ describe("Admin users API", () => {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
         email: "new-user@test.com",
-        password: "Secretpass1",
+        password: "SecretPass123!",
         role: "editor",
         name: "New User",
       }),
@@ -70,7 +70,7 @@ describe("Admin users API", () => {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
         email: "blocked@test.com",
-        password: "Blocked123",
+        password: "BlockedPass123!",
         role: "viewer",
         name: "Blocked",
       }),
@@ -90,7 +90,7 @@ describe("Admin users API", () => {
 
     const body = {
       email: "dup-user@test.com",
-      password: "DupPass123",
+      password: "DupPass1234!",
       role: "editor",
       name: "Dup User",
     };

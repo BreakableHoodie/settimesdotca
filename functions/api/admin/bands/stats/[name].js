@@ -17,7 +17,7 @@ export async function onRequestGet(context) {
   const { DB } = env;
 
   // RBAC: Require viewer role or higher
-  const permCheck = await checkPermission(request, env, "viewer");
+  const permCheck = await checkPermission(context, "viewer");
   if (permCheck.error) {
     return permCheck.response;
   }
@@ -42,27 +42,28 @@ export async function onRequestGet(context) {
     const performances = await DB.prepare(
       `
       SELECT
-        b.id,
-        b.name,
-        b.start_time,
-        b.end_time,
-        b.photo_url,
-        b.description,
-        b.genre,
-        b.origin,
-        b.social_links,
+        p.id,
+        bp.name,
+        p.start_time,
+        p.end_time,
+        bp.photo_url,
+        bp.description,
+        bp.genre,
+        bp.origin,
+        bp.social_links,
         e.id as event_id,
         e.name as event_name,
         e.date as event_date,
-        e.location as event_location,
+        e.city as event_location,
         v.id as venue_id,
         v.name as venue_name,
         v.address as venue_address
-      FROM bands b
-      LEFT JOIN events e ON b.event_id = e.id
-      LEFT JOIN venues v ON b.venue_id = v.id
-      WHERE LOWER(b.name) = LOWER(?)
-      ORDER BY e.date DESC, b.start_time DESC
+      FROM performances p
+      JOIN band_profiles bp ON p.band_profile_id = bp.id
+      LEFT JOIN events e ON p.event_id = e.id
+      LEFT JOIN venues v ON p.venue_id = v.id
+      WHERE LOWER(bp.name) = LOWER(?)
+      ORDER BY e.date DESC, p.start_time DESC
     `,
     )
       .bind(bandName)

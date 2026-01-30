@@ -1,20 +1,24 @@
 import { useState, useEffect, useCallback } from 'react'
-import { eventsApi } from '../utils/adminApi'
+import { authApi, eventsApi } from '../utils/adminApi'
 import EventsTab from './EventsTab'
 import VenuesTab from './VenuesTab'
-import BandsTab from './BandsTab'
+import RosterTab from './RosterTab'
+import LineupTab from './LineupTab'
 import UserManagement from './UserManagement'
+import UserSettings from './UserSettings'
+import PlatformSettings from './PlatformSettings'
 import EventWizard from './EventWizard'
 import BottomNav from './BottomNav'
 import ContextBanner from './components/ContextBanner'
 import Breadcrumbs from './components/Breadcrumbs'
+import MfaSettingsModal from './components/MfaSettingsModal'
 import { Button, Loading, Alert, ConfirmDialog } from '../components/ui'
 
 /**
  * AdminPanel - Main container for admin panel with tab navigation
  *
  * Features:
- * - Tab navigation (Events, Venues, Bands)
+ * - Tab navigation (Events, Lineup, Roster, Venues, Users)
  * - Event selector dropdown at top
  * - Toast notifications for success/error
  * - Logout functionality
@@ -28,6 +32,8 @@ export default function AdminPanel({ onLogout }) {
   const [toast, setToast] = useState(null)
   const [showWizard, setShowWizard] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showMfaModal, setShowMfaModal] = useState(false)
+  const [currentUser, setCurrentUser] = useState(() => authApi.getCurrentUser())
 
   const loadEvents = useCallback(async () => {
     try {
@@ -39,16 +45,38 @@ export default function AdminPanel({ onLogout }) {
       // User can optionally select an event from the dropdown
       setSelectedEventId(null)
     } catch (err) {
+      console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message);
+      if (err.status === 401 || err.message?.includes('Valid session required')) {
+        onLogout()
+        return
+      }
       showToast('Failed to load events: ' + err.message, 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [onLogout])
 
   // Load events on mount
   useEffect(() => {
     loadEvents()
   }, [loadEvents])
+
+  useEffect(() => {
+    let isMounted = true
+    const refreshUser = async () => {
+      const sessionData = await authApi.verifySession()
+      if (isMounted && sessionData?.user) {
+        setCurrentUser(sessionData.user)
+      }
+    }
+    refreshUser()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const isAdmin = currentUser?.role === 'admin'
+  const canManageUsers = isAdmin
 
   // Listen for custom filter events from event detail view
   useEffect(() => {
@@ -60,10 +88,11 @@ export default function AdminPanel({ onLogout }) {
     }
 
     const handleFilterBand = event => {
-      const { bandName } = event.detail
-      setActiveTab('bands')
-      // Store the band name to filter in BandsTab
-      sessionStorage.setItem('filterBandName', bandName)
+      // If filtering by band from an event context, we probably mean Lineup or Roster?
+      // Let's default to Roster for now as it's the global search
+      setActiveTab('roster')
+      // Store the band name to filter
+      sessionStorage.setItem('filterBandName', event.detail.bandName)
     }
 
     window.addEventListener('filterVenue', handleFilterVenue)
@@ -74,6 +103,29 @@ export default function AdminPanel({ onLogout }) {
       window.removeEventListener('filterBand', handleFilterBand)
     }
   }, [])
+
+  // Auto-switch tabs when event selection changes
+  useEffect(() => {
+    if (selectedEventId) {
+      // If we just selected an event, maybe go to Lineup if we were on Events?
+      if (activeTab === 'events') setActiveTab('lineup')
+    } else {
+      // If we cleared event, and were on Lineup, go back to Events
+      if (activeTab === 'lineup') setActiveTab('events')
+    }
+  }, [selectedEventId])
+
+  useEffect(() => {
+    if (activeTab === 'platform' && !isAdmin) {
+      setActiveTab('settings')
+    }
+  }, [activeTab, isAdmin])
+
+  useEffect(() => {
+    if (activeTab === 'users' && !canManageUsers) {
+      setActiveTab('events')
+    }
+  }, [activeTab, canManageUsers])
 
   /**
    * Show toast notification
@@ -106,15 +158,20 @@ export default function AdminPanel({ onLogout }) {
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
 
+  // Dynamic Tabs Configuration
   const tabs = [
     { id: 'events', label: 'Events' },
+    // Only show Lineup if an event is selected
+    ...(selectedEventId ? [{ id: 'lineup', label: 'Lineup' }] : []),
+    { id: 'roster', label: 'Roster' },
     { id: 'venues', label: 'Venues' },
-    { id: 'bands', label: 'Performers' },
-    { id: 'users', label: 'Users' },
+    ...(canManageUsers ? [{ id: 'users', label: 'Users' }] : []),
+    { id: 'settings', label: 'Settings' },
+    ...(isAdmin ? [{ id: 'platform', label: 'Platform' }] : []),
   ]
 
   return (
-    <div className="min-h-screen bg-band-navy">
+    <div className="admin-shell min-h-screen bg-bg-navy">
       {/* Skip Navigation Link */}
       <a
         href="#main-content"
@@ -124,11 +181,14 @@ export default function AdminPanel({ onLogout }) {
       </a>
 
       {/* Header */}
-      <header className="bg-band-purple border-b border-band-orange/20 sticky top-0 z-50">
+      <header className="bg-bg-purple border-b border-accent-500/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-band-orange mb-2">Band Crawl Admin</h1>
+              <h1 className="text-xl sm:text-2xl font-bold font-display mb-2">
+                <span className="text-accent-500">Set</span><span className="text-white">Times</span>
+                <span className="text-text-tertiary text-base font-normal ml-2">Admin</span>
+              </h1>
 
               {/* Event Selector */}
               {events.length > 0 && (
@@ -143,7 +203,7 @@ export default function AdminPanel({ onLogout }) {
                       const value = e.target.value
                       setSelectedEventId(value ? Number(value) : null)
                     }}
-                    className="px-3 py-1.5 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
+                    className="min-h-[44px] px-3 py-1.5 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
                   >
                     <option value="">All Venues/Bands (Global View)</option>
                     {events.map(event => (
@@ -165,12 +225,16 @@ export default function AdminPanel({ onLogout }) {
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              <Button onClick={() => setShowWizard(true)} variant="primary" size="lg">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setShowWizard(true)}
+                variant="primary"
+                size="sm"
+              >
                 Create Event
               </Button>
 
-              <Button onClick={handleLogout} variant="danger">
+              <Button onClick={handleLogout} variant="danger" size="sm">
                 Logout
               </Button>
             </div>
@@ -179,7 +243,7 @@ export default function AdminPanel({ onLogout }) {
       </header>
 
       {/* Tab Navigation */}
-      <div className="bg-band-purple border-b border-band-orange/20">
+      <div className="bg-band-purple border-b border-band-orange/20 hidden md:block">
         <div className="container mx-auto px-4">
           <div className="flex gap-1 sm:gap-2 overflow-x-auto">
             {tabs.map(tab => (
@@ -231,8 +295,8 @@ export default function AdminPanel({ onLogout }) {
 
             {activeTab === 'venues' && <VenuesTab showToast={showToast} />}
 
-            {activeTab === 'bands' && (
-              <BandsTab
+            {activeTab === 'lineup' && selectedEventId && (
+              <LineupTab
                 selectedEventId={selectedEventId}
                 selectedEvent={selectedEvent}
                 events={events}
@@ -241,7 +305,15 @@ export default function AdminPanel({ onLogout }) {
               />
             )}
 
-            {activeTab === 'users' && <UserManagement />}
+            {activeTab === 'roster' && <RosterTab showToast={showToast} />}
+
+            {activeTab === 'users' && canManageUsers && <UserManagement />}
+
+            {activeTab === 'settings' && (
+              <UserSettings user={currentUser} onOpenMfa={() => setShowMfaModal(true)} />
+            )}
+
+            {activeTab === 'platform' && <PlatformSettings isAdmin={isAdmin} />}
           </>
         )}
       </div>
@@ -276,8 +348,16 @@ export default function AdminPanel({ onLogout }) {
         variant="danger"
       />
 
+      <MfaSettingsModal isOpen={showMfaModal} onClose={() => setShowMfaModal(false)} />
+
       {/* Bottom Navigation (Mobile Only) */}
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        showLineup={Boolean(selectedEventId)}
+        showUsers={canManageUsers}
+        showPlatform={isAdmin}
+      />
     </div>
   )
 }

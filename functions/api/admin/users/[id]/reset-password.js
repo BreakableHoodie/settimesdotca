@@ -1,41 +1,31 @@
 // Admin-initiated password reset endpoint
 // POST /api/admin/users/[id]/reset-password
-// Body: { newPassword: string }
-// Returns: { success: true } or error
+// Body: { reason?: string }
+// Returns: { success: true, resetUrl: string } or error
 
 import { checkPermission, auditLog } from "../../_middleware.js";
+import { generatePasswordResetToken } from "../../../../utils/tokens.js";
+import { sanitizeString } from "../../../../utils/validation.js";
+import { getClientIP } from "../../../../utils/request.js";
+import { sendEmail, isEmailConfigured } from "../../../../utils/email.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
   const { DB } = env;
 
   // RBAC: Require admin role
-  const permCheck = await checkPermission(request, env, "admin");
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
   }
 
   const user = permCheck.user;
-  const ipAddress =
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown";
+  const ipAddress = getClientIP(request);
 
   try {
-
     const userId = params.id;
-    const { newPassword } = await request.json().catch(() => ({}));
-
-    // Validate password strength
-    if (!newPassword || newPassword.length < 8) {
-      return new Response(
-        JSON.stringify({ error: "Password must be at least 8 characters" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
+    const { reason } = await request.json().catch(() => ({}));
+    const sanitizedReason = reason ? sanitizeString(reason).slice(0, 500) : null;
 
     // Get target user
     const targetUser = await DB.prepare(
@@ -65,19 +55,57 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Hash the new password (in production, use bcrypt or similar)
-    const passwordHash = await hashPassword(newPassword);
-
-    // Update user's password
+    // Generate reset token and persist it
+    const resetToken = generatePasswordResetToken(userId, user.userId);
     await DB.prepare(
       `
-      UPDATE users
-      SET password_hash = ?, updated_at = datetime('now')
-      WHERE id = ?
+      INSERT INTO password_reset_tokens (user_id, token, created_by, expires_at, ip_address, reason)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `
+    )
+      .bind(
+        userId,
+        resetToken.token,
+        user.userId,
+        resetToken.expiresAt,
+        ipAddress,
+        sanitizedReason,
+      )
+      .run();
+
+    // Revoke existing sessions to force re-authentication
+    await DB.prepare(
+      `
+      DELETE FROM sessions
+      WHERE user_id = ?
     `,
     )
-      .bind(passwordHash, userId)
+      .bind(userId)
       .run();
+
+    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    const resetUrl = `${baseUrl}/reset-password?token=${resetToken.token}`;
+
+    if (isEmailConfigured(env)) {
+      const subject = "Reset your SetTimes password";
+      const text = `A password reset was requested for your account.\n\nReset your password: ${resetUrl}\n\nIf you didn't request this, you can ignore this email.`;
+      const html = `
+        <p>A password reset was requested for your account.</p>
+        <p><a href="${resetUrl}">Reset your password</a></p>
+        <p>If you didn't request this, you can ignore this email.</p>
+      `.trim();
+
+      await sendEmail(env, {
+        to: targetUser.email,
+        subject,
+        text,
+        html,
+      });
+    } else {
+      console.info(
+        `[Email] Password reset link for ${targetUser.email}: ${resetUrl}`,
+      );
+    }
 
     // Audit log the action
     await auditLog(
@@ -89,6 +117,8 @@ export async function onRequestPost(context) {
       {
         adminEmail: user.email,
         targetEmail: targetUser.email,
+        reason: sanitizedReason,
+        resetTokenId: resetToken.token,
       },
       ipAddress,
     );
@@ -96,7 +126,8 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Password updated for ${targetUser.email}`,
+        resetUrl,
+        message: `Password reset link generated for ${targetUser.email}`,
       }),
       {
         status: 200,
@@ -113,11 +144,4 @@ export async function onRequestPost(context) {
       },
     );
   }
-}
-
-// Simple password hashing (in production, use bcrypt or argon2)
-async function hashPassword(password) {
-  // For testing, just prepend 'hashed_'
-  // In production, use: await bcrypt.hash(password, 10)
-  return `hashed_${password}`;
 }

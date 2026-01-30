@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 
-function ComingUp({ bands }) {
+function ComingUp({ bands, currentTime }) {
   const [nextBand, setNextBand] = useState(null)
   const [minutesUntil, setMinutesUntil] = useState(null)
 
   useEffect(() => {
     const updateNextBand = () => {
-      const nowMs = Date.now()
+      const nowDate = currentTime instanceof Date ? currentTime : new Date(currentTime || Date.now())
+      const nowMs = nowDate.getTime()
 
       const upcomingBands = bands
         .map(band => {
@@ -35,7 +36,7 @@ function ComingUp({ bands }) {
     const interval = setInterval(updateNextBand, 30000) // Update every 30 seconds
 
     return () => clearInterval(interval)
-  }, [bands])
+  }, [bands, currentTime])
 
   if (!nextBand || minutesUntil === null) {
     return null

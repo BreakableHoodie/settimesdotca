@@ -1,22 +1,46 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { authApi } from '../utils/adminApi'
-import { useNavigate } from 'react-router-dom'
 
 export default function AdminLogin({ onLoginSuccess }) {
-  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   })
+  const [step, setStep] = useState('login')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [lockoutInfo, setLockoutInfo] = useState(null)
+  const [idleMessage, setIdleMessage] = useState(null)
+  const [mfaToken, setMfaToken] = useState(null)
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaUser, setMfaUser] = useState(null)
+
+  useEffect(() => {
+    const idleLogout = window.sessionStorage.getItem('idleLogout')
+    if (idleLogout) {
+      window.sessionStorage.removeItem('idleLogout')
+      setIdleMessage('You were signed out due to inactivity. Please sign in again.')
+    }
+  }, [])
 
   const handleChange = e => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value,
     }))
+  }
+
+  const handleError = err => {
+    const details = err?.details || {}
+    if (details.locked) {
+      setLockoutInfo({
+        locked: true,
+        minutesRemaining: details.minutesRemaining,
+      })
+      setError(null)
+      return
+    }
+    setError(details.message || err.message)
   }
 
   const handleLogin = async e => {
@@ -28,99 +52,164 @@ export default function AdminLogin({ onLoginSuccess }) {
     try {
       const result = await authApi.login(formData.email, formData.password)
 
+      if (result.mfaRequired) {
+        setStep('mfa')
+        setMfaToken(result.mfaToken)
+        setMfaUser(result.user || null)
+        setMfaCode('')
+        return
+      }
+
       if (result.success) {
         onLoginSuccess()
       }
     } catch (err) {
-      // Parse error for lockout info
-      try {
-        const errorData = JSON.parse(err.message)
-        if (errorData.locked) {
-          setLockoutInfo({
-            locked: true,
-            minutesRemaining: errorData.minutesRemaining,
-          })
-        } else if (errorData.remainingAttempts !== undefined) {
-          setError(`${errorData.message}`)
-        } else {
-          setError(err.message)
-        }
-      } catch (parseError) {
-        console.error('Failed to parse error response:', parseError)
-        setError(err.message)
-      }
+      handleError(err)
     } finally {
       setLoading(false)
     }
   }
 
+  const handleMfaVerify = async e => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    try {
+      const result = await authApi.verifyMfa(mfaToken, mfaCode)
+      if (result.success) {
+        onLoginSuccess()
+      }
+    } catch (err) {
+      handleError(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetMfa = () => {
+    setStep('login')
+    setMfaToken(null)
+    setMfaUser(null)
+    setMfaCode('')
+    setError(null)
+  }
+
   return (
-    <div className="min-h-screen bg-band-navy flex items-center justify-center p-4">
-      <div className="bg-band-purple p-8 rounded-lg shadow-xl max-w-md w-full">
-        <h1 className="text-2xl font-bold text-band-orange mb-6">Admin Login</h1>
+    <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
+      <div className="bg-gradient-card backdrop-blur-sm p-8 rounded-xl shadow-xl max-w-md w-full border border-white/10">
+        <h1 className="text-2xl font-bold font-display mb-6 text-center">
+          <span className="text-accent-500">Set</span><span className="text-white">Times</span>
+          <span className="block text-text-tertiary text-base font-normal mt-1">Admin Login</span>
+        </h1>
 
-        <form onSubmit={handleLogin}>
-          <div className="mb-4">
-            <label htmlFor="email" className="block text-white mb-2">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="mb-4">
-            <label htmlFor="password" className="block text-white mb-2">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          {error && <div className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}
-
-          {lockoutInfo && lockoutInfo.locked && (
-            <div className="bg-yellow-900/50 border border-yellow-600 text-yellow-200 p-3 rounded mb-4">
-              <p className="font-bold mb-1">Account Locked</p>
-              <p className="text-sm">
-                Too many failed login attempts. Please try again in {lockoutInfo.minutesRemaining} minutes.
-              </p>
+        {step === 'login' ? (
+          <form onSubmit={handleLogin}>
+            <div className="mb-4">
+              <label htmlFor="email" className="block text-white mb-2">
+                Email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                required
+                disabled={loading}
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading || (lockoutInfo && lockoutInfo.locked)}
-            className="w-full bg-band-orange text-white py-2 rounded hover:bg-orange-600 disabled:opacity-50 mb-4"
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
+            <div className="mb-4">
+              <label htmlFor="password" className="block text-white mb-2">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                required
+                disabled={loading}
+              />
+            </div>
 
-        <p className="text-gray-400 text-sm text-center">
-          Don&apos;t have an account?{' '}
-          <button
-            type="button"
-            onClick={() => navigate('/admin/signup')}
-            className="text-band-orange hover:text-orange-300 underline"
-          >
-            Sign up
-          </button>
+            {idleMessage && (
+              <div className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">
+                {idleMessage}
+              </div>
+            )}
+
+            {error && <div className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}
+
+            {lockoutInfo && lockoutInfo.locked && (
+              <div className="bg-yellow-900/50 border border-yellow-600 text-yellow-200 p-3 rounded mb-4">
+                <p className="font-bold mb-1">Account Locked</p>
+                <p className="text-sm">
+                  Too many failed login attempts. Please try again in {lockoutInfo.minutesRemaining} minutes.
+                </p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || (lockoutInfo && lockoutInfo.locked)}
+              className="w-full bg-gradient-accent text-white py-3 rounded-lg font-semibold hover:brightness-110 disabled:opacity-50 mb-4 transition-all active:scale-[0.98] shadow-md"
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleMfaVerify}>
+            <div className="mb-4">
+              <p className="text-text-tertiary text-sm mb-2">
+                Enter the 6-digit code from your authenticator app or a backup code.
+              </p>
+              {mfaUser?.email && (
+                <p className="text-text-secondary text-sm mb-4">Signing in as {mfaUser.email}</p>
+              )}
+              <label htmlFor="mfa-code" className="block text-white mb-2">
+                Authentication Code
+              </label>
+              <input
+                id="mfa-code"
+                name="mfa-code"
+                type="text"
+                inputMode="numeric"
+                value={mfaCode}
+                onChange={e => setMfaCode(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                required
+                disabled={loading}
+                autoComplete="one-time-code"
+              />
+            </div>
+
+            {error && <div className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-accent text-white py-3 rounded-lg font-semibold hover:brightness-110 disabled:opacity-50 mb-3 transition-all active:scale-[0.98] shadow-md"
+            >
+              {loading ? 'Verifying...' : 'Verify Code'}
+            </button>
+
+            <button
+              type="button"
+              onClick={resetMfa}
+              className="w-full text-text-tertiary hover:text-white py-2 text-sm transition-colors"
+            >
+              Back to login
+            </button>
+          </form>
+        )}
+
+        <p className="text-text-tertiary text-sm text-center">
+          Need access? Contact an administrator.
         </p>
       </div>
     </div>

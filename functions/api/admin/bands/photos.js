@@ -6,25 +6,25 @@
  * Supports image validation, optimization, and secure file storage.
  */
 
-import { checkPermission } from '../_middleware.js';
+import { checkPermission } from "../_middleware.js";
 
 // Maximum file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 // Allowed MIME types
 const ALLOWED_TYPES = [
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-  'image/gif'
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
 ];
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    const permCheck = await checkPermission(request, env, 'editor');
+    const permCheck = await checkPermission(context, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -32,23 +32,25 @@ export async function onRequestPost(context) {
 
     // Parse multipart form data
     const formData = await request.formData();
-    const file = formData.get('photo');
-    const bandId = formData.get('band_id'); // Optional: associate with band
+    const file = formData.get("photo");
+    const bandId = formData.get("band_id"); // Optional: associate with band
 
     if (!file || !(file instanceof File)) {
-      return new Response(
-        JSON.stringify({ error: 'No photo file provided' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "No photo file provided" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return new Response(
         JSON.stringify({
-          error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`
+          error: `File too large. Maximum size is ${
+            MAX_FILE_SIZE / 1024 / 1024
+          }MB`,
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -56,41 +58,66 @@ export async function onRequestPost(context) {
     if (!ALLOWED_TYPES.includes(file.type)) {
       return new Response(
         JSON.stringify({
-          error: 'Invalid file type. Allowed: JPEG, PNG, WebP, GIF'
+          error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF",
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
     // Generate unique filename with timestamp
     const timestamp = Date.now();
     const sanitizedName = file.name
-      .replace(/[^a-zA-Z0-9.-]/g, '_')
+      .replace(/[^a-zA-Z0-9.-]/g, "_")
       .toLowerCase();
     const filename = `band-photos/${timestamp}-${sanitizedName}`;
 
     // Upload to R2 bucket
-      await env.BAND_PHOTOS.put(filename, file.stream(), {
+    await env.BAND_PHOTOS.put(filename, file.stream(), {
       httpMetadata: {
-        contentType: file.type
+        contentType: file.type,
       },
       customMetadata: {
-          uploadedBy: user.email,
+        uploadedBy: user.email,
         uploadedAt: new Date().toISOString(),
         originalName: file.name,
-        ...(bandId && { bandId: bandId.toString() })
-      }
+        ...(bandId && { bandId: bandId.toString() }),
+      },
     });
 
     // Generate public URL (assumes R2 bucket has public access configured)
     // In production, you'll configure a custom domain or use R2 public URL
     const publicUrl = `https://band-photos.settimes.ca/${filename}`;
 
-    // If band_id provided, update the band record
+    // If band_id provided, update the band profile record
     if (bandId) {
-      await env.DB.prepare(
-        'UPDATE bands SET photo_url = ? WHERE id = ?'
-      ).bind(publicUrl, Number(bandId)).run();
+      const bandIdValue = bandId.toString();
+      let bandProfileId = null;
+
+      if (bandIdValue.startsWith("profile_")) {
+        bandProfileId = Number(bandIdValue.replace("profile_", ""));
+      } else if (!Number.isNaN(Number(bandIdValue))) {
+        const performance = await env.DB.prepare(
+          "SELECT band_profile_id FROM performances WHERE id = ?"
+        )
+          .bind(Number(bandIdValue))
+          .first();
+
+        bandProfileId = performance?.band_profile_id ?? null;
+        if (!bandProfileId) {
+          const profile = await env.DB.prepare(
+            "SELECT id FROM band_profiles WHERE id = ?"
+          )
+            .bind(Number(bandIdValue))
+            .first();
+          bandProfileId = profile?.id ?? null;
+        }
+      }
+
+      if (bandProfileId) {
+        await env.DB.prepare("UPDATE band_profiles SET photo_url = ? WHERE id = ?")
+          .bind(publicUrl, bandProfileId)
+          .run();
+      }
     }
 
     return new Response(
@@ -99,24 +126,23 @@ export async function onRequestPost(context) {
         url: publicUrl,
         filename,
         size: file.size,
-        type: file.type
+        type: file.type,
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
       }
     );
-
   } catch (error) {
-    console.error('Photo upload error:', error);
+    console.error("Photo upload error:", error);
     return new Response(
       JSON.stringify({
-        error: 'Photo upload failed',
-        details: error.message
+        error: "Photo upload failed",
+        details: error.message,
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
       }
     );
   }
@@ -130,51 +156,47 @@ export async function onRequestDelete(context) {
   const { request, env } = context;
 
   try {
-    const permCheck = await checkPermission(request, env, 'editor');
+    const permCheck = await checkPermission(context, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }
 
     // Extract filename from URL path
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const encodedSegment = pathParts[pathParts.length - 1];
-    if (!encodedSegment || encodedSegment === 'photos') {
-      return new Response(
-        JSON.stringify({ error: 'Filename required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    if (!encodedSegment || encodedSegment === "photos") {
+      return new Response(JSON.stringify({ error: "Filename required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const objectKey = decodeURIComponent(encodedSegment);
-    if (!objectKey.startsWith('band-photos/')) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid key' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    if (!objectKey.startsWith("band-photos/")) {
+      return new Response(JSON.stringify({ error: "Invalid key" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Delete from R2 bucket
     await env.BAND_PHOTOS.delete(objectKey);
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error('Photo deletion error:', error);
+    console.error("Photo deletion error:", error);
     return new Response(
       JSON.stringify({
-        error: 'Photo deletion failed',
-        details: error.message
+        error: "Photo deletion failed",
+        details: error.message,
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
       }
     );
   }

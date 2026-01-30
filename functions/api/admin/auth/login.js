@@ -1,20 +1,12 @@
 // Admin login endpoint
 // POST /api/admin/auth/login
 // Body: { email: string, password: string }
-// Returns: { success: true, user: object, sessionToken: string } or error
+// Returns: { success: true, user: object } or error
 
-import { verifyPassword } from "../../../utils/crypto.js";
 import { setSessionCookie } from "../../../utils/cookies.js";
+import { verifyPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import { getClientIP } from "../../../utils/request.js";
 
 // Rate limiting: check failed login attempts
 async function checkRateLimit(DB, email, ipAddress) {
@@ -27,7 +19,7 @@ async function checkRateLimit(DB, email, ipAddress) {
      WHERE (email = ? OR ip_address = ?)
      AND attempt_type = 'login'
      AND success = 0
-     AND created_at > ?`,
+     AND created_at > ?`
   )
     .bind(email, ipAddress, windowStart)
     .first();
@@ -68,7 +60,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
@@ -83,17 +75,18 @@ export async function onRequestPost(context) {
         {
           status: 429,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
     // Find user with all needed fields
     const user = await DB.prepare(
       `
-      SELECT id, email, password_hash, name, role, is_active
+      SELECT id, email, password_hash, name, role, is_active,
+             totp_enabled, totp_secret
       FROM users
       WHERE email = ?
-    `,
+    `
     )
       .bind(email)
       .first();
@@ -102,7 +95,7 @@ export async function onRequestPost(context) {
       // Log failed attempt (user not found)
       await DB.prepare(
         `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, 'login', 0, 'user_not_found')`,
+         VALUES (?, ?, ?, 'login', 0, 'user_not_found')`
       )
         .bind(email, ipAddress, userAgent)
         .run();
@@ -115,7 +108,7 @@ export async function onRequestPost(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
@@ -124,7 +117,7 @@ export async function onRequestPost(context) {
       // Log failed attempt (account disabled)
       await DB.prepare(
         `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'login', 0, 'account_disabled')`,
+         VALUES (?, ?, ?, ?, 'login', 0, 'account_disabled')`
       )
         .bind(user.id, email, ipAddress, userAgent)
         .run();
@@ -138,7 +131,7 @@ export async function onRequestPost(context) {
         {
           status: 403,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
@@ -149,7 +142,7 @@ export async function onRequestPost(context) {
       // Log failed attempt (invalid password)
       await DB.prepare(
         `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'login', 0, 'invalid_password')`,
+         VALUES (?, ?, ?, ?, 'login', 0, 'invalid_password')`
       )
         .bind(user.id, email, ipAddress, userAgent)
         .run();
@@ -162,20 +155,70 @@ export async function onRequestPost(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
-    // Password valid - check if 2FA is required
-    // TODO: Implement 2FA check here when TOTP/WebAuthn/Email OTP are ready
-    // For now, proceed with session creation
+    // Password valid - check if TOTP is required
+    if (Number(user.totp_enabled) === 1) {
+      if (!user.totp_secret) {
+        console.error("TOTP enabled but missing secret for user:", user.id);
+        return new Response(
+          JSON.stringify({
+            error: "MFA configuration error",
+            message:
+              "Multi-factor authentication is not configured correctly. Contact an administrator.",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
 
-    // Update last login
-    await DB.prepare(
-      "UPDATE users SET last_login = datetime('now') WHERE id = ?",
-    )
-      .bind(user.id)
-      .run();
+      const mfaToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+      await DB.prepare(
+        `
+        DELETE FROM mfa_challenges
+        WHERE user_id = ?
+          AND (used = 1 OR expires_at <= datetime('now'))
+      `
+      )
+        .bind(user.id)
+        .run();
+
+      await DB.prepare(
+        `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+        .bind(mfaToken, user.id, ipAddress, userAgent, expiresAt)
+        .run();
+
+      await DB.prepare(
+        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
+         VALUES (?, ?, ?, ?, 'login_mfa_challenge', 1)`
+      )
+        .bind(user.id, email, ipAddress, userAgent)
+        .run();
+
+      return new Response(
+        JSON.stringify({
+          mfaRequired: true,
+          mfaToken,
+          user: {
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Generate session token
     const sessionToken = crypto.randomUUID();
@@ -183,16 +226,23 @@ export async function onRequestPost(context) {
 
     // Create session
     await DB.prepare(
-      `INSERT INTO sessions (id, user_id, ip_address, user_agent, expires_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO sessions (session_token, user_id, ip_address, user_agent, expires_at)
+       VALUES (?, ?, ?, ?, ?)`
     )
       .bind(sessionToken, user.id, ipAddress, userAgent, expiresAt)
+      .run();
+
+    // Update last login
+    await DB.prepare(
+      "UPDATE users SET last_login = datetime('now') WHERE id = ?"
+    )
+      .bind(user.id)
       .run();
 
     // Log successful login
     await DB.prepare(
       `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-       VALUES (?, ?, ?, ?, 'login', 1)`,
+       VALUES (?, ?, ?, ?, 'login', 1)`
     )
       .bind(user.id, email, ipAddress, userAgent)
       .run();
@@ -204,8 +254,11 @@ export async function onRequestPost(context) {
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", setSessionCookie(sessionToken, false));
-    headers.append("Set-Cookie", setCSRFCookie(csrfToken));
+    headers.append(
+      "Set-Cookie",
+      setSessionCookie(sessionToken, false, request)
+    );
+    headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     return new Response(
       JSON.stringify({
@@ -216,13 +269,11 @@ export async function onRequestPost(context) {
           name: user.name,
           role: user.role,
         },
-        sessionToken, // COMPATIBILITY: Include for legacy Authorization header usage
-        csrfToken, // Send CSRF token so client can include it in headers
       }),
       {
         status: 200,
         headers,
-      },
+      }
     );
   } catch (error) {
     console.error("Login error:", error);
@@ -235,7 +286,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      },
+      }
     );
   }
 }

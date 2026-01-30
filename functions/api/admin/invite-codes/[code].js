@@ -2,15 +2,7 @@
 // DELETE /api/admin/invite-codes/[code] - Revoke invite code
 
 import { checkPermission, auditLog } from "../_middleware.js";
-
-// Get client IP from request
-function getClientIP(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown"
-  );
-}
+import { getClientIP } from "../../../utils/request.js";
 
 // DELETE - Revoke invite code
 export async function onRequestDelete(context) {
@@ -19,7 +11,7 @@ export async function onRequestDelete(context) {
   const { code } = params;
 
   // RBAC: Require admin role
-  const permCheck = await checkPermission(request, env, "admin");
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
   }

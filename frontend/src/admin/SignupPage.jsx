@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { authApi } from '../utils/adminApi'
+import PasswordStrength from '../components/PasswordStrength'
+import { FIELD_LIMITS, validatePasswordStrength } from '../utils/validation'
 import { useNavigate } from 'react-router-dom'
 
 export default function SignupPage() {
@@ -9,6 +11,7 @@ export default function SignupPage() {
     password: '',
     confirmPassword: '',
     name: '',
+    inviteCode: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,15 +33,16 @@ export default function SignupPage() {
       return
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters')
+    const passwordError = validatePasswordStrength(formData.password)
+    if (passwordError) {
+      setError(passwordError)
       return
     }
 
     setLoading(true)
 
     try {
-      await authApi.signup(formData.email, formData.password, formData.name)
+      await authApi.signup(formData.email, formData.password, formData.name, formData.inviteCode)
       // Redirect to admin panel on success
       navigate('/admin')
     } catch (err) {
@@ -71,7 +75,7 @@ export default function SignupPage() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
               placeholder="you@example.com"
               required
             />
@@ -87,10 +91,13 @@ export default function SignupPage() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-              placeholder="Min. 8 characters"
+              minLength={FIELD_LIMITS.password.min}
+              maxLength={FIELD_LIMITS.password.max}
+              className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              placeholder={`${FIELD_LIMITS.password.min}+ characters with upper/lower/number/symbol`}
               required
             />
+            <PasswordStrength password={formData.password} />
           </div>
 
           <div>
@@ -103,7 +110,9 @@ export default function SignupPage() {
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              minLength={FIELD_LIMITS.password.min}
+              maxLength={FIELD_LIMITS.password.max}
+              className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
               required
             />
           </div>
@@ -118,15 +127,31 @@ export default function SignupPage() {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
               placeholder="Your Name"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="signup-invite-code" className="block text-white mb-2 text-sm">
+              Invite Code *
+            </label>
+            <input
+              id="signup-invite-code"
+              type="text"
+              name="inviteCode"
+              value={formData.inviteCode}
+              onChange={handleChange}
+              className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              placeholder="Invite code"
+              required
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-4 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors font-semibold"
+            className="w-full min-h-[44px] px-4 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors font-semibold"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>

@@ -107,7 +107,7 @@ export function getGracePeriodHoursRemaining(eventDate) {
  * Format event state for display
  *
  * @param {string} eventDate - Event date in YYYY-MM-DD format
- * @returns {Object} Display info with label, color, emoji
+ * @returns {Object} Display info with label, color, icon
  */
 export function formatEventState(eventDate) {
   const state = getEventState(eventDate)
@@ -116,19 +116,19 @@ export function formatEventState(eventDate) {
     upcoming: {
       label: 'Upcoming Event',
       color: 'green',
-      emoji: '📅',
+      icon: 'calendar',
       description: 'Event has not started yet',
     },
     recently_completed: {
       label: 'Grace Period',
       color: 'yellow',
-      emoji: '⏰',
+      icon: 'clock',
       description: `${getGracePeriodHoursRemaining(eventDate)}h remaining to make edits`,
     },
     archived: {
       label: 'Archived Event',
       color: 'gray',
-      emoji: '🗄️',
+      icon: 'archive',
       description: `Ended ${getDaysSinceEvent(eventDate)} days ago`,
     },
   }
@@ -193,7 +193,7 @@ export function confirmArchivedEventEdit(event) {
 
   // First confirmation - General warning
   const confirmed1 = window.confirm(
-    `⚠️ Warning: This event ended ${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago.\n\n` +
+    `Warning: This event ended ${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago.\n\n` +
       `Editing historical data can affect analytics and records.\n\n` +
       `Are you sure you want to edit this archived event?`
   )
@@ -202,7 +202,7 @@ export function confirmArchivedEventEdit(event) {
 
   // Second confirmation - More explicit
   const confirmed2 = window.confirm(
-    `🔒 Final Confirmation\n\n` +
+    `Final Confirmation\n\n` +
       `You are about to modify historical data for "${event.name}".\n\n` +
       `This action will be logged in the audit trail.\n\n` +
       `Continue with edit?`
@@ -223,7 +223,7 @@ export function confirmArchivedEventDelete(event) {
   const daysAgo = getDaysSinceEvent(event.date)
 
   return window.confirm(
-    `⚠️ Delete Archived Event\n\n` +
+    `Delete Archived Event\n\n` +
       `Event: "${event.name}"\n` +
       `Ended: ${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago\n\n` +
       `This will permanently delete historical event data.\n` +

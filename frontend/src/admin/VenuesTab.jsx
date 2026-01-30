@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { venuesApi } from '../utils/adminApi'
+import { FIELD_LIMITS } from '../utils/validation'
 
 /**
  * VenuesTab - Manage venues (create, edit, delete)
@@ -120,12 +121,15 @@ export default function VenuesTab({ showToast }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-2xl font-bold text-white">Venues</h2>
+      <div className="flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Venues</h2>
+          <p className="text-sm text-white/70 mt-1">Manage venues and locations for your events.</p>
+        </div>
         {!showAddForm && !editingId && (
           <button
             onClick={() => setShowAddForm(true)}
-            className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors"
+            className="px-4 py-2 min-h-[44px] bg-band-orange text-white rounded hover:bg-orange-600 transition-colors"
           >
             + Add Venue
           </button>
@@ -148,10 +152,15 @@ export default function VenuesTab({ showToast }) {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
                   required
+                  minLength={FIELD_LIMITS.venueName.min}
+                  maxLength={FIELD_LIMITS.venueName.max}
                   placeholder="The Rock Bar"
                 />
+                <span className="text-xs text-white/50 mt-1">
+                  {formData.name.length}/{FIELD_LIMITS.venueName.max}
+                </span>
               </div>
 
               <div>
@@ -163,9 +172,13 @@ export default function VenuesTab({ showToast }) {
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  maxLength={FIELD_LIMITS.venueAddress.max}
                   placeholder="123 Main St"
                 />
+                <span className="text-xs text-white/50 mt-1">
+                  {formData.address.length}/{FIELD_LIMITS.venueAddress.max}
+                </span>
               </div>
             </div>
 
@@ -173,14 +186,14 @@ export default function VenuesTab({ showToast }) {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 min-h-[44px] bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'Saving...' : editingId ? 'Update Venue' : 'Add Venue'}
               </button>
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                className="px-4 py-2 min-h-[44px] bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
@@ -218,7 +231,7 @@ export default function VenuesTab({ showToast }) {
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => startEdit(venue)}
-                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                              className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
                             >
                               Edit
                             </button>
@@ -226,7 +239,7 @@ export default function VenuesTab({ showToast }) {
                               <button
                                 onClick={() => handleDelete(venue.id, venue.name, venue.band_count)}
                                 disabled={hasBands}
-                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Delete
                               </button>
@@ -264,14 +277,14 @@ export default function VenuesTab({ showToast }) {
                     <div className="flex gap-2 pt-2">
                       <button
                         onClick={() => startEdit(venue)}
-                        className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                        className="flex-1 px-3 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(venue.id, venue.name, venue.band_count)}
                         disabled={hasBands}
-                        className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 px-3 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title={hasBands ? `Cannot delete: ${venue.band_count} band(s) assigned` : 'Delete venue'}
                       >
                         Delete

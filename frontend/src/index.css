@@ -4,22 +4,24 @@
 
 /* SetTimes Design System - CSS Variables */
 :root {
-  /* Brand Colors */
-  --color-primary-50: #f0f4ff;
-  --color-primary-100: #d9e3ff;
-  --color-primary-500: #4f46e5;
-  --color-primary-600: #4338ca;
-  --color-primary-700: #3730a3;
+  /* Brand Colors - Modern Teal/Cyan */
+  --color-primary-50: #ecfeff;
+  --color-primary-100: #cffafe;
+  --color-primary-400: #22d3ee;
+  --color-primary-500: #06b6d4;
+  --color-primary-600: #0891b2;
+  --color-primary-700: #0e7490;
 
-  --color-accent-400: #ff8c5a;
-  --color-accent-500: #ff6b35;
-  --color-accent-600: #e65a2a;
+  --color-accent-300: #7dd3fc;
+  --color-accent-400: #38bdf8;
+  --color-accent-500: #0ea5e9;
+  --color-accent-600: #0284c7;
 
-  /* Background Colors */
-  --color-bg-navy: #1a1845;
-  --color-bg-purple: #2d2554;
-  --color-bg-dark: #16213e;
-  --color-bg-darker: #0f1729;
+  /* Background Colors - Darker, more sophisticated */
+  --color-bg-navy: #0c0f1a;
+  --color-bg-purple: #141927;
+  --color-bg-dark: #0f1219;
+  --color-bg-darker: #080a10;
 
   /* Semantic Colors */
   --color-success-400: #4ade80;
@@ -70,7 +72,15 @@
 
   /* Typography */
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', 'Courier New', monospace;
+
+  /* Gradients - Modern Teal/Cyan */
+  --gradient-primary: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%);
+  --gradient-accent: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+  --gradient-dark: linear-gradient(180deg, #0c0f1a 0%, #141927 100%);
+  --gradient-card: linear-gradient(145deg, rgba(20, 25, 39, 0.9) 0%, rgba(12, 15, 26, 0.95) 100%);
+  --gradient-glow: radial-gradient(ellipse at center, rgba(14, 165, 233, 0.15) 0%, transparent 70%);
 
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
@@ -108,9 +118,9 @@
   --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
 
-  --shadow-glow-primary: 0 0 20px rgba(79, 70, 229, 0.5);
+  --shadow-glow-primary: 0 0 20px rgba(6, 182, 212, 0.5);
   --shadow-glow-success: 0 0 20px rgba(34, 197, 94, 0.5);
-  --shadow-glow-accent: 0 0 20px rgba(255, 107, 53, 0.5);
+  --shadow-glow-accent: 0 0 20px rgba(14, 165, 233, 0.5);
 
   /* Transitions */
   --duration-fast: 150ms;
@@ -189,10 +199,90 @@ body {
   @apply p-2 hover:bg-gray-700 rounded transition;
 }
 
+/* Compact admin buttons (avoid oversized actions on mobile) */
+.admin-shell button:not(.bottom-nav-button) {
+  min-height: 36px !important;
+  padding-block: 0.35rem !important;
+  padding-inline: 0.75rem !important;
+}
+
 /* Touch targets for mobile */
 @media (max-width: 768px) {
   input[type='checkbox'] {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 24px;
+    min-height: 24px;
   }
+}
+
+/* Animation utilities */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-down {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in { animation: fade-in var(--duration-base) var(--ease-out); }
+.animate-fade-in-up { animation: fade-in-up var(--duration-slow) var(--ease-out); }
+.animate-fade-in-down { animation: fade-in-down var(--duration-slow) var(--ease-out); }
+.animate-scale-in { animation: scale-in var(--duration-base) var(--ease-out); }
+.animate-slide-in-right { animation: slide-in-right var(--duration-slow) var(--ease-out); }
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Stagger animation delays */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+
+.rich-text-content p {
+  margin-bottom: 0.75rem;
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.rich-text-content ul {
+  list-style: disc;
+}
+
+.rich-text-content ol {
+  list-style: decimal;
+}
+
+.rich-text-content a {
+  color: #f97316;
+  text-decoration: underline;
 }

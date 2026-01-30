@@ -3,7 +3,9 @@
 // Body: { token: string, newPassword: string }
 // Returns: { success: true } or error
 
-import { hashPassword } from "../../utils/crypto.js";
+import { hashPassword, verifyPassword } from "../../utils/crypto.js";
+import { validatePassword, FIELD_LIMITS } from "../../utils/validation.js";
+import { getClientIP } from "../../utils/request.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -23,10 +25,17 @@ export async function onRequestPost(context) {
     }
 
     // Validate password strength
-    if (newPassword.length < 8) {
+    const passwordCheck = validatePassword(newPassword, {
+      minLength: FIELD_LIMITS.password.min,
+      requireUppercase: true,
+      requireLowercase: true,
+      requireNumber: true,
+      requireSpecial: true,
+    });
+    if (!passwordCheck.valid) {
       return new Response(
         JSON.stringify({
-          error: "Password must be at least 8 characters long",
+          error: passwordCheck.errors[0],
         }),
         {
           status: 400,
@@ -39,7 +48,7 @@ export async function onRequestPost(context) {
     const resetToken = await DB.prepare(
       `
       SELECT prt.id, prt.user_id, prt.expires_at, prt.used,
-             u.email, u.name, u.is_active
+             u.email, u.name, u.is_active, u.password_hash
       FROM password_reset_tokens prt
       JOIN users u ON prt.user_id = u.id
       WHERE prt.token = ? AND prt.used = 0
@@ -78,6 +87,25 @@ export async function onRequestPost(context) {
           headers: { "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Prevent password reuse
+    if (resetToken.password_hash) {
+      const samePassword = await verifyPassword(
+        newPassword,
+        resetToken.password_hash,
+      );
+      if (samePassword) {
+        return new Response(
+          JSON.stringify({
+            error: "New password must be different from the current password",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
     }
 
     // Hash new password
@@ -123,7 +151,7 @@ export async function onRequestPost(context) {
     `,
     )
       .bind(
-        request.headers.get("CF-Connecting-IP") || "unknown",
+        getClientIP(request),
         request.headers.get("User-Agent") || "unknown",
         JSON.stringify({
           user_id: resetToken.user_id,

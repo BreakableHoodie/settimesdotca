@@ -3,6 +3,12 @@
 // POST /api/admin/venues - Create new venue
 
 import { checkPermission, auditLog } from "./_middleware.js";
+import {
+  validateEntity,
+  VALIDATION_SCHEMAS,
+  validationErrorResponse,
+} from "../../utils/validation.js";
+import { getClientIP } from "../../utils/request.js";
 
 // GET - List all venues
 export async function onRequestGet(context) {
@@ -10,7 +16,7 @@ export async function onRequestGet(context) {
   const { DB } = env;
 
   // RBAC: Require viewer role or higher
-  const permCheck = await checkPermission(request, env, "viewer");
+  const permCheck = await checkPermission(context, "viewer");
   if (permCheck.error) {
     return permCheck.response;
   }
@@ -20,9 +26,9 @@ export async function onRequestGet(context) {
       `
       SELECT
         v.*,
-        COUNT(b.id) as band_count
+        COUNT(p.id) as band_count
       FROM venues v
-      LEFT JOIN bands b ON v.id = b.venue_id
+      LEFT JOIN performances p ON v.id = p.venue_id
       GROUP BY v.id
       ORDER BY v.name
     `,
@@ -59,34 +65,25 @@ export async function onRequestPost(context) {
   const { DB } = env;
 
   // RBAC: Require admin role (venues are structural)
-  const permCheck = await checkPermission(request, env, "admin");
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
   }
 
   const user = permCheck.user;
-  const ipAddress =
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
-    "unknown";
+  const ipAddress = getClientIP(request);
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { name, address } = body;
 
-    // Validation
-    if (!name) {
-      return new Response(
-        JSON.stringify({
-          error: "Validation error",
-          message: "Venue name is required",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    // Validate input using schema
+    const validation = validateEntity(body, VALIDATION_SCHEMAS.venue);
+    if (!validation.valid) {
+      const firstError = Object.values(validation.errors)[0];
+      return validationErrorResponse(firstError, { fields: validation.errors });
     }
+
+    const { name, address } = validation.sanitized;
 
     // Check if venue already exists
     const existingVenue = await DB.prepare(

@@ -11,7 +11,7 @@ describe('GET /api/feeds/ical', () => {
 
   beforeEach(() => {
     mockDB = new MockD1Database()
-    mockEnv = { DB: mockDB, PUBLIC_URL: 'https://bandcrawl.example.com' }
+    mockEnv = { DB: mockDB, PUBLIC_URL: 'https://settimes.example.com' }
     
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })

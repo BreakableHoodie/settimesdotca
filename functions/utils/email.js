@@ -1,4 +1,4 @@
-const PROVIDERS = new Set(["postmark", "mailchannels"]);
+const PROVIDERS = new Set(["postmark", "mailchannels", "resend"]);
 
 function getProvider(env) {
   const provider = (env?.EMAIL_PROVIDER || "").toLowerCase();
@@ -18,6 +18,10 @@ export function isEmailConfigured(env) {
 
   if (provider === "postmark") {
     return Boolean(env?.POSTMARK_API_TOKEN);
+  }
+
+  if (provider === "resend") {
+    return Boolean(env?.RESEND_API_KEY);
   }
 
   return true;
@@ -89,6 +93,38 @@ export async function sendEmail(env, { to, subject, html, text }) {
       const details = await response.text().catch(() => "");
       console.error("[Email] MailChannels error:", response.status, details);
       return { delivered: false, reason: "mailchannels_error" };
+    }
+
+    return { delivered: true };
+  }
+
+  if (provider === "resend") {
+    const token = env?.RESEND_API_KEY;
+    if (!token) {
+      return { delivered: false, reason: "missing_resend_token" };
+    }
+
+    const payload = {
+      from,
+      to: [to],
+      subject,
+      html: html || undefined,
+      text: text || undefined,
+    };
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => "");
+      console.error("[Email] Resend error:", response.status, details);
+      return { delivered: false, reason: "resend_error" };
     }
 
     return { delivered: true };

@@ -1,6 +1,8 @@
 // Rate limiting utility using Cloudflare Cache API
 // No KV binding required - uses the Cache API as a distributed counter
 
+import { logger } from './logger.js';
+
 const RATE_LIMIT_PREFIX = 'rate-limit:';
 
 // Rate limit configurations by endpoint pattern
@@ -123,7 +125,7 @@ export async function checkRateLimit(request) {
     };
   } catch (error) {
     // If rate limiting fails, allow the request (fail open)
-    console.error('Rate limit check failed:', error);
+    logger.warn('Rate limit check failed', { error, ip });
     return { allowed: true, remaining: -1, resetAt: 0 };
   }
 }

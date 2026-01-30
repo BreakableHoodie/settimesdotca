@@ -5,6 +5,7 @@ import { getCookie } from "../../utils/cookies.js";
 import { generateCSRFToken, setCSRFCookie, validateCSRFMiddleware } from "../../utils/csrf.js";
 import { getClientIP } from "../../utils/request.js";
 import { initializeLucia, SESSION_CONFIG } from "../../utils/auth.js";
+import { createRequestLogger } from "../../utils/logger.js";
 
 function parseSessionDate(value) {
   if (!value) return null;
@@ -55,7 +56,7 @@ async function resolveSession(request, env) {
 
     return { lucia, sessionId, session, user, sessionMeta };
   } catch (error) {
-    console.error("Session validation error:", error);
+    // Log silently - session validation failures are common (expired, invalid)
     return { lucia, sessionId, session: null, user: null, sessionMeta: null };
   }
 }
@@ -199,7 +200,8 @@ export async function auditLog(
   resourceType,
   resourceId,
   details,
-  ipAddress
+  ipAddress,
+  log = null
 ) {
   try {
     await env.DB.prepare(
@@ -219,13 +221,16 @@ export async function auditLog(
       .run();
   } catch (error) {
     // Log error but don't fail the request if audit logging fails
-    console.error("Audit log error:", error);
+    if (log) {
+      log.warn("Audit log write failed", { action, resourceType, resourceId, error });
+    }
   }
 }
 
 export async function onRequest(context) {
   const { request, env, next } = context;
   const { pathname } = new URL(request.url);
+  const log = createRequestLogger(context);
 
   // Skip auth check for auth endpoints
   if (pathname.includes("/api/admin/auth/")) {
@@ -298,7 +303,7 @@ export async function onRequest(context) {
       headers,
     });
   } catch (error) {
-    console.error("Auth middleware error:", error);
+    log.error("Auth middleware error", { error });
 
     return new Response(
       JSON.stringify({

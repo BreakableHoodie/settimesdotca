@@ -6,9 +6,11 @@ import {
   rateLimitHeaders,
   rateLimitResponse,
 } from './utils/rateLimit.js';
+import { createRequestLogger } from './utils/logger.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
+  const log = createRequestLogger(context);
 
   // Allowed origins for CORS (production and development)
   const baseAllowedOrigins = [
@@ -144,7 +146,7 @@ export async function onRequest(context) {
       headers: newHeaders,
     });
   } catch (error) {
-    console.error("Middleware error:", error);
+    log.error("Middleware error", { error });
 
     return new Response(
       JSON.stringify({

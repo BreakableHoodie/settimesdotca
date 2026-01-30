@@ -77,8 +77,16 @@ reactjs.instructions.md
 *.token
 *.key
 *.pem
-scripts/update-admin-password.sql
 *.sqlite-journal
+
+# One-off scripts (keep reusable utilities only)
+scripts/update-admin-password.sql
+scripts/update-*.sql
+scripts/unpublish-*.sql
+scripts/seed-*.sql
+scripts/migrate-*.sql
+scripts/run-migrate-*.sh
+scripts/install_awesome_copilot_collections.sh
 
 # Task tracking
 .todo.json

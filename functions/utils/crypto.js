@@ -1,9 +1,10 @@
 // Web Crypto API password hashing utilities for Cloudflare Workers
 // Uses PBKDF2 instead of bcrypt (which requires Node.js)
+// NOTE: Cloudflare Workers limits PBKDF2 to 100,000 iterations max
 
 const SALT_LENGTH = 16;
 const LEGACY_ITERATIONS = 100000;
-const DEFAULT_ITERATIONS = 600000;
+const DEFAULT_ITERATIONS = 100000; // CF Workers limit: max 100,000 iterations
 const KEY_LENGTH = 32;
 
 function timingSafeEqual(a, b) {

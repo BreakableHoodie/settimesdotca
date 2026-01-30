@@ -493,7 +493,9 @@ export default function VenuesTab({ showToast, readOnly = false }) {
       <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
         {filteredVenues.length === 0 ? (
           <div className="p-8 text-center text-white/50">
-            {venues.length === 0 ? 'No venues yet. Add your first venue to get started!' : 'No venues match your filters.'}
+            {venues.length === 0
+              ? 'No venues yet. Add your first venue to get started!'
+              : 'No venues match your filters.'}
           </div>
         ) : (
           <>

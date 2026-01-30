@@ -37,7 +37,7 @@ export default function BandForm({
         : 'Update Performance'
       : globalView
         ? 'Add Artist'
-      : isSchedulingExisting
+        : isSchedulingExisting
           ? 'Add to Lineup'
           : 'Create & Add Artist'
 
@@ -107,14 +107,11 @@ export default function BandForm({
     'WY',
   ]
 
-  const mergedGenreSuggestions = getNormalizedGenreSuggestions(
-    [...DEFAULT_GENRES, ...genreSuggestions],
-    DEFAULT_GENRES
-  )
+  const mergedGenreSuggestions = getNormalizedGenreSuggestions([...DEFAULT_GENRES, ...genreSuggestions], DEFAULT_GENRES)
   const mergedOriginCitySuggestions = Array.from(new Set(originCitySuggestions)).filter(Boolean)
-  const mergedOriginRegionSuggestions = Array.from(
-    new Set([...defaultRegions, ...originRegionSuggestions])
-  ).filter(Boolean)
+  const mergedOriginRegionSuggestions = Array.from(new Set([...defaultRegions, ...originRegionSuggestions])).filter(
+    Boolean
+  )
 
   return (
     <form onSubmit={onSubmit}>

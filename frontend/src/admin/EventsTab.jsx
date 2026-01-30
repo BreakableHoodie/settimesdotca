@@ -1025,7 +1025,9 @@ export default function EventsTab({
       <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
         {filteredEvents.length === 0 ? (
           <div className="p-8 text-center text-white/50">
-            {events.length === 0 ? 'No events yet. Create your first event to get started!' : 'No events match your filters.'}
+            {events.length === 0
+              ? 'No events yet. Create your first event to get started!'
+              : 'No events match your filters.'}
           </div>
         ) : (
           <>

@@ -72,7 +72,9 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
               )}
               <div>
                 <div className="font-bold text-white">{artist.name}</div>
-                <div className="text-xs text-white/60">{[formatOrigin(artist), artist.genre].filter(Boolean).join(' • ')}</div>
+                <div className="text-xs text-white/60">
+                  {[formatOrigin(artist), artist.genre].filter(Boolean).join(' • ')}
+                </div>
               </div>
             </div>
             <span className="px-3 py-1 bg-band-navy border border-band-orange/30 text-band-orange rounded text-xs uppercase font-medium">

@@ -19,13 +19,28 @@ function getCSRFToken() {
   return null
 }
 
+function normalizeHeaders(headers) {
+  if (!headers) return {}
+  if (typeof headers.forEach === 'function') {
+    const output = {}
+    headers.forEach((value, key) => {
+      output[key] = value
+    })
+    return output
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers)
+  }
+  return { ...headers }
+}
+
 function refreshCSRFHeader(headers) {
-  const nextHeaders = headers instanceof Headers ? new Headers(headers) : new Headers(headers || {})
+  const nextHeaders = normalizeHeaders(headers)
   const csrfToken = getCSRFToken()
   if (csrfToken) {
-    nextHeaders.set('X-CSRF-Token', csrfToken)
+    nextHeaders['X-CSRF-Token'] = csrfToken
   } else {
-    nextHeaders.delete('X-CSRF-Token')
+    delete nextHeaders['X-CSRF-Token']
   }
   return nextHeaders
 }
@@ -39,13 +54,15 @@ async function fetchWithCSRFRetry(url, options = {}, retries = 1) {
   let payload = null
   try {
     payload = await response.clone().json()
-  } catch (error) {
+  } catch (_error) {
     payload = null
   }
 
   const isCsrfError =
     payload?.error === 'CSRF validation failed' ||
-    String(payload?.message || '').toLowerCase().includes('csrf')
+    String(payload?.message || '')
+      .toLowerCase()
+      .includes('csrf')
 
   if (!isCsrfError) {
     return response

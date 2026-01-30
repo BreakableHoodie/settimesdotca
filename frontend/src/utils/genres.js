@@ -2,8 +2,8 @@ const GENRE_ALIASES = {
   'hip hop': 'Hip-Hop',
   'hip-hop': 'Hip-Hop',
   'r&b': 'R&B',
-  'rnb': 'R&B',
-  'edm': 'EDM',
+  rnb: 'R&B',
+  edm: 'EDM',
 }
 
 export const DEFAULT_GENRES = [
@@ -72,7 +72,5 @@ export function getNormalizedGenreSuggestions(values = [], canonicalGenres = DEF
     }
   })
 
-  return Array.from(normalized.values()).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: 'base' })
-  )
+  return Array.from(normalized.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
 }

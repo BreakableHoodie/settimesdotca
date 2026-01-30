@@ -195,10 +195,7 @@ export default function AdminApp() {
             isAuthenticated ? <Navigate to="/admin" replace /> : <AdminLogin onLoginSuccess={handleLoginSuccess} />
           }
         />
-        <Route
-          path="signup"
-          element={isAuthenticated ? <Navigate to="/admin" replace /> : <SignupPage />}
-        />
+        <Route path="signup" element={isAuthenticated ? <Navigate to="/admin" replace /> : <SignupPage />} />
         <Route
           path="*"
           element={

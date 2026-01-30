@@ -463,14 +463,14 @@ export default function RosterTab({ showToast, readOnly = false }) {
                 <thead className="bg-band-navy/50 border-b border-band-orange/20">
                   <tr>
                     {!readOnly && (
-                    <th className="px-4 py-3 w-12 text-center align-middle">
-                      <input
-                        type="checkbox"
-                        className="cursor-pointer h-5 w-5 align-middle"
-                        onChange={e => handleSelectAll(e.target.checked)}
-                        checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
-                      />
-                    </th>
+                      <th className="px-4 py-3 w-12 text-center align-middle">
+                        <input
+                          type="checkbox"
+                          className="cursor-pointer h-5 w-5 align-middle"
+                          onChange={e => handleSelectAll(e.target.checked)}
+                          checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
+                        />
+                      </th>
                     )}
                     <th
                       onClick={() => handleSort('name')}

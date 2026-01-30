@@ -455,8 +455,7 @@ export default function LineupTab({
       return next
     })
   }
-  const handleSelectAll = checked =>
-    setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
+  const handleSelectAll = checked => setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
 
   const handleBulkSubmit = async () => {
     if (bulkAction === 'delete') {

@@ -33,8 +33,8 @@ jobs:
             echo "url=https://settimes.ca" >> $GITHUB_OUTPUT
             echo "Scanning production: https://settimes.ca"
           else
-            echo "url=https://dev.settimes.pages.dev" >> $GITHUB_OUTPUT
-            echo "Scanning dev: https://dev.settimes.pages.dev"
+            echo "url=https://dev.settimesdotca.pages.dev" >> $GITHUB_OUTPUT
+            echo "Scanning dev: https://dev.settimesdotca.pages.dev"
           fi
 
       - name: Wait for deployment to be ready

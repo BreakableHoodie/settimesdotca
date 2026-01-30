@@ -20,6 +20,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@noble/hashes": "^2.0.1"
+    "@noble/hashes": "^2.0.1",
+    "otplib": "^13.2.1"
   }
 }

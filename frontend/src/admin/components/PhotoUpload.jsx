@@ -26,9 +26,9 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
     const trimmed = value.trim()
     if (!trimmed) return null
 
-    // Disallow obvious dangerous schemes like javascript:
+    // Disallow obvious dangerous schemes like javascript:, data:, vbscript:
     const lower = trimmed.toLowerCase()
-    if (lower.startsWith('javascript:')) {
+    if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) {
       return null
     }
 

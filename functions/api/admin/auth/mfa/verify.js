@@ -2,10 +2,10 @@
 // POST /api/admin/auth/mfa/verify
 // Body: { mfaToken: string, code: string }
 
-import { setSessionCookie } from "../../../../utils/cookies.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../../utils/csrf.js";
 import { verifyTotp, verifyBackupCode } from "../../../../utils/totp.js";
 import { getClientIP } from "../../../../utils/request.js";
+import { initializeLucia } from "../../../../utils/auth.js";
 
 async function checkRateLimit(DB, userId, ipAddress) {
   const windowMs = 10 * 60 * 1000;
@@ -217,15 +217,15 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Create session
-    const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
+    const lucia = initializeLucia(DB, request);
+    const session = await lucia.createSession(challenge.user_id, {});
 
     await DB.prepare(
-      `INSERT INTO sessions (session_token, user_id, ip_address, user_agent, expires_at)
-       VALUES (?, ?, ?, ?, ?)`
+      `UPDATE lucia_sessions
+       SET ip_address = ?, user_agent = ?, remember_me = ?
+       WHERE id = ?`
     )
-      .bind(sessionToken, challenge.user_id, ipAddress, userAgent, expiresAt)
+      .bind(ipAddress, userAgent, 0, session.id)
       .run();
 
     await DB.prepare(
@@ -261,14 +261,11 @@ export async function onRequestPost(context) {
       .bind(challenge.user_id, challenge.email, ipAddress, userAgent)
       .run();
 
-    const csrfToken = generateCSRFToken();
+    const csrfToken = generateCSRFToken(request, env, session.id);
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append(
-      "Set-Cookie",
-      setSessionCookie(sessionToken, false, request)
-    );
+    headers.append("Set-Cookie", lucia.createSessionCookie(session.id).serialize());
     headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     return new Response(

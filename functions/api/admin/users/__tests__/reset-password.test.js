@@ -1,10 +1,23 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, beforeEach, afterEach, vi } from "vitest";
 import { createTestEnv } from "../../../test-utils.js";
 import * as resetHandler from "../[id]/reset-password.js";
 
 describe("Admin user password reset API", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      text: async () => "",
+    })));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   test("admin generates reset token and logs action", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    env.EMAIL_PROVIDER = "mailchannels";
+    env.EMAIL_FROM = "no-reply@settimes.ca";
     rawDb
       .prepare(
         "INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, ?)"
@@ -28,7 +41,8 @@ describe("Admin user password reset API", () => {
     });
     expect(response.status).toBe(200);
     const payload = await response.json();
-    expect(payload.resetUrl).toContain("reset-password?token=");
+    expect(payload.success).toBe(true);
+    expect(payload.message).toContain("Password reset email sent");
     const resetToken = rawDb
       .prepare(
         "SELECT * FROM password_reset_tokens WHERE user_id = ? ORDER BY created_at DESC"

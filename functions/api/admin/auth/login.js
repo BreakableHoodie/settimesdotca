@@ -3,10 +3,10 @@
 // Body: { email: string, password: string }
 // Returns: { success: true, user: object } or error
 
-import { setSessionCookie } from "../../../utils/cookies.js";
 import { verifyPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
+import { initializeLucia } from "../../../utils/auth.js";
 
 // Rate limiting: check failed login attempts
 async function checkRateLimit(DB, email, ipAddress) {
@@ -82,7 +82,8 @@ export async function onRequestPost(context) {
     // Find user with all needed fields
     const user = await DB.prepare(
       `
-      SELECT id, email, password_hash, name, role, is_active,
+      SELECT id, email, password_hash, name, first_name, last_name, role, is_active,
+             activation_token, activation_token_expires_at, activated_at,
              totp_enabled, totp_secret
       FROM users
       WHERE email = ?
@@ -112,7 +113,30 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Check if account is active
+    // Check if account is activated
+    if (user.is_active === 0 && !user.activated_at) {
+      await DB.prepare(
+        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+         VALUES (?, ?, ?, ?, 'login', 0, 'activation_required')`
+      )
+        .bind(user.id, email, ipAddress, userAgent)
+        .run();
+
+      return new Response(
+        JSON.stringify({
+          error: "Account not activated",
+          message:
+            "Please check your email and activate your account before logging in.",
+          requiresActivation: true,
+        }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Check if account is active (deactivated)
     if (user.is_active === 0) {
       // Log failed attempt (account disabled)
       await DB.prepare(
@@ -209,7 +233,12 @@ export async function onRequestPost(context) {
           mfaToken,
           user: {
             email: user.email,
-            name: user.name,
+            name:
+              user.name ||
+              [user.first_name, user.last_name].filter(Boolean).join(" ") ||
+              null,
+            firstName: user.first_name || null,
+            lastName: user.last_name || null,
             role: user.role,
           },
         }),
@@ -220,16 +249,15 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Generate session token
-    const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 30 * 60000).toISOString(); // 30 min default
+    const lucia = initializeLucia(DB, request);
+    const session = await lucia.createSession(user.id, {});
 
-    // Create session
     await DB.prepare(
-      `INSERT INTO sessions (session_token, user_id, ip_address, user_agent, expires_at)
-       VALUES (?, ?, ?, ?, ?)`
+      `UPDATE lucia_sessions
+       SET ip_address = ?, user_agent = ?, remember_me = ?
+       WHERE id = ?`
     )
-      .bind(sessionToken, user.id, ipAddress, userAgent, expiresAt)
+      .bind(ipAddress, userAgent, 0, session.id)
       .run();
 
     // Update last login
@@ -248,16 +276,13 @@ export async function onRequestPost(context) {
       .run();
 
     // Generate CSRF token
-    const csrfToken = generateCSRFToken();
+    const csrfToken = generateCSRFToken(request, env, session.id);
 
     // Set secure HTTPOnly session cookie and CSRF cookie
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append(
-      "Set-Cookie",
-      setSessionCookie(sessionToken, false, request)
-    );
+    headers.append("Set-Cookie", lucia.createSessionCookie(session.id).serialize());
     headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     return new Response(
@@ -266,7 +291,12 @@ export async function onRequestPost(context) {
         user: {
           id: user.id,
           email: user.email,
-          name: user.name,
+          name:
+            user.name ||
+            [user.first_name, user.last_name].filter(Boolean).join(" ") ||
+            null,
+          firstName: user.first_name || null,
+          lastName: user.last_name || null,
           role: user.role,
         },
       }),

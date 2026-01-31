@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { mfaApi } from '../../utils/adminApi'
 import { Modal, Button, Alert } from '../../components/ui'
 
@@ -134,15 +135,23 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                 </p>
 
                 {setupData ? (
-                  <div className="space-y-3">
-                    <div className="bg-bg-navy/60 border border-white/10 rounded-md p-3">
-                      <p className="text-xs text-text-tertiary mb-1">Secret</p>
-                      <p className="font-mono text-sm text-text-primary break-all">{setupData.secret}</p>
+                  <div className="space-y-4">
+                    <div className="flex justify-center">
+                      <div className="bg-white p-3 rounded-lg">
+                        <QRCodeSVG value={setupData.otpauthUrl} size={180} level="M" includeMargin={false} />
+                      </div>
                     </div>
-                    <div className="bg-bg-navy/60 border border-white/10 rounded-md p-3">
-                      <p className="text-xs text-text-tertiary mb-1">OTP Auth URL</p>
-                      <p className="font-mono text-xs text-text-primary break-all">{setupData.otpauthUrl}</p>
-                    </div>
+                    <p className="text-center text-text-secondary text-sm">
+                      Scan this QR code with your authenticator app
+                    </p>
+                    <details className="bg-bg-navy/60 border border-white/10 rounded-md">
+                      <summary className="px-3 py-2 text-xs text-text-tertiary cursor-pointer hover:text-text-secondary">
+                        Can&apos;t scan? Enter code manually
+                      </summary>
+                      <div className="px-3 pb-3">
+                        <p className="font-mono text-sm text-text-primary break-all select-all">{setupData.secret}</p>
+                      </div>
+                    </details>
                   </div>
                 ) : (
                   <Button onClick={handleSetup} variant="primary" size="sm" disabled={loading}>

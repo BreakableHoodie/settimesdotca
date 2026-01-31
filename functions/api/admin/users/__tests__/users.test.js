@@ -32,7 +32,7 @@ describe("Admin users API", () => {
     expect(response.status).toBe(403);
   });
 
-  it("creates users and logs the action", async () => {
+  it("invites users and logs the action", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
 
     const request = new Request("https://example.test/api/admin/users", {
@@ -40,26 +40,31 @@ describe("Admin users API", () => {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
         email: "new-user@test.com",
-        password: "SecretPass123!",
         role: "editor",
-        name: "New User",
+        firstName: "New",
+        lastName: "User",
       }),
     });
 
     const response = await usersHandler.onRequestPost({ request, env });
     expect(response.status).toBe(201);
 
+    const invite = rawDb
+      .prepare("SELECT * FROM invite_codes WHERE email = ?")
+      .get("new-user@test.com");
+    expect(invite).toBeDefined();
+    expect(invite.role).toBe("editor");
+
     const created = rawDb
       .prepare("SELECT * FROM users WHERE email = ?")
       .get("new-user@test.com");
-    expect(created).toBeDefined();
-    expect(created.password_hash).toBeTruthy();
+    expect(created).toBeUndefined();
 
     const audit = rawDb
-      .prepare("SELECT * FROM audit_log WHERE action = 'user.created'")
+      .prepare("SELECT * FROM audit_log WHERE action = 'user.invited'")
       .get();
     expect(audit).toBeDefined();
-    expect(audit.resource_id).toBe(created.id);
+    expect(audit.resource_id).toBe(invite.id);
   });
 
   it("prevents non-admins from creating users", async () => {
@@ -70,9 +75,9 @@ describe("Admin users API", () => {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
         email: "blocked@test.com",
-        password: "BlockedPass123!",
         role: "viewer",
-        name: "Blocked",
+        firstName: "Blocked",
+        lastName: "User",
       }),
     });
 
@@ -86,36 +91,29 @@ describe("Admin users API", () => {
   });
 
   it("rejects duplicate user emails", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+
+    rawDb
+      .prepare("INSERT INTO users (email, role) VALUES (?, ?)")
+      .run("dup-user@test.com", "viewer");
 
     const body = {
       email: "dup-user@test.com",
-      password: "DupPass1234!",
       role: "editor",
-      name: "Dup User",
+      firstName: "Dup",
+      lastName: "User",
     };
 
-    const first = new Request("https://example.test/api/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify(body),
-    });
-    const second = new Request("https://example.test/api/admin/users", {
+    const request = new Request("https://example.test/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
 
-    const firstResponse = await usersHandler.onRequestPost({
-      request: first,
+    const response = await usersHandler.onRequestPost({
+      request,
       env,
     });
-    expect(firstResponse.status).toBe(201);
-
-    const secondResponse = await usersHandler.onRequestPost({
-      request: second,
-      env,
-    });
-    expect(secondResponse.status).toBe(409);
+    expect(response.status).toBe(409);
   });
 });

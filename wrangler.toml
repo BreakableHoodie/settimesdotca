@@ -7,6 +7,7 @@
 
 name = "settimesdotca"
 compatibility_date = "2025-10-08"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "frontend/dist"
 # Note: Cloudflare Pages ignores wrangler [build] configs and expects the final
 # artifacts to be present in pages_build_output_dir. The GitHub Actions workflow
@@ -27,6 +28,18 @@ pages_build_output_dir = "frontend/dist"
 binding = "DB"
 database_name = "settimes-production-db"
 database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b"
+
+# Analytics Engine binding (privacy-first metrics)
+# Requires Analytics Engine to be enabled in Cloudflare dashboard
+# Enable at: https://dash.cloudflare.com/YOUR_ACCOUNT/workers/analytics-engine
+# [[analytics_engine_datasets]]
+# binding = "ANALYTICS"
+# dataset = "settimes_metrics"
+
+# Cron triggers are not supported for Cloudflare Pages
+# Use a separate Worker if scheduled tasks are needed
+# [triggers]
+# crons = ["0 * * * *"]
 
 # For local development, Wrangler will create a local SQLite database
 # Local DB path: .wrangler/state/v3/d1/miniflare-D1DatabaseObject/

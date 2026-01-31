@@ -42,7 +42,12 @@ export default function EventTimeline() {
         }
         setError(null)
 
-        const response = await fetch('/api/events/timeline')
+        const timelineUrl =
+          typeof window !== 'undefined'
+            ? new URL('/api/events/timeline', window.location.origin).toString()
+            : '/api/events/timeline'
+
+        const response = await fetch(timelineUrl)
 
         if (!response.ok) {
           throw new Error('Failed to fetch events timeline')
@@ -461,13 +466,13 @@ function EventCard({
           </div>
 
           {/* Action Buttons */}
-          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end lg:ml-auto lg:max-w-[560px]">
             <Button
               as={Link}
               to={event.slug ? `/event/${event.slug}` : '#'}
               variant="primary"
               size="md"
-              fullWidth
+              className="w-full sm:w-auto sm:min-w-[160px]"
               onClick={() => {
                 if (!event.slug) {
                   return
@@ -484,7 +489,7 @@ function EventCard({
                 rel="noopener noreferrer"
                 variant="primary"
                 size="md"
-                fullWidth
+                className="w-full sm:w-auto sm:min-w-[160px]"
               >
                 Get Tickets
               </Button>
@@ -492,7 +497,7 @@ function EventCard({
             <Button
               variant="primary"
               size="md"
-              fullWidth
+              className="w-full sm:w-auto sm:min-w-[160px]"
               onClick={() => {
                 const nextExpanded = !expanded
                 setExpanded(nextExpanded)

@@ -1,15 +1,23 @@
 // Shared middleware for Cloudflare Pages Functions
-// Handles CORS, error handling, and common headers
+// Handles CORS, rate limiting, error handling, and common headers
+
+import {
+  checkRateLimit,
+  rateLimitHeaders,
+  rateLimitResponse,
+} from './utils/rateLimit.js';
+import { createRequestLogger } from './utils/logger.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
+  const log = createRequestLogger(context);
 
   // Allowed origins for CORS (production and development)
   const baseAllowedOrigins = [
     "https://settimes.ca",
     "https://www.settimes.ca",
-    "https://dev.settimes.pages.dev",
-    "https://settimes.pages.dev",
+    "https://dev.settimesdotca.pages.dev",
+    "https://settimesdotca.pages.dev",
     "https://dev.settimes.ca",
     "http://localhost:5173",
     "http://localhost:3000",
@@ -61,6 +69,12 @@ export async function onRequest(context) {
     });
   }
 
+  // Rate limiting for public APIs
+  const rateLimit = await checkRateLimit(request);
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(rateLimit, corsHeaders);
+  }
+
   // Basic request size guard for non-upload API requests (1MB)
   if (["POST", "PUT", "PATCH"].includes(request.method)) {
     const contentType = request.headers.get("Content-Type") || "";
@@ -86,9 +100,12 @@ export async function onRequest(context) {
     // Continue to the next middleware/handler
     const response = await context.next();
 
-    // Add CORS headers to response
+    // Add CORS and rate limit headers to response
     const newHeaders = new Headers(response.headers);
     Object.entries(corsHeaders).forEach(([key, value]) => {
+      newHeaders.set(key, value);
+    });
+    Object.entries(rateLimitHeaders(rateLimit)).forEach(([key, value]) => {
       newHeaders.set(key, value);
     });
 
@@ -129,7 +146,7 @@ export async function onRequest(context) {
       headers: newHeaders,
     });
   } catch (error) {
-    console.error("Middleware error:", error);
+    log.error("Middleware error", { error });
 
     return new Response(
       JSON.stringify({

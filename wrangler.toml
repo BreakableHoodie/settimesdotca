@@ -34,8 +34,10 @@ database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b"
 binding = "ANALYTICS"
 dataset = "settimes_metrics"
 
-[triggers]
-crons = ["0 * * * *"]
+# Cron triggers are not supported for Cloudflare Pages
+# Use a separate Worker if scheduled tasks are needed
+# [triggers]
+# crons = ["0 * * * *"]
 
 # For local development, Wrangler will create a local SQLite database
 # Local DB path: .wrangler/state/v3/d1/miniflare-D1DatabaseObject/

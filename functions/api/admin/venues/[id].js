@@ -3,7 +3,22 @@
 // DELETE /api/admin/venues/{id} - Delete venue
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import {
+  FIELD_LIMITS,
+  isValidEmail,
+  isValidPhone,
+  isValidPostalCode,
+  sanitizeString,
+} from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
+
+function formatVenueAddress(venue) {
+  if (!venue) return "";
+  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+  const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
+  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+  return [line1, line2, line3].filter(Boolean).join(", ");
+}
 
 // Helper to extract venue ID from path
 function getVenueId(request) {
@@ -44,10 +59,23 @@ export async function onRequestPut(context) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { name, address } = body;
+    const {
+      name,
+      address,
+      address_line1,
+      address_line2,
+      city,
+      region,
+      postal_code,
+      country,
+      phone,
+      contact_email,
+    } = body;
+
+    const trimmedName = name ? sanitizeString(name) : "";
 
     // Validation
-    if (!name) {
+    if (!trimmedName) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -57,6 +85,91 @@ export async function onRequestPut(context) {
           status: 400,
           headers: { "Content-Type": "application/json" },
         },
+      );
+    }
+    if (trimmedName.length > FIELD_LIMITS.venueName.max) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: `Venue name must be no more than ${FIELD_LIMITS.venueName.max} characters`,
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (address_line1 && address_line1.length > FIELD_LIMITS.venueAddressLine1.max) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: `Street address must be no more than ${FIELD_LIMITS.venueAddressLine1.max} characters`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (address_line2 && address_line2.length > FIELD_LIMITS.venueAddressLine2.max) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: `Address line 2 must be no more than ${FIELD_LIMITS.venueAddressLine2.max} characters`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (city && city.length > FIELD_LIMITS.venueCity.max) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: `City must be no more than ${FIELD_LIMITS.venueCity.max} characters`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (region && region.length > FIELD_LIMITS.venueRegion.max) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: `Province/State must be no more than ${FIELD_LIMITS.venueRegion.max} characters`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (postal_code && !isValidPostalCode(postal_code)) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Postal code must be a valid US ZIP or Canadian postal code",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (country && country.length > FIELD_LIMITS.venueCountry.max) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: `Country must be no more than ${FIELD_LIMITS.venueCountry.max} characters`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (phone && !isValidPhone(phone)) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Phone number must contain only digits and formatting characters",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (contact_email && !isValidEmail(contact_email)) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Contact email must be a valid email address",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -83,13 +196,13 @@ export async function onRequestPut(context) {
     }
 
     // Check if name is already taken by another venue
-    if (name !== venue.name) {
+    if (trimmedName !== venue.name) {
       const existingVenue = await DB.prepare(
         `
         SELECT id FROM venues WHERE name = ? AND id != ?
       `,
       )
-        .bind(name, venueId)
+        .bind(trimmedName, venueId)
         .first();
 
       if (existingVenue) {
@@ -107,15 +220,63 @@ export async function onRequestPut(context) {
     }
 
     // Update venue
+    const nextAddressLine1 =
+      address_line1 !== undefined
+        ? address_line1 || null
+        : address
+          ? address.trim()
+          : venue.address_line1 || null;
+    const nextAddressLine2 =
+      address_line2 !== undefined
+        ? address_line2 || null
+        : venue.address_line2 || null;
+    const nextCity = city !== undefined ? city || null : venue.city || null;
+    const nextRegion = region !== undefined ? region || null : venue.region || null;
+    const nextPostal =
+      postal_code !== undefined ? postal_code || null : venue.postal_code || null;
+    const nextCountry =
+      country !== undefined ? country || null : venue.country || null;
+
+    const formattedAddress =
+      formatVenueAddress({
+        address_line1: nextAddressLine1,
+        address_line2: nextAddressLine2,
+        city: nextCity,
+        region: nextRegion,
+        postal_code: nextPostal,
+        country: nextCountry,
+      }) || (address ? address.trim() : venue.address || null);
+
     const result = await DB.prepare(
       `
       UPDATE venues
-      SET name = ?, address = ?
+      SET name = ?,
+          address = ?,
+          address_line1 = ?,
+          address_line2 = ?,
+          city = ?,
+          region = ?,
+          postal_code = ?,
+          country = ?,
+          phone = ?,
+          contact_email = ?
       WHERE id = ?
       RETURNING *
     `,
     )
-      .bind(name, address || null, venueId)
+      .bind(
+        trimmedName,
+        formattedAddress,
+        nextAddressLine1,
+        nextAddressLine2,
+        nextCity,
+        nextRegion,
+        nextPostal,
+        nextCountry,
+        phone !== undefined ? phone || null : venue.phone || null,
+        contact_email !== undefined ? contact_email || null : venue.contact_email || null,
+        venueId,
+      )
       .first();
 
     // Audit log the update
@@ -129,7 +290,7 @@ export async function onRequestPut(context) {
         oldName: venue.name,
         newName: name,
         oldAddress: venue.address,
-        newAddress: address,
+        newAddress: formattedAddress,
       },
       ipAddress,
     );
@@ -137,7 +298,10 @@ export async function onRequestPut(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        venue: result,
+        venue: {
+          ...result,
+          address: result.address || formattedAddress,
+        },
       }),
       {
         status: 200,

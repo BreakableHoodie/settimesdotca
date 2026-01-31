@@ -4,6 +4,7 @@ import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
 import ArtistPicker from './components/ArtistPicker'
 import HelpPanel from './components/HelpPanel'
+import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import {
   calculateEndTimeFromDuration,
   calculateStartTimeFromDuration,
@@ -19,7 +20,14 @@ import {
  * LineupTab - Manage Event Schedule
  * Replaces the event-mode of BandsTab.
  */
-export default function LineupTab({ selectedEventId, selectedEvent, events, showToast, onEventFilterChange }) {
+export default function LineupTab({
+  selectedEventId,
+  selectedEvent,
+  events,
+  showToast,
+  onEventFilterChange,
+  readOnly = false,
+}) {
   const [bands, setBands] = useState([]) // Current event performances
   const [allBands, setAllBands] = useState([]) // For picker (all roster)
   const [venues, setVenues] = useState([])
@@ -32,6 +40,8 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [selectedProfile, setSelectedProfile] = useState(null)
 
   const [sortConfig, setSortConfig] = useState({ key: 'start_time', direction: 'asc' })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [venueFilter, setVenueFilter] = useState('all')
   const [formData, setFormData] = useState({
     id: null,
     name: '',
@@ -45,6 +55,10 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     photo_url: '',
     genre: '',
     origin: '',
+    origin_city: '',
+    origin_region: '',
+    contact_email: '',
+    is_active: 1,
     website: '',
     instagram: '',
     bandcamp: '',
@@ -59,6 +73,12 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [bulkParams, setBulkParams] = useState({})
 
   const editFormRef = useRef(null)
+
+  const splitOrigin = origin => {
+    if (!origin) return { city: '', region: '' }
+    const [city, region] = origin.split(',').map(part => part.trim())
+    return { city: city || '', region: region || '' }
+  }
 
   const loadData = useCallback(async () => {
     try {
@@ -87,6 +107,43 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     }
   }, [selectedEventId, showToast])
 
+  const originCitySuggestions = useMemo(() => {
+    const values = new Set()
+    allBands.forEach(band => {
+      if (band.origin_city) values.add(band.origin_city)
+      if (!band.origin_city && band.origin) {
+        const parsed = splitOrigin(band.origin)
+        if (parsed.city) values.add(parsed.city)
+      }
+    })
+    return Array.from(values).sort((a, b) => a.localeCompare(b))
+  }, [allBands])
+
+  const originRegionSuggestions = useMemo(() => {
+    const values = new Set()
+    allBands.forEach(band => {
+      if (band.origin_region) values.add(band.origin_region)
+      if (!band.origin_region && band.origin) {
+        const parsed = splitOrigin(band.origin)
+        if (parsed.region) values.add(parsed.region)
+      }
+    })
+    return Array.from(values).sort((a, b) => a.localeCompare(b))
+  }, [allBands])
+
+  const genreSuggestions = useMemo(() => {
+    const values = []
+    allBands.forEach(band => {
+      if (!band.genre) return
+      band.genre
+        .split(',')
+        .map(entry => entry.trim())
+        .filter(Boolean)
+        .forEach(entry => values.push(entry))
+    })
+    return getNormalizedGenreSuggestions(values, DEFAULT_GENRES)
+  }, [allBands])
+
   useEffect(() => {
     if (selectedEventId) loadData()
   }, [selectedEventId, loadData])
@@ -111,7 +168,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       if (serverConflicts.length) {
         setServerConflicts([])
       }
-      const next = { ...prev, [name]: value }
+      const next = { ...prev, [name]: name === 'is_active' ? Number(value) : value }
       const durationMinutes = parseDuration(next.duration)
 
       if (name === 'start_time') {
@@ -150,6 +207,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     if (artist) {
       // Selected existing artist from roster
       setSelectedProfile(artist)
+      const parsedOrigin = splitOrigin(artist.origin)
 
       // Pre-fill form with existing profile data
       let socialLinks = {}
@@ -164,6 +222,10 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         name: artist.name,
         genre: artist.genre || '',
         origin: artist.origin || '',
+        origin_city: artist.origin_city || parsedOrigin.city,
+        origin_region: artist.origin_region || parsedOrigin.region,
+        contact_email: artist.contact_email || '',
+        is_active: artist.is_active ?? 1,
         description: artist.description || '',
         photo_url: artist.photo_url || '',
         url: artist.url || '',
@@ -182,6 +244,10 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         name: newName || '',
         genre: '',
         origin: '',
+        origin_city: '',
+        origin_region: '',
+        contact_email: '',
+        is_active: 1,
         description: '',
         photo_url: '',
         url: '',
@@ -206,6 +272,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         facebook: formData.facebook || '',
       }
 
+      const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
       const payload = {
         eventId: Number(formData.event_id),
         venueId: Number(formData.venue_id),
@@ -213,7 +280,11 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         startTime: formData.start_time,
         endTime: formData.end_time,
         genre: formData.genre,
-        origin: formData.origin,
+        origin: originDisplay,
+        origin_city: formData.origin_city,
+        origin_region: formData.origin_region,
+        contact_email: formData.contact_email,
+        is_active: Number(formData.is_active) === 1,
         description: formData.description,
         photo_url: formData.photo_url,
         social_links: JSON.stringify(socialLinks),
@@ -273,6 +344,8 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       /* Invalid JSON, use empty object */
     }
 
+    const parsedOrigin = splitOrigin(band.origin)
+
     setFormData({
       id: band.id,
       name: band.name,
@@ -286,6 +359,10 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       photo_url: band.photo_url || '',
       genre: band.genre || '',
       origin: band.origin || '',
+      origin_city: band.origin_city || parsedOrigin.city,
+      origin_region: band.origin_region || parsedOrigin.region,
+      contact_email: band.contact_email || '',
+      is_active: band.is_active ?? 1,
       website: socialLinks.website || '',
       instagram: socialLinks.instagram || '',
       bandcamp: socialLinks.bandcamp || '',
@@ -297,10 +374,60 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   // Reuse sorting/conflict logic from BandsTab (simplified)
   const getVenueName = id => venues.find(v => String(v.id) === String(id))?.name || 'Unknown'
 
+  const filteredBands = useMemo(() => {
+    let next = bands
+    if (searchTerm.trim()) {
+      const query = searchTerm.trim().toLowerCase()
+      next = next.filter(band => band.name?.toLowerCase().includes(query))
+    }
+    if (venueFilter !== 'all') {
+      next = next.filter(band => String(band.venue_id) === String(venueFilter))
+    }
+    return next
+  }, [bands, searchTerm, venueFilter])
+
   const sortedBands = useMemo(() => {
-    // ... sort logic ...
-    return sortBandsByStart(bands)
-  }, [bands])
+    if (!sortConfig.key) {
+      return sortBandsByStart(filteredBands)
+    }
+
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+
+    return [...filteredBands].sort((a, b) => {
+      if (sortConfig.key === 'name') {
+        const aVal = (a.name || '').toLowerCase()
+        const bVal = (b.name || '').toLowerCase()
+        return aVal.localeCompare(bVal) * direction
+      }
+      if (sortConfig.key === 'venue') {
+        const aVal = getVenueName(a.venue_id).toLowerCase()
+        const bVal = getVenueName(b.venue_id).toLowerCase()
+        return aVal.localeCompare(bVal) * direction
+      }
+      if (sortConfig.key === 'duration') {
+        const aVal = deriveDurationMinutes(a.start_time, a.end_time) || 0
+        const bVal = deriveDurationMinutes(b.start_time, b.end_time) || 0
+        return (aVal - bVal) * direction
+      }
+
+      const aVal = a.start_time || ''
+      const bVal = b.start_time || ''
+      return aVal.localeCompare(bVal) * direction
+    })
+  }, [filteredBands, sortConfig, venues])
+
+  const handleSort = key => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const SortIcon = ({ col }) => (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
 
   const formConflicts = useMemo(() => {
     if (!formData.venue_id || !formData.start_time || !formData.end_time) return []
@@ -328,7 +455,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       return next
     })
   }
-  const handleSelectAll = checked => setSelectedIds(checked ? new Set(bands.map(b => b.id)) : new Set())
+  const handleSelectAll = checked => setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
 
   const handleBulkSubmit = async () => {
     if (bulkAction === 'delete') {
@@ -362,7 +489,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
           <h2 className="text-2xl font-bold text-white">Event Lineup</h2>
           <p className="text-sm text-white/70 mt-1">Manage performances, times, and venues for the selected event.</p>
         </div>
-        {viewMode === 'list' && (
+        {viewMode === 'list' && !readOnly && (
           <button
             onClick={() => {
               setViewMode('picker')
@@ -377,7 +504,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         )}
       </div>
 
-      {viewMode === 'picker' && (
+      {viewMode === 'picker' && !readOnly && (
         <ArtistPicker
           artists={allBands}
           onSelect={handlePickerSelect}
@@ -386,7 +513,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         />
       )}
 
-      {viewMode === 'form' && (
+      {viewMode === 'form' && !readOnly && (
         <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
           <h3 className="text-lg font-bold text-band-orange mb-4">
             {editingId ? 'Edit Performance' : 'Add Performance'}
@@ -408,6 +535,9 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
               setSelectedProfile(null)
             }}
             conflicts={combinedConflicts}
+            originCitySuggestions={originCitySuggestions}
+            originRegionSuggestions={originRegionSuggestions}
+            genreSuggestions={genreSuggestions}
           />
         </div>
       )}
@@ -415,7 +545,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       {viewMode === 'list' && (
         <>
           {/* Bulk Actions */}
-          {selectedIds.size > 0 && (
+          {!readOnly && selectedIds.size > 0 && (
             <BulkActionBar
               count={selectedIds.size}
               action={bulkAction}
@@ -429,31 +559,80 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
             />
           )}
 
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Filter performers"
+              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+            />
+            <select
+              value={venueFilter}
+              onChange={e => setVenueFilter(e.target.value)}
+              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+            >
+              <option value="all">All venues</option>
+              {venues.map(venue => (
+                <option key={venue.id} value={venue.id}>
+                  {venue.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-text-tertiary">
+              {sortedBands.length} performance{sortedBands.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
           {/* List */}
           <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
             {loading ? (
               <div className="p-8 text-center text-band-orange">Loading lineup...</div>
-            ) : bands.length === 0 ? (
-              <div className="p-8 text-center text-white/50">No performances scheduled yet.</div>
+            ) : filteredBands.length === 0 ? (
+              <div className="p-8 text-center text-white/50">
+                {bands.length === 0 ? 'No performances scheduled yet.' : 'No performances match your filters.'}
+              </div>
             ) : (
               <>
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-band-navy/50 border-b border-band-orange/20">
                       <tr>
-                        <th className="px-4 py-3 w-12">
-                          <input
-                            type="checkbox"
-                            className="h-5 w-5 cursor-pointer"
-                            onChange={e => handleSelectAll(e.target.checked)}
-                            checked={selectedIds.size === bands.length && bands.length > 0}
-                          />
+                        {!readOnly && (
+                          <th className="px-4 py-3 w-12">
+                            <input
+                              type="checkbox"
+                              className="h-5 w-5 cursor-pointer"
+                              onChange={e => handleSelectAll(e.target.checked)}
+                              checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
+                            />
+                          </th>
+                        )}
+                        <th
+                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                          onClick={() => handleSort('name')}
+                        >
+                          Performer <SortIcon col="name" />
                         </th>
-                        <th className="px-4 py-3 text-left text-white font-semibold">Performer</th>
-                        <th className="px-4 py-3 text-left text-white font-semibold">Venue</th>
-                        <th className="px-4 py-3 text-left text-white font-semibold">Time</th>
-                        <th className="px-4 py-3 text-left text-white font-semibold">Duration</th>
-                        <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>
+                        <th
+                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                          onClick={() => handleSort('venue')}
+                        >
+                          Venue <SortIcon col="venue" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                          onClick={() => handleSort('start_time')}
+                        >
+                          Time <SortIcon col="start_time" />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                          onClick={() => handleSort('duration')}
+                        >
+                          Duration <SortIcon col="duration" />
+                        </th>
+                        {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-band-orange/10">
@@ -464,14 +643,16 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                             key={band.id}
                             className={`hover:bg-band-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
                           >
-                            <td className="px-4 py-3">
-                              <input
-                                type="checkbox"
-                                className="h-5 w-5 cursor-pointer"
-                                checked={selectedIds.has(band.id)}
-                                onChange={e => handleSelect(band.id, e.target.checked)}
-                              />
-                            </td>
+                            {!readOnly && (
+                              <td className="px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  className="h-5 w-5 cursor-pointer"
+                                  checked={selectedIds.has(band.id)}
+                                  onChange={e => handleSelect(band.id, e.target.checked)}
+                                />
+                              </td>
+                            )}
                             <td className="px-4 py-3 text-white font-medium">{band.name}</td>
                             <td className="px-4 py-3 text-white/70">{getVenueName(band.venue_id)}</td>
                             <td className="px-4 py-3 text-white/70">
@@ -484,20 +665,22 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                 formatDurationLabel(band.start_time, band.end_time)
                               )}
                             </td>
-                            <td className="px-4 py-3 flex justify-end gap-2">
-                              <button
-                                onClick={() => startEdit(band)}
-                                className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(band.id, band.name)}
-                                className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                              >
-                                Delete
-                              </button>
-                            </td>
+                            {!readOnly && (
+                              <td className="px-4 py-3 flex justify-end gap-2">
+                                <button
+                                  onClick={() => startEdit(band)}
+                                  className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(band.id, band.name)}
+                                  className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         )
                       })}
@@ -505,18 +688,20 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                   </table>
                 </div>
                 <div className="md:hidden divide-y divide-band-orange/10">
-                  <div className="px-4 py-3 flex items-center justify-between">
-                    <label className="flex items-center gap-3 text-white">
-                      <input
-                        type="checkbox"
-                        className="h-5 w-5 cursor-pointer"
-                        onChange={e => handleSelectAll(e.target.checked)}
-                        checked={selectedIds.size === bands.length && bands.length > 0}
-                      />
-                      <span>Select all</span>
-                    </label>
-                    <span className="text-xs text-text-tertiary">{bands.length} performances</span>
-                  </div>
+                  {!readOnly && (
+                    <div className="px-4 py-3 flex items-center justify-between">
+                      <label className="flex items-center gap-3 text-white">
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5 cursor-pointer"
+                          onChange={e => handleSelectAll(e.target.checked)}
+                          checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
+                        />
+                        <span>Select all</span>
+                      </label>
+                      <span className="text-xs text-text-tertiary">{filteredBands.length} performances</span>
+                    </div>
+                  )}
                   {sortedBands.map(band => {
                     const conflicts = detectConflicts(band, bands)
                     return (
@@ -526,12 +711,14 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                       >
                         <div className="flex items-start justify-between gap-3">
                           <label className="flex items-center gap-3 text-white">
-                            <input
-                              type="checkbox"
-                              className="h-5 w-5 cursor-pointer"
-                              checked={selectedIds.has(band.id)}
-                              onChange={e => handleSelect(band.id, e.target.checked)}
-                            />
+                            {!readOnly && (
+                              <input
+                                type="checkbox"
+                                className="h-5 w-5 cursor-pointer"
+                                checked={selectedIds.has(band.id)}
+                                onChange={e => handleSelect(band.id, e.target.checked)}
+                              />
+                            )}
                             <span className="font-medium">{band.name}</span>
                           </label>
                           {conflicts.length ? (
@@ -546,20 +733,22 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                           <div>Venue: {getVenueName(band.venue_id)}</div>
                           <div>Time: {formatTimeRangeLabel(band.start_time, band.end_time)}</div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => startEdit(band)}
-                            className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(band.id, band.name)}
-                            className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        {!readOnly && (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => startEdit(band)}
+                              className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(band.id, band.name)}
+                              className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )
                   })}

@@ -1,6 +1,8 @@
 // Input validation and sanitization utilities
 // Security: Prevent XSS and injection attacks
 
+import DOMPurify from 'isomorphic-dompurify'
+
 /**
  * Centralized field length limits - MUST match backend limits
  */
@@ -9,18 +11,31 @@ export const FIELD_LIMITS = {
   email: { min: 5, max: 255 },
   password: { min: 12, max: 128 },
   userName: { min: 2, max: 100 },
+  userFirstName: { min: 1, max: 60 },
+  userLastName: { min: 1, max: 60 },
 
   // Venue fields
   venueName: { min: 1, max: 200 },
   venueAddress: { min: 0, max: 200 },
+  venueAddressLine1: { min: 0, max: 200 },
+  venueAddressLine2: { min: 0, max: 200 },
+  venueCity: { min: 0, max: 100 },
+  venueRegion: { min: 0, max: 100 },
+  venuePostal: { min: 0, max: 20 },
+  venueCountry: { min: 0, max: 100 },
+  venuePhone: { min: 0, max: 25 },
+  venueContactEmail: { min: 0, max: 255 },
 
   // Band fields
   bandName: { min: 1, max: 200 },
   bandOrigin: { min: 0, max: 100 },
+  bandOriginCity: { min: 0, max: 100 },
+  bandOriginRegion: { min: 0, max: 100 },
   bandGenre: { min: 0, max: 100 },
   bandDescription: { min: 0, max: 5000 },
   bandUrl: { min: 0, max: 500 },
   socialHandle: { min: 0, max: 100 },
+  bandContactEmail: { min: 0, max: 255 },
 
   // Event fields
   eventName: { min: 3, max: 200 },
@@ -43,27 +58,30 @@ export const FIELD_LIMITS = {
  * @param {number} maxLength - Maximum allowed length
  * @returns {string} Sanitized string
  */
-function repeatReplace(str, regex, replacement) {
-  let previous
-  let current = str
-  do {
-    previous = current
-    current = current.replace(regex, replacement)
-  } while (current !== previous)
-  return current
+export function sanitizeInput(input, maxLength = 1000) {
+  if (typeof input !== 'string') return ''
+  const sanitized = DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: [],
+  })
+  return sanitized.trim().substring(0, maxLength)
 }
 
 export function sanitizeString(input, maxLength = 1000) {
-  if (!input) return ''
+  return sanitizeInput(input, maxLength)
+}
 
-  let sanitized = String(input)
-    .trim()
-    .replace(/[<>]/g, '') // Remove < and > to prevent HTML injection
-    .replace(/(?:javascript|data|vbscript):/gi, '') // Remove dangerous URL-like protocols
-
-  sanitized = repeatReplace(sanitized, /on\w+=/gi, '') // Remove event handlers (onclick=, etc.) robustly
-
-  return sanitized.substring(0, maxLength)
+export function sanitizeUrl(url) {
+  if (!url) return ''
+  const sanitized = DOMPurify.sanitize(String(url), {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: [],
+  }).trim()
+  if (!sanitized) return ''
+  if (!/^https?:\/\//i.test(sanitized)) {
+    return `https://${sanitized}`
+  }
+  return sanitized
 }
 
 /**
@@ -74,14 +92,8 @@ export function sanitizeString(input, maxLength = 1000) {
 export function validateUrl(url) {
   if (!url) return null
 
-  const sanitized = sanitizeString(url)
+  const sanitized = sanitizeUrl(url)
   if (!sanitized) return null
-
-  // Must start with http:// or https://
-  if (!sanitized.match(/^https?:\/\//i)) {
-    // Auto-add https:// if missing
-    return `https://${sanitized}`
-  }
 
   return sanitized
 }
@@ -129,7 +141,7 @@ export function validatePasswordStrength(password) {
  */
 export function validatePhone(phone) {
   if (!phone) return true // Optional field
-  const phoneRegex = /^[\d\s+()-]+$/
+  const phoneRegex = /^[+]?[\d\s().-]+$/
   return phoneRegex.test(phone)
 }
 
@@ -183,31 +195,7 @@ export function validateSlug(slug) {
  * @returns {string}
  */
 export function sanitizeVenueAddress(address) {
-  if (!address) return ''
-
-  let sanitized = String(address).trim()
-  let previous
-
-  // Repeatedly apply multi-character replacements until the string stabilizes
-  do {
-    previous = sanitized
-    sanitized = sanitized
-      .replace(/[<>]/g, '') // Remove HTML angle brackets
-      .replace(/javascript:/gi, '') // Remove script protocols
-      .replace(/on\w+=/gi, '') // Remove event handlers
-  } while (sanitized !== previous)
-
-  // Enforce length limit first, then re-sanitize until the truncated string stabilizes
-  sanitized = sanitized.substring(0, 200) // Limit to reasonable length
-  do {
-    previous = sanitized
-    sanitized = sanitized
-      .replace(/[<>]/g, '') // Remove HTML angle brackets
-      .replace(/javascript:/gi, '') // Remove script protocols
-      .replace(/on\w+=/gi, '') // Remove event handlers
-  } while (sanitized !== previous)
-
-  return sanitized.substring(0, 200) // Final length enforcement
+  return sanitizeInput(address, 200)
 }
 
 /**

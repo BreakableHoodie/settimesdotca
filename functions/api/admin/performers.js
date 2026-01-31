@@ -15,6 +15,15 @@ function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+function parseOrigin(origin) {
+  if (!origin) return { city: null, region: null };
+  const [city, region] = origin.split(',').map(part => part.trim());
+  return {
+    city: city || null,
+    region: region || null,
+  };
+}
+
 // Helper to unpack social links
 function unpackSocialLinks(performer) {
   if (!performer) return null;
@@ -24,8 +33,12 @@ function unpackSocialLinks(performer) {
   } catch (_e) {
     social = {};
   }
+  const origin = [performer.origin_city, performer.origin_region]
+    .filter(Boolean)
+    .join(', ') || performer.origin || '';
   return {
     ...performer,
+    origin,
     url: social.website || '',
     instagram: social.instagram || '',
     bandcamp: social.bandcamp || '',
@@ -119,8 +132,19 @@ export async function onRequestPost(context) {
   try {
     const body = await request.json()
     const { 
-      name, genre, origin, description, photo_url, url, 
-      instagram, bandcamp, facebook 
+      name,
+      genre,
+      origin,
+      origin_city,
+      origin_region,
+      contact_email,
+      is_active,
+      description,
+      photo_url,
+      url,
+      instagram,
+      bandcamp,
+      facebook,
     } = body
 
     // Validation
@@ -157,17 +181,39 @@ export async function onRequestPost(context) {
     });
 
     // Create performer
+    const parsedOrigin = parseOrigin(origin?.trim());
+    const resolvedOriginCity = origin_city?.trim() || parsedOrigin.city;
+    const resolvedOriginRegion = origin_region?.trim() || parsedOrigin.region;
+    const computedOrigin =
+      origin?.trim() || [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ") || null;
+    const resolvedIsActive =
+      is_active === undefined ? 1 : Number(is_active) === 1 ? 1 : 0;
+
     const result = await DB.prepare(`
       INSERT INTO band_profiles (
-        name, name_normalized, genre, origin, description, photo_url, social_links
+        name,
+        name_normalized,
+        genre,
+        origin,
+        origin_city,
+        origin_region,
+        contact_email,
+        is_active,
+        description,
+        photo_url,
+        social_links
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `).bind(
       name.trim(),
       nameNormalized,
       genre?.trim() || null,
-      origin?.trim() || null,
+      computedOrigin,
+      resolvedOriginCity,
+      resolvedOriginRegion,
+      contact_email?.trim() || null,
+      resolvedIsActive,
       description?.trim() || null,
       photo_url?.trim() || null,
       socialLinks
@@ -208,9 +254,20 @@ export async function onRequestPut(context) {
 
   try {
     const body = await request.json()
-    const { 
-      name, genre, origin, description, photo_url, url: performerUrl, 
-      instagram, bandcamp, facebook 
+    const {
+      name,
+      genre,
+      origin,
+      origin_city,
+      origin_region,
+      contact_email,
+      is_active,
+      description,
+      photo_url,
+      url: performerUrl,
+      instagram,
+      bandcamp,
+      facebook,
     } = body
 
     // Check performer exists
@@ -258,6 +315,14 @@ export async function onRequestPut(context) {
     });
 
     // Update performer
+    const parsedOrigin = parseOrigin(origin?.trim());
+    const resolvedOriginCity = origin_city?.trim() || parsedOrigin.city;
+    const resolvedOriginRegion = origin_region?.trim() || parsedOrigin.region;
+    const computedOrigin =
+      origin?.trim() || [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ") || null;
+    const resolvedIsActive =
+      is_active === undefined ? null : Number(is_active) === 1 ? 1 : 0;
+
     const result = await DB.prepare(`
       UPDATE band_profiles
       SET 
@@ -265,6 +330,10 @@ export async function onRequestPut(context) {
         name_normalized = COALESCE(?, name_normalized),
         genre = ?,
         origin = ?,
+        origin_city = ?,
+        origin_region = ?,
+        contact_email = ?,
+        is_active = COALESCE(?, is_active),
         description = ?,
         photo_url = ?,
         social_links = ?,
@@ -275,7 +344,11 @@ export async function onRequestPut(context) {
       name?.trim() || null,
       nameNormalized,
       genre?.trim() || null,
-      origin?.trim() || null,
+      computedOrigin,
+      resolvedOriginCity,
+      resolvedOriginRegion,
+      contact_email?.trim() || null,
+      resolvedIsActive,
       description?.trim() || null,
       photo_url?.trim() || null,
       socialLinks,
@@ -347,4 +420,3 @@ export async function onRequestDelete(context) {
     )
   }
 }
-

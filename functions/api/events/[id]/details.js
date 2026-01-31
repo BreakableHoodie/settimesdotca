@@ -14,6 +14,14 @@ export async function onRequestGet(context) {
   }
   const { DB } = env;
 
+  const formatVenueAddress = (venue) => {
+    if (!venue) return null;
+    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+    const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
+    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+    return [line1, line2, line3].filter(Boolean).join(", ");
+  };
+
   const eventId = Number(params.id);
   if (!Number.isFinite(eventId)) {
     return new Response(JSON.stringify({ error: "Invalid event id" }), {
@@ -53,7 +61,13 @@ export async function onRequestGet(context) {
         b.photo_url,
         v.id as venue_id,
         v.name as venue_name,
-        v.address as venue_address
+        v.address as venue_address,
+        v.address_line1,
+        v.address_line2,
+        v.city,
+        v.region,
+        v.postal_code,
+        v.country
       FROM performances p
       LEFT JOIN band_profiles b ON p.band_profile_id = b.id
       LEFT JOIN venues v ON p.venue_id = v.id
@@ -71,7 +85,7 @@ export async function onRequestGet(context) {
         venuesMap.set(row.venue_id, {
           id: row.venue_id,
           name: row.venue_name,
-          address: row.venue_address,
+          address: row.venue_address || formatVenueAddress(row),
           band_count: 0,
         });
       }

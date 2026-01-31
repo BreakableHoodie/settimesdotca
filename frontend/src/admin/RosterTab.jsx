@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { bandsApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
+import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 
 /**
  * RosterTab - Manage Global Artist Roster (Band Profiles)
@@ -11,12 +12,13 @@ import BulkActionBar from './BulkActionBar'
  * - Create/Edit/Delete band profiles
  * - No scheduling data (Time/Venue) here
  */
-export default function RosterTab({ showToast }) {
+export default function RosterTab({ showToast, readOnly = false }) {
   const [bands, setBands] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' })
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -32,6 +34,10 @@ export default function RosterTab({ showToast }) {
     photo_url: '',
     genre: '',
     origin: '',
+    origin_city: '',
+    origin_region: '',
+    contact_email: '',
+    is_active: 1,
     website: '',
     instagram: '',
     bandcamp: '',
@@ -79,10 +85,45 @@ export default function RosterTab({ showToast }) {
   }, [])
 
   // Sorting
-  const sortedBands = useMemo(() => {
-    if (!sortConfig.key) return bands
+  const formatOrigin = band => {
+    if (!band) return ''
+    return [band.origin_city, band.origin_region].filter(Boolean).join(', ') || band.origin || ''
+  }
 
-    return [...bands].sort((a, b) => {
+  const splitOrigin = origin => {
+    if (!origin) return { city: '', region: '' }
+    const [city, region] = origin.split(',').map(part => part.trim())
+    return { city: city || '', region: region || '' }
+  }
+
+  const filteredBands = useMemo(() => {
+    if (!searchTerm.trim()) return bands
+    const query = searchTerm.trim().toLowerCase()
+    return bands.filter(band => {
+      const originText = formatOrigin(band)
+      return (
+        band.name?.toLowerCase().includes(query) ||
+        originText.toLowerCase().includes(query) ||
+        band.genre?.toLowerCase().includes(query) ||
+        band.contact_email?.toLowerCase().includes(query)
+      )
+    })
+  }, [bands, searchTerm])
+
+  const sortedBands = useMemo(() => {
+    if (!sortConfig.key) return filteredBands
+
+    return [...filteredBands].sort((a, b) => {
+      if (sortConfig.key === 'is_active') {
+        const aVal = a.is_active === 0 || a.is_active === false ? 0 : 1
+        const bVal = b.is_active === 0 || b.is_active === false ? 0 : 1
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
+      }
+      if (sortConfig.key === 'origin') {
+        const aVal = formatOrigin(a).toLowerCase()
+        const bVal = formatOrigin(b).toLowerCase()
+        return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      }
       const aVal = (a[sortConfig.key] || '').toLowerCase()
       const bVal = (b[sortConfig.key] || '').toLowerCase()
 
@@ -90,7 +131,7 @@ export default function RosterTab({ showToast }) {
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
-  }, [bands, sortConfig])
+  }, [filteredBands, sortConfig])
 
   const handleSort = key => {
     setSortConfig(prev => ({
@@ -114,6 +155,7 @@ export default function RosterTab({ showToast }) {
         bandcamp: formData.bandcamp || '',
         facebook: formData.facebook || '',
       }
+      const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
 
       // Create Profile Only (no event_id, no venue_id)
       await bandsApi.create({
@@ -121,7 +163,11 @@ export default function RosterTab({ showToast }) {
         description: formData.description,
         photo_url: formData.photo_url,
         genre: formData.genre,
-        origin: formData.origin,
+        origin: originDisplay,
+        origin_city: formData.origin_city,
+        origin_region: formData.origin_region,
+        contact_email: formData.contact_email,
+        is_active: Number(formData.is_active) === 1,
         social_links: JSON.stringify(socialLinks),
         // Explicitly null schedule fields
         eventId: null,
@@ -148,13 +194,18 @@ export default function RosterTab({ showToast }) {
         bandcamp: formData.bandcamp || '',
         facebook: formData.facebook || '',
       }
+      const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
 
       await bandsApi.update(editingId, {
         name: formData.name,
         description: formData.description,
         photo_url: formData.photo_url,
         genre: formData.genre,
-        origin: formData.origin,
+        origin: originDisplay,
+        origin_city: formData.origin_city,
+        origin_region: formData.origin_region,
+        contact_email: formData.contact_email,
+        is_active: Number(formData.is_active) === 1,
         social_links: JSON.stringify(socialLinks),
         // Preserve existing schedule info?
         // The API update might overwrite if we send nulls.
@@ -196,6 +247,7 @@ export default function RosterTab({ showToast }) {
     } catch (e) {
       /* ignore */
     }
+    const parsedOrigin = splitOrigin(band.origin)
 
     setFormData({
       id: band.id,
@@ -204,6 +256,10 @@ export default function RosterTab({ showToast }) {
       photo_url: band.photo_url || '',
       genre: band.genre || '',
       origin: band.origin || '',
+      origin_city: band.origin_city || parsedOrigin.city,
+      origin_region: band.origin_region || parsedOrigin.region,
+      contact_email: band.contact_email || '',
+      is_active: band.is_active ?? 1,
       website: socialLinks.website || '',
       instagram: socialLinks.instagram || '',
       bandcamp: socialLinks.bandcamp || '',
@@ -222,6 +278,10 @@ export default function RosterTab({ showToast }) {
       photo_url: '',
       genre: '',
       origin: '',
+      origin_city: '',
+      origin_region: '',
+      contact_email: '',
+      is_active: 1,
       website: '',
       instagram: '',
       bandcamp: '',
@@ -233,8 +293,49 @@ export default function RosterTab({ showToast }) {
 
   const handleInputChange = e => {
     const { name, value } = e.target
+    if (name === 'is_active') {
+      setFormData(prev => ({ ...prev, [name]: Number(value) }))
+      return
+    }
     setFormData(prev => ({ ...prev, [name]: value }))
   }
+
+  const originCitySuggestions = useMemo(() => {
+    const values = new Set()
+    bands.forEach(band => {
+      if (band.origin_city) values.add(band.origin_city)
+      if (!band.origin_city && band.origin) {
+        const parsed = splitOrigin(band.origin)
+        if (parsed.city) values.add(parsed.city)
+      }
+    })
+    return Array.from(values).sort((a, b) => a.localeCompare(b))
+  }, [bands])
+
+  const originRegionSuggestions = useMemo(() => {
+    const values = new Set()
+    bands.forEach(band => {
+      if (band.origin_region) values.add(band.origin_region)
+      if (!band.origin_region && band.origin) {
+        const parsed = splitOrigin(band.origin)
+        if (parsed.region) values.add(parsed.region)
+      }
+    })
+    return Array.from(values).sort((a, b) => a.localeCompare(b))
+  }, [bands])
+
+  const genreSuggestions = useMemo(() => {
+    const values = []
+    bands.forEach(band => {
+      if (!band.genre) return
+      band.genre
+        .split(',')
+        .map(entry => entry.trim())
+        .filter(Boolean)
+        .forEach(entry => values.push(entry))
+    })
+    return getNormalizedGenreSuggestions(values, DEFAULT_GENRES)
+  }, [bands])
 
   // Selection Logic
   const handleSelect = (id, checked) => {
@@ -246,7 +347,7 @@ export default function RosterTab({ showToast }) {
   }
 
   const handleSelectAll = checked => {
-    setSelectedIds(checked ? new Set(bands.map(b => b.id)) : new Set())
+    setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
   }
 
   const handleBulkSubmit = async () => {
@@ -282,18 +383,27 @@ export default function RosterTab({ showToast }) {
           <h2 className="text-2xl font-bold text-white">Global Artist Roster</h2>
           <p className="text-sm text-white/70 mt-1">Master database of all artists and performers.</p>
         </div>
-        {!showAddForm && !editingId && (
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="px-6 py-3 min-h-[44px] bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium"
-          >
-            + New Artist
-          </button>
-        )}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search name, origin, genre"
+            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-64"
+          />
+          {!showAddForm && !editingId && !readOnly && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="px-6 py-3 min-h-[44px] bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium"
+            >
+              + New Artist
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Bulk Actions */}
-      {selectedIds.size > 0 && (
+      {!readOnly && selectedIds.size > 0 && (
         <div className="bg-band-navy/80 p-4 rounded border border-band-orange/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky top-20 z-10 backdrop-blur-md">
           <span className="text-white font-medium">{selectedIds.size} selected</span>
           <div className="flex flex-col sm:flex-row gap-2">
@@ -317,7 +427,7 @@ export default function RosterTab({ showToast }) {
       )}
 
       {/* Add/Edit Form */}
-      {(showAddForm || editingId) && (
+      {(showAddForm || editingId) && !readOnly && (
         <div ref={editFormRef} className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
           <h3 className="text-lg font-bold text-band-orange mb-4">{editingId ? 'Edit Artist' : 'New Artist'}</h3>
           <BandForm
@@ -331,6 +441,9 @@ export default function RosterTab({ showToast }) {
             onSubmit={editingId ? handleUpdate : handleAdd}
             onCancel={resetForm}
             conflicts={[]}
+            originCitySuggestions={originCitySuggestions}
+            originRegionSuggestions={originRegionSuggestions}
+            genreSuggestions={genreSuggestions}
           />
         </div>
       )}
@@ -339,22 +452,26 @@ export default function RosterTab({ showToast }) {
       <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-band-orange">Loading roster...</div>
-        ) : bands.length === 0 ? (
-          <div className="p-8 text-center text-white/50">Roster is empty.</div>
+        ) : filteredBands.length === 0 ? (
+          <div className="p-8 text-center text-white/50">
+            {bands.length === 0 ? 'Roster is empty.' : 'No artists match your filters.'}
+          </div>
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-band-navy/50 border-b border-band-orange/20">
                   <tr>
-                    <th className="px-4 py-3 w-12">
-                      <input
-                        type="checkbox"
-                        className="cursor-pointer h-5 w-5"
-                        onChange={e => handleSelectAll(e.target.checked)}
-                        checked={selectedIds.size === bands.length && bands.length > 0}
-                      />
-                    </th>
+                    {!readOnly && (
+                      <th className="px-4 py-3 w-12 text-center align-middle">
+                        <input
+                          type="checkbox"
+                          className="cursor-pointer h-5 w-5 align-middle"
+                          onChange={e => handleSelectAll(e.target.checked)}
+                          checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
+                        />
+                      </th>
+                    )}
                     <th
                       onClick={() => handleSort('name')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
@@ -373,7 +490,19 @@ export default function RosterTab({ showToast }) {
                     >
                       Genre <SortIcon col="genre" />
                     </th>
-                    <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>
+                    <th
+                      onClick={() => handleSort('is_active')}
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                    >
+                      Status <SortIcon col="is_active" />
+                    </th>
+                    <th
+                      onClick={() => handleSort('contact_email')}
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                    >
+                      Contact <SortIcon col="contact_email" />
+                    </th>
+                    {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-band-orange/10">
@@ -382,49 +511,76 @@ export default function RosterTab({ showToast }) {
                       key={band.id}
                       className={`hover:bg-band-navy/30 transition-colors ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
                     >
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          className="cursor-pointer h-5 w-5"
-                          checked={selectedIds.has(band.id)}
-                          onChange={e => handleSelect(band.id, e.target.checked)}
-                        />
+                      {!readOnly && (
+                        <td className="px-4 py-3 text-center align-middle">
+                          <input
+                            type="checkbox"
+                            className="cursor-pointer h-5 w-5 align-middle"
+                            checked={selectedIds.has(band.id)}
+                            onChange={e => handleSelect(band.id, e.target.checked)}
+                          />
+                        </td>
+                      )}
+                      <td className="px-4 py-3 text-white font-medium">
+                        <a
+                          href={`/band/${band.band_profile_id || band.id?.toString().replace('profile_', '')}`}
+                          className="text-band-orange hover:underline"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {band.name}
+                        </a>
                       </td>
-                      <td className="px-4 py-3 text-white font-medium">{band.name}</td>
-                      <td className="px-4 py-3 text-white/70">{band.origin || '-'}</td>
+                      <td className="px-4 py-3 text-white/70">{formatOrigin(band) || '-'}</td>
                       <td className="px-4 py-3 text-white/70">{band.genre || '-'}</td>
-                      <td className="px-4 py-3 flex justify-end gap-2">
-                        <button
-                          onClick={() => startEdit(band)}
-                          className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                      <td className="px-4 py-3 text-white/70">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
+                            band.is_active === 0 || band.is_active === false
+                              ? 'bg-gray-700 text-white/80'
+                              : 'bg-emerald-600/20 text-emerald-200'
+                          }`}
                         >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(band.id, band.name)}
-                          className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                        >
-                          Delete
-                        </button>
+                          {band.is_active === 0 || band.is_active === false ? 'Inactive' : 'Active'}
+                        </span>
                       </td>
+                      <td className="px-4 py-3 text-white/70">{band.contact_email || '-'}</td>
+                      {!readOnly && (
+                        <td className="px-4 py-3 flex justify-end gap-2">
+                          <button
+                            onClick={() => startEdit(band)}
+                            className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(band.id, band.name)}
+                            className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="md:hidden divide-y divide-band-orange/10">
-              <div className="px-4 py-3 flex items-center justify-between">
-                <label className="flex items-center gap-3 text-white">
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 cursor-pointer"
-                    onChange={e => handleSelectAll(e.target.checked)}
-                    checked={selectedIds.size === bands.length && bands.length > 0}
-                  />
-                  <span>Select all</span>
-                </label>
-                <span className="text-xs text-text-tertiary">{bands.length} artists</span>
-              </div>
+              {!readOnly && (
+                <div className="px-4 py-3 flex items-center justify-between">
+                  <label className="flex items-center gap-3 text-white">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 cursor-pointer"
+                      onChange={e => handleSelectAll(e.target.checked)}
+                      checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
+                    />
+                    <span>Select all</span>
+                  </label>
+                  <span className="text-xs text-text-tertiary">{filteredBands.length} artists</span>
+                </div>
+              )}
               {sortedBands.map(band => (
                 <div
                   key={band.id}
@@ -432,33 +588,46 @@ export default function RosterTab({ showToast }) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <label className="flex items-center gap-3 text-white">
-                      <input
-                        type="checkbox"
-                        className="h-5 w-5 cursor-pointer"
-                        checked={selectedIds.has(band.id)}
-                        onChange={e => handleSelect(band.id, e.target.checked)}
-                      />
-                      <span className="font-medium">{band.name}</span>
+                      {!readOnly && (
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5 cursor-pointer"
+                          checked={selectedIds.has(band.id)}
+                          onChange={e => handleSelect(band.id, e.target.checked)}
+                        />
+                      )}
+                      <a
+                        href={`/band/${band.band_profile_id || band.id?.toString().replace('profile_', '')}`}
+                        className="font-medium text-band-orange hover:underline"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {band.name}
+                      </a>
                     </label>
                   </div>
                   <div className="text-sm text-text-secondary space-y-1">
-                    <div>Origin: {band.origin || '-'}</div>
+                    <div>Origin: {formatOrigin(band) || '-'}</div>
                     <div>Genre: {band.genre || '-'}</div>
+                    <div>Status: {band.is_active === 0 || band.is_active === false ? 'Inactive' : 'Active'}</div>
+                    <div>Contact: {band.contact_email || '-'}</div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => startEdit(band)}
-                      className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(band.id, band.name)}
-                      className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  {!readOnly && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => startEdit(band)}
+                        className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(band.id, band.name)}
+                        className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

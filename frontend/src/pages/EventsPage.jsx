@@ -1,7 +1,14 @@
+import { useEffect } from 'react'
 import EventTimeline from '../components/EventTimeline'
 import Footer from '../components/Footer'
+import PrivacyBanner from '../components/PrivacyBanner'
+import { trackPageView } from '../utils/metrics'
 
 export default function EventsPage() {
+  useEffect(() => {
+    trackPageView('/')
+  }, [])
+
   return (
     <div className="min-h-screen bg-gradient-dark">
       <header className="py-8 px-4 text-center border-b border-accent-500/30">
@@ -13,6 +20,7 @@ export default function EventsPage() {
 
       <EventTimeline />
       <Footer />
+      <PrivacyBanner />
     </div>
   )
 }

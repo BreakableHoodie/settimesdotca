@@ -174,11 +174,22 @@ const areEventPropsEqual = (prevProps, nextProps) => {
     prevEvent.slug === nextEvent.slug &&
     prevEvent.status === nextEvent.status &&
     prevEvent.band_count === nextEvent.band_count &&
-    prevEvent.ticket_link === nextEvent.ticket_link
+    (prevEvent.ticket_url || prevEvent.ticket_link) === (nextEvent.ticket_url || nextEvent.ticket_link)
   )
 }
 
-const EventRow = memo(function EventRow({ event, onFilter, onEdit, onTogglePublish, onArchive, onDelete, showToast }) {
+const EventRow = memo(function EventRow({
+  event,
+  onFilter,
+  onEdit,
+  onTogglePublish,
+  onArchive,
+  onDelete,
+  showToast,
+  readOnly,
+}) {
+  const ticketLink = event.ticket_url || event.ticket_link
+
   return (
     <tr className="hover:bg-band-navy/30 transition-colors">
       <td className="px-4 py-3">
@@ -192,15 +203,17 @@ const EventRow = memo(function EventRow({ event, onFilter, onEdit, onTogglePubli
       </td>
       <td className="px-4 py-3 text-white/70">{formatEventDate(event.date)}</td>
       <td className="px-4 py-3 text-band-orange font-mono text-sm">{event.slug}</td>
-      <td className="px-4 py-3">
-        <EventStatusBadge status={event.status} />
+      <td className="px-4 py-3 text-center">
+        <div className="inline-flex justify-center w-full">
+          <EventStatusBadge status={event.status} />
+        </div>
       </td>
-      <td className="px-4 py-3 text-white/70">{event.band_count || 0}</td>
-      <td className="px-4 py-3">
-        {event.ticket_link ? (
-          <div className="flex gap-2">
+      <td className="px-4 py-3 text-center text-white/70">{event.band_count || 0}</td>
+      <td className="px-4 py-3 text-center">
+        {ticketLink ? (
+          <div className="flex justify-center gap-2">
             <button
-              onClick={() => window.open(event.ticket_link, '_blank')}
+              onClick={() => window.open(ticketLink, '_blank')}
               className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
               title="Visit ticket link"
             >
@@ -209,7 +222,7 @@ const EventRow = memo(function EventRow({ event, onFilter, onEdit, onTogglePubli
             </button>
             <button
               onClick={async () => {
-                await navigator.clipboard.writeText(event.ticket_link)
+                await navigator.clipboard.writeText(ticketLink)
                 showToast('Ticket link copied!', 'success')
               }}
               className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
@@ -223,47 +236,49 @@ const EventRow = memo(function EventRow({ event, onFilter, onEdit, onTogglePubli
           <span className="text-white/30 text-sm">-</span>
         )}
       </td>
-      <td className="px-4 py-3">
-        <div className="flex justify-end gap-2 flex-wrap">
-          <button
-            onClick={() => onEdit(event)}
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => onTogglePublish(event)}
-            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-              event.status === 'published'
-                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                : 'bg-green-600 hover:bg-green-700 text-white'
-            }`}
-            disabled={event.status === 'archived'}
-          >
-            {event.status === 'published' ? 'Unpublish' : 'Publish'}
-          </button>
-          {event.status !== 'archived' && (
+      {!readOnly && (
+        <td className="px-4 py-3">
+          <div className="flex justify-end gap-2 flex-wrap">
             <button
-              onClick={() => onArchive(event)}
-              className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
-              title="Archive event (admin only)"
+              onClick={() => onEdit(event)}
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
             >
-              Archive
+              Edit
             </button>
-          )}
-          <button
-            onClick={() => onDelete(event)}
-            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
-          >
-            Delete
-          </button>
-        </div>
-      </td>
+            <button
+              onClick={() => onTogglePublish(event)}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                event.status === 'published'
+                  ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+              disabled={event.status === 'archived'}
+            >
+              {event.status === 'published' ? 'Unpublish' : 'Publish'}
+            </button>
+            {event.status !== 'archived' && (
+              <button
+                onClick={() => onArchive(event)}
+                className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                title="Archive event (admin only)"
+              >
+                Archive
+              </button>
+            )}
+            <button
+              onClick={() => onDelete(event)}
+              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        </td>
+      )}
     </tr>
   )
 }, areEventPropsEqual)
 
-const EventCard = memo(function EventCard({ event, onEdit, onTogglePublish, onArchive, onDelete }) {
+const EventCard = memo(function EventCard({ event, onEdit, onTogglePublish, onArchive, onDelete, readOnly }) {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-start justify-between">
@@ -283,39 +298,41 @@ const EventCard = memo(function EventCard({ event, onEdit, onTogglePublish, onAr
         Bands: <span className="text-white">{event.band_count || 0}</span>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => onEdit(event)}
-          className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => onTogglePublish(event)}
-          className={`px-4 py-2 min-h-[44px] rounded text-sm font-medium transition-colors ${
-            event.status === 'published'
-              ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-              : 'bg-green-600 hover:bg-green-700 text-white'
-          }`}
-          disabled={event.status === 'archived'}
-        >
-          {event.status === 'published' ? 'Unpublish' : 'Publish'}
-        </button>
-        {event.status !== 'archived' && (
+      {!readOnly && (
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => onArchive(event)}
-            className="px-4 py-2 min-h-[44px] bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+            onClick={() => onEdit(event)}
+            className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
           >
-            Archive
+            Edit
           </button>
-        )}
-        <button
-          onClick={() => onDelete(event)}
-          className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
-        >
-          Delete
-        </button>
-      </div>
+          <button
+            onClick={() => onTogglePublish(event)}
+            className={`px-4 py-2 min-h-[44px] rounded text-sm font-medium transition-colors ${
+              event.status === 'published'
+                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                : 'bg-green-600 hover:bg-green-700 text-white'
+            }`}
+            disabled={event.status === 'archived'}
+          >
+            {event.status === 'published' ? 'Unpublish' : 'Publish'}
+          </button>
+          {event.status !== 'archived' && (
+            <button
+              onClick={() => onArchive(event)}
+              className="px-4 py-2 min-h-[44px] bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+            >
+              Archive
+            </button>
+          )}
+          <button
+            onClick={() => onDelete(event)}
+            className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   )
 }, areEventPropsEqual)
@@ -337,6 +354,7 @@ export default function EventsTab({
   selectedEventId,
   selectedEvent,
   onEventFilterChange,
+  readOnly = false,
 }) {
   const { refreshEvents } = useEventContext()
   const [showModal, setShowModal] = useState(false)
@@ -347,6 +365,8 @@ export default function EventsTab({
   const [showArchived, setShowArchived] = useState(false)
   // loading state is not currently used in this component; remove to satisfy ESLint
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [eventVenues, setEventVenues] = useState([])
   const [eventBands, setEventBands] = useState([])
   const [showHelp, setShowHelp] = useState(false)
@@ -405,7 +425,24 @@ export default function EventsTab({
     setSortConfig({ key, direction })
   }
 
-  const sortedEvents = [...events].sort((a, b) => {
+  const filteredEvents = events.filter(event => {
+    if (!showArchived && statusFilter !== 'archived' && event.status === 'archived') {
+      return false
+    }
+
+    if (statusFilter !== 'all' && event.status !== statusFilter) {
+      return false
+    }
+
+    if (!searchTerm.trim()) {
+      return true
+    }
+
+    const query = searchTerm.trim().toLowerCase()
+    return event.name?.toLowerCase().includes(query) || event.slug?.toLowerCase().includes(query)
+  })
+
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
     if (!sortConfig.key) return 0
     let aVal = a[sortConfig.key]
     let bVal = b[sortConfig.key]
@@ -421,6 +458,9 @@ export default function EventsTab({
       const statusOrder = { published: 2, draft: 1, archived: 0 }
       aVal = statusOrder[a.status] || 0
       bVal = statusOrder[b.status] || 0
+    } else if (sortConfig.key === 'ticket_url') {
+      aVal = a.ticket_url || a.ticket_link || ''
+      bVal = b.ticket_url || b.ticket_link || ''
     }
 
     if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
@@ -466,6 +506,10 @@ export default function EventsTab({
   }
 
   const startEdit = event => {
+    if (readOnly) {
+      showToast('Read-only access: editing is disabled for your role.', 'error')
+      return
+    }
     // Check if event is archived
     if (isEventArchived(event.date)) {
       // Show two-confirmation gate
@@ -483,6 +527,10 @@ export default function EventsTab({
   // Duplicate flow handled via startDuplicate and eventsApi directly when invoked from UI controls.
 
   const handleTogglePublish = async event => {
+    if (readOnly) {
+      showToast('Read-only access: publishing is disabled for your role.', 'error')
+      return
+    }
     const publish = event.status !== 'published'
     const action = publish ? 'publish' : 'unpublish'
 
@@ -502,6 +550,10 @@ export default function EventsTab({
   }
 
   const handleArchive = async event => {
+    if (readOnly) {
+      showToast('Read-only access: archiving is disabled for your role.', 'error')
+      return
+    }
     if (!window.confirm(`Archive "${event.name}"? It will be hidden from the default view and unpublished.`)) {
       return
     }
@@ -518,6 +570,10 @@ export default function EventsTab({
   }
 
   const handleDelete = async event => {
+    if (readOnly) {
+      showToast('Read-only access: deleting is disabled for your role.', 'error')
+      return
+    }
     const { id: eventId, name: eventName, date: eventDate, band_count: bandCount } = event
 
     // Check if event is archived
@@ -650,12 +706,14 @@ export default function EventsTab({
               >
                 Metrics
               </button>
-              <button
-                onClick={() => startEdit(selectedEvent)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors min-h-[44px]"
-              >
-                Edit
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => startEdit(selectedEvent)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                >
+                  Edit
+                </button>
+              )}
               {selectedEvent.ticket_link && (
                 <button
                   onClick={() => window.open(selectedEvent.ticket_link, '_blank')}
@@ -843,15 +901,17 @@ export default function EventsTab({
         </div>
 
         {/* Modals */}
-        <EventFormModal
-          isOpen={showModal}
-          onClose={() => {
-            setShowModal(false)
-            setEditingEvent(null)
-          }}
-          event={editingEvent}
-          onSave={handleEventSaved}
-        />
+        {!readOnly && (
+          <EventFormModal
+            isOpen={showModal}
+            onClose={() => {
+              setShowModal(false)
+              setEditingEvent(null)
+            }}
+            event={editingEvent}
+            onSave={handleEventSaved}
+          />
+        )}
         {/* Metrics Dashboard Modal */}
         {showMetrics && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -898,6 +958,23 @@ export default function EventsTab({
           <p className="text-sm text-white/70 mt-1">Create, edit, and publish event schedules.</p>
         </div>
         <div className="flex flex-col items-start sm:flex-row sm:items-center gap-3">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search name or slug"
+            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+          />
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+          >
+            <option value="all">All statuses</option>
+            <option value="published">Published</option>
+            <option value="draft">Draft</option>
+            <option value="archived">Archived</option>
+          </select>
           <button
             onClick={() => setShowHelp(!showHelp)}
             className="px-4 py-2 text-band-orange underline text-sm hover:text-orange-500 transition-colors min-h-[44px]"
@@ -914,15 +991,17 @@ export default function EventsTab({
             />
             <span>Show Archived</span>
           </label>
-          <button
-            onClick={() => {
-              setEditingEvent(null)
-              setShowModal(true)
-            }}
-            className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors min-h-[44px]"
-          >
-            + Create New Event
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => {
+                setEditingEvent(null)
+                setShowModal(true)
+              }}
+              className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors min-h-[44px]"
+            >
+              + Create New Event
+            </button>
+          )}
         </div>
       </div>
 
@@ -930,20 +1009,26 @@ export default function EventsTab({
       {showHelp && <HelpPanel topic="events" isOpen={showHelp} onClose={() => setShowHelp(false)} />}
 
       {/* Event Form Modal */}
-      <EventFormModal
-        isOpen={showModal}
-        onClose={() => {
-          setShowModal(false)
-          setEditingEvent(null)
-        }}
-        event={editingEvent}
-        onSave={handleEventSaved}
-      />
+      {!readOnly && (
+        <EventFormModal
+          isOpen={showModal}
+          onClose={() => {
+            setShowModal(false)
+            setEditingEvent(null)
+          }}
+          event={editingEvent}
+          onSave={handleEventSaved}
+        />
+      )}
 
       {/* Events List */}
       <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
-        {events.length === 0 ? (
-          <div className="p-8 text-center text-white/50">No events yet. Create your first event to get started!</div>
+        {filteredEvents.length === 0 ? (
+          <div className="p-8 text-center text-white/50">
+            {events.length === 0
+              ? 'No events yet. Create your first event to get started!'
+              : 'No events match your filters.'}
+          </div>
         ) : (
           <>
             {/* Desktop Table */}
@@ -970,54 +1055,57 @@ export default function EventsTab({
                       Slug {sortConfig.key === 'slug' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                       onClick={() => handleSort('status')}
                     >
                       Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
                       onClick={() => handleSort('band_count')}
                     >
                       Bands {sortConfig.key === 'band_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-4 py-3 text-left text-white font-semibold">Tickets</th>
-                    <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>
+                    <th
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      onClick={() => handleSort('ticket_url')}
+                    >
+                      Tickets {sortConfig.key === 'ticket_url' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
+                    {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-band-orange/10">
-                  {sortedEvents
-                    .filter(event => showArchived || event.status !== 'archived')
-                    .map(event => (
-                      <EventRow
-                        key={event.id}
-                        event={event}
-                        onFilter={onEventFilterChange}
-                        onEdit={startEdit}
-                        onTogglePublish={handleTogglePublish}
-                        onArchive={handleArchive}
-                        onDelete={handleDelete}
-                        showToast={showToast}
-                      />
-                    ))}
+                  {sortedEvents.map(event => (
+                    <EventRow
+                      key={event.id}
+                      event={event}
+                      onFilter={onEventFilterChange}
+                      onEdit={startEdit}
+                      onTogglePublish={handleTogglePublish}
+                      onArchive={handleArchive}
+                      onDelete={handleDelete}
+                      showToast={showToast}
+                      readOnly={readOnly}
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-band-orange/10">
-              {sortedEvents
-                .filter(event => showArchived || event.status !== 'archived')
-                .map(event => (
-                  <EventCard
-                    key={event.id}
-                    event={event}
-                    onEdit={startEdit}
-                    onTogglePublish={handleTogglePublish}
-                    onArchive={handleArchive}
-                    onDelete={handleDelete}
-                  />
-                ))}
+              {sortedEvents.map(event => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onEdit={startEdit}
+                  onTogglePublish={handleTogglePublish}
+                  onArchive={handleArchive}
+                  onDelete={handleDelete}
+                  readOnly={readOnly}
+                />
+              ))}
             </div>
           </>
         )}

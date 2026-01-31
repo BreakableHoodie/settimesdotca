@@ -74,7 +74,7 @@ describe("admin mfa", () => {
     expect(payload.success).toBe(true);
 
     const session = rawDb
-      .prepare("SELECT * FROM sessions WHERE user_id = ?")
+      .prepare("SELECT * FROM lucia_sessions WHERE user_id = ?")
       .get(1);
     expect(session).toBeTruthy();
 

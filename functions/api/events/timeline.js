@@ -18,6 +18,20 @@ export async function onRequestGet(context) {
   }
   const { DB } = env;
 
+  const formatOrigin = (band) => {
+    if (!band) return null;
+    const parts = [band.origin_city, band.origin_region].filter(Boolean);
+    return parts.length ? parts.join(", ") : band.origin || null;
+  };
+
+  const formatVenueAddress = (venue) => {
+    if (!venue) return null;
+    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+    const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
+    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+    return [line1, line2, line3].filter(Boolean).join(", ");
+  };
+
   try {
     const url = new URL(request.url);
     const includeNow = url.searchParams.get("now") !== "false"; // default true
@@ -74,7 +88,7 @@ export async function onRequestGet(context) {
               end_time: row.end_time,
               url: url,
               genre: row.genre,
-              origin: row.origin || null,
+              origin: formatOrigin(row),
               photo_url: row.photo_url,
               venue_id: row.venue_id,
               venue_name: row.venue_name,
@@ -86,7 +100,7 @@ export async function onRequestGet(context) {
             event.venues.set(row.venue_id, {
               id: row.venue_id,
               name: row.venue_name,
-              address: row.venue_address,
+              address: row.venue_address || formatVenueAddress(row),
               band_count: 0,
             });
           }
@@ -123,11 +137,19 @@ export async function onRequestGet(context) {
           p.end_time,
           b.social_links,
           b.genre,
-          NULL as origin,
+          b.origin,
+          b.origin_city,
+          b.origin_region,
           b.photo_url,
           v.id as venue_id,
           v.name as venue_name,
-          v.address as venue_address
+          v.address as venue_address,
+          v.address_line1,
+          v.address_line2,
+          v.city,
+          v.region,
+          v.postal_code,
+          v.country
         FROM events e
         LEFT JOIN performances p ON p.event_id = e.id
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
@@ -159,11 +181,19 @@ export async function onRequestGet(context) {
           p.end_time,
           b.social_links,
           b.genre,
-          NULL as origin,
+          b.origin,
+          b.origin_city,
+          b.origin_region,
           b.photo_url,
           v.id as venue_id,
           v.name as venue_name,
-          v.address as venue_address
+          v.address as venue_address,
+          v.address_line1,
+          v.address_line2,
+          v.city,
+          v.region,
+          v.postal_code,
+          v.country
         FROM events e
         LEFT JOIN performances p ON p.event_id = e.id
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
@@ -204,11 +234,19 @@ export async function onRequestGet(context) {
           p.end_time,
           b.social_links,
           b.genre,
-          NULL as origin,
+          b.origin,
+          b.origin_city,
+          b.origin_region,
           b.photo_url,
           v.id as venue_id,
           v.name as venue_name,
-          v.address as venue_address
+          v.address as venue_address,
+          v.address_line1,
+          v.address_line2,
+          v.city,
+          v.region,
+          v.postal_code,
+          v.country
         FROM events e
         LEFT JOIN performances p ON p.event_id = e.id
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id

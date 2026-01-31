@@ -2,7 +2,6 @@
 // GET /api/admin/users - List all users
 // POST /api/admin/users - Create new user
 
-import { hashPassword } from "../../utils/crypto.js";
 import { checkPermission, auditLog } from "./_middleware.js";
 import {
   validateEntity,
@@ -10,6 +9,8 @@ import {
   validationErrorResponse,
 } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
+import { sendEmail, isEmailConfigured } from "../../utils/email.js";
+import { buildInviteEmail } from "../../utils/emailTemplates.js";
 
 // GET - List all users (admin only)
 export async function onRequestGet(context) {
@@ -30,6 +31,8 @@ export async function onRequestGet(context) {
         id,
         email,
         name,
+        first_name,
+        last_name,
         role,
         is_active,
         created_at,
@@ -44,6 +47,12 @@ export async function onRequestGet(context) {
       JSON.stringify({
         users: users.map((u) => ({
           ...u,
+          firstName: u.first_name || null,
+          lastName: u.last_name || null,
+          name:
+            u.name ||
+            [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+            null,
           isActive: u.is_active === 1, // Convert to camelCase boolean
         })),
       }),
@@ -61,7 +70,7 @@ export async function onRequestGet(context) {
   }
 }
 
-// POST - Create new user (admin only)
+// POST - Invite new user (admin only)
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
@@ -80,13 +89,14 @@ export async function onRequestPost(context) {
     const body = await request.json().catch(() => ({}));
 
     // Validate input using schema
-    const validation = validateEntity(body, VALIDATION_SCHEMAS.user);
+    const validation = validateEntity(body, VALIDATION_SCHEMAS.userInvite);
     if (!validation.valid) {
       const firstError = Object.values(validation.errors)[0];
       return validationErrorResponse(firstError, { fields: validation.errors });
     }
 
-    const { email, password, role, name } = validation.sanitized;
+    const { email, role, firstName, lastName } = validation.sanitized;
+    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
     // Check if email already exists
     const existingUser = await DB.prepare(
@@ -110,44 +120,82 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Hash password
-    const passwordHash = await hashPassword(password);
+    const inviteCode = crypto.randomUUID();
+    const expiresInDays = 7;
+    const expiresAt = new Date(
+      Date.now() + expiresInDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
 
-    // Create user
-    const result = await DB.prepare(
+    // Create invite code
+    const invite = await DB.prepare(
       `
-      INSERT INTO users (email, password_hash, role, name, is_active)
-      VALUES (?, ?, ?, ?, 1)
+      INSERT INTO invite_codes (code, email, role, created_by_user_id, expires_at)
+      VALUES (?, ?, ?, ?, ?)
+      RETURNING *
     `,
     )
-      .bind(email, passwordHash, role, name)
-      .run();
+      .bind(inviteCode, email, role, currentUser.userId, expiresAt)
+      .first();
 
-    const newUserId = result.meta.last_row_id;
+    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    const inviteUrl = new URL("/admin/signup", baseUrl);
+    inviteUrl.searchParams.set("code", inviteCode);
+    inviteUrl.searchParams.set("email", email);
+    if (fullName) {
+      inviteUrl.searchParams.set("name", fullName);
+    }
+    if (firstName) {
+      inviteUrl.searchParams.set("first", firstName);
+    }
+    if (lastName) {
+      inviteUrl.searchParams.set("last", lastName);
+    }
+
+    let emailResult = { delivered: false, reason: "not_configured" };
+    if (isEmailConfigured(env)) {
+      const emailPayload = buildInviteEmail({
+        inviteUrl: inviteUrl.toString(),
+        expiresAt,
+        recipientName: fullName || null,
+      });
+
+      emailResult = await sendEmail(env, {
+        to: email,
+        subject: emailPayload.subject,
+        text: emailPayload.text,
+        html: emailPayload.html,
+      });
+    } else {
+      console.info(`[Email] Invite link for ${email}: ${inviteUrl}`);
+    }
 
     // Audit log
     await auditLog(
       env,
       currentUser.userId,
-      "user.created",
-      "user",
-      newUserId,
+      "user.invited",
+      "invite_code",
+      invite?.id,
       {
         email,
         role,
-        name,
+        name: fullName || null,
+        firstName,
+        lastName,
+        inviteCode,
+        expiresAt,
+        emailDelivered: emailResult.delivered,
       },
       ipAddress,
     );
 
-    // Return created user (without password)
+    // Return invite details
     return new Response(
       JSON.stringify({
-        id: newUserId,
-        email,
-        role,
-        name,
-        isActive: true,
+        success: true,
+        invite,
+        inviteUrl: inviteUrl.toString(),
+        email: emailResult,
       }),
       {
         status: 201,

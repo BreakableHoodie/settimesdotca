@@ -1,5 +1,5 @@
 import { Component } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useInRouterContext } from 'react-router-dom'
 
 /**
  * ErrorBoundary - Catches React component errors and displays fallback UI
@@ -73,12 +73,7 @@ class ErrorBoundary extends Component {
               >
                 Refresh Page
               </button>
-              <Link
-                to="/"
-                className="px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors font-medium"
-              >
-                Go Home
-              </Link>
+              <HomeLink className="px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors font-medium" />
             </div>
           </div>
         </div>
@@ -87,6 +82,24 @@ class ErrorBoundary extends Component {
 
     return this.props.children
   }
+}
+
+function HomeLink({ className }) {
+  const inRouter = useInRouterContext()
+
+  if (!inRouter) {
+    return (
+      <a href="/" className={className}>
+        Go Home
+      </a>
+    )
+  }
+
+  return (
+    <Link to="/" className={className}>
+      Go Home
+    </Link>
+  )
 }
 
 export default ErrorBoundary

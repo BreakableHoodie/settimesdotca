@@ -34,8 +34,9 @@ export default function ResetPasswordPage() {
           setUser(data.user)
           setStatus('ready')
         } else {
+          const debugNote = data?.debugId ? ` (ref: ${data.debugId})` : ''
           setStatus('error')
-          setMessage(data.error || 'Invalid or expired reset token')
+          setMessage(`${data.error || 'Invalid or expired reset token'}${debugNote}`)
         }
       })
       .catch(_error => {
@@ -80,7 +81,8 @@ export default function ResetPasswordPage() {
         }, 3000)
       } else {
         setStatus('error')
-        setMessage(data.error || 'Failed to reset password')
+        const debugNote = data.debugId ? ` (ref: ${data.debugId})` : ''
+        setMessage(`${data.error || 'Failed to reset password'}${debugNote}`)
       }
     } catch {
       setStatus('error')

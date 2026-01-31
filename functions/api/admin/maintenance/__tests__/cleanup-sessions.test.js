@@ -5,18 +5,18 @@ import { onRequestPost } from "../cleanup-sessions.js";
 describe("POST /api/admin/maintenance/cleanup-sessions", () => {
   test("admin can delete expired sessions and logs audit", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
-    const expiredAt = new Date(Date.now() - 60 * 1000).toISOString();
-    const activeAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const expiredAt = Math.floor(Date.now() / 1000) - 60;
+    const activeAt = Math.floor(Date.now() / 1000) + 60 * 60;
 
     rawDb
       .prepare(
-        "INSERT INTO sessions (session_token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
       )
       .run("expired-token", 1, expiredAt, "127.0.0.1", "test-agent");
 
     rawDb
       .prepare(
-        "INSERT INTO sessions (session_token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
       )
       .run("active-token", 1, activeAt, "127.0.0.1", "test-agent");
 
@@ -33,10 +33,10 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
     expect(payload.deleted_count).toBe(1);
 
     const expiredRow = rawDb
-      .prepare("SELECT COUNT(*) as count FROM sessions WHERE session_token = ?")
+      .prepare("SELECT COUNT(*) as count FROM lucia_sessions WHERE id = ?")
       .get("expired-token");
     const activeRow = rawDb
-      .prepare("SELECT COUNT(*) as count FROM sessions WHERE session_token = ?")
+      .prepare("SELECT COUNT(*) as count FROM lucia_sessions WHERE id = ?")
       .get("active-token");
 
     expect(expiredRow.count).toBe(0);

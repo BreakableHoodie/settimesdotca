@@ -7,8 +7,10 @@ import ComingUp from './components/ComingUp'
 import Footer from './components/Footer'
 import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
+import PrivacyBanner from './components/PrivacyBanner'
 import ScheduleView from './components/ScheduleView'
 import { validateBandsData } from './utils/validation'
+import { trackEventView, trackPageView } from './utils/metrics'
 
 const MySchedule = lazy(() => import('./components/MySchedule'))
 const VenueInfo = lazy(() => import('./components/VenueInfo'))
@@ -189,6 +191,16 @@ function App() {
     loadData()
     return () => controller.abort()
   }, [slug])
+
+  useEffect(() => {
+    trackPageView(`/event/${slug || 'current'}`)
+  }, [slug])
+
+  useEffect(() => {
+    if (eventData?.id) {
+      trackEventView(eventData.id)
+    }
+  }, [eventData?.id])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -436,6 +448,7 @@ function App() {
         <VenueInfo eventData={eventData} />
       </Suspense>
       <Footer />
+      <PrivacyBanner />
     </div>
   )
 }

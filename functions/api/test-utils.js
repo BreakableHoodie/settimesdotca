@@ -11,6 +11,11 @@ export function createTestDB() {
       password_hash TEXT,
       role TEXT NOT NULL,
       name TEXT,
+      first_name TEXT,
+      last_name TEXT,
+      activation_token TEXT,
+      activation_token_expires_at TEXT,
+      activated_at TEXT,
       totp_secret TEXT,
       totp_enabled INTEGER DEFAULT 0,
       webauthn_enabled INTEGER DEFAULT 0,
@@ -37,6 +42,17 @@ export function createTestDB() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
       expires_at TEXT NOT NULL
+    );
+
+    CREATE TABLE lucia_sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      remember_me INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_activity_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE mfa_challenges (
@@ -89,11 +105,31 @@ export function createTestDB() {
       name_normalized TEXT UNIQUE NOT NULL,
       genre TEXT,
       origin TEXT,
+      origin_city TEXT,
+      origin_region TEXT,
+      contact_email TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      total_views INTEGER DEFAULT 0,
+      total_social_clicks INTEGER DEFAULT 0,
+      popularity_score REAL DEFAULT 0,
       description TEXT,
       photo_url TEXT,
       social_links TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE artist_daily_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      band_profile_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      page_views INTEGER DEFAULT 0,
+      profile_clicks INTEGER DEFAULT 0,
+      social_clicks INTEGER DEFAULT 0,
+      share_count INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(band_profile_id, date),
+      FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE CASCADE
     );
 
     CREATE TABLE performances (
@@ -120,7 +156,14 @@ export function createTestDB() {
     CREATE TABLE venues (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      address_line1 TEXT,
+      address_line2 TEXT,
       city TEXT,
+      region TEXT,
+      postal_code TEXT,
+      country TEXT,
+      phone TEXT,
+      contact_email TEXT,
       address TEXT
     );
 
@@ -207,7 +250,7 @@ export function createTestDB() {
   `);
 
   const insertUser = db.prepare(
-    "INSERT INTO users (email, role) VALUES (?, ?)"
+    "INSERT INTO users (email, role, activated_at) VALUES (?, ?, datetime('now'))"
   );
   insertUser.run("admin@test", "admin");
   insertUser.run("editor@test", "editor");
@@ -292,9 +335,47 @@ export function insertBand(db, {
   ).get(perfInfo.lastInsertRowid);
 }
 
-export function insertVenue(db, { name = 'Test Venue', city = 'Portland', address = null } = {}) {
-  const stmt = db.prepare('INSERT INTO venues (name, city, address) VALUES (?, ?, ?)')
-  const info = stmt.run(name, city, address)
+export function insertVenue(
+  db,
+  {
+    name = 'Test Venue',
+    city = 'Portland',
+    region = null,
+    address_line1 = null,
+    address_line2 = null,
+    postal_code = null,
+    country = null,
+    phone = null,
+    contact_email = null,
+    address = null,
+  } = {}
+) {
+  const stmt = db.prepare(
+    `INSERT INTO venues (
+      name,
+      address_line1,
+      address_line2,
+      city,
+      region,
+      postal_code,
+      country,
+      phone,
+      contact_email,
+      address
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+  const info = stmt.run(
+    name,
+    address_line1,
+    address_line2,
+    city,
+    region,
+    postal_code,
+    country,
+    phone,
+    contact_email,
+    address,
+  )
   return db.prepare('SELECT * FROM venues WHERE id = ?').get(info.lastInsertRowid)
 }
 
@@ -381,10 +462,10 @@ export function createTestEnv({ role = "editor" } = {}) {
   // Create a valid session for the test user
   const userId = role === "admin" ? 1 : role === "editor" ? 2 : 3;
   const sessionId = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
 
   rawDb.prepare(
-    "INSERT INTO sessions (session_token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)"
   ).run(sessionId, userId, expiresAt, "127.0.0.1", "test-agent");
 
   return {

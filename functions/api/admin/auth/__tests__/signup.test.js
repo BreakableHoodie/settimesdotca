@@ -3,7 +3,7 @@ import { createTestEnv } from "../../../test-utils";
 import * as signupHandler from "../signup.js";
 
 describe("admin signup", () => {
-  it("creates a session for the new user", async () => {
+  it("creates an inactive user and requires activation", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     env.ALLOW_ADMIN_SIGNUP = "true";
     
@@ -29,8 +29,9 @@ describe("admin signup", () => {
     expect(response.status).toBe(201);
 
     const payload = await response.json();
-    expect(payload.user).toBeDefined();
-    expect(payload.user.email).toBe("new.user@example.com");
+    expect(payload.success).toBe(true);
+    expect(payload.requiresActivation).toBe(true);
+    expect(payload.user).toBeUndefined();
     
     // Verify the invite code was marked as used
     const usedInvite = rawDb
@@ -38,5 +39,16 @@ describe("admin signup", () => {
       .get(inviteCode);
     expect(usedInvite.used_by_user_id).toBeDefined();
     expect(usedInvite.used_at).toBeDefined();
+
+    const createdUser = rawDb
+      .prepare(
+        "SELECT email, is_active, activation_token, activation_token_expires_at, activated_at FROM users WHERE email = ?"
+      )
+      .get("new.user@example.com");
+    expect(createdUser).toBeDefined();
+    expect(createdUser.is_active).toBe(0);
+    expect(createdUser.activation_token).toBeTruthy();
+    expect(createdUser.activation_token_expires_at).toBeTruthy();
+    expect(createdUser.activated_at).toBeNull();
   });
 });

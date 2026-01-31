@@ -1,0 +1,43 @@
+# ZAP Baseline Scan Rules
+# Format: rule_id	action	[regex_url]
+# Actions: IGNORE, WARN, FAIL
+# See: https://www.zaproxy.org/docs/docker/baseline-scan/
+
+# Content Security Policy - we have CSP but ZAP may not detect it correctly
+10038	WARN
+
+# X-Content-Type-Options - already set in _headers and middleware
+10021	IGNORE
+
+# X-Frame-Options - already set as DENY
+10020	IGNORE
+
+# Strict-Transport-Security - already set with preload
+10035	IGNORE
+
+# Cookie without SameSite - our session cookies have SameSite=Strict
+10054	WARN
+
+# Modern Web Application - informational
+10109	IGNORE
+
+# Information Disclosure - Server header (Cloudflare sets this)
+10036	IGNORE
+
+# Timestamp Disclosure - false positive on dates in content
+10096	IGNORE
+
+# User Agent Fuzzer - informational only
+10104	IGNORE
+
+# Cross-Domain JavaScript Source File Inclusion - we use CDNs intentionally
+10017	WARN
+
+# Application Error Disclosure - may flag normal error messages
+90022	WARN
+
+# Private IP Disclosure - may flag localhost in development
+2	WARN
+
+# Session ID in URL - we use cookies, not URL params
+3	IGNORE

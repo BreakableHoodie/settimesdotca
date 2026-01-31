@@ -3,6 +3,7 @@
 // DELETE /api/admin/bands/{id} - Delete band
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { isValidEmail } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 
 // Helper to extract band ID from path
@@ -16,6 +17,15 @@ function getBandId(request) {
 // Helper to normalize band name
 function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function parseOrigin(origin) {
+  if (!origin) return { city: null, region: null };
+  const [city, region] = origin.split(',').map(part => part.trim());
+  return {
+    city: city || null,
+    region: region || null,
+  };
 }
 
 // Helper to check for time conflicts (supports sets that cross midnight)
@@ -127,8 +137,20 @@ export async function onRequestPut(context) {
 
     const body = await request.json().catch(() => ({}));
     const { 
-      venueId, name, startTime, endTime, url,
-      description, genre, origin, photo_url, social_links 
+      venueId,
+      name,
+      startTime,
+      endTime,
+      url,
+      description,
+      genre,
+      origin,
+      origin_city,
+      origin_region,
+      contact_email,
+      is_active,
+      photo_url,
+      social_links,
     } = body;
     let realPerformanceId = performanceId;
     let bandProfileId = null;
@@ -233,6 +255,19 @@ export async function onRequestPut(context) {
       }
     }
 
+    if (contact_email !== undefined && contact_email && !isValidEmail(contact_email)) {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Contact email must be a valid email address",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     // Validate time format (only if times are provided)
     if (startTime !== undefined && !/^\d{2}:\d{2}$/.test(startTime)) {
       return new Response(
@@ -333,11 +368,15 @@ export async function onRequestPut(context) {
 
     // Handle profile updates (name, url, and other profile fields)
     if (
-      name !== undefined || 
-      url !== undefined || 
-      description !== undefined || 
-      genre !== undefined || 
-      origin !== undefined || 
+      name !== undefined ||
+      url !== undefined ||
+      description !== undefined ||
+      genre !== undefined ||
+      origin !== undefined ||
+      origin_city !== undefined ||
+      origin_region !== undefined ||
+      contact_email !== undefined ||
+      is_active !== undefined ||
       photo_url !== undefined ||
       social_links !== undefined
     ) {
@@ -360,9 +399,35 @@ export async function onRequestPut(context) {
             profileUpdates.push("genre = ?");
             profileParams.push(genre);
         }
-        if (origin !== undefined) {
+        const parsedOrigin = origin !== undefined ? parseOrigin(origin) : { city: null, region: null };
+        const resolvedOriginCity =
+          origin_city !== undefined ? origin_city : parsedOrigin.city;
+        const resolvedOriginRegion =
+          origin_region !== undefined ? origin_region : parsedOrigin.region;
+        const computedOrigin =
+          origin !== undefined
+            ? origin
+            : [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ") || undefined;
+
+        if (origin !== undefined || origin_city !== undefined) {
+            profileUpdates.push("origin_city = ?");
+            profileParams.push(resolvedOriginCity || null);
+        }
+        if (origin !== undefined || origin_region !== undefined) {
+            profileUpdates.push("origin_region = ?");
+            profileParams.push(resolvedOriginRegion || null);
+        }
+        if (computedOrigin !== undefined) {
             profileUpdates.push("origin = ?");
-            profileParams.push(origin);
+            profileParams.push(computedOrigin || null);
+        }
+        if (contact_email !== undefined) {
+            profileUpdates.push("contact_email = ?");
+            profileParams.push(contact_email || null);
+        }
+        if (is_active !== undefined) {
+            profileUpdates.push("is_active = ?");
+            profileParams.push(Number(is_active) === 1 ? 1 : 0);
         }
         if (photo_url !== undefined) {
             profileUpdates.push("photo_url = ?");
@@ -441,7 +506,15 @@ export async function onRequestPut(context) {
     if (!isProfileUpdate) {
         result = await DB.prepare(
         `
-        SELECT p.*, bp.name, bp.social_links
+        SELECT
+          p.*,
+          bp.name,
+          bp.social_links,
+          bp.origin,
+          bp.origin_city,
+          bp.origin_region,
+          bp.contact_email,
+          bp.is_active
         FROM performances p
         JOIN band_profiles bp ON p.band_profile_id = bp.id
         WHERE p.id = ?
@@ -452,6 +525,11 @@ export async function onRequestPut(context) {
         result = {
             id: `profile_${profile.id}`,
             name: profile.name,
+            origin: profile.origin,
+            origin_city: profile.origin_city,
+            origin_region: profile.origin_region,
+            contact_email: profile.contact_email,
+            is_active: profile.is_active,
             social_links: profile.social_links,
             // ... map other fields if needed by frontend ...
         };
@@ -461,6 +539,10 @@ export async function onRequestPut(context) {
     let social = {};
     try { social = JSON.parse(result.social_links || '{}'); } catch(e) {}
     result.url = social.website || '';
+    result.origin =
+      [result.origin_city, result.origin_region].filter(Boolean).join(", ") ||
+      result.origin ||
+      "";
 
     // Audit log the update
     await auditLog(

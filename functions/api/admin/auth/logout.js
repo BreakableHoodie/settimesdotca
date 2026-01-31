@@ -2,9 +2,10 @@
 // POST /api/admin/auth/logout
 // Clears session cookie and invalidates session
 
-import { deleteSessionCookie, getCookie } from "../../../utils/cookies.js";
+import { getCookie } from "../../../utils/cookies.js";
 import { deleteCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
+import { initializeLucia } from "../../../utils/auth.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -14,20 +15,23 @@ export async function onRequestPost(context) {
 
   try {
     // Get session token from cookie
-    const sessionToken = getCookie(request, "session_token");
+    const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true";
+    const sessionToken =
+      getCookie(request, "session_token") ||
+      (allowHeaderAuth
+        ? request.headers.get("Authorization")?.replace("Bearer ", "")
+        : null);
 
     if (sessionToken) {
       // Get user ID from session before deleting
       const session = await DB.prepare(
-        `SELECT user_id FROM sessions WHERE session_token = ?`,
+        `SELECT user_id FROM lucia_sessions WHERE id = ?`,
       )
         .bind(sessionToken)
         .first();
 
-      // Delete session from database
-      await DB.prepare(`DELETE FROM sessions WHERE session_token = ?`)
-        .bind(sessionToken)
-        .run();
+      const lucia = initializeLucia(DB, request);
+      await lucia.invalidateSession(sessionToken);
 
       // Log logout
       if (session) {
@@ -41,10 +45,11 @@ export async function onRequestPost(context) {
     }
 
     // Clear session cookie (even if no session found)
+    const lucia = initializeLucia(DB, request);
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", deleteSessionCookie(request));
+    headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
     headers.append("Set-Cookie", deleteCSRFCookie(request));
 
     return new Response(
@@ -61,10 +66,11 @@ export async function onRequestPost(context) {
     console.error("Logout error:", error);
 
     // Even if there's an error, clear the cookie
+    const lucia = initializeLucia(DB, request);
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", deleteSessionCookie(request));
+    headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
     headers.append("Set-Cookie", deleteCSRFCookie(request));
 
     return new Response(

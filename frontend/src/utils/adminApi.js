@@ -19,6 +19,63 @@ function getCSRFToken() {
   return null
 }
 
+function normalizeHeaders(headers) {
+  if (!headers) return {}
+  if (typeof headers.forEach === 'function') {
+    const output = {}
+    headers.forEach((value, key) => {
+      output[key] = value
+    })
+    return output
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers)
+  }
+  return { ...headers }
+}
+
+function refreshCSRFHeader(headers) {
+  const nextHeaders = normalizeHeaders(headers)
+  const csrfToken = getCSRFToken()
+  if (csrfToken) {
+    nextHeaders['X-CSRF-Token'] = csrfToken
+  } else {
+    delete nextHeaders['X-CSRF-Token']
+  }
+  return nextHeaders
+}
+
+async function fetchWithCSRFRetry(url, options = {}, retries = 1) {
+  const response = await fetch(url, options)
+  if (response.status !== 403 || retries <= 0) {
+    return response
+  }
+
+  let payload = null
+  try {
+    payload = await response.clone().json()
+  } catch (_error) {
+    payload = null
+  }
+
+  const isCsrfError =
+    payload?.error === 'CSRF validation failed' ||
+    String(payload?.message || '')
+      .toLowerCase()
+      .includes('csrf')
+
+  if (!isCsrfError) {
+    return response
+  }
+
+  const retryOptions = {
+    ...options,
+    headers: refreshCSRFHeader(options.headers),
+  }
+
+  return fetch(url, retryOptions)
+}
+
 // Create headers with CSRF token
 // Session token is automatically sent via HTTPOnly cookie by browser
 function getHeaders() {
@@ -79,29 +136,50 @@ async function handleResponse(response) {
 }
 
 // Auth API
+function resolveFullName(user) {
+  if (!user) return ''
+  if (user.firstName || user.lastName) {
+    return [user.firstName, user.lastName].filter(Boolean).join(' ')
+  }
+  return user.name || ''
+}
+
 export const authApi = {
-  async signup(email, password, name, inviteCode) {
-    const response = await fetch(`${API_BASE}/auth/signup`, {
+  async signup(email, password, firstName, lastName, inviteCode) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include', // IMPORTANT: Include cookies in request
-      body: JSON.stringify({ email, password, name, inviteCode }),
+      body: JSON.stringify({ email, password, firstName, lastName, inviteCode }),
     })
     const data = await handleResponse(response)
 
     // SECURITY: Session token and CSRF token are now in cookies
     // Store user data in localStorage for UI display
-    if (data.user) {
+    if (data.user && !data.requiresActivation) {
       window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', data.user.name || '')
+      window.localStorage.setItem('userName', resolveFullName(data.user))
+      if (data.user.firstName || data.user.lastName) {
+        window.localStorage.setItem('userFirstName', data.user.firstName || '')
+        window.localStorage.setItem('userLastName', data.user.lastName || '')
+      }
       window.localStorage.setItem('userRole', data.user.role)
     }
 
     return data
   },
 
+  async resendActivation(email) {
+    const response = await fetch('/api/auth/resend-activation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    return handleResponse(response)
+  },
+
   async login(email, password) {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include', // IMPORTANT: Include cookies in request
@@ -117,7 +195,11 @@ export const authApi = {
     // Store user data in localStorage for UI display
     if (data.user) {
       window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', data.user.name || '')
+      window.localStorage.setItem('userName', resolveFullName(data.user))
+      if (data.user.firstName || data.user.lastName) {
+        window.localStorage.setItem('userFirstName', data.user.firstName || '')
+        window.localStorage.setItem('userLastName', data.user.lastName || '')
+      }
       window.localStorage.setItem('userRole', data.user.role)
     }
 
@@ -125,7 +207,7 @@ export const authApi = {
   },
 
   async verifyMfa(mfaToken, code) {
-    const response = await fetch(`${API_BASE}/auth/mfa/verify`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/auth/mfa/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -135,7 +217,11 @@ export const authApi = {
 
     if (data.user) {
       window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', data.user.name || '')
+      window.localStorage.setItem('userName', resolveFullName(data.user))
+      if (data.user.firstName || data.user.lastName) {
+        window.localStorage.setItem('userFirstName', data.user.firstName || '')
+        window.localStorage.setItem('userLastName', data.user.lastName || '')
+      }
       window.localStorage.setItem('userRole', data.user.role)
     }
 
@@ -145,7 +231,7 @@ export const authApi = {
   async logout() {
     // Call logout endpoint to clear session cookie and CSRF cookie
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
+      await fetchWithCSRFRetry(`${API_BASE}/auth/logout`, {
         method: 'POST',
         headers: getHeaders(),
         credentials: 'include',
@@ -157,6 +243,8 @@ export const authApi = {
     // Clear local data (cookies are cleared by server)
     window.localStorage.removeItem('userEmail')
     window.localStorage.removeItem('userName')
+    window.localStorage.removeItem('userFirstName')
+    window.localStorage.removeItem('userLastName')
     window.localStorage.removeItem('userRole')
   },
 
@@ -168,13 +256,15 @@ export const authApi = {
     return {
       email: userEmail,
       name: window.localStorage.getItem('userName'),
+      firstName: window.localStorage.getItem('userFirstName') || null,
+      lastName: window.localStorage.getItem('userLastName') || null,
       role: window.localStorage.getItem('userRole'),
     }
   },
 
   async verifySession() {
     try {
-      const response = await fetch(`${API_BASE}/me`, {
+      const response = await fetchWithCSRFRetry(`${API_BASE}/me`, {
         headers: getHeaders(),
         credentials: 'include',
       })
@@ -184,7 +274,11 @@ export const authApi = {
         // Update local storage with fresh data
         if (data.user) {
           window.localStorage.setItem('userEmail', data.user.email)
-          window.localStorage.setItem('userName', data.user.name || '')
+          window.localStorage.setItem('userName', resolveFullName(data.user))
+          if (data.user.firstName || data.user.lastName) {
+            window.localStorage.setItem('userFirstName', data.user.firstName || '')
+            window.localStorage.setItem('userLastName', data.user.lastName || '')
+          }
           window.localStorage.setItem('userRole', data.user.role)
         }
         return data
@@ -198,7 +292,7 @@ export const authApi = {
 
 export const mfaApi = {
   async status() {
-    const response = await fetch(`${API_BASE}/mfa/status`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/mfa/status`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -206,7 +300,7 @@ export const mfaApi = {
   },
 
   async setup() {
-    const response = await fetch(`${API_BASE}/mfa/setup`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/mfa/setup`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -215,7 +309,7 @@ export const mfaApi = {
   },
 
   async enable(code) {
-    const response = await fetch(`${API_BASE}/mfa/enable`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/mfa/enable`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -225,7 +319,7 @@ export const mfaApi = {
   },
 
   async disable(code) {
-    const response = await fetch(`${API_BASE}/mfa/disable`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/mfa/disable`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -235,7 +329,7 @@ export const mfaApi = {
   },
 
   async regenerateBackupCodes(code) {
-    const response = await fetch(`${API_BASE}/mfa/backup-codes`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/mfa/backup-codes`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -248,7 +342,7 @@ export const mfaApi = {
 // Events API
 export const eventsApi = {
   async getAll() {
-    const response = await fetch(`${API_BASE}/events`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -267,7 +361,7 @@ export const eventsApi = {
   },
 
   async create(eventData) {
-    const response = await fetch(`${API_BASE}/events`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -277,7 +371,7 @@ export const eventsApi = {
   },
 
   async update(eventId, eventData) {
-    const response = await fetch(`${API_BASE}/events/${eventId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}`, {
       method: 'PATCH',
       headers: getHeaders(),
       credentials: 'include',
@@ -287,7 +381,7 @@ export const eventsApi = {
   },
 
   async setPublishState(eventId, publish) {
-    const response = await fetch(`${API_BASE}/events/${eventId}/publish`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/publish`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -297,7 +391,7 @@ export const eventsApi = {
   },
 
   async duplicate(eventId, newEventData) {
-    const response = await fetch(`${API_BASE}/events/${eventId}/duplicate`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/duplicate`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -307,7 +401,7 @@ export const eventsApi = {
   },
 
   async delete(eventId) {
-    const response = await fetch(`${API_BASE}/events/${eventId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}`, {
       method: 'DELETE',
       headers: getHeaders(),
       credentials: 'include',
@@ -316,7 +410,7 @@ export const eventsApi = {
   },
 
   async archive(eventId) {
-    const response = await fetch(`${API_BASE}/events/${eventId}/archive`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/archive`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -325,7 +419,7 @@ export const eventsApi = {
   },
 
   async getMetrics(eventId) {
-    const response = await fetch(`${API_BASE}/events/${eventId}/metrics`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/metrics`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -336,7 +430,7 @@ export const eventsApi = {
 // Venues API
 export const venuesApi = {
   async getAll() {
-    const response = await fetch(`${API_BASE}/venues`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/venues`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -344,7 +438,7 @@ export const venuesApi = {
   },
 
   async create(venueData) {
-    const response = await fetch(`${API_BASE}/venues`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/venues`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -354,7 +448,7 @@ export const venuesApi = {
   },
 
   async update(venueId, venueData) {
-    const response = await fetch(`${API_BASE}/venues/${venueId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/venues/${venueId}`, {
       method: 'PUT',
       headers: getHeaders(),
       credentials: 'include',
@@ -364,7 +458,7 @@ export const venuesApi = {
   },
 
   async delete(venueId) {
-    const response = await fetch(`${API_BASE}/venues/${venueId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/venues/${venueId}`, {
       method: 'DELETE',
       headers: getHeaders(),
       credentials: 'include',
@@ -376,7 +470,7 @@ export const venuesApi = {
 // Bands API
 export const bandsApi = {
   async getAll() {
-    const response = await fetch(`${API_BASE}/bands`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -384,7 +478,7 @@ export const bandsApi = {
   },
 
   async getByEvent(eventId) {
-    const response = await fetch(`${API_BASE}/bands?event_id=${eventId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands?event_id=${eventId}`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -392,7 +486,7 @@ export const bandsApi = {
   },
 
   async create(bandData) {
-    const response = await fetch(`${API_BASE}/bands`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -402,7 +496,7 @@ export const bandsApi = {
   },
 
   async update(bandId, bandData) {
-    const response = await fetch(`${API_BASE}/bands/${bandId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/${bandId}`, {
       method: 'PUT',
       headers: getHeaders(),
       credentials: 'include',
@@ -412,7 +506,7 @@ export const bandsApi = {
   },
 
   async delete(bandId) {
-    const response = await fetch(`${API_BASE}/bands/${bandId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/${bandId}`, {
       method: 'DELETE',
       headers: getHeaders(),
       credentials: 'include',
@@ -421,7 +515,7 @@ export const bandsApi = {
   },
 
   async bulkDelete(bandIds) {
-    const response = await fetch(`${API_BASE}/bands/bulk`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/bulk`, {
       method: 'DELETE',
       headers: getHeaders(),
       credentials: 'include',
@@ -431,7 +525,7 @@ export const bandsApi = {
   },
 
   async getStats(bandName) {
-    const response = await fetch(`${API_BASE}/bands/stats/${encodeURIComponent(bandName)}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/stats/${encodeURIComponent(bandName)}`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -442,7 +536,7 @@ export const bandsApi = {
 // Performers API
 export const performersApi = {
   async list() {
-    const response = await fetch(`${API_BASE}/performers`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/performers`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -450,7 +544,7 @@ export const performersApi = {
   },
 
   async get(id) {
-    const response = await fetch(`${API_BASE}/performers/${id}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/performers/${id}`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -458,7 +552,7 @@ export const performersApi = {
   },
 
   async create(data) {
-    const response = await fetch(`${API_BASE}/performers`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/performers`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -468,7 +562,7 @@ export const performersApi = {
   },
 
   async update(id, data) {
-    const response = await fetch(`${API_BASE}/performers/${id}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/performers/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       credentials: 'include',
@@ -478,7 +572,7 @@ export const performersApi = {
   },
 
   async delete(id) {
-    const response = await fetch(`${API_BASE}/performers/${id}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/performers/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
       credentials: 'include',
@@ -490,7 +584,7 @@ export const performersApi = {
 // Users API
 export const usersApi = {
   async getAll() {
-    const response = await fetch(`${API_BASE}/users`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/users`, {
       headers: getHeaders(),
       credentials: 'include',
     })
@@ -498,7 +592,7 @@ export const usersApi = {
   },
 
   async create(data) {
-    const response = await fetch(`${API_BASE}/users`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/users`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -508,7 +602,7 @@ export const usersApi = {
   },
 
   async update(userId, data) {
-    const response = await fetch(`${API_BASE}/users/${userId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/users/${userId}`, {
       method: 'PATCH',
       headers: getHeaders(),
       credentials: 'include',
@@ -518,7 +612,7 @@ export const usersApi = {
   },
 
   async remove(userId) {
-    const response = await fetch(`${API_BASE}/users/${userId}`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/users/${userId}`, {
       method: 'DELETE',
       headers: getHeaders(),
       credentials: 'include',
@@ -527,7 +621,7 @@ export const usersApi = {
   },
 
   async resetPassword(userId, data) {
-    const response = await fetch(`${API_BASE}/users/${userId}/reset-password`, {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/users/${userId}/reset-password`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',

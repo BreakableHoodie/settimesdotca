@@ -30,9 +30,11 @@ database_name = "settimes-production-db"
 database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b"
 
 # Analytics Engine binding (privacy-first metrics)
-[[analytics_engine_datasets]]
-binding = "ANALYTICS"
-dataset = "settimes_metrics"
+# Requires Analytics Engine to be enabled in Cloudflare dashboard
+# Enable at: https://dash.cloudflare.com/YOUR_ACCOUNT/workers/analytics-engine
+# [[analytics_engine_datasets]]
+# binding = "ANALYTICS"
+# dataset = "settimes_metrics"
 
 # Cron triggers are not supported for Cloudflare Pages
 # Use a separate Worker if scheduled tasks are needed

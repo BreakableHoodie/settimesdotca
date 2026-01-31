@@ -16,8 +16,8 @@ export async function onRequest(context) {
   const baseAllowedOrigins = [
     "https://settimes.ca",
     "https://www.settimes.ca",
-    "https://dev.settimes.pages.dev",
-    "https://settimes.pages.dev",
+    "https://dev.settimesdotca.pages.dev",
+    "https://settimesdotca.pages.dev",
     "https://dev.settimes.ca",
     "http://localhost:5173",
     "http://localhost:3000",

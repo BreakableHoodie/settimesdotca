@@ -46,8 +46,10 @@ jobs:
 
             - name: Start Pages Functions (wrangler)
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              env:
+                  CSRF_SECRET: ${{ secrets.CSRF_SECRET || 'e2e-test-csrf-secret-for-ci' }}
               run: |
-                  ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
+                  ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --binding CSRF_SECRET="$CSRF_SECRET" > /tmp/wrangler.log 2>&1 &
                   echo "WRANGLER_PID=$!" >> $GITHUB_ENV
                   
                   # Wait for server with timeout and better error handling

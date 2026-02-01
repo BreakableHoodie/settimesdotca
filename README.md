@@ -16,7 +16,7 @@ SetTimes.ca is designed to streamline the management of multi-venue music events
 
 ## Current Status
 
-**Version:** 1.0.0 (Production)
+**Version:** 1.1.0 (Production)
 **Next Event:** Long Weekend Band Crawl (February 15, 2026)
 
 Core features complete:
@@ -26,6 +26,9 @@ Core features complete:
 - ✅ Public Discovery API
 - ✅ Email Subscriptions
 - ✅ Security Hardening
+- ✅ MFA/2FA with TOTP (authenticator apps)
+- ✅ Trusted Devices & Backup Codes
+- ✅ Navigation with Breadcrumbs & Sticky Headers
 
 ## Features
 
@@ -58,6 +61,9 @@ Core features complete:
 - **CSRF token protection** - Prevents cross-site request forgery
 - **Content Security Policy** - Strict CSP headers with HSTS
 - **Strict CORS validation** - Rejects unauthorized origins
+- **MFA/2FA with TOTP** - Authenticator app support (Google Authenticator, Authy)
+- **Trusted Devices** - Remember devices for 30 days to skip MFA
+- **Backup Codes** - 8 single-use recovery codes per user
 - Rate limiting and brute force protection
 - Comprehensive audit logging (GDPR-compliant)
 - Master password recovery system
@@ -266,6 +272,12 @@ See `.dev.vars.test-users` for credentials. Default users:
    - Every push to `dev` triggers preview deployment
    - Domain: `settimes.pages.dev` (custom domain: `settimes.ca`)
 
+   **Manual Deployment (from project root):**
+   ```bash
+   wrangler pages deploy frontend/dist --project-name settimesdotca --branch main
+   ```
+   This command properly includes static assets from `frontend/dist` and Functions from `functions/`.
+
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.
 
 ## Development Commands
@@ -336,19 +348,28 @@ This is a private project for SetTimes.ca. For issues or questions:
 - ✅ Security hardening (HTTPOnly cookies, CSRF, CSP)
 - ✅ Mobile-responsive design
 
+**Completed (Q1 2026):**
+- ✅ MFA/2FA with TOTP authenticator support
+- ✅ Trusted Devices (30-day remember)
+- ✅ Backup codes for account recovery
+- ✅ Improved navigation (breadcrumbs, sticky header)
+- ✅ Band profile UX improvements
+
 **Current (2026):**
 - Production operations for February 2026 event
 - Performance monitoring and optimization
 
 ## Design
 
-Interface inspired by event poster aesthetic:
-- Deep navy (#1a1845) to purple (#2d2554) gradient background
-- Orange/peach (#f5a962) accent colors for actions
+Interface inspired by modern event aesthetic:
+- Deep navy (#0c0f1a) background
+- Cyan (#0ea5e9) accent colors for actions and branding
 - White text for high contrast and readability
 - Mobile-first responsive layout
 - Desktop: Multi-column grid by venue
 - Mobile: Single column chronological list
+- Sticky navigation header with contextual "My Schedule" link
+- Breadcrumb navigation on band profile pages
 
 ## Browser Support
 

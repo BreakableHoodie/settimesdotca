@@ -24,13 +24,25 @@ function getHeaderToken(request) {
   return request.headers.get("X-CSRF-Token") || "";
 }
 
-function resolveCsrfSecret(env) {
+// Fallback secret for local development ONLY - production must set CSRF_SECRET
+const LOCAL_DEV_CSRF_SECRET = "local-dev-csrf-secret-not-for-production";
+
+function resolveCsrfSecret(env, request) {
   const secret = env?.CSRF_SECRET;
-  if (!secret) {
-    console.error("[CSRF] CSRF_SECRET environment variable is required");
-    throw new Error("CSRF_SECRET environment variable is required");
+  if (secret) {
+    return secret;
   }
-  return secret;
+
+  // Check if this is local development
+  const isLocal = request && isDevRequest(request);
+  if (isLocal) {
+    console.warn("[CSRF] Using fallback secret for local development. Set CSRF_SECRET for production.");
+    return LOCAL_DEV_CSRF_SECRET;
+  }
+
+  // Production requires CSRF_SECRET
+  console.error("[CSRF] CSRF_SECRET environment variable is required in production");
+  throw new Error("CSRF_SECRET environment variable is required");
 }
 
 function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
@@ -82,7 +94,7 @@ function buildRequestAdapter(request, env, sessionIdentifierOverride = null) {
     method: request.method,
     headers: headersAdapter,
     cookies,
-    csrfSecret: resolveCsrfSecret(env),
+    csrfSecret: resolveCsrfSecret(env, request),
     sessionIdentifier: getSessionIdentifier(
       request,
       cookies,

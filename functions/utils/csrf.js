@@ -3,8 +3,6 @@
 
 import { doubleCsrf } from "csrf-csrf";
 
-const DEFAULT_CSRF_SECRET = "settimes-csrf-secret";
-
 function parseCookies(cookieHeader) {
   if (!cookieHeader) return {};
   return cookieHeader.split(";").reduce((acc, cookie) => {
@@ -27,7 +25,12 @@ function getHeaderToken(request) {
 }
 
 function resolveCsrfSecret(env) {
-  return env?.CSRF_SECRET || DEFAULT_CSRF_SECRET;
+  const secret = env?.CSRF_SECRET;
+  if (!secret) {
+    console.error("[CSRF] CSRF_SECRET environment variable is required");
+    throw new Error("CSRF_SECRET environment variable is required");
+  }
+  return secret;
 }
 
 function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
@@ -65,12 +68,19 @@ const csrf = doubleCsrf({
 function buildRequestAdapter(request, env, sessionIdentifierOverride = null) {
   const cookieHeader = request.headers.get("Cookie");
   const cookies = parseCookies(cookieHeader);
+  const csrfHeaderValue = request.headers.get("X-CSRF-Token") || "";
+
+  // Create a headers object with a get() method that csrf-csrf expects
+  const headersAdapter = {
+    "x-csrf-token": csrfHeaderValue,
+    get(name) {
+      return this[name.toLowerCase()] || null;
+    },
+  };
 
   return {
     method: request.method,
-    headers: {
-      "x-csrf-token": request.headers.get("X-CSRF-Token") || "",
-    },
+    headers: headersAdapter,
     cookies,
     csrfSecret: resolveCsrfSecret(env),
     sessionIdentifier: getSessionIdentifier(
@@ -141,7 +151,8 @@ export function validateCSRFToken(request, env = null) {
   try {
     const req = buildRequestAdapter(request, env);
     return csrf.validateRequest(req);
-  } catch (_error) {
+  } catch (error) {
+    console.error("[CSRF] Validation error");
     return false;
   }
 }

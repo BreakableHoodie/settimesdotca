@@ -44,14 +44,63 @@ jobs:
               working-directory: frontend
               run: npm run build
 
-            - name: Start Pages Functions (wrangler)
+            - name: Start Pages Functions and setup database
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              env:
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
               run: |
                   echo 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"' > .dev.vars
+
+                  # Start wrangler to create the D1 database
                   ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
-                  echo "WRANGLER_PID=$!" >> $GITHUB_ENV
-                  
-                  # Wait for server with timeout and better error handling
+                  WRANGLER_PID=$!
+                  echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
+
+                  # Wait for wrangler to create the database directory
+                  echo "Waiting for wrangler to initialize database..."
+                  for i in {1..30}; do
+                      if [ -d ".wrangler/state/v3/d1/miniflare-D1DatabaseObject" ]; then
+                          echo "✓ Database directory created"
+                          break
+                      fi
+                      sleep 1
+                  done
+
+                  # Wait a bit more for the database file to be fully initialized
+                  sleep 3
+
+                  # Find the database file
+                  DB_FILE=$(ls -S .wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite 2>/dev/null | head -1)
+                  if [ -z "$DB_FILE" ]; then
+                      echo "✗ Database file not found"
+                      cat /tmp/wrangler.log
+                      exit 1
+                  fi
+                  echo "Found database: $DB_FILE"
+
+                  # Initialize the database schema
+                  echo "Setting up database schema..."
+                  sqlite3 "$DB_FILE" < database/setup-complete.sql
+
+                  # Hash the E2E password and update the admin user
+                  if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
+                      echo "Creating E2E admin user..."
+                      ADMIN_HASH=$(node scripts/hash-password.mjs "$E2E_ADMIN_PASSWORD")
+
+                      # Insert or update the admin user
+                      sqlite3 "$DB_FILE" "INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active, activated_at) VALUES (100, '$E2E_ADMIN_EMAIL', 'E2E Admin', '$ADMIN_HASH', 'admin', 1, datetime('now'));"
+                      echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
+                  else
+                      echo "⚠ E2E credentials not set, using default test accounts"
+                  fi
+
+                  # Verify the user was created
+                  echo "Database users:"
+                  sqlite3 "$DB_FILE" "SELECT id, email, role FROM users;"
+
+                  # Wait for server to be ready
+                  echo "Waiting for server..."
                   for i in {1..60}; do
                       if curl -s http://localhost:8788/ > /dev/null 2>&1; then
                           echo "✓ Server is ready on port 8788!"

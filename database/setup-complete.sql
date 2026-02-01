@@ -121,6 +121,9 @@ CREATE TABLE IF NOT EXISTS users (
   activation_token TEXT,
   activation_token_expires_at TEXT,
   activated_at TEXT,
+  totp_secret TEXT,
+  totp_enabled INTEGER DEFAULT 0,
+  backup_codes TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_login TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
@@ -167,6 +170,22 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   failure_reason TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- MFA challenges (for TOTP verification flow)
+CREATE TABLE IF NOT EXISTS mfa_challenges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token TEXT NOT NULL UNIQUE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  ip_address TEXT,
+  user_agent TEXT,
+  expires_at TEXT NOT NULL,
+  used INTEGER DEFAULT 0,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_mfa_challenges_token ON mfa_challenges(token);
+CREATE INDEX IF NOT EXISTS idx_mfa_challenges_user_id ON mfa_challenges(user_id);
 
 -- Invite codes
 CREATE TABLE IF NOT EXISTS invite_codes (

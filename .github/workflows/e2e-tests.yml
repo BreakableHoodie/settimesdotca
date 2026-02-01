@@ -74,20 +74,33 @@ jobs:
                       sleep 1
                   done
 
-                  # Make a request to trigger database initialization
+                  # Make a request that uses the database to trigger D1 initialization
                   echo "Triggering database initialization..."
-                  curl -s http://localhost:8788/api/health > /dev/null 2>&1 || true
-                  sleep 2
+                  curl -s http://localhost:8788/api/admin/auth/login -X POST -H "Content-Type: application/json" -d '{"email":"test@test.com","password":"test"}' > /dev/null 2>&1 || true
+                  sleep 3
 
-                  # Find the database file
-                  echo "Looking for database file..."
+                  # Show all sqlite files found for debugging
+                  echo "All sqlite files in .wrangler:"
                   find .wrangler -name "*.sqlite" 2>/dev/null || true
+                  echo ""
 
-                  DB_FILE=$(find .wrangler -name "*.sqlite" 2>/dev/null | head -1)
+                  # Find the D1 database file (NOT the cache database)
+                  echo "Looking for D1 database file..."
+                  DB_FILE=$(find .wrangler -path "*d1*" -name "*.sqlite" 2>/dev/null | head -1)
+
+                  # If D1 database not found, try any sqlite in a D1-related path
                   if [ -z "$DB_FILE" ]; then
-                      echo "✗ Database file not found after initialization"
+                      echo "D1 database not found in standard location, checking alternatives..."
+                      DB_FILE=$(find .wrangler -name "*.sqlite" 2>/dev/null | grep -v cache | head -1)
+                  fi
+
+                  # If still not found, show full directory structure and fail
+                  if [ -z "$DB_FILE" ]; then
+                      echo "✗ D1 database file not found"
                       echo "Wrangler state directory contents:"
                       ls -laR .wrangler 2>/dev/null || echo "No .wrangler directory"
+                      echo ""
+                      echo "Wrangler logs:"
                       cat /tmp/wrangler.log
                       exit 1
                   fi

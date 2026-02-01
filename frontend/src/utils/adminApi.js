@@ -206,12 +206,12 @@ export const authApi = {
     return data
   },
 
-  async verifyMfa(mfaToken, code) {
+  async verifyMfa(mfaToken, code, rememberDevice = false) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/auth/mfa/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ mfaToken, code }),
+      body: JSON.stringify({ mfaToken, code, rememberDevice }),
     })
     const data = await handleResponse(response)
 

@@ -125,7 +125,8 @@ export default function UserManagement() {
       fetchUsers() // Refresh list
     } catch (error) {
       console.error('Failed to create user:', error)
-      alert('Failed to send invite')
+      const message = error.details?.message || error.message || 'Failed to send invite'
+      alert(message)
     } finally {
       setActionLoading(false)
     }
@@ -148,7 +149,8 @@ export default function UserManagement() {
       fetchUsers() // Refresh list
     } catch (error) {
       console.error('Failed to update user:', error)
-      alert('Failed to update user')
+      const message = error.details?.message || error.message || 'Failed to update user'
+      alert(message)
     } finally {
       setActionLoading(false)
     }
@@ -166,7 +168,8 @@ export default function UserManagement() {
       fetchUsers() // Refresh list
     } catch (error) {
       console.error('Failed to delete user:', error)
-      alert('Failed to delete user')
+      const message = error.details?.message || error.message || 'Failed to delete user'
+      alert(message)
     } finally {
       setActionLoading(false)
     }
@@ -182,8 +185,10 @@ export default function UserManagement() {
       setShowResetModal(false)
       setResetReason('')
       setSelectedUser(null)
-    } catch {
-      alert('Failed to send password reset email')
+    } catch (error) {
+      console.error('Failed to send password reset:', error)
+      const message = error.details?.message || error.message || 'Failed to send password reset email'
+      alert(message)
     } finally {
       setActionLoading(false)
     }

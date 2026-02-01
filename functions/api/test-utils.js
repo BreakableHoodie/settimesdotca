@@ -469,7 +469,11 @@ export function createTestEnv({ role = "editor" } = {}) {
   ).run(sessionId, userId, expiresAt, "127.0.0.1", "test-agent");
 
   return {
-    env: { DB: createDBEnv(rawDb), ALLOW_HEADER_AUTH: "true" },
+    env: {
+      DB: createDBEnv(rawDb),
+      ALLOW_HEADER_AUTH: "true",
+      CSRF_SECRET: "test-csrf-secret-for-unit-tests"
+    },
     rawDb,
     role,
     headers: {

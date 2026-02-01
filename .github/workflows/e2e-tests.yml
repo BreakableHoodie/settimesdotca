@@ -57,23 +57,37 @@ jobs:
                   WRANGLER_PID=$!
                   echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
 
-                  # Wait for wrangler to create the database directory
-                  echo "Waiting for wrangler to initialize database..."
-                  for i in {1..30}; do
-                      if [ -d ".wrangler/state/v3/d1/miniflare-D1DatabaseObject" ]; then
-                          echo "✓ Database directory created"
+                  # Wait for server to be ready first
+                  echo "Waiting for server to start..."
+                  for i in {1..60}; do
+                      if curl -s http://localhost:8788/ > /dev/null 2>&1; then
+                          echo "✓ Server is ready on port 8788!"
                           break
                       fi
+                      if [ $i -eq 60 ]; then
+                          echo "✗ Server failed to start after 60 seconds"
+                          echo "Wrangler logs:"
+                          cat /tmp/wrangler.log
+                          exit 1
+                      fi
+                      echo "Waiting for server... ($i/60)"
                       sleep 1
                   done
 
-                  # Wait a bit more for the database file to be fully initialized
-                  sleep 3
+                  # Make a request to trigger database initialization
+                  echo "Triggering database initialization..."
+                  curl -s http://localhost:8788/api/health > /dev/null 2>&1 || true
+                  sleep 2
 
                   # Find the database file
-                  DB_FILE=$(ls -S .wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite 2>/dev/null | head -1)
+                  echo "Looking for database file..."
+                  find .wrangler -name "*.sqlite" 2>/dev/null || true
+
+                  DB_FILE=$(find .wrangler -name "*.sqlite" 2>/dev/null | head -1)
                   if [ -z "$DB_FILE" ]; then
-                      echo "✗ Database file not found"
+                      echo "✗ Database file not found after initialization"
+                      echo "Wrangler state directory contents:"
+                      ls -laR .wrangler 2>/dev/null || echo "No .wrangler directory"
                       cat /tmp/wrangler.log
                       exit 1
                   fi
@@ -99,22 +113,7 @@ jobs:
                   echo "Database users:"
                   sqlite3 "$DB_FILE" "SELECT id, email, role FROM users;"
 
-                  # Wait for server to be ready
-                  echo "Waiting for server..."
-                  for i in {1..60}; do
-                      if curl -s http://localhost:8788/ > /dev/null 2>&1; then
-                          echo "✓ Server is ready on port 8788!"
-                          exit 0
-                      fi
-                      if [ $i -eq 60 ]; then
-                          echo "✗ Server failed to start after 60 seconds"
-                          echo "Wrangler logs:"
-                          cat /tmp/wrangler.log
-                          exit 1
-                      fi
-                      echo "Waiting for server... ($i/60)"
-                      sleep 1
-                  done
+                  echo "✓ Database setup complete"
 
             - name: Install Playwright browsers
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'

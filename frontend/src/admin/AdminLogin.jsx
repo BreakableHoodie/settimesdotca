@@ -87,25 +87,12 @@ export default function AdminLogin({ onLoginSuccess }) {
     setError(null)
     setLoading(true)
 
-    console.log('[MFA Login] Submitting MFA code:', {
-      codeLength: mfaCode?.length,
-      codeValue: mfaCode,
-      mfaTokenExists: !!mfaToken,
-    })
-
     try {
       const result = await authApi.verifyMfa(mfaToken, mfaCode, rememberDevice)
-      console.log('[MFA Login] API result:', result)
       if (result.success) {
         onLoginSuccess()
       }
     } catch (err) {
-      console.error('[MFA Login] Error caught:', {
-        message: err?.message,
-        details: err?.details,
-        status: err?.status,
-        fullError: err,
-      })
       handleError(err)
     } finally {
       setLoading(false)

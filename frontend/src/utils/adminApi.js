@@ -108,7 +108,7 @@ async function handleResponse(response) {
 
   if (!response.ok) {
     if (import.meta.env.DEV) {
-      console.log('API Error Response:', response.status, data)
+      console.warn('API Error Response:', response.status, data)
     }
     if (response.status === 401) {
       if (import.meta.env.DEV) {
@@ -284,7 +284,7 @@ export const authApi = {
         return data
       }
       return null
-    } catch (error) {
+    } catch {
       return null
     }
   },

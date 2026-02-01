@@ -14,8 +14,6 @@ import {
   faGuitar,
   faPlus,
   faCheck,
-  faHome,
-  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons'
 import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
 import BandStats from '../components/BandStats'
@@ -115,7 +113,7 @@ export default function BandProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [scheduleSelections, setScheduleSelections] = useState({}) // { eventSlug: Set of bandIds }
-  const [userHasSchedule, setUserHasSchedule] = useState(() => hasAnySchedule())
+  const [userHasSchedule] = useState(() => hasAnySchedule())
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
 
   const isNumericId = useMemo(() => /^\d+$/.test(id || ''), [id])
@@ -195,33 +193,39 @@ export default function BandProfilePage() {
   }, [profile?.upcoming])
 
   // Toggle a performance in the schedule
-  const toggleSchedule = useCallback((performance) => {
-    if (!performance.event_slug || !performance.id) return
+  const toggleSchedule = useCallback(
+    performance => {
+      if (!performance.event_slug || !performance.id) return
 
-    const scheduleId = generateScheduleId(profile.name, performance.id)
-    const eventSlug = performance.event_slug
+      const scheduleId = generateScheduleId(profile.name, performance.id)
+      const eventSlug = performance.event_slug
 
-    setScheduleSelections(prev => {
-      const currentSet = new Set(prev[eventSlug] || [])
-      if (currentSet.has(scheduleId)) {
-        currentSet.delete(scheduleId)
-      } else {
-        currentSet.add(scheduleId)
-      }
+      setScheduleSelections(prev => {
+        const currentSet = new Set(prev[eventSlug] || [])
+        if (currentSet.has(scheduleId)) {
+          currentSet.delete(scheduleId)
+        } else {
+          currentSet.add(scheduleId)
+        }
 
-      // Save to localStorage
-      saveSelectedBands(eventSlug, Array.from(currentSet))
+        // Save to localStorage
+        saveSelectedBands(eventSlug, Array.from(currentSet))
 
-      return { ...prev, [eventSlug]: currentSet }
-    })
-  }, [profile?.name])
+        return { ...prev, [eventSlug]: currentSet }
+      })
+    },
+    [profile?.name]
+  )
 
   // Check if a performance is in the schedule
-  const isInSchedule = useCallback((performance) => {
-    if (!performance.event_slug || !performance.id || !profile?.name) return false
-    const scheduleId = generateScheduleId(profile.name, performance.id)
-    return scheduleSelections[performance.event_slug]?.has(scheduleId) || false
-  }, [scheduleSelections, profile?.name])
+  const isInSchedule = useCallback(
+    performance => {
+      if (!performance.event_slug || !performance.id || !profile?.name) return false
+      const scheduleId = generateScheduleId(profile.name, performance.id)
+      return scheduleSelections[performance.event_slug]?.has(scheduleId) || false
+    },
+    [scheduleSelections, profile?.name]
+  )
 
   if (loading) {
     return (
@@ -315,10 +319,7 @@ export default function BandProfilePage() {
         <header className="sticky top-0 z-50 border-b border-white/10 bg-bg-navy/95 backdrop-blur-sm">
           <div className="container mx-auto px-4 max-w-6xl">
             <div className="flex items-center justify-between h-14">
-              <Link
-                to="/"
-                className="text-xl font-bold font-display hover:opacity-80 transition-opacity"
-              >
+              <Link to="/" className="text-xl font-bold font-display hover:opacity-80 transition-opacity">
                 <span className="text-accent-500">Set</span>
                 <span className="text-white">Times</span>
               </Link>
@@ -526,10 +527,7 @@ export default function BandProfilePage() {
                               size="sm"
                               className="whitespace-nowrap"
                             >
-                              <FontAwesomeIcon
-                                icon={isInSchedule(performance) ? faCheck : faPlus}
-                                className="mr-2"
-                              />
+                              <FontAwesomeIcon icon={isInSchedule(performance) ? faCheck : faPlus} className="mr-2" />
                               {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
                             </Button>
                             {performance.event_slug && (

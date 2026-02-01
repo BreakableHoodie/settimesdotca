@@ -101,7 +101,7 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
       await navigator.clipboard.writeText(backupCodes.join('\n'))
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
+    } catch {
       setError('Failed to copy backup codes.')
     }
   }
@@ -120,7 +120,7 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
       `Generated: ${new Date().toLocaleString()}`,
     ].join('\n')
 
-    const blob = new Blob([content], { type: 'text/plain' })
+    const blob = new window.Blob([content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url

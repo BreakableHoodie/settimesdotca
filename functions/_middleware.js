@@ -18,8 +18,6 @@ export async function onRequest(context) {
     return context.next();
   }
 
-  const log = createRequestLogger(context);
-
   // Allowed origins for CORS (production and development)
   const baseAllowedOrigins = [
     "https://settimes.ca",

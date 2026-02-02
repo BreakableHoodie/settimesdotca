@@ -101,9 +101,34 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
       await navigator.clipboard.writeText(backupCodes.join('\n'))
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
+    } catch {
       setError('Failed to copy backup codes.')
     }
+  }
+
+  const handleDownload = () => {
+    if (!backupCodes?.length) return
+    const content = [
+      'SetTimes MFA Backup Codes',
+      '========================',
+      '',
+      'Save these codes in a secure place.',
+      'Each code can only be used once.',
+      '',
+      ...backupCodes,
+      '',
+      `Generated: ${new Date().toLocaleString()}`,
+    ].join('\n')
+
+    const blob = new window.Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'settimes-backup-codes.txt'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   const totpEnabled = status?.totpEnabled
@@ -228,14 +253,19 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
             <div className="mt-6 bg-bg-navy/60 border border-white/10 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-text-primary">Backup Codes</h3>
-                <Button onClick={handleCopy} variant="secondary" size="sm">
-                  {copied ? 'Copied' : 'Copy'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={handleCopy} variant="secondary" size="sm">
+                    {copied ? 'Copied!' : 'Copy'}
+                  </Button>
+                  <Button onClick={handleDownload} variant="secondary" size="sm">
+                    Download
+                  </Button>
+                </div>
               </div>
               <p className="text-text-secondary text-sm mb-3">
                 Save these codes in a secure place. Each code can be used once.
               </p>
-              <div className="grid grid-cols-2 gap-2 font-mono text-sm text-text-primary">
+              <div className="grid grid-cols-2 gap-2 font-mono text-sm text-text-primary select-all">
                 {backupCodes.map(code => (
                   <div key={code} className="bg-bg-navy/80 border border-white/10 rounded-md px-3 py-2 text-center">
                     {code}

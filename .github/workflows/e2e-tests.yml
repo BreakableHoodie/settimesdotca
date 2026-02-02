@@ -44,17 +44,25 @@ jobs:
               working-directory: frontend
               run: npm run build
 
-            - name: Start Pages Functions (wrangler)
+            - name: Start Pages Functions and setup database
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              env:
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
               run: |
+                  echo 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"' > .dev.vars
+
+                  # Start wrangler to create the D1 database
                   ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
-                  echo "WRANGLER_PID=$!" >> $GITHUB_ENV
-                  
-                  # Wait for server with timeout and better error handling
+                  WRANGLER_PID=$!
+                  echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
+
+                  # Wait for server to be ready first
+                  echo "Waiting for server to start..."
                   for i in {1..60}; do
                       if curl -s http://localhost:8788/ > /dev/null 2>&1; then
                           echo "✓ Server is ready on port 8788!"
-                          exit 0
+                          break
                       fi
                       if [ $i -eq 60 ]; then
                           echo "✗ Server failed to start after 60 seconds"
@@ -65,6 +73,60 @@ jobs:
                       echo "Waiting for server... ($i/60)"
                       sleep 1
                   done
+
+                  # Make a request that uses the database to trigger D1 initialization
+                  echo "Triggering database initialization..."
+                  curl -s http://localhost:8788/api/admin/auth/login -X POST -H "Content-Type: application/json" -d '{"email":"test@test.com","password":"test"}' > /dev/null 2>&1 || true
+                  sleep 3
+
+                  # Show all sqlite files found for debugging
+                  echo "All sqlite files in .wrangler:"
+                  find .wrangler -name "*.sqlite" 2>/dev/null || true
+                  echo ""
+
+                  # Find the D1 database file (NOT the cache database)
+                  echo "Looking for D1 database file..."
+                  DB_FILE=$(find .wrangler -path "*d1*" -name "*.sqlite" 2>/dev/null | head -1)
+
+                  # If D1 database not found, try any sqlite in a D1-related path
+                  if [ -z "$DB_FILE" ]; then
+                      echo "D1 database not found in standard location, checking alternatives..."
+                      DB_FILE=$(find .wrangler -name "*.sqlite" 2>/dev/null | grep -v cache | head -1)
+                  fi
+
+                  # If still not found, show full directory structure and fail
+                  if [ -z "$DB_FILE" ]; then
+                      echo "✗ D1 database file not found"
+                      echo "Wrangler state directory contents:"
+                      ls -laR .wrangler 2>/dev/null || echo "No .wrangler directory"
+                      echo ""
+                      echo "Wrangler logs:"
+                      cat /tmp/wrangler.log
+                      exit 1
+                  fi
+                  echo "Found database: $DB_FILE"
+
+                  # Initialize the database schema
+                  echo "Setting up database schema..."
+                  sqlite3 "$DB_FILE" < database/setup-complete.sql
+
+                  # Hash the E2E password and update the admin user
+                  if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
+                      echo "Creating E2E admin user..."
+                      ADMIN_HASH=$(node scripts/hash-password.mjs "$E2E_ADMIN_PASSWORD")
+
+                      # Insert or update the admin user
+                      sqlite3 "$DB_FILE" "INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active, activated_at) VALUES (100, '$E2E_ADMIN_EMAIL', 'E2E Admin', '$ADMIN_HASH', 'admin', 1, datetime('now'));"
+                      echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
+                  else
+                      echo "⚠ E2E credentials not set, using default test accounts"
+                  fi
+
+                  # Verify the user was created
+                  echo "Database users:"
+                  sqlite3 "$DB_FILE" "SELECT id, email, role FROM users;"
+
+                  echo "✓ Database setup complete"
 
             - name: Install Playwright browsers
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'

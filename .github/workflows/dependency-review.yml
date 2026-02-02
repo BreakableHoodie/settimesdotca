@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   dependency-review:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     # Continue on error - requires Dependency Graph to be enabled in repo settings
     continue-on-error: true
     steps:

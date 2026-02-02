@@ -420,10 +420,10 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
             </div>
 
             {/* Social Links */}
-            <div>
-              <label className="block text-white mb-2 text-sm font-medium">
+            <fieldset>
+              <legend className="block text-white mb-2 text-sm font-medium">
                 Social Links <span className="text-white/50 text-xs">(optional)</span>
-              </label>
+              </legend>
               <div className="grid gap-3 sm:grid-cols-2">
                 <input
                   id="event-social-website"
@@ -489,7 +489,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
               <p className="text-xs text-white/50 mt-2">
                 Use full URLs or handles (e.g., @settimes). Leave blank to clear.
               </p>
-            </div>
+            </fieldset>
 
             {/* Status */}
             <div>

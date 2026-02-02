@@ -64,16 +64,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Chrome (Fedora)
+      - name: Verify Chrome installed
         working-directory: .
-        run: |
-          if ! command -v google-chrome &> /dev/null; then
-            sudo dnf install -y dnf-plugins-core
-            sudo dnf config-manager --set-enabled google-chrome || \
-              sudo dnf config-manager --add-repo https://dl.google.com/linux/chrome/repo/x86_64/google-chrome.repo
-            sudo dnf install -y google-chrome-stable
-          fi
-          google-chrome --version
+        run: google-chrome --version
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

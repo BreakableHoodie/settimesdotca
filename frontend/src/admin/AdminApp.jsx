@@ -125,7 +125,7 @@ export default function AdminApp() {
         } else {
           // If verification fails, logout (clears local storage and state)
           if (localUser) {
-            console.log('Session verification failed, logging out...')
+            console.warn('Session verification failed, logging out...')
             authApi.logout()
             setIsAuthenticated(false)
           }
@@ -158,6 +158,7 @@ export default function AdminApp() {
       activityEvents.forEach(event => window.removeEventListener(event, registerActivity))
       clearIdleTimers()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, showIdleWarning])
 
   // Listen for unauthorized events (401) from API

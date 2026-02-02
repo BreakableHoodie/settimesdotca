@@ -10,7 +10,7 @@ on:
 jobs:
   format-check:
     name: Format Check
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     defaults:
       run:
         working-directory: frontend
@@ -33,7 +33,7 @@ jobs:
 
   accessibility-tests:
     name: Accessibility Tests
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     defaults:
       run:
         working-directory: frontend
@@ -56,13 +56,17 @@ jobs:
 
   lighthouse:
     name: Lighthouse CI
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     defaults:
       run:
         working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify Chrome installed
+        working-directory: .
+        run: google-chrome --version
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

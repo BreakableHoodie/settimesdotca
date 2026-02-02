@@ -358,7 +358,9 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
               />
               {!isEditing && (
                 <p className="text-xs text-white/50 mt-1">
-                  {formData.status === 'archived' ? 'Past dates allowed for archived events' : 'Date cannot be in the past'}
+                  {formData.status === 'archived'
+                    ? 'Past dates allowed for archived events'
+                    : 'Date cannot be in the past'}
                 </p>
               )}
             </div>

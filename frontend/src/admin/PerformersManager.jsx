@@ -138,7 +138,9 @@ export default function PerformersManager() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="performer-name" className="block text-white mb-2 text-sm">Name *</label>
+              <label htmlFor="performer-name" className="block text-white mb-2 text-sm">
+                Name *
+              </label>
               <input
                 id="performer-name"
                 type="text"
@@ -152,7 +154,9 @@ export default function PerformersManager() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="performer-genre" className="block text-white mb-2 text-sm">Genre</label>
+                <label htmlFor="performer-genre" className="block text-white mb-2 text-sm">
+                  Genre
+                </label>
                 <input
                   id="performer-genre"
                   type="text"
@@ -163,7 +167,9 @@ export default function PerformersManager() {
                 />
               </div>
               <div>
-                <label htmlFor="performer-origin" className="block text-white mb-2 text-sm">Origin/City</label>
+                <label htmlFor="performer-origin" className="block text-white mb-2 text-sm">
+                  Origin/City
+                </label>
                 <input
                   id="performer-origin"
                   type="text"
@@ -176,7 +182,9 @@ export default function PerformersManager() {
             </div>
 
             <div>
-              <label htmlFor="performer-description" className="block text-white mb-2 text-sm">Description</label>
+              <label htmlFor="performer-description" className="block text-white mb-2 text-sm">
+                Description
+              </label>
               <textarea
                 id="performer-description"
                 value={formData.description}
@@ -188,7 +196,9 @@ export default function PerformersManager() {
             </div>
 
             <div>
-              <label htmlFor="performer-url" className="block text-white mb-2 text-sm">Website/Main URL</label>
+              <label htmlFor="performer-url" className="block text-white mb-2 text-sm">
+                Website/Main URL
+              </label>
               <input
                 id="performer-url"
                 type="url"
@@ -200,7 +210,9 @@ export default function PerformersManager() {
             </div>
 
             <div>
-              <label htmlFor="performer-photo-url" className="block text-white mb-2 text-sm">Photo URL</label>
+              <label htmlFor="performer-photo-url" className="block text-white mb-2 text-sm">
+                Photo URL
+              </label>
               <input
                 id="performer-photo-url"
                 type="url"
@@ -213,7 +225,9 @@ export default function PerformersManager() {
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label htmlFor="performer-instagram" className="block text-white mb-2 text-sm">Instagram</label>
+                <label htmlFor="performer-instagram" className="block text-white mb-2 text-sm">
+                  Instagram
+                </label>
                 <input
                   id="performer-instagram"
                   type="text"
@@ -224,7 +238,9 @@ export default function PerformersManager() {
                 />
               </div>
               <div>
-                <label htmlFor="performer-bandcamp" className="block text-white mb-2 text-sm">Bandcamp</label>
+                <label htmlFor="performer-bandcamp" className="block text-white mb-2 text-sm">
+                  Bandcamp
+                </label>
                 <input
                   id="performer-bandcamp"
                   type="text"
@@ -235,7 +251,9 @@ export default function PerformersManager() {
                 />
               </div>
               <div>
-                <label htmlFor="performer-facebook" className="block text-white mb-2 text-sm">Facebook</label>
+                <label htmlFor="performer-facebook" className="block text-white mb-2 text-sm">
+                  Facebook
+                </label>
                 <input
                   id="performer-facebook"
                   type="text"

@@ -112,7 +112,8 @@ export default function EventTimeline() {
     if (!eventId) return
 
     // Early return to avoid duplicate fetches
-    if (detailsStateRef.current[eventId]?.loading || detailsStateRef.current[eventId]?.loaded) {
+    const detailsState = detailsStateRef.current[eventId]
+    if (detailsState?.loading || detailsState?.loaded) {
       return
     }
 
@@ -126,10 +127,10 @@ export default function EventTimeline() {
         throw new Error('Failed to load event details')
       }
       const data = await response.json()
-      
+
       // Mark as loaded
       detailsStateRef.current[eventId] = { loading: false, loaded: true }
-      
+
       startTransition(() => {
         setDetailsById(prev => ({ ...prev, [eventId]: data }))
       })

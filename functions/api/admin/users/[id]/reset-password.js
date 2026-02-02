@@ -104,7 +104,6 @@ export async function onRequestPost(context) {
         },
       );
     }
-
     const emailPayload = buildResetPasswordEmail({
       resetUrl,
       recipientName: targetUser.name,

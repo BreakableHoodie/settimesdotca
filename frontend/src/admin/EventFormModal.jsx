@@ -176,13 +176,13 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
       return false
     }
 
-    // Check date is not in past (only for new events)
-    if (!isEditing) {
+    // Check date is not in past (only for new events, unless status is archived)
+    if (!isEditing && formData.status !== 'archived') {
       const eventDate = new Date(formData.date)
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       if (eventDate < today) {
-        setError('Date cannot be in the past')
+        setError('Date cannot be in the past (use archived status for past events)')
         return false
       }
     }
@@ -354,9 +354,15 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 onChange={handleInputChange}
                 className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
                 required
-                min={!isEditing ? today : undefined}
+                min={!isEditing && formData.status !== 'archived' ? today : undefined}
               />
-              {!isEditing && <p className="text-xs text-white/50 mt-1">Date cannot be in the past</p>}
+              {!isEditing && (
+                <p className="text-xs text-white/50 mt-1">
+                  {formData.status === 'archived'
+                    ? 'Past dates allowed for archived events'
+                    : 'Date cannot be in the past'}
+                </p>
+              )}
             </div>
 
             {/* Description */}

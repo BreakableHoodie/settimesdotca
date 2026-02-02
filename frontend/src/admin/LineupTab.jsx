@@ -70,7 +70,6 @@ export default function LineupTab({
   const [bulkAction, setBulkAction] = useState(null)
   const [bulkParams, setBulkParams] = useState({})
 
-
   const splitOrigin = origin => {
     if (!origin) return { city: '', region: '' }
     const [city, region] = origin.split(',').map(part => part.trim())
@@ -369,10 +368,7 @@ export default function LineupTab({
   }
 
   // Reuse sorting/conflict logic from BandsTab (simplified)
-  const getVenueName = useCallback(
-    id => venues.find(v => String(v.id) === String(id))?.name || 'Unknown',
-    [venues]
-  )
+  const getVenueName = useCallback(id => venues.find(v => String(v.id) === String(id))?.name || 'Unknown', [venues])
 
   const filteredBands = useMemo(() => {
     let next = bands

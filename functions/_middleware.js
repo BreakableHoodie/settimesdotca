@@ -10,14 +10,13 @@ import { createRequestLogger } from './utils/logger.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
+  const log = createRequestLogger(context);
 
   // Only process API routes - let static files pass through without middleware
   const url = new URL(request.url);
   if (!url.pathname.startsWith('/api/')) {
     return context.next();
   }
-
-  const log = createRequestLogger(context);
 
   // Allowed origins for CORS (production and development)
   const baseAllowedOrigins = [

@@ -237,7 +237,6 @@ export default function BandProfilePage() {
     },
     [scheduleSelections, profile?.name]
   )
-
   if (loading) {
     return (
       <div className="min-h-screen bg-band-navy flex items-center justify-center">

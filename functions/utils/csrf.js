@@ -2,7 +2,6 @@
 // Uses csrf-csrf double-submit cookie strategy
 
 import { doubleCsrf } from "csrf-csrf";
-
 function parseCookies(cookieHeader) {
   if (!cookieHeader) return {};
   return cookieHeader.split(";").reduce((acc, cookie) => {
@@ -44,7 +43,6 @@ function resolveCsrfSecret(env, request) {
   console.error("[CSRF] CSRF_SECRET environment variable is required in production");
   throw new Error("CSRF_SECRET environment variable is required");
 }
-
 function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
   if (sessionIdentifierOverride) {
     return sessionIdentifierOverride;

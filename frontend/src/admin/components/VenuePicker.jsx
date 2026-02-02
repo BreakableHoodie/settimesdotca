@@ -68,7 +68,9 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
 
       {/* Select Existing Venue */}
       <div>
-        <label htmlFor="venue-picker-select" className="block text-white mb-2 text-sm">Select Existing Venue</label>
+        <label htmlFor="venue-picker-select" className="block text-white mb-2 text-sm">
+          Select Existing Venue
+        </label>
         {loading ? (
           <div className="text-gray-400 text-sm">Loading venues...</div>
         ) : availableVenues.length > 0 ? (

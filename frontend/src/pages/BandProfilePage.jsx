@@ -120,10 +120,21 @@ export default function BandProfilePage() {
 
   const sanitizedDescription = useMemo(() => {
     if (!profile?.description) return ''
-    return DOMPurify.sanitize(profile.description, {
+    let cleaned = DOMPurify.sanitize(profile.description, {
       ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a'],
       ALLOWED_ATTR: ['href', 'target', 'rel'],
     })
+    // Normalize text: convert multiple <br> tags to paragraph breaks
+    cleaned = cleaned.replace(/(<br\s*\/?>\s*){2,}/gi, '</p><p>')
+    // Replace single <br> tags with spaces for proper text flow
+    cleaned = cleaned.replace(/<br\s*\/?>/gi, ' ')
+    // Collapse multiple spaces
+    cleaned = cleaned.replace(/\s+/g, ' ').trim()
+    // Wrap in paragraph if not already structured
+    if (cleaned && !cleaned.startsWith('<p>') && !cleaned.startsWith('<ul>') && !cleaned.startsWith('<ol>')) {
+      cleaned = `<p>${cleaned}</p>`
+    }
+    return cleaned
   }, [profile?.description])
 
   const plainDescription = useMemo(() => {
@@ -404,7 +415,7 @@ export default function BandProfilePage() {
               <div className="p-6 bg-band-purple/50 border-t border-white/10">
                 {profile.description && (
                   <div
-                    className="text-white/90 mb-4 leading-relaxed rich-text-content break-words whitespace-pre-wrap max-w-full"
+                    className="prose prose-invert prose-sm max-w-none mb-4 text-white/90 prose-p:my-2 prose-p:leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
                   />
                 )}

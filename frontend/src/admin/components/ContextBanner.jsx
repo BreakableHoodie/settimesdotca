@@ -1,6 +1,6 @@
-import { Button, Badge } from '../../components/ui'
+import { Button } from '../../components/ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCalendarDays, faArrowLeft, faBullseye } from '@fortawesome/free-solid-svg-icons'
+import { faArrowLeft, faBullseye } from '@fortawesome/free-solid-svg-icons'
 import EventStatusBadge from './EventStatusBadge'
 
 /**

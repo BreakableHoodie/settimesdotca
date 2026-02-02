@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { bandsApi, venuesApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
 import ArtistPicker from './components/ArtistPicker'
-import HelpPanel from './components/HelpPanel'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import {
   calculateEndTimeFromDuration,
@@ -11,7 +10,6 @@ import {
   deriveDurationMinutes,
   detectConflicts,
   formatDurationLabel,
-  formatTimeLabel,
   formatTimeRangeLabel,
   sortBandsByStart,
 } from './utils/timeUtils'
@@ -22,10 +20,10 @@ import {
  */
 export default function LineupTab({
   selectedEventId,
-  selectedEvent,
+  selectedEvent: _selectedEvent,
   events,
   showToast,
-  onEventFilterChange,
+  onEventFilterChange: _onEventFilterChange,
   readOnly = false,
 }) {
   const [bands, setBands] = useState([]) // Current event performances
@@ -71,8 +69,6 @@ export default function LineupTab({
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkAction, setBulkAction] = useState(null)
   const [bulkParams, setBulkParams] = useState({})
-
-  const editFormRef = useRef(null)
 
   const splitOrigin = origin => {
     if (!origin) return { city: '', region: '' }
@@ -372,7 +368,7 @@ export default function LineupTab({
   }
 
   // Reuse sorting/conflict logic from BandsTab (simplified)
-  const getVenueName = id => venues.find(v => String(v.id) === String(id))?.name || 'Unknown'
+  const getVenueName = useCallback(id => venues.find(v => String(v.id) === String(id))?.name || 'Unknown', [venues])
 
   const filteredBands = useMemo(() => {
     let next = bands
@@ -414,7 +410,7 @@ export default function LineupTab({
       const bVal = b.start_time || ''
       return aVal.localeCompare(bVal) * direction
     })
-  }, [filteredBands, sortConfig, venues])
+  }, [filteredBands, sortConfig, getVenueName])
 
   const handleSort = key => {
     setSortConfig(prev => ({

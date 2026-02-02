@@ -138,8 +138,11 @@ export default function PerformersManager() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-white mb-2 text-sm">Name *</label>
+              <label htmlFor="performer-name" className="block text-white mb-2 text-sm">
+                Name *
+              </label>
               <input
+                id="performer-name"
                 type="text"
                 value={formData.name}
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
@@ -151,8 +154,11 @@ export default function PerformersManager() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-white mb-2 text-sm">Genre</label>
+                <label htmlFor="performer-genre" className="block text-white mb-2 text-sm">
+                  Genre
+                </label>
                 <input
+                  id="performer-genre"
                   type="text"
                   value={formData.genre}
                   onChange={e => setFormData(prev => ({ ...prev, genre: e.target.value }))}
@@ -161,8 +167,11 @@ export default function PerformersManager() {
                 />
               </div>
               <div>
-                <label className="block text-white mb-2 text-sm">Origin/City</label>
+                <label htmlFor="performer-origin" className="block text-white mb-2 text-sm">
+                  Origin/City
+                </label>
                 <input
+                  id="performer-origin"
                   type="text"
                   value={formData.origin}
                   onChange={e => setFormData(prev => ({ ...prev, origin: e.target.value }))}
@@ -173,8 +182,11 @@ export default function PerformersManager() {
             </div>
 
             <div>
-              <label className="block text-white mb-2 text-sm">Description</label>
+              <label htmlFor="performer-description" className="block text-white mb-2 text-sm">
+                Description
+              </label>
               <textarea
+                id="performer-description"
                 value={formData.description}
                 onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
@@ -184,8 +196,11 @@ export default function PerformersManager() {
             </div>
 
             <div>
-              <label className="block text-white mb-2 text-sm">Website/Main URL</label>
+              <label htmlFor="performer-url" className="block text-white mb-2 text-sm">
+                Website/Main URL
+              </label>
               <input
+                id="performer-url"
                 type="url"
                 value={formData.url}
                 onChange={e => setFormData(prev => ({ ...prev, url: e.target.value }))}
@@ -195,8 +210,11 @@ export default function PerformersManager() {
             </div>
 
             <div>
-              <label className="block text-white mb-2 text-sm">Photo URL</label>
+              <label htmlFor="performer-photo-url" className="block text-white mb-2 text-sm">
+                Photo URL
+              </label>
               <input
+                id="performer-photo-url"
                 type="url"
                 value={formData.photo_url}
                 onChange={e => setFormData(prev => ({ ...prev, photo_url: e.target.value }))}
@@ -207,8 +225,11 @@ export default function PerformersManager() {
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-white mb-2 text-sm">Instagram</label>
+                <label htmlFor="performer-instagram" className="block text-white mb-2 text-sm">
+                  Instagram
+                </label>
                 <input
+                  id="performer-instagram"
                   type="text"
                   value={formData.instagram}
                   onChange={e => setFormData(prev => ({ ...prev, instagram: e.target.value }))}
@@ -217,8 +238,11 @@ export default function PerformersManager() {
                 />
               </div>
               <div>
-                <label className="block text-white mb-2 text-sm">Bandcamp</label>
+                <label htmlFor="performer-bandcamp" className="block text-white mb-2 text-sm">
+                  Bandcamp
+                </label>
                 <input
+                  id="performer-bandcamp"
                   type="text"
                   value={formData.bandcamp}
                   onChange={e => setFormData(prev => ({ ...prev, bandcamp: e.target.value }))}
@@ -227,8 +251,11 @@ export default function PerformersManager() {
                 />
               </div>
               <div>
-                <label className="block text-white mb-2 text-sm">Facebook</label>
+                <label htmlFor="performer-facebook" className="block text-white mb-2 text-sm">
+                  Facebook
+                </label>
                 <input
+                  id="performer-facebook"
                   type="text"
                   value={formData.facebook}
                   onChange={e => setFormData(prev => ({ ...prev, facebook: e.target.value }))}

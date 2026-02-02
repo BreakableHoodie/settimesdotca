@@ -29,12 +29,12 @@ export default function Button({
   const baseClasses =
     'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-base focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy disabled:opacity-50 disabled:cursor-not-allowed'
 
-  // Variant styles
+  // Variant styles - primary uses dark text for WCAG AA contrast (4.5:1)
   const variantClasses = {
     primary:
-      'bg-accent-500 text-white hover:bg-accent-600 focus:ring-accent-500 shadow-sm hover:shadow-md active:scale-95',
+      'bg-accent-500 text-bg-navy font-semibold hover:bg-accent-400 focus:ring-accent-500 shadow-sm hover:shadow-md active:scale-95',
     'primary-gradient':
-      'bg-gradient-accent text-white hover:brightness-110 focus:ring-accent-500 shadow-sm hover:shadow-md active:scale-95',
+      'bg-gradient-accent text-bg-navy font-semibold hover:brightness-110 focus:ring-accent-500 shadow-sm hover:shadow-md active:scale-95',
     secondary: 'border-2 border-text-secondary text-text-primary hover:bg-white/10 focus:ring-primary-500',
     danger: 'bg-error-500 text-white hover:bg-error-600 focus:ring-error-500 shadow-sm hover:shadow-md active:scale-95',
     ghost: 'text-text-primary hover:bg-white/5 focus:ring-primary-500',

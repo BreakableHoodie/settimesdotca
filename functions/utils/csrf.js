@@ -2,9 +2,6 @@
 // Uses csrf-csrf double-submit cookie strategy
 
 import { doubleCsrf } from "csrf-csrf";
-
-const DEFAULT_CSRF_SECRET = "settimes-csrf-secret";
-
 function parseCookies(cookieHeader) {
   if (!cookieHeader) return {};
   return cookieHeader.split(";").reduce((acc, cookie) => {
@@ -26,10 +23,26 @@ function getHeaderToken(request) {
   return request.headers.get("X-CSRF-Token") || "";
 }
 
-function resolveCsrfSecret(env) {
-  return env?.CSRF_SECRET || DEFAULT_CSRF_SECRET;
-}
+// Fallback secret for local development ONLY - production must set CSRF_SECRET
+const LOCAL_DEV_CSRF_SECRET = "local-dev-csrf-secret-not-for-production";
 
+function resolveCsrfSecret(env, request) {
+  const secret = env?.CSRF_SECRET;
+  if (secret) {
+    return secret;
+  }
+
+  // Check if this is local development
+  const isLocal = request && isDevRequest(request);
+  if (isLocal) {
+    console.warn("[CSRF] Using fallback secret for local development. Set CSRF_SECRET for production.");
+    return LOCAL_DEV_CSRF_SECRET;
+  }
+
+  // Production requires CSRF_SECRET
+  console.error("[CSRF] CSRF_SECRET environment variable is required in production");
+  throw new Error("CSRF_SECRET environment variable is required");
+}
 function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
   if (sessionIdentifierOverride) {
     return sessionIdentifierOverride;
@@ -65,14 +78,21 @@ const csrf = doubleCsrf({
 function buildRequestAdapter(request, env, sessionIdentifierOverride = null) {
   const cookieHeader = request.headers.get("Cookie");
   const cookies = parseCookies(cookieHeader);
+  const csrfHeaderValue = request.headers.get("X-CSRF-Token") || "";
+
+  // Create a headers object with a get() method that csrf-csrf expects
+  const headersAdapter = {
+    "x-csrf-token": csrfHeaderValue,
+    get(name) {
+      return this[name.toLowerCase()] || null;
+    },
+  };
 
   return {
     method: request.method,
-    headers: {
-      "x-csrf-token": request.headers.get("X-CSRF-Token") || "",
-    },
+    headers: headersAdapter,
     cookies,
-    csrfSecret: resolveCsrfSecret(env),
+    csrfSecret: resolveCsrfSecret(env, request),
     sessionIdentifier: getSessionIdentifier(
       request,
       cookies,
@@ -141,7 +161,8 @@ export function validateCSRFToken(request, env = null) {
   try {
     const req = buildRequestAdapter(request, env);
     return csrf.validateRequest(req);
-  } catch (_error) {
+  } catch (error) {
+    console.error("[CSRF] Validation error");
     return false;
   }
 }

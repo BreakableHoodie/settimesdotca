@@ -1,8 +1,12 @@
 name: DAST - ZAP Baseline
 
+# ZAP scans require a deployed target to scan.
+# We only run on:
+# - Weekly schedule against production
+# - After successful deployment to dev branch
+# Note: PR scans are disabled because Cloudflare Pages doesn't deploy PR previews
+
 on:
-  pull_request:
-    branches: [main, dev]
   schedule:
     # Weekly scan on Monday at 7 AM UTC
     - cron: "0 7 * * 1"
@@ -10,6 +14,13 @@ on:
     workflows: ["Deploy to Cloudflare Pages"]
     types: [completed]
     branches: [dev]
+  # Manual trigger for ad-hoc scans
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'URL to scan (defaults to production)'
+        required: false
+        default: 'https://settimes.ca'
 
 permissions:
   contents: read
@@ -27,14 +38,19 @@ jobs:
       - name: Determine target URL
         id: target
         run: |
-          # For PRs, scan the dev environment
-          # For scheduled runs, scan production
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          # workflow_dispatch: use provided URL or default to production
+          # schedule: scan production
+          # workflow_run (after dev deploy): scan dev environment
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            URL="${{ github.event.inputs.target_url }}"
+            echo "url=${URL:-https://settimes.ca}" >> $GITHUB_OUTPUT
+            echo "Manual scan: ${URL:-https://settimes.ca}"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
             echo "url=https://settimes.ca" >> $GITHUB_OUTPUT
-            echo "Scanning production: https://settimes.ca"
+            echo "Scheduled scan of production: https://settimes.ca"
           else
             echo "url=https://dev.settimesdotca.pages.dev" >> $GITHUB_OUTPUT
-            echo "Scanning dev: https://dev.settimesdotca.pages.dev"
+            echo "Post-deployment scan of dev: https://dev.settimesdotca.pages.dev"
           fi
 
       - name: Wait for deployment to be ready

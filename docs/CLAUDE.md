@@ -4,18 +4,19 @@
 
 A mobile-first web application for live music event management. Provides public event schedules, band profiles with stats, and a full-featured admin panel for event management.
 
-**Current Status**: Sprint 1.3 complete - RBAC ✅, Band Performance History ✅ (88 passing tests, 100% pass rate). Sprint 1.2 Event Management ready to start. Targeting Nov 30, 2025 demo with comprehensive UI/UX redesign.
+**Current Status**: Production (Q1 2026). All core features complete including MFA/2FA, trusted devices, navigation improvements. February 2026 event scheduled.
 
-**Active Roadmap**: See sprint spec files in `docs/specs/` for detailed sprint planning and completion tracking.
+**Active Roadmap**: Production operations and maintenance for upcoming events.
 
 ## Visual Reference
 
 Use `docs/schedule.webp` as the design inspiration:
 
-- **Palette:** Deep navy (#1a1f36) / purple (#2d1b4e) background with bright neon accent colors (orange #ff6b35)
+- **Palette:** Deep navy (#0c0f1a) background with cyan (#0ea5e9) accent colors
 - **Typography:** Clean, legible sans-serif — Inter/system-ui
 - **Layout:** Scrollable vertical timeline, with band blocks styled like event cards
-- **Mood:** Playful but readable in low light (concert/nighttime aesthetic)
+- **Mood:** Modern, readable in low light (concert/nighttime aesthetic)
+- **Navigation:** Sticky header with SetTimes branding, contextual breadcrumbs
 
 ## Stack & Architecture
 
@@ -35,7 +36,8 @@ Use `docs/schedule.webp` as the design inspiration:
 
 - **Runtime:** Cloudflare Pages Functions (serverless)
 - **Database:** Cloudflare D1 (SQLite-based)
-- **Auth:** JWT with 24-hour sessions
+- **Auth:** Session-based with HTTPOnly cookies, CSRF protection
+- **MFA:** TOTP-based 2FA with trusted devices and backup codes
 - **API:** RESTful endpoints with JOIN-optimized queries
 
 ### Database Schema
@@ -50,9 +52,10 @@ Use `docs/schedule.webp` as the design inspiration:
 ### Deployment
 
 - **Platform:** Cloudflare Pages
-- **Prod URL:** https://lwbc.dredre.net
+- **Prod URL:** https://settimes.ca
 - **Dev URL:** https://dev.settimes.pages.dev
 - **Local Dev:** wrangler pages dev on port 8788
+- **Manual Deploy:** `wrangler pages deploy frontend/dist --project-name settimesdotca --branch main` (from project root)
 
 ## Core Features
 
@@ -83,11 +86,14 @@ Use `docs/schedule.webp` as the design inspiration:
 
 ### Security
 
-- ✅ JWT authentication with HttpOnly cookies
+- ✅ Session-based authentication with HTTPOnly cookies
+- ✅ CSRF token protection on all state-changing operations
+- ✅ MFA/2FA with TOTP (Google Authenticator, Authy, etc.)
+- ✅ Trusted devices (30-day remember) to skip MFA
+- ✅ Backup codes (8 single-use recovery codes per user)
 - ✅ SQL injection prevention (parameterized queries)
 - ✅ Input validation on all forms
 - ✅ Password hashing with bcrypt
-- ✅ Session timeout (24h default)
 - ✅ HTTPS-only in production (Cloudflare enforced)
 - 📋 SQL Safety documentation: `docs/SQL_SAFETY.md`
 - 📋 Session Management docs: `docs/SESSION_MANAGEMENT.md`
@@ -203,7 +209,31 @@ settimes/
     └── frontend/src/utils/__tests__/performance.test.js
 ```
 
-## Recent Improvements (Nov 2025)
+## Recent Improvements
+
+### Q1 2026: Security Hardening & Navigation ✅
+
+1. **MFA/2FA Implementation**
+   - TOTP-based multi-factor authentication with authenticator app support
+   - Trusted devices feature (30-day remember)
+   - 8 backup codes per user for account recovery
+   - MFA settings modal in admin panel
+
+2. **Navigation Improvements**
+   - Sticky header on band profile pages with SetTimes branding
+   - Contextual "My Schedule" link when user has saved bands
+   - Breadcrumb navigation showing path: Events → Event Name → Band Name
+   - localStorage-based schedule detection across events
+
+3. **SPA Routing Fix**
+   - Proper `_routes.json` configuration for Cloudflare Pages
+   - Only `/api/*` routes to Functions, everything else to static files
+   - Correct deployment command: `wrangler pages deploy frontend/dist`
+
+4. **UI Updates**
+   - New SetTimes favicon (cyan "S" + white "T" on navy background)
+   - Band profile buttons in column layout
+   - Updated color scheme: navy #0c0f1a, cyan #0ea5e9
 
 ### Sprint 1.3: Band Performance History (Nov 18, 2025) ✅
 
@@ -339,11 +369,13 @@ When working on this project:
 
 ### UI/UX
 
-- Match color palette: Navy (#1a1f36), Purple (#2d1b4e), Orange (#ff6b35)
+- Match color palette: Navy (#0c0f1a), Cyan (#0ea5e9), White
 - Use TailwindCSS utility classes (avoid custom CSS)
 - Mobile-first responsive design (touch targets ≥44px)
 - Dark theme optimized for low-light environments
 - Error states with clear recovery actions
+- Sticky navigation with contextual links
+- Breadcrumb navigation for deep pages
 
 ### Code Quality
 
@@ -366,7 +398,8 @@ When working on this project:
 - ALWAYS use parameterized queries (`.bind()`)
 - Validate inputs against whitelist patterns
 - Never expose SQL errors to users
-- Use JWT for authentication, not sessions
+- Use session cookies with CSRF protection (not JWT)
+- Enforce MFA for admin accounts
 - Log security events for monitoring
 
 ### Testing
@@ -395,17 +428,23 @@ When working on this project:
 
 ### Medium Priority
 
-- [ ] Implement "Remember Me" (7-day sessions)
-- [ ] Add 2FA for admin accounts
 - [ ] Refactor BandsTab.jsx with useReducer (currently 800+ lines)
 - [ ] Structured logger utility (replace console.error)
+- [ ] Enhanced analytics dashboard
 
 ### Low Priority
 
-- [ ] Server-side token revocation (requires Redis/KV)
 - [ ] Session management UI (view/revoke active sessions)
 - [ ] Bulk venue operations
 - [ ] Advanced search/filtering on admin pages
+
+### Completed (Q1 2026)
+
+- [x] Add 2FA for admin accounts (TOTP-based MFA)
+- [x] Trusted devices feature (30-day remember)
+- [x] Backup codes for account recovery
+- [x] Navigation improvements (breadcrumbs, sticky header)
+- [x] SPA routing fix for Cloudflare Pages
 
 ## Agent Utilization Strategy
 
@@ -576,7 +615,7 @@ When working on this project:
 
 ---
 
-**Last Updated**: November 18, 2025
-**Version**: 2.0 (Performers/Performances Architecture)
-**Status**: Sprint 1.3 complete - RBAC ✅, Band Performance History ✅ (88 passing tests, 100% pass rate), targeting Nov 30 demo
-**Roadmap**: See sprint spec files in `docs/specs/` for detailed sprint planning and completion tracking
+**Last Updated**: January 31, 2026
+**Version**: 2.1 (MFA & Navigation Updates)
+**Status**: Production - All core features complete, February 2026 event scheduled
+**Roadmap**: Production operations and maintenance

@@ -7,6 +7,10 @@ import { verifyPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
+import {
+  getTrustedDeviceToken,
+  validateTrustedDevice,
+} from "../../../utils/trustedDevice.js";
 
 // Rate limiting: check failed login attempts
 async function checkRateLimit(DB, email, ipAddress) {
@@ -184,7 +188,33 @@ export async function onRequestPost(context) {
     }
 
     // Password valid - check if TOTP is required
+    // First, check if this is a trusted device (skip MFA)
+    let skipMfa = false;
     if (Number(user.totp_enabled) === 1) {
+      try {
+        const trustedDeviceToken = getTrustedDeviceToken(request);
+        if (trustedDeviceToken) {
+          const trustedUserId = await validateTrustedDevice(
+            DB,
+            trustedDeviceToken,
+            ipAddress,
+            userAgent
+          );
+          if (trustedUserId === user.id) {
+            console.log("[Login] Trusted device validated, skipping MFA for user:", user.id);
+            skipMfa = true;
+          } else if (trustedUserId !== null) {
+            console.log("[Login] Trusted device belongs to different user");
+          }
+        }
+      } catch (trustedDeviceError) {
+        // Don't fail login if trusted device check fails - just require MFA
+        console.error("[Login] Trusted device check failed:", trustedDeviceError?.message || trustedDeviceError);
+        skipMfa = false;
+      }
+    }
+
+    if (Number(user.totp_enabled) === 1 && !skipMfa) {
       if (!user.totp_secret) {
         console.error("TOTP enabled but missing secret for user:", user.id);
         return new Response(

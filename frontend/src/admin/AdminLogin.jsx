@@ -16,6 +16,7 @@ export default function AdminLogin({ onLoginSuccess }) {
   const [mfaUser, setMfaUser] = useState(null)
   const [activationInfo, setActivationInfo] = useState(null)
   const [resendStatus, setResendStatus] = useState({ loading: false, message: '' })
+  const [rememberDevice, setRememberDevice] = useState(false)
 
   useEffect(() => {
     const idleLogout = window.sessionStorage.getItem('idleLogout')
@@ -87,7 +88,7 @@ export default function AdminLogin({ onLoginSuccess }) {
     setLoading(true)
 
     try {
-      const result = await authApi.verifyMfa(mfaToken, mfaCode)
+      const result = await authApi.verifyMfa(mfaToken, mfaCode, rememberDevice)
       if (result.success) {
         onLoginSuccess()
       }
@@ -205,7 +206,7 @@ export default function AdminLogin({ onLoginSuccess }) {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleMfaVerify}>
+          <form onSubmit={handleMfaVerify} noValidate>
             <div className="mb-4">
               <p className="text-text-tertiary text-sm mb-2">
                 Enter the 6-digit code from your authenticator app or a backup code.
@@ -219,6 +220,8 @@ export default function AdminLogin({ onLoginSuccess }) {
                 name="mfa-code"
                 type="text"
                 inputMode="numeric"
+                pattern="[0-9A-Za-z\-\s]{4,12}"
+                title="Enter your 6-digit code or backup code"
                 value={mfaCode}
                 onChange={e => setMfaCode(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
@@ -227,6 +230,17 @@ export default function AdminLogin({ onLoginSuccess }) {
                 autoComplete="one-time-code"
               />
             </div>
+
+            <label className="flex items-center gap-3 mb-4 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberDevice}
+                onChange={e => setRememberDevice(e.target.checked)}
+                className="w-5 h-5 rounded border-white/20 bg-bg-navy text-accent-500 focus:ring-accent-500/20 focus:ring-2 cursor-pointer"
+                disabled={loading}
+              />
+              <span className="text-text-secondary text-sm">Remember this device for 30 days</span>
+            </label>
 
             {error && <div className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}
 

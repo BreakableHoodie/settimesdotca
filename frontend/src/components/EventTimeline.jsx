@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, memo } from 'react'
+import { useMemo, useState, useEffect, useRef, memo, useTransition, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Badge, Card, Alert, Loading } from './ui'
 import { slugifyBandName } from '../utils/slugify'
@@ -31,8 +31,13 @@ export default function EventTimeline() {
   const [detailsById, setDetailsById] = useState({})
   const [detailsLoading, setDetailsLoading] = useState({})
 
+  // Use transition for non-urgent UI updates to improve INP
+  const [isPending, startTransition] = useTransition()
+
   // Fetch timeline data
   const pollRef = useRef(null)
+  // Track loading/loaded state to prevent duplicate fetches
+  const detailsStateRef = useRef({})
 
   useEffect(() => {
     const fetchTimeline = async (isSilent = false) => {
@@ -103,10 +108,17 @@ export default function EventTimeline() {
     }
   }, [])
 
-  const loadDetails = async eventId => {
-    if (!eventId || detailsLoading[eventId] || detailsById[eventId]) {
+  const loadDetails = useCallback(async eventId => {
+    if (!eventId) return
+
+    // Early return to avoid duplicate fetches
+    const detailsState = detailsStateRef.current[eventId]
+    if (detailsState?.loading || detailsState?.loaded) {
       return
     }
+
+    // Mark as loading
+    detailsStateRef.current[eventId] = { loading: true, loaded: false }
 
     try {
       setDetailsLoading(prev => ({ ...prev, [eventId]: true }))
@@ -115,13 +127,21 @@ export default function EventTimeline() {
         throw new Error('Failed to load event details')
       }
       const data = await response.json()
-      setDetailsById(prev => ({ ...prev, [eventId]: data }))
+
+      // Mark as loaded
+      detailsStateRef.current[eventId] = { loading: false, loaded: true }
+
+      startTransition(() => {
+        setDetailsById(prev => ({ ...prev, [eventId]: data }))
+      })
     } catch (err) {
       console.error('Error fetching event details:', err)
+      // Reset loading state on error to allow retry
+      detailsStateRef.current[eventId] = { loading: false, loaded: false }
     } finally {
       setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
     }
-  }
+  }, [])
 
   // Filter events
   const filterEvents = events => {
@@ -164,9 +184,29 @@ export default function EventTimeline() {
       .reverse()
   }, [timeline])
 
-  const clearFilters = () => {
-    setFilters({ venue: null, month: null })
-  }
+  const clearFilters = useCallback(() => {
+    startTransition(() => {
+      setFilters({ venue: null, month: null })
+    })
+  }, [])
+
+  const handleShowPastToggle = useCallback(() => {
+    startTransition(() => {
+      setShowPast(prev => !prev)
+    })
+  }, [])
+
+  const handleShowFiltersToggle = useCallback(() => {
+    startTransition(() => {
+      setShowFilters(prev => !prev)
+    })
+  }, [])
+
+  const handleFilterChange = useCallback((key, value) => {
+    startTransition(() => {
+      setFilters(prev => ({ ...prev, [key]: value }))
+    })
+  }, [])
 
   const hasActiveFilters = filters.venue !== null || filters.month !== null
 
@@ -213,7 +253,7 @@ export default function EventTimeline() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={handleShowFiltersToggle}
               icon={<FontAwesomeIcon icon={faFilter} />}
             >
               {showFilters ? 'Hide' : 'Show'} Filters
@@ -230,7 +270,7 @@ export default function EventTimeline() {
                 <label className="block text-sm font-medium text-text-secondary mb-2">Filter by Venue</label>
                 <select
                   value={filters.venue || ''}
-                  onChange={e => setFilters({ ...filters, venue: e.target.value ? parseInt(e.target.value) : null })}
+                  onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value) : null)}
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
                 >
                   <option value="">All Venues</option>
@@ -247,7 +287,7 @@ export default function EventTimeline() {
                 <label className="block text-sm font-medium text-text-secondary mb-2">Filter by Month</label>
                 <select
                   value={filters.month || ''}
-                  onChange={e => setFilters({ ...filters, month: e.target.value || null })}
+                  onChange={e => handleFilterChange('month', e.target.value || null)}
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
                 >
                   <option value="">All Months</option>
@@ -330,7 +370,7 @@ export default function EventTimeline() {
                 <FontAwesomeIcon icon={faClockRotateLeft} className="text-text-tertiary text-xl" />
                 <h2 className="text-3xl font-bold text-text-secondary">Past Events</h2>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setShowPast(!showPast)}>
+              <Button variant="ghost" size="sm" onClick={handleShowPastToggle}>
                 {showPast ? 'Hide' : 'Show'} History ({filteredPast.length})
               </Button>
             </div>

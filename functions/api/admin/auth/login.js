@@ -191,20 +191,26 @@ export async function onRequestPost(context) {
     // First, check if this is a trusted device (skip MFA)
     let skipMfa = false;
     if (Number(user.totp_enabled) === 1) {
-      const trustedDeviceToken = getTrustedDeviceToken(request);
-      if (trustedDeviceToken) {
-        const trustedUserId = await validateTrustedDevice(
-          DB,
-          trustedDeviceToken,
-          ipAddress,
-          userAgent
-        );
-        if (trustedUserId === user.id) {
-          console.log("[Login] Trusted device validated, skipping MFA for user:", user.id);
-          skipMfa = true;
-        } else if (trustedUserId !== null) {
-          console.log("[Login] Trusted device belongs to different user");
+      try {
+        const trustedDeviceToken = getTrustedDeviceToken(request);
+        if (trustedDeviceToken) {
+          const trustedUserId = await validateTrustedDevice(
+            DB,
+            trustedDeviceToken,
+            ipAddress,
+            userAgent
+          );
+          if (trustedUserId === user.id) {
+            console.log("[Login] Trusted device validated, skipping MFA for user:", user.id);
+            skipMfa = true;
+          } else if (trustedUserId !== null) {
+            console.log("[Login] Trusted device belongs to different user");
+          }
         }
+      } catch (trustedDeviceError) {
+        // Don't fail login if trusted device check fails - just require MFA
+        console.error("[Login] Trusted device check failed:", trustedDeviceError?.message || trustedDeviceError);
+        skipMfa = false;
       }
     }
 

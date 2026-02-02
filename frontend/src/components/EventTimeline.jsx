@@ -132,7 +132,7 @@ export default function EventTimeline() {
 
       // Clear loading state synchronously to prevent race condition
       setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
-      
+
       // Defer details cache update to improve INP
       startTransition(() => {
         setDetailsById(prev => ({ ...prev, [eventId]: data }))

@@ -11,7 +11,6 @@ import {
   faClockRotateLeft,
   faFilter,
   faLocationDot,
-  faTicketSimple,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 
@@ -32,7 +31,7 @@ export default function EventTimeline() {
   const [detailsLoading, setDetailsLoading] = useState({})
 
   // Use transition for non-urgent UI updates to improve INP
-  const [isPending, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
 
   // Fetch timeline data
   const pollRef = useRef(null)
@@ -131,6 +130,10 @@ export default function EventTimeline() {
       // Mark as loaded
       detailsStateRef.current[eventId] = { loading: false, loaded: true }
 
+      // Clear loading state synchronously to prevent race condition
+      setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
+
+      // Defer details cache update to improve INP
       startTransition(() => {
         setDetailsById(prev => ({ ...prev, [eventId]: data }))
       })
@@ -138,7 +141,6 @@ export default function EventTimeline() {
       console.error('Error fetching event details:', err)
       // Reset loading state on error to allow retry
       detailsStateRef.current[eventId] = { loading: false, loaded: false }
-    } finally {
       setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
     }
   }, [])
@@ -267,8 +269,11 @@ export default function EventTimeline() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Venue Filter */}
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Filter by Venue</label>
+                <label htmlFor="timeline-venue-filter" className="block text-sm font-medium text-text-secondary mb-2">
+                  Filter by Venue
+                </label>
                 <select
+                  id="timeline-venue-filter"
                   value={filters.venue || ''}
                   onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value) : null)}
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
@@ -284,8 +289,11 @@ export default function EventTimeline() {
 
               {/* Month Filter */}
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Filter by Month</label>
+                <label htmlFor="timeline-month-filter" className="block text-sm font-medium text-text-secondary mb-2">
+                  Filter by Month
+                </label>
                 <select
+                  id="timeline-month-filter"
                   value={filters.month || ''}
                   onChange={e => handleFilterChange('month', e.target.value || null)}
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"

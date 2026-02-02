@@ -165,11 +165,11 @@ export default function BandForm({
 
         {(globalView || !isSchedulingExisting) && (
           <>
-            <div className="sm:col-span-2">
+            <fieldset className="sm:col-span-2">
               <div className="flex items-center gap-2 mb-2">
-                <label className="block text-text-primary text-sm font-medium">
+                <legend className="text-text-primary text-sm font-medium">
                   Origin <span className="text-text-tertiary text-xs">(optional)</span>
-                </label>
+                </legend>
                 <Tooltip content="Where the band/artist is from (city and province/state)">
                   <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
                 </Tooltip>
@@ -212,7 +212,7 @@ export default function BandForm({
                   <option key={region} value={region} />
                 ))}
               </datalist>
-            </div>
+            </fieldset>
 
             <div className="sm:col-span-2">
               <div className="flex items-center gap-2 mb-2">

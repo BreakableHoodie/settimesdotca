@@ -115,7 +115,7 @@ export default function AdminPanel({ onLogout }) {
       // If we cleared event, and were on Lineup, go back to Events
       if (activeTab === 'lineup') setActiveTab('events')
     }
-  }, [selectedEventId])
+  }, [selectedEventId, activeTab])
 
   useEffect(() => {
     if (activeTab === 'platform' && !isAdmin) {

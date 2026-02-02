@@ -36,6 +36,8 @@ export default function EventTimeline() {
 
   // Fetch timeline data
   const pollRef = useRef(null)
+  // Track loading/loaded state to prevent duplicate fetches
+  const detailsStateRef = useRef({})
 
   useEffect(() => {
     const fetchTimeline = async (isSilent = false) => {
@@ -109,16 +111,14 @@ export default function EventTimeline() {
   const loadDetails = useCallback(async eventId => {
     if (!eventId) return
 
-    // Check current state to avoid race conditions
-    setDetailsLoading(prev => {
-      if (prev[eventId]) return prev // Already loading
-      return prev
-    })
+    // Early return to avoid duplicate fetches
+    const detailsState = detailsStateRef.current[eventId]
+    if (detailsState?.loading || detailsState?.loaded) {
+      return
+    }
 
-    setDetailsById(prev => {
-      if (prev[eventId]) return prev // Already loaded
-      return prev
-    })
+    // Mark as loading
+    detailsStateRef.current[eventId] = { loading: true, loaded: false }
 
     try {
       setDetailsLoading(prev => ({ ...prev, [eventId]: true }))
@@ -127,11 +127,17 @@ export default function EventTimeline() {
         throw new Error('Failed to load event details')
       }
       const data = await response.json()
+
+      // Mark as loaded
+      detailsStateRef.current[eventId] = { loading: false, loaded: true }
+
       startTransition(() => {
         setDetailsById(prev => ({ ...prev, [eventId]: data }))
       })
     } catch (err) {
       console.error('Error fetching event details:', err)
+      // Reset loading state on error to allow retry
+      detailsStateRef.current[eventId] = { loading: false, loaded: false }
     } finally {
       setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
     }

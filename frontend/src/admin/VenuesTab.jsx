@@ -407,7 +407,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
                   maxLength={FIELD_LIMITS.venuePostal.max}
                   placeholder="N2L 3G1"
-                  pattern="(?:\\d{5}(?:-\\d{4})?|[A-Za-z]\\d[A-Za-z][ ]?\\d[A-Za-z]\\d)"
+                  pattern="\\s*(?:\\d{5}(?:-\\d{4})?|[A-Za-z]\\d[A-Za-z][\\s-]?\\d[A-Za-z]\\d)\\s*"
                   title="Use a valid US ZIP or Canadian postal code"
                 />
               </div>

@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { bandsApi } from '../utils/adminApi'
 import BandForm from './BandForm'
-import BulkActionBar from './BulkActionBar'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 
 /**
@@ -46,7 +45,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
   const [submitting, setSubmitting] = useState(false)
 
   // Load all bands
-  const loadBands = async () => {
+  const loadBands = useCallback(async () => {
     try {
       setLoading(true)
       const result = await bandsApi.getAll()
@@ -78,11 +77,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [showToast])
 
   useEffect(() => {
     loadBands()
-  }, [])
+  }, [loadBands])
 
   // Sorting
   const formatOrigin = band => {
@@ -244,7 +243,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
     let socialLinks = {}
     try {
       socialLinks = typeof band.social_links === 'string' ? JSON.parse(band.social_links) : band.social_links || {}
-    } catch (e) {
+    } catch (_e) {
       /* ignore */
     }
     const parsedOrigin = splitOrigin(band.origin)

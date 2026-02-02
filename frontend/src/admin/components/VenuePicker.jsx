@@ -5,7 +5,7 @@ import { venuesApi } from '../../utils/adminApi'
  * VenuePicker - Quick venue selector for adding venues to an event
  * Shows when in event context view
  */
-export default function VenuePicker({ eventId, existingVenueIds, onVenueAdded }) {
+export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVenueAdded }) {
   const [allVenues, setAllVenues] = useState([])
   const [loading, setLoading] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -68,11 +68,14 @@ export default function VenuePicker({ eventId, existingVenueIds, onVenueAdded })
 
       {/* Select Existing Venue */}
       <div>
-        <label className="block text-white mb-2 text-sm">Select Existing Venue</label>
+        <label htmlFor="venue-picker-select" className="block text-white mb-2 text-sm">
+          Select Existing Venue
+        </label>
         {loading ? (
           <div className="text-gray-400 text-sm">Loading venues...</div>
         ) : availableVenues.length > 0 ? (
           <select
+            id="venue-picker-select"
             onChange={e => {
               if (e.target.value) {
                 handleAddExisting(e.target.value)

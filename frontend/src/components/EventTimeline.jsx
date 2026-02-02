@@ -133,12 +133,12 @@ export default function EventTimeline() {
 
       startTransition(() => {
         setDetailsById(prev => ({ ...prev, [eventId]: data }))
+        setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
       })
     } catch (err) {
       console.error('Error fetching event details:', err)
       // Reset loading state on error to allow retry
       detailsStateRef.current[eventId] = { loading: false, loaded: false }
-    } finally {
       setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
     }
   }, [])

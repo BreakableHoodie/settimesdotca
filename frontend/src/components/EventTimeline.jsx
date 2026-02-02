@@ -131,9 +131,12 @@ export default function EventTimeline() {
       // Mark as loaded
       detailsStateRef.current[eventId] = { loading: false, loaded: true }
 
+      // Clear loading state synchronously to prevent race condition
+      setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
+      
+      // Defer details cache update to improve INP
       startTransition(() => {
         setDetailsById(prev => ({ ...prev, [eventId]: data }))
-        setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
       })
     } catch (err) {
       console.error('Error fetching event details:', err)

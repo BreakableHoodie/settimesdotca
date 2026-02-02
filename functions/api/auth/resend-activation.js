@@ -92,6 +92,8 @@ export async function onRequestPost(context) {
     const activationUrl = new URL("/activate", baseUrl);
     activationUrl.searchParams.set("token", activationToken);
 
+    console.log("[ResendActivation] Checking email configuration...");
+
     if (isEmailConfigured(env)) {
       const fullName = [user.first_name, user.last_name]
         .filter(Boolean)
@@ -102,13 +104,16 @@ export async function onRequestPost(context) {
         recipientName: fullName || null,
       });
 
-      await sendEmail(env, {
+      console.log("[ResendActivation] Sending activation email to:", email);
+      const emailResult = await sendEmail(env, {
         to: email,
         subject: emailPayload.subject,
         text: emailPayload.text,
         html: emailPayload.html,
       });
+      console.log("[ResendActivation] Email result:", emailResult);
     } else {
+      console.warn("[ResendActivation] Email not configured, logging activation link");
       console.info(`[Email] Activation link for ${email}: ${activationUrl}`);
     }
 

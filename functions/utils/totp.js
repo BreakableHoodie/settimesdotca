@@ -38,19 +38,32 @@ export async function generateTotpCode(secret, timeMs = Date.now()) {
 
 export async function verifyTotp(secret, code, window = 1) {
   const normalized = normalizeCode(code);
+
   if (!secret || !normalized) {
     return false;
   }
 
   const epochTolerance = Math.max(0, window) * DEFAULT_TOTP_STEP_SECONDS;
-  const result = await verify({
-    secret,
-    token: normalized,
-    digits: DEFAULT_TOTP_DIGITS,
-    period: DEFAULT_TOTP_STEP_SECONDS,
-    epochTolerance,
-  });
-  return result.valid;
+
+  try {
+    const result = await verify({
+      secret,
+      token: normalized,
+      digits: DEFAULT_TOTP_DIGITS,
+      period: DEFAULT_TOTP_STEP_SECONDS,
+      epochTolerance,
+    });
+    console.log("[TOTP] verify() result:", result);
+    return result.valid;
+  } catch (error) {
+    console.error("[TOTP] verify() threw error:", error?.message || error);
+    console.error("[TOTP] Error details:", {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack?.split("\n").slice(0, 3),
+    });
+    return false;
+  }
 }
 
 export function generateBackupCodes(count = DEFAULT_BACKUP_CODE_COUNT) {

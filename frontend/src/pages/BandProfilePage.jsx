@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet, HelmetProvider } from 'react-helmet-async'
 import { Button, Badge, Card, Alert, Loading } from '../components/ui'
@@ -12,13 +12,87 @@ import {
   faArrowLeft,
   faGlobe,
   faGuitar,
+  faPlus,
+  faCheck,
 } from '@fortawesome/free-solid-svg-icons'
 import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
 import BandStats from '../components/BandStats'
 import BandFacts from '../components/BandFacts'
+import Breadcrumbs from '../components/Breadcrumbs'
 import PrivacyBanner from '../components/PrivacyBanner'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
+
+const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
+
+// Generate the same ID format used by the schedule
+function generateScheduleId(bandName, performanceId) {
+  return `${bandName.toLowerCase().replace(/\s+/g, '-')}-${performanceId}`
+}
+
+// Get selected bands for an event from localStorage
+function getSelectedBands(eventSlug) {
+  if (typeof window === 'undefined') return []
+  try {
+    const data = localStorage.getItem(SELECTED_BANDS_KEY)
+    if (!data) return []
+    const parsed = JSON.parse(data)
+    return Array.isArray(parsed[eventSlug]) ? parsed[eventSlug] : []
+  } catch {
+    return []
+  }
+}
+
+// Save selected bands for an event to localStorage
+function saveSelectedBands(eventSlug, bandIds) {
+  if (typeof window === 'undefined') return
+  try {
+    const data = localStorage.getItem(SELECTED_BANDS_KEY)
+    const parsed = data ? JSON.parse(data) : {}
+    parsed[eventSlug] = bandIds
+    localStorage.setItem(SELECTED_BANDS_KEY, JSON.stringify(parsed))
+  } catch (err) {
+    console.warn('Failed to save schedule:', err)
+  }
+}
+
+// Check if user has any schedule built (across all events)
+function hasAnySchedule() {
+  if (typeof window === 'undefined') return false
+  try {
+    const data = localStorage.getItem(SELECTED_BANDS_KEY)
+    if (!data) return false
+    const parsed = JSON.parse(data)
+    if (!parsed || typeof parsed !== 'object') return false
+    return Object.values(parsed).some(arr => Array.isArray(arr) && arr.length > 0)
+  } catch {
+    return false
+  }
+}
+
+// Get the most recent event slug with a schedule
+function getScheduleEventSlug() {
+  if (typeof window === 'undefined') return null
+  try {
+    const data = localStorage.getItem(SELECTED_BANDS_KEY)
+    if (!data) return null
+    const parsed = JSON.parse(data)
+    if (!parsed || typeof parsed !== 'object') return null
+    // Return the first event slug that has bands selected
+    for (const [slug, bands] of Object.entries(parsed)) {
+      if (Array.isArray(bands) && bands.length > 0 && slug !== 'default') {
+        return slug
+      }
+    }
+    // Fallback to 'default' if it has bands
+    if (Array.isArray(parsed.default) && parsed.default.length > 0) {
+      return null // Will link to home
+    }
+    return null
+  } catch {
+    return null
+  }
+}
 
 /**
  * BandProfilePage - Enhanced band profile with design system
@@ -38,6 +112,9 @@ export default function BandProfilePage() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [scheduleSelections, setScheduleSelections] = useState({}) // { eventSlug: Set of bandIds }
+  const [userHasSchedule] = useState(() => hasAnySchedule())
+  const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
 
   const isNumericId = useMemo(() => /^\d+$/.test(id || ''), [id])
 
@@ -100,6 +177,55 @@ export default function BandProfilePage() {
       trackArtistView(profile.id)
     }
   }, [profile?.id])
+
+  // Load schedule selections for upcoming performances
+  useEffect(() => {
+    if (!profile?.upcoming?.length) return
+
+    const selections = {}
+    profile.upcoming.forEach(perf => {
+      if (perf.event_slug) {
+        const selected = getSelectedBands(perf.event_slug)
+        selections[perf.event_slug] = new Set(selected)
+      }
+    })
+    setScheduleSelections(selections)
+  }, [profile?.upcoming])
+
+  // Toggle a performance in the schedule
+  const toggleSchedule = useCallback(
+    performance => {
+      if (!performance.event_slug || !performance.id) return
+
+      const scheduleId = generateScheduleId(profile.name, performance.id)
+      const eventSlug = performance.event_slug
+
+      setScheduleSelections(prev => {
+        const currentSet = new Set(prev[eventSlug] || [])
+        if (currentSet.has(scheduleId)) {
+          currentSet.delete(scheduleId)
+        } else {
+          currentSet.add(scheduleId)
+        }
+
+        // Save to localStorage
+        saveSelectedBands(eventSlug, Array.from(currentSet))
+
+        return { ...prev, [eventSlug]: currentSet }
+      })
+    },
+    [profile?.name]
+  )
+
+  // Check if a performance is in the schedule
+  const isInSchedule = useCallback(
+    performance => {
+      if (!performance.event_slug || !performance.id || !profile?.name) return false
+      const scheduleId = generateScheduleId(profile.name, performance.id)
+      return scheduleSelections[performance.event_slug]?.has(scheduleId) || false
+    },
+    [scheduleSelections, profile?.name]
+  )
 
   if (loading) {
     return (
@@ -189,7 +315,41 @@ export default function BandProfilePage() {
           </script>
         </Helmet>
 
-        <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Sticky Navigation Header */}
+        <header className="sticky top-0 z-50 border-b border-white/10 bg-bg-navy/95 backdrop-blur-sm">
+          <div className="container mx-auto px-4 max-w-6xl">
+            <div className="flex items-center justify-between h-14">
+              <Link to="/" className="text-xl font-bold font-display hover:opacity-80 transition-opacity">
+                <span className="text-accent-500">Set</span>
+                <span className="text-white">Times</span>
+              </Link>
+              {userHasSchedule && (
+                <Link
+                  to={scheduleEventSlug ? `/event/${scheduleEventSlug}` : '/'}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-500/20 text-accent-400 hover:bg-accent-500/30 transition-colors text-sm font-medium"
+                >
+                  <FontAwesomeIcon icon={faCalendarDays} />
+                  My Schedule
+                </Link>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <div className="container mx-auto px-4 pt-4 max-w-6xl">
+          {/* Breadcrumbs */}
+          <Breadcrumbs
+            items={[
+              { label: 'Events', href: '/' },
+              ...(profile.upcoming?.[0]?.event_slug
+                ? [{ label: profile.upcoming[0].event_name, href: `/event/${profile.upcoming[0].event_slug}` }]
+                : []),
+              { label: profile.name },
+            ]}
+          />
+        </div>
+
+        <div className="container mx-auto px-4 pb-8 max-w-6xl">
           {/* Sports Card Hero Section */}
           <div className="bg-band-purple rounded-xl border-2 border-band-orange/30 overflow-hidden mb-6 shadow-xl">
             {/* Band Photo with Overlay */}
@@ -360,11 +520,22 @@ export default function BandProfilePage() {
                               )}
                             </div>
                           </div>
-                          {performance.event_slug && (
-                            <Button as={Link} to={`/event/${performance.event_slug}`} variant="primary" size="sm">
-                              View Event →
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              onClick={() => toggleSchedule(performance)}
+                              variant={isInSchedule(performance) ? 'success' : 'secondary'}
+                              size="sm"
+                              className="whitespace-nowrap"
+                            >
+                              <FontAwesomeIcon icon={isInSchedule(performance) ? faCheck : faPlus} className="mr-2" />
+                              {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
                             </Button>
-                          )}
+                            {performance.event_slug && (
+                              <Button as={Link} to={`/event/${performance.event_slug}`} variant="primary" size="sm">
+                                View Event →
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </Card>
                     ))}

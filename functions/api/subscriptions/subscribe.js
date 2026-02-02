@@ -117,9 +117,16 @@ async function sendVerificationEmail(env, email, city, genre, token) {
     <p>City: ${city}<br/>Genre: ${genre}</p>
   `.trim();
 
+  console.log("[Subscribe] Checking email configuration...");
+
   if (isEmailConfigured(env)) {
-    await sendEmail(env, { to: email, subject, text, html });
+    console.log("[Subscribe] Sending verification email to:", email);
+    const emailResult = await sendEmail(env, { to: email, subject, text, html });
+    console.log("[Subscribe] Email result:", emailResult);
+    return emailResult;
   } else {
+    console.warn("[Subscribe] Email not configured, logging verification link");
     console.info(`[Email] Verification link for ${email}: ${verifyUrl}`);
+    return { delivered: false, reason: "not_configured" };
   }
 }

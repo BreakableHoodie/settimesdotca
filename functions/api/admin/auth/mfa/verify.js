@@ -1,11 +1,15 @@
 // MFA verification endpoint
 // POST /api/admin/auth/mfa/verify
-// Body: { mfaToken: string, code: string }
+// Body: { mfaToken: string, code: string, rememberDevice?: boolean }
 
 import { generateCSRFToken, setCSRFCookie } from "../../../../utils/csrf.js";
 import { verifyTotp, verifyBackupCode } from "../../../../utils/totp.js";
 import { getClientIP } from "../../../../utils/request.js";
 import { initializeLucia } from "../../../../utils/auth.js";
+import {
+  createTrustedDevice,
+  createTrustedDeviceCookie,
+} from "../../../../utils/trustedDevice.js";
 
 async function checkRateLimit(DB, userId, ipAddress) {
   const windowMs = 10 * 60 * 1000;
@@ -58,7 +62,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { mfaToken, code } = body;
+    const { mfaToken, code, rememberDevice } = body;
 
     if (!mfaToken || !code) {
       return new Response(
@@ -183,8 +187,22 @@ export async function onRequestPost(context) {
     let remainingBackupCodes = null;
     let usedBackupCode = false;
 
+    console.log("[MFA Verify] Attempting TOTP verification:", {
+      totpEnabled: challenge.totp_enabled,
+      hasSecret: !!challenge.totp_secret,
+      codeReceived: code,
+      codeLength: code?.length,
+      codeType: typeof code,
+    });
+
     if (Number(challenge.totp_enabled) === 1 && challenge.totp_secret) {
-      verified = await verifyTotp(challenge.totp_secret, code);
+      try {
+        verified = await verifyTotp(challenge.totp_secret, code);
+        console.log("[MFA Verify] TOTP verification result:", verified);
+      } catch (totpError) {
+        console.error("[MFA Verify] TOTP verification threw:", totpError?.message || totpError);
+        verified = false;
+      }
     }
 
     if (!verified) {
@@ -267,6 +285,26 @@ export async function onRequestPost(context) {
     });
     headers.append("Set-Cookie", lucia.createSessionCookie(session.id).serialize());
     headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
+
+    // Create trusted device if requested
+    if (rememberDevice) {
+      try {
+        const trustedDevice = await createTrustedDevice(
+          DB,
+          challenge.user_id,
+          ipAddress,
+          userAgent
+        );
+        headers.append(
+          "Set-Cookie",
+          createTrustedDeviceCookie(trustedDevice.token, request)
+        );
+        console.log("[MFA Verify] Created trusted device for user:", challenge.user_id);
+      } catch (err) {
+        // Don't fail login if trusted device creation fails
+        console.error("[MFA Verify] Failed to create trusted device:", err);
+      }
+    }
 
     return new Response(
       JSON.stringify({

@@ -237,11 +237,11 @@ npm run test:coverage
 
 See `.dev.vars.test-users` for credentials. Default users:
 
-- `admin@pinklemonaderecords.com` - System Administrator (admin)
-- `sarah@pinklemonaderecords.com` - Second Admin (admin)
-- `editor@pinklemonaderecords.com` - Content Editor (editor)
-- `viewer@pinklemonaderecords.com` - Analytics Viewer (viewer)
-- `inactive@pinklemonaderecords.com` - Inactive User (testing)
+- `admin@settimes.ca` - System Administrator (admin)
+- `sarah@settimes.ca` - Second Admin (admin)
+- `editor@settimes.ca` - Content Editor (editor)
+- `viewer@settimes.ca` - Analytics Viewer (viewer)
+- `inactive@settimes.ca` - Inactive User (testing)
 
 **Note:** Use strong passwords in production. See [docs/D1_SETUP.md](docs/D1_SETUP.md) for security best practices.
 

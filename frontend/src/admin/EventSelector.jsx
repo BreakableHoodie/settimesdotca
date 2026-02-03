@@ -9,13 +9,14 @@ import EventStatusBadge from './components/EventStatusBadge'
  *
  * Features:
  * - Shows current event name
- * - Lists all non-archived events
+ * - Lists active events first, then archived events in a separate section
  * - Option to view "All Events"
  * - Status badge for each event
  * - Create new event option
  *
  * This component is always visible in the admin header to ensure users
- * always know which event context they're in.
+ * always know which event context they're in. Archived events are shown
+ * in a separate section to allow adding bands for historical data.
  */
 export default function EventSelector({ onCreateEvent }) {
   const { currentEvent, events, switchEvent, loading } = useEventContext()
@@ -38,8 +39,9 @@ export default function EventSelector({ onCreateEvent }) {
     }
   }, [isOpen])
 
-  // Filter out archived events
-  const nonArchivedEvents = events.filter(e => e.status !== 'archived')
+  // Separate active and archived events for display
+  const activeEvents = events.filter(e => e.status !== 'archived')
+  const archivedEvents = events.filter(e => e.status === 'archived')
 
   const handleSelectEvent = eventId => {
     switchEvent(eventId)
@@ -99,10 +101,10 @@ export default function EventSelector({ onCreateEvent }) {
             </div>
           </button>
 
-          {/* Event List */}
-          {nonArchivedEvents.length > 0 ? (
+          {/* Active Events */}
+          {activeEvents.length > 0 ? (
             <div className="py-1">
-              {nonArchivedEvents.map(event => (
+              {activeEvents.map(event => (
                 <button
                   key={event.id}
                   onClick={() => handleSelectEvent(event.id)}
@@ -131,7 +133,40 @@ export default function EventSelector({ onCreateEvent }) {
             </div>
           ) : (
             <div className="px-4 py-6 text-center text-white/50 text-sm">
-              No events yet. Create your first event to get started!
+              No active events. Create your first event to get started!
+            </div>
+          )}
+
+          {/* Archived Events Section */}
+          {archivedEvents.length > 0 && (
+            <div className="border-t border-band-orange/20">
+              <div className="px-4 py-2 text-xs text-white/50 bg-band-navy/30 font-medium">Archived Events</div>
+              {archivedEvents.map(event => (
+                <button
+                  key={event.id}
+                  onClick={() => handleSelectEvent(event.id)}
+                  className={`w-full px-4 py-3 text-left hover:bg-band-navy/50 transition-colors opacity-75 ${
+                    currentEvent?.id === event.id ? 'bg-band-orange/20 opacity-100' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-white truncate">{event.name}</div>
+                      <div className="text-xs text-white/50">
+                        {event.date &&
+                          new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        {' • '}
+                        {event.band_count || 0} bands
+                      </div>
+                    </div>
+                    <EventStatusBadge status={event.status} />
+                  </div>
+                </button>
+              ))}
             </div>
           )}
 

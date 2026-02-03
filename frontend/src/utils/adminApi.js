@@ -104,7 +104,50 @@ export function getAdminFormDataHeaders() {
 
 // Handle API responses
 async function handleResponse(response) {
-  const data = await response.json()
+  // Try to parse JSON, handling non-JSON responses gracefully
+  let data
+  const contentType = response.headers.get('content-type') || ''
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await response.json()
+    } catch (_parseError) {
+      // JSON parsing failed despite content-type header
+      const error = new Error('Server returned invalid response. Please try again.')
+      error.status = response.status
+      error.isServerError = true
+      throw error
+    }
+  } else {
+    // Non-JSON response (likely an error page)
+    const text = await response.text()
+
+    // Check for Cloudflare error pages
+    if (text.includes('cloudflare') || text.includes('<!DOCTYPE')) {
+      let message = 'Server temporarily unavailable. Please try again in a moment.'
+
+      // Provide more specific messages for known error codes
+      if (response.status === 503) {
+        message = 'Server is temporarily overloaded. Please wait a moment and try again.'
+      } else if (response.status === 502) {
+        message = 'Server is temporarily unavailable. Please try again.'
+      } else if (response.status === 504) {
+        message = 'Request timed out. Please try again.'
+      }
+
+      const error = new Error(message)
+      error.status = response.status
+      error.isServerError = true
+      error.isCloudflareError = true
+      throw error
+    }
+
+    // Other non-JSON responses
+    const error = new Error('Unexpected server response. Please try again.')
+    error.status = response.status
+    error.isServerError = true
+    throw error
+  }
 
   if (!response.ok) {
     if (import.meta.env.DEV) {

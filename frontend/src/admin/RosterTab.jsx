@@ -410,7 +410,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
         )}
         {links.instagram && (
           <a
-            href={links.instagram.startsWith('http') ? links.instagram : `https://instagram.com/${links.instagram.replace('@', '')}`}
+            href={
+              links.instagram.startsWith('http')
+                ? links.instagram
+                : `https://instagram.com/${links.instagram.replace('@', '')}`
+            }
             target="_blank"
             rel="noopener noreferrer"
             className="text-white/70 hover:text-pink-400 transition-colors"

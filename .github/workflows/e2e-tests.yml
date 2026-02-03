@@ -10,6 +10,7 @@ jobs:
     e2e:
         name: e2e
         runs-on: ubuntu-latest
+        container: mcr.microsoft.com/playwright:v1.57.0-jammy
         # Continue on error - requires E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD secrets
         continue-on-error: true
         steps:
@@ -99,19 +100,6 @@ jobs:
                       echo "Waiting for server... ($i/60)"
                       sleep 1
                   done
-
-            - name: Cache Playwright browsers
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cache/ms-playwright
-                  key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-                  restore-keys: |
-                      ${{ runner.os }}-playwright-
-
-            - name: Install Playwright browsers
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
-              run: npx playwright install --with-deps
 
             - name: Run Playwright tests
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'

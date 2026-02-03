@@ -13,6 +13,7 @@ jobs:
     e2e-a11y-visual:
         name: e2e-a11y-visual
         runs-on: ubuntu-latest
+        container: mcr.microsoft.com/playwright:v1.57.0-jammy
         continue-on-error: true
         steps:
             - uses: actions/checkout@v4
@@ -79,17 +80,6 @@ jobs:
                       echo "Waiting for server... ($i/60)"
                       sleep 1
                   done
-
-            - name: Cache Playwright browsers
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cache/ms-playwright
-                  key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-                  restore-keys: |
-                      ${{ runner.os }}-playwright-
-
-            - name: Install Playwright browsers
-              run: npx playwright install --with-deps
 
             - name: Run Playwright tests (A11y + Visual)
               env:

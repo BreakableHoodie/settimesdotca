@@ -415,7 +415,8 @@ export default function BandProfilePage() {
               <div className="p-6 bg-band-purple/50 border-t border-white/10">
                 {profile.description && (
                   <div
-                    className="mb-4 text-white/90 text-sm leading-relaxed break-words overflow-hidden [&>p]:my-2 [&>p]:leading-relaxed [&>a]:text-accent-500 [&>a]:hover:underline [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-semibold [&>em]:italic"
+                    className="prose prose-invert prose-sm mb-4 text-white/90 prose-p:my-2 prose-p:leading-relaxed prose-a:text-accent-500 hover:prose-a:underline break-words"
+                    style={{ maxWidth: '100%' }}
                     dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
                   />
                 )}

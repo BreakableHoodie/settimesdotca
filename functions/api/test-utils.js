@@ -115,6 +115,7 @@ export function createTestDB() {
       description TEXT,
       photo_url TEXT,
       social_links TEXT,
+      created_by_user_id INTEGER REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -140,6 +141,8 @@ export function createTestDB() {
       start_time TEXT,
       end_time TEXT,
       notes TEXT,
+      created_by_user_id INTEGER REFERENCES users(id),
+      updated_by_user_id INTEGER REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -164,7 +167,11 @@ export function createTestDB() {
       country TEXT,
       phone TEXT,
       contact_email TEXT,
-      address TEXT
+      address TEXT,
+      created_by_user_id INTEGER REFERENCES users(id),
+      updated_by_user_id INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
     );
 
     CREATE TABLE email_subscriptions (

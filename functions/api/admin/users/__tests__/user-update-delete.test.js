@@ -124,7 +124,7 @@ describe("Admin user item API", () => {
     expect(response.status).toBe(400);
   });
 
-  test("admin deletes (soft) a non-admin user and logs action", async () => {
+  test("admin permanently deletes a non-admin user and logs action", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     rawDb
       .prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
@@ -146,14 +146,65 @@ describe("Admin user item API", () => {
     });
     expect(response.status).toBe(200);
     const updated = rawDb
-      .prepare("SELECT is_active FROM users WHERE id = ?")
+      .prepare("SELECT * FROM users WHERE id = ?")
       .get(target.id);
-    expect(updated.is_active).toBe(0);
+    expect(updated).toBeUndefined();
     const audit = rawDb
       .prepare(
         "SELECT * FROM audit_log WHERE action = 'user.deleted' AND resource_id = ?"
       )
       .get(target.id);
     expect(audit).toBeTruthy();
+  });
+
+  test("deleting user unlinks created content instead of cascading delete", async () => {
+    const { env, rawDb, headers, user } = createTestEnv({ role: "admin" });
+    
+    // Create a user to be deleted
+    rawDb.prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
+      .run("creator@test.com", "editor", "Content Creator");
+    const creator = rawDb.prepare("SELECT * FROM users WHERE email = ?").get("creator@test.com");
+    
+    // Create content linked to this user
+    rawDb.prepare("INSERT INTO events (name, slug, date, created_by_user_id) VALUES (?, ?, ?, ?)").run("Test Event", "test-event", "2026-01-01", creator.id);
+    rawDb.prepare("INSERT INTO venues (name, created_by_user_id) VALUES (?, ?)").run("Test Venue", creator.id);
+    rawDb.prepare("INSERT INTO band_profiles (name, name_normalized, created_by_user_id) VALUES (?, ?, ?)").run("Test Band", "test-band", creator.id);
+
+    // Verify links exist
+    const eventBefore = rawDb.prepare("SELECT * FROM events WHERE created_by_user_id = ?").get(creator.id);
+    expect(eventBefore).toBeTruthy();
+
+    // Delete the user
+    const request = new Request(
+      `https://example.test/api/admin/users/${creator.id}`,
+      {
+        method: "DELETE",
+        headers: { ...headers },
+      }
+    );
+    const response = await userItemHandler.onRequestDelete({
+      request,
+      env,
+      params: { id: String(creator.id) },
+    });
+    
+    expect(response.status).toBe(200);
+
+    // Verify user is gone
+    const userCheck = rawDb.prepare("SELECT * FROM users WHERE id = ?").get(creator.id);
+    expect(userCheck).toBeUndefined();
+
+    // Verify content still exists but is unlinked
+    const eventAfter = rawDb.prepare("SELECT * FROM events WHERE slug = ?").get("test-event");
+    expect(eventAfter).toBeTruthy(); // Still exists
+    expect(eventAfter.created_by_user_id).toBeNull(); // Unlinked
+
+    const venueAfter = rawDb.prepare("SELECT * FROM venues WHERE name = ?").get("Test Venue");
+    expect(venueAfter).toBeTruthy();
+    expect(venueAfter.created_by_user_id).toBeNull();
+    
+    const bandAfter = rawDb.prepare("SELECT * FROM band_profiles WHERE name_normalized = ?").get("test-band");
+    expect(bandAfter).toBeTruthy();
+    expect(bandAfter.created_by_user_id).toBeNull();
   });
 });

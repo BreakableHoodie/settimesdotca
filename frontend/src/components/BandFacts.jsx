@@ -2,16 +2,6 @@ import PropTypes from 'prop-types'
 import { Card } from './ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faLightbulb } from '@fortawesome/free-solid-svg-icons'
-import DOMPurify from 'dompurify'
-
-const stripHtml = value => {
-  if (!value) return ''
-  return DOMPurify.sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
-    .replace(/&nbsp;|&#160;|&#xA0;/gi, ' ')
-    .replace(/[\u00A0\u00AD\u200B\u200C\u200D\uFEFF]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
 
 function buildFacts(band = {}, stats = {}) {
   const facts = []

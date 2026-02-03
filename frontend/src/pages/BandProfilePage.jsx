@@ -25,18 +25,22 @@ import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metri
 
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
-const ZERO_WIDTH_CHAR_REGEX = /[\u00AD\u200B\u200C\u200D\uFEFF]/g
 const NBSP_ENTITY_REGEX = /&nbsp;|&#160;|&#xA0;/gi
-const NBSP_CHAR_REGEX = /\u00A0/g
 
 function stripZeroWidthCharacters(text) {
   if (!text) return text
-  return text.replace(ZERO_WIDTH_ENTITY_REGEX, '').replace(ZERO_WIDTH_CHAR_REGEX, '')
+  return text
+    .replace(ZERO_WIDTH_ENTITY_REGEX, '')
+    .replace(/\u00AD/g, '')
+    .replace(/\u200B/g, '')
+    .replace(/\u200C/g, '')
+    .replace(/\u200D/g, '')
+    .replace(/\uFEFF/g, '')
 }
 
 function normalizeNonBreakingSpaces(text) {
   if (!text) return text
-  return text.replace(NBSP_ENTITY_REGEX, ' ').replace(NBSP_CHAR_REGEX, ' ')
+  return text.replace(NBSP_ENTITY_REGEX, ' ').replace(/\u00A0/g, ' ')
 }
 
 // Generate the same ID format used by the schedule
@@ -160,9 +164,13 @@ export default function BandProfilePage() {
       ALLOWED_ATTR: [],
     })
       .replace(NBSP_ENTITY_REGEX, ' ')
-      .replace(NBSP_CHAR_REGEX, ' ')
+      .replace(/\u00A0/g, ' ')
       .replace(ZERO_WIDTH_ENTITY_REGEX, '')
-      .replace(ZERO_WIDTH_CHAR_REGEX, '')
+      .replace(/\u00AD/g, '')
+      .replace(/\u200B/g, '')
+      .replace(/\u200C/g, '')
+      .replace(/\u200D/g, '')
+      .replace(/\uFEFF/g, '')
       .replace(/\s+/g, ' ')
       .trim()
   }, [profile?.description])

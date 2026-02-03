@@ -61,7 +61,14 @@ export default function Modal({
     if (tagName === 'input' || tagName === 'textarea') return true
     if (element.isContentEditable) return true
     // Check if inside a contenteditable parent (for rich text editors like Quill)
-    return element.closest?.('[contenteditable="true"]') !== null
+    if (element.closest?.('[contenteditable="true"]')) return true
+    // Safari: check if there's a selection inside a contenteditable
+    const selection = window.getSelection()
+    if (selection?.anchorNode) {
+      const range = selection.anchorNode.parentElement || selection.anchorNode
+      if (range?.closest?.('[contenteditable="true"]')) return true
+    }
+    return false
   }, [])
 
   // Handle focus trap

@@ -7,6 +7,8 @@ import {
   isValidUUID,
   isValidRole,
   isValidISODate,
+  isValidPostalCode,
+  normalizePostalCode,
 } from "../validation.js";
 
 describe("Email Validation", () => {
@@ -125,5 +127,60 @@ describe("ISO Date Validation", () => {
     expect(isValidISODate("1/1/2023")).toBe(false);
     expect(isValidISODate("Jan 1, 2023")).toBe(false);
     expect(isValidISODate("2023/01/01")).toBe(false);
+  });
+});
+
+describe("Postal Code Validation", () => {
+  it("should validate correct Canadian postal codes", () => {
+    expect(isValidPostalCode("M5V 2H1")).toBe(true);
+    expect(isValidPostalCode("K8N 5W6")).toBe(true);
+    expect(isValidPostalCode("V6B 3P8")).toBe(true);
+  });
+
+  it("should validate correct US ZIP codes", () => {
+    expect(isValidPostalCode("90210")).toBe(true);
+    expect(isValidPostalCode("10001")).toBe(true);
+    expect(isValidPostalCode("12345-6789")).toBe(true);
+  });
+
+  it("should handle formatting flexibly (fix/band-profile-text-wrapping)", () => {
+    expect(isValidPostalCode("M5V2H1")).toBe(true); // No space
+    expect(isValidPostalCode("M5V  2H1")).toBe(true); // Extra space
+    expect(isValidPostalCode("M5V\u00A02H1")).toBe(true); // Non-breaking space
+    expect(isValidPostalCode(" m5v 2h1 ")).toBe(true); // Lowercase and trimming
+  });
+
+  it("should reject invalid postal codes", () => {
+    expect(isValidPostalCode("1234")).toBe(false); // Too short
+    expect(isValidPostalCode("1234er")).toBe(false);
+    expect(isValidPostalCode("ABC DEF")).toBe(false); // Invalid format
+    expect(isValidPostalCode("M5V 2H")).toBe(false); // Incomplete
+    expect(isValidPostalCode("")).toBe(true); // Optional field (returns true if empty/null based on implementation)
+    expect(isValidPostalCode(null)).toBe(true);
+  });
+});
+
+describe("Postal Code Normalization", () => {
+  it("should normalize Canadian postal codes", () => {
+    expect(normalizePostalCode("m5v2h1")).toBe("M5V 2H1");
+    expect(normalizePostalCode("k8n 5w6")).toBe("K8N 5W6");
+    expect(normalizePostalCode("  v6b  3p8  ")).toBe("V6B 3P8");
+    expect(normalizePostalCode("M5V\u00A02H1")).toBe("M5V 2H1");
+  });
+
+  it("should preserve valid US ZIP codes", () => {
+    expect(normalizePostalCode("90210")).toBe("90210");
+    expect(normalizePostalCode("12345-6789")).toBe("12345-6789");
+  });
+
+  it("should handle mixed case", () => {
+    expect(normalizePostalCode("m5v 2h1")).toBe("M5V 2H1");
+    expect(normalizePostalCode("M5v 2H1")).toBe("M5V 2H1");
+  });
+
+  it("should handle null/empty inputs", () => {
+    expect(normalizePostalCode("")).toBe(null);
+    expect(normalizePostalCode(null)).toBe(null);
+    expect(normalizePostalCode("   ")).toBe(null);
   });
 });

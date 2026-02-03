@@ -342,7 +342,8 @@ export const mfaApi = {
 // Events API
 export const eventsApi = {
   async getAll() {
-    const response = await fetchWithCSRFRetry(`${API_BASE}/events`, {
+    // Always fetch all events including archived - frontend handles filtering
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events?archived=true`, {
       headers: getHeaders(),
       credentials: 'include',
     })

@@ -415,7 +415,7 @@ export default function BandProfilePage() {
               <div className="p-6 bg-band-purple/50 border-t border-white/10">
                 {profile.description && (
                   <div
-                    className="prose prose-invert prose-sm max-w-none mb-4 text-white/90 prose-p:my-2 prose-p:leading-relaxed text-left normal-case"
+                    className="prose prose-invert prose-sm max-w-none w-full mb-4 text-white/90 prose-p:my-2 prose-p:leading-relaxed [&>p]:max-w-none"
                     dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
                   />
                 )}

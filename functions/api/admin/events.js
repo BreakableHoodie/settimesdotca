@@ -112,12 +112,14 @@ export async function onRequestPost(context) {
       theme_colors,
     } = validation.sanitized;
 
-    // Validate date is not in past
+    // Validate date is not in past (unless status is archived for retroactive events)
     const eventDate = new Date(date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (eventDate < today) {
-      return validationErrorResponse("Date cannot be in the past");
+    if (eventDate < today && status !== "archived") {
+      return validationErrorResponse(
+        "Date cannot be in the past (use archived status for past events)",
+      );
     }
 
     // Check if slug already exists

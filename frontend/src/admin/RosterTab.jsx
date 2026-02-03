@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { bandsApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faGlobe } from '@fortawesome/free-solid-svg-icons'
+import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
 
 /**
  * RosterTab - Manage Global Artist Roster (Band Profiles)
@@ -375,6 +378,73 @@ export default function RosterTab({ showToast, readOnly = false }) {
     </span>
   )
 
+  // Parse social links and render icons
+  const parseSocialLinks = band => {
+    let links = {}
+    try {
+      links = typeof band.social_links === 'string' ? JSON.parse(band.social_links) : band.social_links || {}
+    } catch (_e) {
+      /* ignore */
+    }
+    return links
+  }
+
+  const SocialLinksIcons = ({ band }) => {
+    const links = parseSocialLinks(band)
+    const hasAnyLink = links.website || links.instagram || links.bandcamp || links.facebook
+
+    if (!hasAnyLink) return <span className="text-white/30">-</span>
+
+    return (
+      <div className="flex gap-2">
+        {links.website && (
+          <a
+            href={links.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white/70 hover:text-band-orange transition-colors"
+            title="Website"
+          >
+            <FontAwesomeIcon icon={faGlobe} />
+          </a>
+        )}
+        {links.instagram && (
+          <a
+            href={links.instagram.startsWith('http') ? links.instagram : `https://instagram.com/${links.instagram.replace('@', '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white/70 hover:text-pink-400 transition-colors"
+            title="Instagram"
+          >
+            <FontAwesomeIcon icon={faInstagram} />
+          </a>
+        )}
+        {links.bandcamp && (
+          <a
+            href={links.bandcamp}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white/70 hover:text-teal-400 transition-colors"
+            title="Bandcamp"
+          >
+            <FontAwesomeIcon icon={faBandcamp} />
+          </a>
+        )}
+        {links.facebook && (
+          <a
+            href={links.facebook}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white/70 hover:text-blue-400 transition-colors"
+            title="Facebook"
+          >
+            <FontAwesomeIcon icon={faFacebook} />
+          </a>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -495,6 +565,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                     >
                       Status <SortIcon col="is_active" />
                     </th>
+                    <th className="px-4 py-3 text-left text-white font-semibold">Links</th>
                     <th
                       onClick={() => handleSort('contact_email')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
@@ -542,6 +613,9 @@ export default function RosterTab({ showToast, readOnly = false }) {
                         >
                           {band.is_active === 0 || band.is_active === false ? 'Inactive' : 'Active'}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <SocialLinksIcons band={band} />
                       </td>
                       <td className="px-4 py-3 text-white/70">{band.contact_email || '-'}</td>
                       {!readOnly && (
@@ -609,6 +683,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
                     <div>Origin: {formatOrigin(band) || '-'}</div>
                     <div>Genre: {band.genre || '-'}</div>
                     <div>Status: {band.is_active === 0 || band.is_active === false ? 'Inactive' : 'Active'}</div>
+                    <div className="flex items-center gap-2">
+                      <span>Links:</span>
+                      <SocialLinksIcons band={band} />
+                    </div>
                     <div>Contact: {band.contact_email || '-'}</div>
                   </div>
                   {!readOnly && (

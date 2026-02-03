@@ -56,8 +56,24 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(
         // Prevent body scroll
         document.body.style.overflow = 'hidden';
 
+        // Check if the active element is editable
+        const isEditableElement = (element: Element | null): boolean => {
+          if (!element) return false;
+          const tagName = element.tagName?.toLowerCase();
+          if (tagName === 'input' || tagName === 'textarea') return true;
+          if ((element as HTMLElement).isContentEditable) return true;
+          return element.closest?.('[contenteditable="true"]') !== null;
+        };
+
         // Focus trap: handle Tab key to cycle focus within modal
+        // Also handle Home/End to allow proper behavior in editable elements
         const handleTab = (e: KeyboardEvent) => {
+          // Allow Home/End keys to work normally in editable elements
+          if ((e.key === 'Home' || e.key === 'End') && isEditableElement(document.activeElement)) {
+            e.stopPropagation();
+            return;
+          }
+
           if (e.key !== 'Tab' || !modalRef.current) return;
 
           const focusableElements = modalRef.current.querySelectorAll(

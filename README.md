@@ -202,14 +202,11 @@ settimes/
 │   ├── DATABASE.md            # Database schema documentation
 │   ├── D1_SETUP.md            # Database setup guide
 │   └── BACKEND_FRAMEWORK.md   # API documentation
-├── tests/                     # Test suites
-│   └── __tests__/
-│       ├── api/               # API endpoint tests
-│       └── utils/             # Test utilities
 ├── wrangler.toml              # Cloudflare configuration
-├── package.json               # Root dependencies
-└── ROADMAP_TO_DEMO.md         # Sprint plan & status
+└── package.json               # Root dependencies
 ```
+
+Note: Tests are co-located with their source files in `__tests__/` directories throughout `functions/` and `frontend/src/`.
 
 ## Testing
 

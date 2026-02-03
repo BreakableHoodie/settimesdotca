@@ -357,15 +357,14 @@ export async function onRequestDelete(context) {
       }
     }
 
-    // Soft delete (deactivate)
+    // Hard delete
     await DB.prepare(
       `
-      UPDATE users
-      SET is_active = 0, deactivated_at = datetime('now'), deactivated_by = ?
+      DELETE FROM users
       WHERE id = ?
     `,
     )
-      .bind(currentUser.userId, userId)
+      .bind(userId)
       .run();
 
     // Also invalidate all sessions for this user

@@ -124,7 +124,7 @@ describe("Admin user item API", () => {
     expect(response.status).toBe(400);
   });
 
-  test("admin deletes (soft) a non-admin user and logs action", async () => {
+  test("admin permanently deletes a non-admin user and logs action", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     rawDb
       .prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
@@ -146,9 +146,9 @@ describe("Admin user item API", () => {
     });
     expect(response.status).toBe(200);
     const updated = rawDb
-      .prepare("SELECT is_active FROM users WHERE id = ?")
+      .prepare("SELECT * FROM users WHERE id = ?")
       .get(target.id);
-    expect(updated.is_active).toBe(0);
+    expect(updated).toBeUndefined();
     const audit = rawDb
       .prepare(
         "SELECT * FROM audit_log WHERE action = 'user.deleted' AND resource_id = ?"

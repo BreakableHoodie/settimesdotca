@@ -8,6 +8,7 @@ import {
   isValidEmail,
   isValidPhone,
   isValidPostalCode,
+  normalizePostalCode,
   sanitizeString,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
@@ -233,7 +234,9 @@ export async function onRequestPut(context) {
     const nextCity = city !== undefined ? city || null : venue.city || null;
     const nextRegion = region !== undefined ? region || null : venue.region || null;
     const nextPostal =
-      postal_code !== undefined ? postal_code || null : venue.postal_code || null;
+      postal_code !== undefined
+        ? normalizePostalCode(postal_code)
+        : venue.postal_code || null;
     const nextCountry =
       country !== undefined ? country || null : venue.country || null;
 

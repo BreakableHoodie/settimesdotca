@@ -7,6 +7,7 @@ import {
   validateEntity,
   VALIDATION_SCHEMAS,
   validationErrorResponse,
+  normalizePostalCode,
 } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
 
@@ -101,11 +102,15 @@ export async function onRequestPost(context) {
       address_line2,
       city,
       region,
-      postal_code,
+      postal_code: rawPostalCode,
       country,
       phone,
       contact_email,
     } = validation.sanitized;
+
+    const postal_code = rawPostalCode
+      ? normalizePostalCode(rawPostalCode)
+      : rawPostalCode;
 
     const formattedAddress =
       formatVenueAddress({

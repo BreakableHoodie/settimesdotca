@@ -213,19 +213,7 @@ export default function Modal({
         )}
 
         {/* Content */}
-        <div
-          className="p-6"
-          onKeyDown={e => {
-            // Stop propagation for Home/End keys in editable elements
-            // This prevents the modal container (which has overflow-y-auto) from capturing
-            // these keys and scrolling the modal body
-            if ((e.key === 'Home' || e.key === 'End') && isEditableElement(e.target)) {
-              e.stopPropagation()
-            }
-          }}
-        >
-          {children}
-        </div>
+        <div className="p-6">{children}</div>
 
         {/* Footer */}
         {footer && (

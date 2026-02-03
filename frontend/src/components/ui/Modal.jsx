@@ -54,11 +54,28 @@ export default function Modal({
     return Array.from(modalRef.current.querySelectorAll(focusableSelectors))
   }, [])
 
+  // Check if the active element is editable (input, textarea, or contenteditable)
+  const isEditableElement = useCallback(element => {
+    if (!element) return false
+    const tagName = element.tagName?.toLowerCase()
+    if (tagName === 'input' || tagName === 'textarea') return true
+    if (element.isContentEditable) return true
+    // Check if inside a contenteditable parent (for rich text editors like Quill)
+    return element.closest?.('[contenteditable="true"]') !== null
+  }, [])
+
   // Handle focus trap
   const handleKeyDown = useCallback(
     e => {
       if (e.key === 'Escape') {
         onClose()
+        return
+      }
+
+      // Allow Home/End keys to work normally in editable elements
+      // Stop propagation to prevent modal scroll from interfering with cursor movement
+      if ((e.key === 'Home' || e.key === 'End') && isEditableElement(document.activeElement)) {
+        e.stopPropagation()
         return
       }
 
@@ -81,7 +98,7 @@ export default function Modal({
         firstElement.focus()
       }
     },
-    [getFocusableElements, onClose]
+    [getFocusableElements, isEditableElement, onClose]
   )
 
   // Save previous focus and set initial focus when modal opens

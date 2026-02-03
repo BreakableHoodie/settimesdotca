@@ -357,25 +357,50 @@ export async function onRequestDelete(context) {
       }
     }
 
-    // Soft delete (deactivate)
-    await DB.prepare(
-      `
-      UPDATE users
-      SET is_active = 0, deactivated_at = datetime('now'), deactivated_by = ?
-      WHERE id = ?
-    `,
-    )
-      .bind(currentUser.userId, userId)
-      .run();
+    // Hard delete with cleanup of references
+    // Since some tables don't have ON DELETE SET NULL, we must manually update them
+    // to prevent FK constraint failures or data loss.
+    // Core tables: events, venues, band_profiles, performances
+    // System tables: audit_log, invite_codes (handled by schema ON DELETE SET NULL)
+    // Auth tables: lucia_sessions, password_reset_tokens (handled by schema ON DELETE CASCADE)
 
-    // Also invalidate all sessions for this user
-    await DB.prepare(
-      `
-      DELETE FROM lucia_sessions WHERE user_id = ?
-    `,
-    )
-      .bind(userId)
-      .run();
+    const cleanupStmts = [
+      // Delink from Events
+      DB.prepare(
+        "UPDATE events SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+      ).bind(userId),
+      DB.prepare(
+        "UPDATE events SET updated_by_user_id = NULL WHERE updated_by_user_id = ?",
+      ).bind(userId),
+
+      // Delink from Venues
+      DB.prepare(
+        "UPDATE venues SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+      ).bind(userId),
+      DB.prepare(
+        "UPDATE venues SET updated_by_user_id = NULL WHERE updated_by_user_id = ?",
+      ).bind(userId),
+
+      // Delink from Bands
+      DB.prepare(
+        "UPDATE band_profiles SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+      ).bind(userId),
+      // band_profiles doesn't have updated_by_user_id in v2 schema generally, but let's check schema to be safe
+      // Schema says: updated_at TEXT NOT NULL DEFAULT (datetime('now')) - No updated_by_user_id column logic in schema provided
+
+      // Delink from Performances
+      DB.prepare(
+        "UPDATE performances SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+      ).bind(userId),
+      DB.prepare(
+        "UPDATE performances SET updated_by_user_id = NULL WHERE updated_by_user_id = ?",
+      ).bind(userId),
+
+      // Delete the user - this will trigger ON DELETE CASCADE for sessions/tokens
+      DB.prepare("DELETE FROM users WHERE id = ?").bind(userId),
+    ];
+
+    await DB.batch(cleanupStmts);
 
     // Audit log
     await auditLog(

@@ -415,8 +415,16 @@ export default function BandProfilePage() {
               <div className="p-6 bg-band-purple/50 border-t border-white/10">
                 {profile.description && (
                   <div
-                    className="prose prose-invert prose-sm mb-4 text-white/90 prose-p:my-2 prose-p:leading-relaxed prose-a:text-accent-500 hover:prose-a:underline [&_*]:!break-words [&_*]:![word-break:normal]"
-                    style={{ maxWidth: '100%' }}
+                    className="mb-4 text-white/90 text-sm leading-relaxed [&_p]:my-2 [&_a]:text-accent-500 [&_a:hover]:underline"
+                    style={{
+                      wordBreak: 'keep-all',
+                      overflowWrap: 'normal',
+                      whiteSpace: 'normal',
+                      hyphens: 'none',
+                      WebkitHyphens: 'none',
+                      MozHyphens: 'none',
+                      msHyphens: 'none',
+                    }}
                     dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
                   />
                 )}

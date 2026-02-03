@@ -417,8 +417,8 @@ export default function BandProfilePage() {
                   <div
                     className="mb-4 text-white/90 text-sm leading-relaxed [&_p]:my-2 [&_a]:text-accent-500 [&_a:hover]:underline"
                     style={{
-                      wordBreak: 'keep-all',
-                      overflowWrap: 'normal',
+                      wordBreak: 'normal',
+                      overflowWrap: 'break-word',
                       whiteSpace: 'normal',
                       hyphens: 'none',
                       WebkitHyphens: 'none',

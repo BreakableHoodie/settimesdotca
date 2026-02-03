@@ -10,13 +10,14 @@ import { createRequestLogger } from './utils/logger.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
-  const log = createRequestLogger(context);
 
   // Only process API routes - let static files pass through without middleware
   const url = new URL(request.url);
   if (!url.pathname.startsWith('/api/')) {
     return context.next();
   }
+
+  const log = createRequestLogger(context);
 
   // Allowed origins for CORS (production and development)
   const baseAllowedOrigins = [
@@ -103,8 +104,20 @@ export async function onRequest(context) {
       : env?.ENVIRONMENT === "production";
 
   try {
+    const startTime = Date.now();
+
     // Continue to the next middleware/handler
     const response = await context.next();
+
+    const duration = Date.now() - startTime;
+
+    // Log the completed request
+    log.info(`Request completed: ${request.method} ${url.pathname}`, {
+      status: response.status,
+      durationMs: duration,
+      ip: request.headers.get("CF-Connecting-IP") || "unknown",
+      userAgent: request.headers.get("User-Agent"),
+    });
 
     // Add CORS and rate limit headers to response
     const newHeaders = new Headers(response.headers);
@@ -114,6 +127,9 @@ export async function onRequest(context) {
     Object.entries(rateLimitHeaders(rateLimit)).forEach(([key, value]) => {
       newHeaders.set(key, value);
     });
+
+    // Traceability: Add Request ID to response headers
+    newHeaders.set("X-Request-ID", log.getRequestId());
 
     // Security headers
     newHeaders.set("X-Content-Type-Options", "nosniff");

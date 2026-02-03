@@ -11,6 +11,18 @@ const LOG_LEVELS = {
   error: 3,
 };
 
+// Keys that should be redacted from logs
+const SENSITIVE_KEYS = [
+  'password',
+  'token',
+  'secret',
+  'authorization',
+  'cookie',
+  'key',
+  'access_token',
+  'refresh_token',
+];
+
 /**
  * Get current log level from environment
  * Defaults to 'info' in production, 'debug' in development
@@ -64,6 +76,12 @@ function serializeMetadata(meta) {
     // Handle common non-serializable types
     const cleaned = {};
     for (const [key, value] of Object.entries(meta)) {
+      // Redact sensitive keys
+      if (SENSITIVE_KEYS.some((k) => key.toLowerCase().includes(k))) {
+        cleaned[key] = '[REDACTED]';
+        continue;
+      }
+
       if (value instanceof Request) {
         cleaned[key] = { url: value.url, method: value.method };
       } else if (value instanceof Response) {

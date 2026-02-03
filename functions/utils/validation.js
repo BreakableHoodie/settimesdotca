@@ -21,7 +21,7 @@ const ISO_DATE_REGEX =
  * Postal code regex (supports US ZIP and Canadian postal codes)
  */
 const POSTAL_CODE_REGEX =
-  /^(?:\d{5}(?:-\d{4})?|[A-Za-z]\d[A-Za-z][ ]?\d[A-Za-z]\d)$/;
+  /^(?:\d{5}(?:-\d{4})?|[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d)$/;
 
 /**
  * Phone number regex (permissive, digits + formatting)
@@ -283,6 +283,34 @@ export function isValidPostalCode(postalCode) {
     return true;
   }
   return POSTAL_CODE_REGEX.test(postalCode.trim());
+}
+
+/**
+ * Normalize postal code to standard format
+ * Canadian: "A1A 1A1" (uppercase, single space)
+ * US: "12345" or "12345-6789" (trimmed)
+ * @param {string} postalCode - Raw postal code
+ * @returns {string|null} Normalized postal code or null if empty
+ */
+export function normalizePostalCode(postalCode) {
+  if (!postalCode || typeof postalCode !== "string") {
+    return null;
+  }
+
+  const trimmed = postalCode.trim().toUpperCase();
+  if (!trimmed) return null;
+
+  // Check for Canadian format (A1A 1A1 or A1A1A1)
+  // Remove all whitespace/separators to check the raw alphanumeric sequence
+  const clean = trimmed.replace(/[\s\u00A0-]+/g, ""); // Remove spaces, nbsp, hyphens usually not in CA code
+
+  // Canadian: 6 chars, Letter-Digit-Letter Digit-Letter-Digit
+  if (clean.length === 6 && /^[A-Z]\d[A-Z]\d[A-Z]\d$/.test(clean)) {
+    return `${clean.slice(0, 3)} ${clean.slice(3)}`;
+  }
+
+  // If not identified as Canadian, return the trimmed original (handles US zip)
+  return trimmed;
 }
 
 /**

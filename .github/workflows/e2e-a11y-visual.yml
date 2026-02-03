@@ -1,16 +1,18 @@
-name: E2E Tests
+name: E2E A11y + Visual
 
 on:
-    push:
-        branches: [main, dev]
     pull_request:
         branches: [main]
+        paths:
+            - 'e2e/accessibility/**'
+            - 'e2e/visual-regression.spec.js'
+    schedule:
+        - cron: '0 7 * * 1'
 
 jobs:
-    e2e:
-        name: e2e
+    e2e-a11y-visual:
+        name: e2e-a11y-visual
         runs-on: ubuntu-latest
-        # Continue on error - requires E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD secrets
         continue-on-error: true
         steps:
             - uses: actions/checkout@v4
@@ -21,69 +23,47 @@ jobs:
                   node-version: 20
                   cache: npm
 
-            - name: Run affected tests (fast-path)
-              id: affected
-              uses: dorny/paths-filter@v3
-              with:
-                  filters: |
-                      frontend: 'frontend/**'
-                      e2e: 'e2e/**'
-                      functions: 'functions/**'
-
             - name: Install dependencies
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               run: npm ci
 
             - name: Install frontend dependencies
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               working-directory: frontend
               run: npm ci
 
             - name: Build frontend
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               working-directory: frontend
               run: npm run build
 
             - name: Initialize D1 database with schema
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               env:
                   E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
                   E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
               run: |
                   echo 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"' > .dev.vars
 
-                  # Use wrangler d1 execute to initialize the database schema BEFORE starting the server
-                  # This creates the local D1 database and sets up tables
                   echo "Initializing D1 database with schema..."
                   ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --file=database/setup-complete.sql
 
-                  # Create E2E admin user if credentials are provided
                   if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
                       echo "Creating E2E admin user..."
                       ADMIN_HASH=$(node scripts/hash-password.mjs "$E2E_ADMIN_PASSWORD")
-
-                      # Insert or update the admin user using wrangler d1 execute
                       ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --command="INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active, activated_at) VALUES (100, '$E2E_ADMIN_EMAIL', 'E2E Admin', '$ADMIN_HASH', 'admin', 1, datetime('now'));"
                       echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
                   else
                       echo "⚠ E2E credentials not set, using default test accounts"
                   fi
 
-                  # Verify the database setup
                   echo "Database users:"
                   ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --command="SELECT id, email, role FROM users;"
 
                   echo "✓ Database initialization complete"
 
             - name: Start Pages Functions server
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               run: |
-                  # Start wrangler pages dev (database already initialized via d1 execute)
                   ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
                   WRANGLER_PID=$!
                   echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
 
-                  # Wait for server to be ready
                   echo "Waiting for server to start..."
                   for i in {1..60}; do
                       if curl -s http://localhost:8788/ > /dev/null 2>&1; then
@@ -101,7 +81,6 @@ jobs:
                   done
 
             - name: Cache Playwright browsers
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               uses: actions/cache@v4
               with:
                   path: ~/.cache/ms-playwright
@@ -110,16 +89,13 @@ jobs:
                       ${{ runner.os }}-playwright-
 
             - name: Install Playwright browsers
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               run: npx playwright install --with-deps
 
-            - name: Run Playwright tests
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+            - name: Run Playwright tests (A11y + Visual)
               env:
                   ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
                   ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
-                  PLAYWRIGHT_SKIP_A11Y_VISUAL: 'true'
-              run: npx playwright test
+              run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js
 
             - name: Upload Playwright report
               uses: actions/upload-artifact@v4

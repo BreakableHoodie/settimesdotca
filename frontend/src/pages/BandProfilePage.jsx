@@ -24,6 +24,20 @@ import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
 
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
+const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
+const ZERO_WIDTH_CHAR_REGEX = /[\u00AD\u200B\u200C\u200D\uFEFF]/g
+const NBSP_ENTITY_REGEX = /&nbsp;|&#160;|&#xA0;/gi
+const NBSP_CHAR_REGEX = /\u00A0/g
+
+function stripZeroWidthCharacters(text) {
+  if (!text) return text
+  return text.replace(ZERO_WIDTH_ENTITY_REGEX, '').replace(ZERO_WIDTH_CHAR_REGEX, '')
+}
+
+function normalizeNonBreakingSpaces(text) {
+  if (!text) return text
+  return text.replace(NBSP_ENTITY_REGEX, ' ').replace(NBSP_CHAR_REGEX, ' ')
+}
 
 // Generate the same ID format used by the schedule
 function generateScheduleId(bandName, performanceId) {
@@ -128,8 +142,10 @@ export default function BandProfilePage() {
     cleaned = cleaned.replace(/(<br\s*\/?>\s*){2,}/gi, '</p><p>')
     // Replace single <br> tags with spaces for proper text flow
     cleaned = cleaned.replace(/<br\s*\/?>/gi, ' ')
+    cleaned = normalizeNonBreakingSpaces(cleaned)
     // Collapse multiple spaces
     cleaned = cleaned.replace(/\s+/g, ' ').trim()
+    cleaned = stripZeroWidthCharacters(cleaned)
     // Wrap in paragraph if not already structured
     if (cleaned && !cleaned.startsWith('<p>') && !cleaned.startsWith('<ul>') && !cleaned.startsWith('<ol>')) {
       cleaned = `<p>${cleaned}</p>`
@@ -143,6 +159,10 @@ export default function BandProfilePage() {
       ALLOWED_TAGS: [],
       ALLOWED_ATTR: [],
     })
+      .replace(NBSP_ENTITY_REGEX, ' ')
+      .replace(NBSP_CHAR_REGEX, ' ')
+      .replace(ZERO_WIDTH_ENTITY_REGEX, '')
+      .replace(ZERO_WIDTH_CHAR_REGEX, '')
       .replace(/\s+/g, ' ')
       .trim()
   }, [profile?.description])
@@ -153,7 +173,7 @@ export default function BandProfilePage() {
         setLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/bands/stats/${id}`)
+        const response = await fetch(`/api/bands/stats/${encodeURIComponent(id)}`)
 
         if (!response.ok) {
           throw new Error('Band not found')

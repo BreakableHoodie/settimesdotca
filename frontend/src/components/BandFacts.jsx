@@ -6,7 +6,11 @@ import DOMPurify from 'dompurify'
 
 const stripHtml = value => {
   if (!value) return ''
-  return DOMPurify.sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).replace(/\s+/g, ' ').trim()
+  return DOMPurify.sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+    .replace(/&nbsp;|&#160;|&#xA0;/gi, ' ')
+    .replace(/[\u00A0\u00AD\u200B\u200C\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function buildFacts(band = {}, stats = {}) {
@@ -36,13 +40,6 @@ function buildFacts(band = {}, stats = {}) {
 
   if (stats.signature_venue?.name && stats.unique_events >= 2) {
     facts.push(`Most played venue: ${stats.signature_venue.name}.`)
-  }
-
-  if (!facts.length && band.description) {
-    const plainDescription = stripHtml(band.description)
-    if (plainDescription) {
-      facts.push(plainDescription)
-    }
   }
 
   if (!facts.length) {

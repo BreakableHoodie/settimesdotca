@@ -530,8 +530,7 @@ npm test
 
 **Standards**:
 - WCAG 2.1 AA: https://www.w3.org/WAI/WCAG21/quickref/
-- React Best Practices: `/reactjs.instructions.md`
-- Project Roadmap: `/ROADMAP_TO_DEMO.md`
+- React Best Practices: See repository coding guidelines
 
 **Testing**:
 - Playwright Accessibility: https://playwright.dev/docs/accessibility-testing

@@ -87,6 +87,5 @@
 
 | Location | Purpose |
 | -------- | ------- |
-| `/ROADMAP_TO_DEMO.md` | Active project roadmap |
 | `/SECURITY.md` | Security practices and headers |
 | `/README.md` | Project overview and local dev setup |

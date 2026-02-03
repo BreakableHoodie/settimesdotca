@@ -181,33 +181,35 @@ settimes/
 │   ├── components/
 │   │   ├── ErrorBoundary.jsx     # React error boundaries
 │   │   ├── EventTimeline.jsx     # Public timeline
-│   │   └── BandCard.jsx          # Performance display
+│   │   ├── BandCard.jsx          # Performance display
+│   │   └── __tests__/            # Component tests
 │   ├── pages/
 │   │   ├── BandProfilePage.jsx   # Lazy loaded profiles
 │   │   └── EmbedPage.jsx         # Shareable schedules
 │   └── utils/
 │       ├── performance.js        # DEV-only logging
-│       └── validation.js         # Input validation
+│       ├── validation.js         # Input validation
+│       └── __tests__/            # Utility tests
 ├── functions/api/           # Cloudflare Pages Functions
 │   ├── events/
 │   │   ├── timeline.js          # Optimized JOIN queries
-│   │   └── public.js            # Public event listing
+│   │   ├── public.js            # Public event listing
+│   │   └── __tests__/           # API tests
 │   ├── admin/               # Protected admin endpoints
 │   │   ├── bands.js         # CRUD operations
-│   │   └── performers.js    # Performer registry
-│   └── _middleware.js       # JWT authentication
+│   │   ├── performers.js    # Performer registry
+│   │   └── __tests__/       # Admin API tests
+│   └── _middleware.js       # RBAC authentication
 ├── database/
 │   ├── schema-v2.sql        # Current database schema
 │   └── migrations/          # Migration history
-├── docs/
-│   ├── SQL_SAFETY.md        # SQL security guidelines
-│   ├── SESSION_MANAGEMENT.md # Session timeout policies
-│   └── CLAUDE.md            # This file
-└── tests/
-    ├── functions/api/events/__tests__/timeline.test.js
-    ├── frontend/src/components/__tests__/ErrorBoundary.test.jsx
-    └── frontend/src/utils/__tests__/performance.test.js
+└── docs/
+    ├── SQL_SAFETY.md        # SQL security guidelines
+    ├── SESSION_MANAGEMENT.md # Session timeout policies
+    └── CLAUDE.md            # This file
 ```
+
+Note: Tests are co-located with source files in `__tests__/` directories.
 
 ## Recent Improvements
 
@@ -287,7 +289,6 @@ settimes/
    - Design system foundation prioritized before implementation
    - Comprehensive component library planned (10+ base components)
    - Accessibility built-in (WCAG 2.1 AA compliance)
-   - See `ROADMAP_TO_DEMO.md` for full scope
 
 ### Performance Optimization (Nov 5, 2025)
 
@@ -607,8 +608,8 @@ When working on this project:
 ## Resources
 
 - **Architecture Docs**: `docs/` directory
-- **Test Credentials**: `docs/TEST_ADMIN_CREDENTIALS.md`
 - **Database Entries**: `database/DATABASE_ENTRIES.md`
+- **Test Credentials**: See `.dev.vars.test-users` (local dev only)
 - **Cloudflare D1**: https://developers.cloudflare.com/d1/
 - **Vitest**: https://vitest.dev/
 - **React Testing Library**: https://testing-library.com/react

@@ -25,6 +25,9 @@
   # Permissions policy (disable unnecessary features)
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()
 
+  # Prevent stale HTML fallback caching (SPA routes like /band/*, /event/*)
+  Cache-Control: no-cache, no-store, must-revalidate
+
 # Cache control for static assets (versioned JS/CSS bundles)
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
@@ -36,6 +39,51 @@
 # Favicon with shorter cache for updates
 /favicon.svg
   Cache-Control: public, max-age=86400
+
+/favicon-v2.svg
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon-v2.ico
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon-2026-02-03.svg
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon-2026-02-03.ico
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon.ico
+  Cache-Control: no-cache, must-revalidate, max-age=0
+
+/favicon-32x32-v2.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon-16x16-v2.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/apple-touch-icon-v2.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/android-chrome-192x192-v2.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/android-chrome-512x512-v2.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon-32x32-2026-02-03.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon-16x16-2026-02-03.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/apple-touch-icon-2026-02-03.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/android-chrome-192x192-2026-02-03.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/android-chrome-512x512-2026-02-03.png
+  Cache-Control: public, max-age=31536000, immutable
 
 /*.woff2
   Cache-Control: public, max-age=31536000, immutable

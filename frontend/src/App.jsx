@@ -1,6 +1,7 @@
 import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { useParams } from 'react-router-dom'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
@@ -357,6 +358,9 @@ function App() {
 
   return (
     <div className="min-h-screen pb-20">
+      <Helmet>
+        <title>{eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'}</title>
+      </Helmet>
       <OfflineIndicator />
       <Header view={view} setView={setView} />
       <ComingUp bands={myBands} currentTime={effectiveNow} />

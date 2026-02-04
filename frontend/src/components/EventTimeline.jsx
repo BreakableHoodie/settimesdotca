@@ -46,12 +46,7 @@ export default function EventTimeline() {
         }
         setError(null)
 
-        const timelineUrl =
-          typeof window !== 'undefined'
-            ? new URL('/api/events/timeline', window.location.origin).toString()
-            : '/api/events/timeline'
-
-        const response = await fetch(timelineUrl)
+        const response = await fetch('/api/events/timeline')
 
         if (!response.ok) {
           throw new Error('Failed to fetch events timeline')

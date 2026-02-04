@@ -2,12 +2,6 @@ import PropTypes from 'prop-types'
 import { Card } from './ui'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faLightbulb } from '@fortawesome/free-solid-svg-icons'
-import DOMPurify from 'dompurify'
-
-const stripHtml = value => {
-  if (!value) return ''
-  return DOMPurify.sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).replace(/\s+/g, ' ').trim()
-}
 
 function buildFacts(band = {}, stats = {}) {
   const facts = []
@@ -36,13 +30,6 @@ function buildFacts(band = {}, stats = {}) {
 
   if (stats.signature_venue?.name && stats.unique_events >= 2) {
     facts.push(`Most played venue: ${stats.signature_venue.name}.`)
-  }
-
-  if (!facts.length && band.description) {
-    const plainDescription = stripHtml(band.description)
-    if (plainDescription) {
-      facts.push(plainDescription)
-    }
   }
 
   if (!facts.length) {

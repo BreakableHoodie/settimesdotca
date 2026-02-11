@@ -157,7 +157,9 @@ export default function PerformanceHistory({ bandName, onClose }) {
                             {performance.event.name}
                           </div>
                           <div className="text-white/60 text-sm mb-1">
-                            {(parseLocalDate(performance.event.date) || new Date(performance.event.date + 'T00:00:00')).toLocaleDateString('en-US', {
+                            {(
+                              parseLocalDate(performance.event.date) || new Date(performance.event.date + 'T00:00:00')
+                            ).toLocaleDateString('en-US', {
                               weekday: 'long',
                               year: 'numeric',
                               month: 'long',

@@ -10,9 +10,7 @@ SetTimes.ca is designed to streamline the management of multi-venue music events
 - **Band profile management** with photos, bios, and social links
 - **Event scheduling** with automatic conflict detection
 - **Public API** for schedule discovery and integration
-- **Email subscriptions** with city/genre filtering
-- **iCal feed generation** for calendar sync
-- **Real-time analytics** for organizers
+- **Privacy-first analytics** for organizers
 
 ## Current Status
 
@@ -24,7 +22,6 @@ Core features complete:
 - ✅ Event Management & Scheduling
 - ✅ Band Profiles with Photos
 - ✅ Public Discovery API
-- ✅ Email Subscriptions
 - ✅ Security Hardening
 - ✅ MFA/2FA with TOTP (authenticator apps)
 - ✅ Trusted Devices & Backup Codes
@@ -51,8 +48,6 @@ Core features complete:
 - Conflict detection for overlapping shows
 - Quick copy buttons for schedules (clipboard-friendly)
 - Mobile-first responsive design with adaptive header
-- Email subscription system with preferences
-- iCal feed integration for calendar apps
 
 ### Security & Compliance
 
@@ -75,16 +70,16 @@ For detailed security documentation, see [SECURITY.md](SECURITY.md) and the [SQL
 ### Discovery Features
 
 - **Public Events API** (`/api/events/public`) - no authentication required
-- **iCal Feed Generation** (`/api/feeds/ical`) - calendar sync
-- **Email Subscriptions** with city/genre filtering
+- **Event Timeline API** (`/api/events/timeline`) - full schedule with venues and performances
+- **Band Profile Pages** (`/band/:slug`) - individual artist pages with bios, photos, and social links
 - **Analytics Dashboard** for organizer insights
 
 ## Tech Stack
 
-- **Frontend:** React 18, Vite 5, Tailwind CSS 3, React Router 6
+- **Frontend:** React 18, Vite 7, Tailwind CSS 3, React Router 7
 - **Backend:** Cloudflare Pages Functions (serverless edge)
 - **Database:** Cloudflare D1 (distributed SQLite)
-- **Testing:** Vitest with 65+ tests, 90%+ coverage
+- **Testing:** Vitest with 200+ tests
 - **Build:** GitHub Actions CI/CD
 - **Auth:** Session-based with secure token management
 - **CDN:** Cloudflare global network (190+ cities)
@@ -193,9 +188,8 @@ settimes/
 │   │   └── auth/              # Authentication endpoints
 │   └── _middleware.js         # RBAC & security middleware
 ├── database/
-│   ├── schema-v2.sql          # Base schema
-│   ├── migration-*.sql        # Schema migrations
-│   └── migrate-bands-json.js  # Data migration utilities
+│   └── schema-v2.sql          # Base schema
+├── migrations/                # Numbered schema migrations (0001–0024)
 ├── docs/
 │   ├── CLAUDE.md              # Project context for AI assistants
 │   ├── DEPLOYMENT.md          # Deployment guide
@@ -220,7 +214,7 @@ npm run test:watch
 # Generate coverage report
 npm run test:coverage
 
-# Current status: 65/65 tests passing, 90%+ coverage
+# Current status: 200+ tests passing
 ```
 
 ## Role-Based Access Control
@@ -303,17 +297,22 @@ npx wrangler d1 export settimes-db --output=backup.sql  # Backup database
 ### Public Endpoints (No Auth)
 
 - `GET /api/events/public` - List all published events
-- `GET /api/feeds/ical` - iCal feed for calendar sync
-- `POST /api/subscriptions` - Create email subscription
-- `POST /api/subscriptions/verify` - Verify email subscription
-- `GET /api/subscriptions/unsubscribe/:token` - Unsubscribe
+- `GET /api/events/timeline` - Full schedule with venues and performances
+- `GET /api/events/:id/details` - Event details with full lineup
+- `POST /api/metrics` - Privacy-first analytics beacon
+- `GET /api/auth/activate?token=xxx` - Activate new account
+- `POST /api/auth/reset-password` - Request password reset
+- `POST /api/auth/reset-password-complete` - Complete password reset
+- `POST /api/auth/resend-activation` - Resend activation email
 
 ### Protected Endpoints (Authentication Required)
 
 All admin endpoints require authentication and appropriate role:
 
-- `POST /api/auth/login` - Login with email/password
-- `POST /api/auth/logout` - End session
+- `POST /api/admin/auth/login` - Login with email/password
+- `POST /api/admin/auth/logout` - End session
+- `POST /api/admin/auth/signup` - Register with invite code
+- `POST /api/admin/auth/mfa/verify` - Verify MFA code
 - `GET /api/admin/events` - List events (viewer+)
 - `POST /api/admin/events` - Create event (editor+)
 - `GET /api/admin/bands` - List bands (viewer+)
@@ -321,8 +320,9 @@ All admin endpoints require authentication and appropriate role:
 - `GET /api/admin/venues` - List venues (viewer+)
 - `POST /api/admin/venues` - Create venue (admin only)
 - `GET /api/admin/users` - List users (admin only)
-- `POST /api/admin/users` - Create user (admin only)
+- `POST /api/admin/users` - Invite user (admin only)
 - `GET /api/admin/analytics/*` - Analytics endpoints (viewer+)
+- `GET /api/admin/audit-log` - Audit log (admin only)
 
 See [docs/BACKEND_FRAMEWORK.md](docs/BACKEND_FRAMEWORK.md) for complete API reference.
 
@@ -340,8 +340,7 @@ This is a private project for SetTimes.ca. For issues or questions:
 - ✅ RBAC with admin/editor/viewer roles
 - ✅ Event management with conflict detection
 - ✅ Band profiles with photos and bios
-- ✅ Public discovery API & iCal feeds
-- ✅ Email subscriptions with preferences
+- ✅ Public discovery API
 - ✅ Security hardening (HTTPOnly cookies, CSRF, CSP)
 - ✅ Mobile-responsive design
 
@@ -354,6 +353,11 @@ This is a private project for SetTimes.ca. For issues or questions:
 
 **Current (2026):**
 - Production operations for February 2026 event
+
+**Upcoming:**
+- Email subscriptions with city/genre filtering (backend ready, frontend integration pending)
+- iCal feed integration for calendar apps (backend ready, frontend integration pending)
+- Event theming and colour customization from admin backend
 - Performance monitoring and optimization
 
 ## Design

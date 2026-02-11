@@ -178,7 +178,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
 
     // Check date is not in past (only for new events, unless status is archived)
     if (!isEditing && formData.status !== 'archived') {
-      const eventDate = new Date(formData.date)
+      const eventDate = new Date(formData.date + 'T00:00:00')
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       if (eventDate < today) {

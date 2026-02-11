@@ -3,7 +3,7 @@ import PropTypes from 'prop-types'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTimes, faCalendar, faMapMarkerAlt, faClock, faMusic } from '@fortawesome/free-solid-svg-icons'
 import { bandsApi } from '../../utils/adminApi'
-import { formatTimeRange } from '../../utils/timeFormat'
+import { formatTimeRange, parseLocalDate } from '../../utils/timeFormat'
 
 /**
  * PerformanceHistory Component
@@ -157,7 +157,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
                             {performance.event.name}
                           </div>
                           <div className="text-white/60 text-sm mb-1">
-                            {new Date(performance.event.date).toLocaleDateString('en-US', {
+                            {(parseLocalDate(performance.event.date) || new Date(performance.event.date + 'T00:00:00')).toLocaleDateString('en-US', {
                               weekday: 'long',
                               year: 'numeric',
                               month: 'long',

@@ -6,6 +6,8 @@
   "scripts": {
     "migrate:local": "bash scripts/migrate-local-db.sh",
     "validate:schema": "node scripts/validate-db-schema.js",
+    "deploy:dev": "npm --prefix frontend run build && npx wrangler pages deploy frontend/dist --project-name settimesdotca --branch dev",
+    "deploy:prod": "npm --prefix frontend run build && npx wrangler pages deploy frontend/dist --project-name settimesdotca --branch main",
     "prebuild": "npm run validate:schema",
     "test": "vitest run",
     "test:watch": "vitest",

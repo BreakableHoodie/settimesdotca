@@ -231,11 +231,11 @@ npm run test:coverage
 
 See `.dev.vars.test-users` for credentials. Default users:
 
-- `admin@pinklemonaderecords.com` - System Administrator (admin)
-- `sarah@pinklemonaderecords.com` - Second Admin (admin)
-- `editor@pinklemonaderecords.com` - Content Editor (editor)
-- `viewer@pinklemonaderecords.com` - Analytics Viewer (viewer)
-- `inactive@pinklemonaderecords.com` - Inactive User (testing)
+- `admin@settimes.ca` - System Administrator (admin)
+- `sarah@settimes.ca` - Second Admin (admin)
+- `editor@settimes.ca` - Content Editor (editor)
+- `viewer@settimes.ca` - Analytics Viewer (viewer)
+- `inactive@settimes.ca` - Inactive User (testing)
 
 **Note:** Use strong passwords in production. See [docs/D1_SETUP.md](docs/D1_SETUP.md) for security best practices.
 
@@ -265,7 +265,7 @@ See `.dev.vars.test-users` for credentials. Default users:
 
    **Manual Deployment (from project root):**
    ```bash
-   wrangler pages deploy frontend/dist --project-name settimesdotca --branch main
+   npm run deploy:prod
    ```
    This command properly includes static assets from `frontend/dist` and Functions from `functions/`.
 
@@ -282,6 +282,10 @@ npm run validate:schema         # Validate schema consistency
 npm test                        # Run all tests
 npm run test:watch              # Watch mode
 npm run test:coverage           # Coverage report
+
+# Deploy (always from repo root so Functions are included)
+npm run deploy:dev
+npm run deploy:prod
 
 # Local Development
 npx wrangler pages dev public --binding DB=settimes-db  # Start dev server

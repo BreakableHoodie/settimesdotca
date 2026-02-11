@@ -304,7 +304,7 @@ npx wrangler d1 export settimes-db --output=backup.sql  # Backup database
 - `GET /api/events/timeline` - Full schedule with venues and performances
 - `GET /api/events/:id/details` - Event details with full lineup
 - `POST /api/metrics` - Privacy-first analytics beacon
-- `GET /api/auth/activate?token=xxx` - Activate new account
+- `POST /api/auth/activate` - Activate new account
 - `POST /api/auth/reset-password` - Request password reset
 - `POST /api/auth/reset-password-complete` - Complete password reset
 - `POST /api/auth/resend-activation` - Resend activation email

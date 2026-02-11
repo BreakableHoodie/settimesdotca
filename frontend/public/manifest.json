@@ -4,24 +4,24 @@
   "description": "Build your personalized schedule for live music events",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1845",
-  "theme_color": "#2d2554",
+  "background_color": "#0c0f1a",
+  "theme_color": "#0c0f1a",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon-2026-02-03.svg",
+      "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/android-chrome-192x192-2026-02-03.png",
+      "src": "/android-chrome-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/android-chrome-512x512-2026-02-03.png",
+      "src": "/android-chrome-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"

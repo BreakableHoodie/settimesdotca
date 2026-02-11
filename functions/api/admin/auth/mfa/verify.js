@@ -187,14 +187,6 @@ export async function onRequestPost(context) {
     let remainingBackupCodes = null;
     let usedBackupCode = false;
 
-    console.log("[MFA Verify] Attempting TOTP verification:", {
-      totpEnabled: challenge.totp_enabled,
-      hasSecret: !!challenge.totp_secret,
-      codeReceived: code,
-      codeLength: code?.length,
-      codeType: typeof code,
-    });
-
     if (Number(challenge.totp_enabled) === 1 && challenge.totp_secret) {
       try {
         verified = await verifyTotp(challenge.totp_secret, code);
@@ -235,6 +227,15 @@ export async function onRequestPost(context) {
       );
     }
 
+    // Mark challenge as used BEFORE creating session to close TOCTOU window
+    await DB.prepare(
+      `UPDATE mfa_challenges
+       SET used = 1, used_at = datetime('now')
+       WHERE id = ?`
+    )
+      .bind(challenge.challenge_id)
+      .run();
+
     const lucia = initializeLucia(DB, request);
     const session = await lucia.createSession(challenge.user_id, {});
 
@@ -263,14 +264,6 @@ export async function onRequestPost(context) {
         .bind(nextCodes, challenge.user_id)
         .run();
     }
-
-    await DB.prepare(
-      `UPDATE mfa_challenges
-       SET used = 1, used_at = datetime('now')
-       WHERE id = ?`
-    )
-      .bind(challenge.challenge_id)
-      .run();
 
     await DB.prepare(
       `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)

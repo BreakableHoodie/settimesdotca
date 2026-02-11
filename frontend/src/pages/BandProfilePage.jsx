@@ -112,6 +112,14 @@ function getScheduleEventSlug() {
   }
 }
 
+// Reject non-HTTP(S) URLs to prevent javascript: / data: XSS via social links
+function safeHref(url) {
+  if (!url || typeof url !== 'string') return null
+  const trimmed = url.trim()
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return null
+}
+
 /**
  * BandProfilePage - Enhanced band profile with design system
  * Sprint 2.2: SEO optimization, design system integration, performance history
@@ -458,9 +466,9 @@ export default function BandProfilePage() {
                 )}
                 {profile.social && (
                   <div className="flex flex-wrap gap-3">
-                    {profile.social.website && (
+                    {safeHref(profile.social.website) && (
                       <a
-                        href={profile.social.website}
+                        href={safeHref(profile.social.website)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
@@ -482,9 +490,9 @@ export default function BandProfilePage() {
                         Instagram
                       </a>
                     )}
-                    {profile.social.bandcamp && (
+                    {safeHref(profile.social.bandcamp) && (
                       <a
-                        href={profile.social.bandcamp}
+                        href={safeHref(profile.social.bandcamp)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
@@ -494,9 +502,9 @@ export default function BandProfilePage() {
                         Bandcamp
                       </a>
                     )}
-                    {profile.social.facebook && (
+                    {safeHref(profile.social.facebook) && (
                       <a
-                        href={profile.social.facebook}
+                        href={safeHref(profile.social.facebook)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"

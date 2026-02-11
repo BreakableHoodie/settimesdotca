@@ -34,6 +34,7 @@ coverage/
 test-results/
 playwright-report/
 playwright/.cache/
+output/
 e2e/.auth/
 e2e/visual-regression.spec.js-snapshots/
 *.lcov

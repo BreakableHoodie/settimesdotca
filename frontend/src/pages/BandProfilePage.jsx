@@ -242,7 +242,7 @@ export default function BandProfilePage() {
   // Toggle a performance in the schedule
   const toggleSchedule = useCallback(
     performance => {
-      if (!performance.event_slug || !performance.id) return
+      if (!performance.event_slug || !performance.id || !profile?.name) return
 
       const scheduleId = generateScheduleId(profile.name, performance.id)
       const eventSlug = performance.event_slug

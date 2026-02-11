@@ -20,7 +20,8 @@ export async function onRequestGet(context) {
 
     if (eventParam === "current") {
       // Get the current or next upcoming published event
-      // Note: Using UTC date, adjust with timezone offset if needed
+      // The -6 hour buffer keeps the event visible during late-night/overnight
+      // sets that span past midnight (e.g. 11:30pm-12:30am)
       event = await DB.prepare(
         `
         SELECT * FROM events

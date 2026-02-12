@@ -1,11 +1,11 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import EventTimeline from '../components/EventTimeline'
 import Footer from '../components/Footer'
 import PrivacyBanner from '../components/PrivacyBanner'
 import { trackPageView } from '../utils/metrics'
-import { hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
+import { hasAnySchedule, getScheduleEventSlug, SELECTED_BANDS_KEY } from '../utils/scheduleStorage'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCalendarDays, faArrowRight } from '@fortawesome/free-solid-svg-icons'
 
@@ -14,8 +14,28 @@ export default function EventsPage() {
     trackPageView('/')
   }, [])
 
-  const showBanner = useMemo(() => hasAnySchedule(), [])
-  const scheduleSlug = useMemo(() => getScheduleEventSlug(), [])
+  const [showBanner, setShowBanner] = useState(() => hasAnySchedule())
+  const [scheduleSlug, setScheduleSlug] = useState(() => getScheduleEventSlug())
+
+  const refreshBanner = useCallback(() => {
+    setShowBanner(hasAnySchedule())
+    setScheduleSlug(getScheduleEventSlug())
+  }, [])
+
+  useEffect(() => {
+    const handleStorage = e => {
+      if (e.key === SELECTED_BANDS_KEY) refreshBanner()
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshBanner()
+    }
+    window.addEventListener('storage', handleStorage)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [refreshBanner])
 
   return (
     <div className="min-h-screen bg-gradient-dark">

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button, Badge, Card, Alert, Loading } from './ui'
 import { slugifyBandName } from '../utils/slugify'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
-import { getSelectedCountByEvent } from '../utils/scheduleStorage'
+import { getSelectedCountByEvent, SELECTED_BANDS_KEY } from '../utils/scheduleStorage'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faCircle,
@@ -31,10 +31,27 @@ export default function EventTimeline() {
   const [detailsById, setDetailsById] = useState({})
   const [detailsLoading, setDetailsLoading] = useState({})
 
-  const [savedCounts] = useState(() => getSelectedCountByEvent())
+  const [savedCounts, setSavedCounts] = useState(() => getSelectedCountByEvent())
 
   // Use transition for non-urgent UI updates to improve INP
   const [, startTransition] = useTransition()
+
+  // Refresh saved counts when localStorage changes (cross-tab or tab refocus)
+  useEffect(() => {
+    const refresh = () => setSavedCounts(getSelectedCountByEvent())
+    const handleStorage = e => {
+      if (e.key === SELECTED_BANDS_KEY) refresh()
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    window.addEventListener('storage', handleStorage)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [])
 
   // Fetch timeline data
   const pollRef = useRef(null)

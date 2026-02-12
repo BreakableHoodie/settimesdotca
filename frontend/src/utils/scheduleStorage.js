@@ -1,4 +1,4 @@
-const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
+export const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 
 /**
  * Get selected band IDs for an event from localStorage

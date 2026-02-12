@@ -54,8 +54,8 @@ function BandCard({
       onClick={clickable ? handleToggle : undefined}
       onKeyDown={clickable ? handleKeyDown : undefined}
       tabIndex={clickable ? 0 : undefined}
-      role={clickable ? 'button' : 'group'}
-      aria-label={clickable ? undefined : `${band.name} at ${band.venue}`}
+      role="group"
+      aria-label={`${band.name} at ${band.venue}`}
     >
       <button
         type="button"

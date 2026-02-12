@@ -26,7 +26,16 @@ import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
 
-function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleShowPast, nowOverride, shareUrl, onBrowseAll }) {
+function MySchedule({
+  bands,
+  onToggleBand,
+  onClearSchedule,
+  showPast,
+  onToggleShowPast,
+  nowOverride,
+  shareUrl,
+  onBrowseAll,
+}) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false)
@@ -183,9 +192,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           <FontAwesomeIcon icon={faCalendarPlus} aria-hidden="true" />
         </div>
         <p className="text-white text-xl font-semibold">No bands selected yet</p>
-        <p className="text-accent-400 text-sm">
-          Tap a band to start building your schedule
-        </p>
+        <p className="text-accent-400 text-sm">Tap a band to start building your schedule</p>
         {onBrowseAll && (
           <button
             onClick={onBrowseAll}
@@ -389,7 +396,10 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                   title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Copy shareable link'}
                   disabled={isSharingSchedule}
                 >
-                  <FontAwesomeIcon icon={shareButtonLabel === 'Link Copied!' ? faCheck : faShareNodes} aria-hidden="true" />
+                  <FontAwesomeIcon
+                    icon={shareButtonLabel === 'Link Copied!' ? faCheck : faShareNodes}
+                    aria-hidden="true"
+                  />
                   <span className="transition-opacity duration-200 ease-in-out">{shareButtonLabel}</span>
                 </button>
               )}

@@ -42,10 +42,7 @@ function ScheduleView({
       })
 
   const uniqueVenues = useMemo(() => [...new Set(bands.map(b => b.venue))].sort(), [bands])
-  const uniqueGenres = useMemo(
-    () => [...new Set(bands.filter(b => b.genre).map(b => b.genre))].sort(),
-    [bands]
-  )
+  const uniqueGenres = useMemo(() => [...new Set(bands.filter(b => b.genre).map(b => b.genre))].sort(), [bands])
 
   const filteredBands = visibleBands.filter(
     b => (!venueFilter || b.venue === venueFilter) && (!genreFilter || b.genre === genreFilter)

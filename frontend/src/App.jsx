@@ -1,8 +1,8 @@
 import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import BackToTop from './components/BackToTop'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
@@ -138,8 +138,6 @@ const formatDebugInputValue = dateValue => {
 
 function App() {
   const { slug } = useParams()
-  const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
   const [bands, setBands] = useState(FALLBACK_BANDS)
   const [eventData, setEventData] = useState(null)
   const [selectedBands, setSelectedBands] = useState(() => getStoredSelection(slug))
@@ -150,8 +148,6 @@ function App() {
   const [showPast, setShowPast] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [debugTime, setDebugTime] = useState(() => getInitialDebugTime())
-  const [isSharedSchedule, setIsSharedSchedule] = useState(false)
-  const sharedScheduleRef = useRef(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -232,50 +228,13 @@ function App() {
   }, [debugTime])
 
   useEffect(() => {
-    const sharedParam = searchParams.get('s')
-    if (sharedParam) {
-      const sharedIds = sharedParam
-        .split(',')
-        .map(Number)
-        .filter(id => Number.isFinite(id) && id > 0)
-      if (sharedIds.length > 0) {
-        setSelectedBands(sharedIds)
-        setView('mine')
-        setIsSharedSchedule(true)
-        sharedScheduleRef.current = true
-        // Clean the ?s= param from the URL so refreshing uses localStorage
-        navigate(`/event/${slug}`, { replace: true })
-        return
-      }
-    }
-    // Skip localStorage reset when navigate just cleared the ?s= param
-    if (sharedScheduleRef.current) {
-      sharedScheduleRef.current = false
-      return
-    }
-    setIsSharedSchedule(false)
     const stored = getStoredSelection(slug)
     setSelectedBands(stored)
     setView(stored.length > 0 ? 'mine' : 'all')
-  }, [slug, searchParams, navigate])
-
-  // Sanitize shared IDs against loaded bands to avoid phantom selections
-  useEffect(() => {
-    if (bands.length === 0 || !searchParams.get('s')) return
-    const validIds = new Set(bands.map(b => b.id))
-    setSelectedBands(prev => {
-      const filtered = prev.filter(id => validIds.has(id))
-      return filtered.length === prev.length ? prev : filtered
-    })
-  }, [bands, searchParams])
+  }, [slug])
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-      return
-    }
-
-    // Don't overwrite localStorage when viewing a shared schedule
-    if (isSharedSchedule) {
       return
     }
 
@@ -295,7 +254,7 @@ function App() {
     } catch (error) {
       console.warn('[App] Failed to persist selectedBands', error)
     }
-  }, [selectedBands, slug, isSharedSchedule])
+  }, [selectedBands, slug])
 
   const trackScheduleBuilds = async bandsToTrack => {
     if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {
@@ -357,8 +316,6 @@ function App() {
   }
 
   const myBands = bands.filter(band => selectedBands.includes(band.id))
-  const shareUrl =
-    selectedBands.length > 0 && slug ? `${window.location.origin}/event/${slug}?s=${selectedBands.join(',')}` : null
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
   const effectiveNow = debugTime || currentTime
@@ -488,15 +445,7 @@ function App() {
               showPast={showPast}
               onToggleShowPast={toggleShowPast}
               nowOverride={debugTime}
-              shareUrl={shareUrl}
               onBrowseAll={() => setView('all')}
-              isSharedSchedule={isSharedSchedule}
-              onDismissShared={() => {
-                const stored = getStoredSelection(slug)
-                setSelectedBands(stored)
-                setView(stored.length > 0 ? 'mine' : 'all')
-                setIsSharedSchedule(false)
-              }}
             />
           </Suspense>
         )}

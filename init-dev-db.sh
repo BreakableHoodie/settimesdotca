@@ -1,5 +1,16 @@
 #!/bin/bash
+set -eu
 # Initialize the local dev database for wrangler pages dev
+
+# Ensure background server is cleaned up on exit or error
+SERVER_PID=""
+cleanup() {
+  if [ -n "$SERVER_PID" ]; then
+    kill "$SERVER_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT ERR INT TERM
+
 echo "Starting server and initializing database..."
 
 # Start the server in the background
@@ -40,4 +51,6 @@ echo "Server logs: /tmp/wrangler-init.log"
 echo ""
 
 # Keep the script running so the server continues
+# Disable the EXIT trap since we want the server to keep running until interrupted
+trap - EXIT
 wait $SERVER_PID

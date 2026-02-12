@@ -385,37 +385,29 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       )}
 
       {(conflicts.length > 0 || overlaps.length > 0) && (
-        <div className="space-y-4 max-w-5xl mx-auto">
+        <div className="space-y-3 max-w-5xl mx-auto">
           {overlaps.length > 0 && (
-            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
-              <p className="text-yellow-200 font-semibold text-center leading-normal">
-                <span className="inline-flex items-center gap-2 justify-center">
-                  <span className="text-yellow-300 text-xl align-middle">
-                    <FontAwesomeIcon icon={faBolt} aria-hidden="true" title="Simultaneous sets" />
-                  </span>
-                  <span className="text-sm sm:text-base text-center">
-                    <span className="block">
-                      {overlaps.length} band{overlaps.length !== 1 ? 's' : ''} happening at the same time
-                    </span>
-                    <span className="block">You&apos;ll need to choose!</span>
-                  </span>
+            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg px-4 py-3 flex items-center gap-3">
+              <FontAwesomeIcon icon={faBolt} className="text-yellow-300 text-lg flex-shrink-0" aria-hidden="true" />
+              <p className="text-yellow-200 font-semibold text-sm sm:text-base leading-snug">
+                {overlaps.length} band{overlaps.length !== 1 ? 's' : ''} happening at the same time
+                <span className="block text-yellow-200/70 font-normal text-xs sm:text-sm">
+                  You&apos;ll need to choose!
                 </span>
               </p>
             </div>
           )}
           {conflicts.length > 0 && (
-            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 leading-normal">
-              <p className="text-red-200 font-semibold text-center leading-normal">
-                <span className="inline-flex items-center gap-2 justify-center">
-                  <span className="text-red-300 text-xl align-middle">
-                    <FontAwesomeIcon icon={faTriangleExclamation} aria-hidden="true" title="Overlapping sets" />
-                  </span>
-                  <span className="text-sm sm:text-base text-center">
-                    <span className="block">
-                      {conflicts.length} overlapping set{conflicts.length !== 1 ? 's' : ''}
-                    </span>
-                    <span className="block">Some bands won&apos;t be possible to see fully.</span>
-                  </span>
+            <div className="bg-red-500/20 border border-red-500/50 rounded-lg px-4 py-3 flex items-center gap-3">
+              <FontAwesomeIcon
+                icon={faTriangleExclamation}
+                className="text-red-300 text-lg flex-shrink-0"
+                aria-hidden="true"
+              />
+              <p className="text-red-200 font-semibold text-sm sm:text-base leading-snug">
+                {conflicts.length} overlapping set{conflicts.length !== 1 ? 's' : ''}
+                <span className="block text-red-200/70 font-normal text-xs sm:text-sm">
+                  You may not be able to catch every full set.
                 </span>
               </p>
             </div>
@@ -429,6 +421,27 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           const hasOverlap = overlaps.some(c => c.band1 === band.id || c.band2 === band.id)
           const travelWarning = travelWarnings[band.id]
           const showDreReminder = band.id === firstHighlightedBandId
+
+          // Build warning tooltip text
+          let warningType = null
+          let warningText = null
+          if (hasOverlap || hasConflict) {
+            const matchedBands = (hasOverlap ? overlaps : conflicts)
+              .filter(c => c.band1 === band.id || c.band2 === band.id)
+              .map(c => {
+                const otherId = c.band1 === band.id ? c.band2 : c.band1
+                return visibleBands.find(b => b.id === otherId)
+              })
+              .filter(Boolean)
+            const names = matchedBands.map(b => b.name).join(', ')
+            if (hasOverlap) {
+              warningType = 'overlap'
+              warningText = `Same time as ${names}`
+            } else {
+              warningType = 'conflict'
+              warningText = `Overlaps with ${names}`
+            }
+          }
 
           // Calculate gap from previous band
           let timeGap = null
@@ -461,55 +474,40 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                   <span>{getHighlightMessage()}</span>
                 </div>
               )}
-              <div className="flex gap-3 items-start">
-                {/* Conflict/Overlap emoji - aligned with center of band card */}
-                {(hasConflict || hasOverlap) && (
-                  <div className="flex-shrink-0 flex items-start justify-center pt-1">
-                    <span
-                      role="img"
-                      aria-label={hasOverlap ? 'Simultaneous sets indicator' : 'Overlapping sets indicator'}
-                      title={hasOverlap ? 'Happening at the same time' : 'Overlapping times'}
-                      className={`${hasOverlap ? 'text-yellow-300' : 'text-red-300'} text-xl align-middle`}
-                    >
-                      {hasOverlap ? '⚡' : '⚠️'}
-                    </span>
+              <div className="space-y-2">
+                {/* Travel warning - appears ABOVE the band card */}
+                {travelWarning && (
+                  <div className="text-xs text-blue-300 bg-blue-900/30 px-3 py-1.5 rounded border border-blue-500/30 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faPersonWalking} aria-hidden="true" title="Travel time alert" />
+                    <span>Heads up, the next show at {travelWarning}</span>
                   </div>
                 )}
-                <div className="flex-1 min-w-0">
-                  <div className="space-y-2">
-                    {/* Travel warning - appears ABOVE the band card */}
-                    {travelWarning && (
-                      <div className="text-xs text-blue-300 bg-blue-900/30 px-3 py-1.5 rounded border border-blue-500/30 flex items-center gap-2">
-                        <FontAwesomeIcon icon={faPersonWalking} aria-hidden="true" title="Travel time alert" />
-                        <span>Heads up, the next show at {travelWarning}</span>
-                      </div>
-                    )}
 
-                    <div className={getTimeStatus(band).status === 'now' ? 'playing-now rounded-xl' : ''}>
-                      <BandCard
-                        band={band}
-                        isSelected={true}
-                        onToggle={onToggleBand}
-                        onRemove={onToggleBand}
-                        showVenue={true}
-                        clickable={false}
-                      />
-                    </div>
-
-                    {/* Countdown timer - appears BELOW the band card */}
-                    {(() => {
-                      const timeStatus = getTimeStatus(band)
-                      return (
-                        <div
-                          className={`text-xs font-semibold px-3 py-1.5 rounded border ${timeStatus.color} flex items-center gap-2 leading-normal`}
-                        >
-                          <FontAwesomeIcon icon={timeStatus.icon} aria-hidden="true" />
-                          <span>{timeStatus.text}</span>
-                        </div>
-                      )
-                    })()}
-                  </div>
+                <div className={getTimeStatus(band).status === 'now' ? 'playing-now rounded-xl' : ''}>
+                  <BandCard
+                    band={band}
+                    isSelected={true}
+                    onToggle={onToggleBand}
+                    onRemove={onToggleBand}
+                    showVenue={true}
+                    clickable={false}
+                    warningType={warningType}
+                    warningText={warningText}
+                  />
                 </div>
+
+                {/* Countdown timer - appears BELOW the band card */}
+                {(() => {
+                  const timeStatus = getTimeStatus(band)
+                  return (
+                    <div
+                      className={`text-xs font-semibold px-3 py-1.5 rounded border ${timeStatus.color} flex items-center gap-2 leading-normal`}
+                    >
+                      <FontAwesomeIcon icon={timeStatus.icon} aria-hidden="true" />
+                      <span>{timeStatus.text}</span>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )

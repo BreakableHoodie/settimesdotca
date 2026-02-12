@@ -1,6 +1,6 @@
 // Privacy-first metrics collector
 // Uses Beacon API for non-blocking sends
-/* global crypto */
+/* global crypto, Blob */
 
 const METRICS_ENDPOINT = '/api/metrics'
 const BATCH_INTERVAL = 5000

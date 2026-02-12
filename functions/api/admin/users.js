@@ -140,16 +140,6 @@ export async function onRequestPost(context) {
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
     const inviteUrl = new URL("/admin/signup", baseUrl);
     inviteUrl.searchParams.set("code", inviteCode);
-    inviteUrl.searchParams.set("email", email);
-    if (fullName) {
-      inviteUrl.searchParams.set("name", fullName);
-    }
-    if (firstName) {
-      inviteUrl.searchParams.set("first", firstName);
-    }
-    if (lastName) {
-      inviteUrl.searchParams.set("last", lastName);
-    }
 
     let emailResult = { delivered: false, reason: "not_configured" };
     if (isEmailConfigured(env)) {
@@ -166,7 +156,9 @@ export async function onRequestPost(context) {
         html: emailPayload.html,
       });
     } else {
-      console.info(`[Email] Invite link for ${email}: ${inviteUrl}`);
+      if (env?.DEBUG_EMAIL_LINKS === "true") {
+        console.info(`[Email] Invite link for ${email}: ${inviteUrl}`);
+      }
     }
 
     // Audit log
@@ -182,7 +174,6 @@ export async function onRequestPost(context) {
         name: fullName || null,
         firstName,
         lastName,
-        inviteCode,
         expiresAt,
         emailDelivered: emailResult.delivered,
       },

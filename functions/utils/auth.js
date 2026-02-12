@@ -24,9 +24,7 @@ export function isDevRequest(request) {
   return (
     origin.includes("localhost") ||
     host.includes("localhost") ||
-    url.includes("localhost") ||
-    host.endsWith(".pages.dev") ||
-    origin.includes(".pages.dev")
+    url.includes("localhost")
   );
 }
 

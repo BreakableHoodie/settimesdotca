@@ -58,21 +58,12 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
 
   if (!device) return null;
 
-  // Validate device fingerprint (allows for some IP changes but validates user agent)
+  // Validate device fingerprint (strict match)
   const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
 
-  // For security, we check if at least the user agent matches
-  // This allows for IP changes (mobile, VPN) while still providing some device binding
   if (device.device_fingerprint !== currentFingerprint) {
-    // Soft validation: if IP changed but user agent is the same, allow it
-    const storedUaHash = device.device_fingerprint;
-    const sameIpFingerprint = await generateDeviceFingerprint(device.ip_address, userAgent);
-
-    // If the user agent portion doesn't match at all, reject
-    if (storedUaHash !== sameIpFingerprint && device.device_fingerprint !== currentFingerprint) {
-      console.log("[TrustedDevice] Fingerprint mismatch, device not trusted");
-      return null;
-    }
+    console.log("[TrustedDevice] Fingerprint mismatch, device not trusted");
+    return null;
   }
 
   // Update last_used_at

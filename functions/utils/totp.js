@@ -93,7 +93,27 @@ export async function verifyBackupCode(code, hashedCodes = []) {
   }
 
   const hashed = await hashBackupCode(code);
-  const index = hashedCodes.indexOf(hashed);
+  let index = -1;
+
+  const timingSafeEqual = (a, b) => {
+    if (a.length !== b.length) {
+      return false;
+    }
+
+    let diff = 0;
+    for (let i = 0; i < a.length; i += 1) {
+      diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    return diff === 0;
+  };
+
+  for (let i = 0; i < hashedCodes.length; i += 1) {
+    if (timingSafeEqual(hashed, String(hashedCodes[i] || ""))) {
+      index = i;
+      break;
+    }
+  }
+
   if (index === -1) {
     return { valid: false, remaining: hashedCodes };
   }

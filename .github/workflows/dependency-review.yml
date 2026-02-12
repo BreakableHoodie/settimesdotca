@@ -10,8 +10,7 @@ permissions:
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
-    # Continue on error - requires Dependency Graph to be enabled in repo settings
-    continue-on-error: true
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

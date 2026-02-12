@@ -213,9 +213,10 @@ export const authApi = {
   },
 
   async resendActivation(email) {
-    const response = await fetch('/api/auth/resend-activation', {
+    const response = await fetchWithCSRFRetry('/api/auth/resend-activation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email }),
     })
     return handleResponse(response)

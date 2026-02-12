@@ -440,8 +440,7 @@ export async function onRequestDelete(context) {
     return new Response(
       JSON.stringify({
         error: "Database error",
-        message: "Failed to delete venue",
-        details: error.message
+        message: "Failed to delete venue"
       }),
       {
         status: 500,

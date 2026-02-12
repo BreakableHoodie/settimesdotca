@@ -407,7 +407,7 @@ function App() {
       <OfflineIndicator />
       <Header view={view} setView={setView} selectedCount={selectedBands.length} />
       <ComingUp bands={myBands} currentTime={effectiveNow} />
-      <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
+      <main id="main-content" className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
         <Breadcrumbs items={breadcrumbs} />
         {debugEnabled && (
           <section className="bg-band-purple/80 border border-band-orange/30 rounded-lg p-4">

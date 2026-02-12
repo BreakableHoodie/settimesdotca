@@ -54,7 +54,8 @@ export async function onRequestGet(context) {
       .run();
 
     // Redirect to success page
-    return Response.redirect(`${env.PUBLIC_URL}/subscribe?verified=true`, 302);
+    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    return Response.redirect(`${baseUrl}/subscribe?verified=true`, 302);
   } catch (error) {
     console.error("Verification error:", error);
     return new Response("Verification failed", { status: 500 });

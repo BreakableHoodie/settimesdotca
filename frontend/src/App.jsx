@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useParams } from 'react-router-dom'
+import BackToTop from './components/BackToTop'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
 import Footer from './components/Footer'
@@ -452,6 +453,7 @@ function App() {
         <VenueInfo eventData={eventData} />
       </Suspense>
       <Footer />
+      <BackToTop />
       <PrivacyBanner />
     </div>
   )

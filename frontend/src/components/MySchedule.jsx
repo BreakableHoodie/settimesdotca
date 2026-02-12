@@ -14,12 +14,10 @@ import {
   faMusic,
   faPersonWalking,
   faPizzaSlice,
-  faShareNodes,
   faStar,
   faTaxi,
   faTrashCan,
   faTriangleExclamation,
-  faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useEffect, useMemo, useState } from 'react'
@@ -28,23 +26,10 @@ import { copyToClipboard } from '../utils/clipboard'
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
 
-function MySchedule({
-  bands,
-  onToggleBand,
-  onClearSchedule,
-  showPast,
-  onToggleShowPast,
-  nowOverride,
-  shareUrl,
-  onBrowseAll,
-  isSharedSchedule = false,
-  onDismissShared,
-}) {
+function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleShowPast, nowOverride, onBrowseAll }) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false)
-  const [shareButtonLabel, setShareButtonLabel] = useState('Share')
-  const [isSharingSchedule, setIsSharingSchedule] = useState(false)
 
   // Update current time every minute
   useEffect(() => {
@@ -314,65 +299,8 @@ function MySchedule({
     return copyToClipboard(text)
   }
 
-  const handleShare = async () => {
-    if (isSharingSchedule || !shareUrl) return
-    setIsSharingSchedule(true)
-
-    // Use native share sheet on mobile when available
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'My SetTimes Schedule',
-          text: `Check out my schedule — ${bands.length} ${bands.length === 1 ? 'band' : 'bands'}`,
-          url: shareUrl,
-        })
-        setIsSharingSchedule(false)
-        return
-      } catch (err) {
-        // User cancelled or share failed — fall through to clipboard
-        if (err.name === 'AbortError') {
-          setIsSharingSchedule(false)
-          return
-        }
-      }
-    }
-
-    // Fallback: copy to clipboard
-    const success = await copyToClipboard(shareUrl)
-    if (success) {
-      setShareButtonLabel('Link Copied!')
-      setTimeout(() => {
-        setShareButtonLabel('Share')
-        setIsSharingSchedule(false)
-      }, 2000)
-    } else {
-      setIsSharingSchedule(false)
-    }
-  }
-
   return (
     <div className="py-6 space-y-6 sm:space-y-8">
-      {isSharedSchedule && (
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-accent-500/15 border border-accent-500/30">
-            <div className="flex items-center gap-3 text-accent-400">
-              <FontAwesomeIcon icon={faShareNodes} aria-hidden="true" />
-              <span className="text-sm font-medium">
-                Viewing a shared schedule &mdash; your saved schedule is untouched
-              </span>
-            </div>
-            {onDismissShared && (
-              <button
-                onClick={onDismissShared}
-                className="text-accent-400/70 hover:text-accent-400 transition-colors p-1"
-                aria-label="Dismiss shared schedule notice"
-              >
-                <FontAwesomeIcon icon={faXmark} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1">
@@ -405,20 +333,6 @@ function MySchedule({
               </button>
             )}
             <div className="flex justify-center gap-3 sm:gap-4">
-              {shareUrl && (
-                <button
-                  onClick={handleShare}
-                  className="text-xs px-3 py-1.5 rounded bg-accent-500/20 border border-accent-500/50 text-accent-400 flex items-center gap-2 transition-transform duration-150 hover:bg-accent-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
-                  title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Copy shareable link'}
-                  disabled={isSharingSchedule}
-                >
-                  <FontAwesomeIcon
-                    icon={shareButtonLabel === 'Link Copied!' ? faCheck : faShareNodes}
-                    aria-hidden="true"
-                  />
-                  <span className="transition-opacity duration-200 ease-in-out">{shareButtonLabel}</span>
-                </button>
-              )}
               <button
                 onClick={async () => {
                   if (isCopyingSchedule) return

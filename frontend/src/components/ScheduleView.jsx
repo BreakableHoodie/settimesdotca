@@ -1,6 +1,6 @@
 import { faCheck, faCopy, faMusic } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
 import BandCard from './BandCard'
@@ -17,6 +17,8 @@ function ScheduleView({
 }) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
+  const [venueFilter, setVenueFilter] = useState(null)
+  const [genreFilter, setGenreFilter] = useState(null)
   const nowDate = currentTime instanceof Date ? currentTime : new Date(currentTime)
   const nowMs = nowDate.getTime()
 
@@ -39,7 +41,17 @@ function ScheduleView({
         return bandEndMs > nowMs
       })
 
-  const sortedBands = [...visibleBands].sort((a, b) => {
+  const uniqueVenues = useMemo(() => [...new Set(bands.map(b => b.venue))].sort(), [bands])
+  const uniqueGenres = useMemo(
+    () => [...new Set(bands.filter(b => b.genre).map(b => b.genre))].sort(),
+    [bands]
+  )
+
+  const filteredBands = visibleBands.filter(
+    b => (!venueFilter || b.venue === venueFilter) && (!genreFilter || b.genre === genreFilter)
+  )
+
+  const sortedBands = [...filteredBands].sort((a, b) => {
     // TBD bands go to the end
     const aTBD = !a.startTime || a.startTime === 'TBD'
     const bTBD = !b.startTime || b.startTime === 'TBD'
@@ -222,6 +234,52 @@ function ScheduleView({
           </button>
         </div>
       </div>
+
+      {/* Filter pills */}
+      {(uniqueVenues.length > 1 || uniqueGenres.length > 0) && (
+        <div className="space-y-3">
+          {uniqueVenues.length > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
+              <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
+                {uniqueVenues.map(venue => (
+                  <button
+                    key={venue}
+                    onClick={() => setVenueFilter(prev => (prev === venue ? null : venue))}
+                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                      venueFilter === venue
+                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                    }`}
+                  >
+                    {venue}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {uniqueGenres.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Genre</span>
+              <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
+                {uniqueGenres.map(genre => (
+                  <button
+                    key={genre}
+                    onClick={() => setGenreFilter(prev => (prev === genre ? null : genre))}
+                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                      genreFilter === genre
+                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {noVisibleBands ? (
         <div className="text-center text-white/70 py-12">

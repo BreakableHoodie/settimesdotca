@@ -1,6 +1,7 @@
 import {
   faBell,
   faBolt,
+  faCalendarPlus,
   faCamera,
   faCameraRetro,
   faCheck,
@@ -13,6 +14,7 @@ import {
   faMusic,
   faPersonWalking,
   faPizzaSlice,
+  faShareNodes,
   faStar,
   faTaxi,
   faTrashCan,
@@ -24,10 +26,12 @@ import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
 
-function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleShowPast, nowOverride }) {
+function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleShowPast, nowOverride, shareUrl, onBrowseAll }) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false)
+  const [shareButtonLabel, setShareButtonLabel] = useState('Share')
+  const [isSharingSchedule, setIsSharingSchedule] = useState(false)
 
   // Update current time every minute
   useEffect(() => {
@@ -174,11 +178,22 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
 
   if (sortedBands.length === 0) {
     return (
-      <div className="py-12 text-center">
-        <p className="text-white text-xl mb-2">Your schedule is empty</p>
-        <p className="text-accent-400">
-          Tap on performances from &ldquo;All Performances&rdquo; to build your schedule
+      <div className="py-16 text-center space-y-4">
+        <div className="text-white/20 text-6xl mb-2">
+          <FontAwesomeIcon icon={faCalendarPlus} aria-hidden="true" />
+        </div>
+        <p className="text-white text-xl font-semibold">No bands selected yet</p>
+        <p className="text-accent-400 text-sm">
+          Tap a band to start building your schedule
         </p>
+        {onBrowseAll && (
+          <button
+            onClick={onBrowseAll}
+            className="mt-2 px-6 py-3 min-h-[44px] rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 font-semibold hover:bg-accent-500/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
+          >
+            Browse Lineup
+          </button>
+        )}
       </div>
     )
   }
@@ -272,15 +287,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
   const reminder = getScheduleReminder()
   const hasFinishedBands = hiddenFinishedCount > 0
 
-  const copyBands = async bandsToCopy => {
-    if (bandsToCopy.length === 0) {
-      return false
-    }
-
-    const text = bandsToCopy
-      .map(band => `${band.name} — ${formatTimeRange(band.startTime, band.endTime)} @ ${band.venue}`)
-      .join('\n')
-
+  const copyToClipboard = async text => {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text)
@@ -311,6 +318,33 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     } catch (error) {
       console.error('Fallback copy method failed:', error)
       return false
+    }
+  }
+
+  const copyBands = async bandsToCopy => {
+    if (bandsToCopy.length === 0) {
+      return false
+    }
+
+    const text = bandsToCopy
+      .map(band => `${band.name} — ${formatTimeRange(band.startTime, band.endTime)} @ ${band.venue}`)
+      .join('\n')
+
+    return copyToClipboard(text)
+  }
+
+  const handleShare = async () => {
+    if (isSharingSchedule || !shareUrl) return
+    setIsSharingSchedule(true)
+    const success = await copyToClipboard(shareUrl)
+    if (success) {
+      setShareButtonLabel('Link Copied!')
+      setTimeout(() => {
+        setShareButtonLabel('Share')
+        setIsSharingSchedule(false)
+      }, 2000)
+    } else {
+      setIsSharingSchedule(false)
     }
   }
 
@@ -348,6 +382,17 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
               </button>
             )}
             <div className="flex justify-center gap-3 sm:gap-4">
+              {shareUrl && (
+                <button
+                  onClick={handleShare}
+                  className="text-xs px-3 py-1.5 rounded bg-accent-500/20 border border-accent-500/50 text-accent-400 flex items-center gap-2 transition-transform duration-150 hover:bg-accent-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
+                  title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Copy shareable link'}
+                  disabled={isSharingSchedule}
+                >
+                  <FontAwesomeIcon icon={shareButtonLabel === 'Link Copied!' ? faCheck : faShareNodes} aria-hidden="true" />
+                  <span className="transition-opacity duration-200 ease-in-out">{shareButtonLabel}</span>
+                </button>
+              )}
               <button
                 onClick={async () => {
                   if (isCopyingSchedule) return

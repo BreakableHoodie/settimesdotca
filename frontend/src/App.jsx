@@ -2,7 +2,7 @@ import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import BackToTop from './components/BackToTop'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
@@ -11,6 +11,7 @@ import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
 import PrivacyBanner from './components/PrivacyBanner'
 import ScheduleView from './components/ScheduleView'
+import { BandCardSkeletonGrid } from './components/ui/Skeleton'
 import { validateBandsData } from './utils/validation'
 import { trackEventView, trackPageView } from './utils/metrics'
 
@@ -137,6 +138,7 @@ const formatDebugInputValue = dateValue => {
 
 function App() {
   const { slug } = useParams()
+  const [searchParams] = useSearchParams()
   const [bands, setBands] = useState(FALLBACK_BANDS)
   const [eventData, setEventData] = useState(null)
   const [selectedBands, setSelectedBands] = useState(() => getStoredSelection(slug))
@@ -227,10 +229,32 @@ function App() {
   }, [debugTime])
 
   useEffect(() => {
+    const sharedParam = searchParams.get('s')
+    if (sharedParam) {
+      const sharedIds = sharedParam
+        .split(',')
+        .map(Number)
+        .filter(id => Number.isFinite(id) && id > 0)
+      if (sharedIds.length > 0) {
+        setSelectedBands(sharedIds)
+        setView('mine')
+        return
+      }
+    }
     const stored = getStoredSelection(slug)
     setSelectedBands(stored)
     setView(stored.length > 0 ? 'mine' : 'all')
-  }, [slug])
+  }, [slug, searchParams])
+
+  // Sanitize shared IDs against loaded bands to avoid phantom selections
+  useEffect(() => {
+    if (bands.length === 0 || !searchParams.get('s')) return
+    const validIds = new Set(bands.map(b => b.id))
+    setSelectedBands(prev => {
+      const filtered = prev.filter(id => validIds.has(id))
+      return filtered.length === prev.length ? prev : filtered
+    })
+  }, [bands, searchParams])
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
@@ -315,6 +339,10 @@ function App() {
   }
 
   const myBands = bands.filter(band => selectedBands.includes(band.id))
+  const shareUrl =
+    selectedBands.length > 0
+      ? `${window.location.origin}/event/${slug || 'current'}?s=${selectedBands.join(',')}`
+      : null
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
   const effectiveNow = debugTime || currentTime
@@ -328,8 +356,13 @@ function App() {
 
   if (shouldShowLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-band-orange text-xl">Loading...</div>
+      <div className="min-h-screen pb-20">
+        <Header view={view} setView={setView} selectedCount={selectedBands.length} />
+        <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
+          <div className="py-6">
+            <BandCardSkeletonGrid count={6} />
+          </div>
+        </main>
       </div>
     )
   }
@@ -439,6 +472,8 @@ function App() {
               showPast={showPast}
               onToggleShowPast={toggleShowPast}
               nowOverride={debugTime}
+              shareUrl={shareUrl}
+              onBrowseAll={() => setView('all')}
             />
           </Suspense>
         )}

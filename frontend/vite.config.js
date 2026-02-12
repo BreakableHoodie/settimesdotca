@@ -20,11 +20,6 @@ export default defineConfig({
     chunkSizeWarningLimit: 100, // KB
   },
 
-  // Production optimizations
-  esbuild: {
-    drop: ['console', 'debugger'],
-  },
-
   server: {
     host: '0.0.0.0',
     port: 5173,

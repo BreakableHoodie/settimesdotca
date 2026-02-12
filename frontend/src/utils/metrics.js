@@ -77,7 +77,8 @@ function flushEvents() {
   const payload = JSON.stringify({ events })
 
   if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-    navigator.sendBeacon(METRICS_ENDPOINT, payload)
+    const blob = new Blob([payload], { type: 'application/json' })
+    navigator.sendBeacon(METRICS_ENDPOINT, blob)
     return
   }
 

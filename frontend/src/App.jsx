@@ -246,6 +246,16 @@ function App() {
     setView(stored.length > 0 ? 'mine' : 'all')
   }, [slug, searchParams])
 
+  // Sanitize shared IDs against loaded bands to avoid phantom selections
+  useEffect(() => {
+    if (bands.length === 0 || !searchParams.get('s')) return
+    const validIds = new Set(bands.map(b => b.id))
+    setSelectedBands(prev => {
+      const filtered = prev.filter(id => validIds.has(id))
+      return filtered.length === prev.length ? prev : filtered
+    })
+  }, [bands, searchParams])
+
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
       return

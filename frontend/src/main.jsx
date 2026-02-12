@@ -29,7 +29,7 @@ if (robotsMeta) {
 }
 
 const BUILD_ID = '2026-01-30-1605'
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   // Helps confirm which build is running in production.
   window.__SETTIMES_BUILD_ID__ = BUILD_ID
 }

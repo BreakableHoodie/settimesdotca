@@ -141,8 +141,8 @@ export async function onRequest(context) {
     );
     const csp = [
       "default-src 'self'",
-      "script-src 'self' https: 'unsafe-inline'",
-      "style-src 'self' https: 'unsafe-inline'",
+      "script-src 'self' https:",
+      "style-src 'self' https:",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https:",
       "connect-src 'self' https: wss:",
@@ -186,11 +186,11 @@ export async function onRequest(context) {
           ...(cspEnforce
             ? {
                 "Content-Security-Policy":
-                  "default-src 'self'; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+                  "default-src 'self'; script-src 'self' https:; style-src 'self' https:; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
               }
             : {
                 "Content-Security-Policy-Report-Only":
-                  "default-src 'self'; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+                  "default-src 'self'; script-src 'self' https:; style-src 'self' https:; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
               }),
         },
       },

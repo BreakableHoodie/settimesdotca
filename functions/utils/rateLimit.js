@@ -12,7 +12,7 @@ const RATE_LIMITS = {
   '/api/schedule': { requests: 30, window: 60 },    // 30 req/min
   '/api/feeds': { requests: 20, window: 60 },       // 20 req/min
   '/api/subscriptions': { requests: 10, window: 60 }, // 10 req/min (signup)
-  '/api/metrics': { requests: 100, window: 60 },    // 100 req/min (beacons)
+  '/api/metrics': { requests: 40, window: 60 },    // 40 req/min (beacons)
   '/api/auth/activate': { requests: 10, window: 60 }, // 10 req/min
   '/api/auth/resend': { requests: 3, window: 300 },  // 3 per 5 min
 
@@ -25,6 +25,15 @@ const SKIP_PATTERNS = [
   '/api/admin/',  // Admin APIs use session auth
   '/_',           // Cloudflare internal
 ];
+
+const FAIL_CLOSED_PATTERNS = [
+  '/api/auth/',
+  '/api/subscriptions',
+];
+
+function shouldFailClosed(pathname) {
+  return FAIL_CLOSED_PATTERNS.some((pattern) => pathname.startsWith(pattern));
+}
 
 /**
  * Get rate limit config for a path
@@ -124,7 +133,18 @@ export async function checkRateLimit(request) {
       limit: config.requests,
     };
   } catch (error) {
-    // If rate limiting fails, allow the request (fail open)
+    // Fail closed for sensitive auth/subscription endpoints.
+    if (shouldFailClosed(pathname)) {
+      logger.error('Rate limit check failed on sensitive endpoint', { error, ip, pathname });
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt: now + (config?.window || 60),
+        limit: config?.requests || 30,
+      };
+    }
+
+    // For less sensitive endpoints, fail open to avoid outage.
     logger.warn('Rate limit check failed', { error, ip });
     return { allowed: true, remaining: -1, resetAt: 0 };
   }

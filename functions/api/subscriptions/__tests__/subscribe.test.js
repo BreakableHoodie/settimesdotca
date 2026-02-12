@@ -124,9 +124,8 @@ describe('POST /api/subscriptions/subscribe', () => {
     const data = await response.json()
     expect(data.message).toContain('Verification email sent')
     expect(mockDB.data.email_subscriptions).toHaveLength(1)
-    // Note: The actual implementation has a bug - it doesn't select verification_token in the query,
-    // so the token will be undefined in the email URL. This test validates current behavior.
-    expect(console.info).toHaveBeenCalled()
+    // Verification links are now only logged when DEBUG_EMAIL_LINKS is enabled.
+    expect(console.info).not.toHaveBeenCalled()
   })
 
   it('should generate unique verification and unsubscribe tokens', async () => {

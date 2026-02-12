@@ -144,7 +144,7 @@ export async function onRequestPost(context) {
         adminEmail: user.email,
         targetEmail: targetUser.email,
         reason: sanitizedReason,
-        resetTokenId: resetToken.token,
+        resetTokenGenerated: true,
       },
       ipAddress,
     );

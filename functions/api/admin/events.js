@@ -25,6 +25,14 @@ export async function onRequestGet(context) {
     // Parse query parameters
     const url = new URL(request.url);
     const showArchived = url.searchParams.get("archived") === "true";
+    const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "1000", 10);
+    const requestedOffset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 1000)
+      : 1000;
+    const offset = Number.isFinite(requestedOffset)
+      ? Math.max(requestedOffset, 0)
+      : 0;
 
     // Build query based on archived filter
     let query = `
@@ -34,6 +42,7 @@ export async function onRequestGet(context) {
       FROM events e
       LEFT JOIN performances p ON e.id = p.event_id
     `;
+    const queryParams = [];
 
     // Filter by archived status
     if (!showArchived) {
@@ -43,9 +52,12 @@ export async function onRequestGet(context) {
     query += `
       GROUP BY e.id
       ORDER BY e.date DESC
+      LIMIT ?
+      OFFSET ?
     `;
+    queryParams.push(limit, offset);
 
-    const result = await DB.prepare(query).all();
+    const result = await DB.prepare(query).bind(...queryParams).all();
 
     return new Response(
       JSON.stringify({

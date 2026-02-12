@@ -34,8 +34,7 @@ class ErrorBoundary extends Component {
 
   render() {
     if (this.state.hasError) {
-      const showDevDetails =
-        import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname === 'localhost')
+      const showDevDetails = import.meta.env.DEV
       // Use custom fallback if provided
       if (this.props.fallback) {
         return this.props.fallback

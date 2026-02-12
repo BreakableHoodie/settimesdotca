@@ -43,7 +43,10 @@ export async function onRequestGet(context) {
     const includeUpcoming = url.searchParams.get("upcoming") !== "false"; // default true
     const includePast = url.searchParams.get("past") !== "false"; // default true
     const includeBands = url.searchParams.get("includeBands") !== "false"; // default true
-    const pastLimit = parseInt(url.searchParams.get("pastLimit") || "10", 10);
+    const parsedPastLimit = parseInt(url.searchParams.get("pastLimit") || "10", 10);
+    const pastLimit = Number.isFinite(parsedPastLimit)
+      ? Math.min(Math.max(parsedPastLimit, 1), 100)
+      : 10;
 
     const response = {
       now: [],

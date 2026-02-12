@@ -164,6 +164,31 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Atomically consume reset token before expensive work to prevent replay races
+    const consumeResult = await DB.prepare(
+      `
+      UPDATE password_reset_tokens
+      SET used = 1, used_at = datetime('now')
+      WHERE id = ? AND used = 0
+    `
+    )
+      .bind(resetToken.id)
+      .run();
+
+    if (!consumeResult?.meta?.changes) {
+      logDebug("token_already_used", { tokenId: resetToken.id });
+      await logFailure("TOKEN_ALREADY_USED", { tokenId: resetToken.id });
+      return new Response(
+        JSON.stringify(
+          withDebug({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" })
+        ),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     // Hash new password
     logDebug("hash_start", { userId: resetToken.user_id });
     const passwordHash = await hashPassword(newPassword);
@@ -178,17 +203,6 @@ export async function onRequestPost(context) {
     `,
     )
       .bind(passwordHash, resetToken.user_id)
-      .run();
-
-    // Mark reset token as used
-    await DB.prepare(
-      `
-      UPDATE password_reset_tokens
-      SET used = 1, used_at = datetime('now')
-      WHERE id = ?
-    `,
-    )
-      .bind(resetToken.id)
       .run();
 
     // Invalidate all existing sessions for this user

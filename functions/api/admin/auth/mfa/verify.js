@@ -18,7 +18,8 @@ async function checkRateLimit(DB, userId, ipAddress) {
   const attempts = await DB.prepare(
     `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
      FROM auth_attempts
-     WHERE (user_id = ? OR ip_address = ?)
+     WHERE user_id = ?
+       AND ip_address = ?
        AND attempt_type = 'mfa'
        AND success = 0
        AND created_at > ?`

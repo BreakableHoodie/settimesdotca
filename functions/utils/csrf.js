@@ -2,6 +2,7 @@
 // Uses csrf-csrf double-submit cookie strategy
 
 import { doubleCsrf } from "csrf-csrf";
+import { isDevRequest } from "./auth.js";
 function parseCookies(cookieHeader) {
   if (!cookieHeader) return {};
   return cookieHeader.split(";").reduce((acc, cookie) => {
@@ -11,12 +12,6 @@ function parseCookies(cookieHeader) {
     }
     return acc;
   }, {});
-}
-
-function isDevRequest(request) {
-  if (!request) return false;
-  const origin = request.headers.get("Origin") || "";
-  return origin.includes("localhost") || (request.url || "").includes("localhost");
 }
 
 function getHeaderToken(request) {
@@ -50,8 +45,8 @@ function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
   return (
     cookies.session_token ||
     request.headers.get("Authorization")?.replace("Bearer ", "") ||
-    request.headers.get("CF-Connecting-IP") ||
-    "anonymous"
+    cookies.csrf_token ||
+    "csrf-missing-session"
   );
 }
 

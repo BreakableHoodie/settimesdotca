@@ -38,7 +38,7 @@ export default function EventsPage() {
   }, [refreshBanner])
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
+    <div id="main-content" className="min-h-screen bg-gradient-dark">
       <Helmet>
         <title>SetTimes</title>
       </Helmet>

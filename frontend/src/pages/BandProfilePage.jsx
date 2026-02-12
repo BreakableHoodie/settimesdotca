@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Helmet, HelmetProvider } from 'react-helmet-async'
+import { Helmet } from 'react-helmet-async'
 import { Button, Badge, Card, Alert, Loading } from '../components/ui'
 import DOMPurify from 'dompurify'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -242,7 +242,7 @@ export default function BandProfilePage() {
   }
 
   return (
-    <HelmetProvider>
+    <>
       <div className="min-h-screen bg-band-navy">
         {/* SEO Meta Tags */}
         <Helmet>
@@ -608,6 +608,6 @@ export default function BandProfilePage() {
         </div>
         <PrivacyBanner />
       </div>
-    </HelmetProvider>
+    </>
   )
 }

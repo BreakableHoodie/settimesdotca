@@ -189,19 +189,19 @@ export async function onRequestPost(context) {
       ipAddress,
     );
 
-    // Return invite details
-    return new Response(
-      JSON.stringify({
-        success: true,
-        invite,
-        inviteUrl: inviteUrl.toString(),
-        email: emailResult,
-      }),
-      {
-        status: 201,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    // Return invite details (only expose inviteUrl if email delivery failed)
+    const responseBody = {
+      success: true,
+      invite,
+      email: emailResult,
+    };
+    if (!emailResult.delivered) {
+      responseBody.inviteUrl = inviteUrl.toString();
+    }
+    return new Response(JSON.stringify(responseBody), {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Create user error:", error);
     return new Response(JSON.stringify({ error: "Failed to create user" }), {

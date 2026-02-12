@@ -181,13 +181,15 @@ export default function EventTimeline() {
 
   // Get unique venues and months for filters
   const allVenues = useMemo(() => {
-    return Array.from(
-      new Set(
-        [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
-          .flatMap(event => event.venues || [])
-          .map(v => JSON.stringify({ id: v.id, name: v.name }))
-      )
-    ).map(v => JSON.parse(v))
+    const venueMap = new Map()
+    for (const event of [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]) {
+      for (const v of event.venues || []) {
+        if (!venueMap.has(v.id)) {
+          venueMap.set(v.id, { id: v.id, name: v.name })
+        }
+      }
+    }
+    return Array.from(venueMap.values())
   }, [timeline])
 
   const allMonths = useMemo(() => {
@@ -299,7 +301,7 @@ export default function EventTimeline() {
                 <select
                   id="timeline-venue-filter"
                   value={filters.venue || ''}
-                  onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value) : null)}
+                  onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value, 10) : null)}
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
                 >
                   <option value="">All Venues</option>

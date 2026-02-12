@@ -480,15 +480,15 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                     })()}
                     warningText={(() => {
                       if (!hasOverlap && !hasConflict) return null
-                      const matchedBands = (hasOverlap ? overlaps : conflicts)
+                      const allMatches = [...overlaps, ...conflicts]
                         .filter(c => c.band1 === band.id || c.band2 === band.id)
                         .map(c => {
                           const otherId = c.band1 === band.id ? c.band2 : c.band1
                           return visibleBands.find(b => b.id === otherId)
                         })
                         .filter(Boolean)
-                      const names = matchedBands.map(b => b.name).join(', ')
-                      return hasOverlap ? `Same time as ${names}` : `Overlaps with ${names}`
+                      const uniqueNames = [...new Set(allMatches.map(b => b.name))].join(', ')
+                      return hasOverlap ? `Same time as ${uniqueNames}` : `Overlaps with ${uniqueNames}`
                     })()}
                   />
                 </div>

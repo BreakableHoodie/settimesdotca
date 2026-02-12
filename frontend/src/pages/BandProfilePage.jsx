@@ -22,8 +22,8 @@ import Breadcrumbs from '../components/Breadcrumbs'
 import PrivacyBanner from '../components/PrivacyBanner'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
+import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
 
-const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
 const NBSP_ENTITY_REGEX = /&nbsp;|&#160;|&#xA0;/gi
 
@@ -46,70 +46,6 @@ function normalizeNonBreakingSpaces(text) {
 // Generate the same ID format used by the schedule
 function generateScheduleId(bandName, performanceId) {
   return `${bandName.toLowerCase().replace(/\s+/g, '-')}-${performanceId}`
-}
-
-// Get selected bands for an event from localStorage
-function getSelectedBands(eventSlug) {
-  if (typeof window === 'undefined') return []
-  try {
-    const data = localStorage.getItem(SELECTED_BANDS_KEY)
-    if (!data) return []
-    const parsed = JSON.parse(data)
-    return Array.isArray(parsed[eventSlug]) ? parsed[eventSlug] : []
-  } catch {
-    return []
-  }
-}
-
-// Save selected bands for an event to localStorage
-function saveSelectedBands(eventSlug, bandIds) {
-  if (typeof window === 'undefined') return
-  try {
-    const data = localStorage.getItem(SELECTED_BANDS_KEY)
-    const parsed = data ? JSON.parse(data) : {}
-    parsed[eventSlug] = bandIds
-    localStorage.setItem(SELECTED_BANDS_KEY, JSON.stringify(parsed))
-  } catch (err) {
-    console.warn('Failed to save schedule:', err)
-  }
-}
-
-// Check if user has any schedule built (across all events)
-function hasAnySchedule() {
-  if (typeof window === 'undefined') return false
-  try {
-    const data = localStorage.getItem(SELECTED_BANDS_KEY)
-    if (!data) return false
-    const parsed = JSON.parse(data)
-    if (!parsed || typeof parsed !== 'object') return false
-    return Object.values(parsed).some(arr => Array.isArray(arr) && arr.length > 0)
-  } catch {
-    return false
-  }
-}
-
-// Get the most recent event slug with a schedule
-function getScheduleEventSlug() {
-  if (typeof window === 'undefined') return null
-  try {
-    const data = localStorage.getItem(SELECTED_BANDS_KEY)
-    if (!data) return null
-    const parsed = JSON.parse(data)
-    if (!parsed || typeof parsed !== 'object') return null
-    // Return the first event slug that has bands selected
-    for (const [slug, bands] of Object.entries(parsed)) {
-      if (Array.isArray(bands) && bands.length > 0 && slug !== 'default') {
-        return slug
-      }
-    }
-    // Fallback to 'default' if it has bands
-    if (Array.isArray(parsed.default) && parsed.default.length > 0) {
-      return null // Will link to home
-    }
-    return null
-  } catch {
-    return null
-  }
 }
 
 // Reject non-HTTP(S) URLs to prevent javascript: / data: XSS via social links

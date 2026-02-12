@@ -423,7 +423,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                     <span className="block">
                       {conflicts.length} overlapping set{conflicts.length !== 1 ? 's' : ''}
                     </span>
-                    <span className="block">Some bands won&apos;t be possible to see fully.</span>
+                    <span className="block">You may not be able to catch every full set.</span>
                   </span>
                 </span>
               </p>

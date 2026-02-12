@@ -21,19 +21,20 @@ export default function BackToTop() {
       }
     }
 
-    // Also watch for DOM changes to detect banner dismissal within same tab
-    const checkBanner = () => {
-      setBannerVisible(window.localStorage.getItem(PRIVACY_KEY) !== 'true')
+    // Detect same-tab banner dismissal via click
+    const handleClick = () => {
+      if (window.localStorage.getItem(PRIVACY_KEY) === 'true') {
+        setBannerVisible(false)
+      }
     }
-    const observer = new MutationObserver(checkBanner)
-    observer.observe(document.body, { childList: true, subtree: true })
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('storage', handleStorage)
+    document.addEventListener('click', handleClick, { passive: true })
     return () => {
       window.removeEventListener('scroll', handleScroll)
       window.removeEventListener('storage', handleStorage)
-      observer.disconnect()
+      document.removeEventListener('click', handleClick)
     }
   }, [])
 
@@ -46,6 +47,8 @@ export default function BackToTop() {
       type="button"
       onClick={scrollToTop}
       aria-label="Back to top"
+      aria-hidden={!visible}
+      tabIndex={visible ? 0 : -1}
       className={`fixed right-6 z-50 h-12 w-12 rounded-full bg-accent-500 text-white shadow-lg transition-all duration-300 hover:bg-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy active:scale-95 ${
         bannerVisible ? 'bottom-20' : 'bottom-6'
       } ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'}`}

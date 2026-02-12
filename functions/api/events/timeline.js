@@ -26,9 +26,14 @@ export async function onRequestGet(context) {
 
   const formatVenueAddress = (venue) => {
     if (!venue) return null;
-    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+    const line1 = [venue.address_line1, venue.address_line2]
+      .filter(Boolean)
+      .join(", ");
     const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+    const line3 = [venue.postal_code, venue.country]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
     return [line1, line2, line3].filter(Boolean).join(", ");
   };
 
@@ -38,7 +43,7 @@ export async function onRequestGet(context) {
     const includeUpcoming = url.searchParams.get("upcoming") !== "false"; // default true
     const includePast = url.searchParams.get("past") !== "false"; // default true
     const includeBands = url.searchParams.get("includeBands") !== "false"; // default true
-    const pastLimit = parseInt(url.searchParams.get("pastLimit") || "10");
+    const pastLimit = parseInt(url.searchParams.get("pastLimit") || "10", 10);
 
     const response = {
       now: [],
@@ -77,7 +82,8 @@ export async function onRequestGet(context) {
             if (!url && row.social_links) {
               try {
                 const links = JSON.parse(row.social_links);
-                url = links.website || links.bandcamp || links.instagram || null;
+                url =
+                  links.website || links.bandcamp || links.instagram || null;
               } catch (_) {}
             }
 

@@ -1,18 +1,18 @@
 #!/bin/bash
 
 # SetTimes - Setup Script
-set -e
+set -euo pipefail
 
 echo "🎸 Setting up SetTimes..."
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-npm install
+npm ci
 
 # Install frontend dependencies
 echo "📦 Installing frontend dependencies..."
 cd frontend
-npm install
+npm ci
 cd ..
 
 echo "✅ Setup complete!"

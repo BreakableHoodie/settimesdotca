@@ -6,6 +6,10 @@ on:
     pull_request:
         branches: [main]
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 permissions:
     contents: read
 
@@ -13,6 +17,7 @@ jobs:
     e2e:
         name: e2e
         runs-on: ubuntu-latest
+        timeout-minutes: 20
         container: mcr.microsoft.com/playwright:v1.57.0-jammy
 
         steps:

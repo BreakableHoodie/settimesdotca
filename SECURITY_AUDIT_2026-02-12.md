@@ -53,6 +53,8 @@ The application has solid security fundamentals: PBKDF2 password hashing via Web
 - ✅ PEN-33 fixed (code-path): optional Turnstile validation added to [functions/api/subscriptions/subscribe.js](functions/api/subscriptions/subscribe.js) when `TURNSTILE_SECRET_KEY` is configured.
 - ✅ PEN-34 fixed: password reset token TTL reduced to 2 hours in [functions/utils/tokens.js](functions/utils/tokens.js).
 - ✅ PEN-35 fixed: standardized DOMPurify import in [frontend/src/pages/BandProfilePage.jsx](frontend/src/pages/BandProfilePage.jsx).
+- ✅ PEN-07 fixed: capped batch statements to 20, merged view+click upserts per band in [functions/api/metrics.js](functions/api/metrics.js).
+- ✅ PEN-15 fixed: separated UA hash for independent validation, added constant-time comparison, stored `ua_hash` column in [functions/utils/trustedDevice.js](functions/utils/trustedDevice.js). Migration: [database/migrations/add-trusted-devices-ua-hash.sql](database/migrations/add-trusted-devices-ua-hash.sql).
 
 ---
 

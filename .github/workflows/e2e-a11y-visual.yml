@@ -9,6 +9,10 @@ on:
     schedule:
         - cron: '0 7 * * 1'
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 permissions:
     contents: read
 
@@ -16,6 +20,7 @@ jobs:
     e2e-a11y-visual:
         name: e2e-a11y-visual
         runs-on: ubuntu-latest
+        timeout-minutes: 20
         container: mcr.microsoft.com/playwright:v1.57.0-jammy
 
         steps:

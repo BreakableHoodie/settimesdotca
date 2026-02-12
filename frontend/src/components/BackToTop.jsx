@@ -49,7 +49,7 @@ export default function BackToTop() {
       aria-label="Back to top"
       aria-hidden={!visible}
       tabIndex={visible ? 0 : -1}
-      className={`fixed right-6 z-50 h-12 w-12 rounded-full bg-accent-500 text-white shadow-lg transition-all duration-300 hover:bg-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy active:scale-95 ${
+      className={`fixed left-6 z-50 h-12 w-12 rounded-full bg-accent-500 text-white shadow-lg transition-all duration-300 hover:bg-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy active:scale-95 ${
         bannerVisible ? 'bottom-20' : 'bottom-6'
       } ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'}`}
     >

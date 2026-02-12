@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button, Badge, Card, Alert, Loading } from './ui'
 import { slugifyBandName } from '../utils/slugify'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
+import { getSelectedCountByEvent } from '../utils/scheduleStorage'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faCircle,
@@ -29,6 +30,8 @@ export default function EventTimeline() {
   const [showFilters, setShowFilters] = useState(false)
   const [detailsById, setDetailsById] = useState({})
   const [detailsLoading, setDetailsLoading] = useState({})
+
+  const [savedCounts] = useState(() => getSelectedCountByEvent())
 
   // Use transition for non-urgent UI updates to improve INP
   const [, startTransition] = useTransition()
@@ -337,6 +340,7 @@ export default function EventTimeline() {
                   details={detailsById[event.id]}
                   detailsLoading={detailsLoading[event.id]}
                   onLoadDetails={loadDetails}
+                  savedCount={event.slug ? savedCounts[event.slug] || 0 : 0}
                 />
               ))}
             </div>
@@ -359,6 +363,7 @@ export default function EventTimeline() {
                   details={detailsById[event.id]}
                   detailsLoading={detailsLoading[event.id]}
                   onLoadDetails={loadDetails}
+                  savedCount={event.slug ? savedCounts[event.slug] || 0 : 0}
                 />
               ))}
             </div>
@@ -388,6 +393,7 @@ export default function EventTimeline() {
                     details={detailsById[event.id]}
                     detailsLoading={detailsLoading[event.id]}
                     onLoadDetails={loadDetails}
+                    savedCount={event.slug ? savedCounts[event.slug] || 0 : 0}
                   />
                 ))}
               </div>
@@ -427,6 +433,7 @@ function EventCard({
   details,
   detailsLoading = false,
   onLoadDetails,
+  savedCount = 0,
 }) {
   const [expanded, setExpanded] = useState(isLive) // Auto-expand live events
 
@@ -505,6 +512,11 @@ function EventCard({
                 <span className="font-bold text-text-primary">{allVenueCount}</span>
                 <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
               </div>
+              {savedCount > 0 && (
+                <Badge variant="warning" size="sm">
+                  {savedCount} saved
+                </Badge>
+              )}
             </div>
           </div>
 

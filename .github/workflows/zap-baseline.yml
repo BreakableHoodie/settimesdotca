@@ -29,6 +29,7 @@ permissions:
 jobs:
   zap-baseline:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Only run if deployment succeeded (for workflow_run trigger)
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:

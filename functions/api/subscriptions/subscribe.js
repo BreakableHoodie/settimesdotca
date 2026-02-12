@@ -1,7 +1,7 @@
 // Subscription endpoint
 // POST /api/subscriptions/subscribe
 
-import { generateToken } from "../../utils/tokens";
+import { generateToken } from "../../utils/tokens.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 
 export async function onRequestPost(context) {

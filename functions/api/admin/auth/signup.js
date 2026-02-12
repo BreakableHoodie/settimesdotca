@@ -325,7 +325,6 @@ export async function onRequestPost(context) {
         message:
           "Account created. Please check your email to activate your account.",
         requiresActivation: true,
-        activationUrl: isEmailConfigured(env) ? null : activationUrl.toString(),
         email: emailResult,
       }),
       {

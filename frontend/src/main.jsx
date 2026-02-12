@@ -36,7 +36,11 @@ if (typeof window !== 'undefined') {
 
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-band-navy to-band-purple">
+    <div
+      className="flex items-center justify-center min-h-screen bg-gradient-to-br from-band-navy to-band-purple"
+      role="status"
+      aria-live="polite"
+    >
       <div className="text-white text-xl">Loading...</div>
     </div>
   )

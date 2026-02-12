@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main, dev]
 
+permissions:
+  contents: read
+
 # These checks only run on PRs and focus on quality gates
 # not covered by the main build-and-deploy workflow
 

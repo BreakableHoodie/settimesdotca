@@ -6,13 +6,15 @@ on:
     pull_request:
         branches: [main]
 
+permissions:
+    contents: read
+
 jobs:
     e2e:
         name: e2e
         runs-on: ubuntu-latest
         container: mcr.microsoft.com/playwright:v1.57.0-jammy
-        # Continue on error - requires E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD secrets
-        continue-on-error: true
+
         steps:
             - uses: actions/checkout@v4
 
@@ -61,10 +63,8 @@ jobs:
                   # Create E2E admin user if credentials are provided
                   if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
                       echo "Creating E2E admin user..."
-                      ADMIN_HASH=$(node scripts/hash-password.mjs "$E2E_ADMIN_PASSWORD")
-
-                      # Insert or update the admin user using wrangler d1 execute
-                      ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --command="INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active, activated_at) VALUES (100, '$E2E_ADMIN_EMAIL', 'E2E Admin', '$ADMIN_HASH', 'admin', 1, datetime('now'));"
+                      SEED_SQL=$(node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL" --password "$E2E_ADMIN_PASSWORD")
+                      ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --command="$SEED_SQL"
                       echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
                   else
                       echo "⚠ E2E credentials not set, using default test accounts"

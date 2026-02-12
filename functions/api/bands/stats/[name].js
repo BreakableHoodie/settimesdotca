@@ -274,7 +274,6 @@ export async function onRequestGet(context) {
     return new Response(
       JSON.stringify({
         error: "Failed to fetch band stats",
-        details: error.message,
       }),
       {
         status: 500,

@@ -23,6 +23,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useEffect, useMemo, useState } from 'react'
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx'
+import { copyToClipboard } from '../utils/clipboard'
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
 
@@ -158,32 +159,36 @@ function MySchedule({
   }, [visibleBands, highlightedBandIds])
 
   // Detect overlaps and conflicts
-  const conflicts = []
-  const overlaps = []
+  const { conflicts, overlaps } = useMemo(() => {
+    const conflicts = []
+    const overlaps = []
 
-  for (let i = 0; i < visibleBands.length; i++) {
-    const current = visibleBands[i]
-    const currentStart = new Date(`${current.date}T${current.startTime}:00`)
-    const currentEnd = new Date(`${current.date}T${current.endTime}:00`)
+    for (let i = 0; i < visibleBands.length; i++) {
+      const current = visibleBands[i]
+      const currentStart = new Date(`${current.date}T${current.startTime}:00`)
+      const currentEnd = new Date(`${current.date}T${current.endTime}:00`)
 
-    // Check against all other bands for overlaps
-    for (let j = i + 1; j < visibleBands.length; j++) {
-      const other = visibleBands[j]
-      const otherStart = new Date(`${other.date}T${other.startTime}:00`)
-      const otherEnd = new Date(`${other.date}T${other.endTime}:00`)
+      // Check against all other bands for overlaps
+      for (let j = i + 1; j < visibleBands.length; j++) {
+        const other = visibleBands[j]
+        const otherStart = new Date(`${other.date}T${other.startTime}:00`)
+        const otherEnd = new Date(`${other.date}T${other.endTime}:00`)
 
-      // Check if times overlap
-      if (currentStart < otherEnd && otherStart < currentEnd) {
-        // Complete overlap (same start time)
-        if (currentStart.getTime() === otherStart.getTime()) {
-          overlaps.push({ band1: current.id, band2: other.id })
-        } else {
-          // Partial conflict
-          conflicts.push({ band1: current.id, band2: other.id })
+        // Check if times overlap
+        if (currentStart < otherEnd && otherStart < currentEnd) {
+          // Complete overlap (same start time)
+          if (currentStart.getTime() === otherStart.getTime()) {
+            overlaps.push({ band1: current.id, band2: other.id })
+          } else {
+            // Partial conflict
+            conflicts.push({ band1: current.id, band2: other.id })
+          }
         }
       }
     }
-  }
+
+    return { conflicts, overlaps }
+  }, [visibleBands])
 
   if (sortedBands.length === 0) {
     return (
@@ -293,40 +298,6 @@ function MySchedule({
 
   const reminder = getScheduleReminder()
   const hasFinishedBands = hiddenFinishedCount > 0
-
-  const copyToClipboard = async text => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text)
-        return true
-      }
-    } catch (error) {
-      console.error('Clipboard API failed, using fallback:', error)
-      /* fallback below */
-    }
-
-    try {
-      const textarea = document.createElement('textarea')
-      textarea.value = text
-      textarea.setAttribute('readonly', '')
-      textarea.style.position = 'absolute'
-      textarea.style.left = '-9999px'
-      document.body.appendChild(textarea)
-      const selection = document.getSelection()
-      const originalRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
-      textarea.select()
-      const successful = document.execCommand('copy')
-      document.body.removeChild(textarea)
-      if (originalRange && selection) {
-        selection.removeAllRanges()
-        selection.addRange(originalRange)
-      }
-      return successful
-    } catch (error) {
-      console.error('Fallback copy method failed:', error)
-      return false
-    }
-  }
 
   const copyBands = async bandsToCopy => {
     if (bandsToCopy.length === 0) {

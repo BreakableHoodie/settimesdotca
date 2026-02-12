@@ -112,7 +112,7 @@ export async function onRequestGet(context) {
   } catch (error) {
     console.error('Failed to fetch performers:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to fetch performers', details: error.message }),
+      JSON.stringify({ error: 'Failed to fetch performers' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
@@ -226,7 +226,7 @@ export async function onRequestPost(context) {
   } catch (error) {
     console.error('Failed to create performer:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to create performer', details: error.message }),
+      JSON.stringify({ error: 'Failed to create performer' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
@@ -362,7 +362,7 @@ export async function onRequestPut(context) {
   } catch (error) {
     console.error('Failed to update performer:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to update performer', details: error.message }),
+      JSON.stringify({ error: 'Failed to update performer' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
@@ -415,7 +415,7 @@ export async function onRequestDelete(context) {
   } catch (error) {
     console.error('Failed to delete performer:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to delete performer', details: error.message }),
+      JSON.stringify({ error: 'Failed to delete performer' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }

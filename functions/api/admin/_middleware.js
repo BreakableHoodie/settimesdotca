@@ -233,7 +233,7 @@ export async function onRequest(context) {
   const log = createRequestLogger(context);
 
   // Skip auth check for auth endpoints
-  if (pathname.includes("/api/admin/auth/")) {
+  if (pathname.startsWith("/api/admin/auth/")) {
     return next();
   }
 

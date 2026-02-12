@@ -11,8 +11,7 @@ jobs:
         name: e2e
         runs-on: ubuntu-latest
         container: mcr.microsoft.com/playwright:v1.57.0-jammy
-        # Continue on error - requires E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD secrets
-        continue-on-error: true
+
         steps:
             - uses: actions/checkout@v4
 

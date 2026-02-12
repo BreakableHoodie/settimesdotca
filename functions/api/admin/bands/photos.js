@@ -138,7 +138,6 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         error: "Photo upload failed",
-        details: error.message,
       }),
       {
         status: 500,
@@ -192,7 +191,6 @@ export async function onRequestDelete(context) {
     return new Response(
       JSON.stringify({
         error: "Photo deletion failed",
-        details: error.message,
       }),
       {
         status: 500,

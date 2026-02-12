@@ -243,6 +243,7 @@ function ScheduleView({
                   <button
                     key={venue}
                     onClick={() => setVenueFilter(prev => (prev === venue ? null : venue))}
+                    aria-pressed={venueFilter === venue}
                     className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                       venueFilter === venue
                         ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
@@ -263,6 +264,7 @@ function ScheduleView({
                   <button
                     key={genre}
                     onClick={() => setGenreFilter(prev => (prev === genre ? null : genre))}
+                    aria-pressed={genreFilter === genre}
                     className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                       genreFilter === genre
                         ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'

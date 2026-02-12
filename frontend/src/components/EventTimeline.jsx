@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef, memo, useTransition, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Badge, Card, Alert, Loading } from './ui'
+import { Button, Badge, Card, Alert } from './ui'
+import { EventCardSkeletonList } from './ui/Skeleton'
 import { slugifyBandName } from '../utils/slugify'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { getSelectedCountByEvent, SELECTED_BANDS_KEY } from '../utils/scheduleStorage'
@@ -228,7 +229,15 @@ export default function EventTimeline() {
   const hasActiveFilters = filters.venue !== null || filters.month !== null
 
   if (loading) {
-    return <Loading size="lg" text="Loading events..." fullScreen={false} />
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-text-primary mb-2">Events</h1>
+          <p className="text-text-secondary">Discover upcoming band crawls and music events</p>
+        </div>
+        <EventCardSkeletonList count={2} />
+      </div>
+    )
   }
 
   if (error) {

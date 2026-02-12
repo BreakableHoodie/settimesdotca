@@ -1,6 +1,6 @@
 import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import BackToTop from './components/BackToTop'
@@ -151,6 +151,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [debugTime, setDebugTime] = useState(() => getInitialDebugTime())
   const [isSharedSchedule, setIsSharedSchedule] = useState(false)
+  const sharedScheduleRef = useRef(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -241,10 +242,16 @@ function App() {
         setSelectedBands(sharedIds)
         setView('mine')
         setIsSharedSchedule(true)
+        sharedScheduleRef.current = true
         // Clean the ?s= param from the URL so refreshing uses localStorage
         navigate(`/event/${slug}`, { replace: true })
         return
       }
+    }
+    // Skip localStorage reset when navigate just cleared the ?s= param
+    if (sharedScheduleRef.current) {
+      sharedScheduleRef.current = false
+      return
     }
     setIsSharedSchedule(false)
     const stored = getStoredSelection(slug)
@@ -484,7 +491,12 @@ function App() {
               shareUrl={shareUrl}
               onBrowseAll={() => setView('all')}
               isSharedSchedule={isSharedSchedule}
-              onDismissShared={() => setIsSharedSchedule(false)}
+              onDismissShared={() => {
+                const stored = getStoredSelection(slug)
+                setSelectedBands(stored)
+                setView(stored.length > 0 ? 'mine' : 'all')
+                setIsSharedSchedule(false)
+              }}
             />
           </Suspense>
         )}

@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 # Initialize the local dev database for wrangler pages dev
 echo "Starting server and initializing database..."
 

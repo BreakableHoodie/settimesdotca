@@ -19,6 +19,7 @@ import {
   faTaxi,
   faTrashCan,
   faTriangleExclamation,
+  faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useEffect, useMemo, useState } from 'react'
@@ -36,6 +37,8 @@ function MySchedule({
   nowOverride,
   shareUrl,
   onBrowseAll,
+  isSharedSchedule = false,
+  onDismissShared,
 }) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
@@ -314,6 +317,27 @@ function MySchedule({
   const handleShare = async () => {
     if (isSharingSchedule || !shareUrl) return
     setIsSharingSchedule(true)
+
+    // Use native share sheet on mobile when available
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'My SetTimes Schedule',
+          text: `Check out my schedule — ${bands.length} ${bands.length === 1 ? 'band' : 'bands'}`,
+          url: shareUrl,
+        })
+        setIsSharingSchedule(false)
+        return
+      } catch (err) {
+        // User cancelled or share failed — fall through to clipboard
+        if (err.name === 'AbortError') {
+          setIsSharingSchedule(false)
+          return
+        }
+      }
+    }
+
+    // Fallback: copy to clipboard
     const success = await copyToClipboard(shareUrl)
     if (success) {
       setShareButtonLabel('Link Copied!')
@@ -328,6 +352,27 @@ function MySchedule({
 
   return (
     <div className="py-6 space-y-6 sm:space-y-8">
+      {isSharedSchedule && (
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-accent-500/15 border border-accent-500/30">
+            <div className="flex items-center gap-3 text-accent-400">
+              <FontAwesomeIcon icon={faShareNodes} aria-hidden="true" />
+              <span className="text-sm font-medium">
+                Viewing a shared schedule &mdash; your saved schedule is untouched
+              </span>
+            </div>
+            {onDismissShared && (
+              <button
+                onClick={onDismissShared}
+                className="text-accent-400/70 hover:text-accent-400 transition-colors p-1"
+                aria-label="Dismiss shared schedule notice"
+              >
+                <FontAwesomeIcon icon={faXmark} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1">

@@ -400,7 +400,8 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
               <div className="flex items-center gap-3 text-yellow-200 font-semibold">
                 <FontAwesomeIcon icon={faBolt} className="text-yellow-300 text-xl flex-shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
-                  {overlaps.length} band{overlaps.length !== 1 ? 's' : ''} happening at the same time — you&apos;ll need to choose!
+                  {overlaps.length} band{overlaps.length !== 1 ? 's' : ''} happening at the same time — you&apos;ll need
+                  to choose!
                 </p>
               </div>
             </div>
@@ -408,9 +409,14 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           {conflicts.length > 0 && (
             <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 leading-normal">
               <div className="flex items-center gap-3 text-red-200 font-semibold">
-                <FontAwesomeIcon icon={faTriangleExclamation} className="text-red-300 text-xl flex-shrink-0" aria-hidden="true" />
+                <FontAwesomeIcon
+                  icon={faTriangleExclamation}
+                  className="text-red-300 text-xl flex-shrink-0"
+                  aria-hidden="true"
+                />
                 <p className="text-sm sm:text-base leading-normal">
-                  {conflicts.length} overlapping set{conflicts.length !== 1 ? 's' : ''} — you may not catch every full set.
+                  {conflicts.length} overlapping set{conflicts.length !== 1 ? 's' : ''} — you may not catch every full
+                  set.
                 </p>
               </div>
             </div>

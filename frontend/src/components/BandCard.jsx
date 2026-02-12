@@ -5,7 +5,16 @@ import { Link } from 'react-router-dom'
 import { slugifyBandName } from '../utils/slugify'
 import { getTimeDescription, isHappeningNow } from '../utils/timeFilter'
 
-function BandCard({ band, isSelected, onToggle, showVenue = true, clickable = true, onRemove, warningType, warningText }) {
+function BandCard({
+  band,
+  isSelected,
+  onToggle,
+  showVenue = true,
+  clickable = true,
+  onRemove,
+  warningType,
+  warningText,
+}) {
   const handleToggle = () => {
     if (!clickable) return
     onToggle?.(band.id)
@@ -105,15 +114,10 @@ function BandCard({ band, isSelected, onToggle, showVenue = true, clickable = tr
         {warningType && warningText && (
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mt-1 ${
-              warningType === 'overlap'
-                ? 'bg-yellow-500/30 text-yellow-200'
-                : 'bg-red-500/30 text-red-200'
+              warningType === 'overlap' ? 'bg-yellow-500/30 text-yellow-200' : 'bg-red-500/30 text-red-200'
             }`}
           >
-            <FontAwesomeIcon
-              icon={warningType === 'overlap' ? faBolt : faTriangleExclamation}
-              aria-hidden="true"
-            />
+            <FontAwesomeIcon icon={warningType === 'overlap' ? faBolt : faTriangleExclamation} aria-hidden="true" />
             <span>{warningText}</span>
           </div>
         )}

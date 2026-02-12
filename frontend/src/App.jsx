@@ -350,9 +350,8 @@ function App() {
   }
 
   const myBands = bands.filter(band => selectedBands.includes(band.id))
-  const shareUrl = selectedBands.length > 0 && slug
-    ? `${window.location.origin}/event/${slug}?s=${selectedBands.join(',')}`
-    : null
+  const shareUrl =
+    selectedBands.length > 0 && slug ? `${window.location.origin}/event/${slug}?s=${selectedBands.join(',')}` : null
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
   const effectiveNow = debugTime || currentTime

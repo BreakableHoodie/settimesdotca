@@ -11,12 +11,7 @@ const ALLOWED_EVENTS = new Set([
   "filter_use",
 ]);
 
-const SAFE_KEYS = new Set([
-  "band_profile_id",
-  "event_id",
-  "link_type",
-  "page",
-]);
+const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page"]);
 
 function sanitizeEvent(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -95,35 +90,44 @@ export async function onRequestPost(context) {
         if (event.event === "social_link_click") {
           const bandId = parseInteger(event.props?.band_profile_id);
           if (bandId) {
-            socialClickCounts.set(bandId, (socialClickCounts.get(bandId) || 0) + 1);
+            socialClickCounts.set(
+              bandId,
+              (socialClickCounts.get(bandId) || 0) + 1,
+            );
           }
         }
       }
 
+      const stmts = [];
+
       for (const [bandId, count] of bandViewCounts.entries()) {
-        await env.DB.prepare(
-          `
+        stmts.push(
+          env.DB.prepare(
+            `
           INSERT INTO artist_daily_stats (band_profile_id, date, page_views)
           VALUES (?, ?, ?)
           ON CONFLICT (band_profile_id, date)
           DO UPDATE SET page_views = page_views + ?
         `,
-        )
-          .bind(bandId, today, count, count)
-          .run();
+          ).bind(bandId, today, count, count),
+        );
       }
 
       for (const [bandId, count] of socialClickCounts.entries()) {
-        await env.DB.prepare(
-          `
+        stmts.push(
+          env.DB.prepare(
+            `
           INSERT INTO artist_daily_stats (band_profile_id, date, social_clicks)
           VALUES (?, ?, ?)
           ON CONFLICT (band_profile_id, date)
           DO UPDATE SET social_clicks = social_clicks + ?
         `,
-        )
-          .bind(bandId, today, count, count)
-          .run();
+          ).bind(bandId, today, count, count),
+        );
+      }
+
+      if (stmts.length > 0) {
+        await env.DB.batch(stmts);
       }
     }
 

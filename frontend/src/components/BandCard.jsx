@@ -78,18 +78,24 @@ function BandCard({ band, isSelected, onToggle, showVenue = true, clickable = tr
         </div>
         <p
           className={`text-sm md:text-base font-medium leading-snug ${
-            isPlaying ? 'text-warning-400 font-semibold' : 'text-text-secondary'
+            isPlaying ? 'text-warning-400 font-semibold' : isSelected ? 'text-white/90' : 'text-text-secondary'
           }`}
         >
           {getTimeDescription(band)}
           {isPlaying && <span className="ml-2 text-xs uppercase tracking-wide">Live Now</span>}
         </p>
-        {showVenue && <p className="text-sm text-text-tertiary font-medium leading-snug">{band.venue}</p>}
+        {showVenue && (
+          <p className={`text-sm font-medium leading-snug ${isSelected ? 'text-white/80' : 'text-text-tertiary'}`}>
+            {band.venue}
+          </p>
+        )}
         {band.name && (
           <Link
             to={`/band/${slugifyBandName(band.name)}`}
             onClick={e => e.stopPropagation()}
-            className="text-xs text-accent-400 hover:text-accent-300 underline underline-offset-4"
+            className={`text-xs underline underline-offset-4 ${
+              isSelected ? 'text-white hover:text-white/80' : 'text-accent-400 hover:text-accent-300'
+            }`}
           >
             View profile
           </Link>

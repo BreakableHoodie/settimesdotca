@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useParams } from 'react-router-dom'
+import BackToTop from './components/BackToTop'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
 import Footer from './components/Footer'
@@ -362,7 +363,7 @@ function App() {
         <title>{eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'}</title>
       </Helmet>
       <OfflineIndicator />
-      <Header view={view} setView={setView} />
+      <Header view={view} setView={setView} selectedCount={selectedBands.length} />
       <ComingUp bands={myBands} currentTime={effectiveNow} />
       <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
         <Breadcrumbs items={breadcrumbs} />
@@ -452,6 +453,7 @@ function App() {
         <VenueInfo eventData={eventData} />
       </Suspense>
       <Footer />
+      <BackToTop />
       <PrivacyBanner />
     </div>
   )

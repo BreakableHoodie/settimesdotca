@@ -237,8 +237,12 @@ function ScheduleView({
           {nowPlaying.length > 0 && (
             <div className="relative">
               <div className="flex items-center mb-4">
-                <div className="bg-band-orange text-band-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg animate-pulse">
-                  <FontAwesomeIcon icon={faMusic} className="mr-2" aria-hidden="true" />
+                <div className="bg-band-orange text-band-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-band-navy/60"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-band-navy"></span>
+                  </span>
+                  <FontAwesomeIcon icon={faMusic} aria-hidden="true" />
                   NOW PLAYING
                 </div>
                 <div className="flex-1 h-1 bg-band-orange ml-4"></div>
@@ -294,18 +298,18 @@ function ScheduleView({
           {pastByTime.length > 0 && showPast && (
             <div className="space-y-8">
               <div className="flex items-center mb-4">
-                <div className="bg-gray-400 text-gray-700 font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg opacity-75">
+                <div className="bg-white/10 text-white/40 font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   PAST EVENTS
                 </div>
-                <div className="flex-1 h-0.5 bg-gray-300 ml-4"></div>
+                <div className="flex-1 h-0.5 bg-white/10 ml-4"></div>
               </div>
               {pastByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4 opacity-60">
                   <div className="flex items-center mb-4">
-                    <div className="bg-gray-300 text-gray-600 font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <div className="bg-white/5 text-white/30 font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                     </div>
-                    <div className="flex-1 h-0.5 bg-gray-200 ml-4"></div>
+                    <div className="flex-1 h-0.5 bg-white/5 ml-4"></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
                     {timeBands.map(band => (

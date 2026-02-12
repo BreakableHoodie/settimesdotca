@@ -244,19 +244,19 @@ export function getTimeDescription(performance) {
   // If performance is today
   if (isHappeningToday(performance)) {
     const startDate = new Date(startTime)
-    return `Today at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
+    return `Today at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // If performance is this week
   if (isHappeningThisWeek(performance)) {
     const startDate = new Date(startTime)
-    return `${startDate.toLocaleDateString([], { weekday: 'long' })} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
+    return `${startDate.toLocaleDateString([], { weekday: 'long' })} ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // If performance is next week
   if (isHappeningNextWeek(performance)) {
     const startDate = new Date(startTime)
-    return `Next ${startDate.toLocaleDateString([], { weekday: 'long' })} at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
+    return `Next ${startDate.toLocaleDateString([], { weekday: 'long' })} at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // Default to formatted date and time
@@ -264,5 +264,5 @@ export function getTimeDescription(performance) {
   return `${startDate.toLocaleDateString([], {
     month: 'short',
     day: 'numeric',
-  })} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
+  })} ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
 }

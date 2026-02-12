@@ -2,6 +2,14 @@
 // POST /api/schedule/build
 // Body: { event_id: number, band_ids?: number[], performance_ids?: number[], user_session: string }
 
+const MAX_USER_SESSION_LENGTH = 128;
+const MAX_PERFORMANCE_IDS = 50;
+
+function isSafeSessionId(value) {
+  if (!value || typeof value !== "string") return false;
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
@@ -25,9 +33,20 @@ export async function onRequestPost(context) {
       );
     }
 
-    if (!userSession) {
+    if (
+      !userSession ||
+      userSession.length > MAX_USER_SESSION_LENGTH ||
+      !isSafeSessionId(userSession)
+    ) {
       return new Response(
         JSON.stringify({ error: "Invalid user_session" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (performanceIdsInput.length > MAX_PERFORMANCE_IDS) {
+      return new Response(
+        JSON.stringify({ error: "Too many performance_ids provided" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }

@@ -128,6 +128,14 @@ export async function onRequestGet(context) {
 
   const url = new URL(request.url);
   const eventId = url.searchParams.get("event_id");
+  const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "200", 10);
+  const requestedOffset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 500)
+    : 200;
+  const offset = Number.isFinite(requestedOffset)
+    ? Math.max(requestedOffset, 0)
+    : 0;
 
   try {
     let result;
@@ -199,9 +207,12 @@ export async function onRequestGet(context) {
         LEFT JOIN venues v ON p.venue_id = v.id
         LEFT JOIN events e ON p.event_id = e.id
         ORDER BY e.date DESC, p.start_time, bp.name
-        LIMIT 200
+        LIMIT ?
+        OFFSET ?
       `,
-      ).all();
+      )
+        .bind(limit, offset)
+        .all();
     }
 
     const bands = (result.results || []).map(unpackSocialLinks);

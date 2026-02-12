@@ -1,5 +1,7 @@
 import { checkPermission } from "../_middleware.js";
 
+const MAX_BULK_PREVIEW_IDS = 200;
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -17,6 +19,16 @@ export async function onRequestPost(context) {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  if (band_ids.length > MAX_BULK_PREVIEW_IDS) {
+    return new Response(
+      JSON.stringify({ error: `Maximum ${MAX_BULK_PREVIEW_IDS} band IDs allowed per preview` }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   const changes = [];

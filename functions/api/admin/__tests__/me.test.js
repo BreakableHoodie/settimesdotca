@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { onRequestGet } from "../me.js";
 
 describe("GET /api/admin/me", () => {
-  test("returns authenticated user and session details", async () => {
+  test("returns authenticated user and safe session metadata", async () => {
     const request = new Request("https://example.test/api/admin/me");
     const user = { id: 1, email: "admin@test", role: "admin" };
     const session = {
@@ -22,9 +22,10 @@ describe("GET /api/admin/me", () => {
     expect(payload.authenticated).toBe(true);
     expect(payload.user).toMatchObject(user);
     expect(payload.session).toMatchObject({
-      id: session.id,
-      session_token: session.session_token,
-      user_id: session.user_id,
+      expires_at: session.expires_at,
     });
+    expect(payload.session).not.toHaveProperty("id");
+    expect(payload.session).not.toHaveProperty("session_token");
+    expect(payload.session).not.toHaveProperty("user_id");
   });
 });

@@ -3,12 +3,21 @@
 // Body: { name, date, slug }
 // Returns: { success: true, event: {...} } or error
 
+import { checkPermission, auditLog } from "../../_middleware.js"
+import { getClientIP } from "../../../../utils/request.js"
+
 export async function onRequestPut(context) {
   const { request, env, params } = context
   const { DB } = env
   const eventId = params.id
+  const ipAddress = getClientIP(request)
 
   try {
+    const auth = await checkPermission(context, "editor")
+    if (auth.error) {
+      return auth.response
+    }
+
     if (!eventId || isNaN(eventId)) {
       return new Response(
         JSON.stringify({
@@ -102,6 +111,21 @@ export async function onRequestPut(context) {
     )
       .bind(name, date, slug, ticket_link || null, eventId)
       .first()
+
+    await auditLog(
+      env,
+      auth.user.userId,
+      "event.updated",
+      "event",
+      eventId,
+      {
+        name,
+        date,
+        slug,
+        ticket_link: ticket_link || null,
+      },
+      ipAddress
+    )
 
     return new Response(
       JSON.stringify({

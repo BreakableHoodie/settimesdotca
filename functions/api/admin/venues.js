@@ -29,6 +29,8 @@ export async function onRequestGet(context) {
   if (permCheck.error) {
     return permCheck.response;
   }
+  const userRole = permCheck.user?.role || "viewer";
+  const canViewContactDetails = userRole === "editor" || userRole === "admin";
 
   try {
     const result = await DB.prepare(
@@ -48,6 +50,8 @@ export async function onRequestGet(context) {
       return {
         ...venue,
         address: venue.address || formattedAddress || null,
+        phone: canViewContactDetails ? venue.phone : null,
+        contact_email: canViewContactDetails ? venue.contact_email : null,
       };
     });
 

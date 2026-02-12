@@ -8,7 +8,35 @@
  * DELETE /api/admin/performers/:id   - Delete performer
  */
 
-import { checkPermission } from "./_middleware.js";
+import { checkPermission, auditLog } from "./_middleware.js";
+import {
+  FIELD_LIMITS,
+  validateLength,
+  isValidEmail,
+} from "../../utils/validation.js";
+import { getClientIP } from "../../utils/request.js";
+
+const ROLE_LEVELS = { admin: 3, editor: 2, viewer: 1 };
+
+function sanitizeOptionalText(value, maxLength) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  const lengthCheck = validateLength(text, { max: maxLength });
+  if (!lengthCheck.valid) {
+    throw new Error(lengthCheck.error || "Invalid field length");
+  }
+  return text;
+}
+
+function sanitizeOptionalHttpUrl(value, maxLength) {
+  const text = sanitizeOptionalText(value, maxLength);
+  if (!text) return null;
+  if (!/^https?:\/\//i.test(text)) {
+    throw new Error("URL must start with http:// or https://");
+  }
+  return text;
+}
 
 // Helper to normalize band name for uniqueness check
 function normalizeName(name) {
@@ -49,6 +77,17 @@ function unpackSocialLinks(performer) {
   };
 }
 
+function redactPerformerForRole(performer, role) {
+  const level = ROLE_LEVELS[role] || 0;
+  if (level >= ROLE_LEVELS.editor) {
+    return performer;
+  }
+  return {
+    ...performer,
+    contact_email: null,
+  };
+}
+
 // GET - List all performers
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -63,6 +102,7 @@ export async function onRequestGet(context) {
   }
 
   try {
+    const role = permCheck.user?.role || "viewer";
     // GET /api/admin/performers/:id - Get single performer
     if (id && id !== "performers") {
       if (!/^\d+$/.test(id)) {
@@ -72,7 +112,10 @@ export async function onRequestGet(context) {
         });
       }
       const performer = await DB.prepare(
-        "SELECT * FROM band_profiles WHERE id = ?",
+        `SELECT id, name, name_normalized, genre, origin, origin_city, origin_region,
+                contact_email, is_active, description, photo_url, social_links,
+                total_page_views, total_social_clicks, created_at, updated_at
+         FROM band_profiles WHERE id = ?`,
       )
         .bind(id)
         .first();
@@ -101,7 +144,7 @@ export async function onRequestGet(context) {
       return new Response(
         JSON.stringify({
           success: true,
-          performer: { ...unpackSocialLinks(performer), stats },
+          performer: { ...redactPerformerForRole(unpackSocialLinks(performer), role), stats },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
@@ -110,8 +153,23 @@ export async function onRequestGet(context) {
     // GET /api/admin/performers - List all performers
     const result = await DB.prepare(
       `
-      SELECT 
-        p.*,
+      SELECT
+        p.id,
+        p.name,
+        p.name_normalized,
+        p.genre,
+        p.origin,
+        p.origin_city,
+        p.origin_region,
+        p.contact_email,
+        p.is_active,
+        p.description,
+        p.photo_url,
+        p.social_links,
+        p.total_page_views,
+        p.total_social_clicks,
+        p.created_at,
+        p.updated_at,
         COUNT(perf.id) as performance_count
       FROM band_profiles p
       LEFT JOIN performances perf ON perf.band_profile_id = p.id
@@ -120,7 +178,9 @@ export async function onRequestGet(context) {
     `,
     ).all();
 
-    const performers = (result.results || []).map(unpackSocialLinks);
+    const performers = (result.results || [])
+      .map(unpackSocialLinks)
+      .map((performer) => redactPerformerForRole(performer, role));
 
     return new Response(JSON.stringify({ success: true, performers }), {
       status: 200,
@@ -139,6 +199,7 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
+  const ipAddress = getClientIP(request);
 
   // RBAC: Require editor role or higher
   const permCheck = await checkPermission(context, "editor");
@@ -147,6 +208,7 @@ export async function onRequestPost(context) {
   }
 
   try {
+    const currentUser = permCheck.user;
     const body = await request.json();
     const {
       name,
@@ -172,7 +234,8 @@ export async function onRequestPost(context) {
       );
     }
 
-    const nameNormalized = normalizeName(name);
+    const resolvedName = sanitizeOptionalText(name, FIELD_LIMITS.bandName.max);
+    const nameNormalized = normalizeName(resolvedName);
 
     // Check for duplicate name
     const existing = await DB.prepare(
@@ -192,11 +255,32 @@ export async function onRequestPost(context) {
     }
 
     // Pack social links
+    if (!resolvedName) {
+      return new Response(
+        JSON.stringify({ error: "Performer name is required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    const resolvedGenre = sanitizeOptionalText(genre, FIELD_LIMITS.bandGenre.max);
+    const resolvedDescription = sanitizeOptionalText(description, FIELD_LIMITS.bandDescription.max);
+    const resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max);
+    const resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max);
+    const resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max);
+    const resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max);
+    const resolvedInstagram = sanitizeOptionalText(instagram, FIELD_LIMITS.socialHandle.max);
+    const resolvedContactEmail = sanitizeOptionalText(contact_email, FIELD_LIMITS.bandContactEmail.max);
+    if (resolvedContactEmail && !isValidEmail(resolvedContactEmail)) {
+      return new Response(
+        JSON.stringify({ error: "Contact email must be a valid email address" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const socialLinks = JSON.stringify({
-      website: url?.trim() || null,
-      instagram: instagram?.trim() || null,
-      bandcamp: bandcamp?.trim() || null,
-      facebook: facebook?.trim() || null,
+      website: resolvedWebsite,
+      instagram: resolvedInstagram,
+      bandcamp: resolvedBandcamp,
+      facebook: resolvedFacebook,
     });
 
     // Create performer
@@ -230,19 +314,29 @@ export async function onRequestPost(context) {
     `,
     )
       .bind(
-        name.trim(),
+        resolvedName,
         nameNormalized,
-        genre?.trim() || null,
+        resolvedGenre,
         computedOrigin,
         resolvedOriginCity,
         resolvedOriginRegion,
-        contact_email?.trim() || null,
+        resolvedContactEmail,
         resolvedIsActive,
-        description?.trim() || null,
-        photo_url?.trim() || null,
+        resolvedDescription,
+        resolvedPhotoUrl,
         socialLinks,
       )
       .first();
+
+    await auditLog(
+      env,
+      currentUser.userId,
+      "performer.created",
+      "band_profile",
+      result?.id,
+      { name: resolvedName },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({ success: true, performer: unpackSocialLinks(result) }),
@@ -263,6 +357,7 @@ export async function onRequestPut(context) {
   const { DB } = env;
   const url = new URL(request.url);
   const id = url.pathname.split("/").pop();
+  const ipAddress = getClientIP(request);
 
   // RBAC: Require editor role or higher
   const permCheck = await checkPermission(context, "editor");
@@ -278,6 +373,7 @@ export async function onRequestPut(context) {
   }
 
   try {
+    const currentUser = permCheck.user;
     const body = await request.json();
     const {
       name,
@@ -320,7 +416,14 @@ export async function onRequestPut(context) {
     // Check for duplicate name (if name is being changed)
     let nameNormalized = null;
     if (name) {
-      nameNormalized = normalizeName(name);
+      const resolvedName = sanitizeOptionalText(name, FIELD_LIMITS.bandName.max);
+      if (!resolvedName) {
+        return new Response(
+          JSON.stringify({ error: "Performer name cannot be empty" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      nameNormalized = normalizeName(resolvedName);
       const duplicate = await DB.prepare(
         "SELECT id FROM band_profiles WHERE name_normalized = ? AND id != ?",
       )
@@ -338,11 +441,26 @@ export async function onRequestPut(context) {
     }
 
     // Pack social links
+    const resolvedGenre = sanitizeOptionalText(genre, FIELD_LIMITS.bandGenre.max);
+    const resolvedDescription = sanitizeOptionalText(description, FIELD_LIMITS.bandDescription.max);
+    const resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max);
+    const resolvedWebsite = sanitizeOptionalHttpUrl(performerUrl, FIELD_LIMITS.bandUrl.max);
+    const resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max);
+    const resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max);
+    const resolvedInstagram = sanitizeOptionalText(instagram, FIELD_LIMITS.socialHandle.max);
+    const resolvedContactEmail = sanitizeOptionalText(contact_email, FIELD_LIMITS.bandContactEmail.max);
+    if (resolvedContactEmail && !isValidEmail(resolvedContactEmail)) {
+      return new Response(
+        JSON.stringify({ error: "Contact email must be a valid email address" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const socialLinks = JSON.stringify({
-      website: performerUrl?.trim() || null,
-      instagram: instagram?.trim() || null,
-      bandcamp: bandcamp?.trim() || null,
-      facebook: facebook?.trim() || null,
+      website: resolvedWebsite,
+      instagram: resolvedInstagram,
+      bandcamp: resolvedBandcamp,
+      facebook: resolvedFacebook,
     });
 
     // Update performer
@@ -379,18 +497,28 @@ export async function onRequestPut(context) {
       .bind(
         name?.trim() || null,
         nameNormalized,
-        genre?.trim() || null,
+        resolvedGenre,
         computedOrigin,
         resolvedOriginCity,
         resolvedOriginRegion,
-        contact_email?.trim() || null,
+        resolvedContactEmail,
         resolvedIsActive,
-        description?.trim() || null,
-        photo_url?.trim() || null,
+        resolvedDescription,
+        resolvedPhotoUrl,
         socialLinks,
         id,
       )
       .first();
+
+    await auditLog(
+      env,
+      currentUser.userId,
+      "performer.updated",
+      "band_profile",
+      id,
+      { name: result?.name || name || null },
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({ success: true, performer: unpackSocialLinks(result) }),
@@ -414,6 +542,9 @@ export async function onRequestDelete(context) {
 
   // RBAC: Require admin role
   const permCheck = await checkPermission(context, "admin");
+    const currentUser = permCheck.user;
+    const ipAddress = getClientIP(request);
+
   if (permCheck.error) {
     return permCheck.response;
   }
@@ -446,6 +577,16 @@ export async function onRequestDelete(context) {
 
     // Delete performer
     await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();
+
+    await auditLog(
+      env,
+      currentUser.userId,
+      "performer.deleted",
+      "band_profile",
+      id,
+      null,
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({ success: true, message: "Performer deleted" }),

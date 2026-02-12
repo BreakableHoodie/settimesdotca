@@ -257,8 +257,6 @@ export async function onRequest(context) {
     const normalizedUser = normalizeUser(user);
 
     const sessionData = {
-      id: session.id,
-      session_token: session.id,
       user_id: normalizedUser.userId,
       expires_at: session.expiresAt?.toISOString?.() || null,
       created_at: sessionMeta?.created_at || null,
@@ -290,7 +288,8 @@ export async function onRequest(context) {
     const headers = new Headers(response.headers);
     pendingCookies.forEach((cookie) => headers.append("Set-Cookie", cookie));
 
-    if (timing) {
+    const exposeSessionTimingHeaders = env?.EXPOSE_SESSION_TIMING_HEADERS === "true";
+    if (timing && exposeSessionTimingHeaders) {
       headers.set("X-Session-Expires-In", Math.floor(timing.timeRemaining / 1000).toString());
       headers.set("X-Session-Idle-Expires-In", Math.floor(timing.idleRemaining / 1000).toString());
       headers.set("X-Session-Absolute-Expires-In", Math.floor(timing.absoluteRemaining / 1000).toString());

@@ -63,7 +63,7 @@ export async function sendEmail(env, { to, subject, html, text }) {
       TextBody: text || undefined,
     };
 
-    console.log("[Email] Postmark payload:", { From: from, To: to, Subject: subject });
+    console.log("[Email] Postmark payload prepared");
 
     let response;
     try {
@@ -82,19 +82,15 @@ export async function sendEmail(env, { to, subject, html, text }) {
     }
 
     const responseBody = await response.text().catch(() => "");
-    console.log("[Email] Postmark response:", {
-      status: response.status,
-      statusText: response.statusText,
-      body: responseBody,
-    });
+    console.log("[Email] Postmark response status:", response.status);
 
     if (!response.ok) {
       console.error("[Email] Postmark delivery failed:", response.status, responseBody);
-      return { delivered: false, reason: "postmark_error", details: responseBody };
+      return { delivered: false, reason: "postmark_error" };
     }
 
     console.log("[Email] Postmark delivery successful");
-    return { delivered: true, response: responseBody };
+    return { delivered: true };
   }
 
   if (provider === "mailchannels") {
@@ -110,7 +106,7 @@ export async function sendEmail(env, { to, subject, html, text }) {
       ],
     };
 
-    console.log("[Email] MailChannels payload:", { from, to, subject });
+    console.log("[Email] MailChannels payload prepared");
 
     let response;
     try {
@@ -126,19 +122,15 @@ export async function sendEmail(env, { to, subject, html, text }) {
     }
 
     const responseBody = await response.text().catch(() => "");
-    console.log("[Email] MailChannels response:", {
-      status: response.status,
-      statusText: response.statusText,
-      body: responseBody,
-    });
+    console.log("[Email] MailChannels response status:", response.status);
 
     if (!response.ok) {
       console.error("[Email] MailChannels delivery failed:", response.status, responseBody);
-      return { delivered: false, reason: "mailchannels_error", details: responseBody };
+      return { delivered: false, reason: "mailchannels_error" };
     }
 
     console.log("[Email] MailChannels delivery successful");
-    return { delivered: true, response: responseBody };
+    return { delivered: true };
   }
 
   if (provider === "resend") {
@@ -158,7 +150,7 @@ export async function sendEmail(env, { to, subject, html, text }) {
       text: text || undefined,
     };
 
-    console.log("[Email] Resend payload:", { from, to: [to], subject });
+    console.log("[Email] Resend payload prepared");
 
     let response;
     try {
@@ -177,19 +169,15 @@ export async function sendEmail(env, { to, subject, html, text }) {
     }
 
     const responseBody = await response.text().catch(() => "");
-    console.log("[Email] Resend response:", {
-      status: response.status,
-      statusText: response.statusText,
-      body: responseBody,
-    });
+    console.log("[Email] Resend response status:", response.status);
 
     if (!response.ok) {
       console.error("[Email] Resend delivery failed:", response.status, responseBody);
-      return { delivered: false, reason: "resend_error", details: responseBody };
+      return { delivered: false, reason: "resend_error" };
     }
 
     console.log("[Email] Resend delivery successful");
-    return { delivered: true, response: responseBody };
+    return { delivered: true };
   }
 
   console.error("[Email] Unsupported provider:", provider);

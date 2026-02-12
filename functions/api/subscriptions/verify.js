@@ -32,16 +32,21 @@ export async function onRequestGet(context) {
       return new Response("Email already verified", { status: 200 });
     }
 
-    // Mark as verified
-    await env.DB.prepare(
+    // Mark as verified atomically to prevent token replay races
+    const verifyResult = await env.DB.prepare(
       `
       UPDATE email_subscriptions
       SET verified = 1
-      WHERE id = ?
+      WHERE verification_token = ?
+        AND verified = 0
     `,
     )
-      .bind(subscription.id)
+      .bind(token)
       .run();
+
+    if (!verifyResult?.meta?.changes) {
+      return new Response("Email already verified", { status: 200 });
+    }
 
     // Log verification
     await env.DB.prepare(

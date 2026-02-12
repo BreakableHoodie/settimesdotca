@@ -1,6 +1,8 @@
 import { auditLog, checkPermission } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
 
+const MAX_BULK_BAND_IDS = 200;
+
 // DELETE - Bulk delete bands
 export async function onRequestDelete(context) {
   const { request, env } = context;
@@ -24,6 +26,19 @@ export async function onRequestDelete(context) {
         JSON.stringify({
           error: "Bad request",
           message: "No band IDs provided",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (band_ids.length > MAX_BULK_BAND_IDS) {
+      return new Response(
+        JSON.stringify({
+          error: "Bad request",
+          message: `Maximum ${MAX_BULK_BAND_IDS} band IDs allowed per request`,
         }),
         {
           status: 400,
@@ -78,7 +93,7 @@ export async function onRequestDelete(context) {
         }
       } catch (err) {
         console.error(`Failed to delete band ${id}:`, err);
-        errors.push(`Failed to delete ${id}: ${err.message}`);
+        errors.push(`Failed to delete ${id}`);
       }
     }
 
@@ -99,7 +114,7 @@ export async function onRequestDelete(context) {
     return new Response(
       JSON.stringify({
         error: "Server error",
-        message: error.message,
+        message: "Bulk delete operation failed",
       }),
       {
         status: 500,
@@ -130,6 +145,16 @@ export async function onRequestPatch(context) {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  if (band_ids.length > MAX_BULK_BAND_IDS) {
+    return new Response(
+      JSON.stringify({ error: `Maximum ${MAX_BULK_BAND_IDS} band IDs allowed per request` }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   const allowedActions = new Set(["move_venue", "change_time", "delete"]);

@@ -130,14 +130,30 @@ export class MockD1Database {
     
     // UPDATE email_subscriptions SET verified = 1
     if (queryLower.includes('update email_subscriptions')) {
+      // New atomic path: UPDATE ... WHERE verification_token = ? AND verified = 0
+      if (queryLower.includes('where verification_token = ?')) {
+        const [token] = params
+        const subscription = this.data.email_subscriptions.find(
+          sub => sub.verification_token === token && !sub.verified
+        )
+
+        if (subscription) {
+          subscription.verified = true
+          return { success: true, meta: { changes: 1 } }
+        }
+
+        return { success: true, meta: { changes: 0 } }
+      }
+
+      // Legacy path: UPDATE ... WHERE id = ?
       const [id] = params
       const subscription = this.data.email_subscriptions.find(sub => sub.id === id)
-      
+
       if (subscription) {
         subscription.verified = true
         return { success: true, meta: { changes: 1 } }
       }
-      
+
       return { success: true, meta: { changes: 0 } }
     }
     

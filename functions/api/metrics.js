@@ -2,6 +2,8 @@
 // POST /api/metrics
 // Privacy-first: no PII, aggregated only
 
+const MAX_BATCH_STATEMENTS = 20;
+
 const ALLOWED_EVENTS = new Set([
   "page_view",
   "event_view",
@@ -98,31 +100,26 @@ export async function onRequestPost(context) {
         }
       }
 
+      // Merge view and click counts per band into a single upsert each
+      const allBandIds = new Set([
+        ...bandViewCounts.keys(),
+        ...socialClickCounts.keys(),
+      ]);
+
       const stmts = [];
+      for (const bandId of allBandIds) {
+        if (stmts.length >= MAX_BATCH_STATEMENTS) break;
 
-      for (const [bandId, count] of bandViewCounts.entries()) {
+        const views = bandViewCounts.get(bandId) || 0;
+        const clicks = socialClickCounts.get(bandId) || 0;
+
         stmts.push(
           env.DB.prepare(
-            `
-          INSERT INTO artist_daily_stats (band_profile_id, date, page_views)
-          VALUES (?, ?, ?)
-          ON CONFLICT (band_profile_id, date)
-          DO UPDATE SET page_views = page_views + ?
-        `,
-          ).bind(bandId, today, count, count),
-        );
-      }
-
-      for (const [bandId, count] of socialClickCounts.entries()) {
-        stmts.push(
-          env.DB.prepare(
-            `
-          INSERT INTO artist_daily_stats (band_profile_id, date, social_clicks)
-          VALUES (?, ?, ?)
-          ON CONFLICT (band_profile_id, date)
-          DO UPDATE SET social_clicks = social_clicks + ?
-        `,
-          ).bind(bandId, today, count, count),
+            `INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT (band_profile_id, date)
+             DO UPDATE SET page_views = page_views + ?, social_clicks = social_clicks + ?`,
+          ).bind(bandId, today, views, clicks, views, clicks),
         );
       }
 

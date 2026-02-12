@@ -363,7 +363,7 @@ function App() {
         <title>{eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'}</title>
       </Helmet>
       <OfflineIndicator />
-      <Header view={view} setView={setView} />
+      <Header view={view} setView={setView} selectedCount={selectedBands.length} />
       <ComingUp bands={myBands} currentTime={effectiveNow} />
       <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
         <Breadcrumbs items={breadcrumbs} />

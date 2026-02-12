@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-function Header({ view, setView }) {
+function Header({ view, setView, selectedCount = 0 }) {
   const [scrollProgress, setScrollProgress] = useState(0)
 
   useEffect(() => {
@@ -84,7 +84,7 @@ function Header({ view, setView }) {
             </button>
             <button
               onClick={() => setView('mine')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+              className={`relative px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 view === 'mine'
                   ? 'bg-accent-400 text-bg-navy shadow-lg'
                   : 'bg-bg-purple/50 text-white hover:bg-bg-purple'
@@ -93,6 +93,11 @@ function Header({ view, setView }) {
               aria-pressed={view === 'mine'}
             >
               My Schedule
+              {selectedCount > 0 && (
+                <span className="absolute -top-2 -right-2 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-warning-400 text-bg-navy text-xs font-bold leading-none">
+                  {selectedCount}
+                </span>
+              )}
             </button>
           </div>
         </div>

@@ -453,7 +453,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
               if (gapMinutes >= 60) {
                 const hours = Math.floor(gapMinutes / 60)
                 const mins = gapMinutes % 60
-                timeGap = `${hours}h ${mins}m break`
+                timeGap = mins > 0 ? `${hours}h ${mins}m break` : `${hours}h break`
               } else {
                 timeGap = `${gapMinutes} min break`
               }

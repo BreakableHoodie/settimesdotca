@@ -27,7 +27,9 @@ async function verifyTurnstile(request, env, token) {
   }
 
   if (!token || typeof token !== "string") {
-    return false;
+    // Don't block requests when client doesn't send a token yet —
+    // Turnstile is only enforced once the frontend is wired up.
+    return true;
   }
 
   const ip = request.headers.get("CF-Connecting-IP") || "";

@@ -390,4 +390,4 @@ Platform developed for event management needs, inspired by the Long Weekend Band
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+AGPL-3.0 — see [LICENSE](LICENSE)

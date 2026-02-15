@@ -163,6 +163,7 @@ export async function onRequestPost(context) {
       }
 
       for (const [key, count] of eventViewCounts) {
+        if (pvStmts.length >= MAX_BATCH_STATEMENTS) break;
         pvStmts.push(
           env.DB.prepare(
             `INSERT INTO page_views_daily (page, date, views)

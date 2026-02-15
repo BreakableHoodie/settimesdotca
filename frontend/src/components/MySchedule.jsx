@@ -63,11 +63,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
             : parsedStartMs
 
       let endMs =
-        Number.isFinite(band.endMs) && band.endMs > 0
-          ? band.endMs
-          : Number.isNaN(parsedEndMs)
-            ? 0
-            : parsedEndMs
+        Number.isFinite(band.endMs) && band.endMs > 0 ? band.endMs : Number.isNaN(parsedEndMs) ? 0 : parsedEndMs
 
       if (startMs > 0 && endMs > 0 && endMs < startMs) {
         endMs += oneDayMs
@@ -154,9 +150,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
   // Sort bands chronologically using date + time
   const sortedBands = [...normalizedBands].sort((a, b) => a.startMs - b.startMs)
 
-  const visibleBands = showPast
-    ? sortedBands
-    : sortedBands.filter(band => band.endMs > effectiveNow.getTime())
+  const visibleBands = showPast ? sortedBands : sortedBands.filter(band => band.endMs > effectiveNow.getTime())
 
   const hiddenFinishedCount = sortedBands.length - visibleBands.length
 

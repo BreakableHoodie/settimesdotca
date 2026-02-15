@@ -5,6 +5,7 @@ import { EventCardSkeletonList } from './ui/Skeleton'
 import { slugifyBandName } from '../utils/slugify'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { getSelectedCountByEvent, SELECTED_BANDS_KEY } from '../utils/scheduleStorage'
+import { trackTicketClick } from '../utils/metrics'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faCircle,
@@ -573,6 +574,7 @@ function EventCard({
                 variant="primary"
                 size="md"
                 className="w-full sm:w-auto sm:min-w-[160px]"
+                onClick={() => trackTicketClick(event.id)}
               >
                 Get Tickets
               </Button>

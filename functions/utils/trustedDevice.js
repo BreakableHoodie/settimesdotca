@@ -122,19 +122,20 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
       return null;
     }
     if (!fingerprintMatch) {
-      console.log("[TrustedDevice] Fingerprint mismatch, MFA required");
-      return null;
+      // UA matches but IP changed — normal for DHCP, mobile, VPN users.
+      // Fingerprint is refreshed in the update below.
+      console.log("[TrustedDevice] IP changed for known UA, refreshing fingerprint");
     }
   } else if (!fingerprintMatch) {
     console.log("[TrustedDevice] Fingerprint mismatch, device not trusted");
     return null;
   }
 
-  // Update last_used_at and current IP
+  // Update last_used_at, current IP, and fingerprint (no-op if IP unchanged)
   await DB.prepare(
-    `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ? WHERE id = ?`
+    `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ?, device_fingerprint = ? WHERE id = ?`
   )
-    .bind(ipAddress, device.id)
+    .bind(ipAddress, currentFingerprint, device.id)
     .run();
 
   return device.user_id;

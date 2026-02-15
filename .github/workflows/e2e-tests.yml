@@ -88,6 +88,7 @@ jobs:
 
             - name: Start Pages Functions server
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              timeout-minutes: 3
               run: |
                   # Start wrangler pages dev (database already initialized via d1 execute)
                   ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
@@ -97,21 +98,26 @@ jobs:
                   # Wait for server to be ready
                   echo "Waiting for server to start..."
                   i=1
-                  while [ $i -le 60 ]; do
-                      if curl -s http://localhost:8788/ > /dev/null 2>&1; then
-                          echo "✓ Server is ready on port 8788!"
-                          exit 0
-                      fi
-                      if [ $i -eq 60 ]; then
-                          echo "✗ Server failed to start after 60 seconds"
+                  while [ $i -le 90 ]; do
+                      # Check if wrangler process died
+                      if ! kill -0 $WRANGLER_PID 2>/dev/null; then
+                          echo "✗ Wrangler process exited unexpectedly"
                           echo "Wrangler logs:"
                           cat /tmp/wrangler.log
                           exit 1
                       fi
-                      echo "Waiting for server... ($i/60)"
-                      sleep 1
+                      if curl -s http://localhost:8788/ > /dev/null 2>&1; then
+                          echo "✓ Server is ready on port 8788!"
+                          exit 0
+                      fi
+                      echo "Waiting for server... ($i/90)"
+                      sleep 2
                       i=$((i + 1))
                   done
+                  echo "✗ Server failed to start after 180 seconds"
+                  echo "Wrangler logs:"
+                  cat /tmp/wrangler.log
+                  exit 1
 
             - name: Run Playwright tests
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'

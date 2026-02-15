@@ -8,6 +8,7 @@ import EmbedPage from './pages/EmbedPage.jsx'
 import SubscribePage from './pages/SubscribePage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import ActivatePage from './pages/ActivatePage.jsx'
+import NotFoundPage from './pages/NotFoundPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
 import './index.css'
@@ -124,6 +125,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 </ErrorBoundary>
               }
             />
+            {/* 404 catch-all */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>
       </HelmetProvider>

@@ -50,15 +50,19 @@ export async function onRequestGet(context) {
       .bind(subscription.id)
       .run();
 
-    // Log unsubscribe
-    await env.DB.prepare(
-      `
-      INSERT INTO subscription_unsubscribes (subscription_id)
-      VALUES (?)
-    `,
-    )
-      .bind(subscription.id)
-      .run();
+    // Log unsubscribe (best effort; don't fail successful unsubscriptions)
+    try {
+      await env.DB.prepare(
+        `
+        INSERT INTO subscription_unsubscribes (subscription_id)
+        VALUES (?)
+      `,
+      )
+        .bind(subscription.id)
+        .run();
+    } catch (auditError) {
+      console.error("Unsubscribe audit log failed:", auditError);
+    }
 
     // Return success page
     return new Response(

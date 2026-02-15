@@ -445,11 +445,13 @@ export const eventsApi = {
     return handleResponse(response)
   },
 
-  async delete(eventId) {
+  async delete(eventId, options = {}) {
+    const payload = options.confirmCascade ? { confirmCascade: true } : null
     const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}`, {
       method: 'DELETE',
       headers: getHeaders(),
       credentials: 'include',
+      ...(payload ? { body: JSON.stringify(payload) } : {}),
     })
     return handleResponse(response)
   },

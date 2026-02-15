@@ -16,9 +16,7 @@ export default function NotFoundPage() {
             <FontAwesomeIcon icon={faCompass} />
           </div>
           <h1 className="text-white text-3xl font-bold mb-2">Page Not Found</h1>
-          <p className="text-white/70 mb-8">
-            The page you're looking for doesn't exist or may have moved.
-          </p>
+          <p className="text-white/70 mb-8">The page you&apos;re looking for doesn&apos;t exist or may have moved.</p>
           <Link
             to="/"
             className="inline-block px-6 py-3 bg-band-orange text-band-navy font-semibold rounded-lg hover:brightness-110 transition-all"

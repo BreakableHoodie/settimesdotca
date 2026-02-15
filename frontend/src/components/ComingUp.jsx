@@ -67,7 +67,7 @@ function ComingUp({ bands, currentTime }) {
 
   return (
     <div
-      className={`overflow-hidden transition-all duration-300 ease-out ${hasNext ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0'}`}
+      className={`overflow-hidden transition-all duration-300 ease-out ${hasNext ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}
     >
       {hasNext && (
         <div

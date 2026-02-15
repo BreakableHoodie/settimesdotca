@@ -140,10 +140,16 @@ export async function onRequestPost(context) {
         );
       }
 
-      // Store page views and event views
+      if (stmts.length > 0) {
+        await env.DB.batch(stmts);
+      }
+
+      // Store page views and event views in a separate batch so a missing
+      // page_views_daily table doesn't break artist_daily_stats writes
+      const pvStmts = [];
       for (const [page, count] of pageCounts) {
-        if (stmts.length >= MAX_BATCH_STATEMENTS) break;
-        stmts.push(
+        if (pvStmts.length >= MAX_BATCH_STATEMENTS) break;
+        pvStmts.push(
           env.DB.prepare(
             `INSERT INTO page_views_daily (page, date, views)
              VALUES (?, ?, ?)
@@ -154,8 +160,8 @@ export async function onRequestPost(context) {
       }
 
       for (const [eventId, count] of eventViewCounts) {
-        if (stmts.length >= MAX_BATCH_STATEMENTS) break;
-        stmts.push(
+        if (pvStmts.length >= MAX_BATCH_STATEMENTS) break;
+        pvStmts.push(
           env.DB.prepare(
             `INSERT INTO page_views_daily (page, date, views)
              VALUES (?, ?, ?)
@@ -165,8 +171,12 @@ export async function onRequestPost(context) {
         );
       }
 
-      if (stmts.length > 0) {
-        await env.DB.batch(stmts);
+      if (pvStmts.length > 0) {
+        try {
+          await env.DB.batch(pvStmts);
+        } catch (_) {
+          // Table may not exist yet if migration hasn't run
+        }
       }
     }
 

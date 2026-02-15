@@ -38,10 +38,6 @@ function ComingUp({ bands, currentTime }) {
     return () => clearInterval(interval)
   }, [bands, currentTime])
 
-  if (!nextBand || minutesUntil === null) {
-    return null
-  }
-
   // Format time until next band
   const formatTimeUntil = minutes => {
     if (minutes < 60) {
@@ -64,21 +60,30 @@ function ComingUp({ bands, currentTime }) {
     return parts.join(' ')
   }
 
-  const message = `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name} at ${nextBand.venue}`
+  const hasNext = nextBand && minutesUntil !== null
+  const message = hasNext
+    ? `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name} at ${nextBand.venue}`
+    : undefined
 
   return (
     <div
-      className="bg-gradient-to-r from-band-orange to-yellow-500 text-band-navy py-3 px-4 shadow-lg"
-      role="status"
-      aria-live="polite"
+      className={`overflow-hidden transition-all duration-300 ease-out ${hasNext ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}
     >
-      <div className="container mx-auto max-w-6xl text-center" title={message}>
-        <p className="font-bold text-sm md:text-base leading-normal">
-          <span className="block">Coming up in {formatTimeUntil(minutesUntil)}:</span>
-          <span className="text-lg md:text-xl">{nextBand.name}</span>
-          <span className="block text-sm md:text-base">{nextBand.venue}</span>
-        </p>
-      </div>
+      {hasNext && (
+        <div
+          className="bg-gradient-to-r from-band-orange to-yellow-500 text-band-navy py-3 px-4 shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="container mx-auto max-w-6xl text-center" title={message}>
+            <p className="font-bold text-sm md:text-base leading-normal">
+              <span className="block">Coming up in {formatTimeUntil(minutesUntil)}:</span>
+              <span className="text-lg md:text-xl">{nextBand.name}</span>
+              <span className="block text-sm md:text-base">{nextBand.venue}</span>
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

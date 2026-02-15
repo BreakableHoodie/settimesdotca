@@ -49,17 +49,43 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     return nowOverride ? new Date(nowOverride) : currentTime
   }, [currentTime, nowOverride])
   const highlightedBandIds = useMemo(() => new Set(HIGHLIGHTED_BANDS), [])
+  const normalizedBands = useMemo(() => {
+    const oneDayMs = 24 * 60 * 60 * 1000
+
+    return bands.map(band => {
+      const parsedStartMs = Date.parse(`${band.date}T${band.startTime}:00`)
+      const parsedEndMs = Date.parse(`${band.date}T${band.endTime}:00`)
+      const startMs =
+        Number.isFinite(band.startMs) && band.startMs > 0
+          ? band.startMs
+          : Number.isNaN(parsedStartMs)
+            ? 0
+            : parsedStartMs
+
+      let endMs =
+        Number.isFinite(band.endMs) && band.endMs > 0
+          ? band.endMs
+          : Number.isNaN(parsedEndMs)
+            ? 0
+            : parsedEndMs
+
+      if (startMs > 0 && endMs > 0 && endMs < startMs) {
+        endMs += oneDayMs
+      }
+
+      return {
+        ...band,
+        startMs,
+        endMs,
+      }
+    })
+  }, [bands])
 
   // Calculate time until/since a band
   const getTimeStatus = band => {
-    const testCurrentTime = effectiveNow
-
-    // Parse band start and end times with the date field
-    const bandStart = new Date(`${band.date}T${band.startTime}:00`)
-    const bandEnd = new Date(`${band.date}T${band.endTime}:00`)
-
-    const diffToStart = bandStart - testCurrentTime
-    const diffToEnd = bandEnd - testCurrentTime
+    const nowMs = effectiveNow.getTime()
+    const diffToStart = band.startMs - nowMs
+    const diffToEnd = band.endMs - nowMs
 
     // Band is happening now
     if (diffToStart <= 0 && diffToEnd > 0) {
@@ -126,18 +152,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
   }
 
   // Sort bands chronologically using date + time
-  const sortedBands = [...bands].sort((a, b) => {
-    const aTime = new Date(`${a.date}T${a.startTime}:00`)
-    const bTime = new Date(`${b.date}T${b.startTime}:00`)
-    return aTime - bTime
-  })
+  const sortedBands = [...normalizedBands].sort((a, b) => a.startMs - b.startMs)
 
   const visibleBands = showPast
     ? sortedBands
-    : sortedBands.filter(band => {
-        const bandEnd = new Date(`${band.date}T${band.endTime}:00`)
-        return bandEnd > effectiveNow
-      })
+    : sortedBands.filter(band => band.endMs > effectiveNow.getTime())
 
   const hiddenFinishedCount = sortedBands.length - visibleBands.length
 
@@ -153,19 +172,19 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
 
     for (let i = 0; i < visibleBands.length; i++) {
       const current = visibleBands[i]
-      const currentStart = new Date(`${current.date}T${current.startTime}:00`)
-      const currentEnd = new Date(`${current.date}T${current.endTime}:00`)
+      const currentStart = current.startMs
+      const currentEnd = current.endMs
 
       // Check against all other bands for overlaps
       for (let j = i + 1; j < visibleBands.length; j++) {
         const other = visibleBands[j]
-        const otherStart = new Date(`${other.date}T${other.startTime}:00`)
-        const otherEnd = new Date(`${other.date}T${other.endTime}:00`)
+        const otherStart = other.startMs
+        const otherEnd = other.endMs
 
         // Check if times overlap
         if (currentStart < otherEnd && otherStart < currentEnd) {
           // Complete overlap (same start time)
-          if (currentStart.getTime() === otherStart.getTime()) {
+          if (currentStart === otherStart) {
             overlaps.push({ band1: current.id, band2: other.id })
           } else {
             // Partial conflict
@@ -242,9 +261,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     for (let i = 0; i < visibleBands.length - 1; i++) {
       const current = visibleBands[i]
       const next = visibleBands[i + 1]
-      const currentEnd = new Date(`${current.date}T${current.endTime}:00`)
-      const nextStart = new Date(`${next.date}T${next.startTime}:00`)
-      const breakMinutes = (nextStart - currentEnd) / 1000 / 60
+      const breakMinutes = (next.startMs - current.endMs) / 1000 / 60
       longestBreak = Math.max(longestBreak, breakMinutes)
     }
 
@@ -420,9 +437,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           let timeGap = null
           if (idx > 0) {
             const prevBand = visibleBands[idx - 1]
-            const prevEndTime = new Date(`${prevBand.date}T${prevBand.endTime}:00`)
-            const currentStartTime = new Date(`${band.date}T${band.startTime}:00`)
-            const gapMs = currentStartTime - prevEndTime
+            const gapMs = band.startMs - prevBand.endMs
             const gapMinutes = Math.floor(gapMs / 1000 / 60)
 
             // Only show breaks 15+ minutes (venues are close, don't need tight warnings)

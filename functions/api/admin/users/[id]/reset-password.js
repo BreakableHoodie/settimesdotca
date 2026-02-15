@@ -11,12 +11,10 @@ import { sendEmail, isEmailConfigured } from "../../../../utils/email.js";
 import { buildResetPasswordEmail } from "../../../../utils/emailTemplates.js";
 
 export async function onRequestPost(context) {
-  console.log("[ResetPassword] === ENDPOINT HIT === timestamp:", Date.now());
   const { request, env, params } = context;
   const { DB } = env;
 
   // RBAC: Require admin role
-  console.log("[ResetPassword] Checking permissions for user ID:", params.id);
   const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) {
     return permCheck.response;
@@ -89,8 +87,6 @@ export async function onRequestPost(context) {
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
     const resetUrl = `${baseUrl}/reset-password?token=${resetToken.token}`;
 
-    console.log("[ResetPassword] Checking email configuration...");
-
     if (!isEmailConfigured(env)) {
       console.error("[ResetPassword] Email not configured");
       return new Response(
@@ -109,14 +105,12 @@ export async function onRequestPost(context) {
       recipientName: targetUser.name,
     });
 
-    console.log("[ResetPassword] Sending password reset email to:", targetUser.email);
     const emailResult = await sendEmail(env, {
       to: targetUser.email,
       subject: emailPayload.subject,
       text: emailPayload.text,
       html: emailPayload.html,
     });
-    console.log("[ResetPassword] Email result:", emailResult);
 
     if (!emailResult.delivered) {
       console.error("[ResetPassword] Email delivery failed:", emailResult);

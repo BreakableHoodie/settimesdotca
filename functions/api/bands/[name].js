@@ -160,7 +160,10 @@ export async function onRequestGet(context) {
 
     return new Response(JSON.stringify(profileData), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=300",
+      },
     });
   } catch (error) {
     console.error(

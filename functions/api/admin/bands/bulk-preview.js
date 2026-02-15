@@ -48,13 +48,19 @@ export async function onRequestPost(context) {
 
   if (action === "move_venue") {
     const { venue_id } = params;
+    const venue = await env.DB.prepare("SELECT name FROM venues WHERE id = ?")
+      .bind(venue_id)
+      .first();
+
+    if (!venue) {
+      return new Response(JSON.stringify({ error: "Target venue not found" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // Build changes list
     for (const band of bands.results) {
-      const venue = await env.DB.prepare("SELECT name FROM venues WHERE id = ?")
-        .bind(venue_id)
-        .first();
-
       changes.push({
         band_id: band.id,
         band_name: band.name,
@@ -161,4 +167,3 @@ export async function onRequestPost(context) {
     headers: { "Content-Type": "application/json" },
   });
 }
-

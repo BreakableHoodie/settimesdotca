@@ -41,6 +41,12 @@ function parseInteger(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+async function executeInChunks(db, statements, chunkSize = MAX_BATCH_STATEMENTS) {
+  for (let i = 0; i < statements.length; i += chunkSize) {
+    await db.batch(statements.slice(i, i + chunkSize));
+  }
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -125,8 +131,6 @@ export async function onRequestPost(context) {
 
       const stmts = [];
       for (const bandId of allBandIds) {
-        if (stmts.length >= MAX_BATCH_STATEMENTS) break;
-
         const views = bandViewCounts.get(bandId) || 0;
         const clicks = socialClickCounts.get(bandId) || 0;
 
@@ -141,14 +145,13 @@ export async function onRequestPost(context) {
       }
 
       if (stmts.length > 0) {
-        await env.DB.batch(stmts);
+        await executeInChunks(env.DB, stmts);
       }
 
       // Store page views and event views in a separate batch so a missing
       // page_views_daily table doesn't break artist_daily_stats writes
       const pvStmts = [];
       for (const [page, count] of pageCounts) {
-        if (pvStmts.length >= MAX_BATCH_STATEMENTS) break;
         pvStmts.push(
           env.DB.prepare(
             `INSERT INTO page_views_daily (page, date, views)
@@ -173,7 +176,7 @@ export async function onRequestPost(context) {
 
       if (pvStmts.length > 0) {
         try {
-          await env.DB.batch(pvStmts);
+          await executeInChunks(env.DB, pvStmts);
         } catch (_) {
           // Table may not exist yet if migration hasn't run
         }

@@ -104,9 +104,13 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
       return null;
     }
     if (!fingerprintMatch) {
-      // UA matches but IP changed — log but still reject (strict mode)
-      console.log("[TrustedDevice] IP changed for known UA, device not trusted");
-      return null;
+      // UA matches but IP changed — this is normal (DHCP, mobile, VPN)
+      // Update stored fingerprint to reflect new IP
+      const newFingerprint = currentFingerprint;
+      await DB.prepare(
+        `UPDATE trusted_devices SET device_fingerprint = ?, ip_address = ? WHERE id = ?`
+      ).bind(newFingerprint, ipAddress, device.id).run();
+      console.log("[TrustedDevice] IP changed for known UA, updated fingerprint");
     }
   } else if (!fingerprintMatch) {
     console.log("[TrustedDevice] Fingerprint mismatch, device not trusted");

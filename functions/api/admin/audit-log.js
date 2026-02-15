@@ -18,11 +18,12 @@ export async function onRequestGet(context) {
 
     // Parse query parameters
     const url = new URL(request.url);
-    const userId = url.searchParams.get("user_id");
+    const userIdParam = url.searchParams.get("user_id");
     const action = url.searchParams.get("action");
     const resourceType = url.searchParams.get("resource_type");
     const limit = parseInt(url.searchParams.get("limit")) || 50;
     const offset = parseInt(url.searchParams.get("offset")) || 0;
+    let userId = null;
 
     // Validate limit (prevent excessive queries)
     if (limit > 100) {
@@ -38,13 +39,29 @@ export async function onRequestGet(context) {
       );
     }
 
+    if (userIdParam !== null) {
+      userId = Number.parseInt(userIdParam, 10);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return new Response(
+          JSON.stringify({
+            error: "Bad request",
+            message: "user_id must be a positive integer",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
     // Build WHERE clause based on filters
     const conditions = [];
     const params = [];
 
-    if (userId) {
+    if (userId !== null) {
       conditions.push("a.user_id = ?");
-      params.push(parseInt(userId));
+      params.push(userId);
     }
 
     if (action) {

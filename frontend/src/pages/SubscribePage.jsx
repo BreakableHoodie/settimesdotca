@@ -1,26 +1,103 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCalendarDays, faRss } from '@fortawesome/free-solid-svg-icons'
 
+const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+
 export default function SubscribePage() {
+  const turnstileContainerRef = useRef(null)
+  const turnstileWidgetIdRef = useRef(null)
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+  const turnstileEnabled = Boolean(turnstileSiteKey)
+
   const [formData, setFormData] = useState({
     email: '',
     city: 'kitchener',
     genre: 'all',
     frequency: 'weekly',
   })
+  const [turnstileToken, setTurnstileToken] = useState('')
   const [status, setStatus] = useState('idle') // idle, submitting, success, error
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    if (!turnstileEnabled) {
+      return undefined
+    }
+
+    let cancelled = false
+    let scriptElement = document.querySelector('script[data-turnstile-script="true"]')
+
+    const renderTurnstile = () => {
+      if (cancelled || !window.turnstile || !turnstileContainerRef.current) {
+        return
+      }
+      if (turnstileWidgetIdRef.current !== null) {
+        return
+      }
+
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: turnstileSiteKey,
+        callback: token => {
+          setTurnstileToken(token)
+        },
+        'expired-callback': () => {
+          setTurnstileToken('')
+        },
+        'error-callback': () => {
+          setTurnstileToken('')
+        },
+      })
+    }
+
+    if (scriptElement) {
+      if (window.turnstile) {
+        renderTurnstile()
+      } else {
+        scriptElement.addEventListener('load', renderTurnstile)
+      }
+    } else {
+      const script = document.createElement('script')
+      script.src = TURNSTILE_SCRIPT_SRC
+      script.async = true
+      script.defer = true
+      script.setAttribute('data-turnstile-script', 'true')
+      script.addEventListener('load', renderTurnstile)
+      document.head.appendChild(script)
+      scriptElement = script
+    }
+
+    return () => {
+      cancelled = true
+      if (scriptElement) {
+        scriptElement.removeEventListener('load', renderTurnstile)
+      }
+      if (window.turnstile && turnstileWidgetIdRef.current !== null) {
+        window.turnstile.remove(turnstileWidgetIdRef.current)
+        turnstileWidgetIdRef.current = null
+      }
+    }
+  }, [turnstileEnabled, turnstileSiteKey])
 
   const handleSubmit = async e => {
     e.preventDefault()
     setStatus('submitting')
+    setMessage('')
+
+    if (turnstileEnabled && !turnstileToken) {
+      setStatus('error')
+      setMessage('Please complete the bot verification challenge.')
+      return
+    }
 
     try {
       const response = await fetch('/api/subscriptions/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          turnstileToken,
+        }),
       })
 
       const data = await response.json()
@@ -29,6 +106,10 @@ export default function SubscribePage() {
         setStatus('success')
         setMessage('Check your email to confirm your subscription!')
         setFormData({ email: '', city: 'kitchener', genre: 'all', frequency: 'weekly' })
+        setTurnstileToken('')
+        if (turnstileEnabled && window.turnstile && turnstileWidgetIdRef.current !== null) {
+          window.turnstile.reset(turnstileWidgetIdRef.current)
+        }
       } else {
         setStatus('error')
         setMessage(data.error || 'Subscription failed. Please try again.')
@@ -125,6 +206,7 @@ export default function SubscribePage() {
             </div>
 
             {/* Submit */}
+            {turnstileEnabled && <div ref={turnstileContainerRef} className="min-h-[65px]" />}
             <button
               type="submit"
               disabled={status === 'submitting'}

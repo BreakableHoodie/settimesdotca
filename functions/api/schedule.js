@@ -15,6 +15,13 @@ export async function onRequestGet(context) {
 
   try {
     const { DB } = env;
+    const configuredTtl = Number.parseInt(
+      env.SCHEDULE_CACHE_TTL_SECONDS || "60",
+      10,
+    );
+    const cacheTtl = Number.isFinite(configuredTtl) && configuredTtl >= 0
+      ? configuredTtl
+      : 60;
 
     let event;
 
@@ -144,7 +151,7 @@ export async function onRequestGet(context) {
         status: 200,
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+          "Cache-Control": `public, max-age=${cacheTtl}`,
         },
       },
     );

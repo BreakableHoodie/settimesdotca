@@ -306,17 +306,15 @@ export async function onRequestPost(context) {
         recipientName: resolvedName || null,
       });
 
-      console.log("[Signup] Sending activation email to:", email);
       emailResult = await sendEmail(env, {
         to: email,
         subject: emailPayload.subject,
         text: emailPayload.text,
         html: emailPayload.html,
       });
-      console.log("[Signup] Email result:", emailResult);
+      console.log("[Signup] Activation email delivery attempted.");
     } else {
-      console.warn("[Signup] Email not configured, logging activation link instead");
-      console.info(`[Email] Activation link for ${email}: ${activationUrl}`);
+      console.warn("[Signup] Email not configured; activation email was not sent.");
     }
 
     return new Response(

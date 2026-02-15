@@ -770,7 +770,28 @@ export async function onRequestDelete(context) {
       .bind(eventIdNum)
       .first();
 
-    // Delete the event (database will automatically set event_id to NULL for bands due to ON DELETE SET NULL)
+    const body = await request.json().catch(() => ({}));
+    const url = new URL(request.url);
+    const confirmCascade =
+      body?.confirmCascade === true ||
+      url.searchParams.get("confirmCascade") === "true";
+
+    if (bandCount.count > 0 && !confirmCascade) {
+      return new Response(
+        JSON.stringify({
+          error: "Confirmation required",
+          message:
+            "Deleting this event will permanently remove associated performance records. Repeat the request with confirmCascade=true to continue.",
+          affectedPerformanceCount: bandCount.count,
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Delete the event (performance records are removed automatically via ON DELETE CASCADE)
     await DB.prepare("DELETE FROM events WHERE id = ?").bind(eventIdNum).run();
 
     // Audit log
@@ -790,7 +811,7 @@ export async function onRequestDelete(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} band(s) are now unassigned and can be moved to other events)` : ""}`,
+        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} performance record(s) were permanently deleted with this event)` : ""}`,
       }),
       {
         headers: { "Content-Type": "application/json" },

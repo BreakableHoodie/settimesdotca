@@ -6,12 +6,19 @@ const rootDir = process.cwd();
 
 const FILE_RULES = [
   {
-    path: "database/schema.sql",
-    tables: ["events", "venues", "bands"],
-  },
-  {
-    path: "database/schema-v2.sql",
-    tables: ["events", "venues", "band_profiles", "performances"],
+    path: "database/setup-complete.sql",
+    tables: [
+      "events",
+      "venues",
+      "bands",
+      "performances",
+      "band_profiles",
+      "artist_daily_stats",
+      "page_views_daily",
+      "users",
+      "sessions",
+      "audit_log",
+    ],
   },
 ];
 

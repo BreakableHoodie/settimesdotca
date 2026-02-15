@@ -374,6 +374,7 @@ describe("Event API - handler integration", () => {
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+        body: JSON.stringify({ confirmCascade: true }),
       }
     );
 
@@ -398,6 +399,7 @@ describe("Event API - handler integration", () => {
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+        body: JSON.stringify({ confirmCascade: true }),
       }
     );
 
@@ -409,6 +411,30 @@ describe("Event API - handler integration", () => {
     // Check performance was removed by cascade
     const row = rawDb.prepare("SELECT * FROM performances WHERE id = ?").get(b.id);
     expect(row).toBeUndefined();
+  });
+
+  it("delete with attached performances requires explicit confirmation", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+
+    const ev = insertEvent(rawDb, {
+      name: "ConfirmDelete",
+      slug: "confirm-delete",
+    });
+    insertBand(rawDb, { name: "NeedsConfirm", event_id: ev.id });
+
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+      }
+    );
+
+    const res = await eventIdHandler.onRequestDelete({ request, env });
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error).toBe("Confirmation required");
+    expect(data.affectedPerformanceCount).toBe(1);
   });
 
   it("PATCH can update date and status to published", async () => {

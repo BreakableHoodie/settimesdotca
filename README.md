@@ -18,6 +18,7 @@ SetTimes.ca is designed to streamline the management of multi-venue music events
 **Next Event:** Long Weekend Band Crawl (February 15, 2026)
 
 Core features complete:
+
 - ✅ RBAC Implementation (Admin/Editor/Viewer)
 - ✅ Event Management & Scheduling
 - ✅ Band Profiles with Photos
@@ -221,11 +222,11 @@ npm run test:coverage
 
 ### Roles & Permissions
 
-| Role | Level | Permissions |
-|------|-------|-------------|
-| **Admin** | 3 | Full access - user management, venues (structural data), all content |
-| **Editor** | 2 | Content management - bands, events, publishing (cannot modify venues/users) |
-| **Viewer** | 1 | Read-only - analytics, metrics, event viewing (no modifications) |
+| Role       | Level | Permissions                                                                 |
+| ---------- | ----- | --------------------------------------------------------------------------- |
+| **Admin**  | 3     | Full access - user management, venues (structural data), all content        |
+| **Editor** | 2     | Content management - bands, events, publishing (cannot modify venues/users) |
+| **Viewer** | 1     | Read-only - analytics, metrics, event viewing (no modifications)            |
 
 ### Test Users (Local Development)
 
@@ -264,9 +265,11 @@ See `.dev.vars.test-users` for credentials. Default users:
    - Domain: `settimes.pages.dev` (custom domain: `settimes.ca`)
 
    **Manual Deployment (from project root):**
+
    ```bash
    npm run deploy:prod
    ```
+
    This command properly includes static assets from `frontend/dist` and Functions from `functions/`.
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.
@@ -335,12 +338,13 @@ See [docs/BACKEND_FRAMEWORK.md](docs/BACKEND_FRAMEWORK.md) for complete API refe
 This is a private project for SetTimes.ca. For issues or questions:
 
 - **Technical Issues:** Create a GitHub issue
-- **Security Concerns:** Email security@settimes.ca
-- **General Questions:** hello@settimes.ca
+- **Security Concerns:** Email <security@settimes.ca>
+- **General Questions:** <hello@settimes.ca>
 
 ## Roadmap
 
 **Completed (2025):**
+
 - ✅ RBAC with admin/editor/viewer roles
 - ✅ Event management with conflict detection
 - ✅ Band profiles with photos and bios
@@ -349,6 +353,7 @@ This is a private project for SetTimes.ca. For issues or questions:
 - ✅ Mobile-responsive design
 
 **Completed (Q1 2026):**
+
 - ✅ MFA/2FA with TOTP authenticator support
 - ✅ Trusted Devices (30-day remember)
 - ✅ Backup codes for account recovery
@@ -356,9 +361,11 @@ This is a private project for SetTimes.ca. For issues or questions:
 - ✅ Band profile UX improvements
 
 **Current (2026):**
+
 - Production operations for February 2026 event
 
 **Upcoming:**
+
 - Email subscriptions with city/genre filtering (backend ready, frontend integration pending)
 - iCal feed integration for calendar apps (backend ready, frontend integration pending)
 - Event theming and colour customization from admin backend
@@ -367,6 +374,7 @@ This is a private project for SetTimes.ca. For issues or questions:
 ## Design
 
 Interface inspired by modern event aesthetic:
+
 - Deep navy (#0c0f1a) background
 - Cyan (#0ea5e9) accent colors for actions and branding
 - White text for high contrast and readability
@@ -379,6 +387,7 @@ Interface inspired by modern event aesthetic:
 ## Browser Support
 
 Modern browsers with ES2020+ support:
+
 - Chrome 90+
 - Firefox 88+
 - Safari 14+

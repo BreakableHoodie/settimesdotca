@@ -48,15 +48,19 @@ export async function onRequestGet(context) {
       return new Response("Email already verified", { status: 200 });
     }
 
-    // Log verification
-    await env.DB.prepare(
-      `
-      INSERT INTO subscription_verifications (subscription_id)
-      VALUES (?)
-    `,
-    )
-      .bind(subscription.id)
-      .run();
+    // Log verification (best effort; don't fail successful verifications)
+    try {
+      await env.DB.prepare(
+        `
+        INSERT INTO subscription_verifications (subscription_id)
+        VALUES (?)
+      `,
+      )
+        .bind(subscription.id)
+        .run();
+    } catch (auditError) {
+      console.error("Verification audit log failed:", auditError);
+    }
 
     // Redirect to success page
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;

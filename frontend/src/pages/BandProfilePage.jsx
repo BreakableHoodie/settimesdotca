@@ -79,6 +79,8 @@ export default function BandProfilePage() {
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
 
   const isNumericId = useMemo(() => /^\d+$/.test(id || ''), [id])
+  const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://settimes.ca'
+  const canonicalUrl = `${siteOrigin}/band/${profile?.id || id}`
 
   const sanitizedDescription = useMemo(() => {
     if (!profile?.description) return ''
@@ -120,12 +122,16 @@ export default function BandProfilePage() {
   }, [profile?.description])
 
   useEffect(() => {
+    const controller = new AbortController()
+
     const loadProfile = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/bands/stats/${encodeURIComponent(id)}`)
+        const response = await fetch(`/api/bands/stats/${encodeURIComponent(id)}`, {
+          signal: controller.signal,
+        })
 
         if (!response.ok) {
           throw new Error('Band not found')
@@ -139,16 +145,23 @@ export default function BandProfilePage() {
           navigate(`/band/${data.id}`, { replace: true })
         }
       } catch (err) {
+        if (controller.signal.aborted) {
+          return
+        }
         console.error('Failed to load band profile:', err)
         setError(err.message)
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     if (id) {
       loadProfile()
     }
+
+    return () => controller.abort()
   }, [id, isNumericId, navigate])
 
   useEffect(() => {
@@ -265,8 +278,8 @@ export default function BandProfilePage() {
           <meta property="og:description" content={plainDescription || `${profile.name} on SetTimes`} />
           <meta property="og:type" content="profile" />
           {profile.photo_url && <meta property="og:image" content={profile.photo_url} />}
-          <meta property="og:url" content={`https://settimes.ca/band/${profile?.id || id}`} />
-          <link rel="canonical" href={`https://settimes.ca/band/${profile?.id || id}`} />
+          <meta property="og:url" content={canonicalUrl} />
+          <link rel="canonical" href={canonicalUrl} />
 
           {/* Twitter Card */}
           <meta name="twitter:card" content="summary_large_image" />
@@ -283,7 +296,7 @@ export default function BandProfilePage() {
               genre: profile.genre,
               description: plainDescription,
               image: profile.photo_url,
-              url: `https://settimes.ca/band/${profile?.id || id}`,
+              url: canonicalUrl,
               ...(profile.origin && { foundingLocation: profile.origin }),
               ...(profile.social && {
                 sameAs: [

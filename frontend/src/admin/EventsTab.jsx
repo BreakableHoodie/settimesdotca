@@ -613,7 +613,7 @@ export default function EventsTab({
       // Regular confirmation for non-archived events
       const confirmMessage =
         bandCount > 0
-          ? `Are you sure you want to delete "${eventName}"? This will remove the event but keep all ${bandCount} band(s) (they will become unassigned and can be moved to other events). This action cannot be undone.`
+          ? `Are you sure you want to delete "${eventName}"? This will permanently delete ${bandCount} scheduled performance record(s) for this event. This action cannot be undone.`
           : `Are you sure you want to delete "${eventName}"? This action cannot be undone.`
 
       if (!window.confirm(confirmMessage)) {
@@ -622,7 +622,7 @@ export default function EventsTab({
     }
 
     try {
-      const result = await eventsApi.delete(eventId)
+      const result = await eventsApi.delete(eventId, { confirmCascade: bandCount > 0 })
       showToast(result.message || `Event "${eventName}" deleted successfully!`, 'success')
       onEventsChange()
     } catch (err) {

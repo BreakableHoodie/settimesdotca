@@ -32,7 +32,7 @@ export async function onRequestPut(context) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const { name, date, slug, ticket_link } = body
+    const { name, date, slug, ticket_url } = body
 
     // Validation
     if (!name || !date || !slug) {
@@ -48,8 +48,8 @@ export async function onRequestPut(context) {
       )
     }
 
-    // Validate ticket_link URL if provided
-    if (ticket_link && !ticket_link.match(/^https?:\/\//)) {
+    // Validate ticket_url URL if provided
+    if (ticket_url && !ticket_url.match(/^https?:\/\//)) {
       return new Response(
         JSON.stringify({
           error: 'Validation error',
@@ -104,12 +104,12 @@ export async function onRequestPut(context) {
     const result = await DB.prepare(
       `
       UPDATE events
-      SET name = ?, date = ?, slug = ?, ticket_link = ?
+      SET name = ?, date = ?, slug = ?, ticket_url = ?
       WHERE id = ?
       RETURNING *
     `
     )
-      .bind(name, date, slug, ticket_link || null, eventId)
+      .bind(name, date, slug, ticket_url || null, eventId)
       .first()
 
     await auditLog(
@@ -122,7 +122,7 @@ export async function onRequestPut(context) {
         name,
         date,
         slug,
-        ticket_link: ticket_link || null,
+        ticket_url: ticket_url || null,
       },
       ipAddress
     )

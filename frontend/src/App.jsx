@@ -11,12 +11,12 @@ import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
 import PrivacyBanner from './components/PrivacyBanner'
 import ScheduleView from './components/ScheduleView'
+import VenueInfo from './components/VenueInfo'
 import { BandCardSkeletonGrid } from './components/ui/Skeleton'
 import { validateBandsData } from './utils/validation'
 import { trackEventView, trackPageView } from './utils/metrics'
 
 const MySchedule = lazy(() => import('./components/MySchedule'))
-const VenueInfo = lazy(() => import('./components/VenueInfo'))
 
 const DEBUG_TIME_STORAGE_KEY = 'debugScheduleTime'
 
@@ -331,11 +331,18 @@ function App() {
     return (
       <div className="min-h-screen pb-20">
         <Header view={view} setView={setView} selectedCount={selectedBands.length} />
+        <section className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6" aria-hidden="true">
+          <div className="h-16 sm:h-20 rounded-xl bg-bg-purple/40 border border-white/10" />
+        </section>
         <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
+          <div className="h-6 w-48 rounded bg-bg-purple/40 border border-white/10" aria-hidden="true" />
           <div className="py-6">
             <BandCardSkeletonGrid count={6} />
           </div>
         </main>
+        <Footer />
+        <BackToTop />
+        <PrivacyBanner />
       </div>
     )
   }
@@ -450,15 +457,7 @@ function App() {
           </Suspense>
         )}
       </main>
-      <Suspense
-        fallback={
-          <div className="py-12 text-center text-white/60" role="status" aria-live="polite">
-            Loading venue tips...
-          </div>
-        }
-      >
-        <VenueInfo eventData={eventData} />
-      </Suspense>
+      <VenueInfo eventData={eventData} />
       <Footer />
       <BackToTop />
       <PrivacyBanner />

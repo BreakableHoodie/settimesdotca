@@ -104,6 +104,17 @@ CREATE TABLE IF NOT EXISTS artist_daily_stats (
 CREATE INDEX IF NOT EXISTS idx_artist_stats_date ON artist_daily_stats(date);
 CREATE INDEX IF NOT EXISTS idx_artist_stats_band ON artist_daily_stats(band_profile_id);
 
+-- Page views (aggregated daily by path)
+CREATE TABLE IF NOT EXISTS page_views_daily (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  page TEXT NOT NULL,
+  date TEXT NOT NULL,
+  views INTEGER DEFAULT 0,
+  UNIQUE(page, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views_daily(date);
+
 -- ============================================
 -- AUTH TABLES
 -- ============================================

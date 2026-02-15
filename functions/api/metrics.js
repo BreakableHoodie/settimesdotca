@@ -80,6 +80,8 @@ export async function onRequestPost(context) {
       const today = new Date().toISOString().split("T")[0];
       const bandViewCounts = new Map();
       const socialClickCounts = new Map();
+      const pageCounts = new Map(); // page path → count
+      const eventViewCounts = new Map(); // event_id → count
 
       for (const event of validEvents) {
         if (event.event === "artist_profile_view") {
@@ -95,6 +97,21 @@ export async function onRequestPost(context) {
             socialClickCounts.set(
               bandId,
               (socialClickCounts.get(bandId) || 0) + 1,
+            );
+          }
+        }
+
+        if (event.event === "page_view") {
+          const page = String(event.props?.page || "/").slice(0, 255);
+          pageCounts.set(page, (pageCounts.get(page) || 0) + 1);
+        }
+
+        if (event.event === "event_view") {
+          const eventId = parseInteger(event.props?.event_id);
+          if (eventId) {
+            eventViewCounts.set(
+              eventId,
+              (eventViewCounts.get(eventId) || 0) + 1,
             );
           }
         }
@@ -125,6 +142,41 @@ export async function onRequestPost(context) {
 
       if (stmts.length > 0) {
         await env.DB.batch(stmts);
+      }
+
+      // Store page views and event views in a separate batch so a missing
+      // page_views_daily table doesn't break artist_daily_stats writes
+      const pvStmts = [];
+      for (const [page, count] of pageCounts) {
+        if (pvStmts.length >= MAX_BATCH_STATEMENTS) break;
+        pvStmts.push(
+          env.DB.prepare(
+            `INSERT INTO page_views_daily (page, date, views)
+             VALUES (?, ?, ?)
+             ON CONFLICT (page, date)
+             DO UPDATE SET views = views + ?`,
+          ).bind(page, today, count, count),
+        );
+      }
+
+      for (const [eventId, count] of eventViewCounts) {
+        if (pvStmts.length >= MAX_BATCH_STATEMENTS) break;
+        pvStmts.push(
+          env.DB.prepare(
+            `INSERT INTO page_views_daily (page, date, views)
+             VALUES (?, ?, ?)
+             ON CONFLICT (page, date)
+             DO UPDATE SET views = views + ?`,
+          ).bind(`event:${eventId}`, today, count, count),
+        );
+      }
+
+      if (pvStmts.length > 0) {
+        try {
+          await env.DB.batch(pvStmts);
+        } catch (_) {
+          // Table may not exist yet if migration hasn't run
+        }
       }
     }
 

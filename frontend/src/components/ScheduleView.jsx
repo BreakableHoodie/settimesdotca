@@ -167,7 +167,7 @@ function ScheduleView({
           {finishedCount > 0 && (
             <button
               onClick={onToggleShowPast}
-              className={`text-xs px-3 py-1.5 rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
+              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
                 showPast
                   ? 'bg-band-orange/20 border-band-orange/50 text-band-orange hover:bg-band-orange/30'
                   : 'bg-band-purple/50 border-band-orange/50 text-band-orange hover:bg-band-purple'
@@ -191,7 +191,7 @@ function ScheduleView({
           <button
             onClick={onSelectAll}
             disabled={allSelected}
-            className={`text-xs px-3 py-1.5 rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
+            className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
               allSelected
                 ? 'bg-gray-500/20 border border-gray-500/50 text-gray-400 cursor-not-allowed'
                 : 'bg-band-orange/20 border border-band-orange/50 text-band-orange hover:bg-band-orange/30'

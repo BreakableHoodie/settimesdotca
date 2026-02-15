@@ -9,6 +9,7 @@ const ALLOWED_EVENTS = new Set([
   "event_view",
   "artist_profile_view",
   "social_link_click",
+  "ticket_click",
   "share_event",
   "filter_use",
 ]);
@@ -106,13 +107,12 @@ export async function onRequestPost(context) {
           pageCounts.set(page, (pageCounts.get(page) || 0) + 1);
         }
 
-        if (event.event === "event_view") {
+        if (event.event === "event_view" || event.event === "ticket_click") {
           const eventId = parseInteger(event.props?.event_id);
+          const prefix = event.event === "ticket_click" ? "ticket" : "event";
           if (eventId) {
-            eventViewCounts.set(
-              eventId,
-              (eventViewCounts.get(eventId) || 0) + 1,
-            );
+            const key = `${prefix}:${eventId}`;
+            eventViewCounts.set(key, (eventViewCounts.get(key) || 0) + 1);
           }
         }
       }
@@ -159,7 +159,7 @@ export async function onRequestPost(context) {
         );
       }
 
-      for (const [eventId, count] of eventViewCounts) {
+      for (const [key, count] of eventViewCounts) {
         if (pvStmts.length >= MAX_BATCH_STATEMENTS) break;
         pvStmts.push(
           env.DB.prepare(
@@ -167,7 +167,7 @@ export async function onRequestPost(context) {
              VALUES (?, ?, ?)
              ON CONFLICT (page, date)
              DO UPDATE SET views = views + ?`,
-          ).bind(`event:${eventId}`, today, count, count),
+          ).bind(key, today, count, count),
         );
       }
 

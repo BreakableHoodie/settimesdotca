@@ -71,7 +71,7 @@ function ComingUp({ bands, currentTime }) {
     >
       {hasNext && (
         <div
-          className="bg-gradient-to-r from-band-orange to-yellow-500 text-band-navy py-3 px-4 shadow-lg"
+          className="bg-gradient-to-r from-accent-500 to-primary-600 text-white py-3 px-4 shadow-lg"
           role="status"
           aria-live="polite"
         >

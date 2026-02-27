@@ -45,7 +45,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-band-navy rounded-lg p-8 max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto">
+        <div className="bg-bg-navy rounded-lg p-8 max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto">
           <div className="text-center text-white">
             <FontAwesomeIcon icon={faMusic} spin className="text-4xl mb-4" />
             <p>Loading performance history...</p>
@@ -58,10 +58,10 @@ export default function PerformanceHistory({ bandName, onClose }) {
   if (error) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-band-navy rounded-lg p-8 max-w-4xl w-full mx-4">
+        <div className="bg-bg-navy rounded-lg p-8 max-w-4xl w-full mx-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-white">Error</h2>
-            <button onClick={onClose} className="text-white hover:text-band-orange transition" aria-label="Close">
+            <button onClick={onClose} className="text-white hover:text-accent-400 transition" aria-label="Close">
               <FontAwesomeIcon icon={faTimes} className="text-2xl" />
             </button>
           </div>
@@ -87,14 +87,14 @@ export default function PerformanceHistory({ bandName, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-band-navy rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-bg-navy rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-white/10">
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <FontAwesomeIcon icon={faMusic} className="text-band-orange" />
+            <FontAwesomeIcon icon={faMusic} className="text-accent-400" />
             Performance History
           </h2>
-          <button onClick={onClose} className="text-white hover:text-band-orange transition" aria-label="Close">
+          <button onClick={onClose} className="text-white hover:text-accent-400 transition" aria-label="Close">
             <FontAwesomeIcon icon={faTimes} className="text-2xl" />
           </button>
         </div>
@@ -129,15 +129,15 @@ export default function PerformanceHistory({ bandName, onClose }) {
           {/* Statistics */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-band-dark rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-band-orange mb-1">{stats.totalShows}</div>
+              <div className="text-3xl font-bold text-accent-400 mb-1">{stats.totalShows}</div>
               <div className="text-white/60 text-sm">Total Shows</div>
             </div>
             <div className="bg-band-dark rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-band-orange mb-1">{stats.uniqueVenues}</div>
+              <div className="text-3xl font-bold text-accent-400 mb-1">{stats.uniqueVenues}</div>
               <div className="text-white/60 text-sm">Unique Venues</div>
             </div>
             <div className="bg-band-dark rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-band-orange mb-1">{stats.uniqueEvents}</div>
+              <div className="text-3xl font-bold text-accent-400 mb-1">{stats.uniqueEvents}</div>
               <div className="text-white/60 text-sm">Unique Events</div>
             </div>
           </div>
@@ -153,7 +153,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
                       {performance.event ? (
                         <>
                           <div className="text-white font-semibold mb-2">
-                            <FontAwesomeIcon icon={faCalendar} className="mr-2 text-band-orange" />
+                            <FontAwesomeIcon icon={faCalendar} className="mr-2 text-accent-400" />
                             {performance.event.name}
                           </div>
                           <div className="text-white/60 text-sm mb-1">

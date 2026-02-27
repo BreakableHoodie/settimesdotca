@@ -308,7 +308,7 @@ describe('ErrorBoundary', () => {
 
       const errorContainer = container.firstChild
       expect(errorContainer).toHaveClass('min-h-screen')
-      expect(errorContainer).toHaveClass('bg-band-navy')
+      expect(errorContainer).toHaveClass('bg-bg-navy')
     })
 
     it('should style buttons appropriately', () => {
@@ -319,7 +319,7 @@ describe('ErrorBoundary', () => {
       )
 
       const refreshButton = screen.getByText('Refresh Page')
-      expect(refreshButton).toHaveClass('bg-band-orange')
+      expect(refreshButton).toHaveClass('bg-accent-500')
       expect(refreshButton).toHaveClass('text-white')
     })
   })

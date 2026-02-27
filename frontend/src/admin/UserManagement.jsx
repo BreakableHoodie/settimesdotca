@@ -239,12 +239,12 @@ export default function UserManagement() {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name or email"
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-56"
           />
           <select
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none"
           >
             <option value="all">All roles</option>
             <option value="admin">Admin</option>
@@ -254,7 +254,7 @@ export default function UserManagement() {
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none"
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -265,7 +265,7 @@ export default function UserManagement() {
               setEditingUser(null)
               setShowUserModal(true)
             }}
-            className="bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
+            className="bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
           >
             <FontAwesomeIcon icon={faPlus} />
             Invite User
@@ -358,7 +358,7 @@ export default function UserManagement() {
                             setSelectedUser(user)
                             setShowResetModal(true)
                           }}
-                          className="text-band-orange hover:text-band-orange/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          className="text-accent-400 hover:text-accent-400/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="Reset Password"
                           disabled={actionLoading}
                         >
@@ -429,7 +429,7 @@ export default function UserManagement() {
                       setSelectedUser(user)
                       setShowResetModal(true)
                     }}
-                    className="px-4 py-2 min-h-[44px] bg-band-orange/80 hover:bg-band-orange text-white rounded text-sm"
+                    className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-white rounded text-sm"
                     disabled={actionLoading}
                   >
                     Reset Password
@@ -489,7 +489,7 @@ export default function UserManagement() {
                 id="resetReason"
                 value={resetReason}
                 onChange={e => setResetReason(e.target.value)}
-                className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
+                className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-none placeholder-gray-400"
                 placeholder="Reason for password reset..."
                 rows={3}
               />
@@ -499,7 +499,7 @@ export default function UserManagement() {
               <button
                 onClick={handleResetPassword}
                 disabled={actionLoading}
-                className="flex-1 min-h-[44px] bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+                className="flex-1 min-h-[44px] bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
               >
                 {actionLoading ? 'Sending...' : 'Send Reset Link'}
               </button>

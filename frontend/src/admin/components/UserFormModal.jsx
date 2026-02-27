@@ -123,7 +123,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               maxLength={FIELD_LIMITS.email.max}
               className={`w-full min-h-[44px] px-3 py-2 rounded-lg bg-white/10 text-white border ${
                 errors.email ? 'border-red-500' : 'border-white/20'
-              } focus:border-band-orange focus:outline-none placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed`}
+              } focus:border-accent-500 focus:outline-none placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed`}
               placeholder="user@example.com"
             />
             {errors.email && <p className="mt-1 text-sm text-red-400">{errors.email}</p>}
@@ -154,7 +154,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               maxLength={FIELD_LIMITS.userFirstName.max}
               className={`w-full min-h-[44px] px-3 py-2 rounded-lg bg-white/10 text-white border ${
                 errors.firstName ? 'border-red-500' : 'border-white/20'
-              } focus:border-band-orange focus:outline-none placeholder-gray-400`}
+              } focus:border-accent-500 focus:outline-none placeholder-gray-400`}
               placeholder="First"
             />
             {errors.firstName && <p className="mt-1 text-sm text-red-400">{errors.firstName}</p>}
@@ -177,7 +177,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               maxLength={FIELD_LIMITS.userLastName.max}
               className={`w-full min-h-[44px] px-3 py-2 rounded-lg bg-white/10 text-white border ${
                 errors.lastName ? 'border-red-500' : 'border-white/20'
-              } focus:border-band-orange focus:outline-none placeholder-gray-400`}
+              } focus:border-accent-500 focus:outline-none placeholder-gray-400`}
               placeholder="Last"
             />
             {errors.lastName && <p className="mt-1 text-sm text-red-400">{errors.lastName}</p>}
@@ -197,7 +197,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
               onChange={e => setFormData({ ...formData, role: e.target.value })}
               className={`w-full min-h-[44px] px-3 py-2 rounded-lg bg-white/10 text-white border ${
                 errors.role ? 'border-red-500' : 'border-white/20'
-              } focus:border-band-orange focus:outline-none`}
+              } focus:border-accent-500 focus:outline-none`}
             >
               <option value="admin">Admin</option>
               <option value="editor">Editor</option>
@@ -230,7 +230,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
             <button
               type="submit"
               disabled={loading}
-              className="min-h-[44px] flex-1 bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+              className="min-h-[44px] flex-1 bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
             >
               {loading ? 'Saving...' : isEditMode ? 'Update User' : 'Send Invite'}
             </button>

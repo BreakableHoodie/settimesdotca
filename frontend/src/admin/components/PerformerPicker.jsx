@@ -33,7 +33,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
   }, [query, uniqueArtists])
 
   return (
-    <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20 space-y-4">
+    <div className="bg-bg-purple p-6 rounded-lg border border-accent-500/20 space-y-4">
       <div className="flex justify-between items-start">
         <div>
           <h3 className="text-lg font-bold text-white">Add to Lineup</h3>
@@ -50,7 +50,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
         ref={inputRef}
         type="text"
         placeholder="Search for an artist..."
-        className="w-full min-h-[44px] px-4 py-3 bg-band-navy border border-white/20 rounded text-white focus:border-band-orange focus:outline-none text-lg"
+        className="w-full min-h-[44px] px-4 py-3 bg-bg-navy border border-white/20 rounded text-white focus:border-accent-500 focus:outline-none text-lg"
         value={query}
         onChange={e => setQuery(e.target.value)}
       />
@@ -66,7 +66,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
               {artist.photo_url ? (
                 <img src={artist.photo_url} alt="" className="w-10 h-10 rounded-full object-cover bg-white/10" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-band-orange/20 flex items-center justify-center text-band-orange font-bold">
+                <div className="w-10 h-10 rounded-full bg-accent-500/20 flex items-center justify-center text-accent-400 font-bold">
                   {artist.name.charAt(0)}
                 </div>
               )}
@@ -77,7 +77,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
                 </div>
               </div>
             </div>
-            <span className="px-3 py-1 bg-band-navy border border-band-orange/30 text-band-orange rounded text-xs uppercase font-medium">
+            <span className="px-3 py-1 bg-bg-navy border border-accent-500/30 text-accent-400 rounded text-xs uppercase font-medium">
               Select
             </span>
           </button>
@@ -87,7 +87,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
             <p className="text-white/50 mb-4">No artist found named &quot;{query}&quot;</p>
             <button
               onClick={() => onSelect(null, query)} // Pass query as name for new artist
-              className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition"
+              className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition"
             >
               + Create &quot;{query}&quot;
             </button>
@@ -96,7 +96,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
       </div>
 
       <div className="flex justify-end pt-2 border-t border-white/10">
-        <button onClick={() => onSelect(null)} className="text-band-orange hover:text-orange-400 text-sm font-medium">
+        <button onClick={() => onSelect(null)} className="text-accent-400 hover:text-accent-300 text-sm font-medium">
           + Create New Artist manually
         </button>
       </div>

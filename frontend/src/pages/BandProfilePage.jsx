@@ -1,30 +1,41 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
-import { Button, Badge, Card, Alert, Loading } from '../components/ui'
-import DOMPurify from 'isomorphic-dompurify'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faBandcamp, faFacebook, faInstagram } from '@fortawesome/free-brands-svg-icons'
 import {
-  faLocationDot,
-  faCalendarDays,
-  faClock,
-  faChartLine,
   faArrowLeft,
+  faCalendarDays,
+  faChartLine,
+  faCheck,
+  faClock,
   faGlobe,
   faGuitar,
+  faLocationDot,
   faPlus,
-  faCheck,
 } from '@fortawesome/free-solid-svg-icons'
-import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
-import BandStats from '../components/BandStats'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import DOMPurify from 'dompurify'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Helmet, HelmetProvider } from 'react-helmet-async'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import BandFacts from '../components/BandFacts'
+import BandStats from '../components/BandStats'
 import Breadcrumbs from '../components/Breadcrumbs'
 import PrivacyBanner from '../components/PrivacyBanner'
-import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
+import { Alert, Badge, Button, Card, Loading } from '../components/ui'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
-import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
+import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 
+const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
+
+/** Only allow http/https URLs; returns '#' for any other scheme (e.g. javascript:) */
+function safeHref(url) {
+  if (!url) return '#'
+  try {
+    const parsed = new URL(url)
+    return ['http:', 'https:'].includes(parsed.protocol) ? url : '#'
+  } catch {
+    return '#'
+  }
+}
 const NBSP_ENTITY_REGEX = /&nbsp;|&#160;|&#xA0;/gi
 
 function stripZeroWidthCharacters(text) {
@@ -48,12 +59,68 @@ function generateScheduleId(bandName, performanceId) {
   return `${bandName.toLowerCase().replace(/\s+/g, '-')}-${performanceId}`
 }
 
-// Reject non-HTTP(S) URLs to prevent javascript: / data: XSS via social links
-function safeHref(url) {
-  if (!url || typeof url !== 'string') return null
-  const trimmed = url.trim()
-  if (/^https?:\/\//i.test(trimmed)) return trimmed
-  return null
+// Get selected bands for an event from localStorage
+function getSelectedBands(eventSlug) {
+  if (typeof window === 'undefined') return []
+  try {
+    const data = localStorage.getItem(SELECTED_BANDS_KEY)
+    if (!data) return []
+    const parsed = JSON.parse(data)
+    return Array.isArray(parsed[eventSlug]) ? parsed[eventSlug] : []
+  } catch {
+    return []
+  }
+}
+
+// Save selected bands for an event to localStorage
+function saveSelectedBands(eventSlug, bandIds) {
+  if (typeof window === 'undefined') return
+  try {
+    const data = localStorage.getItem(SELECTED_BANDS_KEY)
+    const parsed = data ? JSON.parse(data) : {}
+    parsed[eventSlug] = bandIds
+    localStorage.setItem(SELECTED_BANDS_KEY, JSON.stringify(parsed))
+  } catch (err) {
+    console.warn('Failed to save schedule:', err)
+  }
+}
+
+// Check if user has any schedule built (across all events)
+function hasAnySchedule() {
+  if (typeof window === 'undefined') return false
+  try {
+    const data = localStorage.getItem(SELECTED_BANDS_KEY)
+    if (!data) return false
+    const parsed = JSON.parse(data)
+    if (!parsed || typeof parsed !== 'object') return false
+    return Object.values(parsed).some(arr => Array.isArray(arr) && arr.length > 0)
+  } catch {
+    return false
+  }
+}
+
+// Get the most recent event slug with a schedule
+function getScheduleEventSlug() {
+  if (typeof window === 'undefined') return null
+  try {
+    const data = localStorage.getItem(SELECTED_BANDS_KEY)
+    if (!data) return null
+    const parsed = JSON.parse(data)
+    if (!parsed || typeof parsed !== 'object') return null
+    // Return the first event slug that has bands selected
+    for (const [slug, bands] of Object.entries(parsed)) {
+      if (Array.isArray(bands) && bands.length > 0 && slug !== 'default') {
+        return slug
+      }
+    }
+    // Fallback to 'default' if it has bands
+    if (Array.isArray(parsed.default) && parsed.default.length > 0) {
+      return null // Will link to home
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -79,8 +146,6 @@ export default function BandProfilePage() {
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
 
   const isNumericId = useMemo(() => /^\d+$/.test(id || ''), [id])
-  const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://settimes.ca'
-  const canonicalUrl = `${siteOrigin}/band/${profile?.id || id}`
 
   const sanitizedDescription = useMemo(() => {
     if (!profile?.description) return ''
@@ -122,16 +187,12 @@ export default function BandProfilePage() {
   }, [profile?.description])
 
   useEffect(() => {
-    const controller = new AbortController()
-
     const loadProfile = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/bands/stats/${encodeURIComponent(id)}`, {
-          signal: controller.signal,
-        })
+        const response = await fetch(`/api/bands/stats/${encodeURIComponent(id)}`)
 
         if (!response.ok) {
           throw new Error('Band not found')
@@ -145,23 +206,16 @@ export default function BandProfilePage() {
           navigate(`/band/${data.id}`, { replace: true })
         }
       } catch (err) {
-        if (controller.signal.aborted) {
-          return
-        }
         console.error('Failed to load band profile:', err)
         setError(err.message)
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     if (id) {
       loadProfile()
     }
-
-    return () => controller.abort()
   }, [id, isNumericId, navigate])
 
   useEffect(() => {
@@ -191,7 +245,7 @@ export default function BandProfilePage() {
   // Toggle a performance in the schedule
   const toggleSchedule = useCallback(
     performance => {
-      if (!performance.event_slug || !performance.id || !profile?.name) return
+      if (!performance.event_slug || !performance.id) return
 
       const scheduleId = generateScheduleId(profile.name, performance.id)
       const eventSlug = performance.event_slug
@@ -224,7 +278,7 @@ export default function BandProfilePage() {
   )
   if (loading) {
     return (
-      <div className="min-h-screen bg-band-navy flex items-center justify-center">
+      <div className="min-h-screen bg-bg-navy flex items-center justify-center">
         <Loading size="lg" text="Loading band profile..." />
       </div>
     )
@@ -232,7 +286,7 @@ export default function BandProfilePage() {
 
   if (error || !profile) {
     return (
-      <div className="min-h-screen bg-band-navy">
+      <div className="min-h-screen bg-bg-navy">
         <div className="container mx-auto px-4 py-12 max-w-2xl">
           <Alert variant="error" className="mb-6">
             <h2 className="text-xl font-bold mb-2">Band Not Found</h2>
@@ -255,8 +309,8 @@ export default function BandProfilePage() {
   }
 
   return (
-    <>
-      <div className="min-h-screen bg-band-navy">
+    <HelmetProvider>
+      <div className="min-h-screen bg-bg-navy">
         {/* SEO Meta Tags */}
         <Helmet>
           <title>{profile.name} - Band Profile | SetTimes</title>
@@ -278,8 +332,8 @@ export default function BandProfilePage() {
           <meta property="og:description" content={plainDescription || `${profile.name} on SetTimes`} />
           <meta property="og:type" content="profile" />
           {profile.photo_url && <meta property="og:image" content={profile.photo_url} />}
-          <meta property="og:url" content={canonicalUrl} />
-          <link rel="canonical" href={canonicalUrl} />
+          <meta property="og:url" content={`https://settimes.ca/band/${profile?.id || id}`} />
+          <link rel="canonical" href={`https://settimes.ca/band/${profile?.id || id}`} />
 
           {/* Twitter Card */}
           <meta name="twitter:card" content="summary_large_image" />
@@ -296,7 +350,7 @@ export default function BandProfilePage() {
               genre: profile.genre,
               description: plainDescription,
               image: profile.photo_url,
-              url: canonicalUrl,
+              url: `https://settimes.ca/band/${profile?.id || id}`,
               ...(profile.origin && { foundingLocation: profile.origin }),
               ...(profile.social && {
                 sameAs: [
@@ -346,28 +400,28 @@ export default function BandProfilePage() {
 
         <div className="container mx-auto px-4 pb-8 max-w-6xl">
           {/* Sports Card Hero Section */}
-          <div className="bg-band-purple rounded-xl border-2 border-band-orange/30 overflow-hidden mb-6 shadow-xl">
+          <div className="bg-bg-purple rounded-xl border-2 border-accent-500/30 overflow-hidden mb-6 shadow-xl">
             {/* Band Photo with Overlay */}
             {profile.photo_url ? (
-              <div className="relative h-80 bg-gradient-to-b from-band-navy via-band-purple to-band-navy overflow-hidden">
+              <div className="relative h-80 bg-gradient-to-b from-bg-navy via-bg-purple to-bg-navy overflow-hidden">
                 <img
                   src={profile.photo_url}
                   alt={profile.name}
                   loading="lazy"
                   className="w-full h-full object-cover opacity-60"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-band-purple via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-bg-purple via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-3">{profile.name}</h1>
                   <div className="flex flex-wrap gap-3">
                     {profile.genre && (
-                      <span className="px-4 py-2 bg-band-orange text-white rounded-lg font-bold text-sm shadow-lg">
+                      <span className="px-4 py-2 bg-accent-500 text-white rounded-lg font-bold text-sm shadow-lg">
                         <FontAwesomeIcon icon={faGuitar} className="mr-2" aria-hidden="true" />
                         {profile.genre}
                       </span>
                     )}
                     {profile.origin && (
-                      <span className="px-4 py-2 bg-band-purple border-2 border-white/30 text-white rounded-lg font-bold text-sm shadow-lg">
+                      <span className="px-4 py-2 bg-bg-purple border-2 border-white/30 text-white rounded-lg font-bold text-sm shadow-lg">
                         <FontAwesomeIcon icon={faLocationDot} className="mr-2" aria-hidden="true" />
                         {profile.origin}
                       </span>
@@ -376,17 +430,17 @@ export default function BandProfilePage() {
                 </div>
               </div>
             ) : (
-              <div className="p-8 bg-gradient-to-br from-band-purple to-band-navy">
+              <div className="p-8 bg-gradient-to-br from-bg-purple to-bg-navy">
                 <h1 className="text-5xl font-bold text-white mb-3">{profile.name}</h1>
                 <div className="flex flex-wrap gap-3">
                   {profile.genre && (
-                    <span className="px-4 py-2 bg-band-orange text-white rounded-lg font-bold text-sm">
+                    <span className="px-4 py-2 bg-accent-500 text-white rounded-lg font-bold text-sm">
                       <FontAwesomeIcon icon={faGuitar} className="mr-2" aria-hidden="true" />
                       {profile.genre}
                     </span>
                   )}
                   {profile.origin && (
-                    <span className="px-4 py-2 bg-band-navy border-2 border-white/30 text-white rounded-lg font-bold text-sm">
+                    <span className="px-4 py-2 bg-bg-navy border-2 border-white/30 text-white rounded-lg font-bold text-sm">
                       <FontAwesomeIcon icon={faLocationDot} className="mr-2" aria-hidden="true" />
                       {profile.origin}
                     </span>
@@ -397,7 +451,7 @@ export default function BandProfilePage() {
 
             {/* Bio and Social Links */}
             {(profile.description || profile.social) && (
-              <div className="p-6 bg-band-purple/50 border-t border-white/10">
+              <div className="p-6 bg-bg-purple/50 border-t border-white/10">
                 {profile.description && (
                   <div
                     className="mb-4 text-white/90 text-sm leading-relaxed [&_p]:my-2 [&_a]:text-accent-500 [&_a:hover]:underline"
@@ -415,12 +469,12 @@ export default function BandProfilePage() {
                 )}
                 {profile.social && (
                   <div className="flex flex-wrap gap-3">
-                    {safeHref(profile.social.website) && (
+                    {profile.social.website && (
                       <a
                         href={safeHref(profile.social.website)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                        className="px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
                         onClick={() => trackSocialClick(profile.id, 'website')}
                       >
                         <FontAwesomeIcon icon={faGlobe} />
@@ -439,7 +493,7 @@ export default function BandProfilePage() {
                         Instagram
                       </a>
                     )}
-                    {safeHref(profile.social.bandcamp) && (
+                    {profile.social.bandcamp && (
                       <a
                         href={safeHref(profile.social.bandcamp)}
                         target="_blank"
@@ -451,7 +505,7 @@ export default function BandProfilePage() {
                         Bandcamp
                       </a>
                     )}
-                    {safeHref(profile.social.facebook) && (
+                    {profile.social.facebook && (
                       <a
                         href={safeHref(profile.social.facebook)}
                         target="_blank"
@@ -621,6 +675,6 @@ export default function BandProfilePage() {
         </div>
         <PrivacyBanner />
       </div>
-    </>
+    </HelmetProvider>
   )
 }

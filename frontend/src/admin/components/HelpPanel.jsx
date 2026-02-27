@@ -31,7 +31,7 @@ export default function HelpPanel({ topic = 'events', isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-band-purple border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+      <div className="bg-bg-purple border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-widest text-white/60">Quick Reference</p>
@@ -60,7 +60,7 @@ export default function HelpPanel({ topic = 'events', isOpen, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="w-full bg-band-orange text-white font-semibold py-2 px-4 rounded-lg hover:bg-orange-500 transition"
+          className="w-full bg-accent-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-accent-600 transition"
         >
           Got it
         </button>

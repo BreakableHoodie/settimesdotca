@@ -436,11 +436,7 @@ export default function EventWizard({ onComplete, onCancel }) {
           <div
             key={step}
             className={`flex-1 text-center ${
-              idx === currentStep
-                ? 'text-accent-400 font-bold'
-                : idx < currentStep
-                  ? 'text-green-400'
-                  : 'text-gray-500'
+              idx === currentStep ? 'text-accent-400 font-bold' : idx < currentStep ? 'text-green-400' : 'text-gray-500'
             }`}
           >
             <div className="text-sm capitalize">{step}</div>

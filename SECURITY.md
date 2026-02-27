@@ -61,7 +61,7 @@ wrangler d1 execute settimes-db --command="INSERT INTO invite_codes..."
 POST /api/admin/auth/signup
 {
   "email": "user@example.com",
-  "password": "SecurePassword123!",
+  "password": "<your-strong-password>",
   "name": "User Name",
   "inviteCode": "generated-uuid-here"
 }

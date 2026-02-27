@@ -92,7 +92,9 @@ export async function onRequestGet(context) {
       {
         headers: {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*", // Allow anyone to consume
+          // Intentional wildcard: this is a public, credential-free, read-only endpoint.
+          // Do NOT add Access-Control-Allow-Credentials: true here.
+          "Access-Control-Allow-Origin": "*",
           "Cache-Control": "public, max-age=300", // Cache for 5 minutes
         },
       },

@@ -28,19 +28,19 @@ export default function MetricsDashboard({ eventId }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Schedule Builds */}
-        <div className="bg-band-purple rounded-lg p-4">
+        <div className="bg-bg-purple rounded-lg p-4">
           <div className="text-gray-400 text-sm">Schedule Builds</div>
           <div className="text-3xl font-bold text-white mt-2">{metrics.totalScheduleBuilds}</div>
         </div>
 
         {/* Unique Visitors */}
-        <div className="bg-band-purple rounded-lg p-4">
+        <div className="bg-bg-purple rounded-lg p-4">
           <div className="text-gray-400 text-sm">Unique Visitors</div>
           <div className="text-3xl font-bold text-white mt-2">{metrics.uniqueVisitors}</div>
         </div>
 
         {/* Last Updated */}
-        <div className="bg-band-purple rounded-lg p-4">
+        <div className="bg-bg-purple rounded-lg p-4">
           <div className="text-gray-400 text-sm">Last Activity</div>
           <div className="text-lg text-white mt-2">
             {metrics.lastUpdated ? new Date(metrics.lastUpdated).toLocaleDateString() : 'Never'}
@@ -49,7 +49,7 @@ export default function MetricsDashboard({ eventId }) {
       </div>
 
       {/* Popular Bands */}
-      <div className="bg-band-purple rounded-lg p-4">
+      <div className="bg-bg-purple rounded-lg p-4">
         <h4 className="text-white font-semibold mb-3">Most Added Bands</h4>
         <div className="space-y-2">
           {metrics.popularBands.length > 0 ? (

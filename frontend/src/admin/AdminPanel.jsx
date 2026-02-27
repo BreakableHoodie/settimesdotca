@@ -244,7 +244,7 @@ export default function AdminPanel({ onLogout }) {
       </header>
 
       {/* Tab Navigation */}
-      <div className="bg-band-purple border-b border-band-orange/20 hidden md:block">
+      <div className="bg-bg-purple border-b border-accent-500/20 hidden md:block">
         <div className="container mx-auto px-4">
           <div className="flex gap-1 sm:gap-2 overflow-x-auto">
             {tabs.map(tab => (
@@ -253,8 +253,8 @@ export default function AdminPanel({ onLogout }) {
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap min-h-[48px] flex items-center ${
                   activeTab === tab.id
-                    ? 'text-band-orange border-b-2 border-band-orange'
-                    : 'text-white/70 hover:text-white hover:bg-band-navy/30'
+                    ? 'text-accent-400 border-b-2 border-accent-500'
+                    : 'text-white/70 hover:text-white hover:bg-bg-navy/30'
                 }`}
               >
                 {tab.label}
@@ -322,7 +322,7 @@ export default function AdminPanel({ onLogout }) {
       {/* Event Wizard Modal */}
       {showWizard && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <EventWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} />
           </div>
         </div>

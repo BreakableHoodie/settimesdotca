@@ -21,7 +21,7 @@ export default function PrivacyBanner() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-band-navy/95 px-4 py-3 text-sm text-gray-300 backdrop-blur">
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-bg-navy/95 px-4 py-3 text-sm text-gray-300 backdrop-blur">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p>We collect anonymous usage data to improve artist profiles. No personal data is stored.</p>
         <button

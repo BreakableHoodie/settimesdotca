@@ -39,7 +39,7 @@ function BasicsStep({ eventData, onChange }) {
           type="text"
           value={eventData.name}
           onChange={e => handleNameChange(e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
           placeholder="Long Weekend Band Crawl Vol. 6"
           required
         />
@@ -54,7 +54,7 @@ function BasicsStep({ eventData, onChange }) {
           type="date"
           value={eventData.date}
           onChange={e => handleChange('date', e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
           required
         />
       </div>
@@ -68,7 +68,7 @@ function BasicsStep({ eventData, onChange }) {
           type="text"
           value={eventData.slug}
           onChange={e => handleChange('slug', e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
           placeholder="vol-6"
           required
         />
@@ -83,7 +83,7 @@ function BasicsStep({ eventData, onChange }) {
           id="event-description"
           value={eventData.description}
           onChange={e => handleChange('description', e.target.value)}
-          className="w-full min-h-[96px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[96px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
           rows={3}
           placeholder="Describe your event..."
         />
@@ -128,7 +128,7 @@ function VenuesStep({ eventData: _eventData, onChange }) {
 
       <div className="space-y-3">
         {venues.map(venue => (
-          <div key={venue.id} className="bg-band-navy rounded p-3 flex justify-between items-center">
+          <div key={venue.id} className="bg-bg-navy rounded p-3 flex justify-between items-center">
             <div>
               <div className="text-white font-medium">{venue.name}</div>
               {venue.address && <div className="text-gray-400 text-sm">{venue.address}</div>}
@@ -147,20 +147,20 @@ function VenuesStep({ eventData: _eventData, onChange }) {
             type="text"
             value={newVenue.name}
             onChange={e => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
             placeholder="Venue name"
           />
           <input
             type="text"
             value={newVenue.address}
             onChange={e => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
             placeholder="Address (optional)"
           />
           <button
             type="button"
             onClick={handleAddVenue}
-            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
+            className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600"
           >
             Add Venue
           </button>
@@ -223,7 +223,7 @@ function BandsStep({ eventData, onChange }) {
         {bands.map(band => {
           const venue = eventData.venues.find(v => v.id === band.venueId)
           return (
-            <div key={band.id} className="bg-band-navy rounded p-3 flex justify-between items-center">
+            <div key={band.id} className="bg-bg-navy rounded p-3 flex justify-between items-center">
               <div>
                 <div className="text-white font-medium">{band.name}</div>
                 <div className="text-gray-400 text-sm">
@@ -245,14 +245,14 @@ function BandsStep({ eventData, onChange }) {
             type="text"
             value={newBand.name}
             onChange={e => setNewBand(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
             placeholder="Band name"
           />
 
           <select
             value={newBand.venueId}
             onChange={e => setNewBand(prev => ({ ...prev, venueId: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
           >
             <option value="">Select venue</option>
             {eventData.venues.map(venue => (
@@ -267,14 +267,14 @@ function BandsStep({ eventData, onChange }) {
               type="time"
               value={newBand.startTime}
               onChange={e => setNewBand(prev => ({ ...prev, startTime: e.target.value }))}
-              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
               placeholder="Start time"
             />
             <input
               type="time"
               value={newBand.endTime}
               onChange={e => setNewBand(prev => ({ ...prev, endTime: e.target.value }))}
-              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
               placeholder="End time"
             />
           </div>
@@ -283,14 +283,14 @@ function BandsStep({ eventData, onChange }) {
             type="url"
             value={newBand.url}
             onChange={e => setNewBand(prev => ({ ...prev, url: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
             placeholder="Band website/social media (optional)"
           />
 
           <button
             type="button"
             onClick={handleAddBand}
-            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
+            className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600"
           >
             Add Band
           </button>
@@ -306,7 +306,7 @@ function PublishStep({ eventData }) {
     <div className="space-y-4">
       <h3 className="text-xl font-bold text-white mb-4">Review & Publish</h3>
 
-      <div className="bg-band-navy rounded p-4 space-y-3">
+      <div className="bg-bg-navy rounded p-4 space-y-3">
         <div>
           <span className="text-gray-400 text-sm">Event Name:</span>
           <div className="text-white font-medium">{eventData.name}</div>
@@ -429,7 +429,7 @@ export default function EventWizard({ onComplete, onCancel }) {
   }
 
   return (
-    <div className="bg-band-purple rounded-lg p-6">
+    <div className="bg-bg-purple rounded-lg p-6">
       {/* Progress indicator */}
       <div className="flex justify-between mb-8">
         {STEPS.map((step, idx) => (
@@ -437,7 +437,7 @@ export default function EventWizard({ onComplete, onCancel }) {
             key={step}
             className={`flex-1 text-center ${
               idx === currentStep
-                ? 'text-band-orange font-bold'
+                ? 'text-accent-400 font-bold'
                 : idx < currentStep
                   ? 'text-green-400'
                   : 'text-gray-500'
@@ -464,7 +464,7 @@ export default function EventWizard({ onComplete, onCancel }) {
           <button
             onClick={handleNext}
             disabled={!canProceed()}
-            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50"
+            className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50"
           >
             Next
           </button>

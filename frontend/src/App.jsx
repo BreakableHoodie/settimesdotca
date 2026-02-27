@@ -3,7 +3,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useParams } from 'react-router-dom'
-import BackToTop from './components/BackToTop'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
 import Footer from './components/Footer'
@@ -11,12 +10,11 @@ import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
 import PrivacyBanner from './components/PrivacyBanner'
 import ScheduleView from './components/ScheduleView'
-import VenueInfo from './components/VenueInfo'
-import { BandCardSkeletonGrid } from './components/ui/Skeleton'
-import { validateBandsData } from './utils/validation'
 import { trackEventView, trackPageView } from './utils/metrics'
+import { validateBandsData } from './utils/validation'
 
 const MySchedule = lazy(() => import('./components/MySchedule'))
+const VenueInfo = lazy(() => import('./components/VenueInfo'))
 
 const DEBUG_TIME_STORAGE_KEY = 'debugScheduleTime'
 
@@ -329,20 +327,8 @@ function App() {
 
   if (shouldShowLoading) {
     return (
-      <div className="min-h-screen pb-20">
-        <Header view={view} setView={setView} selectedCount={selectedBands.length} />
-        <section className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6" aria-hidden="true">
-          <div className="h-16 sm:h-20 rounded-xl bg-bg-purple/40 border border-white/10" />
-        </section>
-        <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
-          <div className="h-6 w-48 rounded bg-bg-purple/40 border border-white/10" aria-hidden="true" />
-          <div className="py-6">
-            <BandCardSkeletonGrid count={6} />
-          </div>
-        </main>
-        <Footer />
-        <BackToTop />
-        <PrivacyBanner />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-accent-400 text-xl">Loading...</div>
       </div>
     )
   }
@@ -355,10 +341,10 @@ function App() {
             <FontAwesomeIcon icon={faCircleExclamation} />
           </div>
           <h2 className="text-white text-2xl font-bold mb-2">Oops! Something went wrong</h2>
-          <p className="text-band-orange mb-6">{error}</p>
+          <p className="text-accent-400 mb-6">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-band-orange text-band-navy font-semibold rounded-lg hover:brightness-110 transition-all"
+            className="px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-all"
           >
             Refresh Page
           </button>
@@ -376,12 +362,12 @@ function App() {
         <title>{eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'}</title>
       </Helmet>
       <OfflineIndicator />
-      <Header view={view} setView={setView} selectedCount={selectedBands.length} />
+      <Header view={view} setView={setView} />
       <ComingUp bands={myBands} currentTime={effectiveNow} />
-      <main id="main-content" className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
+      <main className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
         <Breadcrumbs items={breadcrumbs} />
         {debugEnabled && (
-          <section className="bg-band-purple/80 border border-band-orange/30 rounded-lg p-4">
+          <section className="bg-bg-purple/80 border border-accent-500/30 rounded-lg p-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
                 <h2 className="text-white font-semibold text-lg">Realtime Test Time</h2>
@@ -406,12 +392,12 @@ function App() {
                     const parsed = parseDebugTime(value)
                     setDebugTime(parsed)
                   }}
-                  className="px-3 py-2 rounded bg-band-navy text-white border border-white/20 focus:border-band-orange focus:outline-none text-sm"
+                  className="px-3 py-2 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setDebugTime(new Date())}
-                  className="px-3 py-2 rounded bg-band-orange/20 border border-band-orange/40 text-band-orange text-sm hover:bg-band-orange/30"
+                  className="px-3 py-2 rounded bg-accent-500/20 border border-accent-500/40 text-accent-400 text-sm hover:bg-accent-500/30"
                 >
                   Set to now
                 </button>
@@ -452,14 +438,20 @@ function App() {
               showPast={showPast}
               onToggleShowPast={toggleShowPast}
               nowOverride={debugTime}
-              onBrowseAll={() => setView('all')}
             />
           </Suspense>
         )}
       </main>
-      <VenueInfo eventData={eventData} />
+      <Suspense
+        fallback={
+          <div className="py-12 text-center text-white/60" role="status" aria-live="polite">
+            Loading venue tips...
+          </div>
+        }
+      >
+        <VenueInfo eventData={eventData} />
+      </Suspense>
       <Footer />
-      <BackToTop />
       <PrivacyBanner />
     </div>
   )

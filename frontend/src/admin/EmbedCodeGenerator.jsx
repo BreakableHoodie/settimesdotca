@@ -15,15 +15,15 @@ export default function EmbedCodeGenerator({ event }) {
   }
 
   return (
-    <div className="bg-band-purple rounded-lg p-4">
+    <div className="bg-bg-purple rounded-lg p-4">
       <h3 className="text-white font-bold mb-2">Embed on Your Website</h3>
       <p className="text-gray-400 text-sm mb-4">Copy this code and paste it into your website&apos;s HTML</p>
 
-      <pre className="bg-band-navy p-3 rounded text-sm text-white overflow-x-auto mb-4">{embedCode}</pre>
+      <pre className="bg-bg-navy p-3 rounded text-sm text-white overflow-x-auto mb-4">{embedCode}</pre>
 
       <button
         onClick={handleCopy}
-        className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
+        className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600"
       >
         Copy Code
       </button>

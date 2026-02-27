@@ -38,7 +38,7 @@ if (typeof window !== 'undefined' && import.meta.env.DEV) {
 function LoadingFallback() {
   return (
     <div
-      className="flex items-center justify-center min-h-screen bg-gradient-to-br from-band-navy to-band-purple"
+      className="flex items-center justify-center min-h-screen bg-gradient-to-br from-bg-navy to-bg-purple"
       role="status"
       aria-live="polite"
     >

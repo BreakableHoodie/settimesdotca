@@ -1,21 +1,18 @@
-import { useMemo, useState, useEffect, useRef, memo, useTransition, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { Button, Badge, Card, Alert } from './ui'
-import { EventCardSkeletonList } from './ui/Skeleton'
-import { slugifyBandName } from '../utils/slugify'
-import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
-import { getSelectedCountByEvent, SELECTED_BANDS_KEY } from '../utils/scheduleStorage'
-import { trackTicketClick } from '../utils/metrics'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-  faCircle,
   faCalendarDays,
+  faCircle,
   faClock,
   faClockRotateLeft,
   faFilter,
   faLocationDot,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Link } from 'react-router-dom'
+import { slugifyBandName } from '../utils/slugify'
+import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
+import { Alert, Badge, Button, Card, Loading } from './ui'
 
 /**
  * EventTimeline - Main timeline showing Now, Upcoming, and Past events
@@ -33,27 +30,8 @@ export default function EventTimeline() {
   const [detailsById, setDetailsById] = useState({})
   const [detailsLoading, setDetailsLoading] = useState({})
 
-  const [savedCounts, setSavedCounts] = useState(() => getSelectedCountByEvent())
-
   // Use transition for non-urgent UI updates to improve INP
   const [, startTransition] = useTransition()
-
-  // Refresh saved counts when localStorage changes (cross-tab or tab refocus)
-  useEffect(() => {
-    const refresh = () => setSavedCounts(getSelectedCountByEvent())
-    const handleStorage = e => {
-      if (e.key === SELECTED_BANDS_KEY) refresh()
-    }
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') refresh()
-    }
-    window.addEventListener('storage', handleStorage)
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => {
-      window.removeEventListener('storage', handleStorage)
-      document.removeEventListener('visibilitychange', handleVisibility)
-    }
-  }, [])
 
   // Fetch timeline data
   const pollRef = useRef(null)
@@ -182,15 +160,13 @@ export default function EventTimeline() {
 
   // Get unique venues and months for filters
   const allVenues = useMemo(() => {
-    const venueMap = new Map()
-    for (const event of [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]) {
-      for (const v of event.venues || []) {
-        if (!venueMap.has(v.id)) {
-          venueMap.set(v.id, { id: v.id, name: v.name })
-        }
-      }
-    }
-    return Array.from(venueMap.values())
+    return Array.from(
+      new Set(
+        [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
+          .flatMap(event => event.venues || [])
+          .map(v => JSON.stringify({ id: v.id, name: v.name }))
+      )
+    ).map(v => JSON.parse(v))
   }, [timeline])
 
   const allMonths = useMemo(() => {
@@ -232,15 +208,7 @@ export default function EventTimeline() {
   const hasActiveFilters = filters.venue !== null || filters.month !== null
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-text-primary mb-2">Events</h1>
-          <p className="text-text-secondary">Discover upcoming band crawls and music events</p>
-        </div>
-        <EventCardSkeletonList count={2} />
-      </div>
-    )
+    return <Loading size="lg" text="Loading events..." fullScreen={false} />
   }
 
   if (error) {
@@ -302,7 +270,7 @@ export default function EventTimeline() {
                 <select
                   id="timeline-venue-filter"
                   value={filters.venue || ''}
-                  onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value, 10) : null)}
+                  onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value) : null)}
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
                 >
                   <option value="">All Venues</option>
@@ -369,7 +337,6 @@ export default function EventTimeline() {
                   details={detailsById[event.id]}
                   detailsLoading={detailsLoading[event.id]}
                   onLoadDetails={loadDetails}
-                  savedCount={event.slug ? savedCounts[event.slug] || 0 : 0}
                 />
               ))}
             </div>
@@ -392,7 +359,6 @@ export default function EventTimeline() {
                   details={detailsById[event.id]}
                   detailsLoading={detailsLoading[event.id]}
                   onLoadDetails={loadDetails}
-                  savedCount={event.slug ? savedCounts[event.slug] || 0 : 0}
                 />
               ))}
             </div>
@@ -422,7 +388,6 @@ export default function EventTimeline() {
                     details={detailsById[event.id]}
                     detailsLoading={detailsLoading[event.id]}
                     onLoadDetails={loadDetails}
-                    savedCount={event.slug ? savedCounts[event.slug] || 0 : 0}
                   />
                 ))}
               </div>
@@ -462,7 +427,6 @@ function EventCard({
   details,
   detailsLoading = false,
   onLoadDetails,
-  savedCount = 0,
 }) {
   const [expanded, setExpanded] = useState(isLive) // Auto-expand live events
 
@@ -541,11 +505,6 @@ function EventCard({
                 <span className="font-bold text-text-primary">{allVenueCount}</span>
                 <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
               </div>
-              {savedCount > 0 && (
-                <Badge variant="warning" size="sm">
-                  {savedCount} saved
-                </Badge>
-              )}
             </div>
           </div>
 
@@ -574,7 +533,6 @@ function EventCard({
                 variant="primary"
                 size="md"
                 className="w-full sm:w-auto sm:min-w-[160px]"
-                onClick={() => trackTicketClick(event.id)}
               >
                 Get Tickets
               </Button>

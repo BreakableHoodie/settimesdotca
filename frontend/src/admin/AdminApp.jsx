@@ -181,8 +181,8 @@ export default function AdminApp() {
   // Show loading state while checking session
   if (checking) {
     return (
-      <div className="min-h-screen bg-band-navy flex items-center justify-center">
-        <div className="text-band-orange text-lg">Loading...</div>
+      <div className="min-h-screen bg-bg-navy flex items-center justify-center">
+        <div className="text-accent-400 text-lg">Loading...</div>
       </div>
     )
   }

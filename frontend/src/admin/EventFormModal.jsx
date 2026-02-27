@@ -262,11 +262,11 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-band-orange/30">
+      <div className="bg-bg-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-accent-500/30">
         <div className="p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-band-orange">{isEditing ? 'Edit Event' : 'Create New Event'}</h2>
+            <h2 className="text-2xl font-bold text-accent-400">{isEditing ? 'Edit Event' : 'Create New Event'}</h2>
             <button
               onClick={onClose}
               className="text-white/50 hover:text-white text-2xl transition-colors"
@@ -278,7 +278,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
 
           {/* Creator Info (when editing) */}
           {isEditing && event.created_at && (
-            <div className="mb-4 p-3 bg-band-navy/30 rounded border border-band-orange/10 text-sm text-white/70">
+            <div className="mb-4 p-3 bg-bg-navy/30 rounded border border-accent-500/10 text-sm text-white/70">
               <div>Created: {new Date(event.created_at).toLocaleString()}</div>
               {event.updated_at && event.updated_at !== event.created_at && (
                 <div>Last updated: {new Date(event.updated_at).toLocaleString()}</div>
@@ -304,7 +304,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="name"
                 value={formData.name}
                 onChange={handleNameChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 required
                 placeholder="Long Weekend Band Crawl Vol. 6"
                 minLength={FIELD_LIMITS.eventName.min}
@@ -326,7 +326,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="slug"
                 value={formData.slug}
                 onChange={handleSlugChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange font-mono text-sm"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 font-mono text-sm"
                 required
                 placeholder="vol-6"
                 pattern="[a-z0-9\-]+"
@@ -352,7 +352,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="date"
                 value={formData.date}
                 onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 required
                 min={!isEditing && formData.status !== 'archived' ? today : undefined}
               />
@@ -375,7 +375,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
-                className="w-full min-h-[120px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[120px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 rows={4}
                 maxLength={FIELD_LIMITS.eventDescription.max}
                 placeholder="Describe the event..."
@@ -396,7 +396,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="city"
                 value={formData.city}
                 onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 maxLength={FIELD_LIMITS.eventCity.max}
                 placeholder="Kitchener"
               />
@@ -416,7 +416,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="ticket_url"
                 value={formData.ticket_url}
                 onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 maxLength={FIELD_LIMITS.ticketLink.max}
                 placeholder="https://tickets.example.com"
               />
@@ -437,7 +437,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_website"
                   value={formData.social_website}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="Website URL"
                 />
@@ -447,7 +447,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_instagram"
                   value={formData.social_instagram}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="Instagram (@handle or URL)"
                 />
@@ -457,7 +457,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_facebook"
                   value={formData.social_facebook}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="Facebook URL"
                 />
@@ -467,7 +467,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_x"
                   value={formData.social_x}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="X / Twitter (@handle or URL)"
                 />
@@ -477,7 +477,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_tiktok"
                   value={formData.social_tiktok}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="TikTok (@handle or URL)"
                 />
@@ -487,7 +487,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_youtube"
                   value={formData.social_youtube}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="YouTube URL"
                 />
@@ -507,7 +507,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="status"
                 value={formData.status}
                 onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>

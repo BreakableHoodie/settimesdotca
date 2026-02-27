@@ -4,7 +4,7 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-band-navy rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+      <div className="bg-bg-navy rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
         {/* Header */}
         <div className="p-6 border-b border-gray-700">
           <h3 className="text-xl font-bold text-white">Preview Changes</h3>

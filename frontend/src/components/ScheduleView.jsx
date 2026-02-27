@@ -158,7 +158,7 @@ function ScheduleView({
         <div className="flex-1 text-center sm:text-left">
           <h2 className="text-2xl font-bold text-white text-center">Full Lineup</h2>
           {!showPast && hiddenFinished > 0 && (
-            <p className="text-xs text-band-orange/80 mt-1 text-center sm:text-left">
+            <p className="text-xs text-accent-400/80 mt-1 text-center sm:text-left">
               {hiddenFinished} finished {hiddenFinished === 1 ? 'set hidden' : 'sets hidden'}
             </p>
           )}
@@ -167,10 +167,10 @@ function ScheduleView({
           {finishedCount > 0 && (
             <button
               onClick={onToggleShowPast}
-              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
+              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 showPast
-                  ? 'bg-band-orange/20 border-band-orange/50 text-band-orange hover:bg-band-orange/30'
-                  : 'bg-band-purple/50 border-band-orange/50 text-band-orange hover:bg-band-purple'
+                  ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
+                  : 'bg-bg-purple/50 border-accent-500/50 text-accent-400 hover:bg-bg-purple'
               }`}
               title={showPast ? 'Hide finished sets' : 'Show finished sets'}
               aria-label={showPast ? 'Hide finished sets' : 'Show finished sets'}
@@ -180,7 +180,7 @@ function ScheduleView({
           )}
           <button
             onClick={handleCopyAll}
-            className="text-xs px-3 py-1.5 min-h-[44px] rounded bg-band-purple/60 border border-band-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-band-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange"
+            className="text-xs px-3 py-1.5 min-h-[44px] rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400"
             title={copyAllLabel === 'Copied!' ? 'Full schedule copied to clipboard' : 'Copy the full schedule'}
             aria-label="Copy the full schedule"
             disabled={isCopyingAll}
@@ -191,10 +191,10 @@ function ScheduleView({
           <button
             onClick={onSelectAll}
             disabled={allSelected}
-            className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
+            className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
               allSelected
                 ? 'bg-gray-500/20 border border-gray-500/50 text-gray-400 cursor-not-allowed'
-                : 'bg-band-orange/20 border border-band-orange/50 text-band-orange hover:bg-band-orange/30'
+                : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
             }`}
             title={allSelected ? 'All bands already selected' : 'Select all bands'}
           >
@@ -265,15 +265,15 @@ function ScheduleView({
           {nowPlaying.length > 0 && (
             <div className="relative">
               <div className="flex items-center mb-4">
-                <div className="bg-band-orange text-band-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                <div className="bg-accent-500 text-bg-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
                   <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-band-navy/60"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-band-navy"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-bg-navy/60"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-bg-navy"></span>
                   </span>
                   <FontAwesomeIcon icon={faMusic} aria-hidden="true" />
                   NOW PLAYING
                 </div>
-                <div className="flex-1 h-1 bg-band-orange ml-4"></div>
+                <div className="flex-1 h-1 bg-accent-500 ml-4"></div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
                 {nowPlaying.map(band => (
@@ -293,18 +293,18 @@ function ScheduleView({
           {upcomingByTime.length > 0 && (
             <div className="space-y-8">
               <div className="flex items-center mb-4">
-                <div className="bg-band-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                <div className="bg-bg-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   UPCOMING
                 </div>
-                <div className="flex-1 h-0.5 bg-band-purple/30 ml-4"></div>
+                <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
               </div>
               {upcomingByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4">
                   <div className="flex items-center mb-4">
-                    <div className="bg-band-navy text-white font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <div className="bg-bg-navy text-white font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                     </div>
-                    <div className="flex-1 h-0.5 bg-band-navy/20 ml-4"></div>
+                    <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
                     {timeBands.map(band => (

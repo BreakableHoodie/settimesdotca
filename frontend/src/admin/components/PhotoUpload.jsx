@@ -180,7 +180,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
         className={`
           relative border-2 border-dashed rounded-lg overflow-hidden
           transition-all duration-200
-          ${dragActive ? 'border-band-orange bg-band-orange/10' : 'border-white/20'}
+          ${dragActive ? 'border-accent-500 bg-accent-500/10' : 'border-white/20'}
           ${preview ? 'h-64' : 'h-48'}
         `}
         onDragEnter={handleDrag}
@@ -199,7 +199,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
                 type="button"
                 onClick={handleClick}
                 disabled={uploading}
-                className="min-h-[44px] bg-band-orange hover:bg-band-orange/90 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+                className="min-h-[44px] bg-accent-500 hover:bg-accent-500/90 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
               >
                 <FontAwesomeIcon icon={faUpload} />
                 Change Photo

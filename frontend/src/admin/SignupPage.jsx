@@ -120,8 +120,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-band-navy flex items-center justify-center p-4">
-      <div className="bg-band-purple rounded-lg shadow-lg p-8 max-w-md w-full">
+    <div className="min-h-screen bg-bg-navy flex items-center justify-center p-4">
+      <div className="bg-bg-purple rounded-lg shadow-lg p-8 max-w-md w-full">
         <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
         <p className="text-gray-400 mb-6">Create your SetTimes account</p>
 
@@ -132,7 +132,7 @@ export default function SignupPage() {
             {activationInfo.activationUrl && (
               <div className="mb-4 text-sm text-gray-300 break-all">
                 Activation link:{' '}
-                <a href={activationInfo.activationUrl} className="text-band-orange hover:underline">
+                <a href={activationInfo.activationUrl} className="text-accent-400 hover:underline">
                   {activationInfo.activationUrl}
                 </a>
               </div>
@@ -142,7 +142,7 @@ export default function SignupPage() {
               type="button"
               onClick={handleResend}
               disabled={resendStatus.loading}
-              className="w-full min-h-[44px] px-4 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors font-semibold"
+              className="w-full min-h-[44px] px-4 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 transition-colors font-semibold"
             >
               {resendStatus.loading ? 'Sending...' : 'Resend activation email'}
             </button>
@@ -173,7 +173,7 @@ export default function SignupPage() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   placeholder="you@example.com"
                   required
                 />
@@ -191,7 +191,7 @@ export default function SignupPage() {
                   onChange={handleChange}
                   minLength={FIELD_LIMITS.password.min}
                   maxLength={FIELD_LIMITS.password.max}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   placeholder={`${FIELD_LIMITS.password.min}+ characters with upper/lower/number/symbol`}
                   required
                 />
@@ -210,7 +210,7 @@ export default function SignupPage() {
                   onChange={handleChange}
                   minLength={FIELD_LIMITS.password.min}
                   maxLength={FIELD_LIMITS.password.max}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   required
                 />
                 {passwordMismatch && <p className="mt-2 text-sm text-red-300">{passwordMismatch}</p>}
@@ -226,7 +226,7 @@ export default function SignupPage() {
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   placeholder="First"
                   required
                 />
@@ -242,7 +242,7 @@ export default function SignupPage() {
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   placeholder="Last"
                   required
                 />
@@ -257,7 +257,7 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={loading || !formData.inviteCode || Boolean(passwordMismatch)}
-                className="w-full min-h-[44px] px-4 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors font-semibold"
+                className="w-full min-h-[44px] px-4 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 transition-colors font-semibold"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>
@@ -267,7 +267,7 @@ export default function SignupPage() {
 
         <p className="text-gray-400 text-sm mt-4 text-center">
           Already have an account?{' '}
-          <a href="/admin/login" className="text-band-orange hover:underline">
+          <a href="/admin/login" className="text-accent-400 hover:underline">
             Log in
           </a>
         </p>

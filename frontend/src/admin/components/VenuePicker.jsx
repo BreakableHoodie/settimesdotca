@@ -63,7 +63,7 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
   const availableVenues = allVenues.filter(v => !existingVenueIds.includes(v.id))
 
   return (
-    <div className="bg-band-purple rounded-lg p-4 space-y-4">
+    <div className="bg-bg-purple rounded-lg p-4 space-y-4">
       <h3 className="text-white font-bold text-lg">Add Venue to Event</h3>
 
       {/* Select Existing Venue */}
@@ -82,7 +82,7 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
                 e.target.value = '' // Reset
               }
             }}
-            className="w-full min-h-[44px] px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
             defaultValue=""
           >
             <option value="">Choose a venue...</option>
@@ -114,21 +114,21 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
               type="text"
               value={newVenue.name}
               onChange={e => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
+              className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none text-sm"
               placeholder="Venue name *"
             />
             <input
               type="text"
               value={newVenue.address}
               onChange={e => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
-              className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none text-sm"
+              className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none text-sm"
               placeholder="Address (optional)"
             />
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={handleCreateNew}
                 disabled={!newVenue.name.trim() || loading}
-                className="min-h-[44px] flex-1 px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 text-sm font-medium"
+                className="min-h-[44px] flex-1 px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 text-sm font-medium"
               >
                 {loading ? 'Creating...' : 'Create & Add'}
               </button>

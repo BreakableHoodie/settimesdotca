@@ -121,7 +121,7 @@ export default function SubscribePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-band-navy to-band-purple p-4">
+    <div className="min-h-screen bg-gradient-to-br from-bg-navy to-bg-purple p-4">
       <div className="max-w-2xl mx-auto pt-20">
         {/* Header */}
         <div className="text-center mb-12">
@@ -145,7 +145,7 @@ export default function SubscribePage() {
                 required
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-none placeholder-gray-400"
                 placeholder="you@example.com"
               />
             </div>
@@ -159,7 +159,7 @@ export default function SubscribePage() {
                 id="city"
                 value={formData.city}
                 onChange={e => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-none"
               >
                 <option value="kitchener">Kitchener</option>
                 <option value="waterloo">Waterloo</option>
@@ -178,7 +178,7 @@ export default function SubscribePage() {
                 id="genre"
                 value={formData.genre}
                 onChange={e => setFormData({ ...formData, genre: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-none"
               >
                 <option value="all">All Genres</option>
                 <option value="punk">Punk</option>
@@ -198,7 +198,7 @@ export default function SubscribePage() {
                 id="frequency"
                 value={formData.frequency}
                 onChange={e => setFormData({ ...formData, frequency: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-none"
               >
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -210,7 +210,7 @@ export default function SubscribePage() {
             <button
               type="submit"
               disabled={status === 'submitting'}
-              className="w-full bg-band-orange hover:bg-band-orange/90 text-white font-bold py-3 px-6 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-accent-500 hover:bg-accent-600 text-white font-bold py-3 px-6 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {status === 'submitting' ? 'Subscribing...' : 'Subscribe'}
             </button>

@@ -64,7 +64,7 @@ export default function EventSelector({ onCreateEvent }) {
       {/* Current Event Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 bg-band-purple hover:bg-band-navy border border-band-orange/30 rounded-lg text-white transition-colors min-h-[44px]"
+        className="flex items-center gap-2 px-4 py-2 bg-bg-purple hover:bg-bg-navy border border-accent-500/30 rounded-lg text-white transition-colors min-h-[44px]"
         title="Switch event context"
       >
         <FontAwesomeIcon icon={faLocationDot} className="text-lg" aria-hidden="true" />
@@ -84,12 +84,12 @@ export default function EventSelector({ onCreateEvent }) {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-band-purple border border-band-orange/30 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+        <div className="absolute top-full left-0 mt-2 w-80 bg-bg-purple border border-accent-500/30 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
           {/* All Events Option */}
           <button
             onClick={() => handleSelectEvent(null)}
-            className={`w-full px-4 py-3 text-left hover:bg-band-navy/50 transition-colors border-b border-band-orange/20 ${
-              !currentEvent ? 'bg-band-orange/20' : ''
+            className={`w-full px-4 py-3 text-left hover:bg-bg-navy/50 transition-colors border-b border-accent-500/20 ${
+              !currentEvent ? 'bg-accent-500/20' : ''
             }`}
           >
             <div className="flex items-center gap-2">
@@ -108,8 +108,8 @@ export default function EventSelector({ onCreateEvent }) {
                 <button
                   key={event.id}
                   onClick={() => handleSelectEvent(event.id)}
-                  className={`w-full px-4 py-3 text-left hover:bg-band-navy/50 transition-colors ${
-                    currentEvent?.id === event.id ? 'bg-band-orange/20' : ''
+                  className={`w-full px-4 py-3 text-left hover:bg-bg-navy/50 transition-colors ${
+                    currentEvent?.id === event.id ? 'bg-accent-500/20' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -139,14 +139,14 @@ export default function EventSelector({ onCreateEvent }) {
 
           {/* Archived Events Section */}
           {archivedEvents.length > 0 && (
-            <div className="border-t border-band-orange/20">
-              <div className="px-4 py-2 text-xs text-white/50 bg-band-navy/30 font-medium">Archived Events</div>
+            <div className="border-t border-accent-500/20">
+              <div className="px-4 py-2 text-xs text-white/50 bg-bg-navy/30 font-medium">Archived Events</div>
               {archivedEvents.map(event => (
                 <button
                   key={event.id}
                   onClick={() => handleSelectEvent(event.id)}
-                  className={`w-full px-4 py-3 text-left hover:bg-band-navy/50 transition-colors opacity-75 ${
-                    currentEvent?.id === event.id ? 'bg-band-orange/20 opacity-100' : ''
+                  className={`w-full px-4 py-3 text-left hover:bg-bg-navy/50 transition-colors opacity-75 ${
+                    currentEvent?.id === event.id ? 'bg-accent-500/20 opacity-100' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -173,11 +173,11 @@ export default function EventSelector({ onCreateEvent }) {
           {/* Create New Event Option */}
           <button
             onClick={handleCreateNew}
-            className="w-full px-4 py-3 text-left hover:bg-band-navy/50 transition-colors border-t border-band-orange/20 bg-band-orange/10"
+            className="w-full px-4 py-3 text-left hover:bg-bg-navy/50 transition-colors border-t border-accent-500/20 bg-accent-500/10"
           >
             <div className="flex items-center gap-2">
               <FontAwesomeIcon icon={faPlus} className="text-lg" aria-hidden="true" />
-              <div className="font-medium text-band-orange">Create New Event</div>
+              <div className="font-medium text-accent-400">Create New Event</div>
             </div>
           </button>
         </div>

@@ -27,11 +27,11 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
         className={`
           w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-all duration-150 
           hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 
-          focus-visible:ring-offset-2 focus-visible:ring-band-orange
+          focus-visible:ring-offset-2 focus-visible:ring-accent-400
           ${
             selectedFilter === 'all'
-              ? 'bg-band-purple/50 text-white hover:bg-band-purple'
-              : 'bg-band-orange text-band-navy shadow-lg'
+              ? 'bg-bg-purple/50 text-white hover:bg-bg-purple'
+              : 'bg-accent-500 text-bg-navy shadow-lg'
           }
         `}
         aria-expanded={isOpen}
@@ -58,14 +58,14 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} aria-hidden="true" />
 
           {/* Menu */}
-          <div className="absolute top-full left-0 right-0 sm:right-auto sm:w-64 mt-2 bg-band-navy border border-band-orange/20 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 sm:right-auto sm:w-64 mt-2 bg-bg-navy border border-accent-500/20 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto">
             {options.map(option => (
               <button
                 key={option.value}
                 onClick={() => handleSelect(option)}
                 className={`
-                  w-full px-4 py-3 text-left hover:bg-band-purple/30 transition-colors
-                  ${selectedFilter === option.value ? 'bg-band-orange/20 text-band-orange' : 'text-white'}
+                  w-full px-4 py-3 text-left hover:bg-bg-purple/30 transition-colors
+                  ${selectedFilter === option.value ? 'bg-accent-500/20 text-accent-400' : 'text-white'}
                   first:rounded-t-lg last:rounded-b-lg
                 `}
                 role="option"

@@ -402,7 +402,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             href={links.website}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-band-orange transition-colors"
+            className="text-white/70 hover:text-accent-400 transition-colors"
             title="Website"
           >
             <FontAwesomeIcon icon={faGlobe} />
@@ -462,12 +462,12 @@ export default function RosterTab({ showToast, readOnly = false }) {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name, origin, genre"
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-64"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-64"
           />
           {!showAddForm && !editingId && !readOnly && (
             <button
               onClick={() => setShowAddForm(true)}
-              className="px-6 py-3 min-h-[44px] bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium"
+              className="px-6 py-3 min-h-[44px] bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors font-medium"
             >
               + New Artist
             </button>
@@ -477,7 +477,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
 
       {/* Bulk Actions */}
       {!readOnly && selectedIds.size > 0 && (
-        <div className="bg-band-navy/80 p-4 rounded border border-band-orange/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky top-20 z-10 backdrop-blur-md">
+        <div className="bg-bg-navy/80 p-4 rounded border border-accent-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky top-20 z-10 backdrop-blur-md">
           <span className="text-white font-medium">{selectedIds.size} selected</span>
           <div className="flex flex-col sm:flex-row gap-2">
             <select
@@ -501,8 +501,8 @@ export default function RosterTab({ showToast, readOnly = false }) {
 
       {/* Add/Edit Form */}
       {(showAddForm || editingId) && !readOnly && (
-        <div ref={editFormRef} className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
-          <h3 className="text-lg font-bold text-band-orange mb-4">{editingId ? 'Edit Artist' : 'New Artist'}</h3>
+        <div ref={editFormRef} className="bg-bg-purple p-6 rounded-lg border border-accent-500/20">
+          <h3 className="text-lg font-bold text-accent-400 mb-4">{editingId ? 'Edit Artist' : 'New Artist'}</h3>
           <BandForm
             events={[]} // No events needed for roster
             venues={[]} // No venues needed for roster
@@ -522,9 +522,9 @@ export default function RosterTab({ showToast, readOnly = false }) {
       )}
 
       {/* Table */}
-      <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
+      <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-band-orange">Loading roster...</div>
+          <div className="p-8 text-center text-accent-400">Loading roster...</div>
         ) : filteredBands.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {bands.length === 0 ? 'Roster is empty.' : 'No artists match your filters.'}
@@ -533,7 +533,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
           <>
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-band-navy/50 border-b border-band-orange/20">
+                <thead className="bg-bg-navy/50 border-b border-accent-500/20">
                   <tr>
                     {!readOnly && (
                       <th className="px-4 py-3 w-12 text-center align-middle">
@@ -547,43 +547,43 @@ export default function RosterTab({ showToast, readOnly = false }) {
                     )}
                     <th
                       onClick={() => handleSort('name')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
                       Name <SortIcon col="name" />
                     </th>
                     <th
                       onClick={() => handleSort('origin')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
                       Origin <SortIcon col="origin" />
                     </th>
                     <th
                       onClick={() => handleSort('genre')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
                       Genre <SortIcon col="genre" />
                     </th>
                     <th
                       onClick={() => handleSort('is_active')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
                       Status <SortIcon col="is_active" />
                     </th>
                     <th className="px-4 py-3 text-left text-white font-semibold">Links</th>
                     <th
                       onClick={() => handleSort('contact_email')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
                       Contact <SortIcon col="contact_email" />
                     </th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-band-orange/10">
+                <tbody className="divide-y divide-accent-500/10">
                   {sortedBands.map(band => (
                     <tr
                       key={band.id}
-                      className={`hover:bg-band-navy/30 transition-colors ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
+                      className={`hover:bg-bg-navy/30 transition-colors ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
                     >
                       {!readOnly && (
                         <td className="px-4 py-3 text-center align-middle">
@@ -598,7 +598,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       <td className="px-4 py-3 text-white font-medium">
                         <a
                           href={`/band/${band.band_profile_id || band.id?.toString().replace('profile_', '')}`}
-                          className="text-band-orange hover:underline"
+                          className="text-accent-400 hover:underline"
                           target="_blank"
                           rel="noreferrer"
                         >
@@ -643,7 +643,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                 </tbody>
               </table>
             </div>
-            <div className="md:hidden divide-y divide-band-orange/10">
+            <div className="md:hidden divide-y divide-accent-500/10">
               {!readOnly && (
                 <div className="px-4 py-3 flex items-center justify-between">
                   <label className="flex items-center gap-3 text-white">
@@ -675,7 +675,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       )}
                       <a
                         href={`/band/${band.band_profile_id || band.id?.toString().replace('profile_', '')}`}
-                        className="font-medium text-band-orange hover:underline"
+                        className="font-medium text-accent-400 hover:underline"
                         target="_blank"
                         rel="noreferrer"
                       >

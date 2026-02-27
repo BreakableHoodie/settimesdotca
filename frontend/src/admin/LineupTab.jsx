@@ -493,7 +493,7 @@ export default function LineupTab({
                 loadRoster()
               }
             }}
-            className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors font-medium min-h-[44px]"
+            className="px-6 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors font-medium min-h-[44px]"
           >
             + Add to Lineup
           </button>
@@ -510,8 +510,8 @@ export default function LineupTab({
       )}
 
       {viewMode === 'form' && !readOnly && (
-        <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
-          <h3 className="text-lg font-bold text-band-orange mb-4">
+        <div className="bg-bg-purple p-6 rounded-lg border border-accent-500/20">
+          <h3 className="text-lg font-bold text-accent-400 mb-4">
             {editingId ? 'Edit Performance' : 'Add Performance'}
           </h3>
           <BandForm
@@ -561,12 +561,12 @@ export default function LineupTab({
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="Filter performers"
-              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-56"
             />
             <select
               value={venueFilter}
               onChange={e => setVenueFilter(e.target.value)}
-              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none"
             >
               <option value="all">All venues</option>
               {venues.map(venue => (
@@ -581,9 +581,9 @@ export default function LineupTab({
           </div>
 
           {/* List */}
-          <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
+          <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
             {loading ? (
-              <div className="p-8 text-center text-band-orange">Loading lineup...</div>
+              <div className="p-8 text-center text-accent-400">Loading lineup...</div>
             ) : filteredBands.length === 0 ? (
               <div className="p-8 text-center text-white/50">
                 {bands.length === 0 ? 'No performances scheduled yet.' : 'No performances match your filters.'}
@@ -592,7 +592,7 @@ export default function LineupTab({
               <>
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-band-navy/50 border-b border-band-orange/20">
+                    <thead className="bg-bg-navy/50 border-b border-accent-500/20">
                       <tr>
                         {!readOnly && (
                           <th className="px-4 py-3 w-12">
@@ -605,25 +605,25 @@ export default function LineupTab({
                           </th>
                         )}
                         <th
-                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('name')}
                         >
                           Performer <SortIcon col="name" />
                         </th>
                         <th
-                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('venue')}
                         >
                           Venue <SortIcon col="venue" />
                         </th>
                         <th
-                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('start_time')}
                         >
                           Time <SortIcon col="start_time" />
                         </th>
                         <th
-                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                          className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('duration')}
                         >
                           Duration <SortIcon col="duration" />
@@ -631,13 +631,13 @@ export default function LineupTab({
                         {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-band-orange/10">
+                    <tbody className="divide-y divide-accent-500/10">
                       {sortedBands.map(band => {
                         const conflicts = detectConflicts(band, bands)
                         return (
                           <tr
                             key={band.id}
-                            className={`hover:bg-band-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
+                            className={`hover:bg-bg-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
                           >
                             {!readOnly && (
                               <td className="px-4 py-3">
@@ -683,7 +683,7 @@ export default function LineupTab({
                     </tbody>
                   </table>
                 </div>
-                <div className="md:hidden divide-y divide-band-orange/10">
+                <div className="md:hidden divide-y divide-accent-500/10">
                   {!readOnly && (
                     <div className="px-4 py-3 flex items-center justify-between">
                       <label className="flex items-center gap-3 text-white">

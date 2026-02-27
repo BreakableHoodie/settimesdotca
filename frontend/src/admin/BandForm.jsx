@@ -122,7 +122,7 @@ export default function BandForm({
             {selectedProfile.photo_url ? (
               <img src={selectedProfile.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-band-orange/20 flex items-center justify-center text-band-orange text-xl font-bold">
+              <div className="w-16 h-16 rounded-full bg-accent-500/20 flex items-center justify-center text-accent-400 text-xl font-bold">
                 {selectedProfile.name.charAt(0)}
               </div>
             )}
@@ -131,7 +131,7 @@ export default function BandForm({
               <div className="text-white/60 text-sm">
                 {[selectedProfile.origin, selectedProfile.genre].filter(Boolean).join(' • ')}
               </div>
-              <div className="text-band-orange text-xs mt-1">Adding to lineup</div>
+              <div className="text-accent-400 text-xs mt-1">Adding to lineup</div>
             </div>
           </div>
         ) : (
@@ -284,7 +284,7 @@ export default function BandForm({
                 value={formData.contact_email || ''}
                 onChange={onChange}
                 maxLength={FIELD_LIMITS.bandContactEmail.max}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
                 placeholder="contact@artist.com"
               />
             </div>
@@ -297,7 +297,7 @@ export default function BandForm({
                 name="is_active"
                 value={formData.is_active ?? 1}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
               >
                 <option value={1}>Active</option>
                 <option value={0}>Inactive</option>
@@ -317,7 +317,7 @@ export default function BandForm({
                 name="event_id"
                 value={formData.event_id}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
               >
                 <option value="">No event assigned yet</option>
                 {events.map(event => (
@@ -349,7 +349,7 @@ export default function BandForm({
                 name="venue_id"
                 value={formData.venue_id}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
               >
                 <option value="">No venue assigned yet</option>
                 {venues.map(venue => (
@@ -374,7 +374,7 @@ export default function BandForm({
                 name="start_time"
                 value={formData.start_time}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
                 required={requireSchedule}
               />
             </div>
@@ -390,7 +390,7 @@ export default function BandForm({
                 name="duration"
                 value={formData.duration}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
                 placeholder="45"
                 min="1"
               />
@@ -407,7 +407,7 @@ export default function BandForm({
                 name="end_time"
                 value={formData.end_time}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
                 required={requireSchedule}
               />
             </div>
@@ -425,7 +425,7 @@ export default function BandForm({
             value={formData.website || ''}
             onChange={onChange}
             maxLength={FIELD_LIMITS.bandUrl.max}
-            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
             placeholder="https://example.com"
           />
         </div>
@@ -441,7 +441,7 @@ export default function BandForm({
             value={formData.instagram || ''}
             onChange={onChange}
             maxLength={FIELD_LIMITS.socialHandle.max}
-            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
             placeholder="@bandhandle"
           />
         </div>
@@ -457,7 +457,7 @@ export default function BandForm({
             value={formData.bandcamp || ''}
             onChange={onChange}
             maxLength={FIELD_LIMITS.bandUrl.max}
-            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
             placeholder="https://bandcamp.com/bandname"
           />
         </div>
@@ -473,7 +473,7 @@ export default function BandForm({
             value={formData.facebook || ''}
             onChange={onChange}
             maxLength={FIELD_LIMITS.bandUrl.max}
-            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none sm:text-sm"
             placeholder="https://facebook.com/bandname"
           />
         </div>

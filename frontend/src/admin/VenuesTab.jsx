@@ -262,7 +262,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="text-band-orange text-lg">Loading venues...</div>
+        <div className="text-accent-400 text-lg">Loading venues...</div>
       </div>
     )
   }
@@ -281,12 +281,12 @@ export default function VenuesTab({ showToast, readOnly = false }) {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name, city, phone, email"
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-56"
           />
           {!showAddForm && !editingId && !readOnly && (
             <button
               onClick={() => setShowAddForm(true)}
-              className="px-4 py-2 min-h-[44px] bg-band-orange text-white rounded hover:bg-orange-600 transition-colors"
+              className="px-4 py-2 min-h-[44px] bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors"
             >
               + Add Venue
             </button>
@@ -296,8 +296,8 @@ export default function VenuesTab({ showToast, readOnly = false }) {
 
       {/* Add/Edit Form */}
       {(showAddForm || editingId) && !readOnly && (
-        <div className="bg-band-purple p-6 rounded-lg border border-band-orange/20">
-          <h3 className="text-lg font-bold text-band-orange mb-4">{editingId ? 'Edit Venue' : 'Add New Venue'}</h3>
+        <div className="bg-bg-purple p-6 rounded-lg border border-accent-500/20">
+          <h3 className="text-lg font-bold text-accent-400 mb-4">{editingId ? 'Edit Venue' : 'Add New Venue'}</h3>
 
           <form onSubmit={editingId ? handleUpdate : handleAdd}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -310,7 +310,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   required
                   minLength={FIELD_LIMITS.venueName.min}
                   maxLength={FIELD_LIMITS.venueName.max}
@@ -331,7 +331,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="address_line1"
                   value={formData.address_line1}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   maxLength={FIELD_LIMITS.venueAddressLine1.max}
                   placeholder="123 Main St"
                 />
@@ -350,7 +350,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="address_line2"
                   value={formData.address_line2}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   maxLength={FIELD_LIMITS.venueAddressLine2.max}
                   placeholder="Suite 200"
                 />
@@ -366,7 +366,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="city"
                   value={formData.city}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   maxLength={FIELD_LIMITS.venueCity.max}
                   placeholder="Waterloo"
                 />
@@ -382,7 +382,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="region"
                   value={formData.region}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   maxLength={FIELD_LIMITS.venueRegion.max}
                   placeholder="ON"
                   list="venue-region-list"
@@ -404,7 +404,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="postal_code"
                   value={formData.postal_code}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   maxLength={FIELD_LIMITS.venuePostal.max}
                   placeholder="N2L 3G1"
                   pattern="\\s*(?:\\d{5}(?:-\\d{4})?|[A-Za-z]\\d[A-Za-z][\\s\\u00A0-]?\\d[A-Za-z]\\d)\\s*"
@@ -422,7 +422,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="country"
                   value={formData.country}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   maxLength={FIELD_LIMITS.venueCountry.max}
                   placeholder="Canada"
                   list="venue-country-list"
@@ -444,7 +444,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   maxLength={FIELD_LIMITS.venuePhone.max}
                   placeholder="+1 519 555 1234"
                   pattern="^[+]?[-()\\d\\s.]{7,20}$"
@@ -462,7 +462,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="contact_email"
                   value={formData.contact_email}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
                   maxLength={FIELD_LIMITS.venueContactEmail.max}
                   placeholder="hello@venue.com"
                 />
@@ -473,7 +473,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 min-h-[44px] bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 min-h-[44px] bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'Saving...' : editingId ? 'Update Venue' : 'Add Venue'}
               </button>
@@ -490,7 +490,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
       )}
 
       {/* Venues List */}
-      <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
+      <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
         {filteredVenues.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {venues.length === 0
@@ -502,34 +502,34 @@ export default function VenuesTab({ showToast, readOnly = false }) {
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-band-navy/50 border-b border-band-orange/20">
+                <thead className="bg-bg-navy/50 border-b border-accent-500/20">
                   <tr>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('name')}
                     >
                       Name <SortIcon col="name" />
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('address')}
                     >
                       Address <SortIcon col="address" />
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('phone')}
                     >
                       Phone <SortIcon col="phone" />
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('contact_email')}
                     >
                       Contact <SortIcon col="contact_email" />
                     </th>
                     <th
-                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:text-band-orange"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('band_count')}
                     >
                       Bands <SortIcon col="band_count" />
@@ -537,11 +537,11 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-band-orange/10">
+                <tbody className="divide-y divide-accent-500/10">
                   {sortedVenues.map(venue => {
                     const hasBands = (venue.band_count || 0) > 0
                     return (
-                      <tr key={venue.id} className="hover:bg-band-navy/30 transition-colors">
+                      <tr key={venue.id} className="hover:bg-bg-navy/30 transition-colors">
                         <td className="px-4 py-3 text-white font-medium">{venue.name}</td>
                         <td className="px-4 py-3 text-white/70">{formatAddress(venue) || '-'}</td>
                         <td className="px-4 py-3 text-white/70">{venue.phone || '-'}</td>
@@ -581,7 +581,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
             </div>
 
             {/* Mobile Cards */}
-            <div className="md:hidden divide-y divide-band-orange/10">
+            <div className="md:hidden divide-y divide-accent-500/10">
               {sortedVenues.map(venue => {
                 const hasBands = (venue.band_count || 0) > 0
                 return (

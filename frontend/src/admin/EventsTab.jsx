@@ -192,12 +192,12 @@ const EventRow = memo(function EventRow({
   const ticketLink = event.ticket_url || event.ticket_link
 
   return (
-    <tr className="hover:bg-band-navy/30 transition-colors">
+    <tr className="hover:bg-bg-navy/30 transition-colors">
       <td className="px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => onFilter?.(event.id)}
-            className="text-white font-medium hover:text-band-orange transition-colors text-left"
+            className="text-white font-medium hover:text-accent-400 transition-colors text-left"
             title="Filter to this event"
           >
             {event.name}
@@ -212,7 +212,7 @@ const EventRow = memo(function EventRow({
         </div>
       </td>
       <td className="px-4 py-3 text-white/70">{formatEventDate(event.date)}</td>
-      <td className="px-4 py-3 text-band-orange font-mono text-sm">{event.slug}</td>
+      <td className="px-4 py-3 text-accent-400 font-mono text-sm">{event.slug}</td>
       <td className="px-4 py-3 text-center">
         <div className="inline-flex justify-center w-full">
           <EventStatusBadge status={event.status} />
@@ -309,7 +309,7 @@ const EventCard = memo(function EventCard({
 
       <div className="text-sm">
         <span className="text-white/50">Slug: </span>
-        <span className="text-band-orange font-mono">{event.slug}</span>
+        <span className="text-accent-400 font-mono">{event.slug}</span>
       </div>
 
       <div className="text-sm text-white/70">
@@ -663,10 +663,10 @@ export default function EventsTab({
         />
 
         {/* Event Details Card */}
-        <div className="bg-band-purple rounded-lg border border-band-orange/20 p-6">
+        <div className="bg-bg-purple rounded-lg border border-accent-500/20 p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-band-orange mb-2">{selectedEvent.name}</h2>
+              <h2 className="text-2xl font-bold text-accent-400 mb-2">{selectedEvent.name}</h2>
               <div className="space-y-1 text-white/70">
                 <p>
                   <span className="font-semibold">Date:</span>{' '}
@@ -679,7 +679,7 @@ export default function EventsTab({
                 </p>
                 <p>
                   <span className="font-semibold">Slug:</span>{' '}
-                  <span className="font-mono text-band-orange">{selectedEvent.slug}</span>
+                  <span className="font-mono text-accent-400">{selectedEvent.slug}</span>
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold">Public URL:</span>
@@ -689,21 +689,21 @@ export default function EventsTab({
                         href={getPublicEventUrl(selectedEvent)}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-band-orange underline break-all"
+                        className="text-accent-400 underline break-all"
                       >
                         {getPublicEventUrl(selectedEvent)}
                       </a>
                       <button
                         type="button"
                         onClick={() => handleCopyPublicUrl(selectedEvent)}
-                        className="px-2 py-1 text-xs bg-band-navy/50 text-white rounded hover:bg-band-navy/70"
+                        className="px-2 py-1 text-xs bg-bg-navy/50 text-white rounded hover:bg-bg-navy/70"
                       >
                         Copy
                       </button>
                       <button
                         type="button"
                         onClick={() => window.open(getPublicEventUrl(selectedEvent), '_blank')}
-                        className="px-2 py-1 text-xs bg-band-navy/50 text-white rounded hover:bg-band-navy/70"
+                        className="px-2 py-1 text-xs bg-bg-navy/50 text-white rounded hover:bg-bg-navy/70"
                       >
                         Open
                       </button>
@@ -754,16 +754,16 @@ export default function EventsTab({
 
           {/* Statistics */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 mb-6">
-            <div className="bg-band-navy/50 rounded-lg p-4">
-              <div className="text-3xl font-bold text-band-orange mb-1">{selectedEvent.band_count || 0}</div>
+            <div className="bg-bg-navy/50 rounded-lg p-4">
+              <div className="text-3xl font-bold text-accent-400 mb-1">{selectedEvent.band_count || 0}</div>
               <div className="text-white/70 text-sm">Performers</div>
             </div>
-            <div className="bg-band-navy/50 rounded-lg p-4">
-              <div className="text-3xl font-bold text-band-orange mb-1">{eventVenues.length}</div>
+            <div className="bg-bg-navy/50 rounded-lg p-4">
+              <div className="text-3xl font-bold text-accent-400 mb-1">{eventVenues.length}</div>
               <div className="text-white/70 text-sm">Venues</div>
             </div>
-            <div className="bg-band-navy/50 rounded-lg p-4">
-              <div className="text-3xl font-bold text-band-orange mb-1 capitalize">
+            <div className="bg-bg-navy/50 rounded-lg p-4">
+              <div className="text-3xl font-bold text-accent-400 mb-1 capitalize">
                 {selectedEvent.status || 'Draft'}
               </div>
               <div className="text-white/70 text-sm">Status</div>
@@ -786,7 +786,7 @@ export default function EventsTab({
                         window.dispatchEvent(new CustomEvent('filterVenue', { detail: { venueId: venue.id } }))
                       }, 100)
                     }}
-                    className="inline-block bg-band-orange/20 hover:bg-band-orange/30 text-band-orange px-3 py-1.5 rounded text-sm transition-colors cursor-pointer"
+                    className="inline-block bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 px-3 py-1.5 rounded text-sm transition-colors cursor-pointer"
                     title={`View ${venue.name} profile`}
                   >
                     {venue.name || `Venue ${venue.id}`}
@@ -824,10 +824,10 @@ export default function EventsTab({
                   const venueId = scheduleSummary.venueIdByName[venueName]
 
                   return (
-                    <div key={venueName} className="bg-band-navy/30 rounded-lg border border-band-orange/10">
+                    <div key={venueName} className="bg-bg-navy/30 rounded-lg border border-accent-500/10">
                       <button
                         type="button"
-                        className="w-full px-4 py-3 text-base font-semibold text-band-orange border-b border-band-orange/20 cursor-pointer hover:bg-band-navy/20 transition-colors text-left"
+                        className="w-full px-4 py-3 text-base font-semibold text-accent-400 border-b border-accent-500/20 cursor-pointer hover:bg-bg-navy/20 transition-colors text-left"
                         onClick={() => handleFilterVenue(venueId)}
                         title="View venue profile"
                       >
@@ -835,26 +835,26 @@ export default function EventsTab({
                       </button>
                       <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
-                          <thead className="bg-band-navy/20">
+                          <thead className="bg-bg-navy/20">
                             <tr>
                               <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Time</th>
                               <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Performer</th>
                               <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Duration</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-band-orange/10">
+                          <tbody className="divide-y divide-accent-500/10">
                             {venueBands.map(band => {
                               const duration = getDurationMinutes(band.start_time, band.end_time)
 
                               return (
-                                <tr key={band.id} className="hover:bg-band-navy/20 transition-colors">
+                                <tr key={band.id} className="hover:bg-bg-navy/20 transition-colors">
                                   <td className="px-4 py-2 text-white/90 font-mono text-sm">
                                     {formatTimeRange(band.start_time, band.end_time, { fallback: '-' })}
                                   </td>
                                   <td className="px-4 py-2">
                                     <button
                                       onClick={() => handleFilterBand(band.name)}
-                                      className="text-white hover:text-band-orange transition-colors cursor-pointer"
+                                      className="text-white hover:text-accent-400 transition-colors cursor-pointer"
                                       title="View performer profile"
                                     >
                                       {band.name}
@@ -866,16 +866,16 @@ export default function EventsTab({
                                 </tr>
                               )
                             })}
-                            <tr className="bg-band-orange/20 border-t-2 border-band-orange">
-                              <td className="px-4 py-2 text-band-orange font-semibold" colSpan="2">
+                            <tr className="bg-accent-500/20 border-t-2 border-accent-500">
+                              <td className="px-4 py-2 text-accent-400 font-semibold" colSpan="2">
                                 {venueName} Total
                               </td>
-                              <td className="px-4 py-2 text-band-orange font-semibold">{formatMinutes(venueTotal)}</td>
+                              <td className="px-4 py-2 text-accent-400 font-semibold">{formatMinutes(venueTotal)}</td>
                             </tr>
                           </tbody>
                         </table>
                       </div>
-                      <div className="md:hidden divide-y divide-band-orange/10">
+                      <div className="md:hidden divide-y divide-accent-500/10">
                         {venueBands.map(band => {
                           const duration = getDurationMinutes(band.start_time, band.end_time)
                           return (
@@ -885,7 +885,7 @@ export default function EventsTab({
                               </div>
                               <button
                                 onClick={() => handleFilterBand(band.name)}
-                                className="text-white hover:text-band-orange transition-colors text-left"
+                                className="text-white hover:text-accent-400 transition-colors text-left"
                                 title="View performer profile"
                               >
                                 {band.name}
@@ -896,8 +896,8 @@ export default function EventsTab({
                             </div>
                           )
                         })}
-                        <div className="px-4 py-3 bg-band-orange/20 border-t border-band-orange/40">
-                          <div className="flex items-center justify-between text-band-orange font-semibold">
+                        <div className="px-4 py-3 bg-accent-500/20 border-t border-accent-500/40">
+                          <div className="flex items-center justify-between text-accent-400 font-semibold">
                             <span>{venueName} Total</span>
                             <span>{formatMinutes(venueTotal)}</span>
                           </div>
@@ -907,11 +907,11 @@ export default function EventsTab({
                   )
                 })}
 
-                <div className="mt-4 bg-band-orange/20 rounded-lg p-4 border-2 border-band-orange">
+                <div className="mt-4 bg-accent-500/20 rounded-lg p-4 border-2 border-accent-500">
                   <div className="flex flex-col gap-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-band-orange font-semibold text-lg">Total Scheduled Time</span>
-                      <span className="text-band-orange font-bold text-lg">
+                      <span className="text-accent-400 font-semibold text-lg">Total Scheduled Time</span>
+                      <span className="text-accent-400 font-bold text-lg">
                         {formatMinutes(scheduleSummary.eventTotal)}
                       </span>
                     </div>
@@ -941,7 +941,7 @@ export default function EventsTab({
         {/* Metrics Dashboard Modal */}
         {showMetrics && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-bg-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-white">Metrics for &quot;{showMetrics.name}&quot;</h3>
@@ -957,7 +957,7 @@ export default function EventsTab({
         {/* Embed Code Generator Modal */}
         {showEmbedCode && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-bg-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-white">Embed Code for &quot;{showEmbedCode.name}&quot;</h3>
@@ -989,12 +989,12 @@ export default function EventsTab({
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name or slug"
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-56"
           />
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none"
           >
             <option value="all">All statuses</option>
             <option value="published">Published</option>
@@ -1003,7 +1003,7 @@ export default function EventsTab({
           </select>
           <button
             onClick={() => setShowHelp(!showHelp)}
-            className="px-4 py-2 text-band-orange underline text-sm hover:text-orange-500 transition-colors min-h-[44px]"
+            className="px-4 py-2 text-accent-400 underline text-sm hover:text-accent-300 transition-colors min-h-[44px]"
             aria-label="Toggle help"
           >
             {showHelp ? 'Hide Help' : 'Show Help'}
@@ -1013,7 +1013,7 @@ export default function EventsTab({
               type="checkbox"
               checked={showArchived}
               onChange={e => setShowArchived(e.target.checked)}
-              className="h-5 w-5 rounded border-gray-600 text-band-orange focus:ring-band-orange"
+              className="h-5 w-5 rounded border-gray-600 text-accent-500 focus:ring-accent-500"
             />
             <span>Show Archived</span>
           </label>
@@ -1023,7 +1023,7 @@ export default function EventsTab({
                 setEditingEvent(null)
                 setShowModal(true)
               }}
-              className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors min-h-[44px]"
+              className="px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors min-h-[44px]"
             >
               + Create New Event
             </button>
@@ -1048,7 +1048,7 @@ export default function EventsTab({
       )}
 
       {/* Events List */}
-      <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
+      <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
         {filteredEvents.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {events.length === 0
@@ -1060,40 +1060,40 @@ export default function EventsTab({
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-band-navy/50 border-b border-band-orange/20">
+                <thead className="bg-bg-navy/50 border-b border-accent-500/20">
                   <tr>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('name')}
                     >
                       Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('date')}
                     >
                       Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('slug')}
                     >
                       Slug {sortConfig.key === 'slug' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('status')}
                     >
                       Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('band_count')}
                     >
                       Bands {sortConfig.key === 'band_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('ticket_url')}
                     >
                       Tickets {sortConfig.key === 'ticket_url' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -1101,7 +1101,7 @@ export default function EventsTab({
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-band-orange/10">
+                <tbody className="divide-y divide-accent-500/10">
                   {sortedEvents.map(event => (
                     <EventRow
                       key={event.id}
@@ -1121,7 +1121,7 @@ export default function EventsTab({
             </div>
 
             {/* Mobile Cards */}
-            <div className="md:hidden divide-y divide-band-orange/10">
+            <div className="md:hidden divide-y divide-accent-500/10">
               {sortedEvents.map(event => (
                 <EventCard
                   key={event.id}
@@ -1142,7 +1142,7 @@ export default function EventsTab({
       {/* Metrics Dashboard Modal */}
       {showMetrics && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">Metrics for &quot;{showMetrics.name}&quot;</h3>
@@ -1159,7 +1159,7 @@ export default function EventsTab({
       {/* Embed Code Generator Modal */}
       {showEmbedCode && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">Embed Code for &quot;{showEmbedCode.name}&quot;</h3>

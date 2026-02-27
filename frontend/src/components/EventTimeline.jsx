@@ -12,6 +12,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition 
 import { Link } from 'react-router-dom'
 import { slugifyBandName } from '../utils/slugify'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
+import { trackTicketClick } from '../utils/metrics'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 
 /**
@@ -533,6 +534,7 @@ function EventCard({
                 variant="primary"
                 size="md"
                 className="w-full sm:w-auto sm:min-w-[160px]"
+                onClick={() => trackTicketClick(event.id)}
               >
                 Get Tickets
               </Button>

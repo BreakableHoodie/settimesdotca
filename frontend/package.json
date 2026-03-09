@@ -63,7 +63,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "jest-axe": "^10.0.0",
     "jsdom": "^28.1.0",
-    "node-addon-api": "^8.5.0",
+    "node-addon-api": "^8.6.0",
     "node-gyp": "^12.1.0",
     "postcss": "^8.4.32",
     "prettier": "^3.6.2",

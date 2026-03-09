@@ -48,6 +48,7 @@ export async function onRequestPost(context) {
     .all();
 
   const bandResults = bands.results || [];
+  const mutableBandResults = bandResults.filter((band) => band.event_status !== "archived");
 
   bandResults
     .filter((band) => band.event_status === "archived")
@@ -73,7 +74,7 @@ export async function onRequestPost(context) {
     }
 
     // Build changes list
-    for (const band of bandResults) {
+    for (const band of mutableBandResults) {
       changes.push({
         band_id: band.id,
         band_name: band.name,
@@ -83,7 +84,7 @@ export async function onRequestPost(context) {
     }
 
     // Conflict detection: check for time overlaps at target venue
-    for (const band of bandResults) {
+    for (const band of mutableBandResults) {
       const overlaps = await env.DB.prepare(
         `
         SELECT bp.name, p.start_time, p.end_time
@@ -121,7 +122,7 @@ export async function onRequestPost(context) {
     const { start_time } = params;
 
     // Build changes list
-    for (const band of bandResults) {
+    for (const band of mutableBandResults) {
       changes.push({
         band_id: band.id,
         band_name: band.name,
@@ -131,7 +132,7 @@ export async function onRequestPost(context) {
     }
 
     // Conflict detection: check for time overlaps at same venue
-    for (const band of bandResults) {
+    for (const band of mutableBandResults) {
       const overlaps = await env.DB.prepare(
         `
         SELECT bp.name, p.start_time, p.end_time
@@ -167,7 +168,7 @@ export async function onRequestPost(context) {
     }
   } else if (action === "delete") {
     // Build changes list for deletion
-    for (const band of bandResults) {
+    for (const band of mutableBandResults) {
       changes.push({
         band_id: band.id,
         band_name: band.name,

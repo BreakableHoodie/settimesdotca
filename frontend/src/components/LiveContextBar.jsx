@@ -32,7 +32,7 @@ function isSameLocalDay(eventDate, currentTime) {
 }
 
 function getLifecycleLabel(eventDate, currentTime) {
-  const state = getEventState(eventDate)
+  const state = getEventState(eventDate, currentTime)
 
   if (state === 'archived') {
     return { label: 'Archive', classes: 'bg-white/10 text-white/80 border-white/15' }

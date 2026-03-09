@@ -3,12 +3,12 @@ import { getClientIP } from "../../../utils/request.js";
 
 const MAX_BULK_BAND_IDS = 200;
 
-async function getArchivedPerformances(DB, bandIds) {
-  if (!Array.isArray(bandIds) || bandIds.length === 0) {
+async function getArchivedPerformancesByPerformanceIds(DB, performanceIds) {
+  if (!Array.isArray(performanceIds) || performanceIds.length === 0) {
     return [];
   }
 
-  const placeholders = bandIds.map(() => "?").join(",");
+  const placeholders = performanceIds.map(() => "?").join(",");
   const result = await DB.prepare(
     `SELECT p.id, bp.name, e.name AS event_name
      FROM performances p
@@ -17,7 +17,7 @@ async function getArchivedPerformances(DB, bandIds) {
      WHERE p.id IN (${placeholders})
        AND e.status = 'archived'`,
   )
-    .bind(...bandIds)
+    .bind(...performanceIds)
     .all();
 
   return result.results || [];
@@ -68,7 +68,7 @@ export async function onRequestDelete(context) {
     }
 
     const performanceIds = band_ids.filter((id) => !id.toString().startsWith("profile_"));
-    const archivedPerformances = await getArchivedPerformances(DB, performanceIds);
+    const archivedPerformances = await getArchivedPerformancesByPerformanceIds(DB, performanceIds);
 
     if (archivedPerformances.length > 0) {
       const lockedNames = archivedPerformances.map((performance) => performance.name).join(", ");
@@ -194,7 +194,7 @@ export async function onRequestPatch(context) {
     );
   }
 
-  const archivedPerformances = await getArchivedPerformances(env.DB, band_ids);
+  const archivedPerformances = await getArchivedPerformancesByPerformanceIds(env.DB, band_ids);
   if (archivedPerformances.length > 0) {
     const lockedNames = archivedPerformances.map((performance) => performance.name).join(", ");
     return new Response(

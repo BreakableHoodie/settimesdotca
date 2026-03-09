@@ -375,5 +375,6 @@ describe('Admin bands API - Bulk operations', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.conflicts.some(conflict => conflict.message.includes('archived event'))).toBe(true)
+    expect(data.changes).toHaveLength(0)
   })
 })

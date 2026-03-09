@@ -26,6 +26,6 @@
     "csrf-csrf": "^4.0.3",
     "email-validator": "^2.0.4",
     "lucia": "^3.2.2",
-    "otplib": "^13.2.1"
+    "otplib": "^13.3.0"
   }
 }

@@ -28,6 +28,21 @@ function parseOrigin(origin) {
   };
 }
 
+async function getEventForPerformance(DB, performanceId) {
+  if (!performanceId) return null;
+
+  return DB.prepare(
+    `
+    SELECT e.id, e.status, e.name
+    FROM performances p
+    JOIN events e ON p.event_id = e.id
+    WHERE p.id = ?
+  `
+  )
+    .bind(performanceId)
+    .first();
+}
+
 // Helper to check for time conflicts (supports sets that cross midnight)
 async function checkConflicts(
   DB,
@@ -161,6 +176,7 @@ export async function onRequestPut(context) {
     }
 
     let performance = null;
+    let linkedEvent = null;
 
     if (!isProfileUpdate) {
         // Check if performance exists
@@ -182,6 +198,17 @@ export async function onRequestPut(context) {
             );
         }
         bandProfileId = performance.band_profile_id;
+        linkedEvent = await getEventForPerformance(DB, realPerformanceId);
+
+        if (linkedEvent?.status === 'archived') {
+          return new Response(
+            JSON.stringify({
+              error: 'Validation error',
+              message: 'Archived event performances cannot be edited. Copy the event as a template instead.',
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
     } else {
         // Fetch profile directly
         const profile = await DB.prepare(
@@ -674,6 +701,20 @@ export async function onRequestDelete(context) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const linkedEvent = await getEventForPerformance(DB, performanceId);
+    if (linkedEvent?.status === 'archived') {
+      return new Response(
+        JSON.stringify({
+          error: 'Validation error',
+          message: 'Archived event performances cannot be deleted. Copy the event as a template instead.',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
         },
       );
     }

@@ -3,6 +3,26 @@ import { getClientIP } from "../../../utils/request.js";
 
 const MAX_BULK_BAND_IDS = 200;
 
+async function getArchivedPerformancesByPerformanceIds(DB, performanceIds) {
+  if (!Array.isArray(performanceIds) || performanceIds.length === 0) {
+    return [];
+  }
+
+  const placeholders = performanceIds.map(() => "?").join(",");
+  const result = await DB.prepare(
+    `SELECT p.id, bp.name, e.name AS event_name
+     FROM performances p
+     JOIN band_profiles bp ON p.band_profile_id = bp.id
+     JOIN events e ON p.event_id = e.id
+     WHERE p.id IN (${placeholders})
+       AND e.status = 'archived'`,
+  )
+    .bind(...performanceIds)
+    .all();
+
+  return result.results || [];
+}
+
 // DELETE - Bulk delete bands
 export async function onRequestDelete(context) {
   const { request, env } = context;
@@ -39,6 +59,23 @@ export async function onRequestDelete(context) {
         JSON.stringify({
           error: "Bad request",
           message: `Maximum ${MAX_BULK_BAND_IDS} band IDs allowed per request`,
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const performanceIds = band_ids.filter((id) => !id.toString().startsWith("profile_"));
+    const archivedPerformances = await getArchivedPerformancesByPerformanceIds(DB, performanceIds);
+
+    if (archivedPerformances.length > 0) {
+      const lockedNames = archivedPerformances.map((performance) => performance.name).join(", ");
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: `Cannot delete performances from archived events: ${lockedNames}`,
         }),
         {
           status: 400,
@@ -154,6 +191,21 @@ export async function onRequestPatch(context) {
         status: 400,
         headers: { "Content-Type": "application/json" },
       }
+    );
+  }
+
+  const archivedPerformances = await getArchivedPerformancesByPerformanceIds(env.DB, band_ids);
+  if (archivedPerformances.length > 0) {
+    const lockedNames = archivedPerformances.map((performance) => performance.name).join(", ");
+    return new Response(
+      JSON.stringify({
+        error: "Validation error",
+        message: `Cannot modify performances from archived events: ${lockedNames}`,
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      },
     );
   }
 

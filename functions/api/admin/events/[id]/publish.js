@@ -62,6 +62,19 @@ export async function onRequestPost(context) {
     const body = await request.json().catch(() => ({}));
     const { publish } = body;
 
+    if (event.status === "archived") {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Archived events cannot be published or unpublished",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     // Determine new status
     const newStatus = publish ? "published" : "draft";
 

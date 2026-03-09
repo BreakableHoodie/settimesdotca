@@ -37,14 +37,27 @@ export async function onRequestPost(context) {
   // Get current band data
   const placeholders = band_ids.map(() => "?").join(",");
   const bands = await env.DB.prepare(
-    `SELECT p.*, bp.name, v.name as venue_name
+    `SELECT p.*, bp.name, v.name as venue_name, e.status as event_status, e.name as event_name
      FROM performances p
      JOIN band_profiles bp ON p.band_profile_id = bp.id
      JOIN venues v ON p.venue_id = v.id
+     JOIN events e ON p.event_id = e.id
      WHERE p.id IN (${placeholders})`,
   )
     .bind(...band_ids)
     .all();
+
+  const bandResults = bands.results || [];
+
+  bandResults
+    .filter((band) => band.event_status === "archived")
+    .forEach((band) => {
+      conflicts.push({
+        band_id: band.id,
+        message: `"${band.name}" belongs to archived event "${band.event_name}" and cannot be changed in bulk.`,
+        severity: "error",
+      });
+    });
 
   if (action === "move_venue") {
     const { venue_id } = params;
@@ -60,7 +73,7 @@ export async function onRequestPost(context) {
     }
 
     // Build changes list
-    for (const band of bands.results) {
+    for (const band of bandResults) {
       changes.push({
         band_id: band.id,
         band_name: band.name,
@@ -70,7 +83,7 @@ export async function onRequestPost(context) {
     }
 
     // Conflict detection: check for time overlaps at target venue
-    for (const band of bands.results) {
+    for (const band of bandResults) {
       const overlaps = await env.DB.prepare(
         `
         SELECT bp.name, p.start_time, p.end_time
@@ -108,7 +121,7 @@ export async function onRequestPost(context) {
     const { start_time } = params;
 
     // Build changes list
-    for (const band of bands.results) {
+    for (const band of bandResults) {
       changes.push({
         band_id: band.id,
         band_name: band.name,
@@ -118,7 +131,7 @@ export async function onRequestPost(context) {
     }
 
     // Conflict detection: check for time overlaps at same venue
-    for (const band of bands.results) {
+    for (const band of bandResults) {
       const overlaps = await env.DB.prepare(
         `
         SELECT bp.name, p.start_time, p.end_time
@@ -154,7 +167,7 @@ export async function onRequestPost(context) {
     }
   } else if (action === "delete") {
     // Build changes list for deletion
-    for (const band of bands.results) {
+    for (const band of bandResults) {
       changes.push({
         band_id: band.id,
         band_name: band.name,

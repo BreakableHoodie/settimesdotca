@@ -78,6 +78,24 @@ describe('Admin bands API - CRUD operations', () => {
 })
 
 describe('Admin bands API - Validation', () => {
+  it('create rejects performances for archived events', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'ArchivedAdd', slug: 'archived-add', status: 'archived', is_published: 0 })
+    const venue = insertVenue(rawDb, { name: 'Archive Venue' })
+
+    const body = { eventId: ev.id, venueId: venue.id, name: 'Too Late Band', startTime: '18:00', endTime: '19:00' }
+    const request = new Request('https://example.test/api/admin/bands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    })
+
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(400)
+    const data = await res.json()
+    expect(data.error).toBe('Validation error')
+  })
+
   it('create validation fails when name is missing', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
     const ev = insertEvent(rawDb, { name: 'ValEvent', slug: 'val-event' })
@@ -192,6 +210,24 @@ describe('Admin bands API - Validation', () => {
     expect(res.status).toBe(404)
   })
 
+  it('update rejects performances for archived events', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'ArchivedUpdate', slug: 'archived-update', status: 'archived', is_published: 0 })
+    const venue = insertVenue(rawDb, { name: 'Archive Update Venue' })
+    const band = insertBand(rawDb, { name: 'Frozen Band', event_id: ev.id, venue_id: venue.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ name: 'Renamed Frozen Band' }),
+    })
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(400)
+    const data = await res.json()
+    expect(data.error).toBe('Validation error')
+  })
+
   it('delete returns 404 for non-existent band', async () => {
     const { env, headers } = createTestEnv({ role: 'editor' })
 
@@ -202,6 +238,23 @@ describe('Admin bands API - Validation', () => {
 
     const res = await bandIdHandler.onRequestDelete({ request, env, data: { user: { role: 'editor' } } })
     expect(res.status).toBe(404)
+  })
+
+  it('delete rejects performances for archived events', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'ArchivedDelete', slug: 'archived-delete', status: 'archived', is_published: 0 })
+    const venue = insertVenue(rawDb, { name: 'Archive Delete Venue' })
+    const band = insertBand(rawDb, { name: 'Protected Band', event_id: ev.id, venue_id: venue.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'DELETE',
+      headers: { ...headers },
+    })
+
+    const res = await bandIdHandler.onRequestDelete({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(400)
+    const data = await res.json()
+    expect(data.error).toBe('Validation error')
   })
 })
 
@@ -249,6 +302,43 @@ describe('Admin bands API - Bulk operations', () => {
     expect(data.updated).toBe(2)
   })
 
+  it('PATCH /api/admin/bands/bulk rejects archived event performances', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'Archived Bulk', slug: 'archived-bulk', status: 'archived', is_published: 0 })
+    const venue = insertVenue(rawDb, { name: 'Archived Bulk Venue' })
+    const band = insertBand(rawDb, { name: 'Locked Bulk Band', event_id: ev.id, venue_id: venue.id })
+
+    const body = { band_ids: [band.id], action: 'delete' }
+    const request = new Request('https://example.test/api/admin/bands/bulk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    })
+
+    const res = await bulkHandler.onRequestPatch({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(400)
+    const data = await res.json()
+    expect(data.error).toBe('Validation error')
+  })
+
+  it('DELETE /api/admin/bands/bulk rejects archived event performances', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'Archived Bulk Delete', slug: 'archived-bulk-delete', status: 'archived', is_published: 0 })
+    const venue = insertVenue(rawDb, { name: 'Archived Bulk Delete Venue' })
+    const band = insertBand(rawDb, { name: 'Locked Delete Band', event_id: ev.id, venue_id: venue.id })
+
+    const request = new Request('https://example.test/api/admin/bands/bulk', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ band_ids: [band.id] }),
+    })
+
+    const res = await bulkHandler.onRequestDelete({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(400)
+    const data = await res.json()
+    expect(data.error).toBe('Validation error')
+  })
+
   it('bulk preview returns changes and conflicts', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
     const ev = insertEvent(rawDb, { name: 'PreviewEvent', slug: 'preview-event' })
@@ -267,5 +357,23 @@ describe('Admin bands API - Bulk operations', () => {
     const data = await res.json()
     expect(data.changes).toBeDefined()
     expect(data.conflicts).toBeDefined()
+  })
+
+  it('bulk preview flags archived event performances as conflicts', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'Archived Preview', slug: 'archived-preview', status: 'archived', is_published: 0 })
+    const venue = insertVenue(rawDb, { name: 'Archived Preview Venue' })
+    const band = insertBand(rawDb, { name: 'Preview Locked Band', event_id: ev.id, venue_id: venue.id })
+
+    const request = new Request('https://example.test/api/admin/bands/bulk-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ band_ids: [band.id], action: 'delete' }),
+    })
+
+    const res = await bulkPreviewHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.conflicts.some(conflict => conflict.message.includes('archived event'))).toBe(true)
   })
 })

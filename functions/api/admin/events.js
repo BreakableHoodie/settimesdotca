@@ -124,13 +124,28 @@ export async function onRequestPost(context) {
       theme_colors,
     } = validation.sanitized;
 
+    if (status === "archived" && currentUser.role !== "admin") {
+      return new Response(
+        JSON.stringify({
+          error: "Forbidden",
+          message: "Only admins can create archived events directly",
+        }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     // Validate date is not in past (unless status is archived for retroactive events)
     const eventDate = new Date(date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (eventDate < today && status !== "archived") {
       return validationErrorResponse(
-        "Date cannot be in the past (use archived status for past events)",
+        currentUser.role === "admin"
+          ? "Date cannot be in the past unless you are intentionally creating an archived historical event"
+          : "Date cannot be in the past. Ask an admin to create an archived historical event if needed",
       );
     }
 

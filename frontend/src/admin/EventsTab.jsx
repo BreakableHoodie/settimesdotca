@@ -17,6 +17,15 @@ import {
   confirmArchivedEventDelete,
 } from '../utils/eventLifecycle'
 
+const isEventLockedAsArchived = event => event?.status === 'archived' || isEventArchived(event?.date)
+const getAdminEventState = event => (event?.status === 'archived' ? 'archived' : getEventState(event?.date))
+const buttonFocusClass =
+  'border border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
+const linkFocusClass =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
+const inputFocusClass =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
+
 const MINUTES_IN_DAY = 24 * 60
 const EARLY_MORNING_CUTOFF_HOUR = 6
 const EVENING_START_HOUR = 18
@@ -188,6 +197,7 @@ const EventRow = memo(function EventRow({
   onDelete,
   showToast,
   readOnly,
+  canArchiveEvents,
 }) {
   const ticketLink = event.ticket_url || event.ticket_link
 
@@ -197,14 +207,14 @@ const EventRow = memo(function EventRow({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => onFilter?.(event.id)}
-            className="text-white font-medium hover:text-accent-400 transition-colors text-left"
+            className={`text-white font-medium hover:text-accent-400 transition-colors text-left rounded-sm ${buttonFocusClass}`}
             title="Filter to this event"
           >
             {event.name}
           </button>
           <button
             onClick={() => onViewMetrics?.(event)}
-            className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-medium transition-colors"
+            className={`px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
             title="View event metrics"
           >
             Metrics
@@ -224,7 +234,7 @@ const EventRow = memo(function EventRow({
           <div className="flex justify-center gap-2">
             <button
               onClick={() => window.open(ticketLink, '_blank')}
-              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+              className={`px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Visit ticket link"
             >
               <FontAwesomeIcon icon={faLink} className="mr-1" aria-hidden="true" />
@@ -235,7 +245,7 @@ const EventRow = memo(function EventRow({
                 await navigator.clipboard.writeText(ticketLink)
                 showToast('Ticket link copied!', 'success')
               }}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+              className={`px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Copy ticket link"
             >
               <FontAwesomeIcon icon={faCopy} className="mr-1" aria-hidden="true" />
@@ -243,7 +253,7 @@ const EventRow = memo(function EventRow({
             </button>
           </div>
         ) : (
-          <span className="text-white/30 text-sm">-</span>
+          <span className="text-white/30 text-sm">No ticket link</span>
         )}
       </td>
       {!readOnly && (
@@ -251,13 +261,13 @@ const EventRow = memo(function EventRow({
           <div className="flex justify-end gap-2 flex-wrap">
             <button
               onClick={() => onEdit(event)}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+              className={`px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
               Edit
             </button>
             <button
               onClick={() => onTogglePublish(event)}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${buttonFocusClass} ${
                 event.status === 'published'
                   ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                   : 'bg-green-600 hover:bg-green-700 text-white'
@@ -266,10 +276,10 @@ const EventRow = memo(function EventRow({
             >
               {event.status === 'published' ? 'Unpublish' : 'Publish'}
             </button>
-            {event.status !== 'archived' && (
+            {canArchiveEvents && event.status !== 'archived' && (
               <button
                 onClick={() => onArchive(event)}
-                className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                className={`px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
                 title="Archive event (admin only)"
               >
                 Archive
@@ -277,7 +287,7 @@ const EventRow = memo(function EventRow({
             )}
             <button
               onClick={() => onDelete(event)}
-              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+              className={`px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
               Delete
             </button>
@@ -296,6 +306,7 @@ const EventCard = memo(function EventCard({
   onArchive,
   onDelete,
   readOnly,
+  canArchiveEvents,
 }) {
   return (
     <div className="p-4 space-y-3">
@@ -319,7 +330,7 @@ const EventCard = memo(function EventCard({
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => onViewMetrics?.(event)}
-          className="px-4 py-2 min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors"
+          className={`px-4 py-2 min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
         >
           Metrics
         </button>
@@ -327,13 +338,13 @@ const EventCard = memo(function EventCard({
           <>
             <button
               onClick={() => onEdit(event)}
-              className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+              className={`px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
               Edit
             </button>
             <button
               onClick={() => onTogglePublish(event)}
-              className={`px-4 py-2 min-h-[44px] rounded text-sm font-medium transition-colors ${
+              className={`px-4 py-2 min-h-[44px] rounded text-sm font-medium transition-colors ${buttonFocusClass} ${
                 event.status === 'published'
                   ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                   : 'bg-green-600 hover:bg-green-700 text-white'
@@ -342,17 +353,17 @@ const EventCard = memo(function EventCard({
             >
               {event.status === 'published' ? 'Unpublish' : 'Publish'}
             </button>
-            {event.status !== 'archived' && (
+            {canArchiveEvents && event.status !== 'archived' && (
               <button
                 onClick={() => onArchive(event)}
-                className="px-4 py-2 min-h-[44px] bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                className={`px-4 py-2 min-h-[44px] bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
               >
                 Archive
               </button>
             )}
             <button
               onClick={() => onDelete(event)}
-              className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+              className={`px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
               Delete
             </button>
@@ -381,6 +392,7 @@ export default function EventsTab({
   selectedEvent,
   onEventFilterChange,
   readOnly = false,
+  canArchiveEvents = false,
 }) {
   const { refreshEvents } = useEventContext()
   const [showModal, setShowModal] = useState(false)
@@ -537,7 +549,7 @@ export default function EventsTab({
       return
     }
     // Check if event is archived
-    if (isEventArchived(event.date)) {
+    if (isEventLockedAsArchived(event)) {
       // Show two-confirmation gate
       if (!confirmArchivedEventEdit(event)) {
         showToast('Edit cancelled. Use "Copy as Template" to create a new event instead.', 'error')
@@ -576,8 +588,8 @@ export default function EventsTab({
   }
 
   const handleArchive = async event => {
-    if (readOnly) {
-      showToast('Read-only access: archiving is disabled for your role.', 'error')
+    if (readOnly || !canArchiveEvents) {
+      showToast('Archiving is disabled for your role.', 'error')
       return
     }
     if (!window.confirm(`Archive "${event.name}"? It will be hidden from the default view and unpublished.`)) {
@@ -600,10 +612,10 @@ export default function EventsTab({
       showToast('Read-only access: deleting is disabled for your role.', 'error')
       return
     }
-    const { id: eventId, name: eventName, date: eventDate, band_count: bandCount } = event
+    const { id: eventId, name: eventName, band_count: bandCount } = event
 
     // Check if event is archived
-    if (isEventArchived(eventDate)) {
+    if (isEventLockedAsArchived(event)) {
       // Use special confirmation for archived events
       if (!confirmArchivedEventDelete(event)) {
         showToast('Delete cancelled for archived event.', 'error')
@@ -647,7 +659,7 @@ export default function EventsTab({
 
   // If event is selected, show event detail view
   if (selectedEvent && selectedEventId) {
-    const eventState = getEventState(selectedEvent.date)
+    const eventState = getAdminEventState(selectedEvent)
 
     return (
       <div className="space-y-6">
@@ -689,21 +701,22 @@ export default function EventsTab({
                         href={getPublicEventUrl(selectedEvent)}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-accent-400 underline break-all"
+                        className={`text-accent-400 underline break-all rounded-sm ${linkFocusClass}`}
                       >
-                        {getPublicEventUrl(selectedEvent)}
+                        Open the public event page for {selectedEvent.name}
                       </a>
+                      <code className="text-white/50 text-xs sm:text-sm">{getPublicEventUrl(selectedEvent)}</code>
                       <button
                         type="button"
                         onClick={() => handleCopyPublicUrl(selectedEvent)}
-                        className="px-2 py-1 text-xs bg-bg-navy/50 text-white rounded hover:bg-bg-navy/70"
+                        className={`px-2 py-1 text-xs bg-bg-navy/50 text-white rounded hover:bg-bg-navy/70 ${buttonFocusClass}`}
                       >
                         Copy
                       </button>
                       <button
                         type="button"
                         onClick={() => window.open(getPublicEventUrl(selectedEvent), '_blank')}
-                        className="px-2 py-1 text-xs bg-bg-navy/50 text-white rounded hover:bg-bg-navy/70"
+                        className={`px-2 py-1 text-xs bg-bg-navy/50 text-white rounded hover:bg-bg-navy/70 ${buttonFocusClass}`}
                       >
                         Open
                       </button>
@@ -722,20 +735,20 @@ export default function EventsTab({
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setShowEmbedCode(selectedEvent)}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                className={`px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
               >
                 Embed
               </button>
               <button
                 onClick={() => setShowMetrics(selectedEvent)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                className={`px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
               >
                 Metrics
               </button>
               {!readOnly && (
                 <button
                   onClick={() => startEdit(selectedEvent)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                  className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
                   Edit
                 </button>
@@ -743,7 +756,7 @@ export default function EventsTab({
               {selectedEvent.ticket_link && (
                 <button
                   onClick={() => window.open(selectedEvent.ticket_link, '_blank')}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                  className={`px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
                   <FontAwesomeIcon icon={faTicketSimple} className="mr-2" aria-hidden="true" />
                   Tickets
@@ -774,25 +787,24 @@ export default function EventsTab({
           {eventVenues.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold text-white mb-3">Venues</h3>
-              <div className="flex flex-wrap gap-2">
+              <ul className="flex flex-wrap gap-2" aria-label="Event venues">
                 {eventVenues.map(venue => (
-                  <button
-                    key={venue.id}
-                    onClick={() => {
-                      // Navigate to venues tab with this venue filtered
-                      window.location.href = '#venues'
-                      setTimeout(() => {
-                        // Trigger a custom event to filter this venue
-                        window.dispatchEvent(new CustomEvent('filterVenue', { detail: { venueId: venue.id } }))
-                      }, 100)
-                    }}
-                    className="inline-block bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 px-3 py-1.5 rounded text-sm transition-colors cursor-pointer"
-                    title={`View ${venue.name} profile`}
-                  >
-                    {venue.name || `Venue ${venue.id}`}
-                  </button>
+                  <li key={venue.id}>
+                    <button
+                      onClick={() => {
+                        window.location.href = '#venues'
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('filterVenue', { detail: { venueId: venue.id } }))
+                        }, 100)
+                      }}
+                      className={`inline-block bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 px-3 py-1.5 rounded text-sm transition-colors cursor-pointer ${buttonFocusClass}`}
+                      title={`View ${venue.name} profile`}
+                    >
+                      {venue.name || `Venue ${venue.id}`}
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
@@ -800,16 +812,13 @@ export default function EventsTab({
           {eventBands.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold text-white mb-3">Performers</h3>
-              <div className="flex flex-wrap gap-2">
+              <ul className="flex flex-wrap gap-2" aria-label="Event performers">
                 {Array.from(new Set(eventBands.map(b => b.name))).map(bandName => (
-                  <span
-                    key={bandName}
-                    className="inline-block bg-blue-900/20 text-blue-300 px-3 py-1.5 rounded text-sm"
-                  >
+                  <li key={bandName} className="inline-block bg-blue-900/20 text-blue-300 px-3 py-1.5 rounded text-sm border border-transparent">
                     {bandName}
-                  </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
@@ -827,7 +836,7 @@ export default function EventsTab({
                     <div key={venueName} className="bg-bg-navy/30 rounded-lg border border-accent-500/10">
                       <button
                         type="button"
-                        className="w-full px-4 py-3 text-base font-semibold text-accent-400 border-b border-accent-500/20 cursor-pointer hover:bg-bg-navy/20 transition-colors text-left"
+                        className={`w-full px-4 py-3 text-base font-semibold text-accent-400 border-b border-accent-500/20 cursor-pointer hover:bg-bg-navy/20 transition-colors text-left ${buttonFocusClass}`}
                         onClick={() => handleFilterVenue(venueId)}
                         title="View venue profile"
                       >
@@ -835,11 +844,12 @@ export default function EventsTab({
                       </button>
                       <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
+                          <caption className="sr-only">Schedule for {venueName}</caption>
                           <thead className="bg-bg-navy/20">
                             <tr>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Time</th>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Performer</th>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Duration</th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Time</th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Performer</th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Duration</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-accent-500/10">
@@ -854,7 +864,7 @@ export default function EventsTab({
                                   <td className="px-4 py-2">
                                     <button
                                       onClick={() => handleFilterBand(band.name)}
-                                      className="text-white hover:text-accent-400 transition-colors cursor-pointer"
+                                      className={`text-white hover:text-accent-400 transition-colors cursor-pointer rounded-sm ${buttonFocusClass}`}
                                       title="View performer profile"
                                     >
                                       {band.name}
@@ -885,7 +895,7 @@ export default function EventsTab({
                               </div>
                               <button
                                 onClick={() => handleFilterBand(band.name)}
-                                className="text-white hover:text-accent-400 transition-colors text-left"
+                                className={`text-white hover:text-accent-400 transition-colors text-left rounded-sm ${buttonFocusClass}`}
                                 title="View performer profile"
                               >
                                 {band.name}
@@ -936,6 +946,7 @@ export default function EventsTab({
             }}
             event={editingEvent}
             onSave={handleEventSaved}
+            canCreateArchived={canArchiveEvents}
           />
         )}
         {/* Metrics Dashboard Modal */}
@@ -945,7 +956,10 @@ export default function EventsTab({
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-white">Metrics for &quot;{showMetrics.name}&quot;</h3>
-                  <button onClick={() => setShowMetrics(null)} className="text-gray-400 hover:text-white text-2xl">
+                  <button
+                    onClick={() => setShowMetrics(null)}
+                    className={`text-gray-400 hover:text-white text-2xl rounded ${buttonFocusClass}`}
+                  >
                     ×
                   </button>
                 </div>
@@ -961,7 +975,10 @@ export default function EventsTab({
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-white">Embed Code for &quot;{showEmbedCode.name}&quot;</h3>
-                  <button onClick={() => setShowEmbedCode(null)} className="text-gray-400 hover:text-white text-2xl">
+                  <button
+                    onClick={() => setShowEmbedCode(null)}
+                    className={`text-gray-400 hover:text-white text-2xl rounded ${buttonFocusClass}`}
+                  >
                     ×
                   </button>
                 </div>
@@ -984,17 +1001,21 @@ export default function EventsTab({
           <p className="text-sm text-white/70 mt-1">Create, edit, and publish event schedules.</p>
         </div>
         <div className="flex flex-col items-start sm:flex-row sm:items-center gap-3">
+          <label htmlFor="events-search" className="sr-only">
+            Search events by name or slug
+          </label>
           <input
+            id="events-search"
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name or slug"
-            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-56"
+            className={`min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 w-56 ${inputFocusClass}`}
           />
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none"
+            className={`min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 ${inputFocusClass}`}
           >
             <option value="all">All statuses</option>
             <option value="published">Published</option>
@@ -1003,7 +1024,7 @@ export default function EventsTab({
           </select>
           <button
             onClick={() => setShowHelp(!showHelp)}
-            className="px-4 py-2 text-accent-400 underline text-sm hover:text-accent-300 transition-colors min-h-[44px]"
+            className={`px-4 py-2 text-accent-400 underline text-sm hover:text-accent-300 transition-colors min-h-[44px] rounded ${buttonFocusClass}`}
             aria-label="Toggle help"
           >
             {showHelp ? 'Hide Help' : 'Show Help'}
@@ -1013,7 +1034,7 @@ export default function EventsTab({
               type="checkbox"
               checked={showArchived}
               onChange={e => setShowArchived(e.target.checked)}
-              className="h-5 w-5 rounded border-gray-600 text-accent-500 focus:ring-accent-500"
+              className={`h-5 w-5 rounded border border-gray-600 text-accent-500 ${inputFocusClass}`}
             />
             <span>Show Archived</span>
           </label>
@@ -1023,7 +1044,7 @@ export default function EventsTab({
                 setEditingEvent(null)
                 setShowModal(true)
               }}
-              className="px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors min-h-[44px]"
+              className={`px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors min-h-[44px] ${buttonFocusClass}`}
             >
               + Create New Event
             </button>
@@ -1044,6 +1065,7 @@ export default function EventsTab({
           }}
           event={editingEvent}
           onSave={handleEventSaved}
+          canCreateArchived={canArchiveEvents}
         />
       )}
 
@@ -1060,45 +1082,52 @@ export default function EventsTab({
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
+                <caption className="sr-only">Events list</caption>
                 <thead className="bg-bg-navy/50 border-b border-accent-500/20">
                   <tr>
                     <th
+                      scope="col"
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('name')}
                     >
                       Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
+                      scope="col"
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('date')}
                     >
                       Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
+                      scope="col"
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('slug')}
                     >
                       Slug {sortConfig.key === 'slug' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
+                      scope="col"
                       className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('status')}
                     >
                       Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
+                      scope="col"
                       className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('band_count')}
                     >
                       Bands {sortConfig.key === 'band_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
+                      scope="col"
                       className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('ticket_url')}
                     >
                       Tickets {sortConfig.key === 'ticket_url' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
+                    {!readOnly && <th scope="col" className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-accent-500/10">
@@ -1114,6 +1143,7 @@ export default function EventsTab({
                       onDelete={handleDelete}
                       showToast={showToast}
                       readOnly={readOnly}
+                      canArchiveEvents={canArchiveEvents}
                     />
                   ))}
                 </tbody>
@@ -1132,6 +1162,7 @@ export default function EventsTab({
                   onArchive={handleArchive}
                   onDelete={handleDelete}
                   readOnly={readOnly}
+                  canArchiveEvents={canArchiveEvents}
                 />
               ))}
             </div>
@@ -1146,7 +1177,10 @@ export default function EventsTab({
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">Metrics for &quot;{showMetrics.name}&quot;</h3>
-                <button onClick={() => setShowMetrics(null)} className="text-gray-400 hover:text-white text-2xl">
+                <button
+                  onClick={() => setShowMetrics(null)}
+                  className={`text-gray-400 hover:text-white text-2xl rounded ${buttonFocusClass}`}
+                >
                   ×
                 </button>
               </div>
@@ -1163,7 +1197,10 @@ export default function EventsTab({
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">Embed Code for &quot;{showEmbedCode.name}&quot;</h3>
-                <button onClick={() => setShowEmbedCode(null)} className="text-gray-400 hover:text-white text-2xl">
+                <button
+                  onClick={() => setShowEmbedCode(null)}
+                  className={`text-gray-400 hover:text-white text-2xl rounded ${buttonFocusClass}`}
+                >
                   ×
                 </button>
               </div>

@@ -237,6 +237,58 @@ describe("Event API - handler integration", () => {
     expect(data.error).toBe("Validation error");
   });
 
+  it("create archived event requires admin role", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const body = {
+      name: "Historical Event",
+      slug: "historical-event",
+      date: "2025-01-01",
+      status: "archived",
+    };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(403);
+    const data = await res.json();
+    expect(data.error).toBe("Forbidden");
+  });
+
+  it("publish endpoint rejects archived events", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, {
+      name: "ArchivedEvent",
+      slug: "archived-event",
+      status: "archived",
+      is_published: 0,
+    });
+
+    const body = { publish: false };
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}/publish`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-test-role": "editor",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation error");
+  });
+
   it("PATCH cannot change slug", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
@@ -463,5 +515,32 @@ describe("Event API - handler integration", () => {
     const data = await res.json();
     expect(data.event.date).toBe("2026-03-03");
     expect(data.event.status).toBe("published");
+  });
+
+  it("PATCH rejects archived status changes and requires archive endpoint", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "PatchArchive",
+      slug: "patch-archive",
+      date: "2026-02-02",
+    });
+
+    const body = { status: "archived" };
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-test-role": "editor",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation error");
   });
 });

@@ -13,14 +13,16 @@ import { faBoxArchive, faClock, faCopy } from '@fortawesome/free-solid-svg-icons
  * @param {string} state - Event lifecycle state ('archived', 'recently_completed', 'upcoming')
  */
 export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) {
-  if (!event || state === 'upcoming') return null
+  const effectiveState = event?.status === 'archived' ? 'archived' : state
 
-  const stateInfo = formatEventState(event.date)
+  if (!event || effectiveState === 'upcoming') return null
+
+  const stateInfo = effectiveState === 'archived' ? { label: 'Archived Event' } : formatEventState(event.date)
   const daysAgo = getDaysSinceEvent(event.date)
   const hoursRemaining = getGracePeriodHoursRemaining(event.date)
 
   // Grace period banner (yellow warning)
-  if (state === 'recently_completed') {
+  if (effectiveState === 'recently_completed') {
     return (
       <div className="bg-yellow-900/30 border-l-4 border-yellow-400 px-4 py-3 mb-4 rounded-r animate-slide-down">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -42,7 +44,7 @@ export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) 
   }
 
   // Archived banner (gray, non-dismissible)
-  if (state === 'archived') {
+  if (effectiveState === 'archived') {
     return (
       <div className="bg-gray-900/80 border-l-4 border-gray-500 px-4 py-3 mb-4 rounded-r">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -51,8 +53,9 @@ export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) 
             <div>
               <div className="text-gray-300 font-semibold">{stateInfo.label}</div>
               <div className="text-white/60 text-sm mt-1">
-                This event ended {daysAgo} {daysAgo === 1 ? 'day' : 'days'} ago. Editing historical data is restricted
-                to preserve event records.
+                {daysAgo >= 0
+                  ? `This event ended ${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago. Editing historical data is restricted to preserve event records.`
+                  : 'This event is archived. Editing historical data is restricted to preserve event records.'}
               </div>
             </div>
           </div>

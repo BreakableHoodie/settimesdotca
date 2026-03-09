@@ -814,7 +814,10 @@ export default function EventsTab({
               <h3 className="text-lg font-semibold text-white mb-3">Performers</h3>
               <ul className="flex flex-wrap gap-2" aria-label="Event performers">
                 {Array.from(new Set(eventBands.map(b => b.name))).map(bandName => (
-                  <li key={bandName} className="inline-block bg-blue-900/20 text-blue-300 px-3 py-1.5 rounded text-sm border border-transparent">
+                  <li
+                    key={bandName}
+                    className="inline-block bg-blue-900/20 text-blue-300 px-3 py-1.5 rounded text-sm border border-transparent"
+                  >
                     {bandName}
                   </li>
                 ))}
@@ -847,9 +850,15 @@ export default function EventsTab({
                           <caption className="sr-only">Schedule for {venueName}</caption>
                           <thead className="bg-bg-navy/20">
                             <tr>
-                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Time</th>
-                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Performer</th>
-                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Duration</th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">
+                                Time
+                              </th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">
+                                Performer
+                              </th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">
+                                Duration
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-accent-500/10">
@@ -1127,7 +1136,11 @@ export default function EventsTab({
                     >
                       Tickets {sortConfig.key === 'ticket_url' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    {!readOnly && <th scope="col" className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
+                    {!readOnly && (
+                      <th scope="col" className="px-4 py-3 text-right text-white font-semibold">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-accent-500/10">

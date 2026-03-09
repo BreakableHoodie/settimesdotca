@@ -174,6 +174,18 @@ export async function onRequestPatch(context) {
           },
         );
       }
+      if (status === "archived") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Use the dedicated archive action to archive events",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
       updates.push("status = ?");
       updates.push("is_published = ?");
       params.push(status);

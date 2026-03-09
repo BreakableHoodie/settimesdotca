@@ -11,7 +11,7 @@ import { FIELD_LIMITS } from '../utils/validation'
  * - Create new event or edit existing event
  * - Auto-generate slug from name
  * - Date picker with validation (no past dates)
- * - Status selector (draft, published, archived)
+ * - Status selector for draft/published, with optional archived creation for admins
  * - Form validation
  * - Shows creator info when editing
  *
@@ -19,10 +19,12 @@ import { FIELD_LIMITS } from '../utils/validation'
  * @param {function} onClose - Callback when modal closes
  * @param {object} event - Event object for editing (null for create)
  * @param {function} onSave - Callback when event is saved
+ * @param {boolean} canCreateArchived - Allow creating archived events directly
  */
-export default function EventFormModal({ isOpen, onClose, event = null, onSave }) {
+export default function EventFormModal({ isOpen, onClose, event = null, onSave, canCreateArchived = false }) {
   const isEditing = !!event
   const isPublished = event?.status === 'published' || Number(event?.is_published) === 1
+  const isArchivedEvent = event?.status === 'archived'
   const canEditSlug = !isEditing || !isPublished
 
   const [formData, setFormData] = useState({
@@ -176,13 +178,22 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
       return false
     }
 
-    // Check date is not in past (only for new events, unless status is archived)
+    if (!isEditing && formData.status === 'archived' && !canCreateArchived) {
+      setError('Only admins can create archived events directly')
+      return false
+    }
+
+    // Check date is not in past for normal event creation.
     if (!isEditing && formData.status !== 'archived') {
       const eventDate = new Date(formData.date + 'T00:00:00')
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       if (eventDate < today) {
-        setError('Date cannot be in the past (use archived status for past events)')
+        setError(
+          canCreateArchived
+            ? 'Date cannot be in the past unless you are intentionally creating an archived historical event.'
+            : 'Date cannot be in the past. Archive historical events through an admin workflow.'
+        )
         return false
       }
     }
@@ -233,6 +244,10 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         city: formData.city,
         ticket_url: formData.ticket_url,
         social_links: socialLinksPayload,
+      }
+
+      if (isEditing && formData.status === 'archived') {
+        delete payload.status
       }
 
       let data
@@ -354,12 +369,12 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 onChange={handleInputChange}
                 className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 required
-                min={!isEditing && formData.status !== 'archived' ? today : undefined}
+                min={!isEditing && !(canCreateArchived && formData.status === 'archived') ? today : undefined}
               />
               {!isEditing && (
                 <p className="text-xs text-white/50 mt-1">
-                  {formData.status === 'archived'
-                    ? 'Past dates allowed for archived events'
+                  {formData.status === 'archived' && canCreateArchived
+                    ? 'Past dates are allowed when creating an archived historical event.'
                     : 'Date cannot be in the past'}
                 </p>
               )}
@@ -502,20 +517,36 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
               <label htmlFor="event-status" className="block text-white mb-2 text-sm font-medium">
                 Status
               </label>
-              <select
-                id="event-status"
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-                <option value="archived">Archived</option>
-              </select>
+              {isEditing && isArchivedEvent ? (
+                <div className="space-y-2">
+                  <div className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy/70 text-white border border-gray-600 flex items-center">
+                    Archived
+                  </div>
+                  <p className="text-xs text-white/50">
+                    Archived status is locked. Use the archive action to move an active event into history.
+                  </p>
+                </div>
+              ) : (
+                <select
+                  id="event-status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  {!isEditing && canCreateArchived && <option value="archived">Archived</option>}
+                </select>
+              )}
               <div className="mt-2">
                 <EventStatusBadge status={formData.status} />
               </div>
+              {!isEditing && !canCreateArchived && (
+                <p className="text-xs text-white/50 mt-2">
+                  Archive is handled separately after creation to preserve event history rules.
+                </p>
+              )}
             </div>
 
             {/* Actions */}

@@ -19,6 +19,18 @@ function parseOrigin(origin) {
   };
 }
 
+async function getEventStatus(DB, eventId) {
+  if (!eventId) return null;
+
+  const event = await DB.prepare(
+    `SELECT id, status FROM events WHERE id = ?`
+  )
+    .bind(eventId)
+    .first();
+
+  return event || null;
+}
+
 // Helper to unpack social links
 function unpackSocialLinks(band) {
   if (!band) return null;
@@ -285,6 +297,24 @@ export async function onRequestPost(context) {
         return new Response(
           JSON.stringify({ error: "Missing required fields", message: "Event, Venue, Name, Start Time, and End Time are required" }),
           { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      const event = await getEventStatus(DB, eventId);
+      if (!event) {
+        return new Response(
+          JSON.stringify({ error: "Not found", message: "Event not found" }),
+          { status: 404, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      if (event.status === 'archived') {
+        return new Response(
+          JSON.stringify({
+            error: 'Validation error',
+            message: 'Cannot add performances to an archived event. Copy it as a template instead.',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
         );
       }
     }

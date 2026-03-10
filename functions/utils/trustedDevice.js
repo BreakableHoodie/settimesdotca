@@ -2,6 +2,7 @@
 
 const TRUSTED_DEVICE_COOKIE_NAME = "trusted_device";
 const TRUSTED_DEVICE_EXPIRY_DAYS = 30;
+const SHA256_HEX_REGEX = /^[0-9a-f]{64}$/i;
 
 /**
  * Hash a string using SHA-256, returning hex
@@ -52,6 +53,10 @@ async function hashTrustedDeviceToken(token) {
   return sha256Hex(token);
 }
 
+function looksLikeStoredTokenHash(token) {
+  return typeof token === "string" && SHA256_HEX_REGEX.test(token);
+}
+
 /**
  * Create a trusted device entry in the database
  */
@@ -83,17 +88,28 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
 
   const tokenHash = await hashTrustedDeviceToken(token);
 
-  const device = await DB.prepare(
+  let device = await DB.prepare(
     `SELECT id, user_id, token, device_fingerprint, ua_hash, ip_address, expires_at
      FROM trusted_devices
-     WHERE token IN (?, ?) AND expires_at > datetime('now')`
+     WHERE token = ? AND expires_at > datetime('now')`
   )
-    .bind(tokenHash, token)
+    .bind(tokenHash)
     .first();
+
+  const canUseLegacyRawTokenFallback = !looksLikeStoredTokenHash(token);
+  if (!device && canUseLegacyRawTokenFallback) {
+    device = await DB.prepare(
+      `SELECT id, user_id, token, device_fingerprint, ua_hash, ip_address, expires_at
+       FROM trusted_devices
+       WHERE token = ? AND expires_at > datetime('now')`
+    )
+      .bind(token)
+      .first();
+  }
 
   if (!device) return null;
 
-  if (device.token === token) {
+  if (canUseLegacyRawTokenFallback && device.token === token) {
     await DB.prepare(
       `UPDATE trusted_devices SET token = ? WHERE id = ?`
     )
@@ -142,9 +158,15 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
  */
 export async function revokeTrustedDevice(DB, token) {
   const tokenHash = await hashTrustedDeviceToken(token);
-  await DB.prepare(`DELETE FROM trusted_devices WHERE token IN (?, ?)`)
-    .bind(tokenHash, token)
+  await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`)
+    .bind(tokenHash)
     .run();
+
+  if (!looksLikeStoredTokenHash(token)) {
+    await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`)
+      .bind(token)
+      .run();
+  }
 }
 
 /**

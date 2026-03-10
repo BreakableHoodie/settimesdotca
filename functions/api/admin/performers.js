@@ -11,6 +11,8 @@
 import { checkPermission, auditLog } from "./_middleware.js";
 import {
   FIELD_LIMITS,
+  sanitizeBandSocialLinks,
+  sanitizeOptionalHttpUrl,
   validateLength,
   isValidEmail,
 } from "../../utils/validation.js";
@@ -25,15 +27,6 @@ function sanitizeOptionalText(value, maxLength) {
   const lengthCheck = validateLength(text, { max: maxLength });
   if (!lengthCheck.valid) {
     throw new Error(lengthCheck.error || "Invalid field length");
-  }
-  return text;
-}
-
-function sanitizeOptionalHttpUrl(value, maxLength) {
-  const text = sanitizeOptionalText(value, maxLength);
-  if (!text) return null;
-  if (!/^https?:\/\//i.test(text)) {
-    throw new Error("URL must start with http:// or https://");
   }
   return text;
 }
@@ -268,10 +261,10 @@ export async function onRequestPost(context) {
     let resolvedBandcamp;
     let resolvedFacebook;
     try {
-      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max);
-      resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max);
-      resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max);
-      resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max);
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL");
+      resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
+      resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max, "Bandcamp URL");
+      resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max, "Facebook URL");
     } catch (error) {
       return new Response(
         JSON.stringify({ error: error.message || "Invalid URL" }),
@@ -287,7 +280,7 @@ export async function onRequestPost(context) {
       );
     }
 
-    const socialLinks = JSON.stringify({
+    const socialLinks = sanitizeBandSocialLinks({
       website: resolvedWebsite,
       instagram: resolvedInstagram,
       bandcamp: resolvedBandcamp,
@@ -459,10 +452,10 @@ export async function onRequestPut(context) {
     let resolvedBandcamp;
     let resolvedFacebook;
     try {
-      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max);
-      resolvedWebsite = sanitizeOptionalHttpUrl(performerUrl, FIELD_LIMITS.bandUrl.max);
-      resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max);
-      resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max);
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL");
+      resolvedWebsite = sanitizeOptionalHttpUrl(performerUrl, FIELD_LIMITS.bandUrl.max, "Website URL");
+      resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max, "Bandcamp URL");
+      resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max, "Facebook URL");
     } catch (error) {
       return new Response(
         JSON.stringify({ error: error.message || "Invalid URL" }),
@@ -478,7 +471,7 @@ export async function onRequestPut(context) {
       );
     }
 
-    const socialLinks = JSON.stringify({
+    const socialLinks = sanitizeBandSocialLinks({
       website: resolvedWebsite,
       instagram: resolvedInstagram,
       bandcamp: resolvedBandcamp,

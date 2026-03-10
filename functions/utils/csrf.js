@@ -178,7 +178,7 @@ function isSameOriginMutation(request) {
     }
   }
 
-  return true;
+  return false;
 }
 
 export function validateCSRFMiddleware(request, env = null) {

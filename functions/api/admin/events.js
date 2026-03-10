@@ -134,7 +134,6 @@ export async function onRequestPost(context) {
     } catch (error) {
       return validationErrorResponse(error.message);
     }
-
     if (status === "archived" && currentUser.role !== "admin") {
       return new Response(
         JSON.stringify({

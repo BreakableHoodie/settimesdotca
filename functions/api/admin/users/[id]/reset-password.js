@@ -9,6 +9,7 @@ import { sanitizeString } from "../../../../utils/validation.js";
 import { getClientIP } from "../../../../utils/request.js";
 import { sendEmail, isEmailConfigured } from "../../../../utils/email.js";
 import { buildResetPasswordEmail } from "../../../../utils/emailTemplates.js";
+import { revokeAllTrustedDevices } from "../../../../utils/trustedDevice.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
@@ -83,6 +84,8 @@ export async function onRequestPost(context) {
     )
       .bind(userId)
       .run();
+
+    await revokeAllTrustedDevices(DB, userId);
 
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
     const resetUrl = `${baseUrl}/reset-password?token=${resetToken.token}`;

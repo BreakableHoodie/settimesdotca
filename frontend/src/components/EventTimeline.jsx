@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom'
 import { slugifyBandName } from '../utils/slugify'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
+import { safeExternalHref } from '../utils/urlSafety'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 
 /**
@@ -430,6 +431,7 @@ function EventCard({
   onLoadDetails,
 }) {
   const [expanded, setExpanded] = useState(isLive) // Auto-expand live events
+  const ticketHref = safeExternalHref(event.ticket_url)
 
   const formatDate = dateStr => {
     const date = parseLocalDate(dateStr) || new Date(dateStr)
@@ -525,10 +527,10 @@ function EventCard({
             >
               Build Schedule
             </Button>
-            {event.ticket_url && (
+            {ticketHref !== '#' && (
               <Button
                 as="a"
-                href={event.ticket_url}
+                href={ticketHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="primary"

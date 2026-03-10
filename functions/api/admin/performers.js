@@ -263,10 +263,21 @@ export async function onRequestPost(context) {
     }
     const resolvedGenre = sanitizeOptionalText(genre, FIELD_LIMITS.bandGenre.max);
     const resolvedDescription = sanitizeOptionalText(description, FIELD_LIMITS.bandDescription.max);
-    const resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max);
-    const resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max);
-    const resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max);
-    const resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max);
+    let resolvedPhotoUrl;
+    let resolvedWebsite;
+    let resolvedBandcamp;
+    let resolvedFacebook;
+    try {
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max);
+      resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max);
+      resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max);
+      resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max);
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ error: error.message || "Invalid URL" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
     const resolvedInstagram = sanitizeOptionalText(instagram, FIELD_LIMITS.socialHandle.max);
     const resolvedContactEmail = sanitizeOptionalText(contact_email, FIELD_LIMITS.bandContactEmail.max);
     if (resolvedContactEmail && !isValidEmail(resolvedContactEmail)) {
@@ -443,10 +454,21 @@ export async function onRequestPut(context) {
     // Pack social links
     const resolvedGenre = sanitizeOptionalText(genre, FIELD_LIMITS.bandGenre.max);
     const resolvedDescription = sanitizeOptionalText(description, FIELD_LIMITS.bandDescription.max);
-    const resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max);
-    const resolvedWebsite = sanitizeOptionalHttpUrl(performerUrl, FIELD_LIMITS.bandUrl.max);
-    const resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max);
-    const resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max);
+    let resolvedPhotoUrl;
+    let resolvedWebsite;
+    let resolvedBandcamp;
+    let resolvedFacebook;
+    try {
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max);
+      resolvedWebsite = sanitizeOptionalHttpUrl(performerUrl, FIELD_LIMITS.bandUrl.max);
+      resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max);
+      resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max);
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ error: error.message || "Invalid URL" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
     const resolvedInstagram = sanitizeOptionalText(instagram, FIELD_LIMITS.socialHandle.max);
     const resolvedContactEmail = sanitizeOptionalText(contact_email, FIELD_LIMITS.bandContactEmail.max);
     if (resolvedContactEmail && !isValidEmail(resolvedContactEmail)) {

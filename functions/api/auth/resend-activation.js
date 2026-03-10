@@ -113,8 +113,7 @@ export async function onRequestPost(context) {
       });
       console.log("[ResendActivation] Email result:", emailResult);
     } else {
-      console.warn("[ResendActivation] Email not configured, logging activation link");
-      console.info(`[Email] Activation link for ${email}: ${activationUrl}`);
+      console.warn("[ResendActivation] Email not configured; activation email was not sent.");
     }
 
     return genericResponse;

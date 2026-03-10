@@ -6,6 +6,7 @@
 import { hashPassword, verifyPassword } from "../../utils/crypto.js";
 import { validatePassword, FIELD_LIMITS } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
+import { revokeAllTrustedDevices } from "../../utils/trustedDevice.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -214,6 +215,8 @@ export async function onRequestPost(context) {
     )
       .bind(resetToken.user_id)
       .run();
+
+    await revokeAllTrustedDevices(DB, resetToken.user_id);
 
     // Log the password reset completion
     await DB.prepare(

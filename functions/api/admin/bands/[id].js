@@ -3,7 +3,13 @@
 // DELETE /api/admin/bands/{id} - Delete band
 
 import { checkPermission, auditLog } from "../_middleware.js";
-import { isValidEmail } from "../../../utils/validation.js";
+import {
+  FIELD_LIMITS,
+  isValidEmail,
+  sanitizeBandSocialLinks,
+  sanitizeOptionalHttpUrl,
+  sanitizeString,
+} from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 
 // Helper to extract band ID from path
@@ -167,6 +173,18 @@ export async function onRequestPut(context) {
       photo_url,
       social_links,
     } = body;
+    let resolvedPhotoUrl;
+    try {
+      resolvedPhotoUrl =
+        photo_url !== undefined
+          ? sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL")
+          : undefined;
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: error.message }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
     let realPerformanceId = performanceId;
     let bandProfileId = null;
 
@@ -413,18 +431,19 @@ export async function onRequestPut(context) {
         if (name !== undefined) {
             profileUpdates.push("name = ?");
             profileUpdates.push("name_normalized = ?");
-            profileParams.push(name);
-            profileParams.push(normalizeName(name));
+          const sanitizedName = sanitizeString(name);
+          profileParams.push(sanitizedName);
+          profileParams.push(normalizeName(sanitizedName));
         }
         
         // Update other profile fields
         if (description !== undefined) {
             profileUpdates.push("description = ?");
-            profileParams.push(description);
+          profileParams.push(sanitizeString(description) || null);
         }
         if (genre !== undefined) {
             profileUpdates.push("genre = ?");
-            profileParams.push(genre);
+          profileParams.push(sanitizeString(genre) || null);
         }
         const parsedOrigin = origin !== undefined ? parseOrigin(origin) : { city: null, region: null };
         const resolvedOriginCity =
@@ -458,7 +477,7 @@ export async function onRequestPut(context) {
         }
         if (photo_url !== undefined) {
             profileUpdates.push("photo_url = ?");
-            profileParams.push(photo_url);
+          profileParams.push(resolvedPhotoUrl || null);
         }
 
         // Handle Social Links (merge or overwrite?)
@@ -467,7 +486,17 @@ export async function onRequestPut(context) {
         
         let newSocialLinks = null;
         if (social_links !== undefined) {
-           newSocialLinks = social_links; // Assume string or object? Frontend sends string.
+           try {
+             newSocialLinks = sanitizeBandSocialLinks(social_links);
+           } catch (error) {
+             return new Response(
+               JSON.stringify({
+                 error: "Validation error",
+                 message: error.message,
+               }),
+               { status: 400, headers: { "Content-Type": "application/json" } },
+             );
+           }
         } else if (url !== undefined) {
             // Legacy update of just website
             let existingLinks = {};
@@ -475,8 +504,18 @@ export async function onRequestPut(context) {
                 const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?").bind(performance.band_profile_id).first();
                 existingLinks = JSON.parse(profile.social_links || '{}');
             } catch (e) {}
-            existingLinks.website = url;
-            newSocialLinks = JSON.stringify(existingLinks);
+            existingLinks.website = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
+            try {
+              newSocialLinks = sanitizeBandSocialLinks(existingLinks);
+            } catch (error) {
+              return new Response(
+                JSON.stringify({
+                  error: "Validation error",
+                  message: error.message,
+                }),
+                { status: 400, headers: { "Content-Type": "application/json" } },
+              );
+            }
         }
 
         if (newSocialLinks !== null) {

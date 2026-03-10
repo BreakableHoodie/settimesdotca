@@ -48,11 +48,16 @@ function generateTrustedDeviceToken() {
   return crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
 }
 
+async function hashTrustedDeviceToken(token) {
+  return sha256Hex(token);
+}
+
 /**
  * Create a trusted device entry in the database
  */
 export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
   const token = generateTrustedDeviceToken();
+  const tokenHash = await hashTrustedDeviceToken(token);
   const fingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
   const uaHash = await generateUaHash(userAgent);
   const expiresAt = new Date(
@@ -63,7 +68,7 @@ export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
     `INSERT INTO trusted_devices (user_id, token, device_fingerprint, ua_hash, ip_address, user_agent, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   )
-    .bind(userId, token, fingerprint, uaHash, ipAddress, userAgent, expiresAt)
+    .bind(userId, tokenHash, fingerprint, uaHash, ipAddress, userAgent, expiresAt)
     .run();
 
   return { token, expiresAt };
@@ -76,15 +81,25 @@ export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
 export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
   if (!token) return null;
 
+  const tokenHash = await hashTrustedDeviceToken(token);
+
   const device = await DB.prepare(
-    `SELECT id, user_id, device_fingerprint, ua_hash, ip_address, expires_at
+    `SELECT id, user_id, token, device_fingerprint, ua_hash, ip_address, expires_at
      FROM trusted_devices
-     WHERE token = ? AND expires_at > datetime('now')`
+     WHERE token IN (?, ?) AND expires_at > datetime('now')`
   )
-    .bind(token)
+    .bind(tokenHash, token)
     .first();
 
   if (!device) return null;
+
+  if (device.token === token) {
+    await DB.prepare(
+      `UPDATE trusted_devices SET token = ? WHERE id = ?`
+    )
+      .bind(tokenHash, device.id)
+      .run();
+  }
 
   // Validate IP and UA independently using constant-time comparison
   const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
@@ -104,13 +119,8 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
       return null;
     }
     if (!fingerprintMatch) {
-      // UA matches but IP changed — this is normal (DHCP, mobile, VPN)
-      // Update stored fingerprint to reflect new IP
-      const newFingerprint = currentFingerprint;
-      await DB.prepare(
-        `UPDATE trusted_devices SET device_fingerprint = ?, ip_address = ? WHERE id = ?`
-      ).bind(newFingerprint, ipAddress, device.id).run();
-      console.log("[TrustedDevice] IP changed for known UA, updated fingerprint");
+      console.log("[TrustedDevice] Fingerprint mismatch, MFA required");
+      return null;
     }
   } else if (!fingerprintMatch) {
     console.log("[TrustedDevice] Fingerprint mismatch, device not trusted");
@@ -131,8 +141,9 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
  * Remove a trusted device by token
  */
 export async function revokeTrustedDevice(DB, token) {
-  await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`)
-    .bind(token)
+  const tokenHash = await hashTrustedDeviceToken(token);
+  await DB.prepare(`DELETE FROM trusted_devices WHERE token IN (?, ?)`)
+    .bind(tokenHash, token)
     .run();
 }
 

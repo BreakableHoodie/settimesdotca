@@ -485,42 +485,45 @@ export async function onRequestPut(context) {
         // Or if 'url' is sent legacy style, we merge it.
         
         let newSocialLinks = null;
+        let shouldUpdateSocialLinks = false;
         if (social_links !== undefined) {
-           try {
-             newSocialLinks = sanitizeBandSocialLinks(social_links);
-           } catch (error) {
-             return new Response(
-               JSON.stringify({
-                 error: "Validation error",
-                 message: error.message,
-               }),
-               { status: 400, headers: { "Content-Type": "application/json" } },
-             );
-           }
+          shouldUpdateSocialLinks = true;
+          try {
+            newSocialLinks = sanitizeBandSocialLinks(social_links);
+          } catch (error) {
+            return new Response(
+              JSON.stringify({
+                error: "Validation error",
+                message: error.message,
+              }),
+              { status: 400, headers: { "Content-Type": "application/json" } },
+            );
+          }
         } else if (url !== undefined) {
-            // Legacy update of just website
-            let existingLinks = {};
-            try {
-                const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?").bind(performance.band_profile_id).first();
-                existingLinks = JSON.parse(profile.social_links || '{}');
-            } catch (e) {}
+          shouldUpdateSocialLinks = true;
+          // Legacy update of just website
+          let existingLinks = {};
+          try {
+            const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?").bind(performance.band_profile_id).first();
+            existingLinks = JSON.parse(profile.social_links || '{}');
+          } catch (e) {}
+          try {
             existingLinks.website = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
-            try {
-              newSocialLinks = sanitizeBandSocialLinks(existingLinks);
-            } catch (error) {
-              return new Response(
-                JSON.stringify({
-                  error: "Validation error",
-                  message: error.message,
-                }),
-                { status: 400, headers: { "Content-Type": "application/json" } },
-              );
-            }
+            newSocialLinks = sanitizeBandSocialLinks(existingLinks);
+          } catch (error) {
+            return new Response(
+              JSON.stringify({
+                error: "Validation error",
+                message: error.message,
+              }),
+              { status: 400, headers: { "Content-Type": "application/json" } },
+            );
+          }
         }
 
-        if (newSocialLinks !== null) {
-            profileUpdates.push("social_links = ?");
-            profileParams.push(newSocialLinks);
+        if (shouldUpdateSocialLinks) {
+          profileUpdates.push("social_links = ?");
+          profileParams.push(newSocialLinks);
         }
         
         if (profileUpdates.length > 0) {

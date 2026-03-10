@@ -234,6 +234,10 @@ export async function onRequest(context) {
 
   // Skip auth check for auth endpoints
   if (pathname.startsWith("/api/admin/auth/")) {
+    const csrfError = validateCSRFMiddleware(request, env);
+    if (csrfError) {
+      return csrfError;
+    }
     return next();
   }
 

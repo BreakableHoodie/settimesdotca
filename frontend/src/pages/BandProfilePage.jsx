@@ -22,20 +22,11 @@ import PrivacyBanner from '../components/PrivacyBanner'
 import { Alert, Badge, Button, Card, Loading } from '../components/ui'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
+import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
 
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
 
-/** Only allow http/https URLs; returns '#' for any other scheme (e.g. javascript:) */
-function safeHref(url) {
-  if (!url) return '#'
-  try {
-    const parsed = new URL(url)
-    return ['http:', 'https:'].includes(parsed.protocol) ? url : '#'
-  } catch {
-    return '#'
-  }
-}
 const NBSP_ENTITY_REGEX = /&nbsp;|&#160;|&#xA0;/gi
 
 function stripZeroWidthCharacters(text) {
@@ -469,9 +460,9 @@ export default function BandProfilePage() {
                 )}
                 {profile.social && (
                   <div className="flex flex-wrap gap-3">
-                    {profile.social.website && (
+                    {safeExternalHref(profile.social.website) !== '#' && (
                       <a
-                        href={safeHref(profile.social.website)}
+                        href={safeExternalHref(profile.social.website)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
@@ -481,9 +472,9 @@ export default function BandProfilePage() {
                         Website
                       </a>
                     )}
-                    {profile.social.instagram && (
+                    {safeInstagramHref(profile.social.instagram) !== '#' && (
                       <a
-                        href={`https://instagram.com/${profile.social.instagram.replace('@', '')}`}
+                        href={safeInstagramHref(profile.social.instagram)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
@@ -493,9 +484,9 @@ export default function BandProfilePage() {
                         Instagram
                       </a>
                     )}
-                    {profile.social.bandcamp && (
+                    {safeExternalHref(profile.social.bandcamp) !== '#' && (
                       <a
-                        href={safeHref(profile.social.bandcamp)}
+                        href={safeExternalHref(profile.social.bandcamp)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
@@ -505,9 +496,9 @@ export default function BandProfilePage() {
                         Bandcamp
                       </a>
                     )}
-                    {profile.social.facebook && (
+                    {safeExternalHref(profile.social.facebook) !== '#' && (
                       <a
-                        href={safeHref(profile.social.facebook)}
+                        href={safeExternalHref(profile.social.facebook)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"

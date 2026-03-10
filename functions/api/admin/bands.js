@@ -3,7 +3,13 @@
 // POST /api/admin/bands - Create new band (and performance)
 
 import { checkPermission } from "./_middleware.js";
-import { isValidEmail } from "../../utils/validation.js";
+import {
+  FIELD_LIMITS,
+  isValidEmail,
+  sanitizeBandSocialLinks,
+  sanitizeOptionalHttpUrl,
+  sanitizeString,
+} from "../../utils/validation.js";
 
 // Helper to normalize band name
 function normalizeName(name) {
@@ -272,6 +278,22 @@ export async function onRequestPost(context) {
       social_links, // JSON string from frontend
     } = body;
 
+    const resolvedName = sanitizeString(name || "");
+    const resolvedDescription = description !== undefined ? sanitizeString(description) || null : null;
+    const resolvedGenre = genre !== undefined ? sanitizeString(genre) || null : null;
+    let resolvedPhotoUrl;
+    let resolvedWebsite;
+
+    try {
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL");
+      resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: error.message }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     if (contact_email && !isValidEmail(contact_email)) {
       return new Response(
         JSON.stringify({
@@ -286,14 +308,14 @@ export async function onRequestPost(context) {
     const isGlobalAdd = !eventId;
 
     if (isGlobalAdd) {
-      if (!name) {
+      if (!resolvedName) {
         return new Response(
           JSON.stringify({ error: "Missing required fields", message: "Band Name is required" }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
     } else {
-      if (!venueId || !name || !startTime || !endTime) {
+      if (!venueId || !resolvedName || !startTime || !endTime) {
         return new Response(
           JSON.stringify({ error: "Missing required fields", message: "Event, Venue, Name, Start Time, and End Time are required" }),
           { status: 400, headers: { "Content-Type": "application/json" } },
@@ -375,7 +397,7 @@ export async function onRequestPost(context) {
     }
 
     // 1. Find or Create Band Profile
-    const nameNormalized = normalizeName(name);
+    const nameNormalized = normalizeName(resolvedName);
     const parsedOrigin = parseOrigin(origin?.trim());
     const trimmedOriginCity = origin_city ? origin_city.trim() : parsedOrigin.city;
     const trimmedOriginRegion = origin_region ? origin_region.trim() : parsedOrigin.region;
@@ -393,10 +415,14 @@ export async function onRequestPost(context) {
 
     if (!bandProfile) {
       // Create new profile
-      // If social_links is passed as string, use it, otherwise construct it
-      let socialLinksJson = social_links;
-      if (!socialLinksJson && url) {
-         socialLinksJson = JSON.stringify({ website: url });
+      let socialLinksJson;
+      try {
+        socialLinksJson = sanitizeBandSocialLinks(social_links || (resolvedWebsite ? { website: resolvedWebsite } : null));
+      } catch (error) {
+        return new Response(
+          JSON.stringify({ error: "Validation error", message: error.message }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
       }
 
       bandProfile = await DB.prepare(
@@ -417,16 +443,16 @@ export async function onRequestPost(context) {
          RETURNING id`
       )
         .bind(
-          name.trim(),
+          resolvedName,
           nameNormalized,
-          genre || null,
+          resolvedGenre,
           computedOrigin,
           trimmedOriginCity,
           trimmedOriginRegion,
           contact_email || null,
           resolvedIsActive,
-          description || null,
-          photo_url || null,
+          resolvedDescription,
+          resolvedPhotoUrl,
           socialLinksJson || null
         )
         .first();

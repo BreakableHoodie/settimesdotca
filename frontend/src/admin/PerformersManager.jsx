@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { performersApi } from '../utils/adminApi'
+import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
 
 export default function PerformersManager() {
   const [performers, setPerformers] = useState([])
@@ -309,9 +310,9 @@ export default function PerformersManager() {
                   </div>
                   {performer.description && <p className="text-gray-300 text-sm mt-2">{performer.description}</p>}
                   <div className="flex gap-3 mt-2">
-                    {performer.url && (
+                    {safeExternalHref(performer.url) !== '#' && (
                       <a
-                        href={performer.url}
+                        href={safeExternalHref(performer.url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-accent-400 text-sm hover:underline"
@@ -319,9 +320,9 @@ export default function PerformersManager() {
                         Website
                       </a>
                     )}
-                    {performer.instagram && (
+                    {safeInstagramHref(performer.instagram) !== '#' && (
                       <a
-                        href={`https://instagram.com/${performer.instagram.replace('@', '')}`}
+                        href={safeInstagramHref(performer.instagram)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-accent-400 text-sm hover:underline"
@@ -329,9 +330,9 @@ export default function PerformersManager() {
                         Instagram
                       </a>
                     )}
-                    {performer.bandcamp && (
+                    {safeHttpsFallbackHref(performer.bandcamp) !== '#' && (
                       <a
-                        href={`https://${performer.bandcamp}`}
+                        href={safeHttpsFallbackHref(performer.bandcamp)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-accent-400 text-sm hover:underline"

@@ -19,6 +19,12 @@ const FILE_RULES = [
       "sessions",
       "audit_log",
     ],
+    requiredColumns: {
+      performances: ["band_profile_id", "venue_id", "start_time", "end_time"],
+      band_profiles: ["name", "name_normalized", "genre", "origin_city", "origin_region", "social_links", "photo_url"],
+      venues: ["address_line1", "address_line2", "city", "region", "postal_code", "country"],
+      events: ["description", "city", "ticket_url"],
+    },
   },
 ];
 
@@ -40,12 +46,38 @@ async function ensureFile(rule) {
     );
   }
 
+  const missingColumns = Object.entries(rule.requiredColumns || {}).flatMap(
+    ([table, columns]) =>
+      columns
+        .filter((column) => !hasColumn(sql, table, column))
+        .map((column) => `${table}.${column}`),
+  );
+
+  if (missingColumns.length) {
+    throw new Error(
+      `${rule.path} is missing required columns: ${missingColumns.join(", ")}. ` +
+        "Run the latest migrations and regenerate the schema file.",
+    );
+  }
+
   return { file: rule.path, tables: rule.tables.length };
 }
 
 function hasCreateTable(sql, table) {
   const pattern = new RegExp(`CREATE\\s+TABLE[^;]*\\b${table}\\b`, "i");
   return pattern.test(sql);
+}
+
+function hasColumn(sql, table, column) {
+  const tablePattern = new RegExp(
+    `CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${table}\\s*\\((.*?)\\)\\s*;`,
+    "is",
+  );
+  const tableMatch = sql.match(tablePattern);
+  if (!tableMatch) return false;
+
+  const columnPattern = new RegExp(`\\b${column}\\b`, "i");
+  return columnPattern.test(tableMatch[1]);
 }
 
 async function main() {

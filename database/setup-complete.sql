@@ -26,11 +26,20 @@ CREATE TABLE IF NOT EXISTS events (
 -- Venues table
 CREATE TABLE IF NOT EXISTS venues (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   address TEXT,
+  address_line1 TEXT,
+  address_line2 TEXT,
   city TEXT,
+  region TEXT,
+  postal_code TEXT,
+  country TEXT,
   capacity INTEGER,
   website TEXT,
+  instagram TEXT,
+  facebook TEXT,
+  phone TEXT,
+  contact_email TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -53,33 +62,51 @@ CREATE TABLE IF NOT EXISTS bands (
   FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE SET NULL
 );
 
--- Performances table (for many-to-many relationships)
+-- Performances table (current schema plus legacy compatibility columns)
 CREATE TABLE IF NOT EXISTS performances (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id INTEGER NOT NULL,
+  band_profile_id INTEGER NOT NULL,
+  venue_id INTEGER NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  notes TEXT,
   band_id INTEGER,
   band_name TEXT,
-  venue_id INTEGER,
-  start_time TEXT,
-  end_time TEXT,
   stage TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_by_user_id INTEGER,
+  updated_by_user_id INTEGER,
+  updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE RESTRICT,
   FOREIGN KEY (band_id) REFERENCES bands(id) ON DELETE SET NULL,
-  FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE SET NULL
+  FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE RESTRICT,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id),
+  FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
 );
 
--- Band profiles (persistent band info across events)
+-- Band profiles (current schema plus legacy compatibility columns)
 CREATE TABLE IF NOT EXISTS band_profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  band_name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  name_normalized TEXT NOT NULL UNIQUE,
+  description TEXT,
+  genre TEXT,
+  origin TEXT,
+  origin_city TEXT,
+  origin_region TEXT,
+  contact_email TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  social_links TEXT,
+  photo_url TEXT,
+  url TEXT,
+  band_name TEXT,
   bio TEXT,
   genres TEXT,
   hometown TEXT,
   formed_year INTEGER,
   website TEXT,
-  social_links TEXT,
-  photo_url TEXT,
   total_views INTEGER DEFAULT 0,
   total_social_clicks INTEGER DEFAULT 0,
   popularity_score REAL DEFAULT 0,
@@ -317,7 +344,12 @@ CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 CREATE INDEX IF NOT EXISTS idx_bands_event ON bands(event_id);
 CREATE INDEX IF NOT EXISTS idx_bands_venue ON bands(venue_id);
 CREATE INDEX IF NOT EXISTS idx_performances_event ON performances(event_id);
+CREATE INDEX IF NOT EXISTS idx_performances_band ON performances(band_profile_id);
 CREATE INDEX IF NOT EXISTS idx_performances_venue ON performances(venue_id);
+CREATE INDEX IF NOT EXISTS idx_performances_event_time ON performances(event_id, start_time);
+CREATE INDEX IF NOT EXISTS idx_band_profiles_name ON band_profiles(name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_band_profiles_normalized ON band_profiles(name_normalized);
+CREATE INDEX IF NOT EXISTS idx_band_profiles_genre ON band_profiles(genre);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_activation_token ON users(activation_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);

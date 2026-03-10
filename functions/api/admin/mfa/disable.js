@@ -5,6 +5,7 @@
 import { checkPermission, auditLog } from "../_middleware.js";
 import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
 import { getClientIP } from "../../../utils/request.js";
+import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
 
 function parseBackupCodes(raw) {
   if (!raw) return [];
@@ -107,6 +108,8 @@ export async function onRequestPost(context) {
   )
     .bind(userId)
     .run();
+
+  await revokeAllTrustedDevices(DB, userId);
 
   await auditLog(
     env,

@@ -7,6 +7,8 @@ import {
   validateEntity,
   VALIDATION_SCHEMAS,
   validationErrorResponse,
+  sanitizeEventSocialLinks,
+  sanitizeVenueInfo,
 } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
 
@@ -124,6 +126,14 @@ export async function onRequestPost(context) {
       theme_colors,
     } = validation.sanitized;
 
+    let sanitizedVenueInfo;
+    let sanitizedSocialLinks;
+    try {
+      sanitizedVenueInfo = sanitizeVenueInfo(venue_info);
+      sanitizedSocialLinks = sanitizeEventSocialLinks(social_links);
+    } catch (error) {
+      return validationErrorResponse(error.message);
+    }
     if (status === "archived" && currentUser.role !== "admin") {
       return new Response(
         JSON.stringify({
@@ -201,8 +211,8 @@ export async function onRequestPost(context) {
         description,
         city,
         ticket_url,
-        venue_info,
-        social_links,
+        sanitizedVenueInfo,
+        sanitizedSocialLinks,
         theme_colors,
         currentUser.userId,
       )

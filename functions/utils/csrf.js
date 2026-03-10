@@ -162,6 +162,25 @@ export function validateCSRFToken(request, env = null) {
   }
 }
 
+function isSameOriginMutation(request) {
+  const requestOrigin = new URL(request.url).origin;
+  const originHeader = request.headers.get("Origin");
+  if (originHeader) {
+    return originHeader === requestOrigin;
+  }
+
+  const refererHeader = request.headers.get("Referer");
+  if (refererHeader) {
+    try {
+      return new URL(refererHeader).origin === requestOrigin;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
 export function validateCSRFMiddleware(request, env = null) {
   const method = request.method.toUpperCase();
   if (!["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
@@ -170,6 +189,18 @@ export function validateCSRFMiddleware(request, env = null) {
 
   const url = new URL(request.url);
   if (url.pathname.includes("/api/admin/auth/")) {
+    if (!isSameOriginMutation(request)) {
+      return new Response(
+        JSON.stringify({
+          error: "Origin validation failed",
+          message: "Cross-site authentication requests are not allowed",
+        }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
     return null;
   }
 

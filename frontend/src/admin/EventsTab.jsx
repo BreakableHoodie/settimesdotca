@@ -27,15 +27,6 @@ const linkFocusClass =
 const inputFocusClass =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
 
-const isEventLockedAsArchived = event => event?.status === 'archived' || isEventArchived(event?.date)
-const getAdminEventState = event => (event?.status === 'archived' ? 'archived' : getEventState(event?.date))
-const buttonFocusClass =
-  'border border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
-const linkFocusClass =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
-const inputFocusClass =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
-
 const MINUTES_IN_DAY = 24 * 60
 const EARLY_MORNING_CUTOFF_HOUR = 6
 const EVENING_START_HOUR = 18
@@ -765,7 +756,9 @@ export default function EventsTab({
               )}
               {safeExternalHref(selectedEvent.ticket_link) !== '#' && (
                 <button
-                  onClick={() => window.open(safeExternalHref(selectedEvent.ticket_link), '_blank', 'noopener,noreferrer')}
+                  onClick={() =>
+                    window.open(safeExternalHref(selectedEvent.ticket_link), '_blank', 'noopener,noreferrer')
+                  }
                   className={`px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
                   <FontAwesomeIcon icon={faTicketSimple} className="mr-2" aria-hidden="true" />

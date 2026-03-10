@@ -5,6 +5,7 @@
 import { checkPermission, auditLog } from "../_middleware.js";
 import { verifyTotp, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
 import { getClientIP } from "../../../utils/request.js";
+import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
 
 async function checkRateLimit(DB, userId, ipAddress) {
   const windowMs = 10 * 60 * 1000;
@@ -158,6 +159,8 @@ export async function onRequestPost(context) {
   )
     .bind(JSON.stringify(hashedCodes), userId)
     .run();
+
+  await revokeAllTrustedDevices(DB, userId);
 
   await DB.prepare(
     `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)

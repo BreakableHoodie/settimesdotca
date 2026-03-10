@@ -3,6 +3,7 @@ import { authApi } from '../utils/adminApi'
 import PasswordStrength from '../components/PasswordStrength'
 import { FIELD_LIMITS, validatePasswordStrength } from '../utils/validation'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { safeExternalHref } from '../utils/urlSafety'
 
 export default function SignupPage() {
   const navigate = useNavigate()
@@ -129,10 +130,10 @@ export default function SignupPage() {
           <div className="bg-white/10 border border-white/20 rounded-lg p-4">
             <h2 className="text-lg font-semibold text-white mb-2">Check your email</h2>
             <p className="text-gray-300 text-sm mb-4">{activationInfo.message}</p>
-            {activationInfo.activationUrl && (
+            {safeExternalHref(activationInfo.activationUrl) !== '#' && (
               <div className="mb-4 text-sm text-gray-300 break-all">
                 Activation link:{' '}
-                <a href={activationInfo.activationUrl} className="text-accent-400 hover:underline">
+                <a href={safeExternalHref(activationInfo.activationUrl)} className="text-accent-400 hover:underline">
                   {activationInfo.activationUrl}
                 </a>
               </div>

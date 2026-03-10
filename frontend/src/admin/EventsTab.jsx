@@ -16,6 +16,7 @@ import {
   confirmArchivedEventEdit,
   confirmArchivedEventDelete,
 } from '../utils/eventLifecycle'
+import { safeExternalHref } from '../utils/urlSafety'
 
 const isEventLockedAsArchived = event => event?.status === 'archived' || isEventArchived(event?.date)
 const getAdminEventState = event => (event?.status === 'archived' ? 'archived' : getEventState(event?.date))
@@ -230,10 +231,10 @@ const EventRow = memo(function EventRow({
       </td>
       <td className="px-4 py-3 text-center text-white/70">{event.band_count || 0}</td>
       <td className="px-4 py-3 text-center">
-        {ticketLink ? (
+        {safeExternalHref(ticketLink) !== '#' ? (
           <div className="flex justify-center gap-2">
             <button
-              onClick={() => window.open(ticketLink, '_blank')}
+              onClick={() => window.open(safeExternalHref(ticketLink), '_blank', 'noopener,noreferrer')}
               className={`px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Visit ticket link"
             >
@@ -753,9 +754,11 @@ export default function EventsTab({
                   Edit
                 </button>
               )}
-              {selectedEvent.ticket_link && (
+              {safeExternalHref(selectedEvent.ticket_link) !== '#' && (
                 <button
-                  onClick={() => window.open(selectedEvent.ticket_link, '_blank')}
+                  onClick={() =>
+                    window.open(safeExternalHref(selectedEvent.ticket_link), '_blank', 'noopener,noreferrer')
+                  }
                   className={`px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
                   <FontAwesomeIcon icon={faTicketSimple} className="mr-2" aria-hidden="true" />

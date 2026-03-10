@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { bandsApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
+import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGlobe } from '@fortawesome/free-solid-svg-icons'
 import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
@@ -391,56 +392,60 @@ export default function RosterTab({ showToast, readOnly = false }) {
 
   const SocialLinksIcons = ({ band }) => {
     const links = parseSocialLinks(band)
-    const hasAnyLink = links.website || links.instagram || links.bandcamp || links.facebook
+    const websiteHref = safeExternalHref(links.website)
+    const instagramHref = safeInstagramHref(links.instagram)
+    const bandcampHref = safeHttpsFallbackHref(links.bandcamp)
+    const facebookHref = safeExternalHref(links.facebook)
+    const hasAnyLink = [websiteHref, instagramHref, bandcampHref, facebookHref].some(href => href !== '#')
 
     if (!hasAnyLink) return <span className="text-white/30">-</span>
 
     return (
       <div className="flex gap-2">
-        {links.website && (
+        {websiteHref !== '#' && (
           <a
-            href={links.website}
+            href={websiteHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-accent-400 transition-colors"
+            className="text-white/70 hover:text-accent-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
             title="Website"
+            aria-label={`Open website for ${band.name}`}
           >
             <FontAwesomeIcon icon={faGlobe} />
           </a>
         )}
-        {links.instagram && (
+        {instagramHref !== '#' && (
           <a
-            href={
-              links.instagram.startsWith('http')
-                ? links.instagram
-                : `https://instagram.com/${links.instagram.replace('@', '')}`
-            }
+            href={instagramHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-pink-400 transition-colors"
+            className="text-white/70 hover:text-pink-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-400"
             title="Instagram"
+            aria-label={`Open Instagram for ${band.name}`}
           >
             <FontAwesomeIcon icon={faInstagram} />
           </a>
         )}
-        {links.bandcamp && (
+        {bandcampHref !== '#' && (
           <a
-            href={links.bandcamp}
+            href={bandcampHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-teal-400 transition-colors"
+            className="text-white/70 hover:text-teal-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
             title="Bandcamp"
+            aria-label={`Open Bandcamp for ${band.name}`}
           >
             <FontAwesomeIcon icon={faBandcamp} />
           </a>
         )}
-        {links.facebook && (
+        {facebookHref !== '#' && (
           <a
-            href={links.facebook}
+            href={facebookHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-blue-400 transition-colors"
+            className="text-white/70 hover:text-blue-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
             title="Facebook"
+            aria-label={`Open Facebook for ${band.name}`}
           >
             <FontAwesomeIcon icon={faFacebook} />
           </a>

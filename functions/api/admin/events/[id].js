@@ -5,7 +5,13 @@
 // DELETE /api/admin/events/{id} - Delete event
 
 import { checkPermission, auditLog } from "../_middleware.js";
-import { FIELD_LIMITS, isValidURL, sanitizeString } from "../../../utils/validation.js";
+import {
+  FIELD_LIMITS,
+  isValidURL,
+  sanitizeEventSocialLinks,
+  sanitizeString,
+  sanitizeVenueInfo,
+} from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 
 // Helper to extract event ID from path
@@ -274,51 +280,53 @@ export async function onRequestPatch(context) {
     }
 
     if (venue_info !== undefined) {
-      const parsed = parseJsonField(venue_info, "Venue info");
-      if (parsed.error) {
+      try {
+        const sanitizedVenueInfo = sanitizeVenueInfo(venue_info);
+        if (sanitizedVenueInfo && sanitizedVenueInfo.length > FIELD_LIMITS.eventVenueInfo.max) {
+          return new Response(
+            JSON.stringify({
+              error: "Validation error",
+              message: `Venue info must be no more than ${FIELD_LIMITS.eventVenueInfo.max} characters`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        updates.push("venue_info = ?");
+        params.push(sanitizedVenueInfo ?? null);
+      } catch (error) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
-            message: parsed.error,
+            message: error.message,
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
-      if (typeof parsed.value === "string" && parsed.value.length > FIELD_LIMITS.eventVenueInfo.max) {
-        return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: `Venue info must be no more than ${FIELD_LIMITS.eventVenueInfo.max} characters`,
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      updates.push("venue_info = ?");
-      params.push(parsed.value ?? null);
     }
 
     if (social_links !== undefined) {
-      const parsed = parseJsonField(social_links, "Social links");
-      if (parsed.error) {
+      try {
+        const sanitizedSocialLinks = sanitizeEventSocialLinks(social_links);
+        if (sanitizedSocialLinks && sanitizedSocialLinks.length > FIELD_LIMITS.eventSocialLinks.max) {
+          return new Response(
+            JSON.stringify({
+              error: "Validation error",
+              message: `Social links must be no more than ${FIELD_LIMITS.eventSocialLinks.max} characters`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        updates.push("social_links = ?");
+        params.push(sanitizedSocialLinks ?? null);
+      } catch (error) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
-            message: parsed.error,
+            message: error.message,
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
-      if (typeof parsed.value === "string" && parsed.value.length > FIELD_LIMITS.eventSocialLinks.max) {
-        return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: `Social links must be no more than ${FIELD_LIMITS.eventSocialLinks.max} characters`,
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      updates.push("social_links = ?");
-      params.push(parsed.value ?? null);
     }
 
     if (theme_colors !== undefined) {

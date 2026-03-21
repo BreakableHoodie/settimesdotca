@@ -248,7 +248,7 @@ export default function PerformersManager() {
                   value={formData.bandcamp}
                   onChange={e => setFormData(prev => ({ ...prev, bandcamp: e.target.value }))}
                   className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
-                  placeholder="username.bandcamp.com"
+                  placeholder="https://username.bandcamp.com"
                 />
               </div>
               <div>
@@ -261,7 +261,7 @@ export default function PerformersManager() {
                   value={formData.facebook}
                   onChange={e => setFormData(prev => ({ ...prev, facebook: e.target.value }))}
                   className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
-                  placeholder="facebook.com/page"
+                  placeholder="https://facebook.com/page"
                 />
               </div>
             </div>

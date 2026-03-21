@@ -356,10 +356,38 @@ function App() {
   // Breadcrumb navigation
   const breadcrumbs = [{ label: 'Events', href: '/' }, { label: eventData?.name || 'Event Schedule' }]
 
+  const eventDescription = eventData?.name
+    ? `View the full schedule and set times for ${eventData.name}. Browse all artists and plan your evening.`
+    : null
+
+  const eventJsonLd = eventData
+    ? JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Event',
+        name: eventData.name,
+        startDate: eventData.date,
+        url: `https://settimes.ca/event/${slug}`,
+        description: `Full set times and schedule for ${eventData.name}.`,
+        ...(eventData.city && { location: { '@type': 'Place', address: eventData.city } }),
+        organizer: { '@type': 'Organization', name: 'SetTimes', url: 'https://settimes.ca' },
+      })
+    : null
+
   return (
     <div className="min-h-screen pb-20">
       <Helmet>
         <title>{eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'}</title>
+        {eventDescription && <meta name="description" content={eventDescription} />}
+        {slug && <link rel="canonical" href={`https://settimes.ca/event/${slug}`} />}
+        {eventData && <meta property="og:title" content={`${eventData.name} | SetTimes`} />}
+        {eventDescription && <meta property="og:description" content={eventDescription} />}
+        <meta property="og:type" content="website" />
+        {slug && <meta property="og:url" content={`https://settimes.ca/event/${slug}`} />}
+        <meta property="og:site_name" content="SetTimes" />
+        <meta name="twitter:card" content="summary" />
+        {eventData && <meta name="twitter:title" content={`${eventData.name} | SetTimes`} />}
+        {eventDescription && <meta name="twitter:description" content={eventDescription} />}
+        {eventJsonLd && <script type="application/ld+json">{eventJsonLd}</script>}
       </Helmet>
       <OfflineIndicator />
       <Header view={view} setView={setView} />

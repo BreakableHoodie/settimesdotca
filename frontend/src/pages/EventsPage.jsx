@@ -40,7 +40,24 @@ export default function EventsPage() {
   return (
     <div id="main-content" className="min-h-screen bg-gradient-dark">
       <Helmet>
-        <title>SetTimes</title>
+        <title>SetTimes – Live Music Events &amp; Show Schedules</title>
+        <meta name="description" content="Discover upcoming live music events and build your personalized show schedule. Browse artists, venues, and set times all in one place." />
+        <link rel="canonical" href="https://settimes.ca/" />
+        <meta property="og:title" content="SetTimes – Live Music Events & Show Schedules" />
+        <meta property="og:description" content="Discover upcoming live music events and build your personalized show schedule. Browse artists, venues, and set times all in one place." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://settimes.ca/" />
+        <meta property="og:site_name" content="SetTimes" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="SetTimes – Live Music Events & Show Schedules" />
+        <meta name="twitter:description" content="Discover upcoming live music events and build your personalized show schedule." />
+        <script type="application/ld+json">{JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'SetTimes',
+          url: 'https://settimes.ca',
+          description: 'Discover live music events and build your personalized show schedule.',
+        })}</script>
       </Helmet>
       <header className="py-8 px-4 text-center border-b border-accent-500/30">
         <h1 className="text-4xl font-bold text-white font-display mb-2">

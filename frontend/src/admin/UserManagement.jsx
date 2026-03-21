@@ -239,12 +239,12 @@ export default function UserManagement() {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name or email"
-            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-56"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-56"
           />
           <select
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
           >
             <option value="all">All roles</option>
             <option value="admin">Admin</option>
@@ -254,7 +254,7 @@ export default function UserManagement() {
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -489,7 +489,7 @@ export default function UserManagement() {
                 id="resetReason"
                 value={resetReason}
                 onChange={e => setResetReason(e.target.value)}
-                className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-none placeholder-gray-400"
+                className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-hidden placeholder-gray-400"
                 placeholder="Reason for password reset..."
                 rows={3}
               />

@@ -39,7 +39,7 @@ function BasicsStep({ eventData, onChange }) {
           type="text"
           value={eventData.name}
           onChange={e => handleNameChange(e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           placeholder="Long Weekend Band Crawl Vol. 6"
           required
         />
@@ -54,7 +54,7 @@ function BasicsStep({ eventData, onChange }) {
           type="date"
           value={eventData.date}
           onChange={e => handleChange('date', e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           required
         />
       </div>
@@ -68,7 +68,7 @@ function BasicsStep({ eventData, onChange }) {
           type="text"
           value={eventData.slug}
           onChange={e => handleChange('slug', e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           placeholder="vol-6"
           required
         />
@@ -83,7 +83,7 @@ function BasicsStep({ eventData, onChange }) {
           id="event-description"
           value={eventData.description}
           onChange={e => handleChange('description', e.target.value)}
-          className="w-full min-h-[96px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+          className="w-full min-h-[96px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           rows={3}
           placeholder="Describe your event..."
         />
@@ -147,14 +147,14 @@ function VenuesStep({ eventData: _eventData, onChange }) {
             type="text"
             value={newVenue.name}
             onChange={e => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             placeholder="Venue name"
           />
           <input
             type="text"
             value={newVenue.address}
             onChange={e => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             placeholder="Address (optional)"
           />
           <button
@@ -245,14 +245,14 @@ function BandsStep({ eventData, onChange }) {
             type="text"
             value={newBand.name}
             onChange={e => setNewBand(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             placeholder="Band name"
           />
 
           <select
             value={newBand.venueId}
             onChange={e => setNewBand(prev => ({ ...prev, venueId: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           >
             <option value="">Select venue</option>
             {eventData.venues.map(venue => (
@@ -267,14 +267,14 @@ function BandsStep({ eventData, onChange }) {
               type="time"
               value={newBand.startTime}
               onChange={e => setNewBand(prev => ({ ...prev, startTime: e.target.value }))}
-              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
               placeholder="Start time"
             />
             <input
               type="time"
               value={newBand.endTime}
               onChange={e => setNewBand(prev => ({ ...prev, endTime: e.target.value }))}
-              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
               placeholder="End time"
             />
           </div>
@@ -283,7 +283,7 @@ function BandsStep({ eventData, onChange }) {
             type="url"
             value={newBand.url}
             onChange={e => setNewBand(prev => ({ ...prev, url: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             placeholder="Band website/social media (optional)"
           />
 

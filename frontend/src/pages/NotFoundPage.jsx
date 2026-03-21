@@ -6,7 +6,7 @@ import Footer from '../components/Footer'
 
 export default function NotFoundPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-bg-navy to-bg-purple">
+    <div className="min-h-screen flex flex-col bg-linear-to-br from-bg-navy to-bg-purple">
       <Helmet>
         <title>Page Not Found | SetTimes</title>
       </Helmet>

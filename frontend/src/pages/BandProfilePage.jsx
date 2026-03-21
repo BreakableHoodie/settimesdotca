@@ -356,7 +356,7 @@ export default function BandProfilePage() {
         </Helmet>
 
         {/* Sticky Navigation Header */}
-        <header className="sticky top-0 z-50 border-b border-white/10 bg-bg-navy/95 backdrop-blur-sm">
+        <header className="sticky top-0 z-50 border-b border-white/10 bg-bg-navy/95 backdrop-blur-xs">
           <div className="container mx-auto px-4 max-w-6xl">
             <div className="flex items-center justify-between h-14">
               <Link to="/" className="text-xl font-bold font-display hover:opacity-80 transition-opacity">
@@ -394,14 +394,14 @@ export default function BandProfilePage() {
           <div className="bg-bg-purple rounded-xl border-2 border-accent-500/30 overflow-hidden mb-6 shadow-xl">
             {/* Band Photo with Overlay */}
             {profile.photo_url ? (
-              <div className="relative h-80 bg-gradient-to-b from-bg-navy via-bg-purple to-bg-navy overflow-hidden">
+              <div className="relative h-80 bg-linear-to-b from-bg-navy via-bg-purple to-bg-navy overflow-hidden">
                 <img
                   src={profile.photo_url}
                   alt={profile.name}
                   loading="lazy"
                   className="w-full h-full object-cover opacity-60"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-bg-purple via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-t from-bg-purple via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-3">{profile.name}</h1>
                   <div className="flex flex-wrap gap-3">
@@ -421,7 +421,7 @@ export default function BandProfilePage() {
                 </div>
               </div>
             ) : (
-              <div className="p-8 bg-gradient-to-br from-bg-purple to-bg-navy">
+              <div className="p-8 bg-linear-to-br from-bg-purple to-bg-navy">
                 <h1 className="text-5xl font-bold text-white mb-3">{profile.name}</h1>
                 <div className="flex flex-wrap gap-3">
                   {profile.genre && (
@@ -477,7 +477,7 @@ export default function BandProfilePage() {
                         href={safeInstagramHref(profile.social.instagram)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-4 py-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                        className="px-4 py-2 bg-linear-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
                         onClick={() => trackSocialClick(profile.id, 'instagram')}
                       >
                         <FontAwesomeIcon icon={faInstagram} />

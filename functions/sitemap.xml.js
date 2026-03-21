@@ -2,8 +2,15 @@
  * Dynamic XML sitemap generated from the database.
  * Includes all published events and band profiles with at least one published performance.
  */
+import { getPublicDataGateResponse } from "./utils/publicGate.js";
+
 export async function onRequestGet(context) {
   const { env } = context;
+
+  const gate = getPublicDataGateResponse(env);
+  if (gate) {
+    return new Response("", { status: 503 });
+  }
 
   try {
     const [{ results: events }, { results: bands }] = await Promise.all([

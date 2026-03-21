@@ -64,7 +64,7 @@ function BandCard({
           isSelected
             ? 'bg-white/20 hover:bg-white/30 text-white'
             : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white'
-        } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500`}
+        } focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500`}
         aria-label={labelBase}
         title={labelBase}
       >
@@ -77,7 +77,7 @@ function BandCard({
             <Link
               to={`/band/${slugifyBandName(band.name)}`}
               onClick={e => e.stopPropagation()}
-              className="font-display font-bold text-white text-base md:text-lg leading-snug hover:text-accent-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
+              className="font-display font-bold text-white text-base md:text-lg leading-snug hover:text-accent-400 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
             >
               {band.name}
             </Link>

@@ -82,7 +82,7 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
                 e.target.value = '' // Reset
               }
             }}
-            className="w-full min-h-[44px] px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+            className="w-full min-h-[44px] px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             defaultValue=""
           >
             <option value="">Choose a venue...</option>
@@ -114,14 +114,14 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
               type="text"
               value={newVenue.name}
               onChange={e => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none text-sm"
+              className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden text-sm"
               placeholder="Venue name *"
             />
             <input
               type="text"
               value={newVenue.address}
               onChange={e => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
-              className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none text-sm"
+              className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden text-sm"
               placeholder="Address (optional)"
             />
             <div className="flex flex-col sm:flex-row gap-2">

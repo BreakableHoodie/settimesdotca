@@ -44,7 +44,7 @@ function Header({ view, setView, selectedCount = 0 }) {
 
   return (
     <header
-      className="sticky top-0 z-50 border-b-2 border-accent-500/30 transition-all duration-500 ease-out bg-gradient-to-b from-bg-navy to-bg-purple backdrop-blur-sm"
+      className="sticky top-0 z-50 border-b-2 border-accent-500/30 transition-all duration-500 ease-out bg-linear-to-b from-bg-navy to-bg-purple backdrop-blur-xs"
       style={headerStyle}
     >
       <div className="container mx-auto px-4 max-w-6xl">
@@ -72,7 +72,7 @@ function Header({ view, setView, selectedCount = 0 }) {
           <div className="flex gap-2">
             <button
               onClick={() => setView('all')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+              className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 view === 'all'
                   ? 'bg-accent-400 text-bg-navy shadow-lg'
                   : 'bg-bg-purple/50 text-white hover:bg-bg-purple'
@@ -84,7 +84,7 @@ function Header({ view, setView, selectedCount = 0 }) {
             </button>
             <button
               onClick={() => setView('mine')}
-              className={`relative px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+              className={`relative px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 view === 'mine'
                   ? 'bg-accent-400 text-bg-navy shadow-lg'
                   : 'bg-bg-purple/50 text-white hover:bg-bg-purple'

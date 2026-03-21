@@ -281,7 +281,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name, city, phone, email"
-            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-56"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-56"
           />
           {!showAddForm && !editingId && !readOnly && (
             <button
@@ -310,7 +310,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   required
                   minLength={FIELD_LIMITS.venueName.min}
                   maxLength={FIELD_LIMITS.venueName.max}
@@ -331,7 +331,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="address_line1"
                   value={formData.address_line1}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   maxLength={FIELD_LIMITS.venueAddressLine1.max}
                   placeholder="123 Main St"
                 />
@@ -350,7 +350,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="address_line2"
                   value={formData.address_line2}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   maxLength={FIELD_LIMITS.venueAddressLine2.max}
                   placeholder="Suite 200"
                 />
@@ -366,7 +366,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="city"
                   value={formData.city}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   maxLength={FIELD_LIMITS.venueCity.max}
                   placeholder="Waterloo"
                 />
@@ -382,7 +382,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="region"
                   value={formData.region}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   maxLength={FIELD_LIMITS.venueRegion.max}
                   placeholder="ON"
                   list="venue-region-list"
@@ -404,7 +404,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="postal_code"
                   value={formData.postal_code}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   maxLength={FIELD_LIMITS.venuePostal.max}
                   placeholder="N2L 3G1"
                   pattern="\\s*(?:\\d{5}(?:-\\d{4})?|[A-Za-z]\\d[A-Za-z][\\s\\u00A0-]?\\d[A-Za-z]\\d)\\s*"
@@ -422,7 +422,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="country"
                   value={formData.country}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   maxLength={FIELD_LIMITS.venueCountry.max}
                   placeholder="Canada"
                   list="venue-country-list"
@@ -444,7 +444,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   maxLength={FIELD_LIMITS.venuePhone.max}
                   placeholder="+1 519 555 1234"
                   pattern="^[+]?[-()\\d\\s.]{7,20}$"
@@ -462,7 +462,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   name="contact_email"
                   value={formData.contact_email}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-3 py-2 min-h-[44px] rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   maxLength={FIELD_LIMITS.venueContactEmail.max}
                   placeholder="hello@venue.com"
                 />

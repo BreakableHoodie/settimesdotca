@@ -147,7 +147,7 @@ export default function PerformersManager() {
                 type="text"
                 value={formData.name}
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                 placeholder="Performer name"
                 required
               />
@@ -163,7 +163,7 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.genre}
                   onChange={e => setFormData(prev => ({ ...prev, genre: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="Rock, Jazz, etc."
                 />
               </div>
@@ -176,7 +176,7 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.origin}
                   onChange={e => setFormData(prev => ({ ...prev, origin: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="Montreal, Toronto, etc."
                 />
               </div>
@@ -190,7 +190,7 @@ export default function PerformersManager() {
                 id="performer-description"
                 value={formData.description}
                 onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                 rows={3}
                 placeholder="Brief description of the performer..."
               />
@@ -205,7 +205,7 @@ export default function PerformersManager() {
                 type="url"
                 value={formData.url}
                 onChange={e => setFormData(prev => ({ ...prev, url: e.target.value }))}
-                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                 placeholder="https://example.com"
               />
             </div>
@@ -219,7 +219,7 @@ export default function PerformersManager() {
                 type="url"
                 value={formData.photo_url}
                 onChange={e => setFormData(prev => ({ ...prev, photo_url: e.target.value }))}
-                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                 placeholder="https://example.com/photo.jpg"
               />
             </div>
@@ -234,7 +234,7 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.instagram}
                   onChange={e => setFormData(prev => ({ ...prev, instagram: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="@username"
                 />
               </div>
@@ -247,7 +247,7 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.bandcamp}
                   onChange={e => setFormData(prev => ({ ...prev, bandcamp: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="https://username.bandcamp.com"
                 />
               </div>
@@ -260,7 +260,7 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.facebook}
                   onChange={e => setFormData(prev => ({ ...prev, facebook: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="https://facebook.com/page"
                 />
               </div>

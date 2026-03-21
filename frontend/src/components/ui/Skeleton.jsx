@@ -35,7 +35,7 @@ export function BandCardSkeletonGrid({ count = 6 }) {
 
 export function EventCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6" role="status" aria-label="Loading event">
+    <div className="rounded-2xl border border-white/10 bg-white/3 p-6" role="status" aria-label="Loading event">
       {/* Title bar */}
       <SkeletonBlock className="h-7 w-48 mb-3" />
       {/* Date line */}

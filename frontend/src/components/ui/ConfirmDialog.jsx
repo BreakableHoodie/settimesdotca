@@ -53,7 +53,7 @@ export default function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" role="presentation">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-xs" aria-hidden="true" />
 
       {/* Dialog */}
       <div
@@ -76,7 +76,7 @@ export default function ConfirmDialog({
           </div>
           <button
             onClick={onCancel}
-            className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded focus:outline-hidden focus:ring-2 focus:ring-accent-500"
             aria-label="Close dialog"
           >
             <FontAwesomeIcon icon={faXmark} className="text-xl" />

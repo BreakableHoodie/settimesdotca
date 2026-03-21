@@ -31,7 +31,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
   const toggleLabel = isSelected ? `Remove ${band.name} from my route` : `Add ${band.name} to my route`
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-lg backdrop-blur-sm">
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-lg backdrop-blur-xs">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -53,7 +53,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
             <div className="min-w-0">
               <Link
                 to={`/band/${slugifyBandName(band.name)}`}
-                className="block truncate text-lg font-bold text-white transition-colors hover:text-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy"
+                className="block truncate text-lg font-bold text-white transition-colors hover:text-accent-400 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy"
               >
                 {band.name}
               </Link>
@@ -64,7 +64,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
             <button
               type="button"
               onClick={() => onToggle?.(band.id)}
-              className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy ${
+              className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy ${
                 isSelected
                   ? 'border-accent-500/50 bg-accent-500/20 text-accent-400 hover:bg-accent-500/30'
                   : 'border-white/15 bg-white/5 text-white/80 hover:bg-white/10'

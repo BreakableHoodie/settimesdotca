@@ -50,7 +50,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
         ref={inputRef}
         type="text"
         placeholder="Search for an artist..."
-        className="w-full min-h-[44px] px-4 py-3 bg-bg-navy border border-white/20 rounded text-white focus:border-accent-500 focus:outline-none text-lg"
+        className="w-full min-h-[44px] px-4 py-3 bg-bg-navy border border-white/20 rounded text-white focus:border-accent-500 focus:outline-hidden text-lg"
         value={query}
         onChange={e => setQuery(e.target.value)}
       />

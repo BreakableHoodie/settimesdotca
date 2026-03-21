@@ -392,7 +392,10 @@ function App() {
       <OfflineIndicator />
       <Header view={view} setView={setView} />
       <ComingUp bands={myBands} currentTime={effectiveNow} />
-      <main id="main-content" className="container mx-auto px-4 max-w-screen-2xl mt-4 sm:mt-6 space-y-6 sm:space-y-8">
+      <main
+        id="main-content"
+        className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-4 sm:mt-6 space-y-6 sm:space-y-8"
+      >
         <Breadcrumbs items={breadcrumbs} />
         {debugEnabled && (
           <section className="bg-bg-purple/80 border border-accent-500/30 rounded-lg p-4">
@@ -420,7 +423,7 @@ function App() {
                     const parsed = parseDebugTime(value)
                     setDebugTime(parsed)
                   }}
-                  className="px-3 py-2 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
+                  className="px-3 py-2 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden text-sm"
                 />
                 <button
                   type="button"

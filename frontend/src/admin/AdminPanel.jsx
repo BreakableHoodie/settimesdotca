@@ -177,7 +177,7 @@ export default function AdminPanel({ onLogout }) {
       {/* Skip Navigation Link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-6 focus:py-3 focus:bg-accent-500 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-bg-navy"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-100 focus:px-6 focus:py-3 focus:bg-accent-500 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-bg-navy"
       >
         Skip to main content
       </a>
@@ -206,7 +206,7 @@ export default function AdminPanel({ onLogout }) {
                       const value = e.target.value
                       setSelectedEventId(value ? Number(value) : null)
                     }}
-                    className="min-h-[44px] px-3 py-1.5 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
+                    className="min-h-[44px] px-3 py-1.5 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden text-sm"
                   >
                     <option value="">All Venues/Bands (Global View)</option>
                     {events.map(event => (

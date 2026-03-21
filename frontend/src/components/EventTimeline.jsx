@@ -273,7 +273,7 @@ export default function EventTimeline() {
                   id="timeline-venue-filter"
                   value={filters.venue || ''}
                   onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
+                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-hidden transition-colors"
                 >
                   <option value="">All Venues</option>
                   {allVenues.map(venue => (
@@ -293,7 +293,7 @@ export default function EventTimeline() {
                   id="timeline-month-filter"
                   value={filters.month || ''}
                   onChange={e => handleFilterChange('month', e.target.value || null)}
-                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
+                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-hidden transition-colors"
                 >
                   <option value="">All Months</option>
                   {allMonths.map(month => (
@@ -477,7 +477,7 @@ function EventCard({
                 <h3 className="text-2xl font-bold text-accent-500 flex-1">
                   <Link
                     to={`/event/${event.slug}`}
-                    className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/70 rounded-sm"
+                    className="hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500/70 rounded-xs"
                   >
                     {event.name}
                   </Link>
@@ -626,7 +626,7 @@ function EventCard({
                         {band.name}
                       </div>
                       {band.photo_url && (
-                        <div className="w-12 h-12 rounded-full bg-bg-darker overflow-hidden flex-shrink-0 ring-2 ring-white/10">
+                        <div className="w-12 h-12 rounded-full bg-bg-darker overflow-hidden shrink-0 ring-2 ring-white/10">
                           <img
                             src={band.photo_url}
                             alt={band.name}

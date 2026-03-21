@@ -26,7 +26,7 @@ function VenueInfo({ eventData }) {
           {venues.map(venue => {
             const mapHref = safeExternalHref(venue.googleMaps)
             const cardClassName =
-              'bg-bg-purple/50 hover:bg-bg-purple transition-colors p-4 rounded-lg border border-accent-500/30 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
+              'bg-bg-purple/50 hover:bg-bg-purple transition-colors p-4 rounded-lg border border-accent-500/30 text-center focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
 
             if (mapHref === '#') {
               return (

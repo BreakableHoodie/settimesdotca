@@ -21,11 +21,11 @@ import { safeExternalHref } from '../utils/urlSafety'
 const isEventLockedAsArchived = event => event?.status === 'archived' || isEventArchived(event?.date)
 const getAdminEventState = event => (event?.status === 'archived' ? 'archived' : getEventState(event?.date))
 const buttonFocusClass =
-  'border border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
+  'border border-transparent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
 const linkFocusClass =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
 const inputFocusClass =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
 
 const MINUTES_IN_DAY = 24 * 60
 const EARLY_MORNING_CUTOFF_HOUR = 6
@@ -208,7 +208,7 @@ const EventRow = memo(function EventRow({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => onFilter?.(event.id)}
-            className={`text-white font-medium hover:text-accent-400 transition-colors text-left rounded-sm ${buttonFocusClass}`}
+            className={`text-white font-medium hover:text-accent-400 transition-colors text-left rounded-xs ${buttonFocusClass}`}
             title="Filter to this event"
           >
             {event.name}
@@ -702,7 +702,7 @@ export default function EventsTab({
                         href={getPublicEventUrl(selectedEvent)}
                         target="_blank"
                         rel="noreferrer"
-                        className={`text-accent-400 underline break-all rounded-sm ${linkFocusClass}`}
+                        className={`text-accent-400 underline break-all rounded-xs ${linkFocusClass}`}
                       >
                         Open the public event page for {selectedEvent.name}
                       </a>
@@ -876,7 +876,7 @@ export default function EventsTab({
                                   <td className="px-4 py-2">
                                     <button
                                       onClick={() => handleFilterBand(band.name)}
-                                      className={`text-white hover:text-accent-400 transition-colors cursor-pointer rounded-sm ${buttonFocusClass}`}
+                                      className={`text-white hover:text-accent-400 transition-colors cursor-pointer rounded-xs ${buttonFocusClass}`}
                                       title="View performer profile"
                                     >
                                       {band.name}
@@ -907,7 +907,7 @@ export default function EventsTab({
                               </div>
                               <button
                                 onClick={() => handleFilterBand(band.name)}
-                                className={`text-white hover:text-accent-400 transition-colors text-left rounded-sm ${buttonFocusClass}`}
+                                className={`text-white hover:text-accent-400 transition-colors text-left rounded-xs ${buttonFocusClass}`}
                                 title="View performer profile"
                               >
                                 {band.name}

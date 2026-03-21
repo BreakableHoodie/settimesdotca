@@ -195,7 +195,7 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                   inputMode="numeric"
                   value={verificationCode}
                   onChange={e => setVerificationCode(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
+                  className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
                   placeholder="123456"
                   disabled={loading}
                 />
@@ -228,7 +228,7 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                   inputMode="numeric"
                   value={verificationCode}
                   onChange={e => setVerificationCode(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
+                  className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
                   placeholder="Authenticator code"
                   disabled={loading}
                 />

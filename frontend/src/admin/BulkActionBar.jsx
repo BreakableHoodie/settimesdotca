@@ -16,7 +16,7 @@ function BulkActionBar({
   }
 
   return (
-    <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-900 to-purple-900 p-3 mb-4 rounded-lg shadow-lg">
+    <div className="sticky top-0 z-10 bg-linear-to-r from-blue-900 to-purple-900 p-3 mb-4 rounded-lg shadow-lg">
       <div className="flex flex-col md:flex-row md:items-center gap-3">
         {/* Selection count */}
         <div className="text-white font-semibold min-w-[120px]">

@@ -17,7 +17,7 @@ export default function ContextBanner({ event, onClear }) {
   if (!event) return null
 
   return (
-    <div className="bg-accent-500/10 border-l-2 border-accent-500 px-4 py-2 mb-4 rounded-r animate-slide-down shadow-sm">
+    <div className="bg-accent-500/10 border-l-2 border-accent-500 px-4 py-2 mb-4 rounded-r animate-slide-down shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <FontAwesomeIcon icon={faBullseye} className="text-accent-500 text-lg" />

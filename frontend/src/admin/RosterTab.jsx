@@ -407,7 +407,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             href={websiteHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-accent-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
+            className="text-white/70 hover:text-accent-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
             title="Website"
             aria-label={`Open website for ${band.name}`}
           >
@@ -419,7 +419,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             href={instagramHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-pink-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-400"
+            className="text-white/70 hover:text-pink-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-400"
             title="Instagram"
             aria-label={`Open Instagram for ${band.name}`}
           >
@@ -431,7 +431,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             href={bandcampHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-teal-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
+            className="text-white/70 hover:text-teal-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
             title="Bandcamp"
             aria-label={`Open Bandcamp for ${band.name}`}
           >
@@ -443,7 +443,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             href={facebookHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/70 hover:text-blue-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+            className="text-white/70 hover:text-blue-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
             title="Facebook"
             aria-label={`Open Facebook for ${band.name}`}
           >
@@ -467,7 +467,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name, origin, genre"
-            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-none w-64"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-64"
           />
           {!showAddForm && !editingId && !readOnly && (
             <button

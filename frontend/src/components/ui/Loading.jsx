@@ -54,7 +54,7 @@ const Loading = memo(function Loading({ size = 'md', text = '', className = '', 
   if (fullScreen) {
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-bg-navy/90 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-bg-navy/90 backdrop-blur-xs"
         role="status"
         aria-live="polite"
         aria-label={text || 'Loading'}

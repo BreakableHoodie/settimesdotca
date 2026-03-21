@@ -23,7 +23,7 @@ export default function Breadcrumbs({ selectedEvent, onClearEvent, activeTab, ta
       {/* Root: All Events */}
       <button
         onClick={onClearEvent}
-        className="text-text-secondary hover:text-accent-500 transition-colors focus:outline-none focus:text-accent-500 focus:ring-2 focus:ring-accent-500/50 rounded px-2 py-1"
+        className="text-text-secondary hover:text-accent-500 transition-colors focus:outline-hidden focus:text-accent-500 focus:ring-2 focus:ring-accent-500/50 rounded px-2 py-1"
         aria-label="Return to all events view"
       >
         All Events

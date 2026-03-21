@@ -66,8 +66,8 @@ function LiveContextBar({ eventData, currentTime, bands = [], selectedCount = 0 
   }
 
   return (
-    <section className="sticky top-[72px] z-40 border-b border-white/10 bg-bg-navy/90 backdrop-blur-sm">
-      <div className="container mx-auto px-4 max-w-screen-2xl py-3">
+    <section className="sticky top-[72px] z-40 border-b border-white/10 bg-bg-navy/90 backdrop-blur-xs">
+      <div className="container mx-auto px-4 max-w-(--breakpoint-2xl) py-3">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">

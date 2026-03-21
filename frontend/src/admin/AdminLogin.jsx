@@ -125,7 +125,7 @@ export default function AdminLogin({ onLoginSuccess }) {
 
   return (
     <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
-      <div className="bg-gradient-card backdrop-blur-sm p-8 rounded-xl shadow-xl max-w-md w-full border border-white/10">
+      <div className="bg-gradient-card backdrop-blur-xs p-8 rounded-xl shadow-xl max-w-md w-full border border-white/10">
         <h1 className="text-2xl font-bold font-display mb-6 text-center">
           <span className="text-accent-500">Set</span>
           <span className="text-white">Times</span>
@@ -144,7 +144,7 @@ export default function AdminLogin({ onLoginSuccess }) {
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all"
                 required
                 disabled={loading}
               />
@@ -160,7 +160,7 @@ export default function AdminLogin({ onLoginSuccess }) {
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all"
                 required
                 disabled={loading}
               />
@@ -224,7 +224,7 @@ export default function AdminLogin({ onLoginSuccess }) {
                 title="Enter your 6-digit code or backup code"
                 value={mfaCode}
                 onChange={e => setMfaCode(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all"
                 required
                 disabled={loading}
                 autoComplete="one-time-code"

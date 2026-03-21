@@ -167,7 +167,7 @@ function ScheduleView({
           {finishedCount > 0 && (
             <button
               onClick={onToggleShowPast}
-              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 showPast
                   ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
                   : 'bg-bg-purple/50 border-accent-500/50 text-accent-400 hover:bg-bg-purple'
@@ -180,7 +180,7 @@ function ScheduleView({
           )}
           <button
             onClick={handleCopyAll}
-            className="text-xs px-3 py-1.5 min-h-[44px] rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400"
+            className="text-xs px-3 py-1.5 min-h-[44px] rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400"
             title={copyAllLabel === 'Copied!' ? 'Full schedule copied to clipboard' : 'Copy the full schedule'}
             aria-label="Copy the full schedule"
             disabled={isCopyingAll}
@@ -191,7 +191,7 @@ function ScheduleView({
           <button
             onClick={onSelectAll}
             disabled={allSelected}
-            className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+            className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
               allSelected
                 ? 'bg-gray-500/20 border border-gray-500/50 text-gray-400 cursor-not-allowed'
                 : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'

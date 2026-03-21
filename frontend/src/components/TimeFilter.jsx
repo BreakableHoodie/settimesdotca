@@ -26,7 +26,7 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
         onClick={() => setIsOpen(!isOpen)}
         className={`
           w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-all duration-150 
-          hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 
+          hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 
           focus-visible:ring-offset-2 focus-visible:ring-accent-400
           ${
             selectedFilter === 'all'

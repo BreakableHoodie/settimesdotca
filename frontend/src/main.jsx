@@ -38,7 +38,7 @@ if (typeof window !== 'undefined' && import.meta.env.DEV) {
 function LoadingFallback() {
   return (
     <div
-      className="flex items-center justify-center min-h-screen bg-gradient-to-br from-bg-navy to-bg-purple"
+      className="flex items-center justify-center min-h-screen bg-linear-to-br from-bg-navy to-bg-purple"
       role="status"
       aria-live="polite"
     >
@@ -86,7 +86,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <BrowserRouter>
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-white focus:text-black focus:rounded focus:text-sm focus:font-medium"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-9999 focus:px-4 focus:py-2 focus:bg-white focus:text-black focus:rounded focus:text-sm focus:font-medium"
           >
             Skip to main content
           </a>

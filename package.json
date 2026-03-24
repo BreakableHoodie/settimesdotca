@@ -17,7 +17,7 @@
     "@axe-core/playwright": "^4.11.0",
     "@playwright/test": "^1.58.2",
     "@vitest/coverage-v8": "^4.0.18",
-    "baseline-browser-mapping": "^2.10.0",
+    "baseline-browser-mapping": "^2.10.10",
     "better-sqlite3": "^11.10.0",
     "vitest": "^4.0.18"
   },
@@ -26,6 +26,6 @@
     "csrf-csrf": "^4.0.3",
     "email-validator": "^2.0.4",
     "lucia": "^3.2.2",
-    "otplib": "^13.3.0"
+    "otplib": "^13.4.0"
   }
 }

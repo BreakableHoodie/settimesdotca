@@ -30,7 +30,7 @@ export default function Card({
     elevated: 'shadow-md',
     outlined: 'bg-transparent',
     flat: 'shadow-none',
-    gradient: 'bg-gradient-card backdrop-blur-sm',
+    gradient: 'bg-gradient-card backdrop-blur-xs',
     glow: 'bg-gradient-card shadow-glow-accent',
   }
 

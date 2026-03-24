@@ -202,7 +202,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
         {onBrowseAll && (
           <button
             onClick={onBrowseAll}
-            className="mt-2 px-6 py-3 min-h-[44px] rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 font-semibold hover:bg-accent-500/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
+            className="mt-2 px-6 py-3 min-h-[44px] rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 font-semibold hover:bg-accent-500/30 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
           >
             Browse Lineup
           </button>
@@ -333,7 +333,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
             {hasFinishedBands && (
               <button
                 onClick={onToggleShowPast}
-                className={`text-xs px-3 py-1.5 rounded border transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
+                className={`text-xs px-3 py-1.5 rounded border transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
                   showPast
                     ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
                     : 'bg-bg-purple/50 border-accent-500/50 text-accent-400 hover:bg-bg-purple'
@@ -359,7 +359,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                     setIsCopyingSchedule(false)
                   }
                 }}
-                className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
+                className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
                 title={copyButtonLabel === 'Copied!' ? 'Schedule copied to clipboard' : 'Copy your schedule'}
                 disabled={isCopyingSchedule}
               >
@@ -368,7 +368,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
               </button>
               <button
                 onClick={onClearSchedule}
-                className="text-xs px-3 py-1.5 rounded bg-red-500/20 border border-red-500/50 text-red-200 flex items-center gap-2 transition-transform duration-150 hover:bg-red-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300"
+                className="text-xs px-3 py-1.5 rounded bg-red-500/20 border border-red-500/50 text-red-200 flex items-center gap-2 transition-transform duration-150 hover:bg-red-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300"
                 title="Clear all selected bands"
               >
                 <FontAwesomeIcon icon={faTrashCan} aria-hidden="true" />
@@ -394,7 +394,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           {overlaps.length > 0 && (
             <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
               <div className="flex items-center gap-3 text-yellow-200 font-semibold">
-                <FontAwesomeIcon icon={faBolt} className="text-yellow-300 text-xl flex-shrink-0" aria-hidden="true" />
+                <FontAwesomeIcon icon={faBolt} className="text-yellow-300 text-xl shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
                   {overlaps.length} band{overlaps.length !== 1 ? 's' : ''} happening at the same time — you&apos;ll need
                   to choose!
@@ -407,7 +407,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
               <div className="flex items-center gap-3 text-red-200 font-semibold">
                 <FontAwesomeIcon
                   icon={faTriangleExclamation}
-                  className="text-red-300 text-xl flex-shrink-0"
+                  className="text-red-300 text-xl shrink-0"
                   aria-hidden="true"
                 />
                 <p className="text-sm sm:text-base leading-normal">

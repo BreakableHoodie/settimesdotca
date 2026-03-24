@@ -44,7 +44,7 @@ export default function Select({
     bg-white/5 border rounded-lg
     text-text-primary
     transition-colors duration-base
-    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
+    focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
     disabled:opacity-50 disabled:cursor-not-allowed
     appearance-none cursor-pointer
     ${

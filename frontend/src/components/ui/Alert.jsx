@@ -60,14 +60,14 @@ export default function Alert({
 
   return (
     <div className={classes} role="alert" aria-live={variant === 'error' ? 'assertive' : 'polite'} {...props}>
-      {icon && <FontAwesomeIcon icon={icon} className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true" />}
+      {icon && <FontAwesomeIcon icon={icon} className="text-xl shrink-0 mt-0.5" aria-hidden="true" />}
 
       <div className="flex-1 text-text-primary">{children}</div>
 
       {dismissible && onClose && (
         <button
           onClick={onClose}
-          className="flex-shrink-0 p-1 hover:bg-white/10 rounded transition-colors"
+          className="shrink-0 p-1 hover:bg-white/10 rounded transition-colors"
           aria-label="Dismiss alert"
         >
           <FontAwesomeIcon icon={faXmark} className="text-lg" />

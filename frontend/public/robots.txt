@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /embed/
 
 Sitemap: https://settimes.ca/sitemap.xml

@@ -174,7 +174,7 @@ export default function SignupPage() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="you@example.com"
                   required
                 />
@@ -192,7 +192,7 @@ export default function SignupPage() {
                   onChange={handleChange}
                   minLength={FIELD_LIMITS.password.min}
                   maxLength={FIELD_LIMITS.password.max}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder={`${FIELD_LIMITS.password.min}+ characters with upper/lower/number/symbol`}
                   required
                 />
@@ -211,7 +211,7 @@ export default function SignupPage() {
                   onChange={handleChange}
                   minLength={FIELD_LIMITS.password.min}
                   maxLength={FIELD_LIMITS.password.max}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   required
                 />
                 {passwordMismatch && <p className="mt-2 text-sm text-red-300">{passwordMismatch}</p>}
@@ -227,7 +227,7 @@ export default function SignupPage() {
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="First"
                   required
                 />
@@ -243,7 +243,7 @@ export default function SignupPage() {
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="Last"
                   required
                 />

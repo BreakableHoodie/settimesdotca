@@ -1,4 +1,6 @@
-// Aggregates artist metrics into band_profiles totals
+// Aggregates artist metrics into band_profiles totals and runs data retention cleanup.
+
+import { runRetentionCleanup } from "../api/admin/maintenance/retention.js";
 
 export async function scheduled(_event, env, _ctx) {
   const { DB } = env;
@@ -41,5 +43,12 @@ export async function scheduled(_event, env, _ctx) {
     ).run();
   } catch (error) {
     console.error("[Metrics] Aggregation error:", error);
+  }
+
+  try {
+    const results = await runRetentionCleanup(env);
+    console.log("[Retention] Cleanup complete:", results);
+  } catch (error) {
+    console.error("[Retention] Cleanup error:", error);
   }
 }

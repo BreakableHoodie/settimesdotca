@@ -3,22 +3,52 @@ import { createTestEnv } from "../../../test-utils.js";
 import { onRequestPost } from "../cleanup-sessions.js";
 
 describe("POST /api/admin/maintenance/cleanup-sessions", () => {
-  test("admin can delete expired sessions and logs audit", async () => {
+  test("admin can run retention cleanup across all tables", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     const expiredAt = Math.floor(Date.now() / 1000) - 60;
     const activeAt = Math.floor(Date.now() / 1000) + 60 * 60;
 
+    // Expired session
     rawDb
       .prepare(
         "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
       )
       .run("expired-token", 1, expiredAt, "127.0.0.1", "test-agent");
 
+    // Active session — should survive
     rawDb
       .prepare(
         "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
       )
       .run("active-token", 1, activeAt, "127.0.0.1", "test-agent");
+
+    // Old auth_audit row (>90 days)
+    rawDb
+      .prepare(
+        "INSERT INTO auth_audit (timestamp, action, success, ip_address) VALUES (datetime('now', '-91 days'), 'login_attempt', 0, '1.2.3.4')",
+      )
+      .run();
+
+    // Recent auth_audit row — should survive
+    rawDb
+      .prepare(
+        "INSERT INTO auth_audit (timestamp, action, success, ip_address) VALUES (datetime('now', '-1 day'), 'login_attempt', 1, '1.2.3.4')",
+      )
+      .run();
+
+    // Old audit_log row (>1 year)
+    rawDb
+      .prepare(
+        "INSERT INTO audit_log (user_id, action, created_at) VALUES (1, 'event.updated', datetime('now', '-366 days'))",
+      )
+      .run();
+
+    // Recent audit_log row — should survive
+    rawDb
+      .prepare(
+        "INSERT INTO audit_log (user_id, action, created_at) VALUES (1, 'event.updated', datetime('now', '-1 day'))",
+      )
+      .run();
 
     const request = new Request(
       "https://example.test/api/admin/maintenance/cleanup-sessions",
@@ -30,22 +60,18 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
 
     const payload = await response.json();
     expect(payload.success).toBe(true);
-    expect(payload.deleted_count).toBe(1);
+    expect(payload.sessions_deleted).toBe(1);
+    expect(payload.auth_audit_deleted).toBe(1);
+    expect(payload.audit_log_deleted).toBe(1);
 
-    const expiredRow = rawDb
-      .prepare("SELECT COUNT(*) as count FROM lucia_sessions WHERE id = ?")
-      .get("expired-token");
-    const activeRow = rawDb
-      .prepare("SELECT COUNT(*) as count FROM lucia_sessions WHERE id = ?")
-      .get("active-token");
+    // Active rows must survive
+    expect(rawDb.prepare("SELECT COUNT(*) as c FROM lucia_sessions WHERE id = ?").get("active-token").c).toBe(1);
+    expect(rawDb.prepare("SELECT COUNT(*) as c FROM lucia_sessions WHERE id = ?").get("expired-token").c).toBe(0);
 
-    expect(expiredRow.count).toBe(0);
-    expect(activeRow.count).toBe(1);
-
-    const audit = rawDb
-      .prepare("SELECT COUNT(*) as count FROM audit_log WHERE action = ?")
-      .get("sessions.cleanup");
-    expect(audit.count).toBe(1);
+    const auditEntry = rawDb
+      .prepare("SELECT COUNT(*) as c FROM audit_log WHERE action = ?")
+      .get("maintenance.cleanup");
+    expect(auditEntry.c).toBe(1);
   });
 
   test("non-admin requests are forbidden", async () => {

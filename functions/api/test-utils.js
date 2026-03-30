@@ -216,12 +216,12 @@ export function createTestDB() {
 
     CREATE TABLE auth_audit (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL DEFAULT (datetime('now')),
       action TEXT NOT NULL,
       success INTEGER NOT NULL,
-      ip_address TEXT,
+      ip_address TEXT NOT NULL DEFAULT '',
       user_agent TEXT,
-      details TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      details TEXT
     );
 
     CREATE TABLE subscription_verifications (

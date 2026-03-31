@@ -51,9 +51,23 @@ jobs:
               working-directory: frontend
               run: npm ci
 
+            - name: Cache Playwright browsers
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              id: playwright-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
             - name: Install Playwright browsers
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
-              run: npx playwright install chromium --with-deps
+              run: |
+                  if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+                      npx playwright install-deps chromium
+                      npx playwright install chromium
+                  else
+                      npx playwright install chromium --with-deps
+                  fi
 
             - name: Build frontend
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'

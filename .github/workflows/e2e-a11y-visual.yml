@@ -43,8 +43,21 @@ jobs:
               working-directory: frontend
               run: npm ci
 
+            - name: Cache Playwright browsers
+              id: playwright-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
             - name: Install Playwright browsers
-              run: npx playwright install chromium --with-deps
+              run: |
+                  if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+                      npx playwright install-deps chromium
+                      npx playwright install chromium
+                  else
+                      npx playwright install chromium --with-deps
+                  fi
 
             - name: Build frontend
               working-directory: frontend

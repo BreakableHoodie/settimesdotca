@@ -161,6 +161,118 @@ export async function onRequestDelete(context) {
   }
 }
 
+// POST - Bulk add artists from roster to an event lineup
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  const { DB } = env;
+
+  const permCheck = await checkPermission(context, "editor");
+  if (permCheck.error) return permCheck.response;
+
+  const user = permCheck.user;
+  const ipAddress = getClientIP(request);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+      status: 400, headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const { band_profile_ids, event_id, venue_id, start_time, end_time } = body;
+
+  if (!Array.isArray(band_profile_ids) || band_profile_ids.length === 0) {
+    return new Response(
+      JSON.stringify({ error: "Bad request", message: "band_profile_ids must be a non-empty array" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+  if (band_profile_ids.length > MAX_BULK_BAND_IDS) {
+    return new Response(
+      JSON.stringify({ error: "Bad request", message: `Maximum ${MAX_BULK_BAND_IDS} IDs per request` }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+  if (!event_id || !venue_id) {
+    return new Response(
+      JSON.stringify({ error: "Bad request", message: "event_id and venue_id are required" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // Validate event exists and is not archived
+  const event = await DB.prepare("SELECT id, status FROM events WHERE id = ?").bind(event_id).first();
+  if (!event) {
+    return new Response(
+      JSON.stringify({ error: "Not found", message: "Event not found" }),
+      { status: 404, headers: { "Content-Type": "application/json" } },
+    );
+  }
+  if (event.status === "archived") {
+    return new Response(
+      JSON.stringify({ error: "Validation error", message: "Cannot add performances to an archived event" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // Validate venue exists
+  const venue = await DB.prepare("SELECT id FROM venues WHERE id = ?").bind(venue_id).first();
+  if (!venue) {
+    return new Response(
+      JSON.stringify({ error: "Not found", message: "Venue not found" }),
+      { status: 404, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const added = [];
+  const skipped = [];
+  const errors = [];
+
+  for (const profileId of band_profile_ids) {
+    try {
+      const profile = await DB.prepare("SELECT id, name FROM band_profiles WHERE id = ?")
+        .bind(profileId)
+        .first();
+
+      if (!profile) {
+        errors.push(`Profile ${profileId} not found`);
+        continue;
+      }
+
+      // Skip if already in this event (same profile + event)
+      const existing = await DB.prepare(
+        "SELECT id FROM performances WHERE band_profile_id = ? AND event_id = ?"
+      ).bind(profileId, event_id).first();
+
+      if (existing) {
+        skipped.push(profile.name);
+        continue;
+      }
+
+      const result = await DB.prepare(
+        `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
+         VALUES (?, ?, ?, ?, ?) RETURNING id`
+      ).bind(event_id, venue_id, profileId, start_time || null, end_time || null).first();
+
+      await auditLog(env, user.userId, "band.added_to_lineup", "band", result.id, {
+        bandName: profile.name, eventId: event_id, venueId: venue_id, bulk: true,
+      }, ipAddress);
+
+      added.push(profile.name);
+    } catch (err) {
+      console.error(`Failed to add profile ${profileId}:`, err);
+      errors.push(`Failed to add profile ${profileId}`);
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, added, skipped, errors: errors.length ? errors : undefined }),
+    { status: 201, headers: { "Content-Type": "application/json" } },
+  );
+}
+
 // PATCH - Bulk update bands (existing functionality)
 export async function onRequestPatch(context) {
   const { request, env } = context;

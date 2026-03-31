@@ -9,6 +9,7 @@ import {
   faGuitar,
   faLocationDot,
   faPlus,
+  faArchive,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import DOMPurify from 'dompurify'
@@ -43,6 +44,16 @@ function stripZeroWidthCharacters(text) {
 function normalizeNonBreakingSpaces(text) {
   if (!text) return text
   return text.replace(NBSP_ENTITY_REGEX, ' ').replace(/\u00A0/g, ' ')
+}
+
+function hasAnySocial(social) {
+  if (!social) return false
+  return (
+    safeExternalHref(social.website) !== '#' ||
+    safeInstagramHref(social.instagram) !== '#' ||
+    safeExternalHref(social.bandcamp) !== '#' ||
+    safeExternalHref(social.facebook) !== '#'
+  )
 }
 
 // Generate the same ID format used by the schedule
@@ -441,77 +452,79 @@ export default function BandProfilePage() {
             )}
 
             {/* Bio and Social Links */}
-            {(profile.description || profile.social) && (
-              <div className="p-6 bg-bg-purple/50 border-t border-white/10">
-                {profile.description && (
-                  <div
-                    className="mb-4 text-white/90 text-sm leading-relaxed [&_p]:my-2 [&_a]:text-accent-500 [&_a:hover]:underline"
-                    style={{
-                      wordBreak: 'normal',
-                      overflowWrap: 'break-word',
-                      whiteSpace: 'normal',
-                      hyphens: 'none',
-                      WebkitHyphens: 'none',
-                      MozHyphens: 'none',
-                      msHyphens: 'none',
-                    }}
-                    dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
-                  />
-                )}
-                {profile.social && (
-                  <div className="flex flex-wrap gap-3">
-                    {safeExternalHref(profile.social.website) !== '#' && (
-                      <a
-                        href={safeExternalHref(profile.social.website)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                        onClick={() => trackSocialClick(profile.id, 'website')}
-                      >
-                        <FontAwesomeIcon icon={faGlobe} />
-                        Website
-                      </a>
-                    )}
-                    {safeInstagramHref(profile.social.instagram) !== '#' && (
-                      <a
-                        href={safeInstagramHref(profile.social.instagram)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-4 py-2 bg-linear-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                        onClick={() => trackSocialClick(profile.id, 'instagram')}
-                      >
-                        <FontAwesomeIcon icon={faInstagram} />
-                        Instagram
-                      </a>
-                    )}
-                    {safeExternalHref(profile.social.bandcamp) !== '#' && (
-                      <a
-                        href={safeExternalHref(profile.social.bandcamp)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                        onClick={() => trackSocialClick(profile.id, 'bandcamp')}
-                      >
-                        <FontAwesomeIcon icon={faBandcamp} />
-                        Bandcamp
-                      </a>
-                    )}
-                    {safeExternalHref(profile.social.facebook) !== '#' && (
-                      <a
-                        href={safeExternalHref(profile.social.facebook)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                        onClick={() => trackSocialClick(profile.id, 'facebook')}
-                      >
-                        <FontAwesomeIcon icon={faFacebook} />
-                        Facebook
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="p-6 bg-bg-purple/50 border-t border-white/10">
+              {profile.description ? (
+                <div
+                  className="mb-4 text-white/90 text-sm leading-relaxed [&_p]:my-2 [&_a]:text-accent-500 [&_a:hover]:underline"
+                  style={{
+                    wordBreak: 'normal',
+                    overflowWrap: 'break-word',
+                    whiteSpace: 'normal',
+                    hyphens: 'none',
+                    WebkitHyphens: 'none',
+                    MozHyphens: 'none',
+                    msHyphens: 'none',
+                  }}
+                  dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
+                />
+              ) : (
+                !hasAnySocial(profile.social) && <p className="text-white/30 text-sm italic mb-4">No bio added yet.</p>
+              )}
+              {hasAnySocial(profile.social) ? (
+                <div className="flex flex-wrap gap-3">
+                  {safeExternalHref(profile.social.website) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.website)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                      onClick={() => trackSocialClick(profile.id, 'website')}
+                    >
+                      <FontAwesomeIcon icon={faGlobe} />
+                      Website
+                    </a>
+                  )}
+                  {safeInstagramHref(profile.social.instagram) !== '#' && (
+                    <a
+                      href={safeInstagramHref(profile.social.instagram)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-linear-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                      onClick={() => trackSocialClick(profile.id, 'instagram')}
+                    >
+                      <FontAwesomeIcon icon={faInstagram} />
+                      Instagram
+                    </a>
+                  )}
+                  {safeExternalHref(profile.social.bandcamp) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.bandcamp)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                      onClick={() => trackSocialClick(profile.id, 'bandcamp')}
+                    >
+                      <FontAwesomeIcon icon={faBandcamp} />
+                      Bandcamp
+                    </a>
+                  )}
+                  {safeExternalHref(profile.social.facebook) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.facebook)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                      onClick={() => trackSocialClick(profile.id, 'facebook')}
+                    >
+                      <FontAwesomeIcon icon={faFacebook} />
+                      Facebook
+                    </a>
+                  )}
+                </div>
+              ) : (
+                !profile.description && <p className="text-white/30 text-sm italic">No links added yet.</p>
+              )}
+            </div>
           </div>
 
           {/* Two Column Layout: Stats/Facts + Shows */}
@@ -609,7 +622,15 @@ export default function BandProfilePage() {
                       <Card key={idx} variant="outline" hoverable className="p-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
-                            <h3 className="text-xl font-semibold text-accent-500 mb-2">{performance.event_name}</h3>
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <h3 className="text-xl font-semibold text-accent-500">{performance.event_name}</h3>
+                              {performance.event_status === 'archived' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-white/10 text-white/50 border border-white/10">
+                                  <FontAwesomeIcon icon={faArchive} className="text-xs" aria-hidden="true" />
+                                  Archived
+                                </span>
+                              )}
+                            </div>
                             <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
                               {performance.event_date && (
                                 <span className="flex items-center gap-2">
@@ -645,6 +666,16 @@ export default function BandProfilePage() {
                         </div>
                       </Card>
                     ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Empty state: band exists but has no performances yet */}
+              {(!profile.upcoming || profile.upcoming.length === 0) && (!profile.past || profile.past.length === 0) && (
+                <Card variant="elevated" className="flex items-center justify-center py-12 text-center">
+                  <div>
+                    <p className="text-white/40 text-lg mb-1">No performances on record yet.</p>
+                    <p className="text-white/25 text-sm">Check back after the next event is announced.</p>
                   </div>
                 </Card>
               )}

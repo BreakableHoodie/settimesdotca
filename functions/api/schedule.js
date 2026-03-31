@@ -39,11 +39,11 @@ export async function onRequestGet(context) {
       `,
       ).first();
     } else {
-      // Get event by slug
+      // Get event by slug — includes archived events for read-only history browsing
       event = await DB.prepare(
         `
         SELECT * FROM events
-        WHERE slug = ? AND is_published = 1
+        WHERE slug = ? AND (is_published = 1 OR status = 'archived')
       `,
       )
         .bind(eventParam)
@@ -137,6 +137,7 @@ export async function onRequestGet(context) {
       date: event.date,
       slug: event.slug,
       ticket_url: event.ticket_url,
+      is_archived: event.status === "archived",
       theme_colors: event.theme_colors,
       venue_info: event.venue_info,
       social_links: event.social_links,

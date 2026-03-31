@@ -8,6 +8,7 @@ import EmbedPage from './pages/EmbedPage.jsx'
 import SubscribePage from './pages/SubscribePage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import ActivatePage from './pages/ActivatePage.jsx'
+import PrivacyPage from './pages/PrivacyPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
@@ -47,30 +48,9 @@ function LoadingFallback() {
   )
 }
 
-// Service worker: TEMPORARILY DISABLED to fix caching issues during development
-// Re-enable for production by uncommenting the registration code below
-// if ('serviceWorker' in navigator) {
-//   window.addEventListener('load', () => {
-//     navigator.serviceWorker
-//       .register('/sw.js')
-//       .then(reg => console.log('SW registered:', reg.scope))
-//       .catch(err => console.error('SW registration failed:', err))
-//   })
-// }
-
-// Unregister any existing service workers to clear stale cache (production and dev)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    if (registrations.length > 0) {
-      console.warn('Unregistering', registrations.length, 'service worker(s)...')
-      registrations.forEach(registration => {
-        registration.unregister().then(() => {
-          console.warn('Service worker unregistered - ensuring fresh content')
-          // Optional: Force reload if we just killed a SW?
-          // window.location.reload()
-        })
-      })
-    }
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW registration failed:', err))
   })
 }
 
@@ -98,6 +78,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/subscribe" element={<SubscribePage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/activate" element={<ActivatePage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
 
             {/* Band profiles: Lazy loaded */}
             <Route

@@ -1,44 +1,34 @@
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
+import { runRetentionCleanup } from "./retention.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const { DB } = env;
 
-  // Only allow admins to trigger cleanup manually
-  // If triggered by a cron (future), we might need a different auth mechanism (e.g. API key)
-  // For now, we rely on the admin session check.
   const auth = await checkPermission(context, "admin");
   if (auth.error) {
     return auth.response;
   }
 
   try {
-    const now = Math.floor(Date.now() / 1000);
-
-    // Delete expired sessions
-    const result = await DB.prepare(
-      "DELETE FROM lucia_sessions WHERE expires_at < ?"
-    )
-      .bind(now)
-      .run();
+    const results = await runRetentionCleanup(env);
 
     await auditLog(
       env,
       auth.user.userId,
-      "sessions.cleanup",
-      "lucia_sessions",
+      "maintenance.cleanup",
+      "system",
       null,
-      { deleted_count: result.meta.changes },
+      results,
       getClientIP(request),
     );
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Cleanup complete. Deleted ${result.meta.changes} expired sessions.`,
-        deleted_count: result.meta.changes,
+        message: "Cleanup complete.",
+        ...results,
       }),
       {
         status: 200,
@@ -46,9 +36,9 @@ export async function onRequestPost(context) {
       }
     );
   } catch (error) {
-    console.error("Session cleanup error:", error);
+    console.error("Cleanup error:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to cleanup sessions" }),
+      JSON.stringify({ error: "Failed to run cleanup" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },

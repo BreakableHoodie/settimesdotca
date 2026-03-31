@@ -128,11 +128,12 @@ export async function onRequestGet(context) {
     const today = new Date().toISOString().split("T")[0];
 
     // Separate upcoming and past performances
+    // Archived events always go to past regardless of date
     const upcomingPerformances = allPerformances.filter(
-      (p) => p.event_date >= today,
+      (p) => p.event_date >= today && p.event_status !== "archived",
     );
     const pastPerformances = allPerformances.filter(
-      (p) => p.event_date < today,
+      (p) => p.event_date < today || p.event_status === "archived",
     );
 
     // Get unique venues

@@ -123,12 +123,6 @@ export async function onRequestGet(context) {
       .all();
 
     const allPerformances = performances.results || [];
-    if (allPerformances.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Band not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
-    }
 
     // Calculate statistics
     const today = new Date().toISOString().split("T")[0];

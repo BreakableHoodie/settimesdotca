@@ -8,6 +8,7 @@ import EmbedPage from './pages/EmbedPage.jsx'
 import SubscribePage from './pages/SubscribePage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import ActivatePage from './pages/ActivatePage.jsx'
+import PrivacyPage from './pages/PrivacyPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
@@ -98,6 +99,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/subscribe" element={<SubscribePage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/activate" element={<ActivatePage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
 
             {/* Band profiles: Lazy loaded */}
             <Route

@@ -110,12 +110,12 @@ export async function onRequestGet(context) {
         e.name as event_name,
         e.slug as event_slug,
         e.date as event_date,
-        e.is_published as event_published
+        e.status as event_status
       FROM performances p
       LEFT JOIN venues v ON p.venue_id = v.id
       LEFT JOIN events e ON p.event_id = e.id
       WHERE p.band_profile_id = ?
-        AND e.is_published = 1
+        AND e.status IN ('published', 'archived')
       ORDER BY e.date DESC, p.start_time
     `,
     )
@@ -128,11 +128,12 @@ export async function onRequestGet(context) {
     const today = new Date().toISOString().split("T")[0];
 
     // Separate upcoming and past performances
+    // Archived events always go to past regardless of date
     const upcomingPerformances = allPerformances.filter(
-      (p) => p.event_date >= today,
+      (p) => p.event_date >= today && p.event_status !== "archived",
     );
     const pastPerformances = allPerformances.filter(
-      (p) => p.event_date < today,
+      (p) => p.event_date < today || p.event_status === "archived",
     );
 
     // Get unique venues
@@ -235,6 +236,7 @@ export async function onRequestGet(context) {
         event_name: p.event_name,
         event_slug: p.event_slug,
         event_date: p.event_date,
+        event_status: p.event_status,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
         venue_address: p.venue_address || formatVenueAddress(p),
@@ -247,6 +249,7 @@ export async function onRequestGet(context) {
         event_name: p.event_name,
         event_slug: p.event_slug,
         event_date: p.event_date,
+        event_status: p.event_status,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
         venue_address: p.venue_address || formatVenueAddress(p),

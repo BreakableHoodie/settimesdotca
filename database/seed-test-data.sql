@@ -278,11 +278,11 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 (150, 23, 17, 'End of Shift', '21:00', '22:00', 'Hardcore', 'Montreal', 'Closing time hardcore');
 
 -- Future Test Event (always in the future for E2E tests)
--- Uses a far-future date so public timeline tests always find upcoming events
+-- Uses date('now', '+14 days') so it always falls in the timeline's 30-day upcoming window
 INSERT OR REPLACE INTO events (id, name, date, slug, is_published, status, description, city, ticket_url) VALUES
-(28, 'Future Fest 2099', '2099-06-21', 'future-fest-2099', 1, 'published', 'An annual celebration of live music. Multi-venue festival featuring local and touring acts across Ottawa venues.', 'Ottawa', 'https://ticketscene.ca/future-fest-2099');
+(28, 'Future Fest E2E', date('now', '+14 days'), 'future-fest-e2e', 1, 'published', 'An annual celebration of live music. Multi-venue festival featuring local and touring acts across Ottawa venues.', 'Ottawa', 'https://ticketscene.ca/future-fest-e2e');
 
--- Future Fest 2099 (Event 28) - Bands for E2E test coverage
+-- Future Fest E2E (Event 28) - Bands for E2E test coverage
 INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time, genre, origin, description) VALUES
 (151, 28, 1, 'The Time Travellers', '19:00', '19:45', 'Indie Rock', 'Ottawa', 'Indie rock from the future'),
 (152, 28, 1, 'Future Sound', '20:00', '20:45', 'Electronic', 'Toronto', 'Electronic music ahead of its time'),

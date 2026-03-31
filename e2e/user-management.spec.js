@@ -45,7 +45,7 @@ test.describe('User Management', () => {
     const name = `Test User ${suffix}`;
     const email = `testuser${suffix}@example.com`;
     await openUsersTab(page);
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
 
     await waitForCreateUserForm(page);
 
@@ -66,7 +66,7 @@ test.describe('User Management', () => {
 
   test('should validate required user fields', async ({ page }) => {
     await openUsersTab(page);
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
 
     await page.click('button[type="submit"]:has-text("Create User")');
 
@@ -89,7 +89,7 @@ test.describe('User Management', () => {
     const viewerEmail = `vieweruser${viewerSuffix}@example.com`;
     await openUsersTab(page);
 
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
     await waitForCreateUserForm(page);
     await page.fill('#name', adminName);
     await page.fill('#email', adminEmail);
@@ -104,7 +104,7 @@ test.describe('User Management', () => {
     await expect(adminRow).toContainText(adminName);
     await expect(adminRow).toContainText(/admin/i);
 
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
     await waitForCreateUserForm(page);
     await page.fill('#name', viewerName);
     await page.fill('#email', viewerEmail);
@@ -127,7 +127,7 @@ test.describe('User Management', () => {
     const updatedName = `Updated User ${suffix}`;
     await openUsersTab(page);
 
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
     await waitForCreateUserForm(page);
     await page.fill('#name', name);
     await page.fill('#email', email);

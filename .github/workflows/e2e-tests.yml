@@ -18,7 +18,6 @@ jobs:
         name: e2e
         runs-on: ubuntu-latest
         timeout-minutes: 20
-        container: mcr.microsoft.com/playwright:v1.57.0-jammy
 
         steps:
             - uses: actions/checkout@v6
@@ -52,6 +51,10 @@ jobs:
               working-directory: frontend
               run: npm ci
 
+            - name: Install Playwright browsers
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              run: npx playwright install chromium --with-deps
+
             - name: Build frontend
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               working-directory: frontend
@@ -65,41 +68,34 @@ jobs:
               run: |
                   echo 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"' > .dev.vars
 
-                  # Use wrangler d1 execute to initialize the database schema BEFORE starting the server
-                  # This creates the local D1 database and sets up tables
                   echo "Initializing D1 database with schema..."
-                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --file=database/setup-complete.sql
+                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/setup-complete.sql
 
-                  # Create E2E admin user if credentials are provided
                   if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
                       echo "Creating E2E admin user..."
                       SEED_SQL=$(node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL" --password "$E2E_ADMIN_PASSWORD")
-                      ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --command="$SEED_SQL"
+                      ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="$SEED_SQL"
                       echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
                   else
                       echo "⚠ E2E credentials not set, using default test accounts"
                   fi
 
-                  # Verify the database setup
                   echo "Database users:"
-                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --command="SELECT id, email, role FROM users;"
+                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="SELECT id, email, role FROM users;"
 
                   echo "✓ Database initialization complete"
 
             - name: Start Pages Functions server
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
-              timeout-minutes: 3
+              timeout-minutes: 5
               run: |
-                  # Start wrangler pages dev (database already initialized via d1 execute)
-                  ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
+                  ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state > /tmp/wrangler.log 2>&1 &
                   WRANGLER_PID=$!
                   echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
 
-                  # Wait for server to be ready
                   echo "Waiting for server to start..."
                   i=1
                   while [ $i -le 90 ]; do
-                      # Check if wrangler process died
                       if ! kill -0 $WRANGLER_PID 2>/dev/null; then
                           echo "✗ Wrangler process exited unexpectedly"
                           echo "Wrangler logs:"
@@ -109,6 +105,11 @@ jobs:
                       if curl -s http://localhost:8788/ > /dev/null 2>&1; then
                           echo "✓ Server is ready on port 8788!"
                           exit 0
+                      fi
+                      if [ $((i % 20)) -eq 0 ]; then
+                          echo "--- Wrangler log (iteration $i) ---"
+                          tail -20 /tmp/wrangler.log 2>/dev/null
+                          echo "---"
                       fi
                       echo "Waiting for server... ($i/90)"
                       sleep 2

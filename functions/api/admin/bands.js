@@ -115,6 +115,8 @@ async function checkConflicts(
   const newIntervals = buildIntervals(startTime, endTime);
 
   for (const perf of existingPerformances) {
+    // Skip TBD performances — no times means no interval to compare
+    if (!perf.start_time || !perf.end_time) continue;
     const perfIntervals = buildIntervals(perf.start_time, perf.end_time);
     const hasOverlap = perfIntervals.some((intervalB) =>
       newIntervals.some((intervalA) => intervalsOverlap(intervalA, intervalB)),
@@ -315,9 +317,9 @@ export async function onRequestPost(context) {
         );
       }
     } else {
-      if (!venueId || !resolvedName || !startTime || !endTime) {
+      if (!venueId || !resolvedName) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields", message: "Event, Venue, Name, Start Time, and End Time are required" }),
+          JSON.stringify({ error: "Missing required fields", message: "Event, Venue, and Band Name are required" }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -375,8 +377,8 @@ export async function onRequestPost(context) {
       }
     }
 
-    // Check for conflicts (only if schedule is provided)
-    if (!isGlobalAdd) {
+    // Check for conflicts (only if times are provided)
+    if (!isGlobalAdd && startTime && endTime) {
       const conflicts = await checkConflicts(
         DB,
         eventId,

@@ -1,8 +1,10 @@
-const CACHE_VERSION = 'v2'
+const CACHE_VERSION = 'v3'
 const CACHE_NAME = `schedule-${CACHE_VERSION}`
 
-// Assets to cache immediately on install
-const STATIC_ASSETS = ['/', '/index.html', '/assets/index.css', '/assets/index.js', '/manifest.json']
+// Only cache stable, non-hashed assets on install.
+// Vite hashes JS/CSS filenames (e.g. assets/index-a3f9c.js) so those
+// cannot be precached by name — they are picked up by runtime caching instead.
+const STATIC_ASSETS = ['/', '/index.html', '/manifest.json']
 
 // Install: cache static assets
 self.addEventListener('install', event => {

@@ -105,6 +105,7 @@ async function checkConflicts(
   const newIntervals = buildIntervals(startTime, endTime);
 
   for (const band of existingBands) {
+    if (!band.start_time || !band.end_time) continue;
     const bandIntervals = buildIntervals(band.start_time, band.end_time);
     const hasOverlap = bandIntervals.some((intervalB) =>
       newIntervals.some((intervalA) => intervalsOverlap(intervalA, intervalB)),
@@ -313,8 +314,8 @@ export async function onRequestPut(context) {
       );
     }
 
-    // Validate time format (only if times are provided)
-    if (startTime !== undefined && !/^\d{2}:\d{2}$/.test(startTime)) {
+    // Validate time format (only if a non-empty time is provided; empty string = TBD)
+    if (startTime !== undefined && startTime !== '' && !/^\d{2}:\d{2}$/.test(startTime)) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -327,7 +328,7 @@ export async function onRequestPut(context) {
       );
     }
 
-    if (endTime !== undefined && !/^\d{2}:\d{2}$/.test(endTime)) {
+    if (endTime !== undefined && endTime !== '' && !/^\d{2}:\d{2}$/.test(endTime)) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -540,11 +541,11 @@ export async function onRequestPut(context) {
         }
         if (startTime !== undefined) {
         updates.push("start_time = ?");
-        params.push(startTime);
+        params.push(startTime || null);
         }
         if (endTime !== undefined) {
         updates.push("end_time = ?");
-        params.push(endTime);
+        params.push(endTime || null);
         }
 
         // If performance fields to update

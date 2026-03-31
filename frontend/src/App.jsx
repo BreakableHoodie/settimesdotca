@@ -507,9 +507,9 @@ function App() {
         {isArchived || view === 'all' ? (
           <ScheduleView
             bands={bands}
-            selectedBands={selectedBands}
-            onToggleBand={toggleBand}
-            onSelectAll={selectAll}
+            selectedBands={isArchived ? [] : selectedBands}
+            onToggleBand={isArchived ? undefined : toggleBand}
+            onSelectAll={isArchived ? undefined : selectAll}
             currentTime={effectiveNow}
             showPast={showPast}
             onToggleShowPast={toggleShowPast}

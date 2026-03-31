@@ -105,6 +105,7 @@ async function checkConflicts(
   const newIntervals = buildIntervals(startTime, endTime);
 
   for (const band of existingBands) {
+    if (!band.start_time || !band.end_time) continue;
     const bandIntervals = buildIntervals(band.start_time, band.end_time);
     const hasOverlap = bandIntervals.some((intervalB) =>
       newIntervals.some((intervalA) => intervalsOverlap(intervalA, intervalB)),

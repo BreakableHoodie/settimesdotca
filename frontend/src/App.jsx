@@ -1,8 +1,8 @@
-import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
+import { faBoxArchive, faCircleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
 import Footer from './components/Footer'
@@ -12,6 +12,8 @@ import PrivacyBanner from './components/PrivacyBanner'
 import ScheduleView from './components/ScheduleView'
 import { trackEventView, trackPageView } from './utils/metrics'
 import { validateBandsData } from './utils/validation'
+
+const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 
 const MySchedule = lazy(() => import('./components/MySchedule'))
 const VenueInfo = lazy(() => import('./components/VenueInfo'))
@@ -140,6 +142,9 @@ function App() {
   const [eventData, setEventData] = useState(null)
   const [selectedBands, setSelectedBands] = useState(() => getStoredSelection(slug))
   const [view, setView] = useState(() => (getStoredSelection(slug).length > 0 ? 'mine' : 'all'))
+  const [showHint, setShowHint] = useState(
+    () => typeof window !== 'undefined' && !localStorage.getItem(HINT_DISMISSED_KEY)
+  )
   const [timeFilter] = useState('all')
   const [loading, setLoading] = useState(!HAS_FALLBACK)
   const [error, setError] = useState(null)
@@ -287,6 +292,11 @@ function App() {
     }
   }
 
+  const dismissHint = () => {
+    setShowHint(false)
+    localStorage.setItem(HINT_DISMISSED_KEY, '1')
+  }
+
   const toggleBand = bandId => {
     setSelectedBands(prev => {
       const isSelected = prev.includes(bandId)
@@ -296,6 +306,8 @@ function App() {
 
       const band = bands.find(candidate => candidate.id === bandId)
       trackScheduleBuilds(band ? [band] : [])
+      // Auto-dismiss hint on first band selection
+      if (showHint) dismissHint()
       return [...prev, bandId]
     })
   }
@@ -313,6 +325,7 @@ function App() {
     setSelectedBands(allBandIds)
   }
 
+  const isArchived = Boolean(eventData?.is_archived)
   const myBands = bands.filter(band => selectedBands.includes(band.id))
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
@@ -390,13 +403,61 @@ function App() {
         {eventJsonLd && <script type="application/ld+json">{eventJsonLd}</script>}
       </Helmet>
       <OfflineIndicator />
-      <Header view={view} setView={setView} />
-      <ComingUp bands={myBands} currentTime={effectiveNow} />
+      {isArchived ? (
+        <header className="sticky top-0 z-50 border-b-2 border-white/10 bg-bg-navy/90 backdrop-blur-xs px-4 py-3">
+          <div className="container mx-auto max-w-6xl flex items-center justify-between">
+            <Link to="/" className="font-bold text-white font-display text-2xl hover:opacity-80 transition-opacity">
+              <span className="text-accent-500">Set</span>Times
+            </Link>
+            <Link to="/" className="text-sm text-text-secondary hover:text-white transition-colors">
+              ← All Events
+            </Link>
+          </div>
+        </header>
+      ) : (
+        <Header
+          view={view}
+          setView={setView}
+          selectedCount={myBands.length}
+          eventName={eventData?.name}
+          eventDate={eventData?.date}
+        />
+      )}
+      {!isArchived && <ComingUp bands={myBands} currentTime={effectiveNow} />}
       <main
         id="main-content"
         className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-4 sm:mt-6 space-y-6 sm:space-y-8"
       >
         <Breadcrumbs items={breadcrumbs} />
+
+        {/* Archived event banner */}
+        {isArchived && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-text-secondary">
+            <FontAwesomeIcon icon={faBoxArchive} className="mt-0.5 shrink-0 text-text-tertiary" aria-hidden="true" />
+            <div>
+              <span className="font-semibold text-text-primary">This event has concluded.</span>
+              {' '}You're viewing the archived lineup for reference.
+            </div>
+          </div>
+        )}
+
+        {/* First-time onboarding hint */}
+        {!isArchived && showHint && selectedBands.length === 0 && bands.length > 0 && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-accent-500/10 border border-accent-500/20 text-sm">
+            <p className="text-accent-300">
+              <span className="font-semibold">How it works:</span> Tap any performer to add them to{' '}
+              <span className="font-semibold">My Schedule</span> — your personal lineup for the night.
+            </p>
+            <button
+              onClick={dismissHint}
+              aria-label="Dismiss tip"
+              className="shrink-0 text-accent-400 hover:text-white transition-colors p-1"
+            >
+              <FontAwesomeIcon icon={faXmark} />
+            </button>
+          </div>
+        )}
+
         {debugEnabled && (
           <section className="bg-bg-purple/80 border border-accent-500/30 rounded-lg p-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -443,7 +504,7 @@ function App() {
             </div>
           </section>
         )}
-        {view === 'all' ? (
+        {(isArchived || view === 'all') ? (
           <ScheduleView
             bands={bands}
             selectedBands={selectedBands}

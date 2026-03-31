@@ -33,9 +33,9 @@ export async function onRequestGet(context) {
   try {
     const event = await DB.prepare(
       `
-      SELECT id, name, slug, date, ticket_url
+      SELECT id, name, slug, date, ticket_url, status
       FROM events
-      WHERE id = ? AND is_published = 1
+      WHERE id = ? AND (is_published = 1 OR status = 'archived')
       LIMIT 1
     `,
     )

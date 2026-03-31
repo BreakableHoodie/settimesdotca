@@ -367,6 +367,7 @@ export default function BandForm({
             <div>
               <label htmlFor="band-start-time" className="block text-white mb-2 text-sm">
                 Start Time
+                <span className="text-gray-400 text-xs ml-2">optional — leave blank to announce later</span>
               </label>
               <input
                 id="band-start-time"
@@ -375,7 +376,6 @@ export default function BandForm({
                 value={formData.start_time}
                 onChange={onChange}
                 className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
-                required={requireSchedule}
               />
             </div>
 
@@ -408,7 +408,6 @@ export default function BandForm({
                 value={formData.end_time}
                 onChange={onChange}
                 className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
-                required={requireSchedule}
               />
             </div>
           </>

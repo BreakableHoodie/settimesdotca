@@ -1,4 +1,5 @@
 import {
+  faBoxArchive,
   faCalendarDays,
   faCircle,
   faClock,
@@ -490,6 +491,12 @@ function EventCard({
                   LIVE NOW
                 </Badge>
               )}
+              {event.status === 'archived' && (
+                <Badge variant="default" size="md">
+                  <FontAwesomeIcon icon={faBoxArchive} className="mr-1 text-xs" aria-hidden="true" />
+                  Archived
+                </Badge>
+              )}
               {event.is_published === false && <Badge variant="warning">Draft</Badge>}
             </div>
 
@@ -525,7 +532,7 @@ function EventCard({
                 }
               }}
             >
-              Build Schedule
+              {isPast || event.status === 'archived' ? 'View Lineup' : 'Plan Your Night'}
             </Button>
             {ticketHref !== '#' && (
               <Button

@@ -1,7 +1,14 @@
 import { memo, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-function Header({ view, setView, selectedCount = 0 }) {
+function Header({ view, setView, selectedCount = 0, eventName, eventDate }) {
+  const formattedDate = eventDate
+    ? new Date(`${eventDate}T12:00:00`).toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null
   const [scrollProgress, setScrollProgress] = useState(0)
 
   useEffect(() => {
@@ -63,7 +70,16 @@ function Header({ view, setView, selectedCount = 0 }) {
           className="text-accent-400 text-sm md:text-base font-medium transition-all duration-150 ease-out overflow-hidden text-center"
           style={collapseStyle}
         >
-          Discover · Plan · Experience
+          {eventName ? (
+            <>
+              <span className="font-semibold text-white">{eventName}</span>
+              {formattedDate && (
+                <span className="text-accent-400"> · {formattedDate}</span>
+              )}
+            </>
+          ) : (
+            'Discover · Plan · Experience'
+          )}
         </p>
         <div
           className="flex flex-col sm:flex-row justify-center items-center gap-3 transition-all duration-300 ease-out"

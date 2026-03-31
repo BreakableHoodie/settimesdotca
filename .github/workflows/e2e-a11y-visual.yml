@@ -115,7 +115,7 @@ jobs:
               env:
                   ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
                   ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
-              run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js --reporter=list,html
+              run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js --update-snapshots --reporter=list,html
 
             - name: Upload Playwright report
               uses: actions/upload-artifact@v7

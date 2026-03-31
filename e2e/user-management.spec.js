@@ -54,7 +54,7 @@ test.describe('User Management', () => {
     await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'editor');
 
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /created successfully/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
 
     await page.reload();
     await openUsersTab(page);
@@ -95,7 +95,7 @@ test.describe('User Management', () => {
     await page.fill('#email', adminEmail);
     await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'admin');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /created successfully/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
 
     await page.reload();
     await openUsersTab(page);
@@ -110,7 +110,7 @@ test.describe('User Management', () => {
     await page.fill('#email', viewerEmail);
     await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'viewer');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /created successfully/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
 
     await page.reload();
     await openUsersTab(page);
@@ -133,7 +133,7 @@ test.describe('User Management', () => {
     await page.fill('#email', email);
     await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'editor');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /created successfully/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
 
     await page.reload();
     await openUsersTab(page);

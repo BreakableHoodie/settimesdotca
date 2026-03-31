@@ -197,6 +197,23 @@ export default function LineupTab({
     })
   }
 
+  // Bulk add multiple artists from roster to this event's lineup
+  const handleBulkSelect = async (selectedArtists, venueId, startTime, endTime) => {
+    const profileIds = selectedArtists.map(a => a.band_profile_id || a.id)
+    try {
+      const res = await bandsApi.bulkAddToLineup(profileIds, selectedEventId, venueId, startTime, endTime)
+      const addedCount = res.added?.length || 0
+      const skippedCount = res.skipped?.length || 0
+      let msg = `Added ${addedCount} act${addedCount !== 1 ? 's' : ''} to lineup`
+      if (skippedCount > 0) msg += ` (${skippedCount} already in lineup, skipped)`
+      showToast(msg, addedCount > 0 ? 'success' : 'error')
+      setViewMode('list')
+      loadData()
+    } catch (err) {
+      showToast(err.message, 'error')
+    }
+  }
+
   // Picker selection handler
   const handlePickerSelect = (artist, newName) => {
     setServerConflicts([])
@@ -504,8 +521,10 @@ export default function LineupTab({
         <ArtistPicker
           artists={allBands}
           onSelect={handlePickerSelect}
+          onBulkSelect={handleBulkSelect}
           onCancel={() => setViewMode('list')}
           loading={rosterLoading}
+          venues={venues}
         />
       )}
 

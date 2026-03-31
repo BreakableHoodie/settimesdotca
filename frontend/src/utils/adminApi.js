@@ -571,6 +571,22 @@ export const bandsApi = {
     return handleResponse(response)
   },
 
+  async bulkAddToLineup(bandProfileIds, eventId, venueId, startTime, endTime) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/bulk`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({
+        band_profile_ids: bandProfileIds,
+        event_id: eventId,
+        venue_id: venueId,
+        start_time: startTime || null,
+        end_time: endTime || null,
+      }),
+    })
+    return handleResponse(response)
+  },
+
   async getStats(bandName) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/bands/stats/${encodeURIComponent(bandName)}`, {
       headers: getHeaders(),

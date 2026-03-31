@@ -52,8 +52,8 @@ jobs:
 
             - name: Initialize D1 database with schema
               env:
-                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
-                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
               run: |
                   echo 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"' > .dev.vars
 
@@ -110,8 +110,8 @@ jobs:
 
             - name: Run Playwright tests (A11y + Visual)
               env:
-                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
-                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
               run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js --reporter=list,html
 
             - name: Upload Playwright report

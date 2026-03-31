@@ -658,7 +658,7 @@ export default function BandProfilePage() {
                               )}
                             </div>
                           </div>
-                          {performance.event_status !== 'archived' && performance.event_slug && (
+                          {performance.event_slug && (
                             <Button as={Link} to={`/event/${performance.event_slug}`} variant="secondary" size="sm">
                               View Event →
                             </Button>

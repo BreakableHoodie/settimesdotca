@@ -435,8 +435,8 @@ function App() {
           <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-text-secondary">
             <FontAwesomeIcon icon={faBoxArchive} className="mt-0.5 shrink-0 text-text-tertiary" aria-hidden="true" />
             <div>
-              <span className="font-semibold text-text-primary">This event has concluded.</span>
-              {' '}You're viewing the archived lineup for reference.
+              <span className="font-semibold text-text-primary">This event has concluded.</span> You're viewing the
+              archived lineup for reference.
             </div>
           </div>
         )}
@@ -504,7 +504,7 @@ function App() {
             </div>
           </section>
         )}
-        {(isArchived || view === 'all') ? (
+        {isArchived || view === 'all' ? (
           <ScheduleView
             bands={bands}
             selectedBands={selectedBands}

@@ -73,9 +73,7 @@ function Header({ view, setView, selectedCount = 0, eventName, eventDate }) {
           {eventName ? (
             <>
               <span className="font-semibold text-white">{eventName}</span>
-              {formattedDate && (
-                <span className="text-accent-400"> · {formattedDate}</span>
-              )}
+              {formattedDate && <span className="text-accent-400"> · {formattedDate}</span>}
             </>
           ) : (
             'Discover · Plan · Experience'

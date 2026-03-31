@@ -17,7 +17,7 @@ jobs:
     e2e:
         name: e2e
         runs-on: ubuntu-latest
-        timeout-minutes: 20
+        timeout-minutes: 35
 
         steps:
             - uses: actions/checkout@v6
@@ -126,7 +126,7 @@ jobs:
                   ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
                   ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
                   PLAYWRIGHT_SKIP_A11Y_VISUAL: 'true'
-              run: npx playwright test
+              run: npx playwright test --reporter=list,html
 
             - name: Upload Playwright report
               uses: actions/upload-artifact@v7

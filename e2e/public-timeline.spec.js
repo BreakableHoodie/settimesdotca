@@ -20,11 +20,8 @@ test.describe('Public Timeline Viewing', () => {
     // Verify the card expanded (button flips to Hide Details)
     await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
 
-    // Venue heading only renders when the event has venue data
-    const venuesHeading = firstEvent.getByRole('heading', { name: /venues/i });
-    if (await venuesHeading.isVisible()) {
-      await expect(venuesHeading).toBeVisible();
-    }
+    // Seed data guarantees the upcoming event has venues
+    await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
   });
 
   test('should allow filtering controls', async ({ page }) => {
@@ -43,12 +40,9 @@ test.describe('Public Timeline Viewing', () => {
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
-    // Verify expanded; venue heading present only when the event has venues
+    // Seed data guarantees the upcoming event has venues
     await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
-    const venuesHeading = firstEvent.getByRole('heading', { name: /venues/i });
-    if (await venuesHeading.isVisible()) {
-      await expect(venuesHeading).toBeVisible();
-    }
+    await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
   });
 
   test('should show band/performer information in events', async ({ page }) => {
@@ -57,12 +51,9 @@ test.describe('Public Timeline Viewing', () => {
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
-    // Verify expanded; performers heading present only when the event has performers
+    // Seed data guarantees the upcoming event has performers
     await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
-    const performersHeading = firstEvent.getByRole('heading', { name: /all performers/i });
-    if (await performersHeading.isVisible()) {
-      await expect(performersHeading).toBeVisible();
-    }
+    await expect(firstEvent.getByRole('heading', { name: /all performers/i })).toBeVisible();
   });
 
   test('should navigate to band profile from event', async ({ page }) => {
@@ -148,11 +139,8 @@ test.describe('Public Timeline Viewing', () => {
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
-    // Verify expanded; venue heading present only when the event has venues
+    // Seed data guarantees the upcoming event has venues
     await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
-    const venuesHeading = firstEvent.getByRole('heading', { name: /venues/i });
-    if (await venuesHeading.isVisible()) {
-      await expect(venuesHeading).toBeVisible();
-    }
+    await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
   });
 });

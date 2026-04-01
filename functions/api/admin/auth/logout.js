@@ -15,7 +15,9 @@ export async function onRequestPost(context) {
 
   try {
     // Get session token from cookie
-    const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true";
+    // SECURITY: Bearer token auth is for non-production environments only.
+    const allowHeaderAuth =
+      env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
     const sessionToken =
       getCookie(request, "session_token") ||
       (allowHeaderAuth
@@ -30,7 +32,7 @@ export async function onRequestPost(context) {
         .bind(sessionToken)
         .first();
 
-      const lucia = initializeLucia(DB, request);
+      const lucia = initializeLucia(DB, request, env);
       await lucia.invalidateSession(sessionToken);
 
       // Log logout
@@ -45,12 +47,12 @@ export async function onRequestPost(context) {
     }
 
     // Clear session cookie (even if no session found)
-    const lucia = initializeLucia(DB, request);
+    const lucia = initializeLucia(DB, request, env);
     const headers = new Headers({
       "Content-Type": "application/json",
     });
     headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
-    headers.append("Set-Cookie", deleteCSRFCookie(request));
+    headers.append("Set-Cookie", deleteCSRFCookie(request, env));
 
     return new Response(
       JSON.stringify({
@@ -66,12 +68,12 @@ export async function onRequestPost(context) {
     console.error("Logout error:", error);
 
     // Even if there's an error, clear the cookie
-    const lucia = initializeLucia(DB, request);
+    const lucia = initializeLucia(DB, request, env);
     const headers = new Headers({
       "Content-Type": "application/json",
     });
     headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
-    headers.append("Set-Cookie", deleteCSRFCookie(request));
+    headers.append("Set-Cookie", deleteCSRFCookie(request, env));
 
     return new Response(
       JSON.stringify({

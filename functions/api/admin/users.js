@@ -156,7 +156,7 @@ export async function onRequestPost(context) {
         html: emailPayload.html,
       });
     } else {
-      if (env?.DEBUG_EMAIL_LINKS === "true") {
+      if (env?.ENVIRONMENT !== "production") {
         console.info(`[Email] Invite link for ${email}: ${inviteUrl}`);
       }
     }

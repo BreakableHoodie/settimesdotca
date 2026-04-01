@@ -126,15 +126,16 @@ export async function onRequestPost(context) {
         .bind(user.id, email, ipAddress, userAgent)
         .run();
 
+      // Use 401 + generic message to prevent account enumeration.
+      // requiresActivation hint is preserved for UX but does not change HTTP status.
       return new Response(
         JSON.stringify({
-          error: "Account not activated",
-          message:
-            "Please check your email and activate your account before logging in.",
+          error: "Authentication failed",
+          message: "Invalid email or password",
           requiresActivation: true,
         }),
         {
-          status: 403,
+          status: 401,
           headers: { "Content-Type": "application/json" },
         }
       );
@@ -150,14 +151,14 @@ export async function onRequestPost(context) {
         .bind(user.id, email, ipAddress, userAgent)
         .run();
 
+      // Use 401 + generic message to prevent account enumeration via status codes.
       return new Response(
         JSON.stringify({
-          error: "Account disabled",
-          message:
-            "Your account has been deactivated. Please contact an administrator.",
+          error: "Authentication failed",
+          message: "Invalid email or password",
         }),
         {
-          status: 403,
+          status: 401,
           headers: { "Content-Type": "application/json" },
         }
       );
@@ -279,7 +280,7 @@ export async function onRequestPost(context) {
       );
     }
 
-    const lucia = initializeLucia(DB, request);
+    const lucia = initializeLucia(DB, request, env);
     const session = await lucia.createSession(user.id, {});
 
     await DB.prepare(

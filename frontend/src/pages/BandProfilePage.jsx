@@ -154,7 +154,10 @@ export default function BandProfilePage() {
     let cleaned = DOMPurify.sanitize(profile.description, {
       ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a'],
       ALLOWED_ATTR: ['href', 'target', 'rel'],
+      ADD_ATTR: ['rel'],
     })
+    // Force rel="noopener noreferrer" on all outbound links to prevent window.opener access
+    cleaned = cleaned.replace(/<a\s/gi, '<a rel="noopener noreferrer" ')
     // Normalize text: convert multiple <br> tags to paragraph breaks
     cleaned = cleaned.replace(/(<br\s*\/?>\s*){2,}/gi, '</p><p>')
     // Replace single <br> tags with spaces for proper text flow

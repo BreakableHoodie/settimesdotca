@@ -2,6 +2,7 @@
 //
 // Retention schedule (GDPR storage limitation principle):
 //   lucia_sessions:  delete expired rows (no fixed age — expired = done)
+//   auth_attempts:   30 days  (rate-limit counters; contains IPs/emails)
 //   auth_audit:      90 days  (short-lived security telemetry; contains IPs)
 //   audit_log:       1 year   (admin action history; longer legitimate interest)
 
@@ -9,9 +10,11 @@ export async function runRetentionCleanup(env) {
   const { DB } = env;
   const nowUnix = Math.floor(Date.now() / 1000);
 
-  const [sessions, authAudit, adminAudit] = await Promise.all([
+  const [sessions, authAttempts, authAudit, adminAudit] = await Promise.all([
     DB.prepare("DELETE FROM lucia_sessions WHERE expires_at < ?")
       .bind(nowUnix)
+      .run(),
+    DB.prepare("DELETE FROM auth_attempts WHERE created_at < datetime('now', '-30 days')")
       .run(),
     DB.prepare("DELETE FROM auth_audit WHERE timestamp < datetime('now', '-90 days')")
       .run(),
@@ -21,6 +24,7 @@ export async function runRetentionCleanup(env) {
 
   return {
     sessions_deleted: sessions.meta.changes,
+    auth_attempts_deleted: authAttempts.meta.changes,
     auth_audit_deleted: authAudit.meta.changes,
     audit_log_deleted: adminAudit.meta.changes,
   };

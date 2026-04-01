@@ -30,8 +30,11 @@ function normalizeUser(user) {
 }
 
 async function resolveSession(request, env) {
-  const lucia = initializeLucia(env.DB, request);
-  const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true";
+  const lucia = initializeLucia(env.DB, request, env);
+  // SECURITY: Bearer token auth is for non-production environments only.
+  // In production, only cookie-based sessions are accepted.
+  const allowHeaderAuth =
+    env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
   const sessionId =
     lucia.readSessionCookie(request.headers.get("Cookie") ?? "") ||
     (allowHeaderAuth

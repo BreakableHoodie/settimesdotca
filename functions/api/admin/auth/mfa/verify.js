@@ -191,7 +191,6 @@ export async function onRequestPost(context) {
     if (Number(challenge.totp_enabled) === 1 && challenge.totp_secret) {
       try {
         verified = await verifyTotp(challenge.totp_secret, code);
-        console.log("[MFA Verify] TOTP verification result:", verified);
       } catch (totpError) {
         console.error("[MFA Verify] TOTP verification threw:", totpError?.message || totpError);
         verified = false;
@@ -251,7 +250,7 @@ export async function onRequestPost(context) {
       );
     }
 
-    const lucia = initializeLucia(DB, request);
+    const lucia = initializeLucia(DB, request, env);
     const session = await lucia.createSession(challenge.user_id, {});
 
     await DB.prepare(
@@ -307,7 +306,6 @@ export async function onRequestPost(context) {
           "Set-Cookie",
           createTrustedDeviceCookie(trustedDevice.token, request)
         );
-        console.log("[MFA Verify] Created trusted device for user:", challenge.user_id);
       } catch (err) {
         // Don't fail login if trusted device creation fails
         console.error("[MFA Verify] Failed to create trusted device:", err);

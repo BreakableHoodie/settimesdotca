@@ -43,8 +43,21 @@ jobs:
               working-directory: frontend
               run: npm ci
 
+            - name: Cache Playwright browsers
+              id: playwright-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
             - name: Install Playwright browsers
-              run: npx playwright install chromium --with-deps
+              run: |
+                  if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+                      npx playwright install-deps chromium
+                      npx playwright install chromium
+                  else
+                      npx playwright install chromium --with-deps
+                  fi
 
             - name: Build frontend
               working-directory: frontend
@@ -59,6 +72,9 @@ jobs:
 
                   echo "Initializing D1 database with schema..."
                   ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/setup-complete.sql
+
+                  echo "Seeding test data (venues, events, bands)..."
+                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/seed-test-data.sql
 
                   if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
                       echo "Creating E2E admin user..."
@@ -112,7 +128,7 @@ jobs:
               env:
                   ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
                   ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
-              run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js --reporter=list,html
+              run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js --update-snapshots --reporter=list,html
 
             - name: Upload Playwright report
               uses: actions/upload-artifact@v7

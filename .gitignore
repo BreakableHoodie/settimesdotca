@@ -50,6 +50,7 @@ e2e/visual-regression.spec.js-snapshots/
 # AI assistants (developer-specific)
 .claude/
 .serena/
+.mcp.json
 chatmodes/
 claudedocs/
 instructions/

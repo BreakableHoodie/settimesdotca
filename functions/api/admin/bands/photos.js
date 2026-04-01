@@ -14,11 +14,44 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 // Allowed MIME types
 const ALLOWED_TYPES = [
   "image/jpeg",
-  "image/jpg",
   "image/png",
   "image/webp",
   "image/gif",
 ];
+
+/**
+ * Detect the true MIME type from the file's magic bytes.
+ * Rejects client-supplied Content-Type and validates the actual file header.
+ * @param {File} file
+ * @returns {Promise<string|null>} Detected MIME type or null if unrecognised.
+ */
+async function detectMimeType(file) {
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+
+  // JPEG: FF D8 FF
+  if (header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF) {
+    return "image/jpeg";
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (header[0] === 0x89 && header[1] === 0x50 &&
+      header[2] === 0x4E && header[3] === 0x47) {
+    return "image/png";
+  }
+  // GIF87a / GIF89a: 47 49 46 38
+  if (header[0] === 0x47 && header[1] === 0x49 &&
+      header[2] === 0x46 && header[3] === 0x38) {
+    return "image/gif";
+  }
+  // WebP: RIFF (52 49 46 46) + 4-byte length + WEBP (57 45 42 50)
+  if (header[0] === 0x52 && header[1] === 0x49 &&
+      header[2] === 0x46 && header[3] === 0x46 &&
+      header[8] === 0x57 && header[9] === 0x45 &&
+      header[10] === 0x42 && header[11] === 0x50) {
+    return "image/webp";
+  }
+
+  return null;
+}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -54,8 +87,9 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Validate MIME type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    // Validate MIME type via magic bytes — ignores attacker-controlled file.type.
+    const detectedType = await detectMimeType(file);
+    if (!detectedType || !ALLOWED_TYPES.includes(detectedType)) {
       return new Response(
         JSON.stringify({
           error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF",
@@ -71,10 +105,10 @@ export async function onRequestPost(context) {
       .toLowerCase();
     const filename = `band-photos/${timestamp}-${sanitizedName}`;
 
-    // Upload to R2 bucket
+    // Upload to R2 bucket — use the server-verified type, not the client-supplied one.
     await env.BAND_PHOTOS.put(filename, file.stream(), {
       httpMetadata: {
-        contentType: file.type,
+        contentType: detectedType,
       },
       customMetadata: {
         uploadedBy: user.email,
@@ -126,7 +160,7 @@ export async function onRequestPost(context) {
         url: publicUrl,
         filename,
         size: file.size,
-        type: file.type,
+        type: detectedType,
       }),
       {
         status: 200,

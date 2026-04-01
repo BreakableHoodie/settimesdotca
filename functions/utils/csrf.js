@@ -42,7 +42,9 @@ function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
   if (sessionIdentifierOverride) {
     return sessionIdentifierOverride;
   }
+  // Check __Host- prefixed name (production) then plain name (dev).
   return (
+    cookies["__Host-session_token"] ||
     cookies.session_token ||
     request.headers.get("Authorization")?.replace("Bearer ", "") ||
     cookies.csrf_token ||

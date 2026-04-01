@@ -91,7 +91,7 @@ function generateICal(bands, city, genre) {
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Concert Schedule//EN",
-    `X-WR-CALNAME:${city} ${genre} Shows`,
+    `X-WR-CALNAME:${escapeIcal(`${city} ${genre} Shows`)}`,
     "X-WR-TIMEZONE:America/Los_Angeles",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
@@ -151,5 +151,5 @@ function escapeIcal(text) {
     .replace(/\\/g, "\\\\")
     .replace(/;/g, "\\;")
     .replace(/,/g, "\\,")
-    .replace(/\n/g, "\\n");
+    .replace(/\r\n|\r|\n/g, "\\n");
 }

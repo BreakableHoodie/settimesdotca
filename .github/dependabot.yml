@@ -7,12 +7,16 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Toronto"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "npm"
     commit-message:
       prefix: "deps"
+    groups:
+      root-npm-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
@@ -21,12 +25,16 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Toronto"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "npm"
     commit-message:
       prefix: "deps"
+    groups:
+      frontend-npm-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -35,9 +43,13 @@ updates:
       day: "monday"
       time: "09:15"
       timezone: "America/Toronto"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
       prefix: "ci"
+    groups:
+      github-actions-all:
+        patterns:
+          - "*"

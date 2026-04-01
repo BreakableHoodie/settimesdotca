@@ -10,7 +10,7 @@ export async function onRequestGet(context) {
   const { DB } = env;
   const debugId = crypto.randomUUID();
   const withDebug = (payload) =>
-    env?.RESET_DEBUG === "true" ? { ...payload, debugId } : payload;
+    env?.ENVIRONMENT !== "production" ? { ...payload, debugId } : payload;
   const logDebug = (stage, details) => {
     console.info("[ResetPassword]", stage, { debugId, ...details });
   };

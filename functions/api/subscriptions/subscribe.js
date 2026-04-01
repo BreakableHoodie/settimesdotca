@@ -211,7 +211,7 @@ async function sendVerificationEmail(env, email, city, genre, token) {
     return emailResult;
   } else {
     console.warn("[Subscribe] Email not configured, logging verification link");
-    if (env?.DEBUG_EMAIL_LINKS === "true") {
+    if (env?.ENVIRONMENT !== "production") {
       console.info(`[Email] Verification link for ${email}: ${verifyUrl}`);
     }
     return { delivered: false, reason: "not_configured" };

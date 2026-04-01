@@ -14,7 +14,7 @@ export async function onRequestPost(context) {
   const debugId = crypto.randomUUID();
 
   const withDebug = (payload) => {
-    if (env?.RESET_DEBUG === "true") {
+    if (env?.ENVIRONMENT !== "production") {
       return { ...payload, debugId };
     }
     return payload;

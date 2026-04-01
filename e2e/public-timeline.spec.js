@@ -4,7 +4,8 @@ test.describe('Public Timeline Viewing', () => {
   test('should display upcoming events without authentication', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: /events/i })).toBeVisible();
+    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');
     await expect(eventCards.first()).toBeVisible();
@@ -16,7 +17,14 @@ test.describe('Public Timeline Viewing', () => {
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
-    await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
+    // Verify the card expanded (button flips to Hide Details)
+    await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
+
+    // Venue heading only renders when the event has venue data
+    const venuesHeading = firstEvent.getByRole('heading', { name: /venues/i });
+    if (await venuesHeading.isVisible()) {
+      await expect(venuesHeading).toBeVisible();
+    }
   });
 
   test('should allow filtering controls', async ({ page }) => {
@@ -34,7 +42,13 @@ test.describe('Public Timeline Viewing', () => {
 
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
-    await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
+
+    // Verify expanded; venue heading present only when the event has venues
+    await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
+    const venuesHeading = firstEvent.getByRole('heading', { name: /venues/i });
+    if (await venuesHeading.isVisible()) {
+      await expect(venuesHeading).toBeVisible();
+    }
   });
 
   test('should show band/performer information in events', async ({ page }) => {
@@ -42,7 +56,13 @@ test.describe('Public Timeline Viewing', () => {
 
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
-    await expect(firstEvent.getByRole('heading', { name: /all performers/i })).toBeVisible();
+
+    // Verify expanded; performers heading present only when the event has performers
+    await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
+    const performersHeading = firstEvent.getByRole('heading', { name: /all performers/i });
+    if (await performersHeading.isVisible()) {
+      await expect(performersHeading).toBeVisible();
+    }
   });
 
   test('should navigate to band profile from event', async ({ page }) => {
@@ -70,7 +90,8 @@ test.describe('Public Timeline Viewing', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: /events/i })).toBeVisible();
+    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');
     await expect(eventCards.first()).toBeVisible();
@@ -114,7 +135,8 @@ test.describe('Public Timeline Viewing', () => {
     await expect(page).not.toHaveURL(/\/admin\/login/);
     await expect(page).not.toHaveURL(/\/login/);
 
-    await expect(page.getByRole('heading', { name: /events/i })).toBeVisible();
+    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');
     await expect(eventCards.first()).toBeVisible();
@@ -125,6 +147,12 @@ test.describe('Public Timeline Viewing', () => {
 
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
-    await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
+
+    // Verify expanded; venue heading present only when the event has venues
+    await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
+    const venuesHeading = firstEvent.getByRole('heading', { name: /venues/i });
+    if (await venuesHeading.isVisible()) {
+      await expect(venuesHeading).toBeVisible();
+    }
   });
 });

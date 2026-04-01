@@ -289,6 +289,25 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 (153, 28, 2, 'The Prophets', '21:00', '22:00', 'Post-Rock', 'Montreal', 'Instrumental post-rock soundscapes'),
 (154, 28, 2, 'Tomorrow''s Echo', '22:00', '23:00', 'Dream Pop', 'Ottawa', 'Dreamy sounds from the future');
 
+-- ============================================
+-- BAND PROFILES + PERFORMANCES for Future Fest E2E (Event 28)
+-- The public timeline API reads band_profiles + performances, not the bands table.
+-- Without these, every event card expands with 0 venues and 0 performers, making
+-- venue/performer heading assertions impossible in E2E tests.
+-- ============================================
+
+INSERT OR REPLACE INTO band_profiles (id, name, name_normalized, genre, origin, description) VALUES
+(1, 'The Time Travellers', 'the time travellers', 'Indie Rock', 'Ottawa', 'Indie rock from the future'),
+(2, 'Future Sound', 'future sound', 'Electronic', 'Toronto', 'Electronic music ahead of its time'),
+(3, 'The Prophets', 'the prophets', 'Post-Rock', 'Montreal', 'Instrumental post-rock soundscapes'),
+(4, 'Tomorrows Echo', 'tomorrows echo', 'Dream Pop', 'Ottawa', 'Dreamy sounds from the future');
+
+INSERT OR REPLACE INTO performances (id, event_id, band_profile_id, venue_id, start_time, end_time) VALUES
+(1, 28, 1, 1, '19:00', '19:45'),
+(2, 28, 2, 1, '20:00', '20:45'),
+(3, 28, 3, 2, '21:00', '22:00'),
+(4, 28, 4, 2, '22:00', '23:00');
+
 -- Update sqlite_sequence if needed
-DELETE FROM sqlite_sequence WHERE name IN ('venues', 'events', 'bands');
-INSERT INTO sqlite_sequence (name, seq) VALUES ('venues', 20), ('events', 28), ('bands', 154);
+DELETE FROM sqlite_sequence WHERE name IN ('venues', 'events', 'bands', 'band_profiles', 'performances');
+INSERT INTO sqlite_sequence (name, seq) VALUES ('venues', 20), ('events', 28), ('bands', 154), ('band_profiles', 4), ('performances', 4);

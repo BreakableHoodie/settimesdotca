@@ -18,9 +18,13 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT,
   city TEXT,
   ticket_url TEXT,
+  venue_info TEXT,
+  social_links TEXT,
+  theme_colors TEXT,
   created_by_user_id INTEGER,
   updated_by_user_id INTEGER,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Venues table

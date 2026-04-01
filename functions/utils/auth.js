@@ -16,20 +16,20 @@ export const SESSION_CONFIG = {
   adminAbsoluteTimeout: 8 * 60 * 60 * 1000,
 };
 
-export function isDevRequest(request) {
+export function isDevRequest(request, env = null) {
+  // SECURITY: Trust env.ENVIRONMENT over request headers — the Origin header
+  // is attacker-controlled and must not influence security-sensitive decisions.
+  if (env?.ENVIRONMENT === "production") return false;
+  if (env?.ENVIRONMENT && env.ENVIRONMENT !== "production") return true;
+  // Fallback for local dev without ENVIRONMENT set: check server-controlled headers only.
   if (!request) return false;
-  const origin = request.headers.get("Origin") || "";
   const host = request.headers.get("Host") || "";
   const url = request.url || "";
-  return (
-    origin.includes("localhost") ||
-    host.includes("localhost") ||
-    url.includes("localhost")
-  );
+  return host.includes("localhost") || url.includes("localhost");
 }
 
-export function initializeLucia(DB, request = null) {
-  const isDev = request ? isDevRequest(request) : false;
+export function initializeLucia(DB, request = null, env = null) {
+  const isDev = request ? isDevRequest(request, env) : false;
   const adapter = new D1Adapter(DB, {
     user: "users",
     session: "lucia_sessions",

@@ -58,9 +58,10 @@ test.describe('Event Creation', () => {
     await page.fill('input[name="date"]', '2026-10-15');
 
     await page.click('button[type="submit"]:has-text("Create Event")');
+    await expect(page.getByRole('heading', { name: 'Create New Event' })).not.toBeVisible({ timeout: 15000 });
 
     const row = page.locator('table tbody tr', { hasText: eventName }).first();
-    await expect(row).toBeVisible();
+    await expect(row).toBeVisible({ timeout: 15000 });
   });
 
   test('should validate required fields', async ({ page }) => {
@@ -84,6 +85,7 @@ test.describe('Event Creation', () => {
     await page.fill('input[name="slug"]', eventSlug);
     await page.fill('input[name="date"]', '2026-10-20');
     await page.click('button[type="submit"]:has-text("Create Event")');
+    await expect(page.getByRole('heading', { name: 'Create New Event' })).not.toBeVisible({ timeout: 15000 });
 
     const eventsData = await apiGet(page, '/api/admin/events');
     const createdEvent = eventsData.events?.find(event => event.name === eventName);
@@ -134,6 +136,7 @@ test.describe('Event Creation', () => {
     await page.fill('input[name="slug"]', eventSlug);
     await page.fill('input[name="date"]', '2026-10-25');
     await page.click('button[type="submit"]:has-text("Create Event")');
+    await expect(page.getByRole('heading', { name: 'Create New Event' })).not.toBeVisible({ timeout: 15000 });
 
     const editRow = page.locator('table tbody tr', { hasText: eventName }).first();
     await editRow.locator('button', { hasText: /^Edit$/ }).click();
@@ -157,6 +160,7 @@ test.describe('Event Creation', () => {
     await page.fill('input[name="slug"]', eventSlug);
     await page.fill('input[name="date"]', '2026-10-30');
     await page.click('button[type="submit"]:has-text("Create Event")');
+    await expect(page.getByRole('heading', { name: 'Create New Event' })).not.toBeVisible({ timeout: 15000 });
 
     page.once('dialog', dialog => dialog.accept());
     const deleteRow = page.locator('table tbody tr', { hasText: eventName }).first();

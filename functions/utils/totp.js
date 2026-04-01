@@ -53,7 +53,6 @@ export async function verifyTotp(secret, code, window = 1) {
       period: DEFAULT_TOTP_STEP_SECONDS,
       epochTolerance,
     });
-    console.log("[TOTP] verify() result:", result);
     return result.valid;
   } catch (error) {
     console.error("[TOTP] verify() threw error:", error?.message || error);

@@ -28,7 +28,7 @@ function resolveCsrfSecret(env, request) {
   }
 
   // Check if this is local development
-  const isLocal = request && isDevRequest(request);
+  const isLocal = request && isDevRequest(request, env);
   if (isLocal) {
     console.warn("[CSRF] Using fallback secret for local development. Set CSRF_SECRET for production.");
     return LOCAL_DEV_CSRF_SECRET;
@@ -50,8 +50,8 @@ function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
   );
 }
 
-export function getCookieConfig(request) {
-  const isDev = isDevRequest(request);
+export function getCookieConfig(request, env = null) {
+  const isDev = isDevRequest(request, env);
   return {
     httpOnly: false,
     secure: !isDev,
@@ -102,7 +102,7 @@ export function generateCSRFToken(request, env, sessionIdentifierOverride = null
     cookie: () => {},
   };
   return csrf.generateCsrfToken(req, res, {
-    cookieOptions: getCookieConfig(request),
+    cookieOptions: getCookieConfig(request, env),
     overwrite: true,
   });
 }
@@ -136,16 +136,16 @@ function serializeCookie(name, value, options) {
   return parts.join("; ");
 }
 
-export function setCSRFCookie(token, request = null) {
-  const options = getCookieConfig(request);
+export function setCSRFCookie(token, request = null, env = null) {
+  const options = getCookieConfig(request, env);
   return serializeCookie("csrf_token", token, {
     ...options,
     httpOnly: false,
   });
 }
 
-export function deleteCSRFCookie(request = null) {
-  const options = getCookieConfig(request);
+export function deleteCSRFCookie(request = null, env = null) {
+  const options = getCookieConfig(request, env);
   const secure = options.secure ? "Secure; " : "";
   const sameSite =
     options.sameSite === "none" ? "None" : options.sameSite === "lax" ? "Lax" : "Strict";

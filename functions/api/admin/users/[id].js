@@ -9,7 +9,13 @@ import { getClientIP } from "../../../utils/request.js";
 export async function onRequestPatch(context) {
   const { request, env, params } = context;
   const { DB } = env;
-  const userId = parseInt(params.id);
+  const userId = Number(params.id);
+  if (!Number.isInteger(userId) || userId < 1) {
+    return new Response(
+      JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
   const ipAddress = getClientIP(request);
 
   try {
@@ -285,7 +291,13 @@ export async function onRequestPatch(context) {
 export async function onRequestDelete(context) {
   const { request, env, params } = context;
   const { DB } = env;
-  const userId = parseInt(params.id);
+  const userId = Number(params.id);
+  if (!Number.isInteger(userId) || userId < 1) {
+    return new Response(
+      JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
   const ipAddress = getClientIP(request);
 
   try {

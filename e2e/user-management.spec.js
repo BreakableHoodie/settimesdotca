@@ -45,7 +45,7 @@ test.describe('User Management', () => {
     const name = `Test User ${suffix}`;
     const email = `testuser${suffix}@example.com`;
     await openUsersTab(page);
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
 
     await waitForCreateUserForm(page);
 
@@ -54,7 +54,7 @@ test.describe('User Management', () => {
     await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'editor');
 
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /created successfully/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
 
     await page.reload();
     await openUsersTab(page);
@@ -66,7 +66,7 @@ test.describe('User Management', () => {
 
   test('should validate required user fields', async ({ page }) => {
     await openUsersTab(page);
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
 
     await page.click('button[type="submit"]:has-text("Create User")');
 
@@ -89,13 +89,13 @@ test.describe('User Management', () => {
     const viewerEmail = `vieweruser${viewerSuffix}@example.com`;
     await openUsersTab(page);
 
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
     await waitForCreateUserForm(page);
     await page.fill('#name', adminName);
     await page.fill('#email', adminEmail);
     await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'admin');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /created successfully/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
 
     await page.reload();
     await openUsersTab(page);
@@ -104,13 +104,13 @@ test.describe('User Management', () => {
     await expect(adminRow).toContainText(adminName);
     await expect(adminRow).toContainText(/admin/i);
 
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
     await waitForCreateUserForm(page);
     await page.fill('#name', viewerName);
     await page.fill('#email', viewerEmail);
     await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'viewer');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /created successfully/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
 
     await page.reload();
     await openUsersTab(page);
@@ -127,13 +127,13 @@ test.describe('User Management', () => {
     const updatedName = `Updated User ${suffix}`;
     await openUsersTab(page);
 
-    await page.click('button:has-text("Add User")');
+    await page.click('button:has-text("Invite User")');
     await waitForCreateUserForm(page);
     await page.fill('#name', name);
     await page.fill('#email', email);
     await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'editor');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /created successfully/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
 
     await page.reload();
     await openUsersTab(page);

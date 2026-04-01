@@ -23,6 +23,13 @@ const createComponentPage = async (page, componentHtml) => {
 };
 
 test.describe('Visual Regression', () => {
+  test.beforeEach(async ({}, testInfo) => {
+    testInfo.skip(
+      process.env.PLAYWRIGHT_SKIP_A11Y_VISUAL === 'true',
+      'Visual regression tests skipped in main e2e workflow'
+    );
+  });
+
   test('admin login page', async ({ page }) => {
     await page.goto('/admin/login');
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible();

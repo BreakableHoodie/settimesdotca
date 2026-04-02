@@ -7,43 +7,11 @@ import { verifyPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import {
   getTrustedDeviceToken,
   validateTrustedDevice,
 } from "../../../utils/trustedDevice.js";
-
-// Rate limiting: check failed login attempts
-async function checkRateLimit(DB, email, ipAddress) {
-  const windowMs = 10 * 60 * 1000;
-  const windowStart = new Date(Date.now() - windowMs).toISOString();
-
-  const attempts = await DB.prepare(
-    `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
-     FROM auth_attempts
-     WHERE (email = ? OR ip_address = ?)
-     AND attempt_type = 'login'
-     AND success = 0
-     AND created_at > ?`
-  )
-    .bind(email, ipAddress, windowStart)
-    .first();
-
-  if (Number(attempts.count) >= 5) {
-    const earliestTs = attempts.earliest_attempt
-      ? new Date(attempts.earliest_attempt).getTime()
-      : Date.now();
-    const elapsed = Date.now() - earliestTs;
-    const remainingMs = Math.max(0, windowMs - elapsed);
-    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-
-    return {
-      allowed: false,
-      remainingMinutes,
-    };
-  }
-
-  return { allowed: true };
-}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -69,7 +37,12 @@ export async function onRequestPost(context) {
     }
 
     // Check rate limit
-    const rateCheck = await checkRateLimit(DB, email, ipAddress);
+    const rateCheck = await checkAuthRateLimit(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.login,
+      email,
+      ipAddress,
+      scope: "email-or-ip",
+    });
     if (!rateCheck.allowed) {
       return new Response(
         JSON.stringify({
@@ -98,12 +71,14 @@ export async function onRequestPost(context) {
 
     if (!user) {
       // Log failed attempt (user not found)
-      await DB.prepare(
-        `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, 'login', 0, 'user_not_found')`
-      )
-        .bind(email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "user_not_found",
+        ipAddress,
+        success: false,
+        userAgent,
+      });
 
       return new Response(
         JSON.stringify({
@@ -119,12 +94,15 @@ export async function onRequestPost(context) {
 
     // Check if account is activated
     if (user.is_active === 0 && !user.activated_at) {
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'login', 0, 'activation_required')`
-      )
-        .bind(user.id, email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "activation_required",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: user.id,
+      });
 
       // Use 401 + generic message to prevent account enumeration.
       // requiresActivation hint is preserved for UX but does not change HTTP status.
@@ -144,12 +122,15 @@ export async function onRequestPost(context) {
     // Check if account is active (deactivated)
     if (user.is_active === 0) {
       // Log failed attempt (account disabled)
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'login', 0, 'account_disabled')`
-      )
-        .bind(user.id, email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "account_disabled",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: user.id,
+      });
 
       // Use 401 + generic message to prevent account enumeration via status codes.
       return new Response(
@@ -169,12 +150,15 @@ export async function onRequestPost(context) {
 
     if (!passwordValid) {
       // Log failed attempt (invalid password)
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'login', 0, 'invalid_password')`
-      )
-        .bind(user.id, email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "invalid_password",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: user.id,
+      });
 
       return new Response(
         JSON.stringify({
@@ -251,12 +235,14 @@ export async function onRequestPost(context) {
         .bind(mfaToken, user.id, ipAddress, userAgent, expiresAt)
         .run();
 
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-         VALUES (?, ?, ?, ?, 'login_mfa_challenge', 1)`
-      )
-        .bind(user.id, email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.loginMfaChallenge,
+        email,
+        ipAddress,
+        success: true,
+        userAgent,
+        userId: user.id,
+      });
 
       return new Response(
         JSON.stringify({
@@ -299,12 +285,14 @@ export async function onRequestPost(context) {
       .run();
 
     // Log successful login
-    await DB.prepare(
-      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-       VALUES (?, ?, ?, ?, 'login', 1)`
-    )
-      .bind(user.id, email, ipAddress, userAgent)
-      .run();
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.login,
+      email,
+      ipAddress,
+      success: true,
+      userAgent,
+      userId: user.id,
+    });
 
     // Generate CSRF token
     const csrfToken = generateCSRFToken(request, env, session.id);

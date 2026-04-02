@@ -3,39 +3,7 @@ import { isValidEmail, validatePassword, FIELD_LIMITS } from "../../../utils/val
 import { getClientIP } from "../../../utils/request.js";
 import { isEmailConfigured, sendEmail } from "../../../utils/email.js";
 import { buildActivationEmail } from "../../../utils/emailTemplates.js";
-
-// Rate limiting: check failed signup attempts
-async function checkRateLimit(DB, email, ipAddress) {
-  const windowMs = 10 * 60 * 1000;
-  const windowStart = new Date(Date.now() - windowMs).toISOString();
-
-  const attempts = await DB.prepare(
-    `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
-     FROM auth_attempts
-     WHERE (email = ? OR ip_address = ?)
-     AND attempt_type = 'signup'
-     AND success = 0
-     AND created_at > ?`
-  )
-    .bind(email, ipAddress, windowStart)
-    .first();
-
-  if (Number(attempts.count) >= 5) {
-    const earliestTs = attempts.earliest_attempt
-      ? new Date(attempts.earliest_attempt).getTime()
-      : Date.now();
-    const elapsed = Date.now() - earliestTs;
-    const remainingMs = Math.max(0, windowMs - elapsed);
-    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-
-    return {
-      allowed: false,
-      remainingMinutes,
-    };
-  }
-
-  return { allowed: true };
-}
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -89,7 +57,12 @@ export async function onRequestPost(context) {
     }
 
     // Check rate limit
-    const rateCheck = await checkRateLimit(DB, email, ipAddress);
+    const rateCheck = await checkAuthRateLimit(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.signup,
+      email,
+      ipAddress,
+      scope: "email-or-ip",
+    });
     if (!rateCheck.allowed) {
       return new Response(
         JSON.stringify({
@@ -139,12 +112,14 @@ export async function onRequestPost(context) {
 
     if (!invite) {
       // Log failed signup attempt
-      await DB.prepare(
-        `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, 'signup', 0, 'invalid_invite_code')`
-      )
-        .bind(email, ipAddress, request.headers.get("User-Agent") || "unknown")
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.signup,
+        email,
+        failureReason: "invalid_invite_code",
+        ipAddress,
+        success: false,
+        userAgent: request.headers.get("User-Agent") || "unknown",
+      });
 
       return new Response(
         JSON.stringify({
@@ -161,12 +136,14 @@ export async function onRequestPost(context) {
 
     // If invite is email-restricted, verify email matches
     if (invite.email && invite.email.toLowerCase() !== email.toLowerCase()) {
-      await DB.prepare(
-        `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, 'signup', 0, 'email_mismatch')`
-      )
-        .bind(email, ipAddress, request.headers.get("User-Agent") || "unknown")
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.signup,
+        email,
+        failureReason: "email_mismatch",
+        ipAddress,
+        success: false,
+        userAgent: request.headers.get("User-Agent") || "unknown",
+      });
 
       return new Response(
         JSON.stringify({
@@ -280,17 +257,14 @@ export async function onRequestPost(context) {
       .run();
 
     // Log successful signup
-    await DB.prepare(
-      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-       VALUES (?, ?, ?, ?, 'signup', 1)`
-    )
-      .bind(
-        user.id,
-        email,
-        ipAddress,
-        request.headers.get("User-Agent") || "unknown"
-      )
-      .run();
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.signup,
+      email,
+      ipAddress,
+      success: true,
+      userAgent: request.headers.get("User-Agent") || "unknown",
+      userId: user.id,
+    });
 
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
     const activationUrl = new URL("/activate", baseUrl);

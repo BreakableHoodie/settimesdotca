@@ -77,7 +77,7 @@ export async function onRequest(context) {
   }
 
   // Rate limiting for public APIs
-  const rateLimit = await checkRateLimit(request);
+  const rateLimit = await checkRateLimit(request, env);
   if (!rateLimit.allowed) {
     return rateLimitResponse(rateLimit, corsHeaders);
   }

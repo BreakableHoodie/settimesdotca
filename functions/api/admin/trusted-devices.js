@@ -1,0 +1,91 @@
+// Trusted device management endpoints
+// GET  /api/admin/trusted-devices — list current user's trusted devices
+// DELETE /api/admin/trusted-devices — revoke a specific device by ID (body: { deviceId })
+
+export async function onRequestGet(context) {
+  const { env, data } = context;
+  const { user } = data;
+
+  try {
+    const result = await env.DB.prepare(
+      `
+      SELECT
+        id,
+        ip_address,
+        user_agent,
+        created_at,
+        last_used_at,
+        expires_at
+      FROM trusted_devices
+      WHERE user_id = ? AND expires_at > datetime('now')
+      ORDER BY last_used_at DESC, created_at DESC
+    `
+    )
+      .bind(user.userId)
+      .all();
+
+    return new Response(
+      JSON.stringify({ devices: result.results || [] }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Failed to load trusted devices:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to load trusted devices" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+export async function onRequestDelete(context) {
+  const { request, env, data } = context;
+  const { user } = data;
+
+  let deviceId;
+  try {
+    const body = await request.json();
+    deviceId = body?.deviceId;
+  } catch (_error) {
+    return new Response(JSON.stringify({ error: "Invalid request body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (!deviceId || !Number.isInteger(Number(deviceId))) {
+    return new Response(JSON.stringify({ error: "deviceId is required" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    // Verify the device belongs to the requesting user before deleting
+    const device = await env.DB.prepare(
+      "SELECT user_id FROM trusted_devices WHERE id = ?"
+    )
+      .bind(Number(deviceId))
+      .first();
+
+    if (!device || Number(device.user_id) !== Number(user.userId)) {
+      return new Response(JSON.stringify({ error: "Device not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    await env.DB.prepare("DELETE FROM trusted_devices WHERE id = ? AND user_id = ?")
+      .bind(Number(deviceId), user.userId)
+      .run();
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Failed to revoke trusted device:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to revoke device" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}

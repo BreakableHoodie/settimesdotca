@@ -190,6 +190,29 @@ export function validateCSRFMiddleware(request, env = null) {
   }
 
   const url = new URL(request.url);
+
+  // Logout is an authenticated endpoint: the user always has both a session cookie
+  // and a CSRF cookie set, so the full double-submit token check can be enforced.
+  // The frontend sends X-CSRF-Token on every request via getHeaders(), so this
+  // requires no frontend changes.
+  if (url.pathname === "/api/admin/auth/logout") {
+    if (!validateCSRFToken(request, env)) {
+      const csrfToken = generateCSRFToken(request, env);
+      const headers = new Headers({ "Content-Type": "application/json" });
+      headers.append("Set-Cookie", setCSRFCookie(csrfToken, request, env));
+      return new Response(
+        JSON.stringify({
+          error: "CSRF validation failed",
+          message: "Invalid or missing CSRF token",
+        }),
+        { status: 403, headers }
+      );
+    }
+    return null;
+  }
+
+  // Other auth-route mutations (login, signup, MFA verify) have no session yet,
+  // so no CSRF cookie exists to validate against. Enforce same-origin only.
   if (url.pathname.includes("/api/admin/auth/")) {
     if (!isSameOriginMutation(request)) {
       return new Response(

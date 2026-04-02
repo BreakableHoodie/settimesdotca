@@ -62,9 +62,14 @@ export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
   const tokenHash = await hashTrustedDeviceToken(token);
   const fingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
   const uaHash = await generateUaHash(userAgent);
-  const expiresAt = new Date(
-    Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000
-  ).toISOString();
+  // Store in SQLite datetime format (space separator, no T/Z) so that
+  // TEXT comparisons against datetime('now') are lexicographically correct.
+  // ISO 8601 with 'T' compares greater than space-separated format at the
+  // same instant, which would allow expired devices to pass validation.
+  const expiresAt = new Date(Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .replace("T", " ")
+    .slice(0, 19);
 
   await DB.prepare(
     `INSERT INTO trusted_devices (user_id, token, device_fingerprint, ua_hash, ip_address, user_agent, expires_at)

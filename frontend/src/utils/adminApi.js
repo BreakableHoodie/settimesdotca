@@ -53,9 +53,15 @@ function notifyUnauthorized() {
 }
 
 function parseSessionTiming(response) {
-  const timeRemainingSeconds = Number(response.headers.get('X-Session-Expires-In'))
-  const idleRemainingSeconds = Number(response.headers.get('X-Session-Idle-Expires-In'))
-  const absoluteRemainingSeconds = Number(response.headers.get('X-Session-Absolute-Expires-In'))
+  const rawTime = response.headers.get('X-Session-Expires-In')
+  const rawIdle = response.headers.get('X-Session-Idle-Expires-In')
+  const rawAbsolute = response.headers.get('X-Session-Absolute-Expires-In')
+
+  if (rawTime === null || rawIdle === null || rawAbsolute === null) return null
+
+  const timeRemainingSeconds = Number(rawTime)
+  const idleRemainingSeconds = Number(rawIdle)
+  const absoluteRemainingSeconds = Number(rawAbsolute)
 
   if (
     !Number.isFinite(timeRemainingSeconds) ||

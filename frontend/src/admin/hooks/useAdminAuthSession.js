@@ -53,10 +53,13 @@ export function useAdminAuthSession() {
         window.sessionStorage.setItem('idleLogout', '1')
       }
 
-      await authApi.logout()
-      setCurrentUser(null)
-      setIsAuthenticated(false)
-      logoutInFlightRef.current = false
+      try {
+        await authApi.logout()
+        setCurrentUser(null)
+        setIsAuthenticated(false)
+      } finally {
+        logoutInFlightRef.current = false
+      }
     },
     [clearSessionTimers]
   )
@@ -209,7 +212,7 @@ export function useAdminAuthSession() {
     return () => {
       activityEvents.forEach(event => window.removeEventListener(event, handleActivity))
     }
-  }, [isAuthenticated, showIdleWarning])
+  }, [isAuthenticated, showIdleWarning, refreshSession, clearSessionTimers])
 
   return {
     checking,

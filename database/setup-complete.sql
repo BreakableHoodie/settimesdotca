@@ -295,6 +295,7 @@ CREATE TABLE IF NOT EXISTS trusted_devices (
   user_id INTEGER NOT NULL,
   token TEXT UNIQUE NOT NULL,
   device_fingerprint TEXT,           -- Hash of IP + User-Agent for validation
+  ua_hash TEXT,                      -- Hash of User-Agent alone for independent validation
   ip_address TEXT,
   user_agent TEXT,
   expires_at TEXT NOT NULL,

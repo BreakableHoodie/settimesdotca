@@ -644,6 +644,27 @@ export const performersApi = {
   },
 }
 
+// Trusted Devices API
+export const trustedDevicesApi = {
+  async list() {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/trusted-devices`, {
+      headers: getHeaders(),
+      credentials: 'include',
+    })
+    return handleResponse(response)
+  },
+
+  async revoke(deviceId) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/trusted-devices`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ deviceId }),
+    })
+    return handleResponse(response)
+  },
+}
+
 // Users API
 export const usersApi = {
   async getAll() {

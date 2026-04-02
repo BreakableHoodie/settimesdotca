@@ -46,6 +46,10 @@ export function initializeLucia(DB, request = null, env = null) {
         sameSite: isDev ? "Lax" : "Strict",
         path: "/",
         httpOnly: true,
+        // Explicit Max-Age keeps the cookie aligned with the DB session lifetime
+        // so browsers don't discard it on close while the server-side session
+        // remains valid, which would leave orphaned rows in lucia_sessions.
+        maxAge: 30 * 24 * 60 * 60, // 30 days, matches sessionExpiresIn below
       },
     },
     sessionExpiresIn: new TimeSpan(30, "d"),

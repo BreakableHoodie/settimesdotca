@@ -88,7 +88,9 @@ export async function onRequestPost(context) {
     await revokeAllTrustedDevices(DB, userId);
 
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
-    const resetUrl = `${baseUrl}/reset-password?token=${resetToken.token}`;
+    // Use a hash fragment so the token is never sent to the server, logged by
+    // Cloudflare access logs, stored in browser history, or leaked via Referer.
+    const resetUrl = `${baseUrl}/reset-password#token=${resetToken.token}`;
 
     if (!isEmailConfigured(env)) {
       console.error("[ResetPassword] Email not configured");

@@ -56,7 +56,7 @@ export default function UserSettings({ user, onOpenMfa }) {
     loadDevices()
   }, [loadDevices])
 
-  const handleRevoke = async (deviceId) => {
+  const handleRevoke = async deviceId => {
     setRevoking(deviceId)
     try {
       const res = await fetch('/api/admin/trusted-devices', {
@@ -111,13 +111,10 @@ export default function UserSettings({ user, onOpenMfa }) {
       <Card variant="elevated" className="p-6">
         <h3 className="text-xl font-semibold text-text-primary mb-2">Trusted Devices</h3>
         <p className="text-text-secondary mb-4">
-          Devices you marked as trusted skip the MFA step for 30 days. Revoke any device
-          you no longer recognise.
+          Devices you marked as trusted skip the MFA step for 30 days. Revoke any device you no longer recognise.
         </p>
 
-        {devicesError && (
-          <p className="text-red-400 text-sm mb-4">{devicesError}</p>
-        )}
+        {devicesError && <p className="text-red-400 text-sm mb-4">{devicesError}</p>}
 
         {devicesLoading ? (
           <p className="text-text-tertiary text-sm">Loading devices…</p>
@@ -126,10 +123,7 @@ export default function UserSettings({ user, onOpenMfa }) {
         ) : (
           <ul className="space-y-3">
             {devices.map(device => (
-              <li
-                key={device.id}
-                className="flex items-center justify-between gap-4 rounded-lg bg-white/5 px-4 py-3"
-              >
+              <li key={device.id} className="flex items-center justify-between gap-4 rounded-lg bg-white/5 px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-text-primary truncate">
                     {summariseUserAgent(device.user_agent)}

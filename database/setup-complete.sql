@@ -367,13 +367,14 @@ CREATE INDEX IF NOT EXISTS idx_auth_audit_timestamp ON auth_audit(timestamp);
 CREATE INDEX IF NOT EXISTS idx_auth_audit_ip ON auth_audit(ip_address);
 CREATE INDEX IF NOT EXISTS idx_rate_limit_ip ON rate_limit(ip_address);
 
--- Globally-consistent sliding-window rate limit counters (D1-backed, for auth/subscription endpoints)
+-- Globally-consistent fixed-window rate limit counters (D1-backed, for auth/subscription endpoints)
 CREATE TABLE IF NOT EXISTS rate_limits (
   key TEXT PRIMARY KEY,
   count INTEGER NOT NULL DEFAULT 0,
   window_start INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_rate_limits_updated_at ON rate_limits (updated_at);
 
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)

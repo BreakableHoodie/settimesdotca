@@ -5,8 +5,10 @@
 //   auth_attempts:   30 days  (rate-limit counters; contains IPs/emails)
 //   auth_audit:      90 days  (short-lived security telemetry; contains IPs)
 //   audit_log:       1 year   (admin action history; longer legitimate interest)
-//   rate_limits:     2× max window (30 min) — stale fixed-window counters; uses
-//                    unixepoch() because the column stores integer seconds
+//   rate_limits:     30 min (1800s) — stale fixed-window counters. The largest
+//                    configured window is 300s so this is intentionally 6× to
+//                    give a buffer against races. Uses unixepoch() because the
+//                    column stores integer seconds, not ISO text.
 
 export async function runRetentionCleanup(env) {
   const { DB } = env;

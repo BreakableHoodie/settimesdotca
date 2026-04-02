@@ -6,43 +6,11 @@ import { generateCSRFToken, setCSRFCookie } from "../../../../utils/csrf.js";
 import { verifyTotp, verifyBackupCode } from "../../../../utils/totp.js";
 import { getClientIP } from "../../../../utils/request.js";
 import { initializeLucia } from "../../../../utils/auth.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../../utils/authAttempts.js";
 import {
   createTrustedDevice,
   createTrustedDeviceCookie,
 } from "../../../../utils/trustedDevice.js";
-
-async function checkRateLimit(DB, userId, ipAddress) {
-  const windowMs = 10 * 60 * 1000;
-  const windowStart = new Date(Date.now() - windowMs).toISOString();
-
-  const attempts = await DB.prepare(
-    `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
-     FROM auth_attempts
-     WHERE user_id = ?
-       AND ip_address = ?
-       AND attempt_type = 'mfa'
-       AND success = 0
-       AND created_at > ?`
-  )
-    .bind(userId, ipAddress, windowStart)
-    .first();
-
-  if (Number(attempts.count) >= 5) {
-    const earliestTs = attempts.earliest_attempt
-      ? new Date(attempts.earliest_attempt).getTime()
-      : Date.now();
-    const elapsed = Date.now() - earliestTs;
-    const remainingMs = Math.max(0, windowMs - elapsed);
-    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-
-    return {
-      allowed: false,
-      remainingMinutes,
-    };
-  }
-
-  return { allowed: true };
-}
 
 function parseBackupCodes(raw) {
   if (!raw) return [];
@@ -78,6 +46,24 @@ export async function onRequestPost(context) {
       );
     }
 
+    const invalidTokenRateCheck = await checkAuthRateLimit(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfa,
+      ipAddress,
+      scope: "ip",
+    });
+    if (!invalidTokenRateCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "Too many attempts",
+          message: `Too many failed MFA attempts. Please try again in ${invalidTokenRateCheck.remainingMinutes} minutes.`,
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const challenge = await DB.prepare(
       `
       SELECT c.id as challenge_id,
@@ -100,12 +86,13 @@ export async function onRequestPost(context) {
       .first();
 
     if (!challenge) {
-      await DB.prepare(
-        `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, 'mfa', 0, 'invalid_or_expired_token')`
-      )
-        .bind(null, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.mfa,
+        failureReason: "invalid_or_expired_token",
+        ipAddress,
+        success: false,
+        userAgent,
+      });
 
       return new Response(
         JSON.stringify({
@@ -131,12 +118,15 @@ export async function onRequestPost(context) {
       challenge.user_agent !== userAgent;
 
     if (ipMismatch || uaMismatch) {
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'mfa', 0, 'challenge_mismatch')`
-      )
-        .bind(challenge.user_id, challenge.email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.mfa,
+        email: challenge.email,
+        failureReason: "challenge_mismatch",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: challenge.user_id,
+      });
 
       return new Response(
         JSON.stringify({
@@ -151,12 +141,15 @@ export async function onRequestPost(context) {
     }
 
     if (Number(challenge.is_active) === 0) {
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'mfa', 0, 'account_disabled')`
-      )
-        .bind(challenge.user_id, challenge.email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.mfa,
+        email: challenge.email,
+        failureReason: "account_disabled",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: challenge.user_id,
+      });
 
       return new Response(
         JSON.stringify({
@@ -170,7 +163,12 @@ export async function onRequestPost(context) {
       );
     }
 
-    const rateCheck = await checkRateLimit(DB, challenge.user_id, ipAddress);
+    const rateCheck = await checkAuthRateLimit(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfa,
+      ipAddress,
+      scope: "user-and-ip",
+      userId: challenge.user_id,
+    });
     if (!rateCheck.allowed) {
       return new Response(
         JSON.stringify({
@@ -208,12 +206,15 @@ export async function onRequestPost(context) {
     }
 
     if (!verified) {
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'mfa', 0, 'invalid_code')`
-      )
-        .bind(challenge.user_id, challenge.email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.mfa,
+        email: challenge.email,
+        failureReason: "invalid_code",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: challenge.user_id,
+      });
 
       return new Response(
         JSON.stringify({
@@ -279,12 +280,14 @@ export async function onRequestPost(context) {
         .run();
     }
 
-    await DB.prepare(
-      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-       VALUES (?, ?, ?, ?, 'mfa', 1)`
-    )
-      .bind(challenge.user_id, challenge.email, ipAddress, userAgent)
-      .run();
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfa,
+      email: challenge.email,
+      ipAddress,
+      success: true,
+      userAgent,
+      userId: challenge.user_id,
+    });
 
     const csrfToken = generateCSRFToken(request, env, session.id);
     const headers = new Headers({

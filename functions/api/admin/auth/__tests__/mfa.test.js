@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import { hashPassword } from "../../../../utils/crypto.js";
 import { generateTotpCode, generateTotpSecret } from "../../../../utils/totp.js";
+import { AUTH_ATTEMPT_TYPES } from "../../../../utils/authAttempts.js";
 import * as loginHandler from "../login.js";
 import * as mfaVerifyHandler from "../mfa/verify.js";
 
@@ -82,5 +83,46 @@ describe("admin mfa", () => {
       .prepare("SELECT used FROM mfa_challenges WHERE token = ?")
       .get(mfaToken);
     expect(challenge.used).toBe(1);
+  });
+
+  it("rate limits invalid or expired MFA tokens by IP before challenge lookup", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+
+    rawDb.prepare(
+      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(null, null, "127.0.0.1", "test-agent", AUTH_ATTEMPT_TYPES.mfa, 0, "invalid_or_expired_token");
+    rawDb.prepare(
+      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(null, null, "127.0.0.1", "test-agent", AUTH_ATTEMPT_TYPES.mfa, 0, "invalid_or_expired_token");
+    rawDb.prepare(
+      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(null, null, "127.0.0.1", "test-agent", AUTH_ATTEMPT_TYPES.mfa, 0, "invalid_or_expired_token");
+    rawDb.prepare(
+      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(null, null, "127.0.0.1", "test-agent", AUTH_ATTEMPT_TYPES.mfa, 0, "invalid_or_expired_token");
+    rawDb.prepare(
+      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(null, null, "127.0.0.1", "test-agent", AUTH_ATTEMPT_TYPES.mfa, 0, "invalid_or_expired_token");
+
+    const request = new Request(
+      "https://example.test/api/admin/auth/mfa/verify",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "CF-Connecting-IP": "127.0.0.1",
+          "User-Agent": "test-agent",
+        },
+        body: JSON.stringify({ mfaToken: "invalid-token", code: "123456" }),
+      }
+    );
+
+    const response = await mfaVerifyHandler.onRequestPost({ request, env });
+    expect(response.status).toBe(429);
   });
 });

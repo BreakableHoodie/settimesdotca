@@ -140,6 +140,11 @@ describe("admin mfa settings", () => {
     });
     expect(disableRes.status).toBe(200);
 
+    const disableAttempt = rawDb
+      .prepare("SELECT success FROM auth_attempts WHERE user_id = ? AND attempt_type = ? ORDER BY id DESC LIMIT 1")
+      .get(1, "mfa_disable");
+    expect(disableAttempt.success).toBe(1);
+
     const user = rawDb
       .prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = 1")
       .get();

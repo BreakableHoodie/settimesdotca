@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import { Button, Card } from '../components/ui'
 import RoleBadge from './components/RoleBadge'
+import { trustedDevicesApi } from '../utils/adminApi'
 
 /**
  * Returns a short human-readable label for a user-agent string.
@@ -41,9 +42,7 @@ export default function UserSettings({ user, onOpenMfa }) {
     setDevicesLoading(true)
     setDevicesError(null)
     try {
-      const res = await fetch('/api/admin/trusted-devices', { credentials: 'include' })
-      if (!res.ok) throw new Error('Failed to load trusted devices')
-      const data = await res.json()
+      const data = await trustedDevicesApi.list()
       setDevices(data.devices || [])
     } catch (err) {
       setDevicesError(err.message)
@@ -59,13 +58,7 @@ export default function UserSettings({ user, onOpenMfa }) {
   const handleRevoke = async deviceId => {
     setRevoking(deviceId)
     try {
-      const res = await fetch('/api/admin/trusted-devices', {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId }),
-      })
-      if (!res.ok) throw new Error('Failed to revoke device')
+      await trustedDevicesApi.revoke(deviceId)
       setDevices(prev => prev.filter(d => d.id !== deviceId))
     } catch (err) {
       setDevicesError(err.message)

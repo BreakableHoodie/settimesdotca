@@ -67,7 +67,7 @@ export async function onRequestDelete(context) {
       .bind(Number(deviceId))
       .first();
 
-    if (!device || device.user_id !== user.userId) {
+    if (!device || Number(device.user_id) !== Number(user.userId)) {
       return new Response(JSON.stringify({ error: "Device not found" }), {
         status: 404,
         headers: { "Content-Type": "application/json" },

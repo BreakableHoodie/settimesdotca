@@ -18,9 +18,13 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT,
   city TEXT,
   ticket_url TEXT,
+  venue_info TEXT,
+  social_links TEXT,
+  theme_colors TEXT,
   created_by_user_id INTEGER,
   updated_by_user_id INTEGER,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Venues table
@@ -228,14 +232,17 @@ CREATE INDEX IF NOT EXISTS idx_mfa_challenges_user_id ON mfa_challenges(user_id)
 -- Invite codes
 CREATE TABLE IF NOT EXISTS invite_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT UNIQUE NOT NULL,
-  created_by INTEGER,
-  used_by INTEGER,
-  used_at TEXT,
-  expires_at TEXT,
+  code TEXT NOT NULL UNIQUE,
+  email TEXT,
+  role TEXT NOT NULL DEFAULT 'editor',
+  created_by_user_id INTEGER,
+  used_by_user_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (used_by) REFERENCES users(id) ON DELETE SET NULL
+  used_at TEXT,
+  expires_at TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (used_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ============================================

@@ -4,7 +4,8 @@ test.describe('Public Timeline Viewing', () => {
   test('should display upcoming events without authentication', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: /events/i })).toBeVisible();
+    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');
     await expect(eventCards.first()).toBeVisible();
@@ -16,6 +17,10 @@ test.describe('Public Timeline Viewing', () => {
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
+    // Verify the card expanded (button flips to Hide Details)
+    await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
+
+    // Seed data guarantees the upcoming event has venues
     await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
   });
 
@@ -34,6 +39,9 @@ test.describe('Public Timeline Viewing', () => {
 
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
+
+    // Seed data guarantees the upcoming event has venues
+    await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
     await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
   });
 
@@ -42,6 +50,9 @@ test.describe('Public Timeline Viewing', () => {
 
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
+
+    // Seed data guarantees the upcoming event has performers
+    await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
     await expect(firstEvent.getByRole('heading', { name: /all performers/i })).toBeVisible();
   });
 
@@ -70,7 +81,8 @@ test.describe('Public Timeline Viewing', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: /events/i })).toBeVisible();
+    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');
     await expect(eventCards.first()).toBeVisible();
@@ -114,7 +126,8 @@ test.describe('Public Timeline Viewing', () => {
     await expect(page).not.toHaveURL(/\/admin\/login/);
     await expect(page).not.toHaveURL(/\/login/);
 
-    await expect(page.getByRole('heading', { name: /events/i })).toBeVisible();
+    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');
     await expect(eventCards.first()).toBeVisible();
@@ -125,6 +138,9 @@ test.describe('Public Timeline Viewing', () => {
 
     const firstEvent = page.locator('[data-testid="event-card"]').first();
     await firstEvent.getByRole('button', { name: /view details/i }).click();
+
+    // Seed data guarantees the upcoming event has venues
+    await expect(firstEvent.getByRole('button', { name: /hide details/i })).toBeVisible();
     await expect(firstEvent.getByRole('heading', { name: /venues/i })).toBeVisible();
   });
 });

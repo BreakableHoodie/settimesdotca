@@ -267,6 +267,13 @@ export function createTestDB() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     );
+
+    CREATE TABLE rate_limits (
+      key TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      window_start INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   const insertUser = db.prepare(

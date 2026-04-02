@@ -50,6 +50,22 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
       )
       .run();
 
+    // Stale rate_limits row (updated >30 min ago)
+    const staleUpdatedAt = Math.floor(Date.now() / 1000) - 2000;
+    rawDb
+      .prepare(
+        "INSERT INTO rate_limits (key, count, window_start, updated_at) VALUES (?, 5, ?, ?)",
+      )
+      .run("1.2.3.4:/api/auth", staleUpdatedAt, staleUpdatedAt);
+
+    // Recent rate_limits row — should survive
+    const recentUpdatedAt = Math.floor(Date.now() / 1000) - 60;
+    rawDb
+      .prepare(
+        "INSERT INTO rate_limits (key, count, window_start, updated_at) VALUES (?, 1, ?, ?)",
+      )
+      .run("5.6.7.8:/api/auth", recentUpdatedAt, recentUpdatedAt);
+
     const request = new Request(
       "https://example.test/api/admin/maintenance/cleanup-sessions",
       { method: "POST", headers },
@@ -63,6 +79,7 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
     expect(payload.sessions_deleted).toBe(1);
     expect(payload.auth_audit_deleted).toBe(1);
     expect(payload.audit_log_deleted).toBe(1);
+    expect(payload.rate_limits_deleted).toBe(1);
 
     // Active rows must survive
     expect(rawDb.prepare("SELECT COUNT(*) as c FROM lucia_sessions WHERE id = ?").get("active-token").c).toBe(1);

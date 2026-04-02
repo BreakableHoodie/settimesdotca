@@ -5,12 +5,14 @@
 //   auth_attempts:   30 days  (rate-limit counters; contains IPs/emails)
 //   auth_audit:      90 days  (short-lived security telemetry; contains IPs)
 //   audit_log:       1 year   (admin action history; longer legitimate interest)
+//   rate_limits:     2× max window (30 min) — stale fixed-window counters; uses
+//                    unixepoch() because the column stores integer seconds
 
 export async function runRetentionCleanup(env) {
   const { DB } = env;
   const nowUnix = Math.floor(Date.now() / 1000);
 
-  const [sessions, authAttempts, authAudit, adminAudit] = await Promise.all([
+  const [sessions, authAttempts, authAudit, adminAudit, rateLimits] = await Promise.all([
     DB.prepare("DELETE FROM lucia_sessions WHERE expires_at < ?")
       .bind(nowUnix)
       .run(),
@@ -20,6 +22,8 @@ export async function runRetentionCleanup(env) {
       .run(),
     DB.prepare("DELETE FROM audit_log WHERE created_at < datetime('now', '-1 year')")
       .run(),
+    DB.prepare("DELETE FROM rate_limits WHERE updated_at < unixepoch() - 1800")
+      .run(),
   ]);
 
   return {
@@ -27,5 +31,6 @@ export async function runRetentionCleanup(env) {
     auth_attempts_deleted: authAttempts.meta.changes,
     auth_audit_deleted: authAudit.meta.changes,
     audit_log_deleted: adminAudit.meta.changes,
+    rate_limits_deleted: rateLimits.meta.changes,
   };
 }

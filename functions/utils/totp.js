@@ -66,14 +66,23 @@ export async function verifyTotp(secret, code, window = 1) {
 }
 
 export function generateBackupCodes(count = DEFAULT_BACKUP_CODE_COUNT) {
+  const CHARSET_SIZE = 36; // 0-9a-z
+  // Reject bytes >= this threshold to eliminate modulo bias (256 = 7×36 + 4).
+  const UNBIASED_LIMIT = Math.floor(256 / CHARSET_SIZE) * CHARSET_SIZE; // 252
   const codes = [];
+
   for (let i = 0; i < count; i += 1) {
-    const bytes = new Uint8Array(6);
-    crypto.getRandomValues(bytes);
-    const code = Array.from(bytes)
-      .map(byte => (byte % 36).toString(36))
-      .join("")
-      .toUpperCase();
+    const chars = [];
+    while (chars.length < 6) {
+      const bytes = new Uint8Array(6);
+      crypto.getRandomValues(bytes);
+      for (const byte of bytes) {
+        if (byte < UNBIASED_LIMIT && chars.length < 6) {
+          chars.push((byte % CHARSET_SIZE).toString(36));
+        }
+      }
+    }
+    const code = chars.join("").toUpperCase();
     codes.push(`${code.slice(0, 4)}-${code.slice(4)}`);
   }
   return codes;
@@ -95,21 +104,19 @@ export async function verifyBackupCode(code, hashedCodes = []) {
   let index = -1;
 
   const timingSafeEqual = (a, b) => {
-    if (a.length !== b.length) {
-      return false;
-    }
-
-    let diff = 0;
-    for (let i = 0; i < a.length; i += 1) {
-      diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    // Include length inequality in diff to prevent timing oracle on hash length.
+    const maxLen = Math.max(a.length, b.length);
+    let diff = a.length ^ b.length;
+    for (let i = 0; i < maxLen; i += 1) {
+      diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
     }
     return diff === 0;
   };
 
+  // Iterate all codes without early exit to prevent position-based timing leaks.
   for (let i = 0; i < hashedCodes.length; i += 1) {
     if (timingSafeEqual(hashed, String(hashedCodes[i] || ""))) {
       index = i;
-      break;
     }
   }
 

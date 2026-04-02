@@ -2,7 +2,6 @@
 
 const TRUSTED_DEVICE_COOKIE_NAME = "trusted_device";
 const TRUSTED_DEVICE_EXPIRY_DAYS = 30;
-const SHA256_HEX_REGEX = /^[0-9a-f]{64}$/i;
 
 /**
  * Hash a string using SHA-256, returning hex
@@ -18,10 +17,11 @@ async function sha256Hex(input) {
  * Constant-time string comparison to prevent timing attacks
  */
 function timingSafeStringEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  // Include length inequality in diff to prevent timing oracle on hash length.
+  const maxLen = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < maxLen; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   }
   return diff === 0;
 }
@@ -53,9 +53,6 @@ async function hashTrustedDeviceToken(token) {
   return sha256Hex(token);
 }
 
-function looksLikeStoredTokenHash(token) {
-  return typeof token === "string" && SHA256_HEX_REGEX.test(token);
-}
 
 /**
  * Create a trusted device entry in the database
@@ -88,7 +85,7 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
 
   const tokenHash = await hashTrustedDeviceToken(token);
 
-  let device = await DB.prepare(
+  const device = await DB.prepare(
     `SELECT id, user_id, token, device_fingerprint, ua_hash, ip_address, expires_at
      FROM trusted_devices
      WHERE token = ? AND expires_at > datetime('now')`
@@ -96,26 +93,7 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
     .bind(tokenHash)
     .first();
 
-  const canUseLegacyRawTokenFallback = !looksLikeStoredTokenHash(token);
-  if (!device && canUseLegacyRawTokenFallback) {
-    device = await DB.prepare(
-      `SELECT id, user_id, token, device_fingerprint, ua_hash, ip_address, expires_at
-       FROM trusted_devices
-       WHERE token = ? AND expires_at > datetime('now')`
-    )
-      .bind(token)
-      .first();
-  }
-
   if (!device) return null;
-
-  if (canUseLegacyRawTokenFallback && device.token === token) {
-    await DB.prepare(
-      `UPDATE trusted_devices SET token = ? WHERE id = ?`
-    )
-      .bind(tokenHash, device.id)
-      .run();
-  }
 
   // Validate IP and UA independently using constant-time comparison
   const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
@@ -161,12 +139,6 @@ export async function revokeTrustedDevice(DB, token) {
   await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`)
     .bind(tokenHash)
     .run();
-
-  if (!looksLikeStoredTokenHash(token)) {
-    await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`)
-      .bind(token)
-      .run();
-  }
 }
 
 /**

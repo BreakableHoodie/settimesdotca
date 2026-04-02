@@ -37,7 +37,9 @@ export function initializeLucia(DB, request = null, env = null) {
 
   return new Lucia(adapter, {
     sessionCookie: {
-      name: "session_token",
+      // __Host- prefix enforces Secure + Path=/ + no Domain at the browser level,
+      // preventing subdomain cookie injection. Not valid for HTTP (dev).
+      name: isDev ? "session_token" : "__Host-session_token",
       expires: false,
       attributes: {
         secure: !isDev,

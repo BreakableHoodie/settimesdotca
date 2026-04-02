@@ -42,37 +42,33 @@ test.describe('User Management', () => {
 
   test('should allow admin to create a new user', async ({ page }) => {
     const suffix = uniqueSuffix();
-    const name = `Test User ${suffix}`;
+    const firstName = 'Test';
+    const lastName = `User ${suffix}`;
     const email = `testuser${suffix}@example.com`;
     await openUsersTab(page);
     await page.click('button:has-text("Invite User")');
 
     await waitForCreateUserForm(page);
 
-    await page.fill('#name', name);
+    await page.fill('#firstName', firstName);
+    await page.fill('#lastName', lastName);
     await page.fill('#email', email);
-    await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'editor');
 
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
-
-    await page.reload();
-    await openUsersTab(page);
-    const row = page.locator('table tbody tr', { hasText: email }).first();
-    await expect(row).toBeVisible({ timeout: 15000 });
-    await expect(row).toContainText(name);
-    await expect(row).toContainText(/editor/i);
+    // Invite flow: creates an invite code, not a user row.
+    // The user appears in the table only after they complete signup via the invite link.
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
   });
 
   test('should validate required user fields', async ({ page }) => {
     await openUsersTab(page);
     await page.click('button:has-text("Invite User")');
 
-    await page.click('button[type="submit"]:has-text("Create User")');
+    await page.click('button[type="submit"]:has-text("Send Invite")');
 
     await expect(page.getByText('Email is required')).toBeVisible();
-    await expect(page.getByText('Display name is required')).toBeVisible();
-    await expect(page.getByText('Password is required')).toBeVisible();
+    await expect(page.getByText('First name is required')).toBeVisible();
+    await expect(page.getByText('Last name is required')).toBeVisible();
   });
 
   test.skip('should validate password confirmation match', async ({ page }) => {
@@ -82,70 +78,48 @@ test.describe('User Management', () => {
 
   test('should allow admin to assign different user roles', async ({ page }) => {
     const adminSuffix = uniqueSuffix();
-    const adminName = `Admin User ${adminSuffix}`;
     const adminEmail = `adminuser${adminSuffix}@example.com`;
     const viewerSuffix = uniqueSuffix();
-    const viewerName = `Viewer User ${viewerSuffix}`;
     const viewerEmail = `vieweruser${viewerSuffix}@example.com`;
     await openUsersTab(page);
 
+    // Invite admin-role user
     await page.click('button:has-text("Invite User")');
     await waitForCreateUserForm(page);
-    await page.fill('#name', adminName);
+    await page.fill('#firstName', 'Admin');
+    await page.fill('#lastName', `User ${adminSuffix}`);
     await page.fill('#email', adminEmail);
-    await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'admin');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
 
-    await page.reload();
-    await openUsersTab(page);
-    const adminRow = page.locator('table tbody tr', { hasText: adminEmail }).first();
-    await expect(adminRow).toBeVisible({ timeout: 15000 });
-    await expect(adminRow).toContainText(adminName);
-    await expect(adminRow).toContainText(/admin/i);
-
+    // Invite viewer-role user
     await page.click('button:has-text("Invite User")');
     await waitForCreateUserForm(page);
-    await page.fill('#name', viewerName);
+    await page.fill('#firstName', 'Viewer');
+    await page.fill('#lastName', `User ${viewerSuffix}`);
     await page.fill('#email', viewerEmail);
-    await page.fill('#password', 'Password1234!');
     await page.selectOption('#role', 'viewer');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
-
-    await page.reload();
-    await openUsersTab(page);
-    const viewerRow = page.locator('table tbody tr', { hasText: viewerEmail }).first();
-    await expect(viewerRow).toBeVisible({ timeout: 15000 });
-    await expect(viewerRow).toContainText(viewerName);
-    await expect(viewerRow).toContainText(/viewer/i);
+    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
   });
 
   test('should allow admin to edit user details', async ({ page }) => {
-    const suffix = uniqueSuffix();
-    const name = `Editable User ${suffix}`;
-    const email = `edituser${suffix}@example.com`;
-    const updatedName = `Updated User ${suffix}`;
+    // Use the seeded viewer user — invite flow does not create a user row until
+    // the invitee completes signup, so we edit an already-existing account.
+    const email = 'viewer@settimes.ca';
+    const updatedFirstName = 'Updated';
+    const updatedLastName = 'ViewUser';
     await openUsersTab(page);
 
-    await page.click('button:has-text("Invite User")');
-    await waitForCreateUserForm(page);
-    await page.fill('#name', name);
-    await page.fill('#email', email);
-    await page.fill('#password', 'Password1234!');
-    await page.selectOption('#role', 'editor');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Create User")', /invite (sent|created)/i);
-
-    await page.reload();
-    await openUsersTab(page);
     const editRow = page.locator('table tbody tr', { hasText: email }).first();
     await expect(editRow).toBeVisible({ timeout: 15000 });
     await editRow.locator('button[title="Edit User"]').click();
     await waitForEditUserForm(page, email);
 
-    await page.fill('#name', updatedName);
+    await page.fill('#firstName', updatedFirstName);
+    await page.fill('#lastName', updatedLastName);
     await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Update User")', /updated successfully/i);
 
     const updatedRow = page.locator('table tbody tr', { hasText: email }).first();
-    await expect(updatedRow).toContainText(updatedName);
+    await expect(updatedRow).toContainText(`${updatedFirstName} ${updatedLastName}`);
   });
 });

@@ -5,7 +5,7 @@ import {
   rateLimitResponse,
 } from '../rateLimit.js';
 
-// Mock the caches global
+// Mock the caches global (Cache API, used for non-sensitive endpoints)
 const mockCache = {
   match: vi.fn(),
   put: vi.fn(),
@@ -15,6 +15,20 @@ global.caches = {
   default: mockCache,
 };
 
+// Mock D1 database (used for fail-closed endpoints: /api/auth/*, /api/subscriptions)
+function makeMockDB({ count = 1, window_start = null } = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const row = { count, window_start: window_start ?? now };
+  return {
+    prepare: vi.fn().mockReturnValue({
+      bind: vi.fn().mockReturnValue({
+        run: vi.fn().mockResolvedValue({}),
+        first: vi.fn().mockResolvedValue(row),
+      }),
+    }),
+  };
+}
+
 describe('Rate Limiting', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -22,7 +36,7 @@ describe('Rate Limiting', () => {
     mockCache.put.mockResolvedValue(undefined);
   });
 
-  describe('checkRateLimit', () => {
+  describe('checkRateLimit — Cache API path (non-sensitive endpoints)', () => {
     it('should allow requests under the limit', async () => {
       const request = new Request('https://example.com/api/events', {
         headers: { 'CF-Connecting-IP': '1.2.3.4' },
@@ -85,18 +99,19 @@ describe('Rate Limiting', () => {
       expect(result.remaining).toBe(59); // Window reset, so 60 - 1
     });
 
-    it('should use different limits for different endpoints', async () => {
-      const subscriptionRequest = new Request('https://example.com/api/subscriptions', {
+    it('should fall back to Cache API for subscriptions when DB is unavailable', async () => {
+      // No env.DB provided — falls back to Cache API (local dev)
+      const request = new Request('https://example.com/api/subscriptions', {
         headers: { 'CF-Connecting-IP': '1.2.3.4' },
       });
 
-      const result = await checkRateLimit(subscriptionRequest);
+      const result = await checkRateLimit(request);
 
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(9); // 10 - 1 for subscriptions
     });
 
-    it('should fail open if cache errors', async () => {
+    it('should fail open if Cache API errors (non-sensitive endpoint)', async () => {
       mockCache.match.mockRejectedValue(new Error('Cache error'));
 
       const request = new Request('https://example.com/api/events', {
@@ -106,6 +121,82 @@ describe('Rate Limiting', () => {
       const result = await checkRateLimit(request);
 
       expect(result.allowed).toBe(true);
+    });
+  });
+
+  describe('checkRateLimit — D1 path (fail-closed endpoints)', () => {
+    it('should allow auth requests under the limit using D1', async () => {
+      const db = makeMockDB({ count: 3 }); // well under the limit
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/auth/activate', {
+        headers: { 'CF-Connecting-IP': '1.2.3.4' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(7); // 10 - 3
+      expect(db.prepare).toHaveBeenCalled();
+    });
+
+    it('should block auth requests over the limit using D1', async () => {
+      const db = makeMockDB({ count: 11 }); // over the 10-req/min limit
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/auth/activate', {
+        headers: { 'CF-Connecting-IP': '1.2.3.4' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(false);
+      expect(result.remaining).toBe(0);
+    });
+
+    it('should allow subscription requests under the limit using D1', async () => {
+      const db = makeMockDB({ count: 1 });
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/subscriptions', {
+        headers: { 'CF-Connecting-IP': '1.2.3.4' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(9); // 10 - 1
+    });
+
+    it('should fail closed when D1 throws on a sensitive endpoint', async () => {
+      const db = {
+        prepare: vi.fn().mockReturnValue({
+          bind: vi.fn().mockReturnValue({
+            run: vi.fn().mockRejectedValue(new Error('D1 error')),
+            first: vi.fn().mockResolvedValue(null),
+          }),
+        }),
+      };
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/auth/activate', {
+        headers: { 'CF-Connecting-IP': '1.2.3.4' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(false); // fail closed for security endpoints
+    });
+
+    it('should not use D1 for non-sensitive endpoints even when env.DB is available', async () => {
+      const db = makeMockDB({ count: 1 });
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/events', {
+        headers: { 'CF-Connecting-IP': '1.2.3.4' },
+      });
+
+      await checkRateLimit(request, env);
+
+      // D1 should NOT be called for /api/events
+      expect(db.prepare).not.toHaveBeenCalled();
+      // Cache API should be used instead
+      expect(mockCache.match).toHaveBeenCalled();
     });
   });
 

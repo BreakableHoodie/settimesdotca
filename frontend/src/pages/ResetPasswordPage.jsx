@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import PasswordStrength from '../components/PasswordStrength'
 import { validatePasswordStrength, FIELD_LIMITS } from '../utils/validation'
 
 export default function ResetPasswordPage() {
-  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const token = searchParams.get('token')
+  // Read the token from the URL hash fragment (#token=...) rather than the query
+  // string so it is never sent to the server, never logged in access logs, and
+  // never stored in browser history or leaked via Referer.
+  const token = new URLSearchParams(window.location.hash.slice(1)).get('token')
 
   const [formData, setFormData] = useState({
     newPassword: '',
@@ -26,8 +28,12 @@ export default function ResetPasswordPage() {
       return
     }
 
-    // Verify reset token
-    fetch(`/api/auth/reset-password?token=${token}`)
+    // Verify reset token via POST so the token is never in the URL query string
+    fetch('/api/auth/reset-password/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
         if (response.ok && data.valid) {

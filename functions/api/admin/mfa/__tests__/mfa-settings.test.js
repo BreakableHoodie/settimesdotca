@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import { generateTotpCode } from "../../../../utils/totp.js";
+import { AUTH_ATTEMPT_TYPES } from "../../../../utils/authAttempts.js";
 import * as mfaStatusHandler from "../status.js";
 import * as mfaSetupHandler from "../setup.js";
 import * as mfaEnableHandler from "../enable.js";
@@ -142,7 +143,7 @@ describe("admin mfa settings", () => {
 
     const disableAttempt = rawDb
       .prepare("SELECT success FROM auth_attempts WHERE user_id = ? AND attempt_type = ? ORDER BY id DESC LIMIT 1")
-      .get(1, "mfa_disable");
+      .get(1, AUTH_ATTEMPT_TYPES.mfaDisable);
     expect(disableAttempt.success).toBe(1);
 
     const user = rawDb

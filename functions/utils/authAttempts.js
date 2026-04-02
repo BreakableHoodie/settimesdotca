@@ -88,7 +88,7 @@ export async function checkAuthRateLimit(DB, {
 
   if (Number(attempts.count) >= maxFailures) {
     const earliestTs = attempts.earliest_attempt
-      ? new Date(attempts.earliest_attempt).getTime()
+      ? new Date(attempts.earliest_attempt.replace(' ', 'T') + 'Z').getTime()
       : Date.now();
     const elapsed = Date.now() - earliestTs;
     const remainingMs = Math.max(0, windowMs - elapsed);

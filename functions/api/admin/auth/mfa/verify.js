@@ -46,24 +46,6 @@ export async function onRequestPost(context) {
       );
     }
 
-    const invalidTokenRateCheck = await checkAuthRateLimit(DB, {
-      attemptType: AUTH_ATTEMPT_TYPES.mfa,
-      ipAddress,
-      scope: "ip",
-    });
-    if (!invalidTokenRateCheck.allowed) {
-      return new Response(
-        JSON.stringify({
-          error: "Too many attempts",
-          message: `Too many failed MFA attempts. Please try again in ${invalidTokenRateCheck.remainingMinutes} minutes.`,
-        }),
-        {
-          status: 429,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
     const challenge = await DB.prepare(
       `
       SELECT c.id as challenge_id,
@@ -86,6 +68,24 @@ export async function onRequestPost(context) {
       .first();
 
     if (!challenge) {
+      const invalidTokenRateCheck = await checkAuthRateLimit(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.mfa,
+        ipAddress,
+        scope: "ip",
+      });
+      if (!invalidTokenRateCheck.allowed) {
+        return new Response(
+          JSON.stringify({
+            error: "Too many attempts",
+            message: `Too many failed MFA attempts. Please try again in ${invalidTokenRateCheck.remainingMinutes} minutes.`,
+          }),
+          {
+            status: 429,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
       await writeAuthAttempt(DB, {
         attemptType: AUTH_ATTEMPT_TYPES.mfa,
         failureReason: "invalid_or_expired_token",

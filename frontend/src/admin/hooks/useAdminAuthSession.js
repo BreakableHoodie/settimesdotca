@@ -19,9 +19,8 @@ function clearIntervalRef(ref) {
 }
 
 export function useAdminAuthSession() {
-  const initialUser = authApi.getCurrentUser()
-  const [currentUser, setCurrentUser] = useState(initialUser)
-  const [isAuthenticated, setIsAuthenticated] = useState(Boolean(initialUser))
+  const [currentUser, setCurrentUser] = useState(() => authApi.getCurrentUser())
+  const [isAuthenticated, setIsAuthenticated] = useState(Boolean(currentUser))
   const [checking, setChecking] = useState(true)
   const [showIdleWarning, setShowIdleWarning] = useState(false)
   const [idleCountdownSeconds, setIdleCountdownSeconds] = useState(0)

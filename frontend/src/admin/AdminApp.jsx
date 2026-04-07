@@ -58,7 +58,7 @@ export default function AdminApp() {
           element={
             isAuthenticated ? (
               <EventProvider>
-                <AdminPanel currentUser={currentUser} onLogout={() => logout()} />
+                <AdminPanel currentUser={currentUser} onLogout={logout} />
               </EventProvider>
             ) : (
               <Navigate to="/admin/login" replace />

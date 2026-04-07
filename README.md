@@ -123,7 +123,7 @@ wrangler d1 create settimes-db
 # Update wrangler.toml with database_id from output
 
 # Apply migrations to local database (run all numbered migrations in order)
-for f in migrations/[0-9]*.sql; do
+for f in $(ls migrations/[0-9]*.sql | sort); do
   npx wrangler d1 execute settimes-db --local --file="$f"
 done
 
@@ -131,7 +131,7 @@ done
 ./scripts/run-migrate-schedule-builds-performance-id.sh --local
 
 # Apply to production database
-for f in migrations/[0-9]*.sql; do
+for f in $(ls migrations/[0-9]*.sql | sort); do
   npx wrangler d1 execute settimes-db --remote --file="$f"
 done
 

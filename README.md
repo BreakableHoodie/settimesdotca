@@ -122,21 +122,17 @@ wrangler d1 create settimes-db
 
 # Update wrangler.toml with database_id from output
 
-# Apply migrations to local database (run all numbered migrations in order)
-for f in $(ls migrations/[0-9]*.sql | sort); do
+# Apply schema to local database (single file, includes all tables)
+npx wrangler d1 execute settimes-db --local --file=database/setup-complete.sql
+
+# Apply numbered migrations in order (skip 0002 — it drops tables recreated by setup-complete.sql)
+for f in $(ls migrations/[0-9]*.sql | sort | grep -v 0002_); do
   npx wrangler d1 execute settimes-db --local --file="$f"
 done
 
-# One-off upgrade (only if schedule_builds has band_id, not performance_id)
-./scripts/run-migrate-schedule-builds-performance-id.sh --local
-
 # Apply to production database
-for f in $(ls migrations/[0-9]*.sql | sort); do
-  npx wrangler d1 execute settimes-db --remote --file="$f"
-done
-
-# One-off upgrade (only if schedule_builds has band_id, not performance_id)
-./scripts/run-migrate-schedule-builds-performance-id.sh --remote
+npx wrangler d1 execute settimes-db --remote --file=database/setup-complete.sql
+# ... repeat the migration loop above with --remote instead of --local
 
 # Create first admin invite code
 node scripts/create-admin-invite.js --local  # For local dev

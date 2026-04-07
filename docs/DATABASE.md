@@ -11,8 +11,9 @@ The SetTimes database supports **multi-event management** with a **band profile 
 
 ## Source of Truth
 
-- **Canonical schema:** `database/schema-final.sql`
-- **Active migrations:** `migrations/` (numbered `0001`–`0030`; run in order)
+- **Canonical schema:** `database/setup-complete.sql`
+- **Active migrations:** `migrations/` (numbered `0001_`–`0030_`; add new ones as `0031_`, `0032_`, etc.)
+- **Note:** `0002_migration-single-org.sql` is a one-time transition migration and must be skipped when applying to a fresh database initialised from `setup-complete.sql`
 
 ### Key Features
 
@@ -597,18 +598,18 @@ npx wrangler d1 execute settimes-db --file=database/schema.sql --remote
 
 ### Future Migrations
 
-For schema changes, create timestamped migration files:
+For schema changes, create sequentially numbered migration files:
 
 ```bash
 migrations/
-  0031_add_band_genre.sql           # Future: Add genre field
-  0032_add_event_description.sql    # Future: Add event description
+  0031_add_band_genre.sql          # Next migration
+  0032_add_event_description.sql   # Following migration
 ```
 
 **Migration Pattern:**
 
 ```sql
--- 002_add_band_genre.sql
+-- 0031_add_band_genre.sql
 ALTER TABLE bands ADD COLUMN genre TEXT;
 CREATE INDEX idx_bands_genre ON bands(genre);
 ```

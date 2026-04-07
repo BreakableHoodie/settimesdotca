@@ -48,7 +48,11 @@ function refreshCSRFHeader(headers) {
 
 function notifyUnauthorized() {
   authStateSubscribers.forEach(subscriber => {
-    subscriber.onUnauthorized?.()
+    try {
+      subscriber.onUnauthorized?.()
+    } catch (err) {
+      console.error('[adminApi] onUnauthorized subscriber threw:', err)
+    }
   })
 }
 
@@ -84,7 +88,11 @@ function notifySessionTiming(response) {
   if (!timing) return
 
   authStateSubscribers.forEach(subscriber => {
-    subscriber.onSessionTiming?.(timing)
+    try {
+      subscriber.onSessionTiming?.(timing)
+    } catch (err) {
+      console.error('[adminApi] onSessionTiming subscriber threw:', err)
+    }
   })
 }
 

@@ -1,6 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAdminAuthSession } from '../useAdminAuthSession'
+
+const WARNING_LEAD_MS = 5 * 60 * 1000
 
 const adminApiMocks = vi.hoisted(() => {
   const authApi = {
@@ -96,5 +98,93 @@ describe('useAdminAuthSession', () => {
     expect(adminApiMocks.authApi.logout).toHaveBeenCalledTimes(1)
     expect(result.current.isAuthenticated).toBe(false)
     expect(result.current.currentUser).toBeNull()
+  })
+
+  describe('timer behavior', () => {
+    beforeEach(() => {
+      adminApiMocks.authApi.verifySession.mockResolvedValue({
+        user: { email: 'admin@test', firstName: 'Admin', lastName: 'User', role: 'admin' },
+      })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('schedules the idle warning after timeRemaining minus WARNING_LEAD_MS elapses', async () => {
+      const { result } = renderHook(() => useAdminAuthSession())
+      await waitFor(() => expect(result.current.checking).toBe(false))
+
+      vi.useFakeTimers({ now: Date.now() })
+
+      act(() => {
+        adminApiMocks.getSubscriber()?.onSessionTiming({
+          absoluteRemainingSeconds: 600,
+          idleRemainingSeconds: 600,
+          timeRemainingSeconds: 600,
+          warning: false,
+        })
+      })
+
+      expect(result.current.showIdleWarning).toBe(false)
+
+      act(() => {
+        vi.advanceTimersByTime(600 * 1000 - WARNING_LEAD_MS)
+      })
+
+      expect(result.current.showIdleWarning).toBe(true)
+      expect(result.current.idleCountdownSeconds).toBe(300)
+    })
+
+    it('auto-logs out when the session timer elapses', async () => {
+      const { result } = renderHook(() => useAdminAuthSession())
+      await waitFor(() => expect(result.current.checking).toBe(false))
+
+      vi.useFakeTimers({ now: Date.now() })
+
+      act(() => {
+        adminApiMocks.getSubscriber()?.onSessionTiming({
+          absoluteRemainingSeconds: 30,
+          idleRemainingSeconds: 30,
+          timeRemainingSeconds: 30,
+          warning: false,
+        })
+      })
+
+      await act(async () => {
+        vi.advanceTimersByTime(30 * 1000)
+      })
+
+      expect(adminApiMocks.authApi.logout).toHaveBeenCalledTimes(1)
+      expect(result.current.isAuthenticated).toBe(false)
+    })
+
+    it('throttles verifySession calls within KEEP_ALIVE_MIN_INTERVAL_MS', async () => {
+      renderHook(() => useAdminAuthSession())
+      await waitFor(() => expect(adminApiMocks.authApi.verifySession).toHaveBeenCalledTimes(1))
+
+      vi.useFakeTimers({ now: Date.now() })
+
+      // rapid activity — both calls fall within the throttle window set during bootstrap
+      act(() => {
+        window.dispatchEvent(new Event('mousemove'))
+        window.dispatchEvent(new Event('mousemove'))
+      })
+      await act(async () => {})
+
+      expect(adminApiMocks.authApi.verifySession).toHaveBeenCalledTimes(1)
+
+      // advance past the throttle window, then fire another event
+      act(() => {
+        vi.advanceTimersByTime(2 * 60 * 1000 + 1)
+      })
+
+      act(() => {
+        window.dispatchEvent(new Event('mousemove'))
+      })
+      await act(async () => {})
+
+      expect(adminApiMocks.authApi.verifySession).toHaveBeenCalledTimes(2)
+    })
   })
 })

@@ -142,7 +142,7 @@ async function enforceSession(request, env) {
   return {
     result,
     pendingCookie: session.fresh ? lucia.createSessionCookie(session.id).serialize() : null,
-      timing: refreshedTiming,
+    timing: refreshedTiming,
   };
 }
 

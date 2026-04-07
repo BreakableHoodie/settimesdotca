@@ -12,8 +12,7 @@ The SetTimes database supports **multi-event management** with a **band profile 
 ## Source of Truth
 
 - **Canonical schema:** `database/schema-final.sql`
-- **Active migrations:** `migrations/`
-- **Legacy migrations:** `migrations/legacy/` (kept for historical reference only; do not add new migrations here)
+- **Active migrations:** `migrations/` (numbered `0001`–`0030`; run in order)
 
 ### Key Features
 
@@ -140,7 +139,7 @@ When creating a band that matches an existing normalized name:
 
 ### Migration from v1
 
-See `migrations/legacy/migration-v1-to-v2.sql` for complete migration script.
+The v1→v2 migration script (`migration-v1-to-v2.sql`) has been removed along with the `migrations/legacy/` directory.
 
 **Summary:**
 
@@ -601,10 +600,9 @@ npx wrangler d1 execute settimes-db --file=database/schema.sql --remote
 For schema changes, create timestamped migration files:
 
 ```bash
-migrations/legacy/
-  001_initial_schema.sql           # Current schema
-  002_add_band_genre.sql           # Future: Add genre field
-  003_add_event_description.sql    # Future: Add event description
+migrations/
+  0031_add_band_genre.sql           # Future: Add genre field
+  0032_add_event_description.sql    # Future: Add event description
 ```
 
 **Migration Pattern:**

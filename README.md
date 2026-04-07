@@ -122,24 +122,18 @@ wrangler d1 create settimes-db
 
 # Update wrangler.toml with database_id from output
 
-# Apply migrations to local database
-npx wrangler d1 execute settimes-db --local --file=database/schema-v2.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-single-org.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-2fa.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-password-reset-reason.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-rbac-sprint-1-1.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-sprint-1-2-event-management.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-subscriptions.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-metrics.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-events-theming.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-invite-codes.sql
+# Apply migrations to local database (run all numbered migrations in order)
+for f in migrations/[0-9]*.sql; do
+  npx wrangler d1 execute settimes-db --local --file="$f"
+done
 
 # One-off upgrade (only if schedule_builds has band_id, not performance_id)
 ./scripts/run-migrate-schedule-builds-performance-id.sh --local
 
 # Apply to production database
-npx wrangler d1 execute settimes-db --remote --file=database/schema-v2.sql
-# ... repeat for other migrations (include migration-invite-codes.sql)
+for f in migrations/[0-9]*.sql; do
+  npx wrangler d1 execute settimes-db --remote --file="$f"
+done
 
 # One-off upgrade (only if schedule_builds has band_id, not performance_id)
 ./scripts/run-migrate-schedule-builds-performance-id.sh --remote

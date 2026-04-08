@@ -3,7 +3,7 @@
 **Database:** SetTimes
 **Type:** SQLite (Cloudflare D1)
 **Version:** 2.0 (Band Profile System)
-**Last Updated:** 2025-10-25
+**Last Updated:** 2026-04-07
 
 ## Overview
 
@@ -11,9 +11,10 @@ The SetTimes database supports **multi-event management** with a **band profile 
 
 ## Source of Truth
 
-- **Canonical schema:** `database/schema-final.sql`
-- **Active migrations:** `migrations/`
-- **Legacy migrations:** `migrations/legacy/` (kept for historical reference only; do not add new migrations here)
+- **Canonical schema for fresh installs:** `database/setup-complete.sql` — this is the full end-state schema. Apply it alone when creating a new database; do not run the numbered migrations afterward (those columns already exist).
+- **Numbered migrations:** `migrations/` (numbered sequentially from `0001_` onward; use the next available prefix for new migrations) are for upgrading an existing database to the current schema, not for applying after `setup-complete.sql`.
+- **Local upgrade workflow:** Use `npm run migrate:local` to apply unapplied migrations in local environments.
+- **Special case:** `0002_migration-single-org.sql` is a one-time transition migration for specific existing databases that need to move off the earlier multi-org-era layout onto the current schema path. Do not apply it to a database created from `setup-complete.sql`.
 
 ### Key Features
 
@@ -140,7 +141,7 @@ When creating a band that matches an existing normalized name:
 
 ### Migration from v1
 
-See `migrations/legacy/migration-v1-to-v2.sql` for complete migration script.
+The v1→v2 migration script (`migration-v1-to-v2.sql`) has been removed along with the `migrations/legacy/` directory.
 
 **Summary:**
 
@@ -598,19 +599,18 @@ npx wrangler d1 execute settimes-db --file=database/schema.sql --remote
 
 ### Future Migrations
 
-For schema changes, create timestamped migration files:
+For schema changes, create sequentially numbered migration files:
 
 ```bash
-migrations/legacy/
-  001_initial_schema.sql           # Current schema
-  002_add_band_genre.sql           # Future: Add genre field
-  003_add_event_description.sql    # Future: Add event description
+migrations/
+  0031_add_band_genre.sql          # Next migration
+  0032_add_event_description.sql   # Following migration
 ```
 
 **Migration Pattern:**
 
 ```sql
--- 002_add_band_genre.sql
+-- 0031_add_band_genre.sql
 ALTER TABLE bands ADD COLUMN genre TEXT;
 CREATE INDEX idx_bands_genre ON bands(genre);
 ```

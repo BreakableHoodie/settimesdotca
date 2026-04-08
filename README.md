@@ -116,37 +116,30 @@ npx wrangler pages dev public --binding DB=settimes-db
 
 ### Database Setup
 
+**Fresh install** (new database):
+
 ```bash
 # Create D1 database
 wrangler d1 create settimes-db
 
 # Update wrangler.toml with database_id from output
 
-# Apply migrations to local database
-npx wrangler d1 execute settimes-db --local --file=database/schema-v2.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-single-org.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-2fa.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-password-reset-reason.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-rbac-sprint-1-1.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-sprint-1-2-event-management.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-subscriptions.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-metrics.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-events-theming.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-invite-codes.sql
-
-# One-off upgrade (only if schedule_builds has band_id, not performance_id)
-./scripts/run-migrate-schedule-builds-performance-id.sh --local
-
-# Apply to production database
-npx wrangler d1 execute settimes-db --remote --file=database/schema-v2.sql
-# ... repeat for other migrations (include migration-invite-codes.sql)
-
-# One-off upgrade (only if schedule_builds has band_id, not performance_id)
-./scripts/run-migrate-schedule-builds-performance-id.sh --remote
+# Apply the full schema — this single file creates all tables
+npx wrangler d1 execute settimes-db --local --file=database/setup-complete.sql
+npx wrangler d1 execute settimes-db --remote --file=database/setup-complete.sql
 
 # Create first admin invite code
 node scripts/create-admin-invite.js --local  # For local dev
 node scripts/create-admin-invite.js --prod   # For production
+```
+
+**Upgrading an existing database** (apply only migrations not yet run):
+
+```bash
+npm run migrate:local  # local
+
+# Production — run each unapplied migration manually:
+# npx wrangler d1 execute settimes-db --remote --file=migrations/0031_....sql
 ```
 
 See [docs/D1_SETUP.md](docs/D1_SETUP.md) for complete database setup instructions.

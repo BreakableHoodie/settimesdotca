@@ -119,10 +119,10 @@ export default function AdminPanel({ currentUser, onLogout }) {
    * @param {string} message - Message to display
    * @param {string} type - 'success' or 'error'
    */
-  const showToast = (message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 5000)
-  }
+  }, [])
 
   const handleLogout = () => {
     setShowLogoutConfirm(true)

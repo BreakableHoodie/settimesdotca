@@ -3,7 +3,7 @@
 **Database:** SetTimes
 **Type:** SQLite (Cloudflare D1)
 **Version:** 2.0 (Band Profile System)
-**Last Updated:** 2025-10-25
+**Last Updated:** 2026-04-07
 
 ## Overview
 
@@ -12,9 +12,9 @@ The SetTimes database supports **multi-event management** with a **band profile 
 ## Source of Truth
 
 - **Canonical schema for fresh installs:** `database/setup-complete.sql` — this is the full end-state schema. Apply it alone when creating a new database; do not run the numbered migrations afterward (those columns already exist).
-- **Numbered migrations:** `migrations/` (numbered `0001_`–`0030_`; add new ones as `0031_`, `0032_`, etc.) are for upgrading an existing database to the current schema, not for applying after `setup-complete.sql`.
+- **Numbered migrations:** `migrations/` (numbered sequentially from `0001_` onward; use the next available prefix for new migrations) are for upgrading an existing database to the current schema, not for applying after `setup-complete.sql`.
 - **Local upgrade workflow:** Use `npm run migrate:local` to apply unapplied migrations in local environments.
-- **Special case:** `0002_migration-single-org.sql` is a one-time transition migration for databases predating the multi-org schema. Do not apply it to a database created from `setup-complete.sql`.
+- **Special case:** `0002_migration-single-org.sql` is a one-time transition migration for specific existing databases that need to move off the earlier multi-org-era layout onto the current schema path. Do not apply it to a database created from `setup-complete.sql`.
 
 ### Key Features
 

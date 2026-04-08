@@ -116,27 +116,30 @@ npx wrangler pages dev public --binding DB=settimes-db
 
 ### Database Setup
 
+**Fresh install** (new database):
+
 ```bash
 # Create D1 database
 wrangler d1 create settimes-db
 
 # Update wrangler.toml with database_id from output
 
-# Apply schema to local database (single file, includes all tables)
+# Apply the full schema — this single file creates all tables
 npx wrangler d1 execute settimes-db --local --file=database/setup-complete.sql
-
-# Apply numbered migrations in order (skip 0002 — it drops tables recreated by setup-complete.sql)
-for f in $(ls migrations/[0-9]*.sql | sort | grep -v 0002_); do
-  npx wrangler d1 execute settimes-db --local --file="$f"
-done
-
-# Apply to production database
 npx wrangler d1 execute settimes-db --remote --file=database/setup-complete.sql
-# ... repeat the migration loop above with --remote instead of --local
 
 # Create first admin invite code
 node scripts/create-admin-invite.js --local  # For local dev
 node scripts/create-admin-invite.js --prod   # For production
+```
+
+**Upgrading an existing database** (apply only migrations not yet run):
+
+```bash
+npm run migrate:local  # local
+
+# Production — run each unapplied migration manually:
+# npx wrangler d1 execute settimes-db --remote --file=migrations/0031_....sql
 ```
 
 See [docs/D1_SETUP.md](docs/D1_SETUP.md) for complete database setup instructions.

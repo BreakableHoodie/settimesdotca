@@ -11,9 +11,10 @@ The SetTimes database supports **multi-event management** with a **band profile 
 
 ## Source of Truth
 
-- **Canonical schema:** `database/setup-complete.sql`
-- **Active migrations:** `migrations/` (numbered `0001_`–`0030_`; add new ones as `0031_`, `0032_`, etc.)
-- **Note:** `0002_migration-single-org.sql` is a one-time transition migration and must be skipped when applying to a fresh database initialised from `setup-complete.sql`
+- **Canonical schema for fresh installs:** `database/setup-complete.sql` — this is the full end-state schema. Apply it alone when creating a new database; do not run the numbered migrations afterward (those columns already exist).
+- **Numbered migrations:** `migrations/` (numbered `0001_`–`0030_`; add new ones as `0031_`, `0032_`, etc.) are for upgrading an existing database to the current schema, not for applying after `setup-complete.sql`.
+- **Local upgrade workflow:** Use `npm run migrate:local` to apply unapplied migrations in local environments.
+- **Special case:** `0002_migration-single-org.sql` is a one-time transition migration for databases predating the multi-org schema. Do not apply it to a database created from `setup-complete.sql`.
 
 ### Key Features
 

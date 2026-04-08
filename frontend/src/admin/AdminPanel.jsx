@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { authApi, eventsApi } from '../utils/adminApi'
+import { eventsApi } from '../utils/adminApi'
 import EventsTab from './EventsTab'
 import VenuesTab from './VenuesTab'
 import RosterTab from './RosterTab'
@@ -24,7 +24,7 @@ import { Button, Loading, Alert, ConfirmDialog } from '../components/ui'
  * - Logout functionality
  * - Responsive mobile-first design
  */
-export default function AdminPanel({ onLogout }) {
+export default function AdminPanel({ currentUser, onLogout }) {
   const [activeTab, setActiveTab] = useState('events')
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [events, setEvents] = useState([])
@@ -33,7 +33,6 @@ export default function AdminPanel({ onLogout }) {
   const [showWizard, setShowWizard] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showMfaModal, setShowMfaModal] = useState(false)
-  const [currentUser, setCurrentUser] = useState(() => authApi.getCurrentUser())
 
   const loadEvents = useCallback(async () => {
     try {
@@ -60,20 +59,6 @@ export default function AdminPanel({ onLogout }) {
   useEffect(() => {
     loadEvents()
   }, [loadEvents])
-
-  useEffect(() => {
-    let isMounted = true
-    const refreshUser = async () => {
-      const sessionData = await authApi.verifySession()
-      if (isMounted && sessionData?.user) {
-        setCurrentUser(sessionData.user)
-      }
-    }
-    refreshUser()
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   const isAdmin = currentUser?.role === 'admin'
   const isViewer = currentUser?.role === 'viewer'
@@ -134,10 +119,10 @@ export default function AdminPanel({ onLogout }) {
    * @param {string} message - Message to display
    * @param {string} type - 'success' or 'error'
    */
-  const showToast = (message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 5000)
-  }
+  }, [])
 
   const handleLogout = () => {
     setShowLogoutConfirm(true)

@@ -62,6 +62,7 @@ plugins/
 
 # Session notes and dev archives (developer-specific)
 archive/
+plan/
 
 # Audits, reviews, and reports (keep out of repo)
 CODE_REVIEW*.md

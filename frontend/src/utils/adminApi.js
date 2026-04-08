@@ -2,6 +2,7 @@
 // Handles all API calls to the admin endpoints
 
 const API_BASE = '/api/admin'
+const authStateSubscribers = new Set()
 
 // SECURITY: Session token is now stored in HTTPOnly cookie (not accessible to JavaScript)
 // CSRF token is read from cookie (non-HttpOnly) for double-submit pattern
@@ -43,6 +44,81 @@ function refreshCSRFHeader(headers) {
     delete nextHeaders['X-CSRF-Token']
   }
   return nextHeaders
+}
+
+function notifyUnauthorized() {
+  authStateSubscribers.forEach(subscriber => {
+    try {
+      subscriber.onUnauthorized?.()
+    } catch (err) {
+      console.error('[adminApi] onUnauthorized subscriber threw:', err)
+    }
+  })
+}
+
+function parseSessionTiming(response) {
+  const rawTime = response.headers.get('X-Session-Expires-In')
+  const rawIdle = response.headers.get('X-Session-Idle-Expires-In')
+  const rawAbsolute = response.headers.get('X-Session-Absolute-Expires-In')
+
+  if (rawTime === null || rawIdle === null || rawAbsolute === null) return null
+
+  const timeRemainingSeconds = Number(rawTime)
+  const idleRemainingSeconds = Number(rawIdle)
+  const absoluteRemainingSeconds = Number(rawAbsolute)
+
+  if (
+    !Number.isFinite(timeRemainingSeconds) ||
+    !Number.isFinite(idleRemainingSeconds) ||
+    !Number.isFinite(absoluteRemainingSeconds)
+  ) {
+    return null
+  }
+
+  return {
+    timeRemainingSeconds,
+    idleRemainingSeconds,
+    absoluteRemainingSeconds,
+    warning: response.headers.get('X-Session-Warning') === 'true',
+  }
+}
+
+function notifySessionTiming(response) {
+  const timing = parseSessionTiming(response)
+  if (!timing) return
+
+  authStateSubscribers.forEach(subscriber => {
+    try {
+      subscriber.onSessionTiming?.(timing)
+    } catch (err) {
+      console.error('[adminApi] onSessionTiming subscriber threw:', err)
+    }
+  })
+}
+
+function persistUser(user) {
+  if (!user?.email) return
+
+  window.localStorage.setItem('userEmail', user.email)
+  window.localStorage.setItem('userName', resolveFullName(user))
+  window.localStorage.setItem('userFirstName', user.firstName || '')
+  window.localStorage.setItem('userLastName', user.lastName || '')
+  window.localStorage.setItem('userRole', user.role || '')
+}
+
+function clearPersistedUser() {
+  window.localStorage.removeItem('userEmail')
+  window.localStorage.removeItem('userName')
+  window.localStorage.removeItem('userFirstName')
+  window.localStorage.removeItem('userLastName')
+  window.localStorage.removeItem('userRole')
+}
+
+export function subscribeAdminAuthState(subscriber) {
+  authStateSubscribers.add(subscriber)
+  return () => {
+    authStateSubscribers.delete(subscriber)
+  }
 }
 
 async function fetchWithCSRFRetry(url, options = {}, retries = 1) {
@@ -154,26 +230,15 @@ async function handleResponse(response) {
       console.warn('API Error Response:', response.status, data)
     }
     if (response.status === 401) {
-      if (import.meta.env.DEV) {
-        console.error('Dispatching auth:unauthorized event')
-      }
-      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
-
-      // Fallback: If the app doesn't respond to the event within 1 second, force a redirect
-      setTimeout(() => {
-        if (window.location.pathname !== '/admin/login') {
-          if (import.meta.env.DEV) {
-            console.error('Force redirecting to login...')
-          }
-          window.location.href = '/admin/login'
-        }
-      }, 1000)
+      notifyUnauthorized()
     }
     const error = new Error(data.message || data.error || 'API request failed')
     error.status = response.status
     error.details = data
     throw error
   }
+
+  notifySessionTiming(response)
 
   return data
 }
@@ -200,13 +265,7 @@ export const authApi = {
     // SECURITY: Session token and CSRF token are now in cookies
     // Store user data in localStorage for UI display
     if (data.user && !data.requiresActivation) {
-      window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', resolveFullName(data.user))
-      if (data.user.firstName || data.user.lastName) {
-        window.localStorage.setItem('userFirstName', data.user.firstName || '')
-        window.localStorage.setItem('userLastName', data.user.lastName || '')
-      }
-      window.localStorage.setItem('userRole', data.user.role)
+      persistUser(data.user)
     }
 
     return data
@@ -238,13 +297,7 @@ export const authApi = {
     // SECURITY: Session token and CSRF token are now in cookies
     // Store user data in localStorage for UI display
     if (data.user) {
-      window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', resolveFullName(data.user))
-      if (data.user.firstName || data.user.lastName) {
-        window.localStorage.setItem('userFirstName', data.user.firstName || '')
-        window.localStorage.setItem('userLastName', data.user.lastName || '')
-      }
-      window.localStorage.setItem('userRole', data.user.role)
+      persistUser(data.user)
     }
 
     return data
@@ -260,13 +313,7 @@ export const authApi = {
     const data = await handleResponse(response)
 
     if (data.user) {
-      window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', resolveFullName(data.user))
-      if (data.user.firstName || data.user.lastName) {
-        window.localStorage.setItem('userFirstName', data.user.firstName || '')
-        window.localStorage.setItem('userLastName', data.user.lastName || '')
-      }
-      window.localStorage.setItem('userRole', data.user.role)
+      persistUser(data.user)
     }
 
     return data
@@ -285,11 +332,7 @@ export const authApi = {
     }
 
     // Clear local data (cookies are cleared by server)
-    window.localStorage.removeItem('userEmail')
-    window.localStorage.removeItem('userName')
-    window.localStorage.removeItem('userFirstName')
-    window.localStorage.removeItem('userLastName')
-    window.localStorage.removeItem('userRole')
+    clearPersistedUser()
   },
 
   getCurrentUser() {
@@ -313,21 +356,11 @@ export const authApi = {
         credentials: 'include',
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        // Update local storage with fresh data
-        if (data.user) {
-          window.localStorage.setItem('userEmail', data.user.email)
-          window.localStorage.setItem('userName', resolveFullName(data.user))
-          if (data.user.firstName || data.user.lastName) {
-            window.localStorage.setItem('userFirstName', data.user.firstName || '')
-            window.localStorage.setItem('userLastName', data.user.lastName || '')
-          }
-          window.localStorage.setItem('userRole', data.user.role)
-        }
-        return data
+      const data = await handleResponse(response)
+      if (data.user) {
+        persistUser(data.user)
       }
-      return null
+      return data
     } catch {
       return null
     }

@@ -73,7 +73,7 @@ export default function AdminLogin({ onLoginSuccess }) {
       }
 
       if (result.success) {
-        onLoginSuccess()
+        await onLoginSuccess()
       }
     } catch (err) {
       handleError(err)
@@ -90,7 +90,7 @@ export default function AdminLogin({ onLoginSuccess }) {
     try {
       const result = await authApi.verifyMfa(mfaToken, mfaCode, rememberDevice)
       if (result.success) {
-        onLoginSuccess()
+        await onLoginSuccess()
       }
     } catch (err) {
       handleError(err)

@@ -16,7 +16,7 @@ describe('authApi.verifySession', () => {
   it('returns unauthorized without notifying auth subscribers on 401', async () => {
     const fetchMock = global.fetch
     fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ error: 'Unauthorized', message: 'Valid session required' }), {
+      new globalThis.Response(JSON.stringify({ error: 'Unauthorized', message: 'Valid session required' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -37,7 +37,7 @@ describe('authApi.verifySession', () => {
   it('returns a transient failure result and preserves persisted user data on server errors', async () => {
     const fetchMock = global.fetch
     fetchMock.mockResolvedValue(
-      new Response('<!DOCTYPE html><html>cloudflare</html>', {
+      new globalThis.Response('<!DOCTYPE html><html>cloudflare</html>', {
         status: 503,
         headers: { 'Content-Type': 'text/html' },
       })

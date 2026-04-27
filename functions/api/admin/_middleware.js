@@ -131,13 +131,14 @@ async function enforceSession(request, env) {
     .bind(sessionId)
     .run();
 
+  const idleRemaining = Math.max(0, idleTimeout - idleElapsed);
   const absoluteRemaining = Math.max(0, absoluteTimeout - absoluteElapsed);
 
-    const refreshedTiming = {
-      idleRemaining: idleTimeout,
-      absoluteRemaining,
-      timeRemaining: Math.min(idleTimeout, absoluteRemaining),
-    };
+  const refreshedTiming = {
+    idleRemaining,
+    absoluteRemaining,
+    timeRemaining: Math.min(idleRemaining, absoluteRemaining),
+  };
 
   return {
     result,

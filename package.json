@@ -16,11 +16,11 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.11.2",
     "@playwright/test": "^1.59.1",
-    "@vitest/coverage-v8": "^4.1.4",
-    "baseline-browser-mapping": "^2.10.20",
+    "@vitest/coverage-v8": "^4.1.5",
+    "baseline-browser-mapping": "^2.10.23",
     "better-sqlite3": "^12.9.0",
-    "vite": "^8.0.9",
-    "vitest": "^4.1.4"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5"
   },
   "dependencies": {
     "@lucia-auth/adapter-sqlite": "^3.0.2",

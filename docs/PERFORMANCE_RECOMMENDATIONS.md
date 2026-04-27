@@ -46,8 +46,7 @@ The SetTimes.ca application demonstrates good performance practices with efficie
 **Solution:** Add a cleanup migration to run periodically:
 
 ```sql
--- migrations/legacy/migration-session-cleanup.sql
--- Run this manually or via cron job weekly
+-- Recommended: run this weekly via a scheduled job (or manually for one-off cleanup)
 
 DELETE FROM sessions
 WHERE expires_at < datetime('now', '-7 days');

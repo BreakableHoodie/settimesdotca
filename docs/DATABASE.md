@@ -11,11 +11,13 @@ The SetTimes database supports **multi-event management** with a **band profile 
 
 ## Source of Truth
 
-- **Active schema changes:** `migrations/*.sql`
-- **Local bootstrap and reference seed:** `database/setup-complete.sql`
+- **Canonical schema for fresh installs:** `database/setup-complete.sql` — apply this alone when creating a new database.
+- **Active schema changes:** `migrations/*.sql` — numbered upgrade migrations for existing databases.
 - **Optional local-only starter data:** `database/setup-local-dev.sql`
+- **Local upgrade workflow:** `npm run migrate:local`
 - **Schema validation:** `scripts/validate-db-schema.js`
 - **Release-time remote verification:** `scripts/verify-remote-d1-schema.mjs`
+- **Special case:** `0002_migration-single-org.sql` is a one-time transition migration for older databases and should not be applied to a fresh `setup-complete.sql` install.
 
 Do not add new schema changes to historical files under `database/` or to archived migration notes.
 
@@ -144,7 +146,7 @@ When creating a band that matches an existing normalized name:
 
 ### Migration from v1
 
-See `migrations/legacy/migration-v1-to-v2.sql` for complete migration script.
+The v1→v2 migration script (`migration-v1-to-v2.sql`) has been removed along with the `migrations/legacy/` directory.
 
 **Summary:**
 
@@ -602,19 +604,18 @@ npx wrangler d1 execute settimes-db --file=database/schema.sql --remote
 
 ### Future Migrations
 
-For schema changes, create timestamped migration files:
+For schema changes, create sequentially numbered migration files:
 
 ```bash
-migrations/legacy/
-  001_initial_schema.sql           # Current schema
-  002_add_band_genre.sql           # Future: Add genre field
-  003_add_event_description.sql    # Future: Add event description
+migrations/
+  0031_add_band_genre.sql          # Next migration
+  0032_add_event_description.sql   # Following migration
 ```
 
 **Migration Pattern:**
 
 ```sql
--- 002_add_band_genre.sql
+-- 0031_add_band_genre.sql
 ALTER TABLE bands ADD COLUMN genre TEXT;
 CREATE INDEX idx_bands_genre ON bands(genre);
 ```

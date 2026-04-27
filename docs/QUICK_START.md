@@ -1,4 +1,5 @@
 # SetTimes Quick Start Guide
+
 **Get your first event live in 10 minutes!**
 
 ---
@@ -6,6 +7,7 @@
 ## What You'll Accomplish
 
 By the end of this guide, you'll have:
+
 - ✅ Logged into the SetTimes admin panel
 - ✅ Created your first event
 - ✅ Added at least 2 venues
@@ -19,6 +21,7 @@ By the end of this guide, you'll have:
 ## Prerequisites
 
 Before you start, make sure you have:
+
 - [ ] Your login credentials (email + password)
 - [ ] Event details (name, date)
 - [ ] List of venues with addresses
@@ -56,7 +59,7 @@ Slug: lwbc16
 Description: Annual music crawl featuring 20+ bands across downtown
 ```
 
-3. Click **"Next"** to continue
+1. Click **"Next"** to continue
 
 ---
 
@@ -75,6 +78,7 @@ For each performance location:
 **Quick Tip:** You need at least 1 venue to proceed. You can add more venues later!
 
 **Example Venues:**
+
 - The Analog Cafe - 123 Main St
 - Black Cat Tavern - 456 Queen St
 - Velvet Underground - 789 King St
@@ -98,6 +102,7 @@ For each band:
 **Quick Tip:** Add at least 3 bands to make your event interesting!
 
 **Example Performances:**
+
 ```
 Band: The Sunset Trio
 Venue: The Analog Cafe
@@ -117,7 +122,7 @@ End: 8:00 PM
 
 **Conflict Detection:** If you see a red warning, two bands are scheduled at the same venue at overlapping times. Adjust the times to fix it.
 
-7. Click **"Next"** when all bands are added
+1. Click **"Next"** when all bands are added
 
 ---
 
@@ -158,6 +163,7 @@ Your event is currently a draft (not visible to the public). To make it live:
 5. Verify all information is correct
 
 **Common Issues:**
+
 - **Event not showing?** Make sure it's published (not draft)
 - **Times wrong?** Edit the event and update performer times
 - **Missing band?** Go to Performers tab and add them
@@ -200,26 +206,31 @@ Your event is currently a draft (not visible to the public). To make it live:
 ### Essential Actions
 
 **Create Event:**
+
 ```
 Events tab → Create Event → Fill form → Next → Add venues → Next → Add performers → Create
 ```
 
 **Publish Event:**
+
 ```
 Events tab → Find event → Edit → Check "Published" → Save
 ```
 
 **Add Band:**
+
 ```
 Performers tab → Add Performer → Fill form → Save
 ```
 
 **Edit Event:**
+
 ```
 Events tab → Find event → Edit → Make changes → Save
 ```
 
 **Unpublish Event:**
+
 ```
 Events tab → Find event → Edit → Uncheck "Published" → Save
 ```
@@ -229,12 +240,14 @@ Events tab → Find event → Edit → Uncheck "Published" → Save
 ## Tips for Success
 
 **Before Creating Your Event:**
+
 - [ ] Have all event details ready
 - [ ] Know your venue names and addresses
 - [ ] Know band names and performance times
 - [ ] Allow 15-30 minute buffers between bands
 
 **Common Mistakes to Avoid:**
+
 - ❌ Publishing before double-checking times
 - ❌ Overlapping band times at same venue
 - ❌ Inconsistent venue names (e.g., "The Analog" vs "Analog Cafe")
@@ -242,6 +255,7 @@ Events tab → Find event → Edit → Uncheck "Published" → Save
 - ❌ Using spaces or special characters in event slug
 
 **Best Practices:**
+
 - ✅ Add venues before performers
 - ✅ Use consistent naming (venues, bands)
 - ✅ Add buffer time between sets (15-30 min)
@@ -293,6 +307,7 @@ Events tab → Find event → Edit → Uncheck "Published" → Save
 ### "My event isn't showing on the public timeline"
 
 **Solution:**
+
 1. Make sure the event is **Published** (not Draft)
 2. Wait 1-2 minutes for cache to update
 3. Refresh the page
@@ -308,6 +323,7 @@ Events tab → Find event → Edit → Uncheck "Published" → Save
 ### "I made a mistake after publishing"
 
 **Solution:**
+
 1. Go to Events tab
 2. Click **"Edit"** on your event
 3. Uncheck **"Published"** (makes it a draft)
@@ -320,6 +336,7 @@ Events tab → Find event → Edit → Uncheck "Published" → Save
 ### "I can't log in"
 
 **Solution:**
+
 1. Check your email and password (case-sensitive)
 2. Make sure you're at `settimes.ca/admin`
 3. Clear your browser cache
@@ -331,15 +348,18 @@ Events tab → Find event → Edit → Uncheck "Published" → Save
 ## Need Help?
 
 **In-App Help:**
+
 - Hover over **(?)** icons for tooltips
 - Red error messages explain what's wrong
 
 **Documentation:**
+
 - [User Guide](./USER_GUIDE.md) - Full documentation
 - [Admin Handbook](./ADMIN_HANDBOOK.md) - For administrators
 - [Troubleshooting](./TROUBLESHOOTING.md) - Common issues
 
 **Contact Support:**
+
 - **GitHub Issues:** [github.com/BreakableHoodie/settimesdotca/issues](https://github.com/BreakableHoodie/settimesdotca/issues)
 - Include: Event name, what you're trying to do, screenshots
 

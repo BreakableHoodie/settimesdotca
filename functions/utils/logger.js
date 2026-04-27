@@ -19,6 +19,10 @@ const SENSITIVE_KEYS = [
   'authorization',
   'cookie',
   'key',
+  'email',
+  'ip',
+  'useragent',
+  'user_agent',
   'access_token',
   'refresh_token',
 ];
@@ -126,11 +130,7 @@ function formatLogEntry(level, message, meta = {}) {
  * Can be scoped to a request or module
  */
 export function createLogger(options = {}) {
-  const {
-    env = {},
-    requestId = generateRequestId(),
-    module = null,
-  } = options;
+  const { env = {}, requestId = generateRequestId(), module = null } = options;
 
   const minLevel = LOG_LEVELS[getLogLevel(env)] || LOG_LEVELS.info;
 
@@ -203,10 +203,12 @@ export function createRequestLogger(context) {
  * Use when you don't have request context
  */
 export const logger = {
-  debug: (message, meta) => console.debug(formatLogEntry('debug', message, meta)),
+  debug: (message, meta) =>
+    console.debug(formatLogEntry('debug', message, meta)),
   info: (message, meta) => console.info(formatLogEntry('info', message, meta)),
   warn: (message, meta) => console.warn(formatLogEntry('warn', message, meta)),
-  error: (message, meta) => console.error(formatLogEntry('error', message, meta)),
+  error: (message, meta) =>
+    console.error(formatLogEntry('error', message, meta)),
 };
 
 /**

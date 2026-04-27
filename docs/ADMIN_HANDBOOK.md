@@ -1,4 +1,5 @@
 # SetTimes Admin Handbook
+
 **For System Administrators**
 
 ---
@@ -29,6 +30,7 @@ This handbook is for system administrators managing the SetTimes platform. It co
 - Monitoring and maintenance
 
 **Prerequisites:**
+
 - Access to Cloudflare dashboard
 - Database admin credentials
 - Understanding of Cloudflare Workers/Pages
@@ -41,6 +43,7 @@ This handbook is for system administrators managing the SetTimes platform. It co
 ### Technology Stack
 
 **Frontend:**
+
 - React 18 with Vite 5
 - React Router v7
 - Tailwind CSS 3
@@ -48,12 +51,14 @@ This handbook is for system administrators managing the SetTimes platform. It co
 - Cloudflare Pages (hosting)
 
 **Backend:**
+
 - Cloudflare Workers (API layer)
 - Cloudflare Pages Functions
 - D1 (SQLite) database
 - R2 (Object storage for photos - optional)
 
 **Security:**
+
 - Session-based authentication
 - HTTPOnly cookies
 - CSRF protection (double-submit pattern)
@@ -89,18 +94,21 @@ This handbook is for system administrators managing the SetTimes platform. It co
 ### Component Responsibilities
 
 **Cloudflare Pages** (`frontend/`):
+
 - Serves static React application
 - Handles routing (SPA)
 - PWA service worker
 - Cached assets
 
 **Cloudflare Functions** (`functions/api/`):
+
 - REST API endpoints
 - Authentication & authorization
 - Business logic
 - Database queries
 
 **D1 Database**:
+
 - User accounts & sessions
 - Events, venues, bands
 - Performance schedules
@@ -113,6 +121,7 @@ This handbook is for system administrators managing the SetTimes platform. It co
 ### Creating User Accounts
 
 **Via Invite Codes:**
+
 1. Log in to admin panel
 2. Go to Users tab
 3. Click "Generate Invite Code"
@@ -120,6 +129,7 @@ This handbook is for system administrators managing the SetTimes platform. It co
 5. User signs up with code
 
 **Direct Creation (Admin Only):**
+
 ```javascript
 // Via admin API
 POST /api/admin/users
@@ -133,13 +143,14 @@ POST /api/admin/users
 
 ### Role Hierarchy
 
-| Role | Level | Permissions |
-|------|-------|-------------|
-| **Admin** | 3 | Full system access, user management |
-| **Editor** | 2 | Create/edit events, venues, bands |
-| **Viewer** | 1 | Read-only access |
+| Role       | Level | Permissions                         |
+| ---------- | ----- | ----------------------------------- |
+| **Admin**  | 3     | Full system access, user management |
+| **Editor** | 2     | Create/edit events, venues, bands   |
+| **Viewer** | 1     | Read-only access                    |
 
 **Permission Model:**
+
 - `checkPermission(request, env, requiredRole)`
 - User role level must be ≥ required level
 - Example: Admin (3) ≥ Editor (2) = Access granted
@@ -147,6 +158,7 @@ POST /api/admin/users
 ### Managing User Roles
 
 **Promoting/Demoting Users:**
+
 1. Users tab → Select user
 2. Click "Edit"
 3. Change role dropdown
@@ -157,11 +169,13 @@ POST /api/admin/users
 ### Disabling User Accounts
 
 **Temporarily Disable:**
+
 1. Users tab → Select user
 2. Click "Toggle Status"
 3. User cannot log in (session terminated)
 
 **Permanently Delete:**
+
 1. Users tab → Select user
 2. Click "Delete" (requires confirmation)
 3. User data removed (irreversible)
@@ -171,6 +185,7 @@ POST /api/admin/users
 ### Password Management
 
 **Reset User Password:**
+
 1. Users tab → Select user
 2. Click "Reset Password"
 3. System generates temporary password
@@ -178,6 +193,7 @@ POST /api/admin/users
 5. User must change on first login
 
 **Password Requirements:**
+
 - Minimum 8 characters
 - Must include: uppercase, lowercase, number
 - Hashed using bcrypt (cost factor: 10)
@@ -189,6 +205,7 @@ POST /api/admin/users
 ### D1 Database Structure
 
 **Tables:**
+
 - `users` - User accounts
 - `sessions` - Active user sessions
 - `events` - Event definitions
@@ -202,6 +219,7 @@ POST /api/admin/users
 ### Accessing the Database
 
 **Via Wrangler CLI:**
+
 ```bash
 # List databases
 wrangler d1 list
@@ -214,6 +232,7 @@ wrangler d1 execute settimes-db --file=./migrations/001_initial_schema.sql
 ```
 
 **Via Cloudflare Dashboard:**
+
 1. Workers & Pages → D1
 2. Select database: `settimes-db`
 3. Console tab → Run queries
@@ -221,6 +240,7 @@ wrangler d1 execute settimes-db --file=./migrations/001_initial_schema.sql
 ### Common Database Queries
 
 **Check User Sessions:**
+
 ```sql
 SELECT u.email, s.created_at, s.last_activity_at, s.ip_address
 FROM sessions s
@@ -230,6 +250,7 @@ ORDER BY s.last_activity_at DESC;
 ```
 
 **Event Statistics:**
+
 ```sql
 SELECT
   e.name,
@@ -244,6 +265,7 @@ ORDER BY e.date DESC;
 ```
 
 **Audit Log Review:**
+
 ```sql
 SELECT
   al.action,
@@ -261,22 +283,26 @@ LIMIT 100;
 ### Database Backups
 
 **Automated Backups:**
+
 - Cloudflare D1 automatically backs up databases
 - Point-in-time recovery available (contact Cloudflare support)
 
 **Manual Backup:**
+
 ```bash
 # Export entire database
 wrangler d1 export settimes-db --output=backup-$(date +%Y%m%d).sql
 ```
 
 **Restore from Backup:**
+
 ```bash
 # Restore database
 wrangler d1 execute settimes-db --file=backup-20251119.sql
 ```
 
 **Backup Schedule:**
+
 - Daily automated backups (Cloudflare)
 - Weekly manual export (recommended)
 - Store backups securely off-platform
@@ -297,21 +323,25 @@ wrangler d1 execute settimes-db --file=backup-20251119.sql
 ### Session Management
 
 **Session Configuration:**
-- Expiry: 24 hours (configurable)
-- HTTPOnly: Yes (prevents XSS theft)
-- Secure: Yes (HTTPS only)
-- SameSite: Strict (CSRF protection)
+
+- Storage: Lucia-backed `lucia_sessions` rows in D1
+- Admin idle timeout: 15 minutes
+- Admin absolute lifetime: 8 hours
+- Cookie transport: HttpOnly session cookie (`__Host-session_token` in production)
+- CSRF: Double-submit CSRF cookie plus `X-CSRF-Token`
 
 **Session Cleanup:**
+
 ```sql
 -- Remove expired sessions (run daily)
-DELETE FROM sessions WHERE expires_at < datetime('now');
+DELETE FROM lucia_sessions WHERE expires_at < strftime('%s', 'now');
 ```
 
 **Force Logout User:**
+
 ```sql
 -- Terminate all sessions for a user
-DELETE FROM sessions WHERE user_id = <user_id>;
+DELETE FROM lucia_sessions WHERE user_id = <user_id>;
 ```
 
 ### CSRF Protection
@@ -319,6 +349,7 @@ DELETE FROM sessions WHERE user_id = <user_id>;
 **Implementation:** Double-submit cookie pattern
 
 **How it works:**
+
 1. Server generates CSRF token
 2. Token sent as cookie (readable by JS)
 3. Client includes token in `X-CSRF-Token` header
@@ -327,6 +358,7 @@ DELETE FROM sessions WHERE user_id = <user_id>;
 **Location:** `functions/utils/csrf.js`
 
 **Bypass (for testing only):**
+
 ```javascript
 // Set in request header
 X-CSRF-Token: <token_from_cookie>
@@ -335,6 +367,7 @@ X-CSRF-Token: <token_from_cookie>
 ### Audit Logging
 
 **What's Logged:**
+
 - User logins/logouts
 - Event creation/modification/deletion
 - Venue/band changes
@@ -342,10 +375,12 @@ X-CSRF-Token: <token_from_cookie>
 - Failed login attempts
 
 **Audit Log Retention:**
+
 - Keep for 90 days minimum
 - Archive older logs to R2/S3
 
 **Review Logs Regularly:**
+
 ```sql
 -- Failed logins (potential attacks)
 SELECT * FROM audit_logs
@@ -363,6 +398,7 @@ LIMIT 50;
 ### Security Best Practices
 
 **Regular Tasks:**
+
 - [ ] Review audit logs weekly
 - [ ] Monitor failed login attempts
 - [ ] Update dependencies monthly
@@ -370,6 +406,7 @@ LIMIT 50;
 - [ ] Review user access permissions
 
 **Access Control:**
+
 - Principle of least privilege (grant minimum required role)
 - Regular access reviews (quarterly)
 - Remove inactive users (>90 days)
@@ -382,11 +419,13 @@ LIMIT 50;
 ### Cloudflare Analytics
 
 **Access:**
+
 1. Cloudflare Dashboard
 2. Pages → settimes project
 3. Analytics tab
 
 **Key Metrics:**
+
 - Page views
 - Unique visitors
 - Request rate
@@ -396,6 +435,7 @@ LIMIT 50;
 ### Application Logs
 
 **View Logs:**
+
 ```bash
 # Real-time logs
 wrangler tail
@@ -405,6 +445,7 @@ wrangler tail --status error
 ```
 
 **Log Locations:**
+
 - **API Logs**: Cloudflare Workers logs (via `wrangler tail`)
 - **Audit Logs**: D1 `audit_logs` table
 - **Error Logs**: Console errors (browser dev tools)
@@ -412,11 +453,13 @@ wrangler tail --status error
 ### Performance Monitoring
 
 **Core Web Vitals:**
+
 - LCP (Largest Contentful Paint): < 2.5s
 - FID (First Input Delay): < 100ms
 - CLS (Cumulative Layout Shift): < 0.1
 
 **Check Performance:**
+
 1. Use Lighthouse in Chrome DevTools
 2. Run: `npm run lighthouse` in frontend/
 3. Review PageSpeed Insights: `npm run psi`
@@ -424,6 +467,7 @@ wrangler tail --status error
 ### Alerting
 
 **Set Up Alerts:**
+
 1. Cloudflare Dashboard → Notifications
 2. Configure alerts for:
    - High error rate (>5%)
@@ -438,11 +482,13 @@ wrangler tail --status error
 ### Database Backups
 
 **Backup Strategy:**
+
 - **Frequency**: Daily automated, weekly manual
 - **Retention**: 30 days rolling
 - **Storage**: Off-platform (S3/R2)
 
 **Backup Command:**
+
 ```bash
 # Create backup
 wrangler d1 export settimes-db --output=backups/settimes-$(date +%Y%m%d-%H%M%S).sql
@@ -452,6 +498,7 @@ gzip backups/settimes-*.sql
 ```
 
 **Restore Database:**
+
 ```bash
 # Restore from backup
 gunzip backups/settimes-20251119.sql.gz
@@ -461,6 +508,7 @@ wrangler d1 execute settimes-db --file=backups/settimes-20251119.sql
 ### Disaster Recovery Plan
 
 **Scenario: Database Corruption**
+
 1. Stop all write operations
 2. Assess damage (check audit logs)
 3. Restore from latest backup
@@ -469,12 +517,14 @@ wrangler d1 execute settimes-db --file=backups/settimes-20251119.sql
 6. Document incident
 
 **Scenario: Cloudflare Outage**
+
 1. Check Cloudflare status page
 2. Communicate to users (status page)
 3. Wait for resolution (no action needed)
 4. Verify functionality after recovery
 
 **RTO/RPO:**
+
 - Recovery Time Objective (RTO): 4 hours
 - Recovery Point Objective (RPO): 24 hours
 
@@ -485,6 +535,7 @@ wrangler d1 execute settimes-db --file=backups/settimes-20251119.sql
 ### Frontend Optimization
 
 **Build Optimization:**
+
 - Vite code splitting
 - Tree shaking enabled
 - Asset compression (gzip/brotli)
@@ -492,6 +543,7 @@ wrangler d1 execute settimes-db --file=backups/settimes-20251119.sql
 - React.memo for pure components
 
 **Cache Strategy:**
+
 ```
 /assets/*         → 1 year (immutable)
 /*.html           → no-cache
@@ -502,12 +554,14 @@ Service Worker    → no-cache
 ### API Optimization
 
 **Query Optimization:**
+
 - Use indexes on foreign keys
 - Avoid N+1 queries
 - Limit results (`LIMIT` clause)
 - Cache frequently accessed data
 
 **Rate Limiting:**
+
 - Implement Cloudflare Rate Limiting
 - Login endpoint: 5 requests/minute/IP
 - API endpoints: 100 requests/minute/IP
@@ -515,6 +569,7 @@ Service Worker    → no-cache
 ### Database Optimization
 
 **Indexes:**
+
 ```sql
 -- Ensure indexes exist
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
@@ -524,6 +579,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 ```
 
 **Cleanup Old Data:**
+
 ```sql
 -- Remove old sessions
 DELETE FROM sessions WHERE expires_at < datetime('now', '-7 days');
@@ -544,6 +600,7 @@ DELETE FROM audit_logs WHERE created_at < datetime('now', '-90 days');
 **Issue: Users can't log in**
 
 **Diagnosis:**
+
 ```sql
 -- Check if user exists
 SELECT * FROM users WHERE email = 'user@example.com';
@@ -559,6 +616,7 @@ ORDER BY created_at DESC LIMIT 10;
 ```
 
 **Solutions:**
+
 - Verify user exists and is active
 - Reset password if forgotten
 - Check for account lockout (not implemented yet)
@@ -568,6 +626,7 @@ ORDER BY created_at DESC LIMIT 10;
 **Issue: Events not appearing on public timeline**
 
 **Diagnosis:**
+
 ```sql
 -- Check event status
 SELECT name, date, status, is_published FROM events WHERE id = <event_id>;
@@ -577,6 +636,7 @@ SELECT COUNT(*) FROM bands WHERE event_id = <event_id>;
 ```
 
 **Solutions:**
+
 - Ensure `is_published = 1`
 - Ensure `status != 'archived'`
 - Verify bands are assigned to event
@@ -587,6 +647,7 @@ SELECT COUNT(*) FROM bands WHERE event_id = <event_id>;
 **Issue: Slow API responses**
 
 **Diagnosis:**
+
 ```bash
 # Check API logs
 wrangler tail --status slow
@@ -596,6 +657,7 @@ wrangler d1 execute settimes-db --command="EXPLAIN QUERY PLAN <your_query>"
 ```
 
 **Solutions:**
+
 - Add missing indexes
 - Optimize slow queries
 - Implement caching
@@ -606,12 +668,14 @@ wrangler d1 execute settimes-db --command="EXPLAIN QUERY PLAN <your_query>"
 ### Debug Mode
 
 **Enable Debug Logging:**
+
 ```javascript
 // In functions/api/_middleware.js
 console.log('[DEBUG]', { user, action, details });
 ```
 
 **View Debug Logs:**
+
 ```bash
 wrangler tail --format=pretty
 ```
@@ -654,11 +718,13 @@ wrangler tail --format=pretty
 ## Emergency Contacts
 
 **Cloudflare Support:**
+
 - Dashboard: cloudflare.com/support
 - Enterprise: 24/7 phone support
 - Community: community.cloudflare.com
 
 **Development Team:**
+
 - GitHub: github.com/BreakableHoodie/settimesdotca
 - Issues: Create issue on GitHub
 
@@ -691,6 +757,7 @@ wrangler d1 execute settimes-db --command="DELETE FROM sessions"
 ### Environment Variables
 
 **Required in wrangler.toml:**
+
 ```toml
 [env.production.vars]
 DATABASE_ID = "settimes-production-db"

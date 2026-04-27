@@ -5,6 +5,7 @@
 export async function onRequestGet(context) {
   const { env, data } = context;
   const { user, session } = data;
+  const currentSessionId = session?.id || session?.session_token || null;
 
   try {
     const result = await env.DB.prepare(
@@ -25,23 +26,28 @@ export async function onRequestGet(context) {
       .all();
 
     const sessions = (result.results || []).map((row) => ({
-      ...row,
-      expires_at: row.expires_at ? new Date(row.expires_at * 1000).toISOString() : null,
+      ip_address: row.ip_address,
+      user_agent: row.user_agent,
+      created_at: row.created_at,
+      last_activity_at: row.last_activity_at,
+      expires_at: row.expires_at
+        ? new Date(row.expires_at * 1000).toISOString()
+        : null,
+      current: currentSessionId ? row.id === currentSessionId : false,
     }));
 
     return new Response(
       JSON.stringify({
         sessions,
-        currentSessionId: session?.id || session?.session_token || null,
       }),
-      { headers: { "Content-Type": "application/json" } }
+      { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error("Failed to load sessions:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to load sessions" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    console.error('Failed to load sessions:', error);
+    return new Response(JSON.stringify({ error: 'Failed to load sessions' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
 
@@ -54,35 +60,35 @@ export async function onRequestDelete(context) {
     const sessionId = body.sessionId;
 
     if (!sessionId) {
-      return new Response(JSON.stringify({ error: "Session ID is required" }), {
+      return new Response(JSON.stringify({ error: 'Session ID is required' }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     const sessionRow = await env.DB.prepare(
-      "SELECT user_id FROM lucia_sessions WHERE id = ?"
+      'SELECT user_id FROM lucia_sessions WHERE id = ?'
     )
       .bind(sessionId)
       .first();
 
     if (!sessionRow || sessionRow.user_id !== user.userId) {
-      return new Response(JSON.stringify({ error: "Session not found" }), {
+      return new Response(JSON.stringify({ error: 'Session not found' }), {
         status: 404,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     await lucia.invalidateSession(sessionId);
 
     return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error("Failed to delete session:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to delete session" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    console.error('Failed to delete session:', error);
+    return new Response(JSON.stringify({ error: 'Failed to delete session' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

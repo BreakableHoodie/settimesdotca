@@ -71,24 +71,28 @@ export function useAdminAuthSession() {
       }
 
       lastKeepAliveRef.current = now
-      const sessionData = await authApi.verifySession()
+      const sessionResult = await authApi.verifySession()
 
-      if (sessionData?.user) {
-        setCurrentUser(sessionData.user)
+      if (sessionResult?.status === 'authenticated' && sessionResult.user) {
+        setCurrentUser(sessionResult.user)
         setIsAuthenticated(true)
-        return sessionData
+        return sessionResult
+      }
+
+      if (sessionResult?.status === 'transient') {
+        return sessionResult
       }
 
       if (authApi.getCurrentUser()) {
         await logout()
-        return null
+        return sessionResult
       }
 
       setCurrentUser(null)
       setIsAuthenticated(false)
       setSessionTiming(null)
       clearSessionTimers()
-      return null
+      return sessionResult
     },
     [clearSessionTimers, logout]
   )

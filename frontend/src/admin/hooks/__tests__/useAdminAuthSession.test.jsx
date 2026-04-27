@@ -37,12 +37,13 @@ describe('useAdminAuthSession', () => {
     vi.clearAllMocks()
     window.sessionStorage.clear()
     adminApiMocks.authApi.getCurrentUser.mockReturnValue(null)
-    adminApiMocks.authApi.verifySession.mockResolvedValue(null)
+    adminApiMocks.authApi.verifySession.mockResolvedValue({ status: 'unauthorized' })
     adminApiMocks.authApi.logout.mockResolvedValue(undefined)
   })
 
   it('bootstraps authenticated state from the verified server session', async () => {
     adminApiMocks.authApi.verifySession.mockResolvedValue({
+      status: 'authenticated',
       user: { email: 'admin@test', firstName: 'Admin', lastName: 'User', role: 'admin' },
     })
 
@@ -58,6 +59,7 @@ describe('useAdminAuthSession', () => {
 
   it('shows the warning state from server timing headers', async () => {
     adminApiMocks.authApi.verifySession.mockResolvedValue({
+      status: 'authenticated',
       user: { email: 'admin@test', firstName: 'Admin', lastName: 'User', role: 'admin' },
     })
 
@@ -82,6 +84,7 @@ describe('useAdminAuthSession', () => {
 
   it('logs out through the centralized handler on unauthorized responses', async () => {
     adminApiMocks.authApi.verifySession.mockResolvedValue({
+      status: 'authenticated',
       user: { email: 'admin@test', firstName: 'Admin', lastName: 'User', role: 'admin' },
     })
 
@@ -100,9 +103,52 @@ describe('useAdminAuthSession', () => {
     expect(result.current.currentUser).toBeNull()
   })
 
+  it('logs out persisted auth state when verifySession reports unauthorized', async () => {
+    adminApiMocks.authApi.getCurrentUser.mockReturnValue({
+      email: 'admin@test',
+      firstName: 'Admin',
+      lastName: 'User',
+      role: 'admin',
+    })
+    adminApiMocks.authApi.verifySession.mockResolvedValue({ status: 'unauthorized' })
+
+    const { result } = renderHook(() => useAdminAuthSession())
+
+    await waitFor(() => {
+      expect(result.current.checking).toBe(false)
+    })
+
+    expect(adminApiMocks.authApi.logout).toHaveBeenCalledTimes(1)
+    expect(result.current.isAuthenticated).toBe(false)
+  })
+
+  it('preserves persisted auth state when verifySession fails transiently', async () => {
+    adminApiMocks.authApi.getCurrentUser.mockReturnValue({
+      email: 'admin@test',
+      firstName: 'Admin',
+      lastName: 'User',
+      role: 'admin',
+    })
+    adminApiMocks.authApi.verifySession.mockResolvedValue({
+      status: 'transient',
+      error: new Error('Server temporarily unavailable'),
+    })
+
+    const { result } = renderHook(() => useAdminAuthSession())
+
+    await waitFor(() => {
+      expect(result.current.checking).toBe(false)
+    })
+
+    expect(adminApiMocks.authApi.logout).not.toHaveBeenCalled()
+    expect(result.current.isAuthenticated).toBe(true)
+    expect(result.current.currentUser.email).toBe('admin@test')
+  })
+
   describe('timer behavior', () => {
     beforeEach(() => {
       adminApiMocks.authApi.verifySession.mockResolvedValue({
+        status: 'authenticated',
         user: { email: 'admin@test', firstName: 'Admin', lastName: 'User', role: 'admin' },
       })
     })

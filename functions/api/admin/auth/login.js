@@ -8,6 +8,7 @@ import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import {
   getTrustedDeviceToken,
   validateTrustedDevice,
@@ -200,7 +201,37 @@ export async function onRequestPost(context) {
     }
 
     if (Number(user.totp_enabled) === 1 && !skipMfa) {
-      if (!user.totp_secret) {
+      let totpSecretState;
+      try {
+        totpSecretState = await loadTotpSecret(user.totp_secret, env);
+      } catch (error) {
+        console.error("[Login] Failed to decrypt TOTP secret:", error?.message || error);
+        return new Response(
+          JSON.stringify({
+            error: "MFA configuration error",
+            message:
+              "Multi-factor authentication is not configured correctly. Contact an administrator.",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (totpSecretState?.shouldPersist) {
+        await DB.prepare(
+          `UPDATE users
+           SET totp_secret = ?
+           WHERE id = ? AND totp_secret = ?`
+        )
+          .bind(totpSecretState.encryptedSecret, user.id, user.totp_secret)
+          .run();
+      }
+
+      const totpSecret = totpSecretState?.secret;
+
+      if (!totpSecret) {
         console.error("TOTP enabled but missing secret for user:", user.id);
         return new Response(
           JSON.stringify({
@@ -219,18 +250,16 @@ export async function onRequestPost(context) {
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
       await DB.prepare(
-        `
-        DELETE FROM mfa_challenges
-        WHERE user_id = ?
-          AND (used = 1 OR expires_at <= datetime('now'))
-      `
-      )
-        .bind(user.id)
-        .run();
-
-      await DB.prepare(
-        `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at, used, used_at)
+         VALUES (?, ?, ?, ?, ?, 0, NULL)
+         ON CONFLICT DO UPDATE SET
+           token = excluded.token,
+           ip_address = excluded.ip_address,
+           user_agent = excluded.user_agent,
+           expires_at = excluded.expires_at,
+           used = 0,
+           used_at = NULL,
+           created_at = datetime('now')`
       )
         .bind(mfaToken, user.id, ipAddress, userAgent, expiresAt)
         .run();

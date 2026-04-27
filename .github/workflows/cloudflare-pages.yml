@@ -17,12 +17,16 @@ concurrency:
 
 permissions:
   contents: read
-  deployments: write
+
+env:
+  NODE_VERSION: 20
+  PAGES_PROJECT_NAME: ${{ vars.CF_PAGES_PROJECT_NAME || 'settimesdotca' }}
 
 jobs:
-  build-and-deploy:
+  ci:
+    name: Test and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -32,7 +36,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -40,6 +44,9 @@ jobs:
 
       - name: Install root dependencies
         run: npm ci
+
+      - name: Validate OpenAPI spec
+        run: npm run validate:openapi
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -60,9 +67,187 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Deploy to Cloudflare Pages
-        if: github.event_name == 'push'
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  resolve-release:
+    name: Resolve release target
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.target.outputs.should_deploy }}
+      environment_name: ${{ steps.target.outputs.environment_name }}
+      pages_branch: ${{ steps.target.outputs.pages_branch }}
+      smoke_url: ${{ steps.target.outputs.smoke_url }}
+      d1_database_name: ${{ steps.target.outputs.d1_database_name }}
+    steps:
+      - name: Map branch to release target
+        id: target
+        run: |
+          echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+
+          case "$GITHUB_REF_NAME" in
+            main)
+              if [ "${{ github.event_name }}" != "pull_request" ]; then
+                echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+              fi
+              echo "environment_name=production" >> "$GITHUB_OUTPUT"
+              echo "pages_branch=main" >> "$GITHUB_OUTPUT"
+              echo "smoke_url=${{ vars.CF_PRODUCTION_SMOKE_URL || 'https://settimes.ca' }}" >> "$GITHUB_OUTPUT"
+              echo "d1_database_name=${{ vars.CF_D1_PRODUCTION_DATABASE_NAME || 'settimes-production-db' }}" >> "$GITHUB_OUTPUT"
+              ;;
+            dev)
+              if [ "${{ github.event_name }}" != "pull_request" ]; then
+                echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+              fi
+              echo "environment_name=development" >> "$GITHUB_OUTPUT"
+              echo "pages_branch=dev" >> "$GITHUB_OUTPUT"
+              echo "smoke_url=${{ vars.CF_DEVELOPMENT_SMOKE_URL || 'https://dev.settimes.ca' }}" >> "$GITHUB_OUTPUT"
+              echo "d1_database_name=${{ vars.CF_D1_DEVELOPMENT_DATABASE_NAME || vars.CF_D1_PRODUCTION_DATABASE_NAME || 'settimes-production-db' }}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "environment_name=validation" >> "$GITHUB_OUTPUT"
+              echo "pages_branch=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+              echo "smoke_url=" >> "$GITHUB_OUTPUT"
+              echo "d1_database_name=" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+  migrate-and-verify-d1:
+    name: Migrate and verify remote D1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - ci
+      - resolve-release
+    if: needs.resolve-release.outputs.should_deploy == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Apply remote D1 migrations
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
-        run: npx wrangler pages deploy frontend/dist --project-name settimesdotca --branch ${{ github.ref_name }}
+        run: ./frontend/node_modules/.bin/wrangler d1 migrations apply "${{ needs.resolve-release.outputs.d1_database_name }}" --remote
+
+      - name: Verify live D1 schema
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          D1_DATABASE_NAME: ${{ needs.resolve-release.outputs.d1_database_name }}
+        run: node scripts/verify-remote-d1-schema.mjs
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - migrate-and-verify-d1
+      - resolve-release
+    if: needs.resolve-release.outputs.should_deploy == 'true'
+    environment: ${{ needs.resolve-release.outputs.environment_name }}
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: Deploy Pages assets
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+        run: ./frontend/node_modules/.bin/wrangler pages deploy frontend/dist --project-name "${{ env.PAGES_PROJECT_NAME }}" --branch "${{ needs.resolve-release.outputs.pages_branch }}"
+
+  smoke:
+    name: Post-deploy smoke checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - deploy
+      - resolve-release
+    if: needs.resolve-release.outputs.should_deploy == 'true'
+    steps:
+      - name: Wait for deployment to become available
+        env:
+          SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error --location "$SMOKE_URL" > /tmp/settimes-homepage.html; then
+              echo "Smoke target is reachable: $SMOKE_URL"
+              exit 0
+            fi
+
+            echo "Waiting for deployment to become available ($attempt/30)..."
+            sleep 10
+          done
+
+          echo "Smoke target did not become ready in time: $SMOKE_URL"
+          exit 1
+
+      - name: Verify homepage HTML
+        env:
+          SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
+        run: |
+          curl --fail --silent --show-error --location "$SMOKE_URL" > /tmp/settimes-homepage.html
+          grep -Eiq '<!doctype html|<html' /tmp/settimes-homepage.html
+
+      - name: Verify admin shell HTML
+        env:
+          SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
+        run: |
+          curl --fail --silent --show-error --location "$SMOKE_URL/admin" > /tmp/settimes-admin.html
+          grep -Eiq '<!doctype html|<html' /tmp/settimes-admin.html
+
+      - name: Verify public schedule JSON
+        env:
+          SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
+        run: |
+          curl --fail --silent --show-error --location "$SMOKE_URL/api/schedule?event=current" > /tmp/settimes-schedule.json
+          node --input-type=module <<'EOF'
+          import { readFile } from 'node:fs/promises'
+
+          const raw = await readFile('/tmp/settimes-schedule.json', 'utf8')
+          const parsed = JSON.parse(raw)
+
+          if (!parsed || typeof parsed !== 'object') {
+            throw new Error('Expected /api/schedule?event=current to return a JSON object')
+          }
+          EOF

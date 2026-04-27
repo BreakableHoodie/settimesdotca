@@ -3,6 +3,7 @@
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { generateTotpSecret, buildOtpAuthUrl } from "../../../utils/totp.js";
+import { encryptTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP } from "../../../utils/request.js";
 
 export async function onRequestPost(context) {
@@ -56,12 +57,29 @@ export async function onRequestPost(context) {
     issuer: "SetTimes",
   });
 
+  let encryptedSecret;
+  try {
+    encryptedSecret = await encryptTotpSecret(secret, env);
+  } catch (error) {
+    console.error("[MFA Setup] Failed to encrypt TOTP secret:", error?.message || error);
+    return new Response(
+      JSON.stringify({
+        error: "Server error",
+        message: "Failed to initialize MFA setup",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   await DB.prepare(
     `UPDATE users
      SET totp_secret = ?, totp_enabled = 0, backup_codes = NULL
      WHERE id = ?`
   )
-    .bind(secret, userId)
+    .bind(encryptedSecret, userId)
     .run();
 
   await auditLog(

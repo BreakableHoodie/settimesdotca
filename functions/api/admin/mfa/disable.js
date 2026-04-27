@@ -5,6 +5,7 @@
 import { checkPermission, auditLog } from "../_middleware.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
+import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
 
@@ -98,14 +99,38 @@ export async function onRequestPost(context) {
   }
 
   let verified = false;
+  let totpSecretError = null;
+  let totpSecretState = null;
   if (user.totp_secret) {
-    verified = await verifyTotp(user.totp_secret, code);
+    try {
+      totpSecretState = await loadTotpSecret(user.totp_secret, env);
+    } catch (error) {
+      totpSecretError = error;
+      console.error("[MFA Disable] Failed to decrypt TOTP secret:", error?.message || error);
+    }
+  }
+
+  if (totpSecretState?.secret) {
+    verified = await verifyTotp(totpSecretState.secret, code);
   }
 
   if (!verified) {
     const backupCodes = parseBackupCodes(user.backup_codes);
     const result = await verifyBackupCode(code, backupCodes);
     verified = result.valid;
+  }
+
+  if (!verified && totpSecretError) {
+    return new Response(
+      JSON.stringify({
+        error: "Server error",
+        message: "Failed to verify MFA code",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   if (!verified) {

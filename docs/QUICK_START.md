@@ -59,7 +59,7 @@ Slug: lwbc16
 Description: Annual music crawl featuring 20+ bands across downtown
 ```
 
-1. Click **"Next"** to continue
+3. Click **"Next"** to continue
 
 ---
 
@@ -97,7 +97,8 @@ For each band:
 4. Set the **end time** OR **duration**
    - Example: 9:00 PM (or 60 minutes)
 5. Click **"Add"**
-6. Repeat for all bands
+
+Repeat for all bands
 
 **Quick Tip:** Add at least 3 bands to make your event interesting!
 
@@ -122,7 +123,7 @@ End: 8:00 PM
 
 **Conflict Detection:** If you see a red warning, two bands are scheduled at the same venue at overlapping times. Adjust the times to fix it.
 
-1. Click **"Next"** when all bands are added
+6. Click **"Next"** when all bands are added
 
 ---
 

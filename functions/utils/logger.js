@@ -11,8 +11,10 @@ const LOG_LEVELS = {
   error: 3,
 };
 
-// Keys that should be redacted from logs
-const SENSITIVE_KEYS = [
+// Keys that should be redacted from logs (exact case-insensitive match).
+// camelCase keys are covered by lowercasing: e.g. 'ipAddress' → 'ipaddress',
+// 'userAgent' → 'useragent'. snake_case variants are listed explicitly.
+const SENSITIVE_KEYS = new Set([
   'password',
   'token',
   'secret',
@@ -21,11 +23,13 @@ const SENSITIVE_KEYS = [
   'key',
   'email',
   'ip',
-  'useragent',
-  'user_agent',
+  'ipaddress',   // matches camelCase 'ipAddress'
+  'ip_address',  // matches snake_case 'ip_address'
+  'useragent',   // matches camelCase 'userAgent'
+  'user_agent',  // matches snake_case 'user_agent'
   'access_token',
   'refresh_token',
-];
+]);
 
 /**
  * Get current log level from environment
@@ -81,7 +85,7 @@ function serializeMetadata(meta) {
     const cleaned = {};
     for (const [key, value] of Object.entries(meta)) {
       // Redact sensitive keys
-      if (SENSITIVE_KEYS.some((k) => key.toLowerCase().includes(k))) {
+      if (SENSITIVE_KEYS.has(key.toLowerCase())) {
         cleaned[key] = '[REDACTED]';
         continue;
       }

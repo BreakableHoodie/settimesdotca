@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 import { execFile } from 'node:child_process';
+import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+
+const MAX_ERROR_OUTPUT_LENGTH = 500;
 
 const REQUIRED_SCHEMA = {
   events: ['id', 'slug', 'city', 'is_published'],
@@ -58,6 +61,16 @@ function getDatabaseName() {
   return databaseName;
 }
 
+async function checkWranglerExists() {
+  try {
+    await access(wranglerBin);
+  } catch {
+    throw new Error(
+      `Wrangler binary not found at ${wranglerBin}. Run \`npm ci\` inside the frontend directory to install dependencies.`
+    );
+  }
+}
+
 async function runWranglerQuery(databaseName, query) {
   const { stdout, stderr } = await execFileAsync(
     wranglerBin,
@@ -101,8 +114,15 @@ async function verifyTables(databaseName) {
   const parsed = parseWranglerTable(stdout);
 
   if (parsed.rows.length === 0) {
+    const stdoutSnippet = stdout.trim().slice(0, MAX_ERROR_OUTPUT_LENGTH);
     throw new Error(
-      `Could not parse table list from Wrangler output. ${stderr.trim()}`.trim()
+      [
+        'Could not parse table list from Wrangler output.',
+        stderr.trim() && `stderr: ${stderr.trim()}`,
+        stdoutSnippet && `stdout: ${stdoutSnippet}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
     );
   }
 
@@ -132,8 +152,15 @@ async function verifyColumns(databaseName, table, columns) {
   const nameIndex = parsed.headers.indexOf('name');
 
   if (parsed.rows.length === 0 || nameIndex === -1) {
+    const stdoutSnippet = stdout.trim().slice(0, MAX_ERROR_OUTPUT_LENGTH);
     throw new Error(
-      `Could not parse column list for ${table} from Wrangler output. ${stderr.trim()}`.trim()
+      [
+        `Could not parse column list for ${table} from Wrangler output.`,
+        stderr.trim() && `stderr: ${stderr.trim()}`,
+        stdoutSnippet && `stdout: ${stdoutSnippet}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
     );
   }
 
@@ -154,6 +181,8 @@ async function verifyColumns(databaseName, table, columns) {
 async function main() {
   try {
     const databaseName = getDatabaseName();
+
+    await checkWranglerExists();
 
     console.log(`Verifying remote D1 schema for ${databaseName}...`);
 

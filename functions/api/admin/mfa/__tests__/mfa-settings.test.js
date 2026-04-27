@@ -47,8 +47,8 @@ describe("admin mfa settings", () => {
 
     const user = rawDb.prepare("SELECT totp_secret, totp_enabled FROM users WHERE id = 1").get();
     expect(user.totp_secret).toBeTruthy();
-  expect(isEncryptedTotpSecret(user.totp_secret)).toBe(true);
-  expect(user.totp_secret).not.toBe(setupPayload.secret);
+    expect(isEncryptedTotpSecret(user.totp_secret)).toBe(true);
+    expect(user.totp_secret).not.toBe(setupPayload.secret);
     expect(user.totp_enabled).toBe(0);
 
     const statusReq2 = new Request("https://example.test/api/admin/mfa/status", {

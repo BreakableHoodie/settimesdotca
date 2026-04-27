@@ -12,23 +12,67 @@ const LOG_LEVELS = {
 };
 
 // Keys that should be redacted from logs (exact case-insensitive match).
-// camelCase keys are covered by lowercasing: e.g. 'ipAddress' → 'ipaddress',
-// 'userAgent' → 'useragent'. snake_case variants are listed explicitly.
+// camelCase keys are normalised to lowercase before lookup, so e.g.
+// 'ipAddress' → 'ipaddress' and 'userAgent' → 'useragent'.
+// Common compound/snake_case variants are listed explicitly so that
+// credential-bearing keys like 'password_hash' and 'totp_secret' are
+// also redacted without falling back to substring matching (which would
+// over-redact unrelated keys such as 'emailDelivered').
 const SENSITIVE_KEYS = new Set([
+  // Password variants
   'password',
+  'password_hash',
+  'passwordhash',       // camelCase 'passwordHash'
+
+  // Token variants
   'token',
+  'access_token',
+  'accesstoken',        // camelCase 'accessToken'
+  'refresh_token',
+  'refreshtoken',       // camelCase 'refreshToken'
+  'verification_token',
+  'verificationtoken',  // camelCase 'verificationToken'
+  'reset_token',
+  'resettoken',         // camelCase 'resetToken'
+  'invite_token',
+  'invitetoken',        // camelCase 'inviteToken'
+  'api_token',
+  'apitoken',           // camelCase 'apiToken'
+
+  // Secret variants
   'secret',
+  'totp_secret',
+  'totpsecret',         // camelCase 'totpSecret'
+  'client_secret',
+  'clientsecret',       // camelCase 'clientSecret'
+
+  // Key variants
+  'key',
+  'api_key',
+  'apikey',             // camelCase 'apiKey'
+  'private_key',
+  'privatekey',         // camelCase 'privateKey'
+  'encryption_key',
+  'encryptionkey',      // camelCase 'encryptionKey'
+
+  // Auth headers / cookies
   'authorization',
   'cookie',
-  'key',
+  'bearer',
+
+  // Email (exact only – avoids over-redacting 'emailDelivered' etc.)
   'email',
+  'user_email',
+  'useremail',          // camelCase 'userEmail'
+
+  // IP address variants
   'ip',
-  'ipaddress',   // matches camelCase 'ipAddress'
-  'ip_address',  // matches snake_case 'ip_address'
-  'useragent',   // matches camelCase 'userAgent'
-  'user_agent',  // matches snake_case 'user_agent'
-  'access_token',
-  'refresh_token',
+  'ipaddress',          // camelCase 'ipAddress'
+  'ip_address',
+
+  // User-agent variants
+  'useragent',          // camelCase 'userAgent'
+  'user_agent',
 ]);
 
 /**

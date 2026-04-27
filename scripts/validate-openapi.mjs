@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { access, constants } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import path from "node:path";
 import SwaggerParser from "@apidevtools/swagger-parser";
 
@@ -9,7 +9,7 @@ const specPath = path.join(rootDir, "docs/api-spec.yaml");
 
 async function main() {
   try {
-    await access(specPath, constants.F_OK);
+    await access(specPath);
 
     const api = await SwaggerParser.validate(specPath);
     const title = api?.info?.title || "OpenAPI document";

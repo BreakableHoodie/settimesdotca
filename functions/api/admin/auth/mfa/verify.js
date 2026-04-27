@@ -207,6 +207,15 @@ export async function onRequestPost(context) {
       }
     }
 
+    if (!verified) {
+      const backupCodes = parseBackupCodes(challenge.backup_codes);
+      const backupResult = await verifyBackupCode(code, backupCodes);
+      if (backupResult.valid) {
+        verified = true;
+        usedBackupCode = true;
+        remainingBackupCodes = backupResult.remaining;
+      }
+    }
 
     if (!verified && totpSecretError) {
       return new Response(
@@ -219,16 +228,6 @@ export async function onRequestPost(context) {
           headers: { "Content-Type": "application/json" },
         }
       );
-    }
-
-    if (!verified) {
-      const backupCodes = parseBackupCodes(challenge.backup_codes);
-      const backupResult = await verifyBackupCode(code, backupCodes);
-      if (backupResult.valid) {
-        verified = true;
-        usedBackupCode = true;
-        remainingBackupCodes = backupResult.remaining;
-      }
     }
 
     if (!verified) {

@@ -252,7 +252,7 @@ export async function onRequestPost(context) {
       await DB.prepare(
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at, used, used_at)
          VALUES (?, ?, ?, ?, ?, 0, NULL)
-         ON CONFLICT DO UPDATE SET
+         ON CONFLICT(user_id) WHERE used = 0 DO UPDATE SET
            token = excluded.token,
            ip_address = excluded.ip_address,
            user_agent = excluded.user_agent,

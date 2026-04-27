@@ -139,6 +139,56 @@ describe("admin mfa", () => {
     expect(user.backup_codes).toBeNull();
   });
 
+  it("allows backup-code login when the encrypted TOTP secret cannot be decrypted", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const secret = generateTotpSecret();
+    const encryptedSecret = await encryptTotpSecret(secret, env);
+    const backupCode = "ABCD-34";
+    const backupCodes = [await hashBackupCode(backupCode)];
+    rawDb
+      .prepare(
+        "UPDATE users SET totp_secret = ?, totp_enabled = 1, backup_codes = ? WHERE id = 1"
+      )
+      .run(encryptedSecret, JSON.stringify(backupCodes));
+
+    const mfaToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    rawDb
+      .prepare(
+        `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(mfaToken, 1, "127.0.0.1", "test-agent", expiresAt);
+
+    env.MFA_TOTP_ENCRYPTION_KEY = "";
+
+    const request = new Request(
+      "https://example.test/api/admin/auth/mfa/verify",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "CF-Connecting-IP": "127.0.0.1",
+          "User-Agent": "test-agent",
+        },
+        body: JSON.stringify({ mfaToken, code: backupCode }),
+      }
+    );
+
+    const response = await mfaVerifyHandler.onRequestPost({ request, env });
+    expect(response.status).toBe(200);
+
+    const session = rawDb
+      .prepare("SELECT * FROM lucia_sessions WHERE user_id = ? ORDER BY created_at DESC")
+      .get(1);
+    expect(session).toBeTruthy();
+
+    const user = rawDb
+      .prepare("SELECT backup_codes FROM users WHERE id = ?")
+      .get(1);
+    expect(user.backup_codes).toBeNull();
+  });
+
   it("replaces any previously active MFA challenge when login issues a new token", async () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
     const passwordHash = await hashPassword("StrongPass1!");

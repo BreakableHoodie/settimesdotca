@@ -51,7 +51,13 @@ export class MockD1Database {
       }
       
       // Map results based on SELECT columns
-      if (queryLower.includes('select id, verified')) {
+      if (queryLower.includes('select id, verified, verification_token')) {
+        results = results.map(sub => ({
+          id: sub.id,
+          verified: sub.verified,
+          verification_token: sub.verification_token
+        }))
+      } else if (queryLower.includes('select id, verified')) {
         results = results.map(sub => ({
           id: sub.id,
           verified: sub.verified

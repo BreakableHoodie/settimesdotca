@@ -55,6 +55,19 @@ async function verifyTurnstile(request, env, token) {
   }
 }
 
+// Build a JSON Response, merging an optional verificationUrl when email
+// delivery was skipped so local/dev environments can verify without email.
+function subscriptionResponse(body, status, emailResult) {
+  const payload =
+    !emailResult.delivered && emailResult.reason === 'not_configured'
+      ? { ...body, verificationUrl: emailResult.verifyUrl }
+      : body;
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -149,13 +162,24 @@ export async function onRequestPost(context) {
         );
       } else {
         // Re-send verification email
-        await sendVerificationEmail(
+        const emailResult = await sendVerificationEmail(
           env,
           email,
           city,
           genre,
           existing[0].verification_token
         );
+
+        if (!emailResult.delivered && emailResult.reason === 'not_configured') {
+          return subscriptionResponse(
+            {
+              message:
+                'Email delivery is not configured. Use the link below to verify your subscription.',
+            },
+            200,
+            emailResult
+          );
+        }
 
         return new Response(
           JSON.stringify({
@@ -180,7 +204,18 @@ export async function onRequestPost(context) {
       .run();
 
     // Send verification email
-    await sendVerificationEmail(env, email, city, genre, verificationToken);
+    const emailResult = await sendVerificationEmail(env, email, city, genre, verificationToken);
+
+    if (!emailResult.delivered && emailResult.reason === 'not_configured') {
+      return subscriptionResponse(
+        {
+          message:
+            'Subscription created. Email delivery is not configured; use the link below to verify your subscription.',
+        },
+        201,
+        emailResult
+      );
+    }
 
     return new Response(
       JSON.stringify({
@@ -220,11 +255,11 @@ async function sendVerificationEmail(env, email, city, genre, token) {
       text,
       html,
     });
-    return emailResult;
+    return { ...emailResult, verifyUrl };
   } else {
     console.warn(
       '[Subscribe] Email not configured; verification email was not sent.'
     );
-    return { delivered: false, reason: 'not_configured' };
+    return { delivered: false, reason: 'not_configured', verifyUrl };
   }
 }

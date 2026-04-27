@@ -41,6 +41,11 @@ describe('POST /api/subscriptions/subscribe', () => {
     expect(response.status).toBe(201);
     const data = await response.json();
     expect(data.message).toContain('Subscription created');
+    // When email is not configured the response includes a verificationUrl
+    // so developers/local environments can complete verification without email
+    expect(data.verificationUrl).toMatch(
+      /^https:\/\/example\.com\/verify\?token=/
+    );
 
     expect(mockDB.data.email_subscriptions).toHaveLength(1);
     expect(mockDB.data.email_subscriptions[0]).toMatchObject({
@@ -152,7 +157,12 @@ describe('POST /api/subscriptions/subscribe', () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.message).toContain('Verification email sent');
+    // When email is not configured, the response is explicit about it and
+    // includes the verificationUrl instead of falsely claiming email was sent
+    expect(data.message).toContain('not configured');
+    expect(data.verificationUrl).toMatch(
+      /^https:\/\/example\.com\/verify\?token=existing-token-12345$/
+    );
     expect(mockDB.data.email_subscriptions).toHaveLength(1);
   });
 

@@ -247,7 +247,14 @@ export async function onRequestPost(context) {
       }
 
       const mfaToken = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      // Store in SQLite datetime format (YYYY-MM-DD HH:MM:SS) so TEXT comparisons
+      // against datetime('now') are lexicographically correct. ISO 8601 with 'T'
+      // sorts greater than the space-separated SQLite format at the same instant,
+      // which would allow expired challenges to pass the verify query.
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
+        .toISOString()
+        .replace('T', ' ')
+        .slice(0, 19);
 
       await DB.prepare(
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at, used, used_at)

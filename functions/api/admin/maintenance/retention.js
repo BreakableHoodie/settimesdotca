@@ -39,7 +39,7 @@ export async function runRetentionCleanup(env) {
       "DELETE FROM email_otp_codes WHERE expires_at < datetime('now')"
     ).run(),
     DB.prepare(
-      "DELETE FROM password_reset_tokens WHERE used = 1 OR expires_at < datetime('now')"
+      "DELETE FROM password_reset_tokens WHERE used = 1 OR datetime(expires_at) < datetime('now')"
     ).run(),
     DB.prepare(
       "DELETE FROM trusted_devices WHERE expires_at <= datetime('now')"

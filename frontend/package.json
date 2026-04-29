@@ -80,7 +80,7 @@
     "@lhci/cli": {
       "chrome-launcher": "1.2.1",
       "tmp": "0.2.5",
-      "uuid": "^14.0.0"
+      "uuid": "14.0.0"
     },
     "external-editor": {
       "tmp": "0.2.5"

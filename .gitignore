@@ -51,6 +51,7 @@ e2e/visual-regression.spec.js-snapshots/
 .claude/
 .serena/
 .mcp.json
+workers-mcp-server/
 chatmodes/
 claudedocs/
 instructions/

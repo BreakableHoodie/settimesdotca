@@ -71,7 +71,7 @@ These routes are currently used for authenticated self-service inside the admin 
 
 - `GET /api/admin/me`: returns authenticated user info and safe session expiry metadata
 - `GET /api/admin/sessions`: returns safe session metadata for the current user without raw session IDs
-- `DELETE /api/admin/sessions`: revokes a specific session when a server-known session ID is supplied
+- `DELETE /api/admin/sessions`: revokes a specific session when an opaque `revocationToken` is supplied; raw session IDs are never exposed to the client
 - `POST /api/admin/sessions/revoke-all`: revokes all other sessions and rotates the current session
 - `GET /api/admin/trusted-devices`: lists trusted devices for the current user
 - `DELETE /api/admin/trusted-devices`: revokes a trusted device

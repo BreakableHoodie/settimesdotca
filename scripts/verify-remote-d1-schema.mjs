@@ -31,7 +31,7 @@ const REQUIRED_SCHEMA = {
     'totp_secret',
     'backup_codes',
   ],
-  lucia_sessions: ['id', 'user_id', 'expires_at', 'ip_address', 'user_agent'],
+  lucia_sessions: ['id', 'user_id', 'expires_at', 'ip_address', 'user_agent', 'created_at', 'last_activity_at'],
   invite_codes: ['id', 'code', 'role', 'is_active', 'expires_at'],
   password_reset_tokens: [
     'id',
@@ -50,6 +50,7 @@ const REQUIRED_SCHEMA = {
     'expires_at',
     'used',
     'used_at',
+    'created_at',
   ],
   auth_attempts: [
     'id',

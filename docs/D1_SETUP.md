@@ -1,585 +1,221 @@
-# D1 Database and Admin Panel Setup Guide
+# D1 Setup and Local Database Workflow
 
-Complete setup instructions for the SetTimes admin panel with Cloudflare D1 database.
+This guide documents the current database workflow for SetTimes.
 
-## Table of Contents
+Use this document for:
 
-- [Prerequisites](#prerequisites)
-- [Local Development Setup](#local-development-setup)
-- [Production Deployment](#production-deployment)
-- [Admin Panel Usage](#admin-panel-usage)
-- [Security Best Practices](#security-best-practices)
-- [Troubleshooting](#troubleshooting)
+- local development bootstrap
+- local schema migration and validation
+- remote D1 creation and wiring
+- release-time migration and schema verification
 
----
+The current app uses a single top-level `DB` binding in `wrangler.toml`. Do not follow older docs that refer to a `DATABASE` binding or shared admin-password environment variables.
 
 ## Prerequisites
 
-- Node.js 18+ installed
-- Cloudflare account with Pages enabled
-- Wrangler CLI installed: `npm install -g wrangler`
-- Authenticated with Wrangler: `wrangler login`
+- Node.js 20+
+- npm
+- `sqlite3` CLI for local bootstrap scripts
+- Cloudflare account and `wrangler` access only when working with remote D1 databases
 
----
-
-## Local Development Setup
-
-### 1. Create D1 Database
+Install dependencies first:
 
 ```bash
-# Create the database
-wrangler d1 create settimes-db
-
-# Output will show:
-# database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+./setup.sh
 ```
 
-Copy the `database_id` from the output.
+## Local Development Database
 
-### 2. Update wrangler.toml
+### Recommended two-terminal flow
 
-Edit `wrangler.toml` and replace `YOUR_DATABASE_ID_HERE` with your actual database ID:
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "settimes-db"
-database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Your actual ID
-```
-
-### 3. Initialize Database Schema
+1. Copy the runtime example:
 
 ```bash
-# Create tables
-wrangler d1 execute settimes-db --file=database/schema.sql --local
-
-# Add sample data (optional)
-wrangler d1 execute settimes-db --file=database/seed.sql --local
-```
-
-### 4. Set Up Environment Variables
-
-```bash
-# Copy example file
 cp .env.example .dev.vars
-
-# Edit .dev.vars and set strong passwords
-# NEVER commit .dev.vars to git (it's in .gitignore)
 ```
 
-Example `.dev.vars`:
+1. Build the frontend bundle that Pages serves locally:
+
+```bash
+npm --prefix frontend run build
+```
+
+1. Start Wrangler in one terminal:
+
+```bash
+./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state
+```
+
+1. In a second terminal, initialize the local database:
+
+```bash
+./scripts/setup-local-db.sh
+```
+
+What `./scripts/setup-local-db.sh` does:
+
+- finds the active local SQLite file under `.wrangler/state/v3/d1/miniflare-D1DatabaseObject`
+- loads `database/setup-complete.sql`
+- refreshes the seeded local user passwords
+- prints the generated credentials for the built-in local accounts
+
+Seeded local users:
+
+- `admin@settimes.ca`
+- `editor@settimes.ca`
+- `viewer@settimes.ca`
+
+### One-command helper
+
+If you want to build, start Wrangler, and initialize the database in one step:
+
+```bash
+./init-dev-db.sh
+```
+
+### Local runtime variables
+
+Local Wrangler reads `.dev.vars`. Start from `.env.example`.
+
+Most local workflows only need:
 
 ```env
-ADMIN_PASSWORD=your-strong-admin-password-16-chars-minimum
-MASTER_PASSWORD=your-even-stronger-master-password-20-chars-minimum
-DEVELOPER_CONTACT=555-123-4567
+ENVIRONMENT=development
+PUBLIC_URL=http://localhost:8788
+PUBLIC_DATA_PUBLISH_ENABLED=false
 ```
 
-### 5. Migrate Existing Data (Optional)
+Notes:
 
-If you have existing `bands.json` data:
+- public discovery endpoints stay disabled until `PUBLIC_DATA_PUBLISH_ENABLED=true`
+- local development can use the built-in CSRF fallback secret
+- production must set `CSRF_SECRET`
+- set `MFA_TOTP_ENCRYPTION_KEY` in `.dev.vars` before enabling or verifying TOTP MFA locally
+- production must set `MFA_TOTP_ENCRYPTION_KEY` before enabling or verifying TOTP MFA
+- email settings are only required if you are testing activation, reset, or subscription delivery flows
+
+## Local Schema Changes
+
+When you add or modify a migration:
 
 ```bash
-# Generate migration SQL
-node database/migrate-bands-json.js > database/migration.sql
-
-# Execute migration
-wrangler d1 execute settimes-db --local --file=database/migration.sql
+npm run migrate:local
+npm run validate:schema
 ```
 
-### 6. Run Local Development Server
+`npm run migrate:local` applies the numbered SQL files in `migrations/` to every local SQLite file under `.wrangler/state/...` so Wrangler and local CLI workflows stay consistent.
+
+After applying migrations, restart Wrangler.
+
+## Remote D1 Databases
+
+### Create a database
+
+Create the production database:
 
 ```bash
-# Start Wrangler dev server (includes Pages Functions + D1)
-cd frontend
-npx wrangler pages dev dist --binding DB=settimes-db --local
-
-# Or use Vite dev server (API calls will proxy to port 3000)
-npm run dev
+./frontend/node_modules/.bin/wrangler d1 create settimes-production-db
 ```
 
-Access the app:
-
-- Main app: <http://localhost:5173>
-- Admin panel: <http://localhost:5173/admin>
-
----
-
-## Production Deployment
-
-### 1. Create Production D1 Database
+Optional development database:
 
 ```bash
-# Create production database (different from local)
-wrangler d1 create settimes-db-production
-
-# Note the database_id for production
+./frontend/node_modules/.bin/wrangler d1 create settimes-development-db
 ```
 
-### 2. Update Cloudflare Pages D1 Binding
+Update the `[[d1_databases]]` block in `wrangler.toml` with the correct `database_name` and `database_id` for the project you are operating.
 
-In Cloudflare dashboard:
+### Cloudflare Pages binding
 
-1. Go to **Workers & Pages** > Your project
-2. Click **Settings** > **Functions**
-3. Scroll to **D1 database bindings**
-4. Add binding:
-   - **Variable name**: `DB`
-   - **D1 database**: Select your production database
+In the Cloudflare Pages project:
 
-### 3. Initialize Production Database
+1. Open Settings -> Functions
+2. Add or confirm the D1 binding
+3. Use binding name `DB`
+
+If you use R2 band-photo uploads, also add the `BAND_PHOTOS` binding in the same area.
+
+### Runtime environment variables
+
+Set runtime variables in Cloudflare Pages -> Settings -> Environment Variables.
+
+Key values:
+
+- `ENVIRONMENT=production` or `development`
+- `PUBLIC_URL=https://settimes.ca` or the development host
+- `PUBLIC_DATA_PUBLISH_ENABLED=false` until public data is intentionally released
+- `CSRF_SECRET=<strong random value>`
+- `MFA_TOTP_ENCRYPTION_KEY=<strong stable random value>`
+- `EMAIL_PROVIDER`, `EMAIL_FROM`, and provider secret when email delivery is enabled
+- `CSP_ENFORCE=true` in production unless you are intentionally running report-only
+
+See [.env.example](../.env.example) and [docs/DEPLOYMENT.md](DEPLOYMENT.md) for the complete runtime list.
+
+## Remote Migrations and Release Flow
+
+The supported release path is the GitHub Actions workflow in `.github/workflows/cloudflare-pages.yml`.
+
+That workflow performs:
+
+1. CI and validation
+2. remote D1 migrations
+3. remote schema verification via `scripts/verify-remote-d1-schema.mjs`
+4. Pages deploy
+5. smoke checks
+
+Manual commands are still available when you need them:
 
 ```bash
-# Execute schema on production database
-wrangler d1 execute settimes-db-production --file=database/schema.sql
-
-# Optionally add seed data
-wrangler d1 execute settimes-db-production --file=database/seed.sql
-
-# Or migrate existing bands.json
-node database/migrate-bands-json.js > database/migration.sql
-wrangler d1 execute settimes-db-production --file=database/migration.sql
+./frontend/node_modules/.bin/wrangler d1 migrations apply settimes-production-db --remote
+npm run verify:schema:remote -- settimes-production-db
 ```
 
-### 4. Set Environment Variables in Cloudflare Pages
-
-In Cloudflare dashboard:
-
-1. Go to **Workers & Pages** > Your project
-2. Click **Settings** > **Environment Variables**
-3. Add three variables:
-   - `ADMIN_PASSWORD` - Strong password (16+ characters)
-   - `MASTER_PASSWORD` - Emergency recovery password (20+ characters)
-   - `DEVELOPER_CONTACT` - Your phone number
-
-**Important:** Set these for both **Production** and **Preview** environments (use different passwords for preview).
-
-### 5. Deploy
-
-```bash
-cd frontend
-npm run build
-npx wrangler pages deploy dist
-```
-
-Or push to GitHub if you have automatic deployments configured.
-
-Access your admin panel at: `https://yourdomain.com/admin`
-
----
-
-## Admin Panel Usage
-
-### Accessing the Admin Panel
-
-1. Navigate to `https://yourdomain.com/admin`
-2. Enter the `ADMIN_PASSWORD`
-3. You're now logged in (session persists until browser close)
-
-### Managing Events
-
-**Create New Event:**
-
-1. Go to **Events** tab
-2. Click **Create New Event**
-3. Fill in:
-   - Name (e.g., "Long Weekend Band Crawl Vol. 5")
-   - Date (YYYY-MM-DD format)
-   - Slug (URL-friendly, e.g., "vol-5")
-   - Publish status (optional)
-4. Click **Create**
-
-**Duplicate Event:**
-
-1. Find the event you want to duplicate
-2. Click **Duplicate**
-3. Enter new name, date, and slug
-4. All bands and venues will be copied to the new event
-
-**Publish/Unpublish:**
-
-- Toggle the publish button to make events visible to the public
-- Only published events appear on the main schedule
-
-### Managing Venues
-
-**Add Venue:**
-
-1. Go to **Venues** tab
-2. Fill in venue name and address
-3. Click **Add Venue**
-
-**Edit Venue:**
-
-1. Click **Edit** on the venue
-2. Update name/address
-3. Click **Save**
-
-**Delete Venue:**
-
-- Only venues with 0 bands can be deleted
-- Delete all bands at the venue first
-
-### Managing Bands
-
-**Add Band:**
-
-1. Go to **Bands** tab
-2. Select an event from the dropdown
-3. Fill in:
-   - Band name
-   - Venue (dropdown)
-   - Start time (HH:MM format, 24-hour)
-   - End time
-   - URL (optional)
-4. Click **Add Band**
-
-**Conflict Detection:**
-
-- System automatically detects overlapping times at the same venue
-- Conflicts are highlighted in red
-- You can still save conflicting bands (warnings only)
-
-**Edit Band:**
-
-1. Click **Edit** on the band
-2. Update details
-3. Conflicts are re-checked on save
-
----
-
-## Security Best Practices
-
-### Invite-Only Signup System
-
-**NEW:** The platform now uses an invite-only signup system to prevent unauthorized account creation.
-
-**Creating Admin Invite Codes:**
-
-```bash
-# For local development
-node scripts/create-admin-invite.js --local
-
-# For production
-node scripts/create-admin-invite.js --prod
-```
-
-**Invite Code Best Practices:**
-
-- Generate unique invite codes for each new user
-- Set appropriate expiration times (default: 7 days)
-- Store invite codes securely (password manager)
-- Never share via unsecured channels (email, SMS)
-- Invite codes are single-use only
-- Revoke unused codes if needed via `/api/admin/invite-codes/:code` (DELETE)
-
-**First Admin Setup:**
-
-1. Prepare the database:
-   - **Fresh local database:** `wrangler d1 execute settimes-db --local --file=database/setup-complete.sql`
-   - **Existing local database:** `wrangler d1 execute settimes-db --local --file=migrations/0009_migration-invite-codes.sql` (or run the full upgrade: `npm run migrate:local`)
-2. Generate admin invite: `node scripts/create-admin-invite.js --local`
-3. Insert the invite code into the database using the command printed by the script
-4. Use the code during signup at `/admin`
-
-### Password Management
-
-**User Passwords:**
-
-- 8+ characters minimum (enforced)
-- Mix of letters, numbers, symbols recommended
-- Password strength validation during signup
-- PBKDF2 hashing with 100,000 iterations
-
-**MASTER_PASSWORD (if configured):**
-
-- 20+ characters minimum
-- ONLY stored in developer's password manager
-- NEVER shared with organizers
-- Used only for emergency password recovery
-- Rotate annually
-
-### Rate Limiting
-
-The system automatically protects against brute force:
-
-- 5 failed login attempts in 10 minutes = 1 hour IP lockout
-- All auth attempts logged in `auth_audit` table
-- Friendly lockout messages shown to users
-
-### Audit Logging
-
-All authentication events are logged:
-
-```sql
-SELECT * FROM auth_audit ORDER BY timestamp DESC LIMIT 100;
-```
-
-Monitor for:
-
-- Repeated failed attempts from same IP
-- Successful logins at unusual times
-- Password reset requests
-
-### Access Control
-
-- Only access admin panel over HTTPS
-- Avoid using public WiFi for admin access
-- Consider VPN for additional security
-- Rotate admin password when personnel changes
-- Review audit logs periodically
-
-### Environment Variable Security
-
-- Never commit `.dev.vars` to git (it's in `.gitignore`)
-- Use different passwords for dev/staging/production
-- Set environment variables as encrypted secrets in Cloudflare
-- Never send passwords via email or SMS
-- Use password manager to generate and store
-
----
+Prefer the workflow for normal releases so database and deploy checks stay coupled.
 
 ## Troubleshooting
 
-### "Event not found" or "No published events"
+### No local database files exist
 
-**Problem:** API returns 404 when fetching schedule
-
-**Solutions:**
-
-1. Check that at least one event is published:
-
-   ```bash
-   wrangler d1 execute settimes-db --command "SELECT * FROM events WHERE is_published = 1"
-   ```
-
-2. Publish an event via admin panel or SQL:
-
-   ```bash
-   wrangler d1 execute settimes-db --command "UPDATE events SET is_published = 1 WHERE id = 1"
-   ```
-
-### "Database error" in admin panel
-
-**Problem:** D1 database not bound correctly
-
-**Solutions:**
-
-1. Check `wrangler.toml` has correct database_id
-2. Verify D1 binding in Cloudflare Pages dashboard
-3. Ensure database exists:
-
-   ```bash
-   wrangler d1 list
-   ```
-
-### "Unauthorized" when accessing admin endpoints
-
-**Problem:** Password not set or incorrect
-
-**Solutions:**
-
-1. Check environment variables in Cloudflare dashboard
-2. For local dev, ensure `.dev.vars` exists with correct passwords
-3. Restart Wrangler dev server after changing `.dev.vars`
-
-### Admin panel shows empty/no data
-
-**Problem:** Database tables are empty
-
-**Solutions:**
-
-1. Run schema creation:
-
-   ```bash
-   wrangler d1 execute settimes-db --file=database/schema.sql
-   ```
-
-2. Add seed data or migrate:
-
-   ```bash
-   wrangler d1 execute settimes-db --file=database/seed.sql
-   ```
-
-### "IP locked out" message
-
-**Problem:** Too many failed login attempts
-
-**Solutions:**
-
-1. Wait 1 hour for automatic unlock
-2. Or manually reset in database:
-
-   ```bash
-   wrangler d1 execute settimes-db --command "DELETE FROM rate_limit WHERE ip_address = 'your.ip.here'"
-   ```
-
-3. Use master password to retrieve admin password if forgotten
-
-### Forgot admin password
-
-**Solutions:**
-
-1. Click "Forgot password?" on login screen
-2. Contact developer using phone number shown
-3. Or use master password to retrieve admin password
-
-### Local development - API not working
-
-**Problem:** Functions not running locally
-
-**Solutions:**
-
-1. Use `wrangler pages dev` instead of `npm run dev`
-2. Or ensure Vite proxy is configured (already set up in `vite.config.js`)
-3. Check that D1 binding is correct:
-
-   ```bash
-   npx wrangler pages dev dist --binding DB=settimes-db --local
-   ```
-
----
-
-## Database Queries (Advanced)
-
-### Useful SQL Queries
-
-**List all events with band counts:**
-
-```sql
-SELECT e.*, COUNT(b.id) as band_count
-FROM events e
-LEFT JOIN bands b ON e.id = b.event_id
-GROUP BY e.id;
-```
-
-**Find time conflicts:**
-
-```sql
-SELECT b1.name as band1, b2.name as band2, v.name as venue,
-       b1.start_time, b1.end_time, b2.start_time, b2.end_time
-FROM bands b1
-JOIN bands b2 ON b1.event_id = b2.event_id
-  AND b1.venue_id = b2.venue_id
-  AND b1.id < b2.id
-  AND b1.start_time < b2.end_time
-  AND b1.end_time > b2.start_time
-JOIN venues v ON b1.venue_id = v.id
-WHERE b1.event_id = 1;
-```
-
-**View recent auth attempts:**
-
-```sql
-SELECT timestamp, action, success, ip_address
-FROM auth_audit
-ORDER BY timestamp DESC
-LIMIT 50;
-```
-
-**Check current rate limits:**
-
-```sql
-SELECT * FROM rate_limit
-WHERE lockout_until > datetime('now')
-ORDER BY last_attempt DESC;
-```
-
-### Execute Queries
+Start Wrangler first:
 
 ```bash
-# Production
-wrangler d1 execute settimes-db --command "YOUR SQL HERE"
-
-# Local
-wrangler d1 execute settimes-db --local --command "YOUR SQL HERE"
+./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state
 ```
 
----
+Then rerun:
 
-## Architecture Overview
-
-### Data Flow
-
-```
-User → Frontend (React) → API (/api/schedule?event=current)
-                        → D1 Database → Returns published event data
-
-Admin → Admin Panel → Auth (/api/admin/auth/login)
-                   → CRUD APIs (/api/admin/events, venues, bands)
-                   → D1 Database (with password protection + rate limiting)
+```bash
+./scripts/setup-local-db.sh
 ```
 
-### Fallback Strategy
+### Public endpoints return 503 locally
 
-The app uses a three-tier fallback:
+That is expected until you set:
 
-1. Try `/api/schedule?event=current` (D1 database)
-2. If fails, try `/bands.json` (static file)
-3. If fails, use embedded fallback (compiled into app)
-
-This ensures the app works even if:
-
-- D1 database is not set up yet
-- API is temporarily down
-- Network connectivity issues
-
-### File Structure
-
-```
-settimes/
-├── database/
-│   ├── schema.sql              # D1 table definitions
-│   ├── seed.sql                # Sample data
-│   └── migrate-bands-json.js   # Migration script
-├── functions/
-│   ├── _middleware.js          # CORS + error handling
-│   └── api/
-│       ├── schedule.js         # Public API
-│       └── admin/
-│           ├── _middleware.js  # Auth + rate limiting
-│           ├── auth/
-│           │   ├── login.js
-│           │   └── reset.js
-│           ├── events.js       # Events CRUD
-│           ├── events/[id].js  # Publish/duplicate
-│           ├── venues.js       # Venues CRUD
-│           ├── venues/[id].js  # Edit/delete venue
-│           ├── bands.js        # Bands CRUD + conflicts
-│           └── bands/[id].js   # Edit/delete band
-├── frontend/src/
-│   ├── admin/
-│   │   ├── AdminApp.jsx        # Auth wrapper
-│   │   ├── AdminLogin.jsx      # Login + forgot password
-│   │   ├── AdminPanel.jsx      # Main panel + tabs
-│   │   ├── EventsTab.jsx       # Events management
-│   │   ├── VenuesTab.jsx       # Venues management
-│   │   └── BandsTab.jsx        # Bands + conflicts
-│   └── utils/
-│       └── adminApi.js         # API client functions
-├── wrangler.toml               # D1 bindings + config
-└── .env.example                # Environment variable template
+```env
+PUBLIC_DATA_PUBLISH_ENABLED=true
 ```
 
----
+Only enable it when you intentionally want the public routes live.
 
-## Support
+### Production requests fail with CSRF errors
 
-For issues or questions:
+Confirm `CSRF_SECRET` is set in the target Pages environment. Local fallback behavior does not apply in production.
 
-1. Check this guide and troubleshooting section
-2. Review Cloudflare D1 documentation: <https://developers.cloudflare.com/d1/>
-3. Contact developer at the phone number in your admin panel "Forgot Password" screen
+### Local schema looks inconsistent across tools
 
----
+Run:
 
-## Changelog
+```bash
+npm run migrate:local
+npm run validate:schema
+```
 
-**2025-10-15:** Initial D1 admin panel implementation
+Wrangler can create multiple local SQLite files; the migration helper updates all of them.
 
-- Complete CRUD operations for events, venues, and bands
-- Password-protected admin panel with rate limiting
-- Time conflict detection for band scheduling
-- Master password emergency recovery
-- Comprehensive audit logging
-- Migration script for existing data
+## Related Docs
+
+- [../README.md](../README.md)
+- [DEPLOYMENT.md](DEPLOYMENT.md)
+- [SESSION_MANAGEMENT.md](SESSION_MANAGEMENT.md)
+- [DATABASE.md](DATABASE.md)

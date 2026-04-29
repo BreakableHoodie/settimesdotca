@@ -49,7 +49,7 @@ export async function onRequestPost(context) {
       );
     }
 
-    if (new Date(resetToken.expires_at) < new Date()) {
+    if (new Date(resetToken.expires_at.includes('T') ? resetToken.expires_at : resetToken.expires_at.replace(' ', 'T') + 'Z') < new Date()) {
       return new Response(
         JSON.stringify({ error: "Reset token has expired", code: "TOKEN_EXPIRED" }),
         { status: 400, headers: { "Content-Type": "application/json" } },

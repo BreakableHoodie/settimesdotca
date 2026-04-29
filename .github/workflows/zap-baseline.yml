@@ -40,15 +40,18 @@ jobs:
 
       - name: Determine target URL
         id: target
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TARGET_URL: ${{ github.event.inputs.target_url }}
         run: |
           # workflow_dispatch: use provided URL or default to production
           # schedule: scan production
           # workflow_run (after dev deploy): scan dev environment
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            URL="${{ github.event.inputs.target_url }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            URL="${INPUT_TARGET_URL}"
             echo "url=${URL:-https://settimes.ca}" >> $GITHUB_OUTPUT
             echo "Manual scan: ${URL:-https://settimes.ca}"
-          elif [ "${{ github.event_name }}" = "schedule" ]; then
+          elif [ "$EVENT_NAME" = "schedule" ]; then
             echo "url=https://settimes.ca" >> $GITHUB_OUTPUT
             echo "Scheduled scan of production: https://settimes.ca"
           else

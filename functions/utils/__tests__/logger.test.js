@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createLogger, createRequestLogger, logger, logError } from '../logger.js';
+import {
+  createLogger,
+  createRequestLogger,
+  logger,
+  logError,
+} from '../logger.js';
 
 describe('Structured Logger', () => {
   let consoleSpy;
@@ -52,6 +57,22 @@ describe('Structured Logger', () => {
 
       expect(parsed.userId).toBe(123);
       expect(parsed.action).toBe('login');
+    });
+
+    it('should redact email and IP-like metadata keys', () => {
+      const log = createLogger();
+      log.info('Privacy-safe log', {
+        email: 'admin@test.com',
+        ipAddress: '1.2.3.4',
+        userAgent: 'Mozilla/5.0',
+      });
+
+      const logOutput = consoleSpy.info.mock.calls[0][0];
+      const parsed = JSON.parse(logOutput);
+
+      expect(parsed.email).toBe('[REDACTED]');
+      expect(parsed.ipAddress).toBe('[REDACTED]');
+      expect(parsed.userAgent).toBe('[REDACTED]');
     });
 
     it('should generate consistent request ID', () => {
@@ -164,7 +185,9 @@ describe('Structured Logger', () => {
 
     it('should handle Request objects in metadata', () => {
       const log = createLogger();
-      const request = new Request('https://example.com/test', { method: 'POST' });
+      const request = new Request('https://example.com/test', {
+        method: 'POST',
+      });
 
       log.info('Request log', { request });
 

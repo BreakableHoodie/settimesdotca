@@ -7,6 +7,7 @@ import { verifyTotp, verifyBackupCode } from "../../../../utils/totp.js";
 import { getClientIP } from "../../../../utils/request.js";
 import { initializeLucia } from "../../../../utils/auth.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../../utils/authAttempts.js";
+import { loadTotpSecret } from "../../../../utils/mfaSecrets.js";
 import {
   createTrustedDevice,
   createTrustedDeviceCookie,
@@ -185,10 +186,21 @@ export async function onRequestPost(context) {
     let verified = false;
     let remainingBackupCodes = null;
     let usedBackupCode = false;
+    let totpSecretError = null;
+    let totpSecretState = null;
 
     if (Number(challenge.totp_enabled) === 1 && challenge.totp_secret) {
       try {
-        verified = await verifyTotp(challenge.totp_secret, code);
+        totpSecretState = await loadTotpSecret(challenge.totp_secret, env);
+      } catch (error) {
+        totpSecretError = error;
+        console.error("[MFA Verify] Failed to decrypt TOTP secret:", error?.message || error);
+      }
+    }
+
+    if (totpSecretState?.secret) {
+      try {
+        verified = await verifyTotp(totpSecretState.secret, code);
       } catch (totpError) {
         console.error("[MFA Verify] TOTP verification threw:", totpError?.message || totpError);
         verified = false;
@@ -203,6 +215,19 @@ export async function onRequestPost(context) {
         usedBackupCode = true;
         remainingBackupCodes = backupResult.remaining;
       }
+    }
+
+    if (!verified && totpSecretError) {
+      return new Response(
+        JSON.stringify({
+          error: "Server error",
+          message: "Failed to verify MFA code",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     if (!verified) {
@@ -251,6 +276,33 @@ export async function onRequestPost(context) {
       );
     }
 
+    if (totpSecretState?.shouldPersist || usedBackupCode) {
+      const setClauses = [];
+      const bindValues = [];
+
+      if (totpSecretState?.shouldPersist) {
+        setClauses.push("totp_secret = ?");
+        bindValues.push(totpSecretState.encryptedSecret);
+      }
+
+      if (usedBackupCode) {
+        const nextCodes =
+          remainingBackupCodes && remainingBackupCodes.length > 0
+            ? JSON.stringify(remainingBackupCodes)
+            : null;
+        setClauses.push("backup_codes = ?");
+        bindValues.push(nextCodes);
+      }
+
+      await DB.prepare(
+        `UPDATE users
+         SET ${setClauses.join(", ")}
+         WHERE id = ?`
+      )
+        .bind(...bindValues, challenge.user_id)
+        .run();
+    }
+
     const lucia = initializeLucia(DB, request, env);
     const session = await lucia.createSession(challenge.user_id, {});
 
@@ -267,18 +319,6 @@ export async function onRequestPost(context) {
     )
       .bind(challenge.user_id)
       .run();
-
-    if (usedBackupCode) {
-      const nextCodes =
-        remainingBackupCodes && remainingBackupCodes.length > 0
-          ? JSON.stringify(remainingBackupCodes)
-          : null;
-      await DB.prepare(
-        "UPDATE users SET backup_codes = ? WHERE id = ?"
-      )
-        .bind(nextCodes, challenge.user_id)
-        .run();
-    }
 
     await writeAuthAttempt(DB, {
       attemptType: AUTH_ATTEMPT_TYPES.mfa,

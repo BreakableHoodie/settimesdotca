@@ -1,1140 +1,230 @@
 # SetTimes API Documentation
-**RESTful API for Event Schedule Management**
 
----
+Current API contract for the Cloudflare Pages Functions implementation in `functions/api`.
 
-## Table of Contents
+## Overview
 
-1. [Introduction](#introduction)
-2. [Getting Started](#getting-started)
-3. [Authentication](#authentication)
-4. [Rate Limiting & Security](#rate-limiting--security)
-5. [Public API Endpoints](#public-api-endpoints)
-6. [Admin API Endpoints](#admin-api-endpoints)
-7. [Error Handling](#error-handling)
-8. [Examples & Use Cases](#examples--use-cases)
-9. [API Reference](#api-reference)
+SetTimes exposes two API surfaces:
 
----
-
-## Introduction
-
-The SetTimes API provides programmatic access to event schedules, venues, and performer information. The API is divided into two main categories:
-
-**Public API:**
-- No authentication required
-- Read-only access to published events
-- Optimized for public consumption (cached responses)
-- Used by the SetTimes frontend and embeds
-
-**Admin API:**
-- Requires authentication (session-based)
-- Full CRUD operations for events, venues, and performers
-- Role-based access control (RBAC)
-- Audit logging for all state-changing operations
+- Public read endpoints for published schedules, events, bands, calendar feeds, subscription flows, and privacy-safe telemetry.
+- Admin endpoints for invite-based account onboarding, session-backed authentication, MFA, and event/catalog administration.
 
 ### Base URLs
 
-- **Production:** `https://settimes.ca`
-- **Development:** `https://dev.settimes.ca`
-- **Local:** `http://localhost:5173`
+- Production: `https://settimes.ca`
+- Local Pages development: `http://localhost:8788`
+- Branch or preview deployments: the active Cloudflare Pages preview URL
 
-### API Characteristics
+### Common behavior
 
-- **Format:** JSON (application/json)
-- **Protocol:** HTTPS (required in production)
-- **Versioning:** Currently v1 (implicit in URLs)
-- **CORS:** Enabled for specified origins
-- **Caching:** Cloudflare CDN with custom cache rules
+- JSON is the default response format unless a route explicitly returns HTML or `text/calendar`.
+- Dates use `YYYY-MM-DD`; times use `HH:MM`.
+- Public schedule and discovery routes fail closed when `PUBLIC_DATA_PUBLISH_ENABLED` is unset or falsey. In that state they return `503` with `Retry-After: 3600`.
+- Some older compatibility handlers still exist for admin routes. The inventory below reflects the routes the current frontend and handler set expect.
 
----
+## Authentication and Security
 
-## Getting Started
+### Admin session model
 
-### Prerequisites
+SetTimes no longer uses the earlier shared-password admin flow. Admin access is per-user and invite-based:
 
-**For Public API:**
-- No authentication required
-- No API key needed
-- Subject to rate limiting (see below)
+1. `POST /api/admin/auth/signup` creates an inactive account from a valid invite code.
+2. `POST /api/auth/activate` activates the account from the emailed activation token.
+3. `POST /api/admin/auth/login` validates credentials.
+4. If MFA is enabled, login returns `mfaRequired: true` plus a short-lived `mfaToken`, and the client completes `POST /api/admin/auth/mfa/verify`.
+5. On success, the server sets a session cookie and a readable `csrf_token` cookie.
 
-**For Admin API:**
-- Active user account with editor or admin role
-- Session cookie (obtained via login)
-- CSRF token (for state-changing requests)
+### Cookies and CSRF
 
-### Quick Start Example
+- Local development uses `session_token`; deployed environments use `__Host-session_token`.
+- Authenticated `POST`, `PUT`, `PATCH`, and `DELETE` admin requests must echo the `csrf_token` cookie value in the `X-CSRF-Token` header.
+- Pre-session auth routes (`/api/admin/auth/login`, `/api/admin/auth/signup`, `/api/admin/auth/mfa/verify`) rely on same-origin validation instead of the double-submit token because no session cookie exists yet.
+- `POST /api/admin/auth/logout` is fully CSRF-protected.
 
-**Fetch the current event schedule:**
+### Timeouts and roles
+
+- Admin idle timeout: 15 minutes
+- Admin absolute timeout: 8 hours
+- Role hierarchy: `viewer` < `editor` < `admin`
+- Non-production bearer-token header auth is only available when `ALLOW_HEADER_AUTH=true` and `ENVIRONMENT != production`; it is not part of the production contract.
+
+## Public API
+
+### Discovery and read endpoints
+
+| Route | Method | Notes |
+| --- | --- | --- |
+| `/api/schedule` | `GET` | Returns `{ event, bands }` for `event=current` or a specific event slug. Archived events are readable by slug. Cache TTL comes from `SCHEDULE_CACHE_TTL_SECONDS` and defaults to 60 seconds. |
+| `/api/events/public` | `GET` | Public event listing with filters for `city`, `genre`, `limit` (max 100), and `upcoming` (defaults to true). Returns `{ events, filters, count, generated_at }`. |
+| `/api/events/timeline` | `GET` | Grouped timeline response with `now`, `upcoming`, and `past`. Supports `now`, `upcoming`, `past`, `includeBands`, and `pastLimit` (1-100, default 10). |
+| `/api/events/{id}/details` | `GET` | Returns one published or archived event with `bands`, `venues`, `band_count`, and `venue_count`. `{id}` must be numeric. |
+| `/api/bands/{name}` | `GET` | Returns a public band profile plus published performance history. `{name}` may be a numeric band ID or a normalized band name. |
+| `/api/bands/stats/{name}` | `GET` | Extended band profile endpoint with aggregate stats, upcoming shows, and history across published and archived events. |
+| `/api/feeds/ical` | `GET` | Returns `text/calendar` content. Supports `city` and `genre`; both default to `all`. |
+| `/api/metrics` | `POST` | Privacy-safe metrics ingestion. Accepts up to 50 events per batch and always answers `200 OK` on malformed or rejected payloads. |
+| `/api/schedule/build` | `POST` | Records schedule-build analytics. Requires `event_id`, `user_session`, and `performance_ids` or the legacy `band_ids` alias. |
+
+### Subscriptions and account recovery
+
+| Route | Method | Notes |
+| --- | --- | --- |
+| `/api/subscriptions/subscribe` | `POST` | Body: `{ email, city, genre, frequency, turnstileToken? }`. `frequency` must be `daily`, `weekly`, or `monthly`. |
+| `/api/subscriptions/verify` | `GET` | Verifies a subscription via `?token=` and redirects to `/subscribe?verified=true` on success. |
+| `/api/subscriptions/unsubscribe` | `GET` | Removes a subscription via `?token=` and returns an HTML confirmation page. |
+| `/api/auth/activate` | `POST` | Body: `{ token }`. Activates an invited user account. |
+| `/api/auth/resend-activation` | `POST` | Body: `{ email }`. Always returns a generic success payload to avoid account enumeration. |
+| `/api/auth/reset-password/validate` | `POST` | Body: `{ token }`. Validates a reset token without placing it in the URL. |
+| `/api/auth/reset-password` | `POST` | Body: `{ token, newPassword }`. Consumes the token, rotates the password, revokes sessions, and clears trusted devices. |
+| `/api/auth/reset-password` | `GET` | Intentionally unsupported. Returns `405` so reset tokens are never validated through query strings. |
+
+### Public request notes
+
+- `POST /api/metrics` only persists allow-listed analytics events: `page_view`, `event_view`, `artist_profile_view`, `social_link_click`, `ticket_click`, `share_event`, and `filter_use`.
+- `POST /api/schedule/build` accepts at most 50 performance IDs and validates `user_session` against a restricted `[A-Za-z0-9_-]+` pattern.
+- All public discovery routes listed in the first table are gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
+
+### Example: current schedule
 
 ```bash
-curl https://settimes.ca/api/schedule?event=current
+curl "https://settimes.ca/api/schedule?event=current"
 ```
 
-**Response:**
 ```json
-[
-  {
-    "id": "the-sunset-trio-1",
-    "name": "The Sunset Trio",
-    "venue": "The Analog Cafe",
-    "date": "2025-05-17",
-    "startTime": "19:00",
-    "endTime": "20:00",
-    "url": "https://thesunsettrio.com"
+{
+  "event": {
+    "id": 12,
+    "name": "Winter Crawl 2026",
+    "date": "2026-01-17",
+    "slug": "winter-crawl-2026",
+    "ticket_url": "https://tickets.example.com/winter-crawl-2026",
+    "is_archived": false,
+    "theme_colors": "{\"accent\":\"#f97316\"}",
+    "venue_info": null,
+    "social_links": null
   },
-  {
-    "id": "electric-dreams-2",
-    "name": "Electric Dreams",
-    "venue": "Black Cat Tavern",
-    "date": "2025-05-17",
-    "startTime": "20:30",
-    "endTime": "21:30",
-    "url": null
-  }
-]
-```
-
----
-
-## Authentication
-
-### Session-Based Authentication
-
-SetTimes uses **session-based authentication** with HTTPOnly cookies for security.
-
-#### Login Flow
-
-1. **POST** `/api/admin/auth/login` with credentials
-2. Receive session cookie in response
-3. Browser automatically includes cookie in subsequent requests
-4. Session expires after 24 hours (configurable)
-
-**Login Request:**
-```bash
-curl -X POST https://settimes.ca/api/admin/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@example.com", "password": "your-password"}'
-```
-
-**Login Response (Success):**
-```json
-{
-  "success": true,
-  "message": "Login successful",
-  "user": {
-    "id": 1,
-    "email": "admin@example.com",
-    "name": "Admin User",
-    "role": "admin"
-  }
-}
-```
-
-**Session Cookie:**
-```
-Set-Cookie: session_token=abc123...; HttpOnly; Secure; SameSite=Strict; Max-Age=86400
-```
-
-### CSRF Protection
-
-All state-changing requests (POST, PUT, DELETE, PATCH) require a CSRF token.
-
-**How it works:**
-1. Server sends CSRF token as a readable cookie
-2. Client includes token in `X-CSRF-Token` header
-3. Server validates cookie matches header
-
-**Example Request with CSRF:**
-```bash
-curl -X POST https://settimes.ca/api/admin/events \
-  -H "Content-Type: application/json" \
-  -H "X-CSRF-Token: csrf_abc123..." \
-  -H "Cookie: session_token=abc123...; csrf_token=csrf_abc123..." \
-  -d '{"name": "Spring Fest", "date": "2025-06-15", "slug": "spring-fest"}'
-```
-
-### Logout
-
-**POST** `/api/admin/auth/logout` to terminate the session.
-
-```bash
-curl -X POST https://settimes.ca/api/admin/auth/logout \
-  -H "Cookie: session_token=abc123..."
-```
-
----
-
-## Rate Limiting & Security
-
-### Rate Limits
-
-**Public API:**
-- **100 requests/minute/IP** for schedule endpoints
-- **No authentication required**
-- Responses cached for 5 minutes (reduces load)
-
-**Admin API:**
-- **5 failed login attempts/10 minutes/IP** → 1 hour lockout
-- **100 requests/minute/session** for authenticated endpoints
-- **Audit logging** for all state-changing operations
-
-### Security Features
-
-**HTTPS/TLS:**
-- All production traffic encrypted with TLS 1.3
-- HSTS enabled (max-age=31536000)
-- Automatic HTTP→HTTPS redirect
-
-**Input Validation:**
-- All inputs validated and sanitized
-- Parameterized SQL queries (SQL injection prevention)
-- React auto-escaping (XSS prevention)
-
-**CSRF Protection:**
-- Double-submit cookie pattern
-- Required for POST/PUT/DELETE/PATCH
-- Validated on all state-changing requests
-
-**Role-Based Access Control (RBAC):**
-- **Admin** (level 3) - Full system access
-- **Editor** (level 2) - Create/edit events, venues, bands
-- **Viewer** (level 1) - Read-only access to admin panel
-
-**Audit Logging:**
-- All logins/logouts logged
-- All create/update/delete operations logged
-- IP addresses tracked
-- Timestamps recorded
-
----
-
-## Public API Endpoints
-
-### GET /api/schedule
-
-Fetch the event schedule for public consumption.
-
-**Authentication:** None required
-
-**Query Parameters:**
-- `event` (optional) - Event slug or "current" (default: "current")
-
-**Examples:**
-
-```bash
-# Get the most recent published event
-curl https://settimes.ca/api/schedule?event=current
-
-# Get a specific event by slug
-curl https://settimes.ca/api/schedule?event=spring-fest-2025
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "id": "the-sunset-trio-1",
-    "name": "The Sunset Trio",
-    "venue": "The Analog Cafe",
-    "date": "2025-05-17",
-    "startTime": "19:00",
-    "endTime": "20:00",
-    "url": "https://thesunsettrio.com"
-  }
-]
-```
-
-**Response Headers:**
-```
-Cache-Control: public, max-age=300
-Content-Type: application/json
-```
-
-**Error Responses:**
-
-**404 Not Found** - Event doesn't exist or no published events
-```json
-{
-  "error": "Event not found",
-  "message": "No published events available"
-}
-```
-
-**500 Internal Server Error** - Database error
-```json
-{
-  "error": "Database error",
-  "message": "Failed to fetch schedule"
-}
-```
-
----
-
-## Admin API Endpoints
-
-All admin endpoints require authentication (session cookie).
-
-### Events
-
-#### GET /api/admin/events
-
-List all events (published and unpublished).
-
-**Authentication:** Required (editor or admin)
-
-**Response (200 OK):**
-```json
-{
-  "events": [
-    {
-      "id": 1,
-      "name": "Spring Music Fest 2025",
-      "date": "2025-05-17",
-      "slug": "spring-fest-2025",
-      "is_published": 1,
-      "created_at": "2025-01-15T10:30:00Z",
-      "band_count": 25
-    },
-    {
-      "id": 2,
-      "name": "Summer Bash 2025",
-      "date": "2025-07-20",
-      "slug": "summer-bash-2025",
-      "is_published": 0,
-      "created_at": "2025-02-01T14:00:00Z",
-      "band_count": 0
-    }
-  ]
-}
-```
-
----
-
-#### POST /api/admin/events
-
-Create a new event.
-
-**Authentication:** Required (editor or admin)
-
-**Request Body:**
-```json
-{
-  "name": "Fall Festival 2025",
-  "date": "2025-10-15",
-  "slug": "fall-fest-2025",
-  "isPublished": false
-}
-```
-
-**Field Validation:**
-- `name` (required) - Event name
-- `date` (required) - YYYY-MM-DD format
-- `slug` (required) - Lowercase, numbers, hyphens only (must be unique)
-- `isPublished` (optional) - Default: false
-
-**Response (201 Created):**
-```json
-{
-  "success": true,
-  "event": {
-    "id": 3,
-    "name": "Fall Festival 2025",
-    "date": "2025-10-15",
-    "slug": "fall-fest-2025",
-    "is_published": 0,
-    "created_at": "2025-03-15T12:00:00Z"
-  }
-}
-```
-
-**Error Responses:**
-
-**400 Bad Request** - Validation error
-```json
-{
-  "error": "Validation error",
-  "message": "Slug must contain only lowercase letters, numbers, and hyphens"
-}
-```
-
-**409 Conflict** - Slug already exists
-```json
-{
-  "error": "Conflict",
-  "message": "An event with this slug already exists"
-}
-```
-
----
-
-#### PUT /api/admin/events/:id
-
-Update an existing event.
-
-**Authentication:** Required (editor or admin)
-
-**Request Body:**
-```json
-{
-  "name": "Fall Festival 2025 (Updated)",
-  "date": "2025-10-16",
-  "isPublished": true
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "event": {
-    "id": 3,
-    "name": "Fall Festival 2025 (Updated)",
-    "date": "2025-10-16",
-    "slug": "fall-fest-2025",
-    "is_published": 1,
-    "created_at": "2025-03-15T12:00:00Z"
-  }
-}
-```
-
----
-
-#### DELETE /api/admin/events/:id
-
-Delete an event (and all associated performers).
-
-**Authentication:** Required (admin only)
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Event deleted successfully"
-}
-```
-
-**Error Response:**
-
-**403 Forbidden** - Insufficient permissions
-```json
-{
-  "error": "Forbidden",
-  "message": "Only admins can delete events"
-}
-```
-
----
-
-### Venues
-
-#### GET /api/admin/venues
-
-List all venues.
-
-**Authentication:** Required (editor or admin)
-
-**Response (200 OK):**
-```json
-{
-  "venues": [
-    {
-      "id": 1,
-      "name": "The Analog Cafe",
-      "address": "123 Main Street",
-      "website": "https://analogcafe.com",
-      "instagram": "analogcafe",
-      "facebook": "analogcafe",
-      "band_count": 15
-    },
-    {
-      "id": 2,
-      "name": "Black Cat Tavern",
-      "address": "456 Queen Street",
-      "website": null,
-      "instagram": null,
-      "facebook": null,
-      "band_count": 12
-    }
-  ]
-}
-```
-
----
-
-#### POST /api/admin/venues
-
-Create a new venue.
-
-**Authentication:** Required (editor or admin)
-
-**Request Body:**
-```json
-{
-  "name": "The Velvet Underground",
-  "address": "789 King Street",
-  "website": "https://velvetunderground.com",
-  "instagram": "velvetunderground",
-  "facebook": "velvetunderground"
-}
-```
-
-**Field Validation:**
-- `name` (required) - Venue name (must be unique)
-- `address` (optional) - Full address
-- `website` (optional) - Full URL
-- `instagram` (optional) - Username without @
-- `facebook` (optional) - Page name or full URL
-
-**Response (201 Created):**
-```json
-{
-  "success": true,
-  "venue": {
-    "id": 3,
-    "name": "The Velvet Underground",
-    "address": "789 King Street",
-    "website": "https://velvetunderground.com",
-    "instagram": "velvetunderground",
-    "facebook": "velvetunderground"
-  }
-}
-```
-
-**Error Response:**
-
-**409 Conflict** - Venue name already exists
-```json
-{
-  "error": "Conflict",
-  "message": "A venue with this name already exists"
-}
-```
-
----
-
-#### PUT /api/admin/venues/:id
-
-Update an existing venue.
-
-**Authentication:** Required (editor or admin)
-
-**Request Body:**
-```json
-{
-  "name": "The Velvet Underground (Updated)",
-  "address": "789 King Street West",
-  "website": "https://velvetunderground.ca"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "venue": {
-    "id": 3,
-    "name": "The Velvet Underground (Updated)",
-    "address": "789 King Street West",
-    "website": "https://velvetunderground.ca",
-    "instagram": "velvetunderground",
-    "facebook": "velvetunderground"
-  }
-}
-```
-
----
-
-#### DELETE /api/admin/venues/:id
-
-Delete a venue (only if no bands assigned).
-
-**Authentication:** Required (admin only)
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Venue deleted successfully"
-}
-```
-
-**Error Response:**
-
-**400 Bad Request** - Venue has assigned bands
-```json
-{
-  "error": "Bad request",
-  "message": "Cannot delete venue with assigned performances"
-}
-```
-
----
-
-### Performers (Bands)
-
-#### GET /api/admin/bands
-
-List bands for a specific event.
-
-**Authentication:** Required (editor or admin)
-
-**Query Parameters:**
-- `event_id` (required) - Event ID
-
-**Example:**
-```bash
-curl https://settimes.ca/api/admin/bands?event_id=1 \
-  -H "Cookie: session_token=abc123..."
-```
-
-**Response (200 OK):**
-```json
-{
   "bands": [
     {
-      "id": 1,
-      "event_id": 1,
-      "venue_id": 1,
+      "id": "the-sunset-trio-41",
+      "performance_id": 41,
+      "band_profile_id": 7,
       "name": "The Sunset Trio",
-      "start_time": "19:00",
-      "end_time": "20:00",
-      "url": "https://thesunsettrio.com",
-      "instagram": "thesunsettrio",
-      "facebook": null,
-      "description": "Jazz fusion trio from Toronto",
-      "created_at": "2025-01-15T10:30:00Z",
-      "venue_name": "The Analog Cafe",
-      "event_name": "Spring Music Fest 2025"
+      "venue": "The Analog Cafe",
+      "date": "2026-01-17",
+      "startTime": "19:00",
+      "endTime": "20:00",
+      "url": "https://thesunsettrio.com"
     }
   ]
 }
 ```
 
----
+## Admin API
 
-#### POST /api/admin/bands
+All admin routes require a valid session cookie. State-changing routes also require `X-CSRF-Token` after the session is established.
 
-Create a new band/performance with conflict detection.
+### Authentication and self-service
 
-**Authentication:** Required (editor or admin)
+| Route | Method | Minimum role | Notes |
+| --- | --- | --- | --- |
+| `/api/admin/auth/signup` | `POST` | none | Invite-only signup. The request role is ignored; the invite code determines the role. |
+| `/api/admin/auth/login` | `POST` | none | Body: `{ email, password }`. Returns either a session success response or `{ mfaRequired, mfaToken, user }`. |
+| `/api/admin/auth/mfa/verify` | `POST` | none | Body: `{ mfaToken, code, rememberDevice? }`. Completes login and can create a trusted-device cookie. |
+| `/api/admin/auth/logout` | `POST` | viewer | Invalidates the current session and clears session and CSRF cookies. |
+| `/api/admin/me` | `GET` | viewer | Returns `{ user, session, authenticated: true }` with safe session metadata only. |
+| `/api/admin/sessions` | `GET` | viewer | Lists the current user's active sessions. |
+| `/api/admin/sessions` | `DELETE` | viewer | Body: `{ sessionId }`. Revokes one of the current user's sessions. |
+| `/api/admin/sessions/revoke-all` | `POST` | viewer | Revokes all sessions for the current user and issues a fresh current-session cookie. |
+| `/api/admin/trusted-devices` | `GET` | viewer | Lists active trusted devices for the current user. |
+| `/api/admin/trusted-devices` | `DELETE` | viewer | Body: `{ deviceId }`. Revokes one trusted device. |
+| `/api/admin/mfa/status` | `GET` | viewer | Returns `totpEnabled`, `setupPending`, and `hasBackupCodes`. |
+| `/api/admin/mfa/setup` | `POST` | viewer | Generates a new TOTP secret and returns `{ secret, otpauthUrl }`. |
+| `/api/admin/mfa/enable` | `POST` | viewer | Body: `{ code }`. Verifies the code, enables TOTP, and returns new backup codes. |
+| `/api/admin/mfa/backup-codes` | `POST` | viewer | Body: `{ code }`. Regenerates backup codes after verifying a TOTP code. |
+| `/api/admin/mfa/disable` | `POST` | viewer | Body: `{ code }`. Accepts a TOTP or backup code and disables MFA. |
 
-**Request Body:**
-```json
-{
-  "eventId": 1,
-  "venueId": 1,
-  "name": "Electric Dreams",
-  "startTime": "20:30",
-  "endTime": "21:30",
-  "url": "https://electricdreams.com",
-  "instagram": "electricdreamsband",
-  "facebook": "electricdreams",
-  "description": "Electronic dance music duo"
-}
+### Content, roster, and media
+
+| Route | Method | Minimum role | Notes |
+| --- | --- | --- | --- |
+| `/api/admin/events` | `GET` | viewer | Lists events. Supports `archived=true`, `limit`, and `offset`. |
+| `/api/admin/events` | `POST` | editor | Creates an event from the validated event schema. Admins may create archived events directly; editors may not. |
+| `/api/admin/events/{id}` | `PATCH` | editor | General event update route used by the current frontend. `slug` cannot be changed here. |
+| `/api/admin/events/{id}` | `DELETE` | admin | Deletes an event. If performances exist, repeat with `confirmCascade=true` in the body or query string. |
+| `/api/admin/events/{id}/edit` | `PUT` | editor | Narrow event-edit route for `{ name, date, slug, ticket_url }`. |
+| `/api/admin/events/{id}/publish` | `POST` | editor | Body: `{ publish: boolean }`. Refuses to publish an event with no performances. |
+| `/api/admin/events/{id}/archive` | `POST` | admin | Archives an event and clears `is_published`. |
+| `/api/admin/events/{id}/metrics` | `GET` | viewer | Schedule-build analytics for one event. |
+| `/api/admin/events/{id}/duplicate` | `POST` | editor | Body: `{ name, date, slug }`. Duplicates the event and its performances into a new draft event. |
+| `/api/admin/venues` | `GET` | viewer | Lists venues with band counts. Contact details are redacted for viewers. |
+| `/api/admin/venues` | `POST` | admin | Creates a new venue. |
+| `/api/admin/venues/{id}` | `PUT` | admin | Updates a venue. |
+| `/api/admin/venues/{id}` | `DELETE` | admin | Deletes a venue. |
+| `/api/admin/bands` | `GET` | viewer | Lists performances. Supports `event_id`, `limit`, and `offset`. Without `event_id`, profile-only rows are returned as synthetic IDs like `profile_123`. |
+| `/api/admin/bands` | `POST` | editor | Creates a performance plus band profile data, or a profile-only record when `eventId` is omitted. |
+| `/api/admin/bands/{id}` | `PUT` | editor | Updates a performance or a profile-only row. `{id}` may be a performance ID or a `profile_{id}` synthetic identifier. |
+| `/api/admin/bands/{id}` | `DELETE` | editor | Deletes one performance or one profile-only row, subject to archived-event protections. |
+| `/api/admin/bands/bulk-preview` | `POST` | editor | Preview bulk venue moves, time changes, or deletions before applying them. |
+| `/api/admin/bands/bulk` | `POST` | editor | Adds existing band profiles to an event lineup. Body: `{ band_profile_ids, event_id, venue_id, start_time?, end_time? }`. |
+| `/api/admin/bands/bulk` | `DELETE` | editor | Bulk deletes performances or profile-only rows. Body: `{ band_ids }`. |
+| `/api/admin/bands/photos` | `POST` | editor | `multipart/form-data` upload with `photo` and optional `band_id`. Stores assets in R2 and can update `photo_url`. |
+| `/api/admin/bands/stats/{name}` | `GET` | viewer | Internal stats and history view for a band profile. |
+| `/api/admin/performers` | `GET` | viewer | Lists the global performer registry. |
+| `/api/admin/performers` | `POST` | editor | Creates a global performer record. |
+| `/api/admin/performers/{id}` | `GET` | viewer | Returns one performer plus aggregate performance stats. |
+| `/api/admin/performers/{id}` | `PUT` | editor | Updates a performer record. |
+| `/api/admin/performers/{id}` | `DELETE` | admin | Deletes a performer if no performances still reference it. |
+
+### User administration, invites, analytics, and maintenance
+
+| Route | Method | Minimum role | Notes |
+| --- | --- | --- | --- |
+| `/api/admin/users` | `GET` | admin | Lists all users, excluding password hashes. |
+| `/api/admin/users` | `POST` | admin | Creates an invite-backed user invitation and optionally emails the signup URL. |
+| `/api/admin/users/{id}` | `PATCH` | admin | Updates role and display-name fields. Prevents demoting the last active admin. |
+| `/api/admin/users/{id}` | `DELETE` | admin | Removes a user. |
+| `/api/admin/users/{id}/reset-password` | `POST` | admin | Body: `{ reason? }`. Creates a reset token, revokes sessions, clears trusted devices, and emails the reset URL. |
+| `/api/admin/users/{id}/toggle-status` | `POST` | admin | Activates or deactivates a user account. Deactivation revokes sessions. |
+| `/api/admin/invite-codes` | `GET` | admin | Lists invite codes. |
+| `/api/admin/invite-codes` | `POST` | admin | Body: `{ email?, role = "editor", expiresInDays = 7 }`. Creates an open or email-restricted invite. |
+| `/api/admin/invite-codes/{code}` | `DELETE` | admin | Revokes an invite code. |
+| `/api/admin/audit-log` | `GET` | admin | Query: `user_id`, `action`, `resource_type`, `limit` (max 100), and `offset`. |
+| `/api/admin/analytics/subscriptions` | `GET` | admin | Aggregate subscription analytics only; no subscriber PII is exposed. |
+| `/api/admin/maintenance/cleanup-sessions` | `POST` | admin | Runs the retention cleanup for expired sessions, MFA challenges, reset tokens, trusted devices, and security telemetry. |
+
+## Error handling
+
+Common status codes used across the API:
+
+- `400 Bad Request`: validation failure, missing required fields, or malformed path, query, or body data
+- `401 Unauthorized`: missing or invalid credentials, invalid MFA code, expired challenge token
+- `403 Forbidden`: authenticated but insufficient role, failed CSRF validation, or origin validation failure
+- `404 Not Found`: missing record or unknown route segment
+- `409 Conflict`: uniqueness conflicts, invalid state transitions, or confirmation-required destructive actions
+- `429 Too Many Requests`: login or MFA rate limit exceeded
+- `503 Service Unavailable`: public data publishing is disabled for gated read routes
+
+## Example: admin login with optional MFA
+
+```bash
+curl -X POST "https://settimes.ca/api/admin/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"editor@example.com","password":"correct horse battery staple"}'
 ```
 
-**Field Validation:**
-- `eventId` (required) - Must exist in events table
-- `venueId` (required) - Must exist in venues table
-- `name` (required) - Band name
-- `startTime` (required) - HH:MM format (24-hour)
-- `endTime` (required) - HH:MM format (must be after startTime)
-- `url` (optional) - Full URL
-- `instagram` (optional) - Username without @
-- `facebook` (optional) - Page name or full URL
-- `description` (optional) - Band description (shown on profile page)
+A successful direct login returns `success: true` and sets the session and CSRF cookies. If MFA is enabled for the account, the same endpoint returns:
 
-**Response (201 Created - No Conflicts):**
 ```json
 {
-  "success": true,
-  "band": {
-    "id": 2,
-    "event_id": 1,
-    "venue_id": 1,
-    "name": "Electric Dreams",
-    "start_time": "20:30",
-    "end_time": "21:30",
-    "url": "https://electricdreams.com",
-    "instagram": "electricdreamsband",
-    "facebook": "electricdreams",
-    "description": "Electronic dance music duo",
-    "created_at": "2025-01-15T11:00:00Z"
+  "mfaRequired": true,
+  "mfaToken": "8e8d0f1e-....",
+  "user": {
+    "email": "editor@example.com",
+    "name": "Editor Example",
+    "firstName": "Editor",
+    "lastName": "Example",
+    "role": "editor"
   }
 }
 ```
 
-**Response (201 Created - With Conflicts):**
-```json
-{
-  "success": true,
-  "band": {
-    "id": 3,
-    "event_id": 1,
-    "venue_id": 1,
-    "name": "Overlapping Band",
-    "start_time": "20:00",
-    "end_time": "21:00",
-    "url": null,
-    "created_at": "2025-01-15T12:00:00Z"
-  },
-  "conflicts": [
-    {
-      "id": 1,
-      "name": "The Sunset Trio",
-      "startTime": "19:00",
-      "endTime": "20:00"
-    },
-    {
-      "id": 2,
-      "name": "Electric Dreams",
-      "startTime": "20:30",
-      "endTime": "21:30"
-    }
-  ],
-  "warning": "This band overlaps with 2 other band(s) at the same venue"
-}
-```
-
-**Note:** Conflicts are returned as warnings but do not prevent creation. The frontend highlights conflicts in red for admin review.
-
-**Error Responses:**
-
-**400 Bad Request** - Validation error
-```json
-{
-  "error": "Validation error",
-  "message": "End time must be after start time"
-}
-```
-
-**404 Not Found** - Event or venue doesn't exist
-```json
-{
-  "error": "Not found",
-  "message": "Event not found"
-}
-```
-
----
-
-#### PUT /api/admin/bands/:id
-
-Update an existing band/performance.
-
-**Authentication:** Required (editor or admin)
-
-**Request Body:**
-```json
-{
-  "name": "Electric Dreams (Updated)",
-  "startTime": "21:00",
-  "endTime": "22:00"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "band": {
-    "id": 2,
-    "event_id": 1,
-    "venue_id": 1,
-    "name": "Electric Dreams (Updated)",
-    "start_time": "21:00",
-    "end_time": "22:00",
-    "url": "https://electricdreams.com",
-    "created_at": "2025-01-15T11:00:00Z"
-  },
-  "conflicts": []
-}
-```
-
----
-
-#### DELETE /api/admin/bands/:id
-
-Delete a band/performance.
-
-**Authentication:** Required (editor or admin)
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Band deleted successfully"
-}
-```
-
----
-
-## Error Handling
-
-### Standard Error Format
-
-All errors return JSON with the following structure:
-
-```json
-{
-  "error": "Error type",
-  "message": "Human-readable error message",
-  "details": {
-    "field": "Additional context (optional)"
-  }
-}
-```
-
-### HTTP Status Codes
-
-| Code | Meaning | When Used |
-|------|---------|-----------|
-| **200** | OK | Successful GET, PUT, DELETE |
-| **201** | Created | Successful POST |
-| **400** | Bad Request | Validation error, missing parameters |
-| **401** | Unauthorized | Invalid credentials, session expired |
-| **403** | Forbidden | Insufficient permissions (RBAC) |
-| **404** | Not Found | Resource doesn't exist |
-| **409** | Conflict | Duplicate slug/name, constraint violation |
-| **429** | Too Many Requests | Rate limit exceeded |
-| **500** | Internal Server Error | Database error, unexpected server error |
-
-### Common Error Scenarios
-
-**Invalid CSRF Token:**
-```json
-{
-  "error": "CSRF validation failed",
-  "message": "Invalid or missing CSRF token"
-}
-```
-
-**Session Expired:**
-```json
-{
-  "error": "Unauthorized",
-  "message": "Session expired. Please log in again."
-}
-```
-
-**Insufficient Permissions:**
-```json
-{
-  "error": "Forbidden",
-  "message": "This action requires admin permissions"
-}
-```
-
-**Rate Limited:**
-```json
-{
-  "error": "Too many requests",
-  "message": "Rate limit exceeded. Please try again in 45 minutes.",
-  "minutesRemaining": 45
-}
-```
-
----
-
-## Examples & Use Cases
-
-### Use Case 1: Building a Public Event Widget
-
-**Scenario:** Embed SetTimes schedule on an external website.
-
-**Implementation:**
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>SetTimes Widget</title>
-  <style>
-    .band { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
-    .band-name { font-weight: bold; }
-    .venue { color: #666; }
-  </style>
-</head>
-<body>
-  <div id="schedule"></div>
-
-  <script>
-    fetch('https://settimes.ca/api/schedule?event=current')
-      .then(response => response.json())
-      .then(bands => {
-        const scheduleDiv = document.getElementById('schedule');
-        bands.forEach(band => {
-          const bandDiv = document.createElement('div');
-          bandDiv.className = 'band';
-          bandDiv.innerHTML = `
-            <div class="band-name">${band.name}</div>
-            <div class="venue">${band.venue} - ${band.startTime} to ${band.endTime}</div>
-          `;
-          scheduleDiv.appendChild(bandDiv);
-        });
-      })
-      .catch(error => console.error('Error:', error));
-  </script>
-</body>
-</html>
-```
-
----
-
-### Use Case 2: Automated Event Creation
-
-**Scenario:** Import events from an external system.
-
-**Implementation:**
-
-```javascript
-// Login first
-const loginResponse = await fetch('https://settimes.ca/api/admin/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    email: 'admin@example.com',
-    password: 'your-password'
-  }),
-  credentials: 'include' // Important: Include cookies
-});
-
-if (loginResponse.ok) {
-  // Get CSRF token from cookies
-  const csrfToken = document.cookie
-    .split('; ')
-    .find(row => row.startsWith('csrf_token='))
-    .split('=')[1];
-
-  // Create event
-  const createResponse = await fetch('https://settimes.ca/api/admin/events', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': csrfToken
-    },
-    credentials: 'include',
-    body: JSON.stringify({
-      name: 'Automated Event',
-      date: '2025-08-15',
-      slug: 'automated-event',
-      isPublished: false
-    })
-  });
-
-  const result = await createResponse.json();
-  console.log('Event created:', result);
-}
-```
-
----
-
-### Use Case 3: Conflict Detection Before Scheduling
-
-**Scenario:** Check for scheduling conflicts before adding a band.
-
-**Implementation:**
-
-```javascript
-async function addBandWithConflictCheck(bandData) {
-  // Add band (conflicts are returned in response)
-  const response = await fetch('https://settimes.ca/api/admin/bands', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': csrfToken
-    },
-    credentials: 'include',
-    body: JSON.stringify(bandData)
-  });
-
-  const result = await response.json();
-
-  if (result.conflicts && result.conflicts.length > 0) {
-    console.warn('Scheduling conflicts detected:');
-    result.conflicts.forEach(conflict => {
-      console.warn(`- ${conflict.name} (${conflict.startTime} - ${conflict.endTime})`);
-    });
-
-    // Prompt user for confirmation
-    const confirmed = confirm(
-      `This band overlaps with ${result.conflicts.length} other band(s). Continue anyway?`
-    );
-
-    if (!confirmed) {
-      // Delete the band if user cancels
-      await fetch(`https://settimes.ca/api/admin/bands/${result.band.id}`, {
-        method: 'DELETE',
-        headers: { 'X-CSRF-Token': csrfToken },
-        credentials: 'include'
-      });
-      return null;
-    }
-  }
-
-  return result.band;
-}
-```
-
----
-
-## API Reference
-
-### OpenAPI Specification
-
-A complete OpenAPI 3.0 specification is available at:
-- **File:** `docs/api-spec.yaml`
-- **View:** Import into [Swagger UI](https://editor.swagger.io/) or [Postman](https://www.postman.com/)
-
-**Note:** The OpenAPI spec may reference the old "Long Weekend Band Crawl" branding. All endpoints work with the current SetTimes platform.
-
-### Postman Collection
-
-A Postman collection is available for testing (coming soon):
-- **File:** `docs/settimes-api-postman.json`
-
-### Rate Limit Headers
-
-All API responses include rate limit information:
-
-```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1699564800
-```
-
-### Caching Headers
-
-**Public API:**
-```
-Cache-Control: public, max-age=300
-Vary: Origin
-```
-
-**Admin API:**
-```
-Cache-Control: no-cache, no-store, must-revalidate
-```
-
----
-
-## Best Practices
-
-### Performance
-
-**1. Use Caching Effectively:**
-- Public schedule API is cached for 5 minutes
-- Don't poll more frequently than cache TTL
-- Use cache headers to avoid unnecessary requests
-
-**2. Minimize Requests:**
-- Batch operations when possible
-- Use query parameters to filter results
-- Don't fetch full lists repeatedly
-
-**3. Handle Rate Limits:**
-- Respect rate limit headers
-- Implement exponential backoff for retries
-- Cache responses on client side
-
-### Security
-
-**1. Protect Credentials:**
-- Never expose passwords in client-side code
-- Use environment variables for API credentials
-- Rotate passwords regularly
-
-**2. Validate Input:**
-- Validate data client-side before sending
-- Handle validation errors gracefully
-- Sanitize user input
-
-**3. Handle Sessions Properly:**
-- Set `credentials: 'include'` in fetch() calls
-- Store CSRF tokens securely
-- Implement automatic session refresh
-
-### Error Handling
-
-**1. Always Check Response Status:**
-```javascript
-const response = await fetch(url);
-if (!response.ok) {
-  const error = await response.json();
-  console.error('API Error:', error.message);
-  throw new Error(error.message);
-}
-```
-
-**2. Implement Retry Logic:**
-```javascript
-async function fetchWithRetry(url, options, retries = 3) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const response = await fetch(url, options);
-      if (response.ok) return response;
-      if (response.status === 429) {
-        // Rate limited - wait before retry
-        await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
-      }
-    } catch (error) {
-      if (i === retries - 1) throw error;
-    }
-  }
-}
-```
-
-**3. Show User-Friendly Errors:**
-```javascript
-try {
-  const response = await fetch(url);
-  const data = await response.json();
-
-  if (!response.ok) {
-    showUserError(data.message);
-    return;
-  }
-
-  // Success
-} catch (error) {
-  showUserError('Network error. Please check your connection.');
-}
-```
-
----
-
-## Support & Resources
-
-### Documentation
-
-- **User Guide:** [USER_GUIDE.md](./USER_GUIDE.md) - For event organizers
-- **Admin Handbook:** [ADMIN_HANDBOOK.md](./ADMIN_HANDBOOK.md) - For system administrators
-- **Quick Start:** [QUICK_START.md](./QUICK_START.md) - 10-minute setup tutorial
-- **Troubleshooting:** [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Common issues
-
-### Contact
-
-- **GitHub Issues:** [github.com/BreakableHoodie/settimesdotca/issues](https://github.com/BreakableHoodie/settimesdotca/issues)
-- **API Questions:** Tag issues with `api` label
-
-### Changelog
-
-**v1.0 (November 2025):**
-- Initial API release
-- Public schedule endpoint
-- Admin CRUD operations
-- Session-based authentication
-- CSRF protection
-- Rate limiting
-- Conflict detection
-
----
-
-**Version:** 1.0
-**Last Updated:** November 2025
-**For:** SetTimes Platform (settimes.ca)
-
----
-
-**Ready to integrate?** Check out the [OpenAPI spec](./api-spec.yaml) and start building!
+The client then completes `POST /api/admin/auth/mfa/verify` with `{ mfaToken, code, rememberDevice? }`.

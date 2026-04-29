@@ -16,7 +16,7 @@ export default function PrivacyPage() {
         </Link>
 
         <h1 className="text-white text-3xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-text-tertiary text-sm mb-10">Last updated: March 2026</p>
+        <p className="text-text-tertiary text-sm mb-10">Last updated: April 2026</p>
 
         <div className="space-y-8 text-gray-300 leading-relaxed">
           <section>
@@ -33,22 +33,26 @@ export default function PrivacyPage() {
 
             <h3 className="text-white/80 font-medium mb-2 mt-4">If you just browse</h3>
             <p>
-              Nothing personally identifiable. We count anonymous page views and artist profile visits to understand
-              which features are useful. These counts are not linked to your IP address or any persistent identifier.
+              We do not use advertising trackers, tracking pixels, or persistent cookies for public browsing. We count
+              anonymous page views and artist profile visits to understand which features are useful. Limited request
+              metadata may be processed briefly for security and abuse prevention, but public browsing is not tied to a
+              persistent account or profiling identifier in our application data.
             </p>
 
             <h3 className="text-white/80 font-medium mb-2 mt-4">If you subscribe to email updates</h3>
             <p>
               We store your email address, your city/genre preferences, and a verification timestamp. We do not store
-              your IP address. Your email is only used to send the updates you subscribed to, and the one-click
-              unsubscribe in every email immediately removes all your data.
+              your IP address in the subscription record itself. Limited request metadata may still be processed
+              transiently for abuse prevention and rate limiting. Your email is only used to send the updates you
+              subscribed to, and the one-click unsubscribe in every email removes the active subscription immediately.
             </p>
 
             <h3 className="text-white/80 font-medium mb-2 mt-4">If you are an organiser with admin access</h3>
             <p>
               We store your email address, hashed password (PBKDF2-SHA256, 100,000 iterations), and session tokens.
-              Login attempts and admin actions are logged with your IP address for security purposes. These logs are
-              automatically deleted after 90 days (login logs) and 1 year (admin action logs).
+              Login attempts and admin actions may include security metadata such as IP address and user agent for
+              account protection, abuse investigation, and session management. These records are retained for limited
+              periods and deleted automatically according to our retention rules.
             </p>
           </section>
 

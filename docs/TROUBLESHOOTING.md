@@ -1,4 +1,5 @@
 # SetTimes Troubleshooting Guide
+
 **Common Issues and Solutions**
 
 ---
@@ -40,6 +41,7 @@
    - Contact administrator to verify
 
 4. **Clear browser cache:**
+
    ```bash
    # Chrome/Edge: Ctrl+Shift+Delete
    # Firefox: Ctrl+Shift+Delete
@@ -58,7 +60,7 @@
 
 **Problem:** Logged out unexpectedly during work.
 
-**Cause:** Session expired (default: 24 hours) or server restart.
+**Cause:** The admin session hit an enforced timeout. Admin sessions currently expire after 15 minutes of inactivity or after 8 hours total, whichever comes first.
 
 **Solutions:**
 
@@ -67,9 +69,13 @@
    - Re-authenticate at `/admin`
 
 2. **Prevent in future:**
-   - Don't leave admin panel idle for extended periods
+   - Don't leave the admin panel idle for extended periods
    - Save work frequently
-   - Consider adjusting session timeout (admin only)
+   - Use the `Stay signed in` prompt when it appears before idle logout
+
+3. **If you saw this during a temporary outage:**
+   - Reload and sign in again once the service is healthy
+   - Temporary `5xx` failures during session verification should not normally force logout on their own
 
 **Note:** Session timeout is a security feature to protect your data.
 
@@ -97,6 +103,7 @@
    - Double-check email address
 
 **Administrator Reset:**
+
 ```sql
 -- Via wrangler CLI
 wrangler d1 execute settimes-db --command="DELETE FROM auth_audit WHERE ip_address = 'XX.XX.XX.XX'"
@@ -153,6 +160,7 @@ wrangler d1 execute settimes-db --command="DELETE FROM auth_audit WHERE ip_addre
    - Keeps historical data
 
 **Administrator Alternative:**
+
 ```sql
 -- WARNING: Deletes event and all bands (irreversible!)
 DELETE FROM bands WHERE event_id = <event_id>;
@@ -277,12 +285,14 @@ DELETE FROM events WHERE id = <event_id>;
    - Conflicts shown in red for review
 
 **Example Conflict:**
+
 ```
 Band A: 7:00 PM - 8:00 PM (Analog Cafe)
 Band B: 7:30 PM - 8:30 PM (Analog Cafe) ❌ CONFLICT
 ```
 
 **Fixed:**
+
 ```
 Band A: 7:00 PM - 8:00 PM (Analog Cafe)
 Band B: 8:30 PM - 9:30 PM (Analog Cafe) ✅ NO CONFLICT
@@ -617,14 +627,15 @@ Band B: 8:30 PM - 9:30 PM (Analog Cafe) ✅ NO CONFLICT
    - `settimes.ca` ≠ `www.settimes.ca`
 
 **Example:**
+
 ```javascript
 // Correct
 fetch('https://settimes.ca/api/admin/events', {
-  credentials: 'include' // Important!
-})
+  credentials: 'include', // Important!
+});
 
 // Wrong
-fetch('https://settimes.ca/api/admin/events')
+fetch('https://settimes.ca/api/admin/events');
 // Missing credentials - 401 error
 ```
 
@@ -639,21 +650,22 @@ fetch('https://settimes.ca/api/admin/events')
 **Solutions:**
 
 1. **Include CSRF token:**
+
    ```javascript
    // Get CSRF token from cookie
    const csrfToken = document.cookie
      .split('; ')
-     .find(row => row.startsWith('csrf_token='))
+     .find((row) => row.startsWith('csrf_token='))
      .split('=')[1];
 
    // Include in request header
    fetch(url, {
      method: 'POST',
      headers: {
-       'X-CSRF-Token': csrfToken
+       'X-CSRF-Token': csrfToken,
      },
-     credentials: 'include'
-   })
+     credentials: 'include',
+   });
    ```
 
 2. **Refresh CSRF token:**
@@ -675,13 +687,14 @@ fetch('https://settimes.ca/api/admin/events')
    - Wait until reset time
 
 2. **Implement exponential backoff:**
+
    ```javascript
    async function fetchWithRetry(url, options, retries = 3) {
      for (let i = 0; i < retries; i++) {
        const response = await fetch(url, options);
        if (response.status === 429) {
          // Wait 2^i seconds before retry
-         await new Promise(resolve =>
+         await new Promise((resolve) =>
            setTimeout(resolve, Math.pow(2, i) * 1000)
          );
          continue;
@@ -720,11 +733,13 @@ fetch('https://settimes.ca/api/admin/events')
 **Solutions (Administrator):**
 
 1. **Check D1 database status:**
+
    ```bash
    wrangler d1 info settimes-db
    ```
 
 2. **Check error logs:**
+
    ```bash
    wrangler tail --status error
    ```
@@ -734,6 +749,7 @@ fetch('https://settimes.ca/api/admin/events')
    - Ensure `DATABASE` binding exists
 
 4. **Test database connection:**
+
    ```bash
    wrangler d1 execute settimes-db --command="SELECT 1"
    ```
@@ -749,11 +765,13 @@ fetch('https://settimes.ca/api/admin/events')
 **Solutions (Administrator):**
 
 1. **Restore from backup:**
+
    ```bash
    wrangler d1 execute settimes-db --file=backups/settimes-20251119.sql
    ```
 
 2. **Check audit logs:**
+
    ```sql
    SELECT * FROM audit_logs
    WHERE action LIKE '%delete%'
@@ -761,6 +779,7 @@ fetch('https://settimes.ca/api/admin/events')
    ```
 
 3. **Verify data integrity:**
+
    ```sql
    -- Check for orphaned bands
    SELECT b.* FROM bands b
@@ -797,6 +816,7 @@ fetch('https://settimes.ca/api/admin/events')
    - Adds extra security layer
 
 **Administrator Actions:**
+
 ```sql
 -- View recent logins
 SELECT * FROM audit_logs
@@ -823,12 +843,13 @@ DELETE FROM sessions WHERE user_id = <user_id>;
    - Add origin to CORS headers
 
 2. **Check request origin:**
+
    ```javascript
    // Allowed origins
    const allowedOrigins = [
      'https://settimes.ca',
      'https://dev.settimes.ca',
-     'http://localhost:5173'
+     'http://localhost:5173',
    ];
    ```
 
@@ -867,6 +888,7 @@ DELETE FROM sessions WHERE user_id = <user_id>;
 **GitHub Issues:** [github.com/BreakableHoodie/settimesdotca/issues](https://github.com/BreakableHoodie/settimesdotca/issues)
 
 **Include in your report:**
+
 - Clear description of problem
 - Steps to reproduce
 - Expected vs actual behavior
@@ -876,6 +898,7 @@ DELETE FROM sessions WHERE user_id = <user_id>;
 ### Emergency Contacts
 
 **Critical Issues (site down, data loss, security breach):**
+
 1. Create urgent GitHub issue with `[URGENT]` prefix
 2. Contact administrator directly
 3. Do not share sensitive information publicly
@@ -884,17 +907,17 @@ DELETE FROM sessions WHERE user_id = <user_id>;
 
 ## Appendix: Common Error Messages
 
-| Error Message | Cause | Solution |
-|---------------|-------|----------|
-| "CSRF validation failed" | Missing CSRF token | Include X-CSRF-Token header |
-| "Session expired" | Session timeout | Log in again |
-| "Validation error" | Invalid input data | Check field requirements |
-| "Slug already exists" | Duplicate slug | Use unique slug |
-| "Event not found" | Invalid event ID | Verify event exists |
-| "Unauthorized" | Not logged in | Log in first |
-| "Forbidden" | Insufficient permissions | Contact admin for role upgrade |
-| "Rate limited" | Too many requests | Wait and retry |
-| "Database error" | Server issue | Retry or contact admin |
+| Error Message            | Cause                                            | Solution                       |
+| ------------------------ | ------------------------------------------------ | ------------------------------ |
+| "CSRF validation failed" | Missing CSRF token                               | Include X-CSRF-Token header    |
+| "Session expired"        | Idle timeout or maximum session lifetime reached | Log in again                   |
+| "Validation error"       | Invalid input data                               | Check field requirements       |
+| "Slug already exists"    | Duplicate slug                                   | Use unique slug                |
+| "Event not found"        | Invalid event ID                                 | Verify event exists            |
+| "Unauthorized"           | Not logged in                                    | Log in first                   |
+| "Forbidden"              | Insufficient permissions                         | Contact admin for role upgrade |
+| "Rate limited"           | Too many requests                                | Wait and retry                 |
+| "Database error"         | Server issue                                     | Retry or contact admin         |
 
 ---
 

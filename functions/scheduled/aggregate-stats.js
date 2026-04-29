@@ -46,8 +46,8 @@ export async function scheduled(_event, env, _ctx) {
   }
 
   try {
-    const results = await runRetentionCleanup(env);
-    console.log("[Retention] Cleanup complete:", results);
+    await runRetentionCleanup(env);
+    console.log("[Retention] Cleanup complete.");
   } catch (error) {
     console.error("[Retention] Cleanup error:", error);
   }

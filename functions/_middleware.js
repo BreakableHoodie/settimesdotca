@@ -21,55 +21,52 @@ export async function onRequest(context) {
 
   // Allowed origins for CORS (production and development)
   const baseAllowedOrigins = [
-    "https://settimes.ca",
-    "https://www.settimes.ca",
-    "https://dev.settimesdotca.pages.dev",
-    "https://settimesdotca.pages.dev",
-    "https://dev.settimes.ca",
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://localhost:8788",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8788",
+    'https://settimes.ca',
+    'https://www.settimes.ca',
+    'https://dev.settimesdotca.pages.dev',
+    'https://settimesdotca.pages.dev',
+    'https://dev.settimes.ca',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8788',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8788',
   ];
-  const envAllowedOrigins = (env?.CORS_ALLOWED_ORIGINS || "")
-    .split(",")
+  const envAllowedOrigins = (env?.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
   const ALLOWED_ORIGINS = Array.from(
-    new Set([...baseAllowedOrigins, ...envAllowedOrigins]),
+    new Set([...baseAllowedOrigins, ...envAllowedOrigins])
   );
 
   // SECURITY: Check if origin is allowed
-  const origin = request.headers.get("Origin");
+  const origin = request.headers.get('Origin');
 
   // Only set CORS headers if origin is explicitly allowed
   const corsHeaders = {};
   if (ALLOWED_ORIGINS.includes(origin)) {
-    corsHeaders["Access-Control-Allow-Origin"] = origin;
-    corsHeaders["Access-Control-Allow-Methods"] =
-      "GET, POST, PUT, DELETE, OPTIONS";
-    corsHeaders["Access-Control-Allow-Headers"] =
-      "Content-Type, Authorization, X-CSRF-Token";
-    corsHeaders["Access-Control-Max-Age"] = "86400";
-    corsHeaders["Access-Control-Allow-Credentials"] = "true";
+    corsHeaders['Access-Control-Allow-Origin'] = origin;
+    corsHeaders['Access-Control-Allow-Methods'] =
+      'GET, POST, PUT, DELETE, OPTIONS';
+    corsHeaders['Access-Control-Allow-Headers'] =
+      'Content-Type, Authorization, X-CSRF-Token';
+    corsHeaders['Access-Control-Max-Age'] = '86400';
+    corsHeaders['Access-Control-Allow-Credentials'] = 'true';
   } else if (!origin) {
     // Same-origin request (no Origin header) - allow
     // Browser will handle same-origin policy
   } else {
     // Origin provided but not in allowed list - reject
-    return new Response(
-      JSON.stringify({ error: "Origin not allowed" }),
-      {
-        status: 403,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   // Handle preflight requests
-  if (request.method === "OPTIONS") {
+  if (request.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
       headers: corsHeaders,
@@ -83,25 +80,22 @@ export async function onRequest(context) {
   }
 
   // Basic request size guard for non-upload API requests (1MB)
-  if (["POST", "PUT", "PATCH"].includes(request.method)) {
-    const contentType = request.headers.get("Content-Type") || "";
-    const isMultipart = contentType.includes("multipart/form-data");
-    const contentLength = Number(request.headers.get("Content-Length") || 0);
+  if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
+    const contentType = request.headers.get('Content-Type') || '';
+    const isMultipart = contentType.includes('multipart/form-data');
+    const contentLength = Number(request.headers.get('Content-Length') || 0);
     if (!isMultipart && contentLength > 1_000_000) {
-      return new Response(
-        JSON.stringify({ error: "Payload too large" }),
-        {
-          status: 413,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Payload too large' }), {
+        status: 413,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
   }
 
   const cspEnforce =
     env?.CSP_ENFORCE !== undefined && env?.CSP_ENFORCE !== null
-      ? env?.CSP_ENFORCE === "true"
-      : env?.ENVIRONMENT === "production";
+      ? env?.CSP_ENFORCE === 'true'
+      : env?.ENVIRONMENT === 'production';
 
   try {
     const startTime = Date.now();
@@ -115,8 +109,6 @@ export async function onRequest(context) {
     log.info(`Request completed: ${request.method} ${url.pathname}`, {
       status: response.status,
       durationMs: duration,
-      ip: request.headers.get("CF-Connecting-IP") || "unknown",
-      userAgent: request.headers.get("User-Agent"),
     });
 
     // Add CORS and rate limit headers to response
@@ -129,15 +121,15 @@ export async function onRequest(context) {
     });
 
     // Traceability: Add Request ID to response headers
-    newHeaders.set("X-Request-ID", log.getRequestId());
+    newHeaders.set('X-Request-ID', log.getRequestId());
 
     // Security headers
-    newHeaders.set("X-Content-Type-Options", "nosniff");
-    newHeaders.set("X-Frame-Options", "DENY");
-    newHeaders.set("Referrer-Policy", "no-referrer");
+    newHeaders.set('X-Content-Type-Options', 'nosniff');
+    newHeaders.set('X-Frame-Options', 'DENY');
+    newHeaders.set('Referrer-Policy', 'no-referrer');
     newHeaders.set(
-      "Permissions-Policy",
-      "geolocation=(), microphone=(), camera=()"
+      'Permissions-Policy',
+      'geolocation=(), microphone=(), camera=()'
     );
     const csp = [
       "default-src 'self'",
@@ -149,16 +141,16 @@ export async function onRequest(context) {
       "object-src 'none'",
       "base-uri 'self'",
       "frame-ancestors 'none'",
-    ].join("; ");
+    ].join('; ');
     if (cspEnforce) {
-      newHeaders.set("Content-Security-Policy", csp);
+      newHeaders.set('Content-Security-Policy', csp);
     } else {
-      newHeaders.set("Content-Security-Policy-Report-Only", csp);
+      newHeaders.set('Content-Security-Policy-Report-Only', csp);
     }
-    if (request.url.startsWith("https://")) {
+    if (request.url.startsWith('https://')) {
       newHeaders.set(
-        "Strict-Transport-Security",
-        "max-age=63072000; includeSubDomains; preload"
+        'Strict-Transport-Security',
+        'max-age=63072000; includeSubDomains; preload'
       );
     }
 
@@ -168,32 +160,32 @@ export async function onRequest(context) {
       headers: newHeaders,
     });
   } catch (error) {
-    log.error("Middleware error", { error });
+    log.error('Middleware error', { error });
 
     return new Response(
       JSON.stringify({
-        error: "Internal server error",
+        error: 'Internal server error',
       }),
       {
         status: 500,
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           ...corsHeaders,
-          "X-Content-Type-Options": "nosniff",
-          "X-Frame-Options": "DENY",
-          "Referrer-Policy": "no-referrer",
-          "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'Referrer-Policy': 'no-referrer',
+          'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
           ...(cspEnforce
             ? {
-                "Content-Security-Policy":
+                'Content-Security-Policy':
                   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
               }
             : {
-                "Content-Security-Policy-Report-Only":
+                'Content-Security-Policy-Report-Only':
                   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
               }),
         },
-      },
+      }
     );
   }
 }

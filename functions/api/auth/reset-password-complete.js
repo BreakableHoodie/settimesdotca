@@ -112,7 +112,7 @@ export async function onRequestPost(context) {
     }
 
     // Check if token is expired
-    if (new Date(resetToken.expires_at) < new Date()) {
+    if (new Date(resetToken.expires_at.includes('T') ? resetToken.expires_at : resetToken.expires_at.replace(' ', 'T') + 'Z') < new Date()) {
       logDebug("token_expired", { expiresAt: resetToken.expires_at });
       await logFailure("TOKEN_EXPIRED", { expiresAt: resetToken.expires_at });
       return new Response(

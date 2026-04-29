@@ -228,6 +228,10 @@ CREATE TABLE IF NOT EXISTS mfa_challenges (
 
 CREATE INDEX IF NOT EXISTS idx_mfa_challenges_token ON mfa_challenges(token);
 CREATE INDEX IF NOT EXISTS idx_mfa_challenges_user_id ON mfa_challenges(user_id);
+CREATE INDEX IF NOT EXISTS idx_mfa_challenges_expires_at ON mfa_challenges(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mfa_challenges_active_user
+  ON mfa_challenges(user_id)
+  WHERE used = 0;
 
 -- Invite codes
 CREATE TABLE IF NOT EXISTS invite_codes (

@@ -356,13 +356,23 @@ export const authApi = {
         credentials: 'include',
       })
 
+      if (response.status === 401) {
+        return { status: 'unauthorized' }
+      }
+
       const data = await handleResponse(response)
       if (data.user) {
         persistUser(data.user)
       }
-      return data
-    } catch {
-      return null
+      return {
+        status: 'authenticated',
+        ...data,
+      }
+    } catch (error) {
+      return {
+        status: 'transient',
+        error,
+      }
     }
   },
 }

@@ -65,6 +65,7 @@ const REQUIRED_SCHEMA = {
   auth_audit: ['id', 'action', 'success', 'ip_address', 'user_agent', 'timestamp'],
   rate_limits: ['key', 'count', 'window_start', 'updated_at'],
   trusted_devices: ['id', 'token', 'user_id', 'expires_at'],
+  email_otp_codes: ['id', 'user_id', 'code_hash', 'expires_at', 'verified'],
   audit_log: ['id', 'user_id', 'action', 'resource_type', 'created_at'],
 };
 

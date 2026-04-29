@@ -32,7 +32,7 @@ export function generatePasswordResetToken(userId, createdBy) {
     token: crypto.randomUUID(),
     userId,
     createdBy,
-    expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours
+    expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19),
   };
 }
 

@@ -87,27 +87,33 @@ jobs:
     steps:
       - name: Map branch to release target
         id: target
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CF_PROD_SMOKE_URL: ${{ vars.CF_PRODUCTION_SMOKE_URL }}
+          CF_DEV_SMOKE_URL: ${{ vars.CF_DEVELOPMENT_SMOKE_URL }}
+          CF_D1_PROD_DB: ${{ vars.CF_D1_PRODUCTION_DATABASE_NAME }}
+          CF_D1_DEV_DB: ${{ vars.CF_D1_DEVELOPMENT_DATABASE_NAME }}
         run: |
           echo "should_deploy=false" >> "$GITHUB_OUTPUT"
 
           case "$GITHUB_REF_NAME" in
             main)
-              if [ "${{ github.event_name }}" != "pull_request" ]; then
+              if [ "$EVENT_NAME" != "pull_request" ]; then
                 echo "should_deploy=true" >> "$GITHUB_OUTPUT"
               fi
               echo "environment_name=production" >> "$GITHUB_OUTPUT"
               echo "pages_branch=main" >> "$GITHUB_OUTPUT"
-              echo "smoke_url=${{ vars.CF_PRODUCTION_SMOKE_URL || 'https://settimes.ca' }}" >> "$GITHUB_OUTPUT"
-              echo "d1_database_name=${{ vars.CF_D1_PRODUCTION_DATABASE_NAME || 'settimes-production-db' }}" >> "$GITHUB_OUTPUT"
+              echo "smoke_url=${CF_PROD_SMOKE_URL:-https://settimes.ca}" >> "$GITHUB_OUTPUT"
+              echo "d1_database_name=${CF_D1_PROD_DB:-settimes-production-db}" >> "$GITHUB_OUTPUT"
               ;;
             dev)
-              if [ "${{ github.event_name }}" != "pull_request" ]; then
+              if [ "$EVENT_NAME" != "pull_request" ]; then
                 echo "should_deploy=true" >> "$GITHUB_OUTPUT"
               fi
               echo "environment_name=development" >> "$GITHUB_OUTPUT"
               echo "pages_branch=dev" >> "$GITHUB_OUTPUT"
-              echo "smoke_url=${{ vars.CF_DEVELOPMENT_SMOKE_URL || 'https://dev.settimes.ca' }}" >> "$GITHUB_OUTPUT"
-              echo "d1_database_name=${{ vars.CF_D1_DEVELOPMENT_DATABASE_NAME || vars.CF_D1_PRODUCTION_DATABASE_NAME || 'settimes-production-db' }}" >> "$GITHUB_OUTPUT"
+              echo "smoke_url=${CF_DEV_SMOKE_URL:-https://dev.settimes.ca}" >> "$GITHUB_OUTPUT"
+              echo "d1_database_name=${CF_D1_DEV_DB:-${CF_D1_PROD_DB:-settimes-production-db}}" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "environment_name=validation" >> "$GITHUB_OUTPUT"
@@ -146,7 +152,8 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
-        run: ./frontend/node_modules/.bin/wrangler d1 migrations apply "${{ needs.resolve-release.outputs.d1_database_name }}" --remote
+          D1_DATABASE_NAME: ${{ needs.resolve-release.outputs.d1_database_name }}
+        run: ./frontend/node_modules/.bin/wrangler d1 migrations apply "$D1_DATABASE_NAME" --remote
 
       - name: Verify live D1 schema
         env:
@@ -194,7 +201,9 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
-        run: ./frontend/node_modules/.bin/wrangler pages deploy frontend/dist --project-name "${{ env.PAGES_PROJECT_NAME }}" --branch "${{ needs.resolve-release.outputs.pages_branch }}"
+          PAGES_PROJECT: ${{ env.PAGES_PROJECT_NAME }}
+          PAGES_BRANCH: ${{ needs.resolve-release.outputs.pages_branch }}
+        run: ./frontend/node_modules/.bin/wrangler pages deploy frontend/dist --project-name "$PAGES_PROJECT" --branch "$PAGES_BRANCH"
 
   smoke:
     name: Post-deploy smoke checks

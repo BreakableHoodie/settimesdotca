@@ -124,7 +124,7 @@ function parseWranglerTable(stdout) {
     .map((line) => line.trim())
     .filter((line) => line.startsWith('│') && line.endsWith('│'));
 
-  if (rowLines.length < 2) {
+  if (rowLines.length === 0) {
     return { headers: [], rows: [] };
   }
 
@@ -146,7 +146,7 @@ async function verifyTables(databaseName) {
   const { stdout, stderr } = await runWranglerQuery(databaseName, query);
   const parsed = parseWranglerTable(stdout);
 
-  if (parsed.rows.length === 0) {
+  if (parsed.headers.length === 0) {
     const stdoutSnippet = stdout.trim().slice(0, MAX_ERROR_OUTPUT_LENGTH);
     throw new Error(
       [

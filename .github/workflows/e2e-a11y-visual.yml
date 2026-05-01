@@ -14,7 +14,7 @@ concurrency:
     cancel-in-progress: true
 
 permissions:
-    contents: read
+    contents: write
 
 jobs:
     e2e-a11y-visual:
@@ -123,6 +123,21 @@ jobs:
                   echo "Wrangler logs:"
                   cat /tmp/wrangler.log
                   exit 1
+
+            - name: Generate missing linux snapshots
+              env:
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+              run: |
+                  if [ ! -f "e2e/visual-regression.spec.js-snapshots/admin-login-chromium-linux.png" ]; then
+                      echo "Linux snapshots missing — generating initial baselines..."
+                      npx playwright test e2e/visual-regression.spec.js --update-snapshots
+                      git config user.name "github-actions[bot]"
+                      git config user.email "github-actions[bot]@users.noreply.github.com"
+                      git add e2e/visual-regression.spec.js-snapshots/
+                      git commit -m "chore: add initial linux visual regression snapshots [skip ci]"
+                      git push
+                  fi
 
             - name: Run Playwright tests (A11y + Visual)
               env:

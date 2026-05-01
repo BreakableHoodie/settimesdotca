@@ -458,6 +458,16 @@ export const eventsApi = {
     return handleResponse(response)
   },
 
+  async createWizard(wizardData) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/wizard`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(wizardData),
+    })
+    return handleResponse(response)
+  },
+
   async update(eventId, eventData) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}`, {
       method: 'PATCH',

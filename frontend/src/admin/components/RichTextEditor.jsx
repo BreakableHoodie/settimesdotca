@@ -1,7 +1,13 @@
 import { useMemo } from 'react'
 import ReactQuill from 'react-quill-new'
+import DOMPurify from 'dompurify'
 import 'react-quill-new/dist/quill.snow.css'
 import './RichTextEditor.css'
+
+const QUILL_ALLOWED = {
+  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a'],
+  ALLOWED_ATTR: ['href'],
+}
 
 export default function RichTextEditor({
   value,
@@ -18,12 +24,14 @@ export default function RichTextEditor({
 
   const formats = useMemo(() => ['bold', 'italic', 'underline', 'list', 'bullet', 'link'], [])
 
+  const handleChange = html => onChange(DOMPurify.sanitize(html, QUILL_ALLOWED))
+
   return (
     <div className="rich-text-editor" style={{ '--rich-text-min-height': `${minHeight}px` }}>
       <ReactQuill
         theme="snow"
         value={value || ''}
-        onChange={onChange}
+        onChange={handleChange}
         placeholder={placeholder}
         modules={modules}
         formats={formats}

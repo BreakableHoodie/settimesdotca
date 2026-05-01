@@ -1,0 +1,121 @@
+name: Update Visual Snapshots
+
+on:
+    workflow_dispatch:
+        inputs:
+            branch:
+                description: Branch to update snapshots on (defaults to triggering branch)
+                required: false
+                type: string
+
+concurrency:
+    group: update-visual-snapshots-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: write
+
+jobs:
+    update-snapshots:
+        name: Regenerate linux snapshots and commit
+        runs-on: ubuntu-latest
+        timeout-minutes: 35
+
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  ref: ${{ inputs.branch || github.ref }}
+                  fetch-depth: 1
+
+            - name: Setup Node
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+              with:
+                  node-version: 20
+                  cache: npm
+                  cache-dependency-path: |
+                      package-lock.json
+                      frontend/package-lock.json
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Install frontend dependencies
+              working-directory: frontend
+              run: npm ci
+
+            - name: Cache Playwright browsers
+              id: playwright-cache
+              uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+            - name: Install Playwright browsers
+              env:
+                  CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+              run: |
+                  if [ "$CACHE_HIT" = "true" ]; then
+                      npx playwright install-deps chromium
+                      npx playwright install chromium
+                  else
+                      npx playwright install chromium --with-deps
+                  fi
+
+            - name: Build frontend
+              working-directory: frontend
+              run: npm run build
+
+            - name: Initialize D1 database with schema
+              env:
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+              run: |
+                  printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\n' > .dev.vars
+
+                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/setup-complete.sql
+                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/seed-test-data.sql
+
+                  if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
+                      SEED_SQL=$(node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL" --password "$E2E_ADMIN_PASSWORD")
+                      ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="$SEED_SQL"
+                  fi
+
+            - name: Start Pages Functions server
+              timeout-minutes: 5
+              run: |
+                  ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state > /tmp/wrangler.log 2>&1 &
+                  WRANGLER_PID=$!
+                  echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
+
+                  i=1
+                  while [ $i -le 90 ]; do
+                      if ! kill -0 $WRANGLER_PID 2>/dev/null; then
+                          echo "✗ Wrangler process exited unexpectedly"
+                          cat /tmp/wrangler.log
+                          exit 1
+                      fi
+                      if curl -s http://localhost:8788/ > /dev/null 2>&1; then
+                          echo "✓ Server is ready"
+                          break
+                      fi
+                      sleep 2
+                      i=$((i + 1))
+                  done
+
+            - name: Regenerate visual snapshots
+              env:
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+              run: npx playwright test e2e/visual-regression.spec.js --update-snapshots
+
+            - name: Commit updated snapshots
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add e2e/visual-regression.spec.js-snapshots/
+                  if git diff --cached --quiet; then
+                      echo "No snapshot changes to commit"
+                  else
+                      git commit -m "chore: update linux visual regression snapshots [skip ci]"
+                      git push
+                  fi

@@ -52,12 +52,12 @@ E2E tests run against a live local server and require the Pages dev server to be
 
 ## Database migrations
 
-Migrations live in `database/migrations/` and are numbered sequentially (`0001_*.sql`, `0002_*.sql`, …).
+Migrations live in the top-level `migrations/` directory and are numbered sequentially (`0001_*.sql`, `0002_*.sql`, …). This is the authoritative location — do not add migrations to `database/`.
 
 - **Local:** `npm run migrate:local` applies all pending migrations to `.wrangler/state`
-- **Remote (CI only):** Wrangler applies migrations automatically during the `migrate-and-verify-d1` CI job on push to `main`/`dev`
+- **Remote (CI only):** Wrangler applies migrations from `migrations/` automatically during the `migrate-and-verify-d1` CI job on push to `main`/`dev`
 
-To add a migration, create the next numbered file and run `npm run validate:schema` to verify the schema snapshot is still consistent.
+To add a migration, create the next numbered file in `migrations/` and run `npm run validate:schema` to verify the schema snapshot is still consistent.
 
 ## Pull requests
 

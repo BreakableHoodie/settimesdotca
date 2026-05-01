@@ -194,9 +194,8 @@ export async function onRequestPost(context) {
     }
 
     // Create subscription
-    let result;
     try {
-      result = await env.DB.prepare(
+      await env.DB.prepare(
         `
         INSERT INTO email_subscriptions (email, city, genre, frequency, verification_token, unsubscribe_token)
         VALUES (?, ?, ?, ?, ?, ?)

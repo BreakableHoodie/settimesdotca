@@ -235,8 +235,11 @@ export default function AdminPanel({ currentUser, onLogout }) {
             {tabs.map(tab => (
               <button
                 key={tab.id}
+                id={`tab-${tab.id}`}
                 role="tab"
                 aria-selected={activeTab === tab.id}
+                aria-controls="main-content"
+                tabIndex={activeTab === tab.id ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap min-h-[48px] flex items-center ${
                   activeTab === tab.id
@@ -252,7 +255,12 @@ export default function AdminPanel({ currentUser, onLogout }) {
       </div>
 
       {/* Tab Content */}
-      <div id="main-content" className="container mx-auto px-4 py-6 pb-24 md:pb-6">
+      <div
+        id="main-content"
+        role="tabpanel"
+        aria-labelledby={`tab-${activeTab}`}
+        className="container mx-auto px-4 py-6 pb-24 md:pb-6"
+      >
         {/* Context Banner - Shows when event is selected */}
         <ContextBanner event={selectedEvent} onClear={() => setSelectedEventId(null)} />
 

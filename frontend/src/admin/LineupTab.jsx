@@ -636,28 +636,52 @@ export default function LineupTab({
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('name')}
-                          aria-sort={sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                          aria-sort={
+                            sortConfig.key === 'name'
+                              ? sortConfig.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           Performer <SortIcon col="name" />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('venue')}
-                          aria-sort={sortConfig.key === 'venue' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                          aria-sort={
+                            sortConfig.key === 'venue'
+                              ? sortConfig.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           Venue <SortIcon col="venue" />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('start_time')}
-                          aria-sort={sortConfig.key === 'start_time' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                          aria-sort={
+                            sortConfig.key === 'start_time'
+                              ? sortConfig.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           Time <SortIcon col="start_time" />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('duration')}
-                          aria-sort={sortConfig.key === 'duration' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                          aria-sort={
+                            sortConfig.key === 'duration'
+                              ? sortConfig.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           Duration <SortIcon col="duration" />
                         </th>

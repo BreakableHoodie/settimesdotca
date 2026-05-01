@@ -167,7 +167,9 @@ export default function AdminLogin({ onLoginSuccess }) {
             </div>
 
             {idleMessage && (
-              <div role="status" className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">{idleMessage}</div>
+              <div role="status" className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">
+                {idleMessage}
+              </div>
             )}
 
             {activationInfo && (
@@ -186,7 +188,11 @@ export default function AdminLogin({ onLoginSuccess }) {
               </div>
             )}
 
-            {error && <div role="alert" className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}
+            {error && (
+              <div role="alert" className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">
+                {error}
+              </div>
+            )}
 
             {lockoutInfo && lockoutInfo.locked && (
               <div role="alert" className="bg-yellow-900/50 border border-yellow-600 text-yellow-200 p-3 rounded mb-4">

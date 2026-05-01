@@ -193,8 +193,8 @@ Sessions are managed by **Lucia auth v3** using a Cloudflare D1 (`lucia_sessions
 
 | Property | Value |
 |----------|-------|
-| **Production cookie name** | `__Host-auth_session` |
-| **Dev cookie name** | `auth_session` |
+| **Production cookie name** | `__Host-session_token` |
+| **Dev cookie name** | `session_token` |
 | **HTTPOnly** | Yes (not accessible to JavaScript) |
 | **Secure** | Yes in production (enforced by `__Host-` prefix) |
 | **SameSite** | Strict (prevents CSRF) |
@@ -214,8 +214,8 @@ Optionally, users can choose "Remember this device" to skip MFA for 30 days. Tru
 
 1. **Creation:** Successful MFA verification calls `lucia.createSession(userId, {})`
 2. **Storage:** Session ID stored in `lucia_sessions` table with IP + UA metadata
-3. **Validation:** `_middleware.js` calls `lucia.validateSessionCookie()` on every admin request
-4. **Activity:** `last_used_at` updated each validation; sessions slide on activity
+3. **Validation:** `_middleware.js` reads the session cookie with `lucia.readSessionCookie()` and validates the resulting ID with `lucia.validateSession(sessionId)` on every admin request
+4. **Activity:** `last_used_at` updated on successful validation; sessions slide on activity
 5. **Expiration:** Sessions expire after 30 days of inactivity
 6. **Logout:** `lucia.invalidateSession()` deletes the DB row; cookies cleared
 

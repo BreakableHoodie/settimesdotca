@@ -194,14 +194,24 @@ export async function onRequestPost(context) {
     }
 
     // Create subscription
-    const result = await env.DB.prepare(
+    try {
+      await env.DB.prepare(
+        `
+        INSERT INTO email_subscriptions (email, city, genre, frequency, verification_token, unsubscribe_token)
+        VALUES (?, ?, ?, ?, ?, ?)
       `
-      INSERT INTO email_subscriptions (email, city, genre, frequency, verification_token, unsubscribe_token)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `
-    )
-      .bind(email, city, genre, frequency, verificationToken, unsubscribeToken)
-      .run();
+      )
+        .bind(email, city, genre, frequency, verificationToken, unsubscribeToken)
+        .run();
+    } catch (insertError) {
+      if (insertError?.message?.includes('UNIQUE constraint failed')) {
+        return new Response(
+          JSON.stringify({ error: 'You are already subscribed to this feed' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      throw insertError;
+    }
 
     // Send verification email
     const emailResult = await sendVerificationEmail(env, email, city, genre, verificationToken);

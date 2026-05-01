@@ -9,6 +9,7 @@ import Footer from './components/Footer'
 import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
 import PrivacyBanner from './components/PrivacyBanner'
+import ConfirmDialog from './components/ui/ConfirmDialog'
 import ScheduleView from './components/ScheduleView'
 import { trackEventView, trackPageView } from './utils/metrics'
 import { validateBandsData } from './utils/validation'
@@ -151,6 +152,7 @@ function App() {
   const [showPast, setShowPast] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [debugTime, setDebugTime] = useState(() => getInitialDebugTime())
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -313,10 +315,7 @@ function App() {
   }
 
   const clearSchedule = () => {
-    if (window.confirm('Are you sure you want to clear your entire schedule?')) {
-      setSelectedBands([])
-      setView('all')
-    }
+    setClearConfirmOpen(true)
   }
 
   const selectAll = () => {
@@ -545,6 +544,19 @@ function App() {
       </Suspense>
       <Footer />
       <PrivacyBanner />
+      <ConfirmDialog
+        isOpen={clearConfirmOpen}
+        title="Clear Schedule"
+        message="Are you sure you want to clear your entire schedule?"
+        confirmText="Clear"
+        onConfirm={() => {
+          setClearConfirmOpen(false)
+          setSelectedBands([])
+          setView('all')
+        }}
+        onCancel={() => setClearConfirmOpen(false)}
+        variant="danger"
+      />
     </div>
   )
 }

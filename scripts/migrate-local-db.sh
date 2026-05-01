@@ -62,10 +62,11 @@ for DB_FILE in $DB_FILES; do
     for MIGRATION_FILE in $MIGRATION_FILES; do
         MIGRATION_NAME=$(basename "$MIGRATION_FILE")
 
-        # Try to apply migration, ignore if already applied
-        if sqlite3 "$DB_FILE" < "$MIGRATION_FILE" 2>&1 | grep -q "duplicate column"; then
+        # Capture output once; || true prevents set -e from exiting on non-zero sqlite3 status
+        RESULT=$(sqlite3 "$DB_FILE" < "$MIGRATION_FILE" 2>&1) || true
+        if echo "$RESULT" | grep -q "duplicate column"; then
             echo "  ⏭️  $MIGRATION_NAME (already applied)"
-        elif sqlite3 "$DB_FILE" < "$MIGRATION_FILE" 2>&1 | grep -q "error"; then
+        elif echo "$RESULT" | grep -q "error"; then
             echo "  ⚠️  $MIGRATION_NAME (error - may already be applied)"
         else
             echo "  ✅ $MIGRATION_NAME"

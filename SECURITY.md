@@ -1,7 +1,7 @@
 # Security Documentation - SetTimes.ca
 
-**Last Updated:** 2026-01-29
-**Version:** 2.1 (January 2026 Review)
+**Last Updated:** 2026-04-30
+**Version:** 2.2 (April 2026 Review)
 
 ---
 
@@ -31,8 +31,11 @@ This application implements defense-in-depth security with multiple layers of pr
 - ✅ **Strict CORS** - Prevents unauthorized cross-origin requests
 - ✅ **PBKDF2 password hashing** - 100,000 iterations with SHA-256
 - ✅ **Role-based access control** - Admin, Editor, Viewer roles
+- ✅ **TOTP MFA** - Time-based one-time password with backup codes
+- ✅ **Trusted device** - 30-day device remembrance validated by IP + User-Agent hash
 - ✅ **Comprehensive audit logging** - All actions tracked
 - ✅ **Rate limiting** - Prevents brute force attacks
+- ✅ **DOMPurify** - Rich-text HTML sanitization
 
 ---
 
@@ -186,21 +189,35 @@ if (permCheck.error) {
 
 ### Session Cookies
 
-- **Name:** `session_token`
-- **HTTPOnly:** Yes (not accessible to JavaScript)
-- **Secure:** Yes (HTTPS only)
-- **SameSite:** Strict (prevents CSRF)
-- **Max-Age:** 1800 seconds (30 minutes)
+Sessions are managed by **Lucia auth v3** using a Cloudflare D1 (`lucia_sessions`) backend.
+
+| Property | Value |
+|----------|-------|
+| **Production cookie name** | `__Host-session_token` |
+| **Dev cookie name** | `session_token` |
+| **HTTPOnly** | Yes (not accessible to JavaScript) |
+| **Secure** | Yes in production (enforced by `__Host-` prefix) |
+| **SameSite** | Strict (prevents CSRF) |
+| **Expiry** | 30 days (absolute); sliding on activity |
+
+The `__Host-` prefix also enforces `Path=/` and prohibits a `Domain` attribute, preventing subdomain injection attacks.
+
+### MFA & Trusted Devices
+
+When TOTP MFA is enabled, login is a two-step flow:
+1. Password check → issues a short-lived `mfa_challenges` token (5 minutes)
+2. TOTP/backup-code verification → issues the full Lucia session
+
+Optionally, users can choose "Remember this device" to skip MFA for 30 days. Trusted device tokens are stored as `__Host-trusted_device` (SHA-256 hashed in DB) and validated against the stored SHA-256 hashes of the IP address and User-Agent string from when the device was registered.
 
 ### Session Lifecycle
 
-1. **Creation:** Login/signup generates UUID session token
-2. **Storage:** Token stored in `sessions` table with expiry
-3. **Transmission:** Browser sends cookie automatically
-4. **Validation:** Middleware checks cookie + database
-5. **Activity:** `last_activity_at` updated on each request (future enhancement)
-6. **Expiration:** Sessions auto-expire after 30 minutes
-7. **Logout:** Token deleted from database, cookie cleared
+1. **Creation:** Successful MFA verification calls `lucia.createSession(userId, {})`
+2. **Storage:** Session ID stored in `lucia_sessions` table with IP + UA metadata
+3. **Validation:** `_middleware.js` reads the session cookie with `lucia.readSessionCookie()` and validates the resulting ID with `lucia.validateSession(sessionId)` on every admin request
+4. **Activity:** `last_used_at` updated on successful validation; sessions slide on activity
+5. **Expiration:** Sessions expire after 30 days of inactivity
+6. **Logout:** `lucia.invalidateSession()` deletes the DB row; cookies cleared
 
 ---
 
@@ -243,17 +260,14 @@ if (!valid) return 403;
 
 ## Input Validation & Sanitization
 
-### Current Validation (Client-Side)
+### Current Validation
 
 File: `frontend/src/utils/validation.js`
 
-**Note:** Current sanitization is insufficient (see P0-5 in code review).
-
-**Recommended:**
-- Install DOMPurify for HTML sanitization
-- Always validate/sanitize server-side
-- Use parameterized queries (already implemented ✅)
-- Escape output at render time (React does this automatically ✅)
+- **DOMPurify** sanitizes all rich-text HTML before it is stored or rendered ✅
+- Parameterized queries for all D1 SQL ✅
+- React escapes plain-text output automatically ✅
+- Server-side validation on all admin endpoints (email format, required fields, length limits)
 
 ### Server-Side Validation
 
@@ -337,13 +351,20 @@ CORS requests with credentials (`credentials: 'include'`) only allowed from appr
 
 ### Environment Variables
 
-**Required in Cloudflare Pages:**
+**Required secrets in Cloudflare Pages (set via dashboard, never commit):**
 
 ```bash
-# DO NOT commit these values to Git!
-ADMIN_PASSWORD=<use-password-manager>
-MASTER_PASSWORD=<use-password-manager>
-DEVELOPER_CONTACT=555-123-4567
+CSRF_SECRET=<32+ byte random hex>          # HMAC key for CSRF tokens
+MFA_ENCRYPTION_KEY=<32 byte hex>           # AES-256 key for TOTP secrets at rest
+TURNSTILE_SECRET_KEY=<from Cloudflare>     # Bot protection for public forms
+CF_PAGES_API_TOKEN=<from Cloudflare>       # CI deployment token (GitHub secret)
+CF_ACCOUNT_ID=<from Cloudflare>            # CI deployment (GitHub secret)
+```
+
+**Optional:**
+```bash
+ENVIRONMENT=development   # Set in dev environment to relax __Host- cookie prefix
+RESEND_API_KEY=<key>      # Email delivery for subscription notifications
 ```
 
 ### Database Setup

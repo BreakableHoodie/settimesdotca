@@ -378,7 +378,7 @@ export default function EventWizard({ onComplete, onCancel }) {
 
     try {
       // Create event
-      const event = await eventsApi.create({
+      const { event } = await eventsApi.create({
         name: eventData.name,
         date: eventData.date,
         slug: eventData.slug,

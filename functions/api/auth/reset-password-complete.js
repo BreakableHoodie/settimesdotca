@@ -230,7 +230,6 @@ export async function onRequestPost(context) {
         request.headers.get("User-Agent") || "unknown",
         JSON.stringify({
           user_id: resetToken.user_id,
-          user_email: resetToken.email,
           reset_token_id: resetToken.id,
         }),
       )

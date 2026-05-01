@@ -432,8 +432,8 @@ export default function EventsTab({
     if (selectedEventId) {
       const loadEventData = async () => {
         try {
-          const bandsData = await bandsApi.getAll()
-          const eventBandsData = bandsData.bands.filter(b => b.event_id === selectedEventId)
+          const bandsData = await bandsApi.getByEvent(selectedEventId)
+          const eventBandsData = bandsData.bands
 
           // Get venue names from the bands
           const uniqueVenues = {}

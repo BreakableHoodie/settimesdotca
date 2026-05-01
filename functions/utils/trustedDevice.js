@@ -1,6 +1,10 @@
 // Trusted Device utilities for "Remember this device" MFA feature
+import { isDevRequest } from "./auth.js";
 
-const TRUSTED_DEVICE_COOKIE_NAME = "trusted_device";
+// __Host- prefix enforces Secure + Path=/ + no Domain, preventing subdomain injection.
+// Must align with the name used in getTrustedDeviceToken's cookie parsing.
+const TRUSTED_DEVICE_COOKIE_NAME_SECURE = "__Host-trusted_device";
+const TRUSTED_DEVICE_COOKIE_NAME_DEV = "trusted_device";
 const TRUSTED_DEVICE_EXPIRY_DAYS = 30;
 
 /**
@@ -165,37 +169,38 @@ export async function cleanupExpiredDevices(DB) {
 }
 
 /**
- * Create the trusted device cookie string
+ * Create the trusted device cookie string.
+ * Uses __Host- prefix in production to enforce Secure + Path=/ and prevent subdomain injection.
  */
-export function createTrustedDeviceCookie(token, request) {
-  const isSecure = !request?.url?.includes("localhost");
+export function createTrustedDeviceCookie(token, request, env) {
+  const isDev = isDevRequest(request, env);
+  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
   const maxAge = TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60;
 
   const parts = [
-    `${TRUSTED_DEVICE_COOKIE_NAME}=${token}`,
+    `${cookieName}=${token}`,
     `Path=/`,
     `Max-Age=${maxAge}`,
     `SameSite=Strict`,
+    `HttpOnly`,
   ];
 
-  if (isSecure) {
+  if (!isDev) {
     parts.push("Secure");
   }
-
-  // HTTPOnly so JavaScript can't access it
-  parts.push("HttpOnly");
 
   return parts.join("; ");
 }
 
 /**
- * Create a cookie to delete the trusted device
+ * Create a cookie to clear the trusted device.
  */
-export function deleteTrustedDeviceCookie(request) {
-  const isSecure = !request?.url?.includes("localhost");
-  const secure = isSecure ? "Secure; " : "";
+export function deleteTrustedDeviceCookie(request, env) {
+  const isDev = isDevRequest(request, env);
+  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
+  const secure = isDev ? "" : "Secure; ";
 
-  return `${TRUSTED_DEVICE_COOKIE_NAME}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
+  return `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
 }
 
 /**
@@ -208,7 +213,7 @@ export function getTrustedDeviceToken(request) {
   const cookies = cookieHeader.split(";");
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split("=");
-    if (name === TRUSTED_DEVICE_COOKIE_NAME) {
+    if (name === TRUSTED_DEVICE_COOKIE_NAME_SECURE || name === TRUSTED_DEVICE_COOKIE_NAME_DEV) {
       return value;
     }
   }

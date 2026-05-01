@@ -3,6 +3,7 @@ import { bandsApi, venuesApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
 import ArtistPicker from './components/ArtistPicker'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import {
   calculateEndTimeFromDuration,
@@ -69,6 +70,7 @@ export default function LineupTab({
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkAction, setBulkAction] = useState(null)
   const [bulkParams, setBulkParams] = useState({})
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: () => {} })
 
   const splitOrigin = origin => {
     if (!origin) return { city: '', region: '' }
@@ -334,15 +336,20 @@ export default function LineupTab({
     }
   }
 
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Remove "${name}" from this event?`)) return
-    try {
-      await bandsApi.delete(id)
-      showToast('Performance removed', 'success')
-      loadData()
-    } catch (err) {
-      showToast(err.message, 'error')
-    }
+  const handleDelete = (id, name) => {
+    setConfirmDialog({
+      open: true,
+      message: `Remove "${name}" from this event?`,
+      onConfirm: async () => {
+        try {
+          await bandsApi.delete(id)
+          showToast('Performance removed', 'success')
+          loadData()
+        } catch (err) {
+          showToast(err.message, 'error')
+        }
+      },
+    })
   }
 
   const startEdit = band => {
@@ -470,25 +477,28 @@ export default function LineupTab({
   }
   const handleSelectAll = checked => setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
 
-  const handleBulkSubmit = async () => {
+  const handleBulkSubmit = () => {
     if (bulkAction === 'delete') {
-      if (!window.confirm(`Delete ${selectedIds.size} performances?`)) return
-      try {
-        const res = await bandsApi.bulkDelete(Array.from(selectedIds))
-        if (res.success) {
-          showToast('Deleted', 'success')
-          setSelectedIds(new Set())
-          loadData()
-        } else {
-          showToast(res.error, 'error')
-        }
-      } catch (e) {
-        showToast(e.message, 'error')
-      }
+      setConfirmDialog({
+        open: true,
+        message: `Delete ${selectedIds.size} performance${selectedIds.size !== 1 ? 's' : ''}?`,
+        onConfirm: async () => {
+          try {
+            const res = await bandsApi.bulkDelete(Array.from(selectedIds))
+            if (res.success) {
+              showToast('Deleted', 'success')
+              setSelectedIds(new Set())
+              loadData()
+            } else {
+              showToast(res.error, 'error')
+            }
+          } catch (e) {
+            showToast(e.message, 'error')
+          }
+        },
+      })
     } else if (bulkAction === 'venue' || bulkAction === 'time') {
-      // Handle bulk venue/time change
-      // Use existing BulkActionBar logic or implement here
-      // For brevity, skipping implementation detail but it should hook into same API endpoint
+      showToast('This action is not yet available.', 'error')
     }
   }
 
@@ -626,24 +636,52 @@ export default function LineupTab({
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('name')}
+                          aria-sort={
+                            sortConfig.key === 'name'
+                              ? sortConfig.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           Performer <SortIcon col="name" />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('venue')}
+                          aria-sort={
+                            sortConfig.key === 'venue'
+                              ? sortConfig.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           Venue <SortIcon col="venue" />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('start_time')}
+                          aria-sort={
+                            sortConfig.key === 'start_time'
+                              ? sortConfig.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           Time <SortIcon col="start_time" />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                           onClick={() => handleSort('duration')}
+                          aria-sort={
+                            sortConfig.key === 'duration'
+                              ? sortConfig.direction === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           Duration <SortIcon col="duration" />
                         </th>
@@ -773,6 +811,16 @@ export default function LineupTab({
           </div>
         </>
       )}
+      <ConfirmDialog
+        isOpen={confirmDialog.open}
+        message={confirmDialog.message}
+        onConfirm={async () => {
+          setConfirmDialog(d => ({ ...d, open: false }))
+          await confirmDialog.onConfirm()
+        }}
+        onCancel={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        variant="danger"
+      />
     </div>
   )
 }

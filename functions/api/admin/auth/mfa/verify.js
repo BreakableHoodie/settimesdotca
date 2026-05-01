@@ -347,7 +347,7 @@ export async function onRequestPost(context) {
         );
         headers.append(
           "Set-Cookie",
-          createTrustedDeviceCookie(trustedDevice.token, request)
+          createTrustedDeviceCookie(trustedDevice.token, request, env)
         );
       } catch (err) {
         // Don't fail login if trusted device creation fails

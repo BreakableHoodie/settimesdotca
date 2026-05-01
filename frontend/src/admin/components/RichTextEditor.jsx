@@ -6,7 +6,7 @@ import './RichTextEditor.css'
 
 const QUILL_ALLOWED = {
   ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a'],
-  ALLOWED_ATTR: ['href'],
+  ALLOWED_ATTR: ['href', 'target', 'rel'],
 }
 
 export default function RichTextEditor({

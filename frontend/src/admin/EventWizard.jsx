@@ -382,6 +382,16 @@ export default function EventWizard({ onComplete, onCancel }) {
     // Map temp local venue IDs to 0-based indices for the wizard endpoint
     const venueIndexMap = Object.fromEntries(eventData.venues.map((v, i) => [v.id, i]))
 
+    // Pre-flight: detect bands referencing a venue that was removed before publishing
+    const staleband = eventData.bands.find(b => venueIndexMap[b.venueId] === undefined)
+    if (staleband) {
+      setPublishError(
+        `Band "${staleband.name}" references a venue that was removed. Please go back and fix the band's venue assignment.`
+      )
+      setLoading(false)
+      return
+    }
+
     try {
       const { event } = await eventsApi.createWizard({
         event: {
@@ -393,7 +403,7 @@ export default function EventWizard({ onComplete, onCancel }) {
         venues: eventData.venues.map(v => ({ name: v.name, address: v.address })),
         bands: eventData.bands.map(b => ({
           name: b.name,
-          venueIndex: venueIndexMap[b.venueId] ?? 0,
+          venueIndex: venueIndexMap[b.venueId],
           startTime: b.startTime,
           endTime: b.endTime,
           url: b.url,

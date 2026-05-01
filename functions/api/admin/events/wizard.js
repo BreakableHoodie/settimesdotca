@@ -1,8 +1,9 @@
-// Event Wizard endpoint — atomic multi-entity creation
+// Event Wizard endpoint — single-request event creation
 // POST /api/admin/events/wizard
 //
-// Accepts { event, venues, bands } in a single request and creates all entities
-// using DB.batch() so venue inserts and performance inserts are each atomic.
+// Accepts { event, venues, bands } and creates all three entity types.
+// Venue inserts use find-or-create (reuses an existing venue by name).
+// Performance inserts are wrapped in a single DB.batch() for atomicity.
 // bands[].venueIndex is a 0-based index into the venues array (not a DB ID).
 
 import { checkPermission, auditLog } from "../_middleware.js";
@@ -12,16 +13,13 @@ import {
   validationErrorResponse,
   sanitizeString,
   sanitizeOptionalHttpUrl,
+  isValidTime,
   FIELD_LIMITS,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 
 function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function validateTimeFormat(t) {
-  return !t || /^\d{2}:\d{2}$/.test(t);
 }
 
 export async function onRequestPost(context) {
@@ -59,44 +57,51 @@ export async function onRequestPost(context) {
   }
   const { name, date, slug, description } = eventValidation.sanitized;
 
+  // Reject past dates — same rule as POST /api/admin/events
+  const eventDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (eventDate < today) {
+    return validationErrorResponse("Date cannot be in the past");
+  }
+
   // --- Validate venues ---
   if (!Array.isArray(venuesInput) || venuesInput.length > 50) {
     return new Response(
       JSON.stringify({ error: "venues must be an array of up to 50 items" }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      },
+      { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
-  const sanitizedVenues = venuesInput.map((v, i) => {
-    const venueName = sanitizeString(String(v?.name || ""));
-    if (!venueName || venueName.length > FIELD_LIMITS.venueName.max) {
-      throw Object.assign(
-        new Error(
+  let sanitizedVenues;
+  try {
+    sanitizedVenues = venuesInput.map((v, i) => {
+      const venueName = sanitizeString(String(v?.name || ""));
+      if (!venueName || venueName.length > FIELD_LIMITS.venueName.max) {
+        throw new Error(
           `Venue ${i + 1}: name is required (max ${FIELD_LIMITS.venueName.max} chars)`,
-        ),
-        { status: 400 },
-      );
-    }
-    return {
-      name: venueName,
-      address:
-        sanitizeString(String(v?.address || "")).slice(
-          0,
-          FIELD_LIMITS.venueAddress.max,
-        ) || null,
-    };
-  });
+        );
+      }
+      return {
+        name: venueName,
+        address:
+          sanitizeString(String(v?.address || "")).slice(
+            0,
+            FIELD_LIMITS.venueAddress.max,
+          ) || null,
+      };
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   // --- Validate bands ---
   if (!Array.isArray(bandsInput) || bandsInput.length > 200) {
     return new Response(
       JSON.stringify({ error: "bands must be an array of up to 200 items" }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      },
+      { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
   let sanitizedBands;
@@ -118,11 +123,15 @@ export async function onRequestPost(context) {
           `Band ${i + 1}: venueIndex ${venueIndex} is out of range`,
         );
       }
-      if (
-        !validateTimeFormat(b?.startTime) ||
-        !validateTimeFormat(b?.endTime)
-      ) {
-        throw new Error(`Band ${i + 1}: times must be in HH:MM format`);
+      if (b?.startTime) {
+        const startCheck = isValidTime(b.startTime);
+        if (!startCheck.valid)
+          throw new Error(`Band ${i + 1}: ${startCheck.error}`);
+      }
+      if (b?.endTime) {
+        const endCheck = isValidTime(b.endTime);
+        if (!endCheck.valid)
+          throw new Error(`Band ${i + 1}: ${endCheck.error}`);
       }
       let url = null;
       try {
@@ -157,10 +166,7 @@ export async function onRequestPost(context) {
     if (existing) {
       return new Response(
         JSON.stringify({ error: "An event with this slug already exists" }),
-        {
-          status: 409,
-          headers: { "Content-Type": "application/json" },
-        },
+        { status: 409, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -173,19 +179,18 @@ export async function onRequestPost(context) {
       .bind(name, date, slug, description || null, currentUser.userId)
       .first();
 
-    // --- Batch-create venues ---
+    // --- Find or create venues (reuses existing venue if name already taken) ---
     const venueIds = [];
-    if (sanitizedVenues.length > 0) {
-      const venueResults = await DB.batch(
-        sanitizedVenues.map((v) =>
-          DB.prepare(
-            `INSERT INTO venues (name, address) VALUES (?, ?) RETURNING id`,
-          ).bind(v.name, v.address),
-        ),
-      );
-      for (const r of venueResults) {
-        venueIds.push(r.results[0]?.id);
-      }
+    for (const v of sanitizedVenues) {
+      await DB.prepare(
+        `INSERT OR IGNORE INTO venues (name, address) VALUES (?, ?)`,
+      )
+        .bind(v.name, v.address)
+        .run();
+      const venue = await DB.prepare(`SELECT id FROM venues WHERE name = ?`)
+        .bind(v.name)
+        .first();
+      venueIds.push(venue.id);
     }
 
     // --- Upsert band_profiles, then batch-create performances ---
@@ -214,7 +219,7 @@ export async function onRequestPost(context) {
         profileIds.push(profile.id);
       }
 
-      // Batch-insert all performances atomically
+      // Batch-insert all performances — all succeed or all fail together
       await DB.batch(
         sanitizedBands.map((band, i) =>
           DB.prepare(

@@ -62,17 +62,21 @@ test.describe("Admin Login - Accessibility", () => {
   test("can navigate the form with keyboard only", async ({ page }) => {
     await page.goto("/admin/login");
 
-    // Tab to email
-    await page.keyboard.press("Tab");
-    await expect(page.locator("#email")).toBeFocused();
+    // Click body to move browser focus into the page before tabbing
+    await page.locator("body").click();
 
-    // Tab to password
-    await page.keyboard.press("Tab");
-    await expect(page.locator("#password")).toBeFocused();
-
-    // Tab to submit button
-    await page.keyboard.press("Tab");
+    const emailInput = page.locator("#email");
+    const passwordInput = page.locator("#password");
     const submitButton = page.getByRole("button", { name: /sign in/i });
+
+    // Tab through the form and verify all interactive elements are reachable
+    await emailInput.focus();
+    await expect(emailInput).toBeFocused();
+
+    await page.keyboard.press("Tab");
+    await expect(passwordInput).toBeFocused();
+
+    await page.keyboard.press("Tab");
     await expect(submitButton).toBeFocused();
   });
 

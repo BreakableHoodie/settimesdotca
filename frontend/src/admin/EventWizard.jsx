@@ -383,10 +383,10 @@ export default function EventWizard({ onComplete, onCancel }) {
     const venueIndexMap = Object.fromEntries(eventData.venues.map((v, i) => [v.id, i]))
 
     // Pre-flight: detect bands referencing a venue that was removed before publishing
-    const staleband = eventData.bands.find(b => venueIndexMap[b.venueId] === undefined)
-    if (staleband) {
+    const staleBand = eventData.bands.find(b => venueIndexMap[b.venueId] === undefined)
+    if (staleBand) {
       setPublishError(
-        `Band "${staleband.name}" references a venue that was removed. Please go back and fix the band's venue assignment.`
+        `Band "${staleBand.name}" references a venue that was removed. Please go back and fix the band's venue assignment.`
       )
       setLoading(false)
       return

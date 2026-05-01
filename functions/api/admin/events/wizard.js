@@ -2,6 +2,7 @@
 // POST /api/admin/events/wizard
 //
 // Accepts { event, venues, bands } and creates all three entity types.
+// Requires admin role — venue creation is admin-only throughout the app.
 // Venue inserts use find-or-create (reuses an existing venue by name).
 // Performance inserts are wrapped in a single DB.batch() for atomicity.
 // bands[].venueIndex is a 0-based index into the venues array (not a DB ID).
@@ -22,12 +23,58 @@ function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// Returns minutes-since-midnight, wrapping end times that cross midnight.
+function toMinutes(t) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function intervalsOverlap([a0, a1], [b0, b1]) {
+  return a0 < b1 && b0 < a1;
+}
+
+// Build two canonical intervals to handle midnight crossover (mirrors bands.js logic).
+function buildIntervals(start, end) {
+  const s = toMinutes(start);
+  const e = toMinutes(end);
+  const ne = e <= s ? e + 24 * 60 : e;
+  return [
+    [s, ne],
+    [s + 24 * 60, ne + 24 * 60],
+  ];
+}
+
+// Detect scheduling conflicts within the submitted band list (all for a new event).
+function findConflict(bands) {
+  const byVenue = {};
+  for (const b of bands) {
+    if (!b.startTime || !b.endTime) continue;
+    (byVenue[b.venueIndex] ??= []).push(b);
+  }
+  for (const group of Object.values(byVenue)) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const aIntervals = buildIntervals(group[i].startTime, group[i].endTime);
+        const bIntervals = buildIntervals(group[j].startTime, group[j].endTime);
+        const hasOverlap = aIntervals.some((a) =>
+          bIntervals.some((b) => intervalsOverlap(a, b)),
+        );
+        if (hasOverlap) {
+          return `"${group[i].name}" and "${group[j].name}" have overlapping times at the same venue`;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
   const ipAddress = getClientIP(request);
 
-  const permCheck = await checkPermission(context, "editor");
+  // Venue creation is admin-only throughout the app — require admin here too.
+  const permCheck = await checkPermission(context, "admin");
   if (permCheck.error) return permCheck.response;
   const currentUser = permCheck.user;
 
@@ -57,12 +104,14 @@ export async function onRequestPost(context) {
   }
   const { name, date, slug, description } = eventValidation.sanitized;
 
-  // Reject past dates — same rule as POST /api/admin/events
+  // Wizard always creates drafts — archived/backdated events are out of scope here.
   const eventDate = new Date(date);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (eventDate < today) {
-    return validationErrorResponse("Date cannot be in the past");
+    return validationErrorResponse(
+      "Draft events created via the wizard cannot have a past date",
+    );
   }
 
   // --- Validate venues ---
@@ -158,6 +207,16 @@ export async function onRequestPost(context) {
     });
   }
 
+  // Detect time conflicts before touching the DB (new event = no pre-existing performances).
+  const conflict = findConflict(sanitizedBands);
+  if (conflict) {
+    return new Response(
+      JSON.stringify({ error: `Schedule conflict: ${conflict}` }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  let event = null;
   try {
     // --- Check for duplicate slug ---
     const existing = await DB.prepare("SELECT id FROM events WHERE slug = ?")
@@ -171,7 +230,7 @@ export async function onRequestPost(context) {
     }
 
     // --- Create event ---
-    const event = await DB.prepare(
+    event = await DB.prepare(
       `INSERT INTO events (name, date, slug, status, is_published, description, created_by_user_id)
        VALUES (?, ?, ?, 'draft', 0, ?, ?)
        RETURNING *`,
@@ -257,6 +316,16 @@ export async function onRequestPost(context) {
     });
   } catch (error) {
     console.error("Wizard creation error:", error);
+
+    // Compensate: delete the event row if it was created before the failure,
+    // so we don't leave an empty draft behind.
+    if (event?.id) {
+      await DB.prepare("DELETE FROM events WHERE id = ?")
+        .bind(event.id)
+        .run()
+        .catch((e) => console.error("Wizard cleanup failed:", e));
+    }
+
     return new Response(JSON.stringify({ error: "Failed to create event" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

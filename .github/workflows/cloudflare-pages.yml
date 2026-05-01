@@ -29,12 +29,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -68,7 +68,7 @@ jobs:
         run: npm run build
 
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: frontend-dist
           path: frontend/dist
@@ -113,7 +113,11 @@ jobs:
               echo "environment_name=development" >> "$GITHUB_OUTPUT"
               echo "pages_branch=dev" >> "$GITHUB_OUTPUT"
               echo "smoke_url=${CF_DEV_SMOKE_URL:-https://dev.settimes.ca}" >> "$GITHUB_OUTPUT"
-              echo "d1_database_name=${CF_D1_DEV_DB:-${CF_D1_PROD_DB:-settimes-production-db}}" >> "$GITHUB_OUTPUT"
+              if [ -z "$CF_D1_DEV_DB" ]; then
+                echo "::error::CF_D1_DEVELOPMENT_DATABASE_NAME is not set. Set this GitHub Actions variable to prevent dev migrations from running against the production database."
+                exit 1
+              fi
+              echo "d1_database_name=$CF_D1_DEV_DB" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "environment_name=validation" >> "$GITHUB_OUTPUT"
@@ -133,12 +137,12 @@ jobs:
     if: needs.resolve-release.outputs.should_deploy == 'true'
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -176,12 +180,12 @@ jobs:
       deployments: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -192,7 +196,7 @@ jobs:
         run: npm ci
 
       - name: Download frontend build artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: frontend-dist
           path: frontend/dist
@@ -249,8 +253,14 @@ jobs:
         env:
           SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
         run: |
-          curl --fail --silent --show-error --location "$SMOKE_URL/api/schedule?event=current" > /tmp/settimes-schedule.json
-          node --input-type=module <<'EOF'
+          # Accept 200 (published) or 503 (publish flag disabled) — both are valid deployed states.
+          STATUS=$(curl --silent --show-error --location --write-out '%{http_code}' --output /tmp/settimes-schedule.json "$SMOKE_URL/api/schedule?event=current")
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "503" ]; then
+            echo "::error::Unexpected HTTP $STATUS from /api/schedule?event=current"
+            exit 1
+          fi
+          if [ "$STATUS" = "200" ]; then
+            node --input-type=module <<'EOF'
           import { readFile } from 'node:fs/promises'
 
           const raw = await readFile('/tmp/settimes-schedule.json', 'utf8')
@@ -260,3 +270,4 @@ jobs:
             throw new Error('Expected /api/schedule?event=current to return a JSON object')
           }
           EOF
+          fi

@@ -231,10 +231,12 @@ export default function AdminPanel({ currentUser, onLogout }) {
       {/* Tab Navigation */}
       <div className="bg-bg-purple border-b border-accent-500/20 hidden md:block">
         <div className="container mx-auto px-4">
-          <div className="flex gap-1 sm:gap-2 overflow-x-auto">
+          <div className="flex gap-1 sm:gap-2 overflow-x-auto" role="tablist">
             {tabs.map(tab => (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap min-h-[48px] flex items-center ${
                   activeTab === tab.id

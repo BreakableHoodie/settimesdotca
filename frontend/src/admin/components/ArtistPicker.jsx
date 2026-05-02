@@ -41,7 +41,7 @@ export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel
   }
 
   const handleBulkAdd = () => {
-    if (!checkedIds.size || !bulkVenueId) return
+    if (!checkedIds.size) return
     const selected = uniqueArtists.filter(a => {
       const id = a.band_profile_id || a.id
       return checkedIds.has(id)

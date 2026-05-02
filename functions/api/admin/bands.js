@@ -281,6 +281,7 @@ export async function onRequestPost(context) {
     } = body;
 
     const resolvedName = sanitizeString(name || "");
+    const resolvedVenueId = venueId ? Number(venueId) : null;
     const resolvedDescription = description !== undefined ? sanitizeString(description) || null : null;
     const resolvedGenre = genre !== undefined ? sanitizeString(genre) || null : null;
     let resolvedPhotoUrl;
@@ -378,11 +379,11 @@ export async function onRequestPost(context) {
     }
 
     // Check for conflicts (only if times are provided)
-    if (!isGlobalAdd && venueId && startTime && endTime) {
+    if (!isGlobalAdd && resolvedVenueId && startTime && endTime) {
       const conflicts = await checkConflicts(
         DB,
         eventId,
-        venueId,
+        resolvedVenueId,
         startTime,
         endTime,
       );
@@ -469,7 +470,7 @@ export async function onRequestPost(context) {
          VALUES (?, ?, ?, ?, ?)
          RETURNING id`
       )
-        .bind(eventId, venueId, bandProfile.id, startTime, endTime)
+        .bind(eventId, resolvedVenueId, bandProfile.id, startTime || null, endTime || null)
         .first();
     }
 

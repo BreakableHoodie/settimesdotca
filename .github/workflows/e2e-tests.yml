@@ -18,6 +18,9 @@ jobs:
         name: e2e
         runs-on: ubuntu-latest
         timeout-minutes: 35
+        # Fork PRs cannot access repo secrets; credentials.js throws when ADMIN_PASSWORD is unset.
+        # Skip the job for fork PRs — it still runs on push and same-repo PRs.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
 
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

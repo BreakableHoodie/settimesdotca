@@ -105,10 +105,11 @@ export async function onRequestPost(context) {
   const { name, date, slug, description } = eventValidation.sanitized;
 
   // Wizard always creates drafts — archived/backdated events are out of scope here.
-  const eventDate = new Date(date);
+  // Compare YYYY-MM-DD strings directly: new Date('YYYY-MM-DD') parses as UTC midnight,
+  // which would incorrectly reject "today" on systems/CIs running west of UTC.
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (eventDate < today) {
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  if (date < todayStr) {
     return validationErrorResponse(
       "Draft events created via the wizard cannot have a past date",
     );
@@ -333,10 +334,13 @@ export async function onRequestPost(context) {
     // Compensate: delete the event row if it was created before the failure,
     // so we don't leave an empty draft behind.
     if (event?.id) {
-      await DB.prepare("DELETE FROM events WHERE id = ?")
-        .bind(event.id)
-        .run()
-        .catch((e) => console.error("Wizard cleanup failed:", e));
+      try {
+        await DB.prepare("DELETE FROM events WHERE id = ?")
+          .bind(event.id)
+          .run();
+      } catch (e) {
+        console.error("Wizard cleanup failed:", e);
+      }
     }
 
     return new Response(JSON.stringify({ error: "Failed to create event" }), {

@@ -84,6 +84,19 @@ describe("POST /api/admin/events/wizard - event validation", () => {
     expect(data.message).toMatch(/past date/i);
   });
 
+  it("accepts today's date (timezone-safe string comparison)", async () => {
+    const payload = basePayload();
+    const now = new Date();
+    payload.event.date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    // Give the slug a unique name to avoid conflicts with other tests
+    payload.event.slug = "test-today-date";
+    const res = await wizardHandler.onRequestPost({
+      request: makeRequest(payload),
+      env,
+    });
+    expect(res.status).toBe(201);
+  });
+
   it("rejects duplicate slug with 409", async () => {
     insertEvent(rawDb, { slug: "test-fest" });
     const res = await wizardHandler.onRequestPost({
@@ -241,5 +254,23 @@ describe("POST /api/admin/events/wizard - successful creation", () => {
       .prepare("SELECT * FROM performances WHERE event_id = ?")
       .all(data.event.id);
     expect(perfs.length).toBe(0);
+  });
+
+  it("rolls back event row when DB.batch() throws after event insert", async () => {
+    env.DB.batch = async () => {
+      throw new Error("Simulated DB batch failure");
+    };
+
+    const res = await wizardHandler.onRequestPost({
+      request: makeRequest(basePayload()),
+      env,
+    });
+
+    expect(res.status).toBe(500);
+    // Compensating DELETE should have removed the orphaned event row
+    const event = rawDb
+      .prepare("SELECT * FROM events WHERE slug = ?")
+      .get("test-fest");
+    expect(event).toBeUndefined();
   });
 });

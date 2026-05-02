@@ -21,6 +21,10 @@ jobs:
         name: e2e-a11y-visual
         runs-on: ubuntu-latest
         timeout-minutes: 35
+        # Fork PRs cannot access repo secrets. Although the a11y/visual tests don't currently
+        # use credentials.js, guard the job defensively so fork PRs don't break if that changes.
+        # Scheduled runs (weekly) are always allowed to proceed.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
 
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

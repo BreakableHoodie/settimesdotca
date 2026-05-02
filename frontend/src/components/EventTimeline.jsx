@@ -11,6 +11,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
+import { fetchPublicJson } from '../utils/publicApi'
 import { slugifyBandName } from '../utils/slugify'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
@@ -49,18 +50,12 @@ export default function EventTimeline() {
         }
         setError(null)
 
-        const response = await fetch('/api/events/timeline')
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch events timeline')
-        }
-
-        const data = await response.json()
+        const data = await fetchPublicJson('/api/events/timeline', {}, 'Failed to fetch events timeline')
         setTimeline(data)
       } catch (err) {
         console.error('Error fetching timeline:', err)
         if (!isSilent) {
-          setError(err.message)
+          setError(err instanceof Error ? err : new Error('Failed to fetch events timeline'))
         }
       } finally {
         if (!isSilent) {
@@ -209,6 +204,7 @@ export default function EventTimeline() {
   }, [])
 
   const hasActiveFilters = filters.venue !== null || filters.month !== null
+  const isPublishGateError = error?.status === 503
 
   if (loading) {
     return <Loading size="lg" text="Loading events..." fullScreen={false} />
@@ -218,8 +214,10 @@ export default function EventTimeline() {
     return (
       <div className="container mx-auto px-4 py-16">
         <Alert variant="error" dismissible onClose={() => setError(null)}>
-          <h4 className="font-bold mb-2">Failed to load events</h4>
-          <p>{error}</p>
+          <h4 className="font-bold mb-2">
+            {isPublishGateError ? 'Events are not published yet' : 'Failed to load events'}
+          </h4>
+          <p>{error.message}</p>
         </Alert>
       </div>
     )

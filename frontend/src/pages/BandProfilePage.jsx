@@ -22,6 +22,7 @@ import Breadcrumbs from '../components/Breadcrumbs'
 import PrivacyBanner from '../components/PrivacyBanner'
 import { Alert, Badge, Button, Card, Loading } from '../components/ui'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
+import { fetchPublicJson } from '../utils/publicApi'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
 
@@ -191,19 +192,17 @@ export default function BandProfilePage() {
       .trim()
   }, [profile?.description])
 
+  const errorStatus = error?.status || null
+  const isPublishGateError = errorStatus === 503
+  const isNotFoundError = errorStatus === 404 || (!errorStatus && !profile)
+
   useEffect(() => {
     const loadProfile = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/bands/stats/${encodeURIComponent(id)}`)
-
-        if (!response.ok) {
-          throw new Error('Band not found')
-        }
-
-        const data = await response.json()
+        const data = await fetchPublicJson(`/api/bands/stats/${encodeURIComponent(id)}`, {}, 'Band not found')
         setProfile(data)
 
         if (!isNumericId && data?.id && !hasRedirectedRef.current) {
@@ -212,7 +211,7 @@ export default function BandProfilePage() {
         }
       } catch (err) {
         console.error('Failed to load band profile:', err)
-        setError(err.message)
+        setError(err instanceof Error ? err : new Error('Failed to load band profile'))
       } finally {
         setLoading(false)
       }
@@ -294,8 +293,16 @@ export default function BandProfilePage() {
       <div className="min-h-screen bg-bg-navy">
         <div className="container mx-auto px-4 py-12 max-w-2xl">
           <Alert variant="error" className="mb-6">
-            <h2 className="text-xl font-bold mb-2">Band Not Found</h2>
-            <p>We couldn&apos;t find a profile for this band. {error && `Error: ${error}`}</p>
+            <h2 className="text-xl font-bold mb-2">
+              {isPublishGateError ? 'Band Profiles Unavailable' : isNotFoundError ? 'Band Not Found' : 'Failed to load band profile'}
+            </h2>
+            <p>
+              {isPublishGateError
+                ? error.message
+                : isNotFoundError
+                  ? `We couldn't find a profile for this band.${error ? ` Error: ${error.message}` : ''}`
+                  : error?.message || 'We couldn\'t load this band profile right now.'}
+            </p>
           </Alert>
           <div className="text-center">
             <Button

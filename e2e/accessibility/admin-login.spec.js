@@ -95,7 +95,7 @@ test.describe('Admin Login - Accessibility', () => {
     await expect(
       page
         .locator('[role="alert"]')
-        .or(page.locator('[data-testid="mfa-prompt"]')),
+        .or(page.locator('#mfa-code')),
     ).toBeVisible({ timeout: 5000 })
   })
 })

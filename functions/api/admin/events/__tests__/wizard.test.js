@@ -127,6 +127,18 @@ describe("POST /api/admin/events/wizard - venue validation", () => {
 });
 
 describe("POST /api/admin/events/wizard - band validation", () => {
+  it("rejects missing startTime with 400", async () => {
+    const payload = basePayload();
+    delete payload.bands[0].startTime;
+    const res = await wizardHandler.onRequestPost({
+      request: makeRequest(payload),
+      env,
+    });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/start and end time are required/i);
+  });
+
   it("rejects out-of-range venueIndex with 400", async () => {
     const payload = basePayload();
     payload.bands[0].venueIndex = 5;

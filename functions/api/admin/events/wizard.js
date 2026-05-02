@@ -172,17 +172,16 @@ export async function onRequestPost(context) {
           `Band ${i + 1}: venueIndex ${venueIndex} is out of range`,
         );
       }
-      if (b?.startTime) {
-        const startCheck = isValidTime(b.startTime);
-        if (!startCheck.valid)
-          throw new Error(`Band ${i + 1}: ${startCheck.error}`);
+      if (!b?.startTime || !b?.endTime) {
+        throw new Error(`Band ${i + 1}: start and end time are required`);
       }
-      if (b?.endTime) {
-        const endCheck = isValidTime(b.endTime);
-        if (!endCheck.valid)
-          throw new Error(`Band ${i + 1}: ${endCheck.error}`);
-      }
-      if (b?.startTime && b?.endTime) {
+      const startCheck = isValidTime(b.startTime);
+      if (!startCheck.valid)
+        throw new Error(`Band ${i + 1}: ${startCheck.error}`);
+      const endCheck = isValidTime(b.endTime);
+      if (!endCheck.valid)
+        throw new Error(`Band ${i + 1}: ${endCheck.error}`);
+      if (b.startTime && b.endTime) {
         if (b.startTime === b.endTime) {
           throw new Error(
             `Band ${i + 1}: start and end time cannot be the same`,

@@ -254,3 +254,30 @@ describe("POST /api/admin/events/wizard - successful creation", () => {
     expect(perfs.length).toBe(0);
   });
 });
+
+describe("POST /api/admin/events/wizard - error cleanup", () => {
+  it("deletes the event row when DB.batch() fails mid-creation", async () => {
+    // Wrap the DB env with a batch() that always throws after the event INSERT.
+    const failingEnv = {
+      DB: {
+        ...createDBEnv(rawDb),
+        async batch() {
+          throw new Error("Simulated batch failure");
+        },
+      },
+    };
+
+    const res = await wizardHandler.onRequestPost({
+      request: makeRequest(basePayload()),
+      env: failingEnv,
+    });
+
+    expect(res.status).toBe(500);
+
+    // The compensating DELETE should have removed the orphan event row.
+    const orphan = rawDb
+      .prepare("SELECT id FROM events WHERE slug = ?")
+      .get("test-fest");
+    expect(orphan).toBeUndefined();
+  });
+});

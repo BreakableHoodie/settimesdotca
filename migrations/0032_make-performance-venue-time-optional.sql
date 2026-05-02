@@ -1,9 +1,13 @@
--- Migration: Make performances.venue_id, start_time, end_time nullable
--- Allows bands to be added to a lineup before venue and schedule are confirmed.
--- Run: wrangler d1 execute settimes-db --remote --file=database/migrations/make-performance-venue-time-optional.sql
+-- Migration: 0032_make-performance-venue-time-optional
+-- Description: Make performances.venue_id, start_time, and end_time nullable so bands can
+--   be added to a lineup before venue and schedule are confirmed (TBD lineup entries).
+--   Also changes the venue FK from ON DELETE RESTRICT to ON DELETE SET NULL.
 --
--- SQLite does not support ALTER COLUMN, so we recreate the table.
--- NOTE: This migration has already been applied to production as of 2026-05-02.
+-- Apply locally:  npm run migrate:local
+-- Apply to prod:  npx wrangler d1 migrations apply settimes-production-db --remote
+--
+-- NOTE: SQLite does not support ALTER COLUMN, so we recreate the table.
+-- This migration was applied to production on 2026-05-02.
 
 PRAGMA foreign_keys = OFF;
 

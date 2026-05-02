@@ -105,9 +105,13 @@ export async function onRequestPost(context) {
   const { name, date, slug, description } = eventValidation.sanitized;
 
   // Wizard always creates drafts — archived/backdated events are out of scope here.
-  // Use string comparison to avoid UTC-vs-local timezone bugs from `new Date('YYYY-MM-DD')`.
-  const todayStr = new Date().toISOString().slice(0, 10);
-  if (date < todayStr) {
+  // Workers run in UTC; users submit their local date. A user in UTC-12 submitting
+  // "today" could be one day behind UTC, so we allow dates >= yesterday (UTC) as a
+  // grace window that covers all time zones.
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const cutoffStr = yesterday.toISOString().slice(0, 10);
+  if (date < cutoffStr) {
     return validationErrorResponse(
       "Draft events created via the wizard cannot have a past date",
     );
@@ -332,10 +336,11 @@ export async function onRequestPost(context) {
     // Compensate: delete the event row if it was created before the failure,
     // so we don't leave an empty draft behind.
     if (event?.id) {
-      await DB.prepare("DELETE FROM events WHERE id = ?")
-        .bind(event.id)
-        .run()
-        .catch((e) => console.error("Wizard cleanup failed:", e));
+      try {
+        await DB.prepare("DELETE FROM events WHERE id = ?").bind(event.id).run();
+      } catch (e) {
+        console.error("Wizard cleanup failed:", e);
+      }
     }
 
     return new Response(JSON.stringify({ error: "Failed to create event" }), {

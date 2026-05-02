@@ -182,6 +182,20 @@ export async function onRequestPost(context) {
         if (!endCheck.valid)
           throw new Error(`Band ${i + 1}: ${endCheck.error}`);
       }
+      if (b?.startTime && b?.endTime) {
+        if (b.startTime === b.endTime) {
+          throw new Error(
+            `Band ${i + 1}: start and end time cannot be the same`,
+          );
+        }
+        const [sh, sm] = b.startTime.split(":").map(Number);
+        const [eh, em] = b.endTime.split(":").map(Number);
+        const startM = sh * 60 + sm;
+        const endM = eh * 60 + em;
+        if (endM < startM && 24 * 60 - startM + endM > 8 * 60) {
+          throw new Error(`Band ${i + 1}: end time must be after start time`);
+        }
+      }
       let url = null;
       try {
         url = sanitizeOptionalHttpUrl(

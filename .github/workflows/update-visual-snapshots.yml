@@ -9,7 +9,7 @@ on:
                 type: string
 
 concurrency:
-    group: update-visual-snapshots-${{ github.ref }}
+    group: update-visual-snapshots-${{ inputs.branch || github.ref_name }}
     cancel-in-progress: true
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
               with:
-                  ref: ${{ inputs.branch || github.ref }}
+                  ref: ${{ inputs.branch || github.ref_name }}
                   fetch-depth: 1
 
             - name: Setup Node

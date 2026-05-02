@@ -4,6 +4,7 @@ import { Button } from '../components/ui'
 import { eventsApi } from '../utils/adminApi'
 import { FIELD_LIMITS } from '../utils/validation'
 
+
 /**
  * EventFormModal - Modal for creating and editing events
  *
@@ -41,6 +42,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
     social_x: '',
     social_tiktok: '',
     social_youtube: '',
+    reveal_mode: false,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -97,6 +99,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         social_x: socialLinks.x || socialLinks.twitter || '',
         social_tiktok: socialLinks.tiktok || '',
         social_youtube: socialLinks.youtube || '',
+        reveal_mode: event?.reveal_mode === 1 || event?.reveal_mode === true,
       })
       setSlugEdited(true) // Prevent auto-generation when editing
     } else {
@@ -114,6 +117,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         social_x: '',
         social_tiktok: '',
         social_youtube: '',
+        reveal_mode: false,
       })
       setSlugEdited(false)
     }
@@ -255,6 +259,12 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         data = await eventsApi.update(event.id, payload)
       } else {
         data = await eventsApi.create(payload)
+      }
+
+      // Update reveal mode if it changed (editing only — new events default to off)
+      const originalRevealMode = event?.reveal_mode === 1 || event?.reveal_mode === true
+      if (isEditing && formData.reveal_mode !== originalRevealMode) {
+        await eventsApi.setRevealMode(event.id, formData.reveal_mode)
       }
 
       // Success!
@@ -548,6 +558,36 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
                 </p>
               )}
             </div>
+
+            {/* Reveal Mode (editing only) */}
+            {isEditing && (
+              <div className="flex items-center justify-between py-3 border-t border-white/10">
+                <div>
+                  <label className="text-sm font-medium text-text-primary" htmlFor="reveal-mode">
+                    Reveal mode
+                  </label>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    When on, only announced bands appear on the public schedule.
+                  </p>
+                </div>
+                <button
+                  id="reveal-mode"
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.reveal_mode}
+                  onClick={() => setFormData(prev => ({ ...prev, reveal_mode: !prev.reveal_mode }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 ${
+                    formData.reveal_mode ? 'bg-accent-500' : 'bg-white/20'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.reveal_mode ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">

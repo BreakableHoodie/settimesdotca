@@ -1,4 +1,4 @@
-import { faBoxArchive, faCircleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faBell, faBoxArchive, faCircleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
@@ -500,6 +500,20 @@ function App() {
             >
               <FontAwesomeIcon icon={faXmark} />
             </button>
+          </div>
+        )}
+
+        {/* Reveal mode teaser — more bands dropping soon */}
+        {!isArchived && eventData?.reveal_mode === 1 && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-accent-500/10 border border-accent-500/20 text-sm">
+            <FontAwesomeIcon icon={faBell} className="text-accent-400 shrink-0" aria-hidden="true" />
+            <p className="text-accent-300">
+              <span className="font-semibold">More bands dropping soon.</span>{' '}
+              <a href="/subscribe" className="underline hover:text-accent-200 transition-colors">
+                Subscribe for updates
+              </a>{' '}
+              or follow individual bands on their profile pages.
+            </p>
           </div>
         )}
 

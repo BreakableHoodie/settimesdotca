@@ -525,6 +525,16 @@ export const eventsApi = {
     })
     return handleResponse(response)
   },
+
+  async setRevealMode(eventId, revealMode) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/reveal-mode`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ reveal_mode: revealMode }),
+    })
+    return handleResponse(response)
+  },
 }
 
 // Venues API
@@ -636,6 +646,16 @@ export const bandsApi = {
         start_time: startTime || null,
         end_time: endTime || null,
       }),
+    })
+    return handleResponse(response)
+  },
+
+  async patch(bandId, data) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/${bandId}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data),
     })
     return handleResponse(response)
   },

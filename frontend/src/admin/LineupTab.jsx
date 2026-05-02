@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
 import { bandsApi, venuesApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
@@ -21,7 +23,7 @@ import {
  */
 export default function LineupTab({
   selectedEventId,
-  selectedEvent: _selectedEvent,
+  selectedEvent,
   events,
   showToast,
   onEventFilterChange: _onEventFilterChange,
@@ -350,6 +352,17 @@ export default function LineupTab({
         }
       },
     })
+  }
+
+  const toggleAnnounced = async (performanceId, currentValue) => {
+    try {
+      const res = await bandsApi.patch(performanceId, { is_announced: !currentValue })
+      if (!res) throw new Error('Failed to toggle announcement')
+      await loadData()
+    } catch (err) {
+      console.error('[LineupTab] toggleAnnounced error:', err)
+      showToast('Failed to toggle announcement', 'error')
+    }
   }
 
   const startEdit = band => {
@@ -720,6 +733,20 @@ export default function LineupTab({
                             </td>
                             {!readOnly && (
                               <td className="px-4 py-3 flex justify-end gap-2">
+                                {selectedEvent?.reveal_mode === 1 && (
+                                  <button
+                                    onClick={() => toggleAnnounced(band.id, band.is_announced)}
+                                    title={band.is_announced ? 'Announced — click to hide' : 'Hidden — click to announce'}
+                                    className={`p-1.5 rounded transition-colors ${
+                                      band.is_announced
+                                        ? 'text-green-400 hover:text-green-300'
+                                        : 'text-white/30 hover:text-white/60'
+                                    }`}
+                                    aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
+                                  >
+                                    <FontAwesomeIcon icon={band.is_announced ? faEye : faEyeSlash} />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => startEdit(band)}
                                   className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
@@ -788,6 +815,20 @@ export default function LineupTab({
                         </div>
                         {!readOnly && (
                           <div className="flex flex-wrap gap-2">
+                            {selectedEvent?.reveal_mode === 1 && (
+                              <button
+                                onClick={() => toggleAnnounced(band.id, band.is_announced)}
+                                title={band.is_announced ? 'Announced — click to hide' : 'Hidden — click to announce'}
+                                className={`p-1.5 rounded transition-colors ${
+                                  band.is_announced
+                                    ? 'text-green-400 hover:text-green-300'
+                                    : 'text-white/30 hover:text-white/60'
+                                }`}
+                                aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
+                              >
+                                <FontAwesomeIcon icon={band.is_announced ? faEye : faEyeSlash} />
+                              </button>
+                            )}
                             <button
                               onClick={() => startEdit(band)}
                               className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"

@@ -670,45 +670,66 @@ export async function onRequestPatch(context) {
     return permCheck.response
   }
 
-  const performanceId = getBandId(request)
-  if (!performanceId || isNaN(performanceId)) {
+  const user = permCheck.user
+  const ipAddress = getClientIP(request)
+
+  try {
+    const performanceId = getBandId(request)
+    if (!performanceId || isNaN(performanceId)) {
+      return new Response(
+        JSON.stringify({ error: 'Bad request', message: 'Invalid performance ID' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const body = await request.json().catch(() => ({}))
+    if (typeof body.is_announced !== 'boolean') {
+      return new Response(
+        JSON.stringify({ error: 'Bad request', message: 'is_announced (boolean) is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const performance = await DB.prepare(
+      'SELECT id, is_announced FROM performances WHERE id = ?'
+    ).bind(performanceId).first()
+
+    if (!performance) {
+      return new Response(
+        JSON.stringify({ error: 'Not found', message: 'Performance not found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const newValue = body.is_announced ? 1 : 0
+    await DB.prepare(
+      "UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?"
+    ).bind(newValue, performanceId).run()
+
+    await auditLog(
+      env,
+      user.userId,
+      'performance.announced',
+      'performance',
+      Number(performanceId),
+      { is_announced: newValue, changedBy: user.email },
+      ipAddress
+    )
+
     return new Response(
-      JSON.stringify({ error: 'Bad request', message: 'Invalid performance ID' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: true,
+        performance: { id: Number(performanceId), is_announced: newValue },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    console.error('Error toggling is_announced:', error)
+    return new Response(
+      JSON.stringify({ error: 'Database error', message: 'Failed to update performance' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
-
-  const body = await request.json().catch(() => ({}))
-  if (typeof body.is_announced !== 'boolean') {
-    return new Response(
-      JSON.stringify({ error: 'Bad request', message: 'is_announced (boolean) is required' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
-
-  const performance = await DB.prepare(
-    'SELECT id, is_announced FROM performances WHERE id = ?'
-  ).bind(performanceId).first()
-
-  if (!performance) {
-    return new Response(
-      JSON.stringify({ error: 'Not found', message: 'Performance not found' }),
-      { status: 404, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
-
-  const newValue = body.is_announced ? 1 : 0
-  await DB.prepare(
-    "UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?"
-  ).bind(newValue, performanceId).run()
-
-  return new Response(
-    JSON.stringify({
-      success: true,
-      performance: { id: Number(performanceId), is_announced: newValue },
-    }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
-  )
 }
 
 // DELETE - Delete band

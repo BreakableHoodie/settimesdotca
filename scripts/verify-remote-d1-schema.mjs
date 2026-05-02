@@ -108,7 +108,7 @@ async function checkWranglerExists() {
 async function runWranglerQuery(databaseName, query) {
   const { stdout, stderr } = await execFileAsync(
     wranglerBin,
-    ['d1', 'execute', databaseName, '--remote', '--command', query],
+    ['d1', 'execute', databaseName, '--remote', '--json', '--command', query],
     {
       cwd: process.cwd(),
       env: process.env,
@@ -120,21 +120,21 @@ async function runWranglerQuery(databaseName, query) {
 }
 
 function parseWranglerTable(stdout) {
-  const rowLines = stdout
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('│') && line.endsWith('│'));
+  const jsonMatch = stdout.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) return { headers: [], rows: [] };
 
-  if (rowLines.length === 0) {
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
     return { headers: [], rows: [] };
   }
 
-  const parseRow = (line) =>
-    line
-      .split('│')
-      .slice(1, -1)
-      .map((cell) => cell.trim());
-  const [headers, ...rows] = rowLines.map(parseRow);
+  const results = parsed[0]?.results;
+  if (!results || results.length === 0) return { headers: [], rows: [] };
+
+  const headers = Object.keys(results[0]);
+  const rows = results.map((obj) => headers.map((h) => obj[h] ?? null));
 
   return { headers, rows };
 }

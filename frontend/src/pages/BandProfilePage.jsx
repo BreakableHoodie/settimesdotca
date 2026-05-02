@@ -194,7 +194,7 @@ export default function BandProfilePage() {
 
   const errorStatus = error?.status || null
   const isPublishGateError = errorStatus === 503
-  const isNotFoundError = errorStatus === 404 || (!errorStatus && !profile)
+  const isNotFoundError = errorStatus === 404 || (!error && !profile)
 
   useEffect(() => {
     const loadProfile = async () => {

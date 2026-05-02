@@ -218,8 +218,8 @@ VALUES (
 
 ```javascript
 // Use Node.js with bcrypt
-const bcrypt = require('bcrypt');
-const hash = bcrypt.hashSync('your-secure-password', 10);
+const bcrypt = require("bcrypt");
+const hash = bcrypt.hashSync("your-secure-password", 10);
 console.log(hash);
 ```
 
@@ -425,7 +425,9 @@ curl https://settimes.ca
 
 ```bash
 curl https://settimes.ca/api/schedule?event=current
-# Should return JSON (may be empty initially)
+# Should return JSON with either:
+# - HTTP 200 and { event, bands } when a current/upcoming published event exists
+# - HTTP 404 and { error: "Event not found", message: "No published events available" } when none exists
 ```
 
 **Check Database:**
@@ -448,7 +450,7 @@ The GitHub Actions release workflow now runs an automated smoke suite after ever
 
 - `/` returns the public app HTML
 - `/admin` returns the admin shell HTML
-- `/api/schedule?event=current` returns valid JSON
+- `/api/schedule?event=current` returns valid JSON for the current publish state (`200`, `404`, or `503` depending on environment and available events)
 
 Manual post-release testing is still recommended for login, publishing, and other data-changing admin flows.
 

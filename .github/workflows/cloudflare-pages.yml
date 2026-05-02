@@ -297,25 +297,38 @@ jobs:
           STATUS=$(curl --silent --show-error --location --write-out '%{http_code}' --output /tmp/settimes-schedule.json "$SMOKE_URL/api/schedule?event=current")
 
           if [ "$DEPLOY_ENV" = "production" ]; then
-            if [ "$STATUS" != "200" ]; then
-              echo "::error::Expected HTTP 200 from /api/schedule?event=current in production, got $STATUS"
+            if [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ] && [ "$STATUS" != "503" ]; then
+              echo "::error::Expected HTTP 200, 404, or 503 from /api/schedule?event=current in production, got $STATUS"
               cat /tmp/settimes-schedule.json
               exit 1
             fi
-          elif [ "$STATUS" != "200" ] && [ "$STATUS" != "503" ]; then
+          elif [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ] && [ "$STATUS" != "503" ]; then
             echo "::error::Unexpected HTTP $STATUS from /api/schedule?event=current"
             exit 1
           fi
 
-          if [ "$STATUS" = "200" ]; then
-            node --input-type=module <<'EOF'
+          STATUS="$STATUS" node --input-type=module <<'EOF'
           import { readFile } from 'node:fs/promises'
 
+          const status = process.env.STATUS
           const raw = await readFile('/tmp/settimes-schedule.json', 'utf8')
           const parsed = JSON.parse(raw)
 
           if (!parsed || typeof parsed !== 'object') {
             throw new Error('Expected /api/schedule?event=current to return a JSON object')
           }
+
+          if (status === '200') {
+            if (!parsed.event || !Array.isArray(parsed.bands)) {
+              throw new Error('Expected successful /api/schedule?event=current response to include event metadata and bands')
+            }
+          } else if (status === '404') {
+            if (parsed.error !== 'Event not found' || parsed.message !== 'No published events available') {
+              throw new Error('Expected /api/schedule?event=current 404 to describe the missing published event state')
+            }
+          } else if (status === '503') {
+            if (parsed.error !== 'Public data is not yet published') {
+              throw new Error('Expected /api/schedule?event=current 503 to describe the publish gate state')
+            }
+          }
           EOF
-          fi

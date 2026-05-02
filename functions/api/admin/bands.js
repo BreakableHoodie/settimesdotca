@@ -186,10 +186,10 @@ export async function onRequestGet(context) {
           e.name as event_name
         FROM performances p
         JOIN band_profiles bp ON p.band_profile_id = bp.id
-        JOIN venues v ON p.venue_id = v.id
+        LEFT JOIN venues v ON p.venue_id = v.id
         JOIN events e ON p.event_id = e.id
         WHERE p.event_id = ?
-        ORDER BY p.start_time, v.name
+        ORDER BY p.start_time NULLS LAST, bp.name
       `,
       )
         .bind(eventId)

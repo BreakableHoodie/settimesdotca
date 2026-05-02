@@ -105,10 +105,9 @@ export async function onRequestPost(context) {
   const { name, date, slug, description } = eventValidation.sanitized;
 
   // Wizard always creates drafts — archived/backdated events are out of scope here.
-  const eventDate = new Date(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (eventDate < today) {
+  // Use string comparison to avoid UTC-vs-local timezone bugs from `new Date('YYYY-MM-DD')`.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (date < todayStr) {
     return validationErrorResponse(
       "Draft events created via the wizard cannot have a past date",
     );

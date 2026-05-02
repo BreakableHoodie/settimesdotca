@@ -84,6 +84,17 @@ describe("POST /api/admin/events/wizard - event validation", () => {
     expect(data.message).toMatch(/past date/i);
   });
 
+  it("accepts today's date (timezone-safe string comparison)", async () => {
+    const payload = basePayload();
+    payload.event.slug = "today-fest";
+    payload.event.date = new Date().toISOString().slice(0, 10);
+    const res = await wizardHandler.onRequestPost({
+      request: makeRequest(payload),
+      env,
+    });
+    expect(res.status).toBe(201);
+  });
+
   it("rejects duplicate slug with 409", async () => {
     insertEvent(rawDb, { slug: "test-fest" });
     const res = await wizardHandler.onRequestPost({

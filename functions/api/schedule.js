@@ -82,7 +82,7 @@ export async function onRequestGet(context) {
         v.name as venue
       FROM performances p
       INNER JOIN band_profiles b ON p.band_profile_id = b.id
-      INNER JOIN venues v ON p.venue_id = v.id
+      LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
       ORDER BY p.start_time, v.name
     `,
@@ -124,7 +124,7 @@ export async function onRequestGet(context) {
         performance_id: band.performance_id,
         band_profile_id: band.band_id,
         name: band.name,
-        venue: band.venue,
+        venue: band.venue ?? null,
         date: event.date,
         startTime: extractTime(band.startTime),
         endTime: extractTime(band.endTime),

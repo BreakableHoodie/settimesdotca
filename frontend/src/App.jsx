@@ -2,7 +2,7 @@ import { faBoxArchive, faCircleExclamation, faXmark } from '@fortawesome/free-so
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
 import Footer from './components/Footer'
@@ -139,6 +139,7 @@ const formatDebugInputValue = dateValue => {
 
 function App() {
   const { slug } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [bands, setBands] = useState(FALLBACK_BANDS)
   const [eventData, setEventData] = useState(null)
   const [selectedBands, setSelectedBands] = useState(() => getStoredSelection(slug))
@@ -153,6 +154,8 @@ function App() {
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [debugTime, setDebugTime] = useState(() => getInitialDebugTime())
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [sharedScheduleConfirmOpen, setSharedScheduleConfirmOpen] = useState(false)
+  const [pendingSharedBands, setPendingSharedBands] = useState([])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -260,6 +263,44 @@ function App() {
       console.warn('[App] Failed to persist selectedBands', error)
     }
   }, [selectedBands, slug])
+
+  useEffect(() => {
+    const sParam = searchParams.get('s')
+    if (!sParam || bands.length === 0) return
+
+    const requestedIds = new Set(
+      sParam.split(',').map(s => s.trim()).filter(s => /^\d+$/.test(s))
+    )
+
+    const matchedStringIds = bands
+      .filter(band => {
+        const parts = band.id.split('-')
+        const perfId = parts[parts.length - 1]
+        return requestedIds.has(perfId)
+      })
+      .map(band => band.id)
+
+    if (matchedStringIds.length === 0) return
+
+    const existing = getStoredSelection(slug)
+
+    const applySelection = () => {
+      setSelectedBands(matchedStringIds)
+      setView('mine')
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev)
+        next.delete('s')
+        return next
+      }, { replace: true })
+    }
+
+    if (existing.length === 0) {
+      applySelection()
+    } else {
+      setPendingSharedBands(matchedStringIds)
+      setSharedScheduleConfirmOpen(true)
+    }
+  }, [bands, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const trackScheduleBuilds = async bandsToTrack => {
     if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {
@@ -556,6 +597,32 @@ function App() {
         }}
         onCancel={() => setClearConfirmOpen(false)}
         variant="danger"
+      />
+      <ConfirmDialog
+        isOpen={sharedScheduleConfirmOpen}
+        title="Load Shared Schedule?"
+        message="Loading this shared schedule will replace your current picks."
+        confirmText="Load"
+        onConfirm={() => {
+          setSharedScheduleConfirmOpen(false)
+          setSelectedBands(pendingSharedBands)
+          setView('mine')
+          setSearchParams(prev => {
+            const next = new URLSearchParams(prev)
+            next.delete('s')
+            return next
+          }, { replace: true })
+          setPendingSharedBands([])
+        }}
+        onCancel={() => {
+          setSharedScheduleConfirmOpen(false)
+          setPendingSharedBands([])
+          setSearchParams(prev => {
+            const next = new URLSearchParams(prev)
+            next.delete('s')
+            return next
+          }, { replace: true })
+        }}
       />
     </div>
   )

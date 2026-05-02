@@ -114,11 +114,11 @@ describe('Admin bands API - Validation', () => {
     expect(data.error).toBe('Missing required fields')
   })
 
-  it('create validation fails when event band missing venue/times', async () => {
+  it('create succeeds for event band without venue or times (TBD lineup)', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
     const ev = insertEvent(rawDb, { name: 'MissingEvent', slug: 'missing-event' })
 
-    const body = { eventId: ev.id, name: 'Incomplete Band' }
+    const body = { eventId: ev.id, name: 'TBD Band' }
     const request = new Request('https://example.test/api/admin/bands', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
@@ -126,9 +126,47 @@ describe('Admin bands API - Validation', () => {
     })
 
     const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(201)
     const data = await res.json()
-    expect(data.error).toBe('Missing required fields')
+    expect(data.band.name).toBe('TBD Band')
+  })
+
+  it('create succeeds for event band with venue but no times', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'NoTimeEvent', slug: 'no-time-event' })
+    const venue = insertVenue(rawDb, { name: 'No Time Venue' })
+
+    const body = { eventId: ev.id, venueId: venue.id, name: 'No Time Band' }
+    const request = new Request('https://example.test/api/admin/bands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    })
+
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(201)
+  })
+
+  it('GET with event_id returns null-venue performances', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'NullVenueEvent', slug: 'null-venue-event' })
+
+    // Insert a band (performance) without a venue or times
+    const bandBody = { eventId: ev.id, name: 'TBD Venue Band' }
+    const postReq = new Request('https://example.test/api/admin/bands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(bandBody),
+    })
+    await bandsHandler.onRequestPost({ request: postReq, env, data: { user: { role: 'editor' } } })
+
+    const getReq = new Request(`https://example.test/api/admin/bands?event_id=${ev.id}`, { headers })
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: 'editor' } } })
+    expect(getRes.status).toBe(200)
+    const list = await getRes.json()
+    expect(list.bands.length).toBe(1)
+    expect(list.bands[0].venue_name).toBeNull()
+    expect(list.bands[0].start_time).toBeNull()
   })
 
   it('create validation fails with invalid time format', async () => {

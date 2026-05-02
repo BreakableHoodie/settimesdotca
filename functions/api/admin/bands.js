@@ -186,10 +186,10 @@ export async function onRequestGet(context) {
           e.name as event_name
         FROM performances p
         JOIN band_profiles bp ON p.band_profile_id = bp.id
-        JOIN venues v ON p.venue_id = v.id
+        LEFT JOIN venues v ON p.venue_id = v.id
         JOIN events e ON p.event_id = e.id
         WHERE p.event_id = ?
-        ORDER BY p.start_time, v.name
+        ORDER BY p.start_time NULLS LAST, bp.name
       `,
       )
         .bind(eventId)
@@ -281,6 +281,7 @@ export async function onRequestPost(context) {
     } = body;
 
     const resolvedName = sanitizeString(name || "");
+    const resolvedVenueId = venueId ? Number(venueId) : null;
     const resolvedDescription = description !== undefined ? sanitizeString(description) || null : null;
     const resolvedGenre = genre !== undefined ? sanitizeString(genre) || null : null;
     let resolvedPhotoUrl;
@@ -317,9 +318,9 @@ export async function onRequestPost(context) {
         );
       }
     } else {
-      if (!venueId || !resolvedName) {
+      if (!resolvedName) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields", message: "Event, Venue, and Band Name are required" }),
+          JSON.stringify({ error: "Missing required fields", message: "Band Name is required" }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -378,11 +379,11 @@ export async function onRequestPost(context) {
     }
 
     // Check for conflicts (only if times are provided)
-    if (!isGlobalAdd && startTime && endTime) {
+    if (!isGlobalAdd && resolvedVenueId && startTime && endTime) {
       const conflicts = await checkConflicts(
         DB,
         eventId,
-        venueId,
+        resolvedVenueId,
         startTime,
         endTime,
       );
@@ -469,7 +470,7 @@ export async function onRequestPost(context) {
          VALUES (?, ?, ?, ?, ?)
          RETURNING id`
       )
-        .bind(eventId, venueId, bandProfile.id, startTime, endTime)
+        .bind(eventId, resolvedVenueId, bandProfile.id, startTime || null, endTime || null)
         .first();
     }
 

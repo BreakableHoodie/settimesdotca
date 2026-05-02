@@ -86,10 +86,8 @@ describe("POST /api/admin/events/wizard - event validation", () => {
 
   it("accepts today's date (timezone-safe string comparison)", async () => {
     const payload = basePayload();
-    const now = new Date();
-    payload.event.date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    // Give the slug a unique name to avoid conflicts with other tests
-    payload.event.slug = "test-today-date";
+    payload.event.slug = "today-fest";
+    payload.event.date = new Date().toISOString().slice(0, 10);
     const res = await wizardHandler.onRequestPost({
       request: makeRequest(payload),
       env,
@@ -255,22 +253,31 @@ describe("POST /api/admin/events/wizard - successful creation", () => {
       .all(data.event.id);
     expect(perfs.length).toBe(0);
   });
+});
 
-  it("rolls back event row when DB.batch() throws after event insert", async () => {
-    env.DB.batch = async () => {
-      throw new Error("Simulated DB batch failure");
+describe("POST /api/admin/events/wizard - error cleanup", () => {
+  it("deletes the event row when DB.batch() fails mid-creation", async () => {
+    // Wrap the DB env with a batch() that always throws after the event INSERT.
+    const failingEnv = {
+      DB: {
+        ...createDBEnv(rawDb),
+        async batch() {
+          throw new Error("Simulated batch failure");
+        },
+      },
     };
 
     const res = await wizardHandler.onRequestPost({
       request: makeRequest(basePayload()),
-      env,
+      env: failingEnv,
     });
 
     expect(res.status).toBe(500);
-    // Compensating DELETE should have removed the orphaned event row
-    const event = rawDb
-      .prepare("SELECT * FROM events WHERE slug = ?")
+
+    // The compensating DELETE should have removed the orphan event row.
+    const orphan = rawDb
+      .prepare("SELECT id FROM events WHERE slug = ?")
       .get("test-fest");
-    expect(event).toBeUndefined();
+    expect(orphan).toBeUndefined();
   });
 });

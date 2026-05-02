@@ -71,9 +71,9 @@ CREATE TABLE IF NOT EXISTS performances (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id INTEGER NOT NULL,
   band_profile_id INTEGER NOT NULL,
-  venue_id INTEGER NOT NULL,
-  start_time TEXT NOT NULL,
-  end_time TEXT NOT NULL,
+  venue_id INTEGER,
+  start_time TEXT,
+  end_time TEXT,
   notes TEXT,
   band_id INTEGER,
   band_name TEXT,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS performances (
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
   FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE RESTRICT,
   FOREIGN KEY (band_id) REFERENCES bands(id) ON DELETE SET NULL,
-  FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE RESTRICT,
+  FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE SET NULL,
   FOREIGN KEY (created_by_user_id) REFERENCES users(id),
   FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
 );

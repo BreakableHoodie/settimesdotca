@@ -41,15 +41,15 @@ export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel
   }
 
   const handleBulkAdd = () => {
-    if (!checkedIds.size || !bulkVenueId) return
+    if (!checkedIds.size) return
     const selected = uniqueArtists.filter(a => {
       const id = a.band_profile_id || a.id
       return checkedIds.has(id)
     })
-    onBulkSelect(selected, Number(bulkVenueId), bulkStartTime || null, bulkEndTime || null)
+    onBulkSelect(selected, bulkVenueId ? Number(bulkVenueId) : null, bulkStartTime || null, bulkEndTime || null)
   }
 
-  const isBulkReady = checkedIds.size > 0 && bulkVenueId
+  const isBulkReady = checkedIds.size > 0
 
   return (
     <div className="bg-bg-purple p-6 rounded-lg border border-accent-500/20 space-y-4">
@@ -136,7 +136,7 @@ export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel
       {checkedIds.size > 0 && (
         <div className="border border-accent-500/30 rounded-lg bg-accent-500/5 p-4 space-y-3">
           <p className="text-accent-300 font-semibold text-sm">
-            {checkedIds.size} act{checkedIds.size !== 1 ? 's' : ''} selected — set shared venue and optional time:
+            {checkedIds.size} act{checkedIds.size !== 1 ? 's' : ''} selected — set shared venue and time (all optional):
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <select
@@ -144,7 +144,7 @@ export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel
               onChange={e => setBulkVenueId(e.target.value)}
               className="flex-1 min-h-[44px] px-3 py-2 bg-bg-navy border border-white/20 rounded text-white focus:border-accent-500 focus:outline-hidden"
             >
-              <option value="">Select venue (required)...</option>
+              <option value="">Select venue (optional)...</option>
               {(venues || []).map(v => (
                 <option key={v.id} value={v.id}>
                   {v.name}

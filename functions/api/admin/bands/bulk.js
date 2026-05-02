@@ -129,7 +129,7 @@ export async function onRequestDelete(context) {
             }
         }
       } catch (err) {
-        console.error(`Failed to delete band ${id}:`, err);
+        console.error("Failed to delete band", id, err);
         errors.push(`Failed to delete ${id}`);
       }
     }
@@ -195,12 +195,14 @@ export async function onRequestPost(context) {
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
-  if (!event_id || !venue_id) {
+  if (!event_id) {
     return new Response(
-      JSON.stringify({ error: "Bad request", message: "event_id and venue_id are required" }),
+      JSON.stringify({ error: "Bad request", message: "event_id is required" }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
+
+  const resolvedVenueId = venue_id ? Number(venue_id) : null;
 
   // Validate event exists and is not archived
   const event = await DB.prepare("SELECT id, status FROM events WHERE id = ?").bind(event_id).first();
@@ -217,13 +219,15 @@ export async function onRequestPost(context) {
     );
   }
 
-  // Validate venue exists
-  const venue = await DB.prepare("SELECT id FROM venues WHERE id = ?").bind(venue_id).first();
-  if (!venue) {
-    return new Response(
-      JSON.stringify({ error: "Not found", message: "Venue not found" }),
-      { status: 404, headers: { "Content-Type": "application/json" } },
-    );
+  // Validate venue exists only if provided
+  if (resolvedVenueId) {
+    const venue = await DB.prepare("SELECT id FROM venues WHERE id = ?").bind(resolvedVenueId).first();
+    if (!venue) {
+      return new Response(
+        JSON.stringify({ error: "Not found", message: "Venue not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
+    }
   }
 
   const added = [];
@@ -254,15 +258,15 @@ export async function onRequestPost(context) {
       const result = await DB.prepare(
         `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
          VALUES (?, ?, ?, ?, ?) RETURNING id`
-      ).bind(event_id, venue_id, profileId, start_time || null, end_time || null).first();
+      ).bind(event_id, resolvedVenueId, profileId, start_time || null, end_time || null).first();
 
       await auditLog(env, user.userId, "band.added_to_lineup", "band", result.id, {
-        bandName: profile.name, eventId: event_id, venueId: venue_id, bulk: true,
+        bandName: profile.name, eventId: event_id, venueId: resolvedVenueId, bulk: true,
       }, ipAddress);
 
       added.push(profile.name);
     } catch (err) {
-      console.error(`Failed to add profile ${profileId}:`, err);
+      console.error("Failed to add profile", profileId, err);
       errors.push(`Failed to add profile ${profileId}`);
     }
   }

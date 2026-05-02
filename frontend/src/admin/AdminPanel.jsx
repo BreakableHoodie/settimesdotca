@@ -119,7 +119,6 @@ export default function AdminPanel({ currentUser, onLogout }) {
     }
   }, [activeTab, canManageUsers])
 
-
   const handleLogout = () => {
     setShowLogoutConfirm(true)
   }

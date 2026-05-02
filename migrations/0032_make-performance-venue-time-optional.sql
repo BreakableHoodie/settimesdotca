@@ -43,4 +43,11 @@ CREATE INDEX IF NOT EXISTS idx_performances_band ON performances(band_profile_id
 CREATE INDEX IF NOT EXISTS idx_performances_venue ON performances(venue_id);
 CREATE INDEX IF NOT EXISTS idx_performances_event_time ON performances(event_id, start_time);
 
+-- Restore trigger dropped by table recreation
+CREATE TRIGGER IF NOT EXISTS update_performances_timestamp
+AFTER UPDATE ON performances
+BEGIN
+  UPDATE performances SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
 PRAGMA foreign_keys = ON;

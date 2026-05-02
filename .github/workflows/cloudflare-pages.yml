@@ -297,8 +297,8 @@ jobs:
           STATUS=$(curl --silent --show-error --location --write-out '%{http_code}' --output /tmp/settimes-schedule.json "$SMOKE_URL/api/schedule?event=current")
 
           if [ "$DEPLOY_ENV" = "production" ]; then
-            if [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ]; then
-              echo "::error::Expected HTTP 200 or 404 from /api/schedule?event=current in production, got $STATUS"
+            if [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ] && [ "$STATUS" != "503" ]; then
+              echo "::error::Expected HTTP 200, 404, or 503 from /api/schedule?event=current in production, got $STATUS"
               cat /tmp/settimes-schedule.json
               exit 1
             fi

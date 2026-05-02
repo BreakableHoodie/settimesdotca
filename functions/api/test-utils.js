@@ -109,7 +109,8 @@ export function createTestDB() {
       created_by_user_id INTEGER REFERENCES users(id),
       updated_by_user_id INTEGER,
       created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
+      updated_at TEXT DEFAULT (datetime('now')),
+      reveal_mode INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE band_profiles (
@@ -157,7 +158,8 @@ export function createTestDB() {
       created_by_user_id INTEGER REFERENCES users(id),
       updated_by_user_id INTEGER REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
+      updated_at TEXT DEFAULT (datetime('now')),
+      is_announced INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE schedule_builds (

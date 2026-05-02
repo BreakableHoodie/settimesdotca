@@ -660,6 +660,57 @@ export async function onRequestPut(context) {
   }
 }
 
+// PATCH - Toggle is_announced for a performance
+export async function onRequestPatch(context) {
+  const { request, env } = context
+  const { DB } = env
+
+  const permCheck = await checkPermission(context, 'editor')
+  if (permCheck.error) {
+    return permCheck.response
+  }
+
+  const performanceId = getBandId(request)
+  if (!performanceId || isNaN(performanceId)) {
+    return new Response(
+      JSON.stringify({ error: 'Bad request', message: 'Invalid performance ID' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const body = await request.json().catch(() => ({}))
+  if (typeof body.is_announced !== 'boolean') {
+    return new Response(
+      JSON.stringify({ error: 'Bad request', message: 'is_announced (boolean) is required' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const performance = await DB.prepare(
+    'SELECT id, is_announced FROM performances WHERE id = ?'
+  ).bind(performanceId).first()
+
+  if (!performance) {
+    return new Response(
+      JSON.stringify({ error: 'Not found', message: 'Performance not found' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const newValue = body.is_announced ? 1 : 0
+  await DB.prepare(
+    "UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?"
+  ).bind(newValue, performanceId).run()
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      performance: { id: Number(performanceId), is_announced: newValue },
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  )
+}
+
 // DELETE - Delete band
 export async function onRequestDelete(context) {
   const { request, env } = context;

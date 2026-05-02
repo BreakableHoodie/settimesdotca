@@ -34,6 +34,11 @@ export default function AdminPanel({ currentUser, onLogout }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showMfaModal, setShowMfaModal] = useState(false)
 
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 5000)
+  }, [])
+
   const loadEvents = useCallback(async () => {
     try {
       setLoading(true)
@@ -53,7 +58,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
     } finally {
       setLoading(false)
     }
-  }, [onLogout])
+  }, [onLogout, showToast])
 
   // Load events on mount
   useEffect(() => {
@@ -114,15 +119,6 @@ export default function AdminPanel({ currentUser, onLogout }) {
     }
   }, [activeTab, canManageUsers])
 
-  /**
-   * Show toast notification
-   * @param {string} message - Message to display
-   * @param {string} type - 'success' or 'error'
-   */
-  const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 5000)
-  }, [])
 
   const handleLogout = () => {
     setShowLogoutConfirm(true)

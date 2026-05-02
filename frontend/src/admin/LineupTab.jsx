@@ -707,7 +707,7 @@ export default function LineupTab({
                         return (
                           <tr
                             key={band.id}
-                            className={`hover:bg-bg-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
+                            className={`hover:bg-bg-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
                           >
                             {!readOnly && (
                               <td className="px-4 py-3">
@@ -787,7 +787,7 @@ export default function LineupTab({
                     return (
                       <div
                         key={band.id}
-                        className={`px-4 py-3 space-y-2 ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
+                        className={`px-4 py-3 space-y-2 ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <label className="flex items-center gap-3 text-white">

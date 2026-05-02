@@ -18,6 +18,9 @@ jobs:
         name: e2e
         runs-on: ubuntu-latest
         timeout-minutes: 35
+        # Fork PRs cannot access repo secrets; credentials.js throws when ADMIN_PASSWORD is unset.
+        # Skip the job for fork PRs — it still runs on push and same-repo PRs.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
 
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -77,8 +80,8 @@ jobs:
             - name: Initialize D1 database with schema
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               env:
-                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
               run: |
                   printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\n' > .dev.vars
 
@@ -140,8 +143,8 @@ jobs:
             - name: Run Playwright tests
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               env:
-                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
                   PLAYWRIGHT_SKIP_A11Y_VISUAL: 'true'
               run: npx playwright test --reporter=list,html
 

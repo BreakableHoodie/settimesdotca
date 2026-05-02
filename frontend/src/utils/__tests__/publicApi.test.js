@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { fetchPublicJson, parsePublicApiResponse } from '../publicApi.js'
 
@@ -36,19 +36,24 @@ describe('parsePublicApiResponse', () => {
 })
 
 describe('fetchPublicJson', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('parses the fetch response body', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+    const fetchMock = global.fetch
+    fetchMock.mockResolvedValue(
       new globalThis.Response(JSON.stringify({ id: 22, name: '$wamp A$$' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     )
 
-    vi.stubGlobal('fetch', fetchMock)
-
     await expect(fetchPublicJson('/api/bands/stats/22')).resolves.toEqual({ id: 22, name: '$wamp A$$' })
     expect(fetchMock).toHaveBeenCalledWith('/api/bands/stats/22', {})
-
-    vi.unstubAllGlobals()
   })
 })

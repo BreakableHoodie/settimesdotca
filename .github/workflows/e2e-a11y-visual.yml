@@ -65,8 +65,8 @@ jobs:
 
             - name: Initialize D1 database with schema
               env:
-                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD  }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL  }}
               run: |
                   printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\n' > .dev.vars
 
@@ -126,8 +126,8 @@ jobs:
 
             - name: Generate missing linux snapshots
               env:
-                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD  }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL  }}
               run: |
                   if [ ! -f "e2e/visual-regression.spec.js-snapshots/admin-login-chromium-linux.png" ]; then
                       echo "Linux snapshots missing — generating initial baselines..."
@@ -136,13 +136,13 @@ jobs:
                       git config user.email "github-actions[bot]@users.noreply.github.com"
                       git add e2e/visual-regression.spec.js-snapshots/
                       git commit -m "chore: add initial linux visual regression snapshots [skip ci]"
-                      git push
+                      git push origin HEAD:"$GITHUB_HEAD_REF"
                   fi
 
             - name: Run Playwright tests (A11y + Visual)
               env:
-                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD  }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL  }}
               run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js --reporter=list,html
 
             - name: Upload Playwright report

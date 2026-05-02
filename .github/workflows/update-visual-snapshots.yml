@@ -67,8 +67,8 @@ jobs:
 
             - name: Initialize D1 database with schema
               env:
-                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD  }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL  }}
               run: |
                   printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\n' > .dev.vars
 
@@ -104,8 +104,8 @@ jobs:
 
             - name: Regenerate visual snapshots
               env:
-                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD  }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL  }}
               run: npx playwright test e2e/visual-regression.spec.js --update-snapshots
 
             - name: Commit updated snapshots

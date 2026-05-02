@@ -317,9 +317,9 @@ export async function onRequestPost(context) {
         );
       }
     } else {
-      if (!venueId || !resolvedName) {
+      if (!resolvedName) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields", message: "Event, Venue, and Band Name are required" }),
+          JSON.stringify({ error: "Missing required fields", message: "Band Name is required" }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -378,7 +378,7 @@ export async function onRequestPost(context) {
     }
 
     // Check for conflicts (only if times are provided)
-    if (!isGlobalAdd && startTime && endTime) {
+    if (!isGlobalAdd && venueId && startTime && endTime) {
       const conflicts = await checkConflicts(
         DB,
         eventId,

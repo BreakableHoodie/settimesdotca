@@ -77,8 +77,8 @@ jobs:
             - name: Initialize D1 database with schema
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               env:
-                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
               run: |
                   printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\n' > .dev.vars
 
@@ -140,8 +140,8 @@ jobs:
             - name: Run Playwright tests
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               env:
-                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
                   PLAYWRIGHT_SKIP_A11Y_VISUAL: 'true'
               run: npx playwright test --reporter=list,html
 

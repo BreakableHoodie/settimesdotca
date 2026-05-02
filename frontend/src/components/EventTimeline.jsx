@@ -214,7 +214,9 @@ export default function EventTimeline() {
     return (
       <div className="container mx-auto px-4 py-16">
         <Alert variant="error" dismissible onClose={() => setError(null)}>
-          <h4 className="font-bold mb-2">{isPublishGateError ? 'Events are not published yet' : 'Failed to load events'}</h4>
+          <h4 className="font-bold mb-2">
+            {isPublishGateError ? 'Events are not published yet' : 'Failed to load events'}
+          </h4>
           <p>{error.message}</p>
         </Alert>
       </div>

@@ -321,10 +321,14 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       .filter(id => /^\d+$/.test(id))
       .join(',')
 
+    if (!performanceIds) return
+
     const url = `${window.location.origin}${window.location.pathname}?s=${performanceIds}`
-    await copyToClipboard(url)
-    setShareButtonLabel('Link Copied!')
-    setTimeout(() => setShareButtonLabel('Share Schedule'), 2000)
+    const success = await copyToClipboard(url)
+    if (success) {
+      setShareButtonLabel('Link Copied!')
+      setTimeout(() => setShareButtonLabel('Share Schedule'), 2000)
+    }
   }
 
   return (
@@ -388,6 +392,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                   onClick={handleShareSchedule}
                   className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
                   title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Share your schedule'}
+                  aria-label="Copy shareable link to your schedule"
                 >
                   <FontAwesomeIcon icon={shareButtonLabel === 'Link Copied!' ? faCheck : faLink} aria-hidden="true" />
                   <span className="transition-opacity duration-200 ease-in-out">{shareButtonLabel}</span>

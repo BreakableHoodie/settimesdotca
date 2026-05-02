@@ -299,6 +299,11 @@ function App() {
     } else {
       setPendingSharedBands(matchedStringIds)
       setSharedScheduleConfirmOpen(true)
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev)
+        next.delete('s')
+        return next
+      }, { replace: true })
     }
   }, [bands, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -607,21 +612,11 @@ function App() {
           setSharedScheduleConfirmOpen(false)
           setSelectedBands(pendingSharedBands)
           setView('mine')
-          setSearchParams(prev => {
-            const next = new URLSearchParams(prev)
-            next.delete('s')
-            return next
-          }, { replace: true })
           setPendingSharedBands([])
         }}
         onCancel={() => {
           setSharedScheduleConfirmOpen(false)
           setPendingSharedBands([])
-          setSearchParams(prev => {
-            const next = new URLSearchParams(prev)
-            next.delete('s')
-            return next
-          }, { replace: true })
         }}
       />
     </div>

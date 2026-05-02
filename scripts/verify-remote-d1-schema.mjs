@@ -11,7 +11,7 @@ const MAX_ERROR_OUTPUT_LENGTH = 500;
 
 const REQUIRED_SCHEMA = {
   events: ['id', 'slug', 'city', 'is_published'],
-  venues: ['id', 'event_id', 'name', 'city'],
+  venues: ['id', 'name', 'city'],
   band_profiles: ['id', 'name', 'name_normalized', 'genre', 'photo_url'],
   performances: [
     'id',

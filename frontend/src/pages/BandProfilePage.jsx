@@ -144,6 +144,9 @@ export default function BandProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [scheduleSelections, setScheduleSelections] = useState({}) // { eventSlug: Set of bandIds }
+  const [followEmail, setFollowEmail] = useState('')
+  const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'loading' | 'success' | 'error'
+  const [followError, setFollowError] = useState('')
   const [userHasSchedule] = useState(() => hasAnySchedule())
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
 
@@ -281,6 +284,29 @@ export default function BandProfilePage() {
     },
     [scheduleSelections, profile?.name]
   )
+
+  const submitFollow = async e => {
+    e.preventDefault()
+    if (!followEmail.trim()) return
+    setFollowStatus('loading')
+    setFollowError('')
+    try {
+      const res = await fetch(`/api/bands/${profile.id}/follow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: followEmail.trim() }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Something went wrong')
+      }
+      setFollowStatus('success')
+    } catch (err) {
+      setFollowStatus('error')
+      setFollowError(err.message)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-bg-navy flex items-center justify-center">
@@ -528,6 +554,40 @@ export default function BandProfilePage() {
                 !profile.description && <p className="text-white/30 text-sm italic">No links added yet.</p>
               )}
             </div>
+          </div>
+
+          {/* Follow band */}
+          <div className="mt-6 p-4 rounded-lg bg-white/5 border border-white/10">
+            <h3 className="text-sm font-semibold text-text-primary mb-1">
+              Follow {profile.name}
+            </h3>
+            <p className="text-xs text-text-secondary mb-3">
+              Get notified when they join a new lineup.
+            </p>
+            {followStatus === 'success' ? (
+              <p className="text-sm text-green-400">
+                <FontAwesomeIcon icon={faCheck} className="mr-1.5" />
+                You&apos;re following {profile.name}!
+              </p>
+            ) : (
+              <form onSubmit={submitFollow} className="flex gap-2">
+                <input
+                  type="email"
+                  value={followEmail}
+                  onChange={e => setFollowEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  className="flex-1 px-3 py-2 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
+                  aria-label={`Email to follow ${profile.name}`}
+                />
+                <Button type="submit" disabled={followStatus === 'loading'} size="sm">
+                  {followStatus === 'loading' ? 'Saving…' : 'Follow'}
+                </Button>
+              </form>
+            )}
+            {followStatus === 'error' && (
+              <p className="text-xs text-red-400 mt-1">{followError}</p>
+            )}
           </div>
 
           {/* Two Column Layout: Stats/Facts + Shows */}

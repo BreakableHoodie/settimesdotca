@@ -88,4 +88,59 @@ describe('PATCH /api/admin/bands/:id - announce toggle', () => {
 
     expect(res.status).toBe(403)
   })
+
+  it('sets band_follow_notified=1 when band is announced and followers exist', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'Vol6', slug: 'vol6-notify' })
+    rawDb.prepare('UPDATE events SET reveal_mode=1 WHERE id=?').run(ev.id)
+    const venue = insertVenue(rawDb, { name: 'Venue N' })
+    const band = insertBand(rawDb, { name: 'Notify Band', event_id: ev.id, venue_id: venue.id })
+    rawDb.prepare('UPDATE performances SET is_announced=0 WHERE id=?').run(band.id)
+
+    rawDb.prepare(
+      'INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)'
+    ).run('follower@example.com', band.band_profile_id, 'unsub-token-1')
+
+    const req = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ is_announced: true }),
+    })
+    await bandIdHandler.onRequestPatch({
+      request: req,
+      env,
+      data: { user: { role: 'editor', id: 2 } },
+    })
+
+    // Email is fire-and-forget and skipped (no EMAIL_FROM in test env).
+    // Assert the DB dedup flag was set.
+    const row = rawDb.prepare('SELECT band_follow_notified FROM performances WHERE id=?').get(band.id)
+    expect(row.band_follow_notified).toBe(1)
+  })
+
+  it('does not set band_follow_notified again if band was already notified', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'Vol6', slug: 'vol6-renotify' })
+    const band = insertBand(rawDb, { name: 'Already Notified', event_id: ev.id })
+    rawDb.prepare('UPDATE performances SET is_announced=0, band_follow_notified=1 WHERE id=?').run(band.id)
+
+    rawDb.prepare(
+      'INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)'
+    ).run('follower2@example.com', band.band_profile_id, 'unsub-token-2')
+
+    const req = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ is_announced: true }),
+    })
+    const res = await bandIdHandler.onRequestPatch({
+      request: req,
+      env,
+      data: { user: { role: 'editor', id: 2 } },
+    })
+
+    expect(res.status).toBe(200)
+    const row = rawDb.prepare('SELECT band_follow_notified FROM performances WHERE id=?').get(band.id)
+    expect(row.band_follow_notified).toBe(1)
+  })
 })

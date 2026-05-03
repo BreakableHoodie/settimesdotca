@@ -11,6 +11,7 @@ import {
   sanitizeString,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
+import { sendEmail, isEmailConfigured } from '../../../utils/email.js'
 
 // Helper to extract band ID from path
 function getBandId(request) {
@@ -691,7 +692,7 @@ export async function onRequestPatch(context) {
     }
 
     const performance = await DB.prepare(
-      'SELECT id, is_announced FROM performances WHERE id = ?'
+      'SELECT id, is_announced, band_follow_notified FROM performances WHERE id = ?'
     ).bind(performanceId).first()
 
     if (!performance) {
@@ -706,6 +707,42 @@ export async function onRequestPatch(context) {
       "UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?"
     ).bind(newValue, performanceId).run()
 
+    // Notify band followers on 0 → 1 transition (fire-and-forget, never re-notify)
+    if (newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified) {
+      const perf = await DB.prepare(
+        `SELECT p.band_profile_id, bp.name as band_name, e.name as event_name
+         FROM performances p
+         JOIN band_profiles bp ON p.band_profile_id = bp.id
+         JOIN events e ON p.event_id = e.id
+         WHERE p.id = ?`
+      ).bind(performanceId).first()
+
+      if (perf) {
+        const { results: followers } = await DB.prepare(
+          'SELECT email, unsubscribe_token FROM band_follows WHERE band_profile_id = ? AND verified = 1'
+        ).bind(perf.band_profile_id).all()
+
+        if (followers.length > 0 && isEmailConfigured(env)) {
+          const publicUrl = env.PUBLIC_URL || 'https://settimes.ca'
+          await Promise.allSettled(
+            followers.map(follower => {
+              const unsubUrl = `${publicUrl}/api/bands/${perf.band_profile_id}/unfollow?token=${follower.unsubscribe_token}`
+              return sendEmail(env, {
+                to: follower.email,
+                subject: `${perf.band_name} just joined the lineup!`,
+                text: `${perf.band_name} is now on the lineup for ${perf.event_name}.\n\nUnfollow: ${unsubUrl}`,
+                html: `<p><strong>${perf.band_name}</strong> is now on the lineup for <strong>${perf.event_name}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
+              })
+            })
+          )
+        }
+
+        await DB.prepare(
+          'UPDATE performances SET band_follow_notified = 1 WHERE id = ?'
+        ).bind(performanceId).run()
+      }
+    }
+
     await auditLog(
       env,
       user.userId,
@@ -719,7 +756,13 @@ export async function onRequestPatch(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        performance: { id: Number(performanceId), is_announced: newValue },
+        performance: {
+          id: Number(performanceId),
+          is_announced: newValue,
+          band_follow_notified: (newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified)
+            ? 1
+            : (performance.band_follow_notified ?? 0),
+        },
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )

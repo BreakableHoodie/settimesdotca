@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { eventsApi, bandsApi } from '../utils/adminApi'
 
 /**
@@ -23,37 +23,54 @@ export default function HistoricalImportModal({ onClose, onImported }) {
 
   // --- Shared state ---
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const [errors, setErrors] = useState([])
   const [progress, setProgress] = useState(null) // { done, total } or null
-  const [failedBands, setFailedBands] = useState([])
 
-  // Auto-generate slug from name
+  // --- Refs ---
+  const bandTextareaRef = useRef(null)
+
+  // Focus the band textarea when advancing to step 2
+  useEffect(() => {
+    if (step === 2) {
+      bandTextareaRef.current?.focus()
+    }
+  }, [step])
+
+  // Close on Escape (unless submitting)
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape' && !submitting) onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [submitting, onClose])
+
+  // Auto-generate slug from name — aligned with EventFormModal logic
   const handleNameChange = e => {
     const val = e.target.value
     setName(val)
     setSlug(
       val
         .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
     )
   }
 
   // --- Step 1 submit ---
   const handleStep1Submit = async e => {
     e.preventDefault()
-    setError('')
+    setErrors([])
 
     const trimmedName = name.trim()
     const trimmedDate = date.trim()
 
     if (!trimmedName) {
-      setError('Event name is required.')
+      setErrors(['Event name is required.'])
       return
     }
     if (!trimmedDate) {
-      setError('Event date is required.')
+      setErrors(['Event date is required.'])
       return
     }
 
@@ -66,57 +83,57 @@ export default function HistoricalImportModal({ onClose, onImported }) {
         status: 'archived',
         is_published: 0,
       })
+      if (!data?.event?.id) {
+        throw new Error('Server did not return a valid event. Please try again.')
+      }
       setCreatedEvent(data.event)
       setStep(2)
     } catch (err) {
-      setError(err.message || 'Failed to create event. Please try again.')
+      setErrors([err.message || 'Failed to create event. Please try again.'])
     } finally {
       setSubmitting(false)
     }
   }
 
   // --- Step 2 submit ---
-  const handleStep2Submit = async e => {
+  async function handleStep2Submit(e) {
     e.preventDefault()
-    setError('')
-    setFailedBands([])
 
-    const lines = bandList
+    const names = bandList
       .split('\n')
-      .map(l => l.trim())
+      .map((n) => n.trim())
       .filter(Boolean)
 
-    if (!lines.length) {
-      setError('Please enter at least one band name.')
+    if (names.length === 0) return
+    if (names.length > 200) {
+      setErrors([`Too many bands (${names.length}). Maximum is 200 per import. Split into multiple imports.`])
       return
     }
 
     setSubmitting(true)
-    setProgress({ done: 0, total: lines.length })
+    setErrors([])
+    setProgress({ done: 0, total: names.length })
 
     const failed = []
 
-    for (let i = 0; i < lines.length; i++) {
-      const bandName = lines[i]
-      try {
-        await bandsApi.create({ eventId: createdEvent.id, name: bandName })
-      } catch (err) {
-        failed.push(bandName)
+    try {
+      for (let i = 0; i < names.length; i++) {
+        try {
+          await bandsApi.create({ eventId: createdEvent.id, name: names[i] })
+        } catch (err) {
+          failed.push(`${names[i]}: ${err.message || 'unknown error'}`)
+        }
+        setProgress({ done: i + 1, total: names.length })
       }
-      setProgress({ done: i + 1, total: lines.length })
-    }
 
-    setSubmitting(false)
-    setProgress(null)
-
-    if (failed.length > 0) {
-      setFailedBands(failed)
-      setError(
-        `Import completed with ${failed.length} failure${failed.length === 1 ? '' : 's'}. The bands listed below could not be added.`
-      )
-    } else {
-      onImported()
-      onClose()
+      if (failed.length > 0) {
+        setErrors(failed)
+      } else {
+        onImported?.()
+        onClose()
+      }
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -148,16 +165,20 @@ export default function HistoricalImportModal({ onClose, onImported }) {
             </button>
           </div>
 
-          {/* Error */}
-          {error && (
+          {/* Errors */}
+          {errors.length > 0 && (
             <div className="mb-4 bg-red-900/30 text-red-300 rounded-lg p-3 text-sm" role="alert">
-              {error}
-              {failedBands.length > 0 && (
-                <ul className="mt-2 list-disc list-inside space-y-0.5">
-                  {failedBands.map(band => (
-                    <li key={band}>{band}</li>
-                  ))}
-                </ul>
+              {errors.length === 1 ? (
+                errors[0]
+              ) : (
+                <>
+                  <p>Import completed with {errors.length} failure{errors.length === 1 ? '' : 's'}. The following bands could not be added:</p>
+                  <ul className="mt-2 list-disc list-inside space-y-0.5">
+                    {errors.map((msg, i) => (
+                      <li key={i}>{msg}</li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
           )}
@@ -242,6 +263,7 @@ export default function HistoricalImportModal({ onClose, onImported }) {
                 </label>
                 <textarea
                   id="him-bands"
+                  ref={bandTextareaRef}
                   value={bandList}
                   onChange={e => setBandList(e.target.value)}
                   disabled={submitting}

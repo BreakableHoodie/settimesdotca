@@ -724,17 +724,29 @@ export async function onRequestPatch(context) {
 
         if (followers.length > 0 && isEmailConfigured(env)) {
           const publicUrl = env.PUBLIC_URL || 'https://settimes.ca'
-          await Promise.allSettled(
+          const emailResults = await Promise.allSettled(
             followers.map(follower => {
               const unsubUrl = `${publicUrl}/api/bands/${perf.band_profile_id}/unfollow?token=${follower.unsubscribe_token}`
               return sendEmail(env, {
                 to: follower.email,
-                subject: `${perf.band_name} just joined the lineup!`,
+                subject: `${perf.band_name} just joined the lineup for ${perf.event_name}!`,
                 text: `${perf.band_name} is now on the lineup for ${perf.event_name}.\n\nUnfollow: ${unsubUrl}`,
                 html: `<p><strong>${perf.band_name}</strong> is now on the lineup for <strong>${perf.event_name}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
               })
             })
           )
+          const failedCount = emailResults.filter(r => r.status === 'rejected').length
+          if (failedCount > 0) {
+            await auditLog(
+              env,
+              user.userId,
+              'performance.announced.email_failure',
+              'performance',
+              Number(performanceId),
+              { failed_count: failedCount, band_name: perf.band_name },
+              ipAddress
+            ).catch(() => {})
+          }
         }
 
         await DB.prepare(

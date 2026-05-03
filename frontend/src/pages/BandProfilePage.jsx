@@ -567,7 +567,7 @@ export default function BandProfilePage() {
             {followStatus === 'success' ? (
               <p className="text-sm text-green-400">
                 <FontAwesomeIcon icon={faCheck} className="mr-1.5" />
-                You&apos;re following {profile.name}!
+                You&apos;re following {profile.name}! We&apos;ll email you when they join a lineup.
               </p>
             ) : (
               <form onSubmit={submitFollow} className="flex gap-2">

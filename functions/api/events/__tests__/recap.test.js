@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'vitest';
 import { onRequestGet } from '../[id]/recap.js';
 import {
   createTestEnv,
@@ -186,6 +186,41 @@ describe('GET /api/events/:id/recap', () => {
     expect(returningBand.is_returning).toBe(true);
     expect(newBand.is_returning).toBe(false);
   });
+
+  it('counts only assigned venues (null venue does not increment venue_count)', async () => {
+    const { env, rawDb } = createTestEnv()
+    env.PUBLIC_DATA_PUBLISH_ENABLED = 'true'
+    const event = insertEvent(rawDb, { name: 'Mixed Venues', slug: 'mixed-venues' })
+    rawDb.prepare("UPDATE events SET status='archived', is_published=1 WHERE id=?").run(event.id)
+    const venue = insertVenue(rawDb, { name: 'Stage A' })
+    insertBand(rawDb, { name: 'Band With Venue', event_id: event.id, venue_id: venue.id })
+    insertBand(rawDb, { name: 'Band Without Venue', event_id: event.id }) // no venue
+
+    const res = await onRequestGet({
+      request: new Request(`https://example.test/api/events/${event.id}/recap`),
+      env,
+      params: { id: String(event.id) },
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.stats.venue_count).toBe(1) // only the one with a venue
+    expect(data.stats.total_sets).toBe(2) // both bands appear
+  })
+
+  it('returns 500 on DB error', async () => {
+    const { env } = createTestEnv()
+    env.PUBLIC_DATA_PUBLISH_ENABLED = 'true'
+    env.DB = {
+      prepare: () => { throw new Error('simulated DB failure') },
+    }
+
+    const res = await onRequestGet({
+      request: new Request('https://example.test/api/events/any-slug/recap'),
+      env,
+      params: { id: 'any-slug' },
+    })
+    expect(res.status).toBe(500)
+  })
 
   test('returns 503 when PUBLIC_DATA_PUBLISH_ENABLED is not set', async () => {
     const { env, rawDb } = createTestEnv();

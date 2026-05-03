@@ -56,7 +56,10 @@ export async function onRequestGet(context) {
         v.name AS venue_name,
         CASE WHEN EXISTS (
           SELECT 1 FROM performances p2
-          WHERE p2.band_profile_id = bp.id AND p2.event_id != ?
+          JOIN events e2 ON p2.event_id = e2.id
+          WHERE p2.band_profile_id = bp.id
+            AND p2.event_id != ?
+            AND e2.status = 'archived'
         ) THEN 1 ELSE 0 END AS is_returning
       FROM performances p
       JOIN band_profiles bp ON p.band_profile_id = bp.id
@@ -100,7 +103,7 @@ export async function onRequestGet(context) {
     });
 
     const stats = {
-      total_sets: rows.length,
+      total_sets: rows.length, // performance slots; one band playing two sets counts as 2
       venue_count: venueIds.size,
       first_timers: firstTimers,
       returning_acts: returningActs,

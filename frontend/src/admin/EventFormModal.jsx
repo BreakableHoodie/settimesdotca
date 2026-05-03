@@ -4,7 +4,6 @@ import { Button } from '../components/ui'
 import { eventsApi } from '../utils/adminApi'
 import { FIELD_LIMITS } from '../utils/validation'
 
-
 /**
  * EventFormModal - Modal for creating and editing events
  *

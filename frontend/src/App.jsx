@@ -269,7 +269,10 @@ function App() {
     if (!sParam || bands.length === 0) return
 
     const requestedIds = new Set(
-      sParam.split(',').map(s => s.trim()).filter(s => /^\d+$/.test(s))
+      sParam
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => /^\d+$/.test(s))
     )
 
     const matchedStringIds = bands
@@ -287,11 +290,14 @@ function App() {
     const applySelection = () => {
       setSelectedBands(matchedStringIds)
       setView('mine')
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev)
-        next.delete('s')
-        return next
-      }, { replace: true })
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev)
+          next.delete('s')
+          return next
+        },
+        { replace: true }
+      )
     }
 
     if (existing.length === 0) {
@@ -299,11 +305,14 @@ function App() {
     } else {
       setPendingSharedBands(matchedStringIds)
       setSharedScheduleConfirmOpen(true)
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev)
-        next.delete('s')
-        return next
-      }, { replace: true })
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev)
+          next.delete('s')
+          return next
+        },
+        { replace: true }
+      )
     }
   }, [bands, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -739,7 +739,9 @@ export default function LineupTab({
                                   <button
                                     onClick={() => toggleAnnounced(band.id, band.is_announced)}
                                     disabled={togglingId === band.id}
-                                    title={band.is_announced ? 'Announced — click to hide' : 'Hidden — click to announce'}
+                                    title={
+                                      band.is_announced ? 'Announced — click to hide' : 'Hidden — click to announce'
+                                    }
                                     className={`p-1.5 rounded transition-colors ${
                                       band.is_announced
                                         ? 'text-green-400 hover:text-green-300'

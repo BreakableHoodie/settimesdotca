@@ -647,12 +647,8 @@ export default function BandProfilePage() {
 
           {/* Follow band */}
           <div className="mt-6 p-4 rounded-lg bg-white/5 border border-white/10">
-            <h3 className="text-sm font-semibold text-text-primary mb-1">
-              Follow {profile.name}
-            </h3>
-            <p className="text-xs text-text-secondary mb-3">
-              Get notified when they join a new lineup.
-            </p>
+            <h3 className="text-sm font-semibold text-text-primary mb-1">Follow {profile.name}</h3>
+            <p className="text-xs text-text-secondary mb-3">Get notified when they join a new lineup.</p>
             {followStatus === 'success' ? (
               <p className="text-sm text-green-400">
                 <FontAwesomeIcon icon={faCheck} className="mr-1.5" />
@@ -678,14 +674,10 @@ export default function BandProfilePage() {
                     {followStatus === 'loading' ? 'Saving…' : 'Follow'}
                   </Button>
                 </div>
-                {turnstileEnabled && (
-                  <div ref={turnstileContainerRef} className="mt-2" />
-                )}
+                {turnstileEnabled && <div ref={turnstileContainerRef} className="mt-2" />}
               </form>
             )}
-            {followStatus === 'error' && (
-              <p className="text-xs text-red-400 mt-1">{followError}</p>
-            )}
+            {followStatus === 'error' && <p className="text-xs text-red-400 mt-1">{followError}</p>}
           </div>
 
           {/* Two Column Layout: Stats/Facts + Shows */}

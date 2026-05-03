@@ -2,6 +2,10 @@ import { isValidEmail } from '../../../utils/validation.js'
 import { generateToken } from '../../../utils/tokens.js'
 import { sendEmail, isEmailConfigured } from '../../../utils/email.js'
 
+const escapeHtml = s => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
 const MAX_EMAIL_LENGTH = 320
 
 async function verifyTurnstile(request, env, token) {
@@ -109,7 +113,7 @@ export async function onRequestPost(context) {
         to: email,
         subject: `You're following ${band.name} on SetTimes`,
         text: `You'll be notified when ${band.name} joins a lineup.\n\nUnfollow: ${unsubUrl}`,
-        html: `<p>You'll be notified when <strong>${band.name}</strong> joins a lineup.</p><p><a href="${unsubUrl}">Unfollow</a></p>`,
+        html: `<p>You'll be notified when <strong>${escapeHtml(band.name)}</strong> joins a lineup.</p><p><a href="${unsubUrl}">Unfollow</a></p>`,
       }).catch(() => {})
     }
 

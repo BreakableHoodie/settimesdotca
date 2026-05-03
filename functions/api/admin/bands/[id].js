@@ -13,6 +13,10 @@ import {
 import { getClientIP } from "../../../utils/request.js";
 import { sendEmail, isEmailConfigured } from '../../../utils/email.js'
 
+const escapeHtml = s => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
 // Helper to extract band ID from path
 function getBandId(request) {
   const url = new URL(request.url);
@@ -702,12 +706,20 @@ export async function onRequestPatch(context) {
       )
     }
 
+    const linkedEvent = await getEventForPerformance(DB, performanceId)
+    if (linkedEvent?.status === 'archived') {
+      return new Response(
+        JSON.stringify({ error: 'Validation error', message: 'Archived event performances cannot be edited.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     const newValue = body.is_announced ? 1 : 0
     await DB.prepare(
       "UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?"
     ).bind(newValue, performanceId).run()
 
-    // Notify band followers on 0 → 1 transition (fire-and-forget, never re-notify)
+    // Notify band followers on first 0 → 1 transition only
     if (newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified) {
       const perf = await DB.prepare(
         `SELECT p.band_profile_id, bp.name as band_name, e.name as event_name
@@ -722,48 +734,59 @@ export async function onRequestPatch(context) {
           'SELECT email, unsubscribe_token FROM band_follows WHERE band_profile_id = ? AND verified = 1'
         ).bind(perf.band_profile_id).all()
 
-        if (followers.length > 0 && isEmailConfigured(env)) {
-          const publicUrl = env.PUBLIC_URL || 'https://settimes.ca'
-          const emailResults = await Promise.allSettled(
-            followers.map(follower => {
-              const unsubUrl = `${publicUrl}/api/bands/${perf.band_profile_id}/unfollow?token=${follower.unsubscribe_token}`
-              return sendEmail(env, {
-                to: follower.email,
-                subject: `${perf.band_name} just joined the lineup for ${perf.event_name}!`,
-                text: `${perf.band_name} is now on the lineup for ${perf.event_name}.\n\nUnfollow: ${unsubUrl}`,
-                html: `<p><strong>${perf.band_name}</strong> is now on the lineup for <strong>${perf.event_name}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
+        if (followers.length > 0) {
+          // Atomic claim: only the first concurrent request sees changes > 0.
+          // band_follow_notified stays 0 if no followers existed — preserving future notification eligibility.
+          const claimed = await DB.prepare(
+            'UPDATE performances SET band_follow_notified = 1 WHERE id = ? AND band_follow_notified = 0'
+          ).bind(performanceId).run()
+
+          if (claimed.meta.changes > 0 && isEmailConfigured(env)) {
+            const publicUrl = env.PUBLIC_URL || 'https://settimes.ca'
+            const emailResults = await Promise.allSettled(
+              followers.map(follower => {
+                const unsubUrl = `${publicUrl}/api/bands/${perf.band_profile_id}/unfollow?token=${follower.unsubscribe_token}`
+                return sendEmail(env, {
+                  to: follower.email,
+                  subject: `${escapeHtml(perf.band_name)} just joined the lineup for ${escapeHtml(perf.event_name)}!`,
+                  text: `${perf.band_name} is now on the lineup for ${perf.event_name}.\n\nUnfollow: ${unsubUrl}`,
+                  html: `<p><strong>${escapeHtml(perf.band_name)}</strong> is now on the lineup for <strong>${escapeHtml(perf.event_name)}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
+                })
               })
-            })
-          )
-          const failedCount = emailResults.filter(r => r.status === 'rejected').length
-          if (failedCount > 0) {
-            await auditLog(
-              env,
-              user.userId,
-              'performance.announced.email_failure',
-              'performance',
-              Number(performanceId),
-              { failed_count: failedCount, band_name: perf.band_name },
-              ipAddress
-            ).catch(() => {})
+            )
+            // sendEmail returns {delivered:false} on failure rather than throwing — filter both rejection types
+            const failedCount = emailResults.filter(
+              r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value?.delivered)
+            ).length
+            if (failedCount > 0) {
+              await auditLog(
+                env,
+                user.userId,
+                'performance.announced.email_failure',
+                'performance',
+                Number(performanceId),
+                { failed_count: failedCount, band_name: perf.band_name },
+                ipAddress
+              ).catch(() => {})
+            }
           }
         }
-
-        await DB.prepare(
-          'UPDATE performances SET band_follow_notified = 1 WHERE id = ?'
-        ).bind(performanceId).run()
       }
     }
 
     await auditLog(
       env,
       user.userId,
-      'performance.announced',
+      newValue ? 'performance.announced' : 'performance.unannounced',
       'performance',
       Number(performanceId),
       { is_announced: newValue, changedBy: user.email },
       ipAddress
     )
+
+    const updated = await DB.prepare(
+      'SELECT band_follow_notified FROM performances WHERE id = ?'
+    ).bind(performanceId).first()
 
     return new Response(
       JSON.stringify({
@@ -771,9 +794,7 @@ export async function onRequestPatch(context) {
         performance: {
           id: Number(performanceId),
           is_announced: newValue,
-          band_follow_notified: (newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified)
-            ? 1
-            : (performance.band_follow_notified ?? 0),
+          band_follow_notified: updated?.band_follow_notified ?? 0,
         },
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }

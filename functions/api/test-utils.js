@@ -159,7 +159,8 @@ export function createTestDB() {
       updated_by_user_id INTEGER REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
-      is_announced INTEGER NOT NULL DEFAULT 1
+      is_announced INTEGER NOT NULL DEFAULT 1,
+      band_follow_notified INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE schedule_builds (
@@ -201,6 +202,17 @@ export function createTestDB() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       last_email_sent TEXT,
       UNIQUE(email, city, genre)
+    );
+
+    CREATE TABLE band_follows (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      band_profile_id INTEGER NOT NULL REFERENCES band_profiles(id) ON DELETE CASCADE,
+      verified INTEGER NOT NULL DEFAULT 0,
+      verification_token TEXT UNIQUE,
+      unsubscribe_token TEXT UNIQUE NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(email, band_profile_id)
     );
 
     CREATE TABLE password_reset_tokens (

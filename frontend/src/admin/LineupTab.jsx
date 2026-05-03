@@ -66,6 +66,7 @@ export default function LineupTab({
     facebook: '',
   })
   const [submitting, setSubmitting] = useState(false)
+  const [togglingId, setTogglingId] = useState(null)
   const [serverConflicts, setServerConflicts] = useState([])
 
   // Selected IDs for bulk delete within event
@@ -355,13 +356,15 @@ export default function LineupTab({
   }
 
   const toggleAnnounced = async (performanceId, currentValue) => {
+    setTogglingId(performanceId)
     try {
-      const res = await bandsApi.patch(performanceId, { is_announced: !currentValue })
-      if (!res) throw new Error('Failed to toggle announcement')
+      const res = await bandsApi.patch(performanceId, { is_announced: currentValue !== 1 })
+      if (!res.ok) throw new Error('Failed to toggle announcement')
       await loadData()
     } catch (err) {
       console.error('[LineupTab] toggleAnnounced error:', err)
-      showToast('Failed to toggle announcement', 'error')
+    } finally {
+      setTogglingId(null)
     }
   }
 
@@ -736,12 +739,13 @@ export default function LineupTab({
                                 {selectedEvent?.reveal_mode === 1 && (
                                   <button
                                     onClick={() => toggleAnnounced(band.id, band.is_announced)}
+                                    disabled={togglingId === band.id}
                                     title={band.is_announced ? 'Announced — click to hide' : 'Hidden — click to announce'}
                                     className={`p-1.5 rounded transition-colors ${
                                       band.is_announced
                                         ? 'text-green-400 hover:text-green-300'
                                         : 'text-white/30 hover:text-white/60'
-                                    }`}
+                                    } ${togglingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
                                   >
                                     <FontAwesomeIcon icon={band.is_announced ? faEye : faEyeSlash} />
@@ -818,12 +822,13 @@ export default function LineupTab({
                             {selectedEvent?.reveal_mode === 1 && (
                               <button
                                 onClick={() => toggleAnnounced(band.id, band.is_announced)}
+                                disabled={togglingId === band.id}
                                 title={band.is_announced ? 'Announced — click to hide' : 'Hidden — click to announce'}
                                 className={`p-1.5 rounded transition-colors ${
                                   band.is_announced
                                     ? 'text-green-400 hover:text-green-300'
                                     : 'text-white/30 hover:text-white/60'
-                                }`}
+                                } ${togglingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
                               >
                                 <FontAwesomeIcon icon={band.is_announced ? faEye : faEyeSlash} />

@@ -4,6 +4,41 @@ import { sendEmail, isEmailConfigured } from '../../../utils/email.js'
 
 const MAX_EMAIL_LENGTH = 320
 
+async function verifyTurnstile(request, env, token) {
+  const secret = env?.TURNSTILE_SECRET_KEY
+  if (!secret) {
+    return true
+  }
+
+  if (!token || typeof token !== 'string') {
+    return false
+  }
+
+  const ip = request.headers.get('CF-Connecting-IP') || ''
+  const formData = new URLSearchParams()
+  formData.set('secret', secret)
+  formData.set('response', token)
+  if (ip) {
+    formData.set('remoteip', ip)
+  }
+
+  try {
+    const response = await fetch(
+      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData,
+      }
+    )
+
+    const result = await response.json().catch(() => ({}))
+    return Boolean(result?.success)
+  } catch (_error) {
+    return false
+  }
+}
+
 export async function onRequestPost(context) {
   const { request, env, params } = context
   const { DB } = env
@@ -11,10 +46,19 @@ export async function onRequestPost(context) {
   try {
     const body = await request.json().catch(() => ({}))
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    const turnstileToken = body.turnstileToken
 
     if (!email || email.length > MAX_EMAIL_LENGTH || !isValidEmail(email)) {
       return new Response(
         JSON.stringify({ error: 'Invalid email address' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const turnstileValid = await verifyTurnstile(request, env, turnstileToken)
+    if (!turnstileValid) {
+      return new Response(
+        JSON.stringify({ error: 'Bot verification failed' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }

@@ -358,8 +358,7 @@ export default function LineupTab({
   const toggleAnnounced = async (performanceId, currentValue) => {
     setTogglingId(performanceId)
     try {
-      const res = await bandsApi.patch(performanceId, { is_announced: currentValue !== 1 })
-      if (!res.ok) throw new Error('Failed to toggle announcement')
+      await bandsApi.patch(performanceId, { is_announced: currentValue !== 1 })
       await loadData()
     } catch (err) {
       console.error('[LineupTab] toggleAnnounced error:', err)

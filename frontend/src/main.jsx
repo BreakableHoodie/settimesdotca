@@ -17,6 +17,7 @@ import './index.css'
 // Lazy load admin panel and band profiles (not needed for initial page load)
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
 const BandProfilePage = lazy(() => import('./pages/BandProfilePage.jsx'))
+const EventRecapPage = lazy(() => import('./pages/EventRecapPage.jsx'))
 
 const hostname = typeof window !== 'undefined' ? window.location.hostname || '' : ''
 const isPreviewBuild = hostname.startsWith('dev.') || hostname.endsWith('.pages.dev')
@@ -79,6 +80,18 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/activate" element={<ActivatePage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+
+            {/* Event recap: Lazy loaded */}
+            <Route
+              path="/events/:slug/recap"
+              element={
+                <ErrorBoundary title="Event Recap Error" message="Unable to load event recap. Please try again.">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <EventRecapPage />
+                  </Suspense>
+                </ErrorBoundary>
+              }
+            />
 
             {/* Band profiles: Lazy loaded */}
             <Route

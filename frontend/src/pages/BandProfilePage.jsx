@@ -20,7 +20,7 @@ import BandFacts from '../components/BandFacts'
 import BandStats from '../components/BandStats'
 import Breadcrumbs from '../components/Breadcrumbs'
 import PrivacyBanner from '../components/PrivacyBanner'
-import { Alert, Badge, Button, Card, Loading } from '../components/ui'
+import { Alert, Badge, Button, Card, BandProfileSkeleton } from '../components/ui'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
 import { fetchPublicJson } from '../utils/publicApi'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
@@ -385,11 +385,7 @@ export default function BandProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-bg-navy flex items-center justify-center">
-        <Loading size="lg" text="Loading band profile..." />
-      </div>
-    )
+    return <BandProfileSkeleton />
   }
 
   if (error || !profile) {

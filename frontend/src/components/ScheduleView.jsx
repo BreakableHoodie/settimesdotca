@@ -286,6 +286,7 @@ function ScheduleView({
                     onToggle={onToggleBand}
                     clickable={!!onToggleBand}
                     showVenue={true}
+                    currentTime={currentTime}
                   />
                 ))}
               </div>
@@ -317,6 +318,7 @@ function ScheduleView({
                         isSelected={selectedBands.includes(band.id)}
                         onToggle={onToggleBand}
                         showVenue={true}
+                        currentTime={currentTime}
                       />
                     ))}
                   </div>
@@ -350,6 +352,7 @@ function ScheduleView({
                         isSelected={selectedBands.includes(band.id)}
                         onToggle={onToggleBand}
                         showVenue={true}
+                        currentTime={currentTime}
                       />
                     ))}
                   </div>

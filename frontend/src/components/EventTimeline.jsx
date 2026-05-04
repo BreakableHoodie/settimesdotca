@@ -16,7 +16,8 @@ import { slugifyBandName } from '../utils/slugify'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
-import { Alert, Badge, Button, Card, Loading } from './ui'
+import { Alert, Badge, Button, Card } from './ui'
+import EventsPageSkeleton from './EventsPageSkeleton'
 
 /**
  * EventTimeline - Main timeline showing Now, Upcoming, and Past events
@@ -207,7 +208,7 @@ export default function EventTimeline() {
   const isPublishGateError = error?.status === 503
 
   if (loading) {
-    return <Loading size="lg" text="Loading events..." fullScreen={false} />
+    return <EventsPageSkeleton />
   }
 
   if (error) {

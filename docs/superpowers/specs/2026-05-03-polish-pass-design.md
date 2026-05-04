@@ -25,10 +25,11 @@
 ## Files
 
 ### New files
-- `frontend/src/components/ui/Skeleton.jsx` — base shimmer primitive
 - `frontend/src/components/ScheduleSkeleton.jsx` — skeleton for the schedule/lineup view
 - `frontend/src/components/EventsPageSkeleton.jsx` — skeleton for the events listing page
-- `frontend/src/components/BandProfileSkeleton.jsx` — skeleton for the band profile page
+
+### New exports in existing files
+- `frontend/src/components/ui/Skeleton.jsx` — `BandProfileSkeleton` added here (not a separate file); also switched to shimmer animation
 
 ### Modified files
 - `frontend/src/index.css` — add `@keyframes shimmer` animation

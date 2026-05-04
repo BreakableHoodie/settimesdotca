@@ -1,5 +1,5 @@
 function SkeletonBlock({ className = '' }) {
-  return <div className={`bg-white/8 animate-shimmer rounded ${className}`} aria-hidden="true" />
+  return <div className={`animate-shimmer rounded ${className}`} aria-hidden="true" />
 }
 
 export function BandCardSkeleton() {

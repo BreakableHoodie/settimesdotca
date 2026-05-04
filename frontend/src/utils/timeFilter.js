@@ -197,7 +197,7 @@ export function getTimeFilterOptions() {
 /**
  * Check if a band is starting soon (within the specified threshold from current time)
  * @param {Object} band - Band object with startMs property
- * @param {number} currentTime - Current time in milliseconds (allows for time injection in tests)
+ * @param {Date|number} currentTime - Current time as a Date or ms timestamp; unary + coerces both (allows time injection in tests)
  * @param {number} thresholdMinutes - Minutes threshold (default: 30)
  * @returns {boolean} True if band starts within the threshold and hasn't already started
  */

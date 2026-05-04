@@ -61,9 +61,14 @@ function LiveContextBar({ eventData, currentTime, bands = [], selectedCount = 0 
 
   const lifecycle = useMemo(() => getLifecycleLabel(eventData?.date, currentTime), [currentTime, eventData?.date])
 
-  const daysUntil = lifecycle.label === 'Upcoming' && eventData?.date
-    ? Math.ceil((new Date(eventData.date + 'T00:00:00').getTime() - (+currentTime)) / 86400000)
-    : null
+  const daysUntil = (() => {
+    if (lifecycle.label !== 'Upcoming' || !eventData?.date) return null
+    const eventDateObj = new Date(eventData.date + 'T00:00:00')
+    const nowDate = currentTime instanceof Date ? currentTime : new Date(+currentTime)
+    const eventDay = Date.UTC(eventDateObj.getFullYear(), eventDateObj.getMonth(), eventDateObj.getDate())
+    const todayDay = Date.UTC(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate())
+    return Math.ceil((eventDay - todayDay) / 86400000)
+  })()
 
   if (!eventData?.name) {
     return null

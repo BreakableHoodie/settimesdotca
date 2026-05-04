@@ -1080,7 +1080,10 @@ export default function EventsTab({
       {/* Historical Import Modal */}
       {showHistoricalImport && (
         <HistoricalImportModal
-          onClose={() => setShowHistoricalImport(false)}
+          onClose={() => {
+            setShowHistoricalImport(false)
+            refreshEvents()
+          }}
           onImported={() => {
             setShowHistoricalImport(false)
             refreshEvents()

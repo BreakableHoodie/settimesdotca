@@ -61,7 +61,16 @@ export default function EventRecapPage() {
   }
 
   const { event, stats, bands } = data ?? {}
-  const eventDate = event?.date ? (parseLocalDate(event.date) ?? new Date(event.date)) : null
+
+  if (!event || !stats || !Array.isArray(bands)) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
+        <Alert variant="error">Event recap data is unavailable.</Alert>
+      </div>
+    )
+  }
+
+  const eventDate = event.date ? (parseLocalDate(event.date) ?? new Date(event.date)) : null
   const formattedDate = eventDate
     ? eventDate.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Date TBD'

@@ -61,6 +61,12 @@ function LiveContextBar({ eventData, currentTime, bands = [], selectedCount = 0 
 
   const lifecycle = useMemo(() => getLifecycleLabel(eventData?.date, currentTime), [currentTime, eventData?.date])
 
+  const daysUntil = useMemo(() => {
+    if (lifecycle.label !== 'Upcoming' || !eventData?.date) return null
+    const eventDateMs = new Date(eventData.date + 'T00:00:00').getTime()
+    return Math.ceil((eventDateMs - (+currentTime)) / 86_400_000)
+  }, [lifecycle.label, eventData?.date, currentTime])
+
   if (!eventData?.name) {
     return null
   }
@@ -106,6 +112,13 @@ function LiveContextBar({ eventData, currentTime, bands = [], selectedCount = 0 
                 {selectedCount} {selectedCount === 1 ? 'stop in route' : 'stops in route'}
               </span>
             </div>
+            {daysUntil !== null && (
+              <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-warning-400/35 bg-warning-400/10 px-3 py-2 text-warning-400 font-semibold">
+                <span aria-label={`${daysUntil} ${daysUntil === 1 ? 'day' : 'days'} until the event`}>
+                  ⏳ {daysUntil} {daysUntil === 1 ? 'day' : 'days'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -131,3 +131,4 @@ database/migration-*.sql
 band_crawl_schedule.json
 database/exports/
 /docs/code-review
+.superpowers/

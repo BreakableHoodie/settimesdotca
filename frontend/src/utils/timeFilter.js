@@ -195,6 +195,20 @@ export function getTimeFilterOptions() {
 }
 
 /**
+ * Check if a band is starting soon (within the specified threshold from current time)
+ * @param {Object} band - Band object with startMs property
+ * @param {number} currentTime - Current time in milliseconds (allows for time injection in tests)
+ * @param {number} thresholdMinutes - Minutes threshold (default: 30)
+ * @returns {boolean} True if band starts within the threshold and hasn't already started
+ */
+export function isStartingSoon(band, currentTime, thresholdMinutes = 30) {
+  if (!band.startMs) return false
+  const nowMs = +currentTime
+  const diff = band.startMs - nowMs
+  return diff > 0 && diff <= thresholdMinutes * 60_000
+}
+
+/**
  * Calculate duration in minutes between start and end times
  */
 function getDurationMinutes(startMs, endMs) {

@@ -76,11 +76,11 @@ function BandCard({
       </button>
 
       <div className="flex flex-col items-center gap-2 pr-10">
-          {startingSoon && !isPlaying && (
-            <span className="soon-pill" aria-label={`Starts in ${minutesUntil} minutes`}>
-              Starts in {minutesUntil}m
-            </span>
-          )}
+        {startingSoon && !isPlaying && (
+          <span className="soon-pill" aria-label={`Starts in ${minutesUntil} minutes`}>
+            Starts in {minutesUntil}m
+          </span>
+        )}
         <div className={`inline-block px-3 py-1.5 rounded-lg mb-1 ${isSelected ? 'bg-white/20' : 'bg-bg-navy/60'}`}>
           {band.name ? (
             <Link

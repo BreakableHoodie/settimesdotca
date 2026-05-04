@@ -17,10 +17,10 @@
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
-    "@axe-core/playwright": "^4.11.2",
+    "@axe-core/playwright": "^4.11.3",
     "@playwright/test": "^1.59.1",
     "@vitest/coverage-v8": "^4.1.5",
-    "baseline-browser-mapping": "^2.10.23",
+    "baseline-browser-mapping": "^2.10.27",
     "better-sqlite3": "^12.9.0",
     "vite": "^8.0.10",
     "vitest": "^4.1.5"

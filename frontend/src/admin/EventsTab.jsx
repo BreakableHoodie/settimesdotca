@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { eventsApi, bandsApi } from '../utils/adminApi'
 import { useEventContext } from '../contexts/EventContext'
 import EventFormModal from './EventFormModal'
+import HistoricalImportModal from './HistoricalImportModal'
 import EventStatusBadge from './components/EventStatusBadge'
 import EmbedCodeGenerator from './EmbedCodeGenerator'
 import MetricsDashboard from './MetricsDashboard'
@@ -397,6 +398,7 @@ export default function EventsTab({
 }) {
   const { refreshEvents } = useEventContext()
   const [showModal, setShowModal] = useState(false)
+  const [showHistoricalImport, setShowHistoricalImport] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
   // duplication flow simplified: startDuplicate will perform duplication directly
   const [showEmbedCode, setShowEmbedCode] = useState(null)
@@ -1050,6 +1052,14 @@ export default function EventsTab({
             />
             <span>Show Archived</span>
           </label>
+          {!readOnly && canArchiveEvents && (
+            <button
+              onClick={() => setShowHistoricalImport(true)}
+              className={`px-3 py-2 text-sm text-gray-300 hover:text-white border border-white/20 hover:border-white/40 rounded transition-colors min-h-[44px] ${buttonFocusClass}`}
+            >
+              Import historical event
+            </button>
+          )}
           {!readOnly && (
             <button
               onClick={() => {
@@ -1066,6 +1076,17 @@ export default function EventsTab({
 
       {/* Help Panel */}
       {showHelp && <HelpPanel topic="events" isOpen={showHelp} onClose={() => setShowHelp(false)} />}
+
+      {/* Historical Import Modal */}
+      {showHistoricalImport && (
+        <HistoricalImportModal
+          onClose={() => setShowHistoricalImport(false)}
+          onImported={() => {
+            setShowHistoricalImport(false)
+            refreshEvents()
+          }}
+        />
+      )}
 
       {/* Event Form Modal */}
       {!readOnly && (

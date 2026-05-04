@@ -205,7 +205,7 @@ export function isStartingSoon(band, currentTime, thresholdMinutes = 30) {
   if (!band.startMs) return false
   const nowMs = +currentTime
   const diff = band.startMs - nowMs
-  return diff > 0 && diff <= thresholdMinutes * 60_000
+  return diff > 0 && diff <= thresholdMinutes * 60000
 }
 
 /**

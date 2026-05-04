@@ -14,7 +14,7 @@ function BandCard({
   onRemove,
   warningType,
   warningText,
-  currentTime = Date.now(),
+  currentTime,
 }) {
   const handleToggle = () => {
     if (!clickable) return
@@ -38,7 +38,7 @@ function BandCard({
   const isPlaying = isHappeningNow(band)
   const nowMs = +currentTime
   const startingSoon = isStartingSoon(band, currentTime)
-  const minutesUntil = startingSoon ? Math.ceil((band.startMs - nowMs) / 60_000) : 0
+  const minutesUntil = startingSoon ? Math.ceil((band.startMs - nowMs) / 60000) : 0
 
   const baseClasses = `w-full p-4 rounded-xl transition-all duration-200 ${
     isSelected

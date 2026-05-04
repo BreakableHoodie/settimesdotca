@@ -730,7 +730,7 @@ export async function onRequestPatch(context) {
       ).bind(performanceId).first()
 
       if (perf) {
-        const { results: followers } = await DB.prepare(
+        const { results: followers = [] } = await DB.prepare(
           'SELECT email, unsubscribe_token FROM band_follows WHERE band_profile_id = ? AND verified = 1'
         ).bind(perf.band_profile_id).all()
 
@@ -748,7 +748,7 @@ export async function onRequestPatch(context) {
                 const unsubUrl = `${publicUrl}/api/bands/${perf.band_profile_id}/unfollow?token=${follower.unsubscribe_token}`
                 return sendEmail(env, {
                   to: follower.email,
-                  subject: `${escapeHtml(perf.band_name)} just joined the lineup for ${escapeHtml(perf.event_name)}!`,
+                  subject: `${perf.band_name} just joined the lineup for ${perf.event_name}!`,
                   text: `${perf.band_name} is now on the lineup for ${perf.event_name}.\n\nUnfollow: ${unsubUrl}`,
                   html: `<p><strong>${escapeHtml(perf.band_name)}</strong> is now on the lineup for <strong>${escapeHtml(perf.event_name)}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
                 })

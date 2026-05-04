@@ -101,7 +101,7 @@ export default function HistoricalImportModal({ onClose, onImported }) {
 
     const names = bandList
       .split('\n')
-      .map((n) => n.trim())
+      .map(n => n.trim())
       .filter(Boolean)
 
     if (names.length === 0) return
@@ -172,7 +172,10 @@ export default function HistoricalImportModal({ onClose, onImported }) {
                 errors[0]
               ) : (
                 <>
-                  <p>Import completed with {errors.length} failure{errors.length === 1 ? '' : 's'}. The following bands could not be added:</p>
+                  <p>
+                    Import completed with {errors.length} failure{errors.length === 1 ? '' : 's'}. The following bands
+                    could not be added:
+                  </p>
                   <ul className="mt-2 list-disc list-inside space-y-0.5">
                     {errors.map((msg, i) => (
                       <li key={i}>{msg}</li>
@@ -268,7 +271,7 @@ export default function HistoricalImportModal({ onClose, onImported }) {
                   onChange={e => setBandList(e.target.value)}
                   disabled={submitting}
                   rows={10}
-                  placeholder={"The Strokes\nArctic Monkeys\nPhoenix"}
+                  placeholder={'The Strokes\nArctic Monkeys\nPhoenix'}
                   className="w-full px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 disabled:opacity-50 font-mono text-sm resize-y"
                 />
                 <p className="text-xs text-white/50 mt-1">

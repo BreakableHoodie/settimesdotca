@@ -314,7 +314,7 @@ function App() {
         { replace: true }
       )
     }
-  }, [bands, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bands, searchParams, slug])
 
   const trackScheduleBuilds = async bandsToTrack => {
     if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {

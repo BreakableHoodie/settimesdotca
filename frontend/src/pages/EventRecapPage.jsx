@@ -7,12 +7,13 @@ import { parseLocalDate } from '../utils/timeFormat'
 
 function StatCard({ label, value }) {
   return (
-    <div
-      className="bg-white/5 rounded-lg p-4 text-center"
-      aria-label={`${label}: ${value ?? '—'}`}
-    >
-      <div className="text-3xl font-bold text-white" aria-hidden="true">{value ?? '—'}</div>
-      <div className="text-sm text-white/60 mt-1" aria-hidden="true">{label}</div>
+    <div className="bg-white/5 rounded-lg p-4 text-center" aria-label={`${label}: ${value ?? '—'}`}>
+      <div className="text-3xl font-bold text-white" aria-hidden="true">
+        {value ?? '—'}
+      </div>
+      <div className="text-sm text-white/60 mt-1" aria-hidden="true">
+        {label}
+      </div>
     </div>
   )
 }
@@ -85,10 +86,7 @@ export default function EventRecapPage() {
         />
       </Helmet>
 
-      <main
-        id="main-content"
-        className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple px-4 py-10"
-      >
+      <main id="main-content" className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple px-4 py-10">
         <div className="max-w-3xl mx-auto">
           {/* Header */}
           <header className="mb-8 text-center">
@@ -111,7 +109,7 @@ export default function EventRecapPage() {
               {bands.length === 0 ? (
                 <li className="text-white/50 text-sm py-4 text-center">No performers recorded for this event.</li>
               ) : (
-                bands.map((band) => (
+                bands.map(band => (
                   <li key={band.id} className="bg-white/5 rounded-lg p-4 flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <Link
@@ -120,12 +118,8 @@ export default function EventRecapPage() {
                       >
                         {band.name}
                       </Link>
-                      {band.genre && (
-                        <span className="ml-2 text-white/50 text-sm">{band.genre}</span>
-                      )}
-                      {band.venue_name && (
-                        <div className="text-white/50 text-sm mt-0.5">{band.venue_name}</div>
-                      )}
+                      {band.genre && <span className="ml-2 text-white/50 text-sm">{band.genre}</span>}
+                      {band.venue_name && <div className="text-white/50 text-sm mt-0.5">{band.venue_name}</div>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {band.is_returning === false && (

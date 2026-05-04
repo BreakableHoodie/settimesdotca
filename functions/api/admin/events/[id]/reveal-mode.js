@@ -48,15 +48,15 @@ export async function onRequestPost(context) {
 
     const newValue = body.reveal_mode ? 1 : 0;
     await DB.prepare(
-      "UPDATE events SET reveal_mode = ?, updated_at = datetime('now') WHERE id = ?"
+      "UPDATE events SET reveal_mode = ?, updated_at = datetime('now'), updated_by_user_id = ? WHERE id = ?"
     )
-      .bind(newValue, eventId)
+      .bind(newValue, currentUser.userId, eventId)
       .run();
 
     await auditLog(
       env,
       currentUser.userId,
-      newValue ? "event_reveal_mode_on" : "event_reveal_mode_off",
+      newValue ? "event.reveal_mode.on" : "event.reveal_mode.off",
       "event",
       eventId,
       { event_id: eventId },

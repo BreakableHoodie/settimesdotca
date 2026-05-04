@@ -476,7 +476,9 @@ function App() {
         />
       )}
       {!isArchived && <ComingUp bands={myBands} currentTime={effectiveNow} />}
-      <LiveContextBar eventData={eventData} currentTime={effectiveNow} bands={bands} selectedCount={myBands.length} />
+      {!isArchived && (
+        <LiveContextBar eventData={eventData} currentTime={effectiveNow} bands={bands} selectedCount={myBands.length} />
+      )}
       <main
         id="main-content"
         className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-4 sm:mt-6 space-y-6 sm:space-y-8"

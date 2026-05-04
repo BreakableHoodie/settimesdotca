@@ -76,8 +76,11 @@ function BandCard({
       </button>
 
       <div className="flex flex-col items-center gap-2 pr-10">
-        {startingSoon && !isPlaying && (
-          <span className="soon-pill" aria-label={`Starts in ${minutesUntil} minutes`}>
+        {startingSoon && (
+          <span
+            className="soon-pill"
+            aria-label={`Starts in ${minutesUntil} ${minutesUntil === 1 ? 'minute' : 'minutes'}`}
+          >
             Starts in {minutesUntil}m
           </span>
         )}

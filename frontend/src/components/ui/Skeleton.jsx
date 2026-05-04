@@ -58,8 +58,13 @@ export function EventCardSkeletonList({ count = 3 }) {
 
 export function BandProfileSkeleton() {
   return (
-    <div className="min-h-screen py-8 px-4" role="status" aria-label="Loading band profile">
-      <div className="max-w-3xl mx-auto space-y-8">
+    <div className="min-h-screen" role="status" aria-label="Loading band profile">
+      <div className="sticky top-0 z-50 border-b border-white/10 bg-bg-navy/95">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="h-14" aria-hidden="true" />
+        </div>
+      </div>
+      <div className="container mx-auto px-4 pt-4 pb-8 max-w-6xl space-y-8">
         <div className="flex items-center gap-6">
           <SkeletonBlock className="w-24 h-24 rounded-full flex-shrink-0" />
           <div className="flex-1 space-y-3">

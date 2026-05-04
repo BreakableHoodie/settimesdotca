@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { createTestEnv, insertBand, insertEvent } from '../../test-utils'
 import * as followHandler from '../[name]/follow.js'
 
+const waitUntil = () => {}
+
 describe('POST /api/bands/:name/follow', () => {
   it('creates a band follow for a valid email and band', async () => {
     const { env, rawDb } = createTestEnv()
@@ -13,7 +15,7 @@ describe('POST /api/bands/:name/follow', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'fan@example.com' }),
     })
-    const res = await followHandler.onRequestPost({ request: req, env, params: { name: String(band.band_profile_id) } })
+    const res = await followHandler.onRequestPost({ request: req, env, params: { name: String(band.band_profile_id) }, waitUntil })
 
     expect(res.status).toBe(200)
     const data = await res.json()
@@ -36,7 +38,7 @@ describe('POST /api/bands/:name/follow', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'not-an-email' }),
     })
-    const res = await followHandler.onRequestPost({ request: req, env, params: { name: String(band.band_profile_id) } })
+    const res = await followHandler.onRequestPost({ request: req, env, params: { name: String(band.band_profile_id) }, waitUntil })
     expect(res.status).toBe(400)
   })
 
@@ -54,7 +56,7 @@ describe('POST /api/bands/:name/follow', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'fan@example.com' }),
     })
-    const res = await followHandler.onRequestPost({ request: req, env, params: { name: String(band.band_profile_id) } })
+    const res = await followHandler.onRequestPost({ request: req, env, params: { name: String(band.band_profile_id) }, waitUntil })
     expect(res.status).toBe(200)
 
     const rows = rawDb.prepare('SELECT * FROM band_follows WHERE email=? AND band_profile_id=?')
@@ -70,7 +72,7 @@ describe('POST /api/bands/:name/follow', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'fan@example.com' }),
     })
-    const res = await followHandler.onRequestPost({ request: req, env, params: { name: '99999' } })
+    const res = await followHandler.onRequestPost({ request: req, env, params: { name: '99999' }, waitUntil })
     expect(res.status).toBe(404)
   })
 })

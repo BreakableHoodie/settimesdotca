@@ -48,7 +48,7 @@ async function verifyTurnstile(request, env, token) {
 }
 
 export async function onRequestPost(context) {
-  const { request, env, params } = context;
+  const { request, env, params, waitUntil } = context;
   const { DB } = env;
 
   try {
@@ -109,18 +109,21 @@ export async function onRequestPost(context) {
     if (result.meta.changes > 0 && isEmailConfigured(env)) {
       const publicUrl = env.PUBLIC_URL || "https://settimes.ca";
       const unsubUrl = `${publicUrl}/api/bands/${band.id}/unfollow?token=${unsubscribeToken}`;
-      sendEmail(env, {
-        to: email,
-        subject: `You're following ${band.name} on SetTimes`,
-        text: `You'll be notified when ${band.name} joins a lineup.\n\nUnfollow: ${unsubUrl}`,
-        html: `<p>You'll be notified when <strong>${escapeHtml(band.name)}</strong> joins a lineup.</p><p><a href="${unsubUrl}">Unfollow</a></p>`,
-      }).then(result => {
-        if (!result?.delivered) {
-          console.warn("[band-follow] Confirmation email not delivered:", result?.reason);
-        }
-      }).catch(err => {
-        console.error("[band-follow] Failed to send confirmation email:", err);
-      });
+      // Use waitUntil so the Worker stays alive for the email after the response is returned.
+      waitUntil(
+        sendEmail(env, {
+          to: email,
+          subject: `You're following ${band.name} on SetTimes`,
+          text: `You'll be notified when ${band.name} joins a lineup.\n\nUnfollow: ${unsubUrl}`,
+          html: `<p>You'll be notified when <strong>${escapeHtml(band.name)}</strong> joins a lineup.</p><p><a href="${unsubUrl}">Unfollow</a></p>`,
+        }).then(result => {
+          if (!result?.delivered) {
+            console.warn("[band-follow] Confirmation email not delivered:", result?.reason);
+          }
+        }).catch(err => {
+          console.error("[band-follow] Failed to send confirmation email:", err);
+        })
+      );
     }
 
     return new Response(JSON.stringify({ success: true }), {

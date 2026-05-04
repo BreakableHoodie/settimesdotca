@@ -18,7 +18,7 @@ export async function onRequestGet(context) {
 
     return new Response(
       '<html><body style="font-family:sans-serif;padding:2rem"><h2>Unfollowed</h2><p>You have been removed from this band\'s follower list.</p></body></html>',
-      { status: 200, headers: { 'Content-Type': 'text/html' } }
+      { status: 200, headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } }
     )
   } catch (err) {
     console.error('[band-unfollow] Error:', err)

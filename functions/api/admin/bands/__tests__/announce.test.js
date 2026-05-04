@@ -91,6 +91,11 @@ describe('PATCH /api/admin/bands/:id - announce toggle', () => {
 
   it('sets band_follow_notified=1 when band is announced and followers exist', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    env.EMAIL_PROVIDER = 'mailchannels'
+    env.EMAIL_FROM = 'noreply@settimes.ca'
+    // Stub fetch so sendEmail resolves without a real network call.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 202 }))
+
     const ev = insertEvent(rawDb, { name: 'Vol6', slug: 'vol6-notify' })
     rawDb.prepare('UPDATE events SET reveal_mode=1 WHERE id=?').run(ev.id)
     const venue = insertVenue(rawDb, { name: 'Venue N' })
@@ -112,8 +117,8 @@ describe('PATCH /api/admin/bands/:id - announce toggle', () => {
       data: { user: { role: 'editor', id: 2 } },
     })
 
-    // Email is fire-and-forget and skipped (no EMAIL_FROM in test env).
-    // Assert the DB dedup flag was set.
+    vi.unstubAllGlobals()
+
     const row = rawDb.prepare('SELECT band_follow_notified FROM performances WHERE id=?').get(band.id)
     expect(row.band_follow_notified).toBe(1)
   })

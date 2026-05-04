@@ -734,14 +734,15 @@ export async function onRequestPatch(context) {
           'SELECT email, unsubscribe_token FROM band_follows WHERE band_profile_id = ? AND verified = 1'
         ).bind(perf.band_profile_id).all()
 
-        if (followers.length > 0) {
+        if (followers.length > 0 && isEmailConfigured(env)) {
           // Atomic claim: only the first concurrent request sees changes > 0.
-          // band_follow_notified stays 0 if no followers existed — preserving future notification eligibility.
+          // Latch is only set when email is actually configured — if email is temporarily
+          // misconfigured, band_follow_notified stays 0 so notifications can fire later.
           const claimed = await DB.prepare(
             'UPDATE performances SET band_follow_notified = 1 WHERE id = ? AND band_follow_notified = 0'
           ).bind(performanceId).run()
 
-          if (claimed.meta.changes > 0 && isEmailConfigured(env)) {
+          if (claimed.meta.changes > 0) {
             const publicUrl = env.PUBLIC_URL || 'https://settimes.ca'
             const emailResults = await Promise.allSettled(
               followers.map(follower => {

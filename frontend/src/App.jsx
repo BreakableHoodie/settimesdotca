@@ -10,7 +10,9 @@ import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
 import PrivacyBanner from './components/PrivacyBanner'
 import ConfirmDialog from './components/ui/ConfirmDialog'
+import LiveContextBar from './components/LiveContextBar'
 import ScheduleView from './components/ScheduleView'
+import ScheduleSkeleton from './components/ScheduleSkeleton'
 import { trackEventView, trackPageView } from './utils/metrics'
 import { validateBandsData } from './utils/validation'
 
@@ -393,11 +395,7 @@ function App() {
   })()
 
   if (shouldShowLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-accent-400 text-xl">Loading...</div>
-      </div>
-    )
+    return <ScheduleSkeleton />
   }
 
   if (error) {
@@ -478,6 +476,9 @@ function App() {
         />
       )}
       {!isArchived && <ComingUp bands={myBands} currentTime={effectiveNow} />}
+      {!isArchived && (
+        <LiveContextBar eventData={eventData} currentTime={effectiveNow} bands={bands} selectedCount={myBands.length} />
+      )}
       <main
         id="main-content"
         className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-4 sm:mt-6 space-y-6 sm:space-y-8"

@@ -505,6 +505,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                     onRemove={onToggleBand}
                     showVenue={true}
                     clickable={false}
+                    currentTime={effectiveNow}
                     warningType={(() => {
                       if (hasOverlap) return 'overlap'
                       if (hasConflict) return 'conflict'

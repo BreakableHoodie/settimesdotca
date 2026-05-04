@@ -11,6 +11,11 @@ import {
   sanitizeString,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
+import { sendEmail, isEmailConfigured } from '../../../utils/email.js'
+
+const escapeHtml = s => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
 // Helper to extract band ID from path
 function getBandId(request) {
@@ -657,6 +662,150 @@ export async function onRequestPut(context) {
         headers: { "Content-Type": "application/json" },
       },
     );
+  }
+}
+
+// PATCH - Toggle is_announced for a performance
+export async function onRequestPatch(context) {
+  const { request, env } = context
+  const { DB } = env
+
+  const permCheck = await checkPermission(context, 'editor')
+  if (permCheck.error) {
+    return permCheck.response
+  }
+
+  const user = permCheck.user
+  const ipAddress = getClientIP(request)
+
+  try {
+    const performanceId = getBandId(request)
+    if (!performanceId || isNaN(performanceId)) {
+      return new Response(
+        JSON.stringify({ error: 'Bad request', message: 'Invalid performance ID' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const body = await request.json().catch(() => ({}))
+    if (typeof body.is_announced !== 'boolean') {
+      return new Response(
+        JSON.stringify({ error: 'Bad request', message: 'is_announced (boolean) is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const performance = await DB.prepare(
+      'SELECT id, is_announced, band_follow_notified FROM performances WHERE id = ?'
+    ).bind(performanceId).first()
+
+    if (!performance) {
+      return new Response(
+        JSON.stringify({ error: 'Not found', message: 'Performance not found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const linkedEvent = await getEventForPerformance(DB, performanceId)
+    if (linkedEvent?.status === 'archived') {
+      return new Response(
+        JSON.stringify({ error: 'Validation error', message: 'Archived event performances cannot be edited.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const newValue = body.is_announced ? 1 : 0
+    await DB.prepare(
+      "UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?"
+    ).bind(newValue, performanceId).run()
+
+    // Notify band followers on first 0 → 1 transition only
+    if (newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified) {
+      const perf = await DB.prepare(
+        `SELECT p.band_profile_id, bp.name as band_name, e.name as event_name
+         FROM performances p
+         JOIN band_profiles bp ON p.band_profile_id = bp.id
+         JOIN events e ON p.event_id = e.id
+         WHERE p.id = ?`
+      ).bind(performanceId).first()
+
+      if (perf) {
+        const { results: followers = [] } = await DB.prepare(
+          'SELECT email, unsubscribe_token FROM band_follows WHERE band_profile_id = ? AND verified = 1'
+        ).bind(perf.band_profile_id).all()
+
+        if (followers.length > 0 && isEmailConfigured(env)) {
+          // Atomic claim: only the first concurrent request sees changes > 0.
+          // Latch is only set when email is actually configured — if email is temporarily
+          // misconfigured, band_follow_notified stays 0 so notifications can fire later.
+          const claimed = await DB.prepare(
+            'UPDATE performances SET band_follow_notified = 1 WHERE id = ? AND band_follow_notified = 0'
+          ).bind(performanceId).run()
+
+          if (claimed.meta.changes > 0) {
+            const publicUrl = env.PUBLIC_URL || 'https://settimes.ca'
+            const emailResults = await Promise.allSettled(
+              followers.map(follower => {
+                const unsubUrl = `${publicUrl}/api/bands/${perf.band_profile_id}/unfollow?token=${follower.unsubscribe_token}`
+                return sendEmail(env, {
+                  to: follower.email,
+                  subject: `${perf.band_name} just joined the lineup for ${perf.event_name}!`,
+                  text: `${perf.band_name} is now on the lineup for ${perf.event_name}.\n\nUnfollow: ${unsubUrl}`,
+                  html: `<p><strong>${escapeHtml(perf.band_name)}</strong> is now on the lineup for <strong>${escapeHtml(perf.event_name)}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
+                })
+              })
+            )
+            // sendEmail returns {delivered:false} on failure rather than throwing — filter both rejection types
+            const failedCount = emailResults.filter(
+              r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value?.delivered)
+            ).length
+            if (failedCount > 0) {
+              await auditLog(
+                env,
+                user.userId,
+                'performance.announced.email_failure',
+                'performance',
+                Number(performanceId),
+                { failed_count: failedCount, band_name: perf.band_name },
+                ipAddress
+              ).catch(() => {})
+            }
+          }
+        }
+      }
+    }
+
+    await auditLog(
+      env,
+      user.userId,
+      newValue ? 'performance.announced' : 'performance.unannounced',
+      'performance',
+      Number(performanceId),
+      { is_announced: newValue, changedBy: user.email },
+      ipAddress
+    )
+
+    const updated = await DB.prepare(
+      'SELECT band_follow_notified FROM performances WHERE id = ?'
+    ).bind(performanceId).first()
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        performance: {
+          id: Number(performanceId),
+          is_announced: newValue,
+          band_follow_notified: updated?.band_follow_notified ?? 0,
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    console.error('Error toggling is_announced:', error)
+    return new Response(
+      JSON.stringify({ error: 'Database error', message: 'Failed to update performance' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
   }
 }
 

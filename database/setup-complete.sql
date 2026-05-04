@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS events (
   venue_info TEXT,
   social_links TEXT,
   theme_colors TEXT,
+  reveal_mode INTEGER NOT NULL DEFAULT 0,
   created_by_user_id INTEGER,
   updated_by_user_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -78,6 +79,8 @@ CREATE TABLE IF NOT EXISTS performances (
   band_id INTEGER,
   band_name TEXT,
   stage TEXT,
+  is_announced INTEGER NOT NULL DEFAULT 1,
+  band_follow_notified INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   created_by_user_id INTEGER,
   updated_by_user_id INTEGER,
@@ -345,6 +348,19 @@ CREATE TABLE IF NOT EXISTS rate_limit (
   lockout_until TEXT,
   last_attempt TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS band_follows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  band_profile_id INTEGER NOT NULL REFERENCES band_profiles(id) ON DELETE CASCADE,
+  verified INTEGER NOT NULL DEFAULT 0,
+  verification_token TEXT UNIQUE,
+  unsubscribe_token TEXT UNIQUE NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(email, band_profile_id)
+);
+CREATE INDEX IF NOT EXISTS idx_band_follows_band ON band_follows(band_profile_id);
+CREATE INDEX IF NOT EXISTS idx_band_follows_email ON band_follows(email);
 
 -- ============================================
 -- INDEXES

@@ -27,6 +27,7 @@ import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
 
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
+const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
 
 const NBSP_ENTITY_REGEX = /&nbsp;|&#160;|&#xA0;/gi
@@ -145,6 +146,14 @@ export default function BandProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [scheduleSelections, setScheduleSelections] = useState({}) // { eventSlug: Set of bandIds }
+  const [followEmail, setFollowEmail] = useState('')
+  const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'loading' | 'success' | 'error'
+  const [followError, setFollowError] = useState('')
+  const turnstileContainerRef = useRef(null)
+  const turnstileWidgetIdRef = useRef(null)
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+  const turnstileEnabled = Boolean(turnstileSiteKey)
+  const [turnstileToken, setTurnstileToken] = useState('')
   const [userHasSchedule] = useState(() => hasAnySchedule())
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
 
@@ -280,6 +289,101 @@ export default function BandProfilePage() {
     },
     [scheduleSelections, profile?.name]
   )
+
+  useEffect(() => {
+    if (!turnstileEnabled) {
+      return undefined
+    }
+
+    let cancelled = false
+    let scriptElement = document.querySelector('script[data-turnstile-script="true"]')
+
+    const renderTurnstile = () => {
+      if (cancelled || !window.turnstile || !turnstileContainerRef.current) {
+        return
+      }
+      if (turnstileWidgetIdRef.current !== null) {
+        return
+      }
+
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: turnstileSiteKey,
+        callback: token => {
+          setTurnstileToken(token)
+        },
+        'expired-callback': () => {
+          setTurnstileToken('')
+        },
+        'error-callback': () => {
+          setTurnstileToken('')
+        },
+      })
+    }
+
+    if (scriptElement) {
+      if (window.turnstile) {
+        renderTurnstile()
+      } else {
+        scriptElement.addEventListener('load', renderTurnstile)
+      }
+    } else {
+      const script = document.createElement('script')
+      script.src = TURNSTILE_SCRIPT_SRC
+      script.async = true
+      script.defer = true
+      script.setAttribute('data-turnstile-script', 'true')
+      script.addEventListener('load', renderTurnstile)
+      document.head.appendChild(script)
+      scriptElement = script
+    }
+
+    return () => {
+      cancelled = true
+      if (scriptElement) {
+        scriptElement.removeEventListener('load', renderTurnstile)
+      }
+      if (window.turnstile && turnstileWidgetIdRef.current !== null) {
+        window.turnstile.remove(turnstileWidgetIdRef.current)
+        turnstileWidgetIdRef.current = null
+      }
+    }
+  }, [turnstileEnabled, turnstileSiteKey])
+
+  const submitFollow = async e => {
+    e.preventDefault()
+    if (!followEmail.trim()) return
+    if (turnstileEnabled && !turnstileToken) {
+      setFollowStatus('error')
+      setFollowError('Please complete the bot verification challenge.')
+      return
+    }
+    setFollowStatus('loading')
+    setFollowError('')
+    try {
+      const res = await fetch(`/api/bands/${profile.id}/follow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: followEmail.trim(), turnstileToken }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Something went wrong')
+      }
+      setFollowStatus('success')
+      setTurnstileToken('')
+      if (turnstileEnabled && window.turnstile && turnstileWidgetIdRef.current !== null) {
+        window.turnstile.reset(turnstileWidgetIdRef.current)
+      }
+    } catch (err) {
+      setFollowStatus('error')
+      setFollowError(err.message)
+      setTurnstileToken('')
+      if (turnstileEnabled && window.turnstile && turnstileWidgetIdRef.current !== null) {
+        window.turnstile.reset(turnstileWidgetIdRef.current)
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-bg-navy flex items-center justify-center">
@@ -539,6 +643,41 @@ export default function BandProfilePage() {
                 !profile.description && <p className="text-white/30 text-sm italic">No links added yet.</p>
               )}
             </div>
+          </div>
+
+          {/* Follow band */}
+          <div className="mt-6 p-4 rounded-lg bg-white/5 border border-white/10">
+            <h3 className="text-sm font-semibold text-text-primary mb-1">Follow {profile.name}</h3>
+            <p className="text-xs text-text-secondary mb-3">Get notified when they join a new lineup.</p>
+            {followStatus === 'success' ? (
+              <p className="text-sm text-green-400">
+                <FontAwesomeIcon icon={faCheck} className="mr-1.5" />
+                You&apos;re following {profile.name}! We&apos;ll email you when they join a lineup.
+              </p>
+            ) : (
+              <form onSubmit={submitFollow} className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={followEmail}
+                    onChange={e => setFollowEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    required
+                    className="flex-1 px-3 py-2 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
+                    aria-label={`Email to follow ${profile.name}`}
+                  />
+                  <Button
+                    type="submit"
+                    disabled={followStatus === 'loading' || (turnstileEnabled && !turnstileToken)}
+                    size="sm"
+                  >
+                    {followStatus === 'loading' ? 'Saving…' : 'Follow'}
+                  </Button>
+                </div>
+                {turnstileEnabled && <div ref={turnstileContainerRef} className="mt-2" />}
+              </form>
+            )}
+            {followStatus === 'error' && <p className="text-xs text-red-400 mt-1">{followError}</p>}
           </div>
 
           {/* Two Column Layout: Stats/Facts + Shows */}

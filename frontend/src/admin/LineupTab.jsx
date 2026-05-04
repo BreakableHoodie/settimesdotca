@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
 import { bandsApi, venuesApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
@@ -21,7 +23,7 @@ import {
  */
 export default function LineupTab({
   selectedEventId,
-  selectedEvent: _selectedEvent,
+  selectedEvent,
   events,
   showToast,
   onEventFilterChange: _onEventFilterChange,
@@ -64,6 +66,7 @@ export default function LineupTab({
     facebook: '',
   })
   const [submitting, setSubmitting] = useState(false)
+  const [togglingId, setTogglingId] = useState(null)
   const [serverConflicts, setServerConflicts] = useState([])
 
   // Selected IDs for bulk delete within event
@@ -350,6 +353,18 @@ export default function LineupTab({
         }
       },
     })
+  }
+
+  const toggleAnnounced = async (performanceId, currentValue) => {
+    setTogglingId(performanceId)
+    try {
+      await bandsApi.patch(performanceId, { is_announced: currentValue !== 1 })
+      await loadData()
+    } catch (err) {
+      showToast(err.message || 'Failed to update announced status', 'error')
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   const startEdit = band => {
@@ -694,7 +709,7 @@ export default function LineupTab({
                         return (
                           <tr
                             key={band.id}
-                            className={`hover:bg-bg-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
+                            className={`hover:bg-bg-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
                           >
                             {!readOnly && (
                               <td className="px-4 py-3">
@@ -720,6 +735,23 @@ export default function LineupTab({
                             </td>
                             {!readOnly && (
                               <td className="px-4 py-3 flex justify-end gap-2">
+                                {selectedEvent?.reveal_mode === 1 && (
+                                  <button
+                                    onClick={() => toggleAnnounced(band.id, band.is_announced)}
+                                    disabled={togglingId === band.id}
+                                    title={
+                                      band.is_announced ? 'Announced — click to hide' : 'Hidden — click to announce'
+                                    }
+                                    className={`p-1.5 rounded transition-colors ${
+                                      band.is_announced
+                                        ? 'text-green-400 hover:text-green-300'
+                                        : 'text-white/30 hover:text-white/60'
+                                    } ${togglingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
+                                  >
+                                    <FontAwesomeIcon icon={band.is_announced ? faEye : faEyeSlash} />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => startEdit(band)}
                                   className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
@@ -760,7 +792,7 @@ export default function LineupTab({
                     return (
                       <div
                         key={band.id}
-                        className={`px-4 py-3 space-y-2 ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
+                        className={`px-4 py-3 space-y-2 ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <label className="flex items-center gap-3 text-white">
@@ -788,6 +820,21 @@ export default function LineupTab({
                         </div>
                         {!readOnly && (
                           <div className="flex flex-wrap gap-2">
+                            {selectedEvent?.reveal_mode === 1 && (
+                              <button
+                                onClick={() => toggleAnnounced(band.id, band.is_announced)}
+                                disabled={togglingId === band.id}
+                                title={band.is_announced ? 'Announced — click to hide' : 'Hidden — click to announce'}
+                                className={`p-1.5 rounded transition-colors ${
+                                  band.is_announced
+                                    ? 'text-green-400 hover:text-green-300'
+                                    : 'text-white/30 hover:text-white/60'
+                                } ${togglingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
+                              >
+                                <FontAwesomeIcon icon={band.is_announced ? faEye : faEyeSlash} />
+                              </button>
+                            )}
                             <button
                               onClick={() => startEdit(band)}
                               className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"

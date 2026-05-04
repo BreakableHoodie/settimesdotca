@@ -62,7 +62,7 @@ function ScheduleView({
     const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
     const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
     if (aTime === bTime) {
-      return a.venue.localeCompare(b.venue)
+      return (a.venue ?? '').localeCompare(b.venue ?? '')
     }
     return aTime - bTime
   })
@@ -83,7 +83,7 @@ function ScheduleView({
     })
 
     grouped.forEach(group => {
-      group.bands.sort((a, b) => a.venue.localeCompare(b.venue))
+      group.bands.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
     })
 
     return grouped
@@ -119,7 +119,7 @@ function ScheduleView({
   })
 
   // Sort Now Playing by venue only (no time grouping)
-  nowPlaying.sort((a, b) => a.venue.localeCompare(b.venue))
+  nowPlaying.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
 
   // Group upcoming and past bands by time
   const upcomingByTime = groupByTime(upcomingBands)

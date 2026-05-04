@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 const MAX_ERROR_OUTPUT_LENGTH = 500;
 
 const REQUIRED_SCHEMA = {
-  events: ['id', 'slug', 'city', 'is_published'],
+  events: ['id', 'slug', 'city', 'is_published', 'reveal_mode'],
   venues: ['id', 'name', 'city'],
   band_profiles: ['id', 'name', 'name_normalized', 'genre', 'photo_url'],
   performances: [
@@ -20,6 +20,8 @@ const REQUIRED_SCHEMA = {
     'band_profile_id',
     'start_time',
     'end_time',
+    'is_announced',
+    'band_follow_notified',
   ],
   users: [
     'id',
@@ -68,6 +70,15 @@ const REQUIRED_SCHEMA = {
   trusted_devices: ['id', 'token', 'user_id', 'expires_at'],
   email_otp_codes: ['id', 'user_id', 'code_hash', 'expires_at', 'verified'],
   audit_log: ['id', 'user_id', 'action', 'resource_type', 'created_at'],
+  band_follows: [
+    'id',
+    'email',
+    'band_profile_id',
+    'verified',
+    'verification_token',
+    'unsubscribe_token',
+    'created_at',
+  ],
 };
 
 const wranglerBin = path.join(

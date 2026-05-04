@@ -11,6 +11,7 @@ import {
   faFaceSmile,
   faGuitar,
   faHourglassHalf,
+  faLink,
   faMusic,
   faPersonWalking,
   faPizzaSlice,
@@ -30,6 +31,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false)
+  const [shareButtonLabel, setShareButtonLabel] = useState('Share Schedule')
 
   // Update current time every minute
   useEffect(() => {
@@ -310,6 +312,25 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     return copyToClipboard(text)
   }
 
+  const handleShareSchedule = async () => {
+    const performanceIds = bands
+      .map(band => {
+        const parts = band.id.split('-')
+        return parts[parts.length - 1]
+      })
+      .filter(id => /^\d+$/.test(id))
+      .join(',')
+
+    if (!performanceIds) return
+
+    const url = `${window.location.origin}${window.location.pathname}?s=${performanceIds}`
+    const success = await copyToClipboard(url)
+    if (success) {
+      setShareButtonLabel('Link Copied!')
+      setTimeout(() => setShareButtonLabel('Share Schedule'), 2000)
+    }
+  }
+
   return (
     <div className="py-6 space-y-6 sm:space-y-8">
       <div className="max-w-5xl mx-auto space-y-4">
@@ -366,6 +387,17 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                 <FontAwesomeIcon icon={copyButtonLabel === 'Copied!' ? faCheck : faCopy} aria-hidden="true" />
                 <span className="transition-opacity duration-200 ease-in-out">{copyButtonLabel}</span>
               </button>
+              {bands.length > 0 && (
+                <button
+                  onClick={handleShareSchedule}
+                  className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
+                  title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Share your schedule'}
+                  aria-label="Copy shareable link to your schedule"
+                >
+                  <FontAwesomeIcon icon={shareButtonLabel === 'Link Copied!' ? faCheck : faLink} aria-hidden="true" />
+                  <span className="transition-opacity duration-200 ease-in-out">{shareButtonLabel}</span>
+                </button>
+              )}
               <button
                 onClick={onClearSchedule}
                 className="text-xs px-3 py-1.5 rounded bg-red-500/20 border border-red-500/50 text-red-200 flex items-center gap-2 transition-transform duration-150 hover:bg-red-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300"

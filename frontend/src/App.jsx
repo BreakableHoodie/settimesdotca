@@ -11,6 +11,7 @@ import OfflineIndicator from './components/OfflineIndicator'
 import PrivacyBanner from './components/PrivacyBanner'
 import ConfirmDialog from './components/ui/ConfirmDialog'
 import ScheduleView from './components/ScheduleView'
+import ScheduleSkeleton from './components/ScheduleSkeleton'
 import { trackEventView, trackPageView } from './utils/metrics'
 import { validateBandsData } from './utils/validation'
 
@@ -393,11 +394,7 @@ function App() {
   })()
 
   if (shouldShowLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-accent-400 text-xl">Loading...</div>
-      </div>
-    )
+    return <ScheduleSkeleton />
   }
 
   if (error) {

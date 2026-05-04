@@ -222,17 +222,8 @@ export function validateBandsData(data) {
     if (!band.name || typeof band.name !== 'string') {
       return { valid: false, error: 'Each band must have a name string' }
     }
-    if (!band.venue || typeof band.venue !== 'string') {
-      return { valid: false, error: 'Each band must have a venue string' }
-    }
     if (!band.date || typeof band.date !== 'string') {
       return { valid: false, error: 'Each band must have a date string' }
-    }
-    if (!band.startTime || typeof band.startTime !== 'string') {
-      return { valid: false, error: 'Each band must have a startTime string' }
-    }
-    if (!band.endTime || typeof band.endTime !== 'string') {
-      return { valid: false, error: 'Each band must have an endTime string' }
     }
   }
 

@@ -127,7 +127,7 @@ async function fetchWithCSRFRetry(url, options = {}, retries = 1) {
     return response
   }
 
-  let payload = null
+  let payload
   try {
     payload = await response.clone().json()
   } catch (_error) {

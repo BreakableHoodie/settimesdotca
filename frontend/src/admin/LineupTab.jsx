@@ -17,6 +17,14 @@ import {
   sortBandsByStart,
 } from './utils/timeUtils'
 
+function SortIcon({ col, sortConfig }) {
+  return (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
+}
+
 /**
  * LineupTab - Manage Event Schedule
  * Replaces the event-mode of BandsTab.
@@ -458,11 +466,6 @@ export default function LineupTab({
     }))
   }
 
-  const SortIcon = ({ col }) => (
-    <span className="ml-1 inline-block w-4">
-      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-    </span>
-  )
 
   const formConflicts = useMemo(() => {
     if (!formData.venue_id || !formData.start_time || !formData.end_time) return []
@@ -659,7 +662,7 @@ export default function LineupTab({
                               : 'none'
                           }
                         >
-                          Performer <SortIcon col="name" />
+                          Performer <SortIcon col="name" sortConfig={sortConfig} />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
@@ -672,7 +675,7 @@ export default function LineupTab({
                               : 'none'
                           }
                         >
-                          Venue <SortIcon col="venue" />
+                          Venue <SortIcon col="venue" sortConfig={sortConfig} />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
@@ -685,7 +688,7 @@ export default function LineupTab({
                               : 'none'
                           }
                         >
-                          Time <SortIcon col="start_time" />
+                          Time <SortIcon col="start_time" sortConfig={sortConfig} />
                         </th>
                         <th
                           className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
@@ -698,7 +701,7 @@ export default function LineupTab({
                               : 'none'
                           }
                         >
-                          Duration <SortIcon col="duration" />
+                          Duration <SortIcon col="duration" sortConfig={sortConfig} />
                         </th>
                         {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                       </tr>

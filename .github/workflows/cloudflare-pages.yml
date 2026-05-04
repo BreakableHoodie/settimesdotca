@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: 20
+  NODE_VERSION: 22
   PAGES_PROJECT_NAME: ${{ vars.CF_PAGES_PROJECT_NAME || 'settimesdotca' }}
 
 jobs:

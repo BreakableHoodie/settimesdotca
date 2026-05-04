@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { bandsApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
@@ -6,6 +6,88 @@ import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../u
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGlobe } from '@fortawesome/free-solid-svg-icons'
 import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
+
+function parseSocialLinks(band) {
+  let links = {}
+  try {
+    links = typeof band.social_links === 'string' ? JSON.parse(band.social_links) : band.social_links || {}
+  } catch (_e) {
+    /* ignore */
+  }
+  return links
+}
+
+function SocialLinksIcons({ band }) {
+  const links = parseSocialLinks(band)
+  const websiteHref = safeExternalHref(links.website)
+  const instagramHref = safeInstagramHref(links.instagram)
+  const bandcampHref = safeHttpsFallbackHref(links.bandcamp)
+  const facebookHref = safeExternalHref(links.facebook)
+  const hasAnyLink = [websiteHref, instagramHref, bandcampHref, facebookHref].some(href => href !== '#')
+
+  if (!hasAnyLink) return <span className="text-white/30">-</span>
+
+  return (
+    <div className="flex gap-2">
+      {websiteHref !== '#' && (
+        <a
+          href={websiteHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-accent-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
+          title="Website"
+          aria-label={`Open website for ${band.name}`}
+        >
+          <FontAwesomeIcon icon={faGlobe} />
+        </a>
+      )}
+      {instagramHref !== '#' && (
+        <a
+          href={instagramHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-pink-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-400"
+          title="Instagram"
+          aria-label={`Open Instagram for ${band.name}`}
+        >
+          <FontAwesomeIcon icon={faInstagram} />
+        </a>
+      )}
+      {bandcampHref !== '#' && (
+        <a
+          href={bandcampHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-teal-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
+          title="Bandcamp"
+          aria-label={`Open Bandcamp for ${band.name}`}
+        >
+          <FontAwesomeIcon icon={faBandcamp} />
+        </a>
+      )}
+      {facebookHref !== '#' && (
+        <a
+          href={facebookHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-blue-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+          title="Facebook"
+          aria-label={`Open Facebook for ${band.name}`}
+        >
+          <FontAwesomeIcon icon={faFacebook} />
+        </a>
+      )}
+    </div>
+  )
+}
+
+function SortIcon({ col, sortConfig }) {
+  return (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
+}
 
 /**
  * RosterTab - Manage Global Artist Roster (Band Profiles)
@@ -373,87 +455,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
     }
   }
 
-  const SortIcon = ({ col }) => (
-    <span className="ml-1 inline-block w-4">
-      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-    </span>
-  )
-
-  // Parse social links and render icons
-  const parseSocialLinks = band => {
-    let links = {}
-    try {
-      links = typeof band.social_links === 'string' ? JSON.parse(band.social_links) : band.social_links || {}
-    } catch (_e) {
-      /* ignore */
-    }
-    return links
-  }
-
-  const SocialLinksIcons = ({ band }) => {
-    const links = parseSocialLinks(band)
-    const websiteHref = safeExternalHref(links.website)
-    const instagramHref = safeInstagramHref(links.instagram)
-    const bandcampHref = safeHttpsFallbackHref(links.bandcamp)
-    const facebookHref = safeExternalHref(links.facebook)
-    const hasAnyLink = [websiteHref, instagramHref, bandcampHref, facebookHref].some(href => href !== '#')
-
-    if (!hasAnyLink) return <span className="text-white/30">-</span>
-
-    return (
-      <div className="flex gap-2">
-        {websiteHref !== '#' && (
-          <a
-            href={websiteHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-accent-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
-            title="Website"
-            aria-label={`Open website for ${band.name}`}
-          >
-            <FontAwesomeIcon icon={faGlobe} />
-          </a>
-        )}
-        {instagramHref !== '#' && (
-          <a
-            href={instagramHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-pink-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-400"
-            title="Instagram"
-            aria-label={`Open Instagram for ${band.name}`}
-          >
-            <FontAwesomeIcon icon={faInstagram} />
-          </a>
-        )}
-        {bandcampHref !== '#' && (
-          <a
-            href={bandcampHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-teal-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
-            title="Bandcamp"
-            aria-label={`Open Bandcamp for ${band.name}`}
-          >
-            <FontAwesomeIcon icon={faBandcamp} />
-          </a>
-        )}
-        {facebookHref !== '#' && (
-          <a
-            href={facebookHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-blue-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
-            title="Facebook"
-            aria-label={`Open Facebook for ${band.name}`}
-          >
-            <FontAwesomeIcon icon={faFacebook} />
-          </a>
-        )}
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -554,32 +555,32 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       onClick={() => handleSort('name')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Name <SortIcon col="name" />
+                      Name <SortIcon col="name" sortConfig={sortConfig} />
                     </th>
                     <th
                       onClick={() => handleSort('origin')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Origin <SortIcon col="origin" />
+                      Origin <SortIcon col="origin" sortConfig={sortConfig} />
                     </th>
                     <th
                       onClick={() => handleSort('genre')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Genre <SortIcon col="genre" />
+                      Genre <SortIcon col="genre" sortConfig={sortConfig} />
                     </th>
                     <th
                       onClick={() => handleSort('is_active')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Status <SortIcon col="is_active" />
+                      Status <SortIcon col="is_active" sortConfig={sortConfig} />
                     </th>
                     <th className="px-4 py-3 text-left text-white font-semibold">Links</th>
                     <th
                       onClick={() => handleSort('contact_email')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Contact <SortIcon col="contact_email" />
+                      Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
                     </th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>

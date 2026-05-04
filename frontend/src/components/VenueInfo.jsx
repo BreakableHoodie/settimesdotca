@@ -3,9 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { safeExternalHref } from '../utils/urlSafety'
 
 function VenueInfo({ eventData }) {
-  // Parse event venue info from JSON with error handling
-  let venues = []
-
+  let venues
   try {
     venues = eventData?.venue_info ? JSON.parse(eventData.venue_info) : []
   } catch (error) {

@@ -5,6 +5,14 @@ import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import { usersApi } from '../utils/adminApi'
 
+function SortIcon({ col, sortConfig }) {
+  return (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
+}
+
 export default function UserManagement() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -18,10 +26,6 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-
-  useEffect(() => {
-    fetchUsers()
-  }, [])
 
   const resolveDisplayName = user => {
     if (user?.firstName || user?.lastName) {
@@ -87,12 +91,6 @@ export default function UserManagement() {
     }))
   }
 
-  const SortIcon = ({ col }) => (
-    <span className="ml-1 inline-block w-4">
-      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-    </span>
-  )
-
   const fetchUsers = async () => {
     try {
       const data = await usersApi.getAll()
@@ -104,6 +102,10 @@ export default function UserManagement() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
 
   const handleCreateUser = async userData => {
     setActionLoading(true)
@@ -282,25 +284,25 @@ export default function UserManagement() {
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('name')}
                 >
-                  User <SortIcon col="name" />
+                  User <SortIcon col="name" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('role')}
                 >
-                  Role <SortIcon col="role" />
+                  Role <SortIcon col="role" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('status')}
                 >
-                  Status <SortIcon col="status" />
+                  Status <SortIcon col="status" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('last_login')}
                 >
-                  Last Login <SortIcon col="last_login" />
+                  Last Login <SortIcon col="last_login" sortConfig={sortConfig} />
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Actions

@@ -159,6 +159,7 @@ export default function BandProfilePage() {
 
   const isNumericId = useMemo(() => /^\d+$/.test(id || ''), [id])
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const sanitizedDescription = useMemo(() => {
     if (!profile?.description) return ''
     let cleaned = DOMPurify.sanitize(profile.description, {
@@ -183,6 +184,7 @@ export default function BandProfilePage() {
     return cleaned
   }, [profile?.description])
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const plainDescription = useMemo(() => {
     if (!profile?.description) return ''
     return DOMPurify.sanitize(profile.description, {
@@ -257,6 +259,7 @@ export default function BandProfilePage() {
 
   // Toggle a performance in the schedule
   const toggleSchedule = useCallback(
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     performance => {
       if (!performance.event_slug || !performance.id) return
 
@@ -282,6 +285,7 @@ export default function BandProfilePage() {
 
   // Check if a performance is in the schedule
   const isInSchedule = useCallback(
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     performance => {
       if (!performance.event_slug || !performance.id || !profile?.name) return false
       const scheduleId = generateScheduleId(profile.name, performance.id)

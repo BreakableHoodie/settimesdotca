@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectConflicts, sortBandsByStart } from '../timeUtils'
+import { AFTER_MIDNIGHT_THRESHOLD_MINUTES, detectConflicts, parseTimeToMinutes, sortBandsByStart } from '../timeUtils'
 
 // ─── sortBandsByStart ────────────────────────────────────────────────────────
 
@@ -37,7 +37,6 @@ describe('sortBandsByStart — after-midnight ordering', () => {
   it('keeps TBD bands at the end when sorting descending (LineupTab inline sort regression)', () => {
     // Simulates the manual sort in LineupTab with direction = -1 (descending).
     // Null times must always go last regardless of sort direction.
-    const { parseTimeToMinutes: ptm, AFTER_MIDNIGHT_THRESHOLD_MINUTES: threshold } = require('../timeUtils')
     const bands = [
       { id: 1, name: 'TBD', start_time: null },
       { id: 2, name: 'Late', start_time: '01:00' },
@@ -45,13 +44,13 @@ describe('sortBandsByStart — after-midnight ordering', () => {
     ]
     const direction = -1
     const sorted = [...bands].sort((a, b) => {
-      const aMin = ptm(a.start_time)
-      const bMin = ptm(b.start_time)
+      const aMin = parseTimeToMinutes(a.start_time)
+      const bMin = parseTimeToMinutes(b.start_time)
       if (aMin == null && bMin == null) return 0
       if (aMin == null) return 1
       if (bMin == null) return -1
-      const aAdj = aMin < threshold ? aMin + 1440 : aMin
-      const bAdj = bMin < threshold ? bMin + 1440 : bMin
+      const aAdj = aMin < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? aMin + 1440 : aMin
+      const bAdj = bMin < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? bMin + 1440 : bMin
       return (aAdj - bAdj) * direction
     })
     expect(sorted[sorted.length - 1].name).toBe('TBD')

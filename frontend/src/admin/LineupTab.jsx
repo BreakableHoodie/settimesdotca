@@ -8,12 +8,14 @@ import ArtistPicker from './components/ArtistPicker'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import {
+  adjustForMidnight,
   calculateEndTimeFromDuration,
   calculateStartTimeFromDuration,
   deriveDurationMinutes,
   detectConflicts,
   formatDurationLabel,
   formatTimeRangeLabel,
+  parseTimeToMinutes,
   sortBandsByStart,
 } from './utils/timeUtils'
 
@@ -466,9 +468,14 @@ export default function LineupTab({
         return (aVal - bVal) * direction
       }
 
-      const aVal = a.start_time || ''
-      const bVal = b.start_time || ''
-      return aVal.localeCompare(bVal) * direction
+      const aMin = parseTimeToMinutes(a.start_time)
+      const bMin = parseTimeToMinutes(b.start_time)
+      if (aMin == null && bMin == null) return 0
+      if (aMin == null) return 1
+      if (bMin == null) return -1
+      const aAdj = adjustForMidnight(aMin)
+      const bAdj = adjustForMidnight(bMin)
+      return (aAdj - bAdj) * direction
     })
   }, [filteredBands, sortConfig, getVenueName])
 
@@ -484,13 +491,14 @@ export default function LineupTab({
     return detectConflicts(
       {
         id: editingId,
+        event_id: Number(formData.event_id),
         venue_id: Number(formData.venue_id),
         start_time: formData.start_time,
         end_time: formData.end_time,
       },
       bands
     )
-  }, [bands, editingId, formData.venue_id, formData.start_time, formData.end_time])
+  }, [bands, editingId, formData.event_id, formData.venue_id, formData.start_time, formData.end_time])
 
   const combinedConflicts = useMemo(() => {
     const merged = new Set([...formConflicts, ...serverConflicts])

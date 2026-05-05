@@ -246,6 +246,16 @@ export async function onRequestPost(context) {
 
   const resolvedVenueId = venue_id ? Number(venue_id) : null;
 
+  if ((start_time || end_time) && !resolvedVenueId) {
+    return new Response(
+      JSON.stringify({
+        error: "Bad request",
+        message: "A venue is required when setting a start or end time",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   // Validate event exists and is not archived
   const event = await DB.prepare("SELECT id, status FROM events WHERE id = ?")
     .bind(event_id)

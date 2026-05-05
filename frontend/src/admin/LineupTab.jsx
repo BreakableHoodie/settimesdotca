@@ -217,6 +217,10 @@ export default function LineupTab({
 
   // Bulk add multiple artists from roster to this event's lineup
   const handleBulkSelect = async (selectedArtists, venueId, startTime, endTime) => {
+    if ((startTime || endTime) && !venueId) {
+      showToast('Please assign a venue before setting a time.', 'error')
+      return
+    }
     const profileIds = selectedArtists.map(a => a.band_profile_id || a.id)
     try {
       const res = await bandsApi.bulkAddToLineup(profileIds, selectedEventId, venueId, startTime, endTime)

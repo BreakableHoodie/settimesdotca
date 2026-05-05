@@ -2,6 +2,20 @@ import { checkPermission } from "../_middleware.js";
 
 const MAX_BULK_PREVIEW_IDS = 200;
 
+// Compute the new end time after shifting start time while preserving duration.
+// Handles sets that span midnight (e.g. 23:40–00:10).
+function computeNewEndTime(oldStart, oldEnd, newStart) {
+  const toMins = (t) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const fromMins = (m) =>
+    `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  let dur = toMins(oldEnd) - toMins(oldStart);
+  if (dur < 0) dur += 24 * 60;
+  return fromMins((toMins(newStart) + dur) % (24 * 60));
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -135,8 +149,17 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Conflict detection: check for time overlaps at same venue
+    // Conflict detection: check for time overlaps at same venue using the
+    // computed new end_time (preserving duration), not the old end_time.
     for (const band of mutableBandResults) {
+      if (!band.start_time || !band.end_time || !band.venue_id) continue;
+
+      const newEndTime = computeNewEndTime(
+        band.start_time,
+        band.end_time,
+        start_time,
+      );
+
       const overlaps = await env.DB.prepare(
         `
         SELECT bp.name, p.start_time, p.end_time
@@ -155,10 +178,10 @@ export async function onRequestPost(context) {
           band.venue_id,
           band.event_id,
           ...band_ids,
-          band.end_time,
+          newEndTime,
           start_time,
           start_time,
-          band.end_time,
+          newEndTime,
         )
         .all();
 

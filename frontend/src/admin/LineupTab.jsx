@@ -167,6 +167,7 @@ export default function LineupTab({
     setEditingId(null)
     setSelectedProfile(null)
     setSelectedIds(new Set())
+    setBulkPreviewData(null)
   }, [selectedEventId])
 
   const handleInputChange = e => {

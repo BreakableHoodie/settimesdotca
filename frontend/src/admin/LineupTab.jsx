@@ -4,6 +4,7 @@ import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
 import { bandsApi, venuesApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
+import BulkPreviewModal from './BulkPreviewModal'
 import ArtistPicker from './components/ArtistPicker'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
@@ -81,6 +82,9 @@ export default function LineupTab({
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkAction, setBulkAction] = useState(null)
   const [bulkParams, setBulkParams] = useState({})
+  const [bulkPreviewData, setBulkPreviewData] = useState(null)
+  const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false)
+  const [bulkApplying, setBulkApplying] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: () => {} })
 
   const splitOrigin = origin => {
@@ -289,6 +293,11 @@ export default function LineupTab({
 
   const handleSubmit = async e => {
     e.preventDefault()
+    // Require a venue when scheduling a time
+    if ((formData.start_time || formData.end_time) && !formData.venue_id) {
+      showToast('Please assign a venue before setting a time. Use the Venue field above.', 'error')
+      return
+    }
     setSubmitting(true)
     try {
       const socialLinks = {
@@ -495,7 +504,14 @@ export default function LineupTab({
   }
   const handleSelectAll = checked => setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
 
-  const handleBulkSubmit = () => {
+  const clearBulkState = () => {
+    setSelectedIds(new Set())
+    setBulkAction(null)
+    setBulkParams({})
+    setBulkPreviewData(null)
+  }
+
+  const handleBulkSubmit = async () => {
     if (bulkAction === 'delete') {
       setConfirmDialog({
         open: true,
@@ -505,7 +521,7 @@ export default function LineupTab({
             const res = await bandsApi.bulkDelete(Array.from(selectedIds))
             if (res.success) {
               showToast('Deleted', 'success')
-              setSelectedIds(new Set())
+              clearBulkState()
               loadData()
             } else {
               showToast(res.error, 'error')
@@ -515,8 +531,30 @@ export default function LineupTab({
           }
         },
       })
-    } else if (bulkAction === 'venue' || bulkAction === 'time') {
-      showToast('This action is not yet available.', 'error')
+    } else if (bulkAction === 'move_venue' || bulkAction === 'change_time') {
+      setBulkPreviewLoading(true)
+      try {
+        const res = await bandsApi.bulkPreview(Array.from(selectedIds), bulkAction, bulkParams)
+        setBulkPreviewData(res)
+      } catch (e) {
+        showToast(e.message || 'Failed to load preview', 'error')
+      } finally {
+        setBulkPreviewLoading(false)
+      }
+    }
+  }
+
+  const handleBulkConfirm = async ignoreConflicts => {
+    setBulkApplying(true)
+    try {
+      await bandsApi.bulkUpdate(Array.from(selectedIds), bulkAction, bulkParams, ignoreConflicts)
+      showToast(`Updated ${selectedIds.size} performance${selectedIds.size !== 1 ? 's' : ''}`, 'success')
+      clearBulkState()
+      loadData()
+    } catch (e) {
+      showToast(e.message || 'Failed to apply changes', 'error')
+    } finally {
+      setBulkApplying(false)
     }
   }
 
@@ -594,11 +632,21 @@ export default function LineupTab({
               action={bulkAction}
               params={bulkParams}
               venues={venues}
-              onActionChange={setBulkAction}
-              onParamsChange={setBulkParams}
+              onActionChange={action => { setBulkAction(action); setBulkParams({}) }}
+              onParamsChange={p => setBulkParams(prev => ({ ...prev, ...p }))}
               onSubmit={handleBulkSubmit}
-              onCancel={() => setSelectedIds(new Set())}
+              onCancelAction={() => { setBulkAction(null); setBulkParams({}) }}
+              onCancelAll={clearBulkState}
               isGlobalView={false}
+              isLoading={bulkPreviewLoading}
+            />
+          )}
+          {bulkPreviewData && (
+            <BulkPreviewModal
+              previewData={bulkPreviewData}
+              isProcessing={bulkApplying}
+              onConfirm={handleBulkConfirm}
+              onCancel={() => setBulkPreviewData(null)}
             />
           )}
 

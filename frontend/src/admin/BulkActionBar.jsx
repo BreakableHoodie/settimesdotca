@@ -6,8 +6,10 @@ function BulkActionBar({
   onActionChange,
   onParamsChange,
   onSubmit,
-  onCancel,
+  onCancelAction,
+  onCancelAll,
   isGlobalView,
+  isLoading,
 }) {
   const isActionReady = () => {
     if (action === 'move_venue') return params.venue_id != null
@@ -80,20 +82,30 @@ function BulkActionBar({
 
         {/* Action buttons */}
         <div className="flex gap-2 md:ml-auto">
-          <button onClick={onCancel} className="btn-secondary flex-1 md:flex-none min-h-[44px]">
-            Cancel
-          </button>
-          {action && (
-            <button
-              onClick={onSubmit}
-              className={`flex-1 md:flex-none px-4 py-2 min-h-[44px] rounded-lg font-medium transition-colors ${
-                action === 'delete'
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-accent-500 hover:bg-accent-600 text-white'
-              }`}
-              disabled={action !== 'delete' && !isActionReady()}
-            >
-              {action === 'delete' ? 'Confirm Delete' : 'Preview Changes'}
+          {action ? (
+            <>
+              <button
+                onClick={onCancelAction}
+                className="btn-secondary flex-1 md:flex-none min-h-[44px]"
+                disabled={isLoading}
+              >
+                Back
+              </button>
+              <button
+                onClick={onSubmit}
+                className={`flex-1 md:flex-none px-4 py-2 min-h-[44px] rounded-lg font-medium transition-colors ${
+                  action === 'delete'
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-accent-500 hover:bg-accent-600 text-white'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={(action !== 'delete' && !isActionReady()) || isLoading}
+              >
+                {isLoading ? 'Loading...' : action === 'delete' ? 'Confirm Delete' : 'Preview Changes'}
+              </button>
+            </>
+          ) : (
+            <button onClick={onCancelAll} className="btn-secondary flex-1 md:flex-none min-h-[44px]">
+              Cancel
             </button>
           )}
         </div>

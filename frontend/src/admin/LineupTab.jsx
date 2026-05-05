@@ -475,7 +475,6 @@ export default function LineupTab({
     }))
   }
 
-
   const formConflicts = useMemo(() => {
     if (!formData.venue_id || !formData.start_time || !formData.end_time) return []
     return detectConflicts(
@@ -632,10 +631,16 @@ export default function LineupTab({
               action={bulkAction}
               params={bulkParams}
               venues={venues}
-              onActionChange={action => { setBulkAction(action); setBulkParams({}) }}
+              onActionChange={action => {
+                setBulkAction(action)
+                setBulkParams({})
+              }}
               onParamsChange={p => setBulkParams(prev => ({ ...prev, ...p }))}
               onSubmit={handleBulkSubmit}
-              onCancelAction={() => { setBulkAction(null); setBulkParams({}) }}
+              onCancelAction={() => {
+                setBulkAction(null)
+                setBulkParams({})
+              }}
               onCancelAll={clearBulkState}
               isGlobalView={false}
               isLoading={bulkPreviewLoading}

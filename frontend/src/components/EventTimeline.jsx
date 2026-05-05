@@ -239,12 +239,7 @@ export default function EventTimeline() {
                 Clear Filters
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleShowFiltersToggle}
-              icon={<Funnel size={14} />}
-            >
+            <Button variant="secondary" size="sm" onClick={handleShowFiltersToggle} icon={<Funnel size={14} />}>
               {showFilters ? 'Hide' : 'Show'} Filters
             </Button>
           </div>

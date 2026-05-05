@@ -185,7 +185,11 @@ function ScheduleView({
             aria-label="Copy the full schedule"
             disabled={isCopyingAll}
           >
-            {copyAllLabel === 'Copied!' ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+            {copyAllLabel === 'Copied!' ? (
+              <Check size={14} aria-hidden="true" />
+            ) : (
+              <Copy size={14} aria-hidden="true" />
+            )}
             <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
           </button>
           {onSelectAll && (

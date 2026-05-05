@@ -382,7 +382,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                 title={copyButtonLabel === 'Copied!' ? 'Schedule copied to clipboard' : 'Copy your schedule'}
                 disabled={isCopyingSchedule}
               >
-                {copyButtonLabel === 'Copied!' ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                {copyButtonLabel === 'Copied!' ? (
+                  <Check size={14} aria-hidden="true" />
+                ) : (
+                  <Copy size={14} aria-hidden="true" />
+                )}
                 <span className="transition-opacity duration-200 ease-in-out">{copyButtonLabel}</span>
               </button>
               {bands.length > 0 && (
@@ -392,7 +396,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                   title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Share your schedule'}
                   aria-label="Copy shareable link to your schedule"
                 >
-                  {shareButtonLabel === 'Link Copied!' ? <Check size={14} aria-hidden="true" /> : <Link size={14} aria-hidden="true" />}
+                  {shareButtonLabel === 'Link Copied!' ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <Link size={14} aria-hidden="true" />
+                  )}
                   <span className="transition-opacity duration-200 ease-in-out">{shareButtonLabel}</span>
                 </button>
               )}
@@ -413,7 +421,10 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       {reminder && (
         <div className="max-w-5xl mx-auto">
           <div className="text-xs text-green-300 bg-green-900/20 px-4 py-2 rounded border border-green-500/30 text-center flex items-center justify-center gap-2 leading-normal">
-            {(() => { const ReminderIcon = reminder.icon; return <ReminderIcon size={14} aria-hidden="true" /> })()}
+            {(() => {
+              const ReminderIcon = reminder.icon
+              return <ReminderIcon size={14} aria-hidden="true" />
+            })()}
             <span>{reminder.text}</span>
           </div>
         </div>
@@ -527,7 +538,10 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                     <div
                       className={`text-xs font-semibold px-3 py-1.5 rounded border ${timeStatus.color} flex items-center gap-2 leading-normal`}
                     >
-                      {(() => { const StatusIcon = timeStatus.icon; return <StatusIcon size={14} aria-hidden="true" /> })()}
+                      {(() => {
+                        const StatusIcon = timeStatus.icon
+                        return <StatusIcon size={14} aria-hidden="true" />
+                      })()}
                       <span>{timeStatus.text}</span>
                     </div>
                   )

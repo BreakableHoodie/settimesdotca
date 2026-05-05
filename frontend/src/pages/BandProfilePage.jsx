@@ -401,13 +401,7 @@ export default function BandProfilePage() {
             </p>
           </Alert>
           <div className="text-center">
-            <Button
-              as={Link}
-              to="/"
-              variant="secondary"
-              icon={<ArrowLeft size={14} />}
-              iconPosition="left"
-            >
+            <Button as={Link} to="/" variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
               Back to Schedule
             </Button>
           </div>
@@ -730,7 +724,11 @@ export default function BandProfilePage() {
                               size="sm"
                               className="whitespace-nowrap"
                             >
-                              {isInSchedule(performance) ? <Check size={14} className="mr-2" /> : <Plus size={14} className="mr-2" />}
+                              {isInSchedule(performance) ? (
+                                <Check size={14} className="mr-2" />
+                              ) : (
+                                <Plus size={14} className="mr-2" />
+                              )}
                               {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
                             </Button>
                             {performance.event_slug && (
@@ -825,13 +823,7 @@ export default function BandProfilePage() {
 
           {/* Back to Events */}
           <div className="mt-6 text-center">
-            <Button
-              as={Link}
-              to="/"
-              variant="secondary"
-              icon={<ArrowLeft size={14} />}
-              iconPosition="left"
-            >
+            <Button as={Link} to="/" variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
               Back to Events
             </Button>
           </div>

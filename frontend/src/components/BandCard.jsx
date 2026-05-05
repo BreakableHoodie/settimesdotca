@@ -128,7 +128,11 @@ function BandCard({
               warningType === 'overlap' ? 'bg-yellow-500/30 text-yellow-200' : 'bg-red-500/30 text-red-200'
             }`}
           >
-            {warningType === 'overlap' ? <Zap size={14} aria-hidden="true" /> : <TriangleAlert size={14} aria-hidden="true" />}
+            {warningType === 'overlap' ? (
+              <Zap size={14} aria-hidden="true" />
+            ) : (
+              <TriangleAlert size={14} aria-hidden="true" />
+            )}
             <span>{warningText}</span>
           </div>
         )}

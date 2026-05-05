@@ -94,10 +94,7 @@ export default function ConfirmDialog({
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <TriangleAlert
-              size={24}
-              className={variant === 'danger' ? 'text-error-500' : 'text-accent-500'}
-            />
+            <TriangleAlert size={24} className={variant === 'danger' ? 'text-error-500' : 'text-accent-500'} />
             <h2 id="confirm-dialog-title" className="text-xl font-bold text-text-primary">
               {title}
             </h2>

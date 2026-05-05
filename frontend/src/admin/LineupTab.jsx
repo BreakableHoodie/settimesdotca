@@ -471,8 +471,8 @@ export default function LineupTab({
       const aMin = parseTimeToMinutes(a.start_time)
       const bMin = parseTimeToMinutes(b.start_time)
       if (aMin == null && bMin == null) return 0
-      if (aMin == null) return direction
-      if (bMin == null) return -direction
+      if (aMin == null) return 1
+      if (bMin == null) return -1
       const aAdj = aMin < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? aMin + 1440 : aMin
       const bAdj = bMin < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? bMin + 1440 : bMin
       return (aAdj - bAdj) * direction

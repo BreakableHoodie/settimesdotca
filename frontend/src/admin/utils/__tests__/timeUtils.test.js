@@ -34,6 +34,29 @@ describe('sortBandsByStart — after-midnight ordering', () => {
     expect(result.map(b => b.name)).toEqual(['Evening', 'Late', 'TBD'])
   })
 
+  it('keeps TBD bands at the end when sorting descending (LineupTab inline sort regression)', () => {
+    // Simulates the manual sort in LineupTab with direction = -1 (descending).
+    // Null times must always go last regardless of sort direction.
+    const { parseTimeToMinutes: ptm, AFTER_MIDNIGHT_THRESHOLD_MINUTES: threshold } = require('../timeUtils')
+    const bands = [
+      { id: 1, name: 'TBD', start_time: null },
+      { id: 2, name: 'Late', start_time: '01:00' },
+      { id: 3, name: 'Evening', start_time: '22:00' },
+    ]
+    const direction = -1
+    const sorted = [...bands].sort((a, b) => {
+      const aMin = ptm(a.start_time)
+      const bMin = ptm(b.start_time)
+      if (aMin == null && bMin == null) return 0
+      if (aMin == null) return 1
+      if (bMin == null) return -1
+      const aAdj = aMin < threshold ? aMin + 1440 : aMin
+      const bAdj = bMin < threshold ? bMin + 1440 : bMin
+      return (aAdj - bAdj) * direction
+    })
+    expect(sorted[sorted.length - 1].name).toBe('TBD')
+  })
+
   it('treats bands before 6 AM as after-midnight (not early morning)', () => {
     const bands = [
       { id: 1, name: 'Dawn', start_time: '05:59' },

@@ -12,8 +12,8 @@ function BulkActionBar({
   isLoading,
 }) {
   const isActionReady = () => {
-    if (action === 'move_venue') return params.venue_id != null
-    if (action === 'change_time') return params.start_time != null
+    if (action === 'move_venue') return Number.isFinite(params.venue_id)
+    if (action === 'change_time') return Boolean(params.start_time)
     return false
   }
 

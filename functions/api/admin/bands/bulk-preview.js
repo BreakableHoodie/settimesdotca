@@ -23,11 +23,13 @@ export async function onRequestPost(context) {
 
   if (band_ids.length > MAX_BULK_PREVIEW_IDS) {
     return new Response(
-      JSON.stringify({ error: `Maximum ${MAX_BULK_PREVIEW_IDS} band IDs allowed per preview` }),
+      JSON.stringify({
+        error: `Maximum ${MAX_BULK_PREVIEW_IDS} band IDs allowed per preview`,
+      }),
       {
         status: 400,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -40,7 +42,7 @@ export async function onRequestPost(context) {
     `SELECT p.*, bp.name, v.name as venue_name, e.status as event_status, e.name as event_name
      FROM performances p
      JOIN band_profiles bp ON p.band_profile_id = bp.id
-     JOIN venues v ON p.venue_id = v.id
+     LEFT JOIN venues v ON p.venue_id = v.id
      JOIN events e ON p.event_id = e.id
      WHERE p.id IN (${placeholders})`,
   )
@@ -48,7 +50,9 @@ export async function onRequestPost(context) {
     .all();
 
   const bandResults = bands.results || [];
-  const mutableBandResults = bandResults.filter((band) => band.event_status !== "archived");
+  const mutableBandResults = bandResults.filter(
+    (band) => band.event_status !== "archived",
+  );
 
   bandResults
     .filter((band) => band.event_status === "archived")

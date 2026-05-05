@@ -19,9 +19,9 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
               <div key={change.band_id} className="bg-gray-800 p-3 rounded">
                 <div className="text-white font-medium">{change.band_name}</div>
                 <div className="text-sm text-gray-400">
-                  {change.from_venue && change.to_venue && (
+                  {change.to_venue && (
                     <span>
-                      {change.from_venue} → {change.to_venue}
+                      {change.from_venue ?? 'No venue'} → {change.to_venue}
                     </span>
                   )}
                   {change.from_time && change.to_time && (

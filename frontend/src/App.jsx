@@ -1,5 +1,4 @@
-import { faBell, faBoxArchive, faCircleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { Archive, Bell, CircleAlert, X } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -387,7 +386,7 @@ function App() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md text-center">
           <div className="text-red-400 text-6xl mb-4" aria-hidden="true">
-            <FontAwesomeIcon icon={faCircleExclamation} />
+            <CircleAlert size={16} />
           </div>
           <h2 className="text-white text-2xl font-bold mb-2">Oops! Something went wrong</h2>
           <p className="text-accent-400 mb-6">{error}</p>
@@ -472,7 +471,7 @@ function App() {
         {/* Archived event banner */}
         {isArchived && (
           <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-text-secondary">
-            <FontAwesomeIcon icon={faBoxArchive} className="mt-0.5 shrink-0 text-text-tertiary" aria-hidden="true" />
+            <Archive size={16} className="mt-0.5 shrink-0 text-text-tertiary" aria-hidden="true" />
             <div>
               <span className="font-semibold text-text-primary">This event has concluded.</span> You&apos;re viewing the
               archived lineup for reference.
@@ -492,7 +491,7 @@ function App() {
               aria-label="Dismiss tip"
               className="shrink-0 text-accent-400 hover:text-white transition-colors p-1"
             >
-              <FontAwesomeIcon icon={faXmark} />
+              <X size={16} />
             </button>
           </div>
         )}
@@ -500,7 +499,7 @@ function App() {
         {/* Reveal mode teaser — more bands dropping soon */}
         {!isArchived && eventData?.reveal_mode === 1 && (
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-accent-500/10 border border-accent-500/20 text-sm">
-            <FontAwesomeIcon icon={faBell} className="text-accent-400 shrink-0" aria-hidden="true" />
+            <Bell size={16} className="text-accent-400 shrink-0" aria-hidden="true" />
             <p className="text-accent-300">
               <span className="font-semibold">More bands dropping soon.</span>{' '}
               <a href="/subscribe" className="underline hover:text-accent-200 transition-colors">

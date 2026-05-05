@@ -1,6 +1,5 @@
+import { CalendarDays, Clock, Route, Warehouse } from 'lucide-react'
 import { memo, useMemo } from 'react'
-import { faCalendarDays, faClock, faRoute, faWarehouse } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { getEventState } from '../utils/eventLifecycle'
 
 function parseVenueInfo(venueInfo) {
@@ -94,23 +93,23 @@ function LiveContextBar({ eventData, currentTime, bands = [], selectedCount = 0 
 
           <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
             <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white/80">
-              <FontAwesomeIcon icon={faClock} aria-hidden="true" className="text-accent-400" />
+              <Clock size={14} aria-hidden="true" className="text-accent-400" />
               <span aria-live="polite">{formatCurrentTime(currentTime)}</span>
             </div>
             <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white/80">
-              <FontAwesomeIcon icon={faWarehouse} aria-hidden="true" className="text-accent-400" />
+              <Warehouse size={14} aria-hidden="true" className="text-accent-400" />
               <span>
                 {uniqueVenues} {uniqueVenues === 1 ? 'venue' : 'venues'}
               </span>
             </div>
             <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white/80">
-              <FontAwesomeIcon icon={faCalendarDays} aria-hidden="true" className="text-accent-400" />
+              <CalendarDays size={14} aria-hidden="true" className="text-accent-400" />
               <span>
                 {bands.length} {bands.length === 1 ? 'set' : 'sets'}
               </span>
             </div>
             <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-accent-500/25 bg-accent-500/10 px-3 py-2 text-accent-400">
-              <FontAwesomeIcon icon={faRoute} aria-hidden="true" />
+              <Route size={14} aria-hidden="true" />
               <span>
                 {selectedCount} {selectedCount === 1 ? 'stop in route' : 'stops in route'}
               </span>

@@ -1,5 +1,4 @@
-import { faChevronRight } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 function Breadcrumbs({ items }) {
@@ -13,7 +12,7 @@ function Breadcrumbs({ items }) {
         {items.map((item, index) => (
           <li key={index} className="flex items-center gap-2">
             {index > 0 && (
-              <FontAwesomeIcon icon={faChevronRight} className="text-xs text-text-tertiary" aria-hidden="true" />
+              <ChevronRight size={12} className="text-text-tertiary" aria-hidden="true" />
             )}
             {item.href && index !== items.length - 1 ? (
               <Link to={item.href} className="text-accent-400 hover:text-accent-500 transition-colors">

@@ -1,14 +1,4 @@
-import {
-  faBoxArchive,
-  faCalendarDays,
-  faCircle,
-  faClock,
-  faClockRotateLeft,
-  faFilter,
-  faLocationDot,
-  faXmark,
-} from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { Archive, CalendarDays, Clock, Funnel, History, MapPin, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
@@ -245,7 +235,7 @@ export default function EventTimeline() {
 
           <div className="flex items-center gap-3">
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} icon={<FontAwesomeIcon icon={faXmark} />}>
+              <Button variant="ghost" size="sm" onClick={clearFilters} icon={<X size={14} />}>
                 Clear Filters
               </Button>
             )}
@@ -253,7 +243,7 @@ export default function EventTimeline() {
               variant="secondary"
               size="sm"
               onClick={handleShowFiltersToggle}
-              icon={<FontAwesomeIcon icon={faFilter} />}
+              icon={<Funnel size={14} />}
             >
               {showFilters ? 'Hide' : 'Show'} Filters
             </Button>
@@ -324,7 +314,7 @@ export default function EventTimeline() {
         {hasNow && (
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <FontAwesomeIcon icon={faCircle} className="text-error-500 animate-pulse text-sm" />
+              <span className="inline-block w-3 h-3 rounded-full bg-error-500 animate-pulse" aria-hidden="true" />
               <h2 className="text-3xl font-bold text-accent-500">Happening Now</h2>
               <Badge variant="error" size="sm">
                 LIVE
@@ -349,7 +339,7 @@ export default function EventTimeline() {
         {hasUpcoming && (
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <FontAwesomeIcon icon={faCalendarDays} className="text-primary-500 text-xl" />
+              <CalendarDays size={20} className="text-primary-500" />
               <h2 className="text-3xl font-bold text-text-primary">Coming Up</h2>
             </div>
             <div className="space-y-6">
@@ -372,7 +362,7 @@ export default function EventTimeline() {
           <section>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
-                <FontAwesomeIcon icon={faClockRotateLeft} className="text-text-tertiary text-xl" />
+                <History size={20} className="text-text-tertiary" />
                 <h2 className="text-3xl font-bold text-text-secondary">Past Events</h2>
               </div>
               <Button variant="ghost" size="sm" onClick={handleShowPastToggle}>
@@ -492,7 +482,7 @@ function EventCard({
               )}
               {event.status === 'archived' && (
                 <Badge variant="default" size="md">
-                  <FontAwesomeIcon icon={faBoxArchive} className="mr-1 text-xs" aria-hidden="true" />
+                  <Archive size={12} className="mr-1" aria-hidden="true" />
                   Archived
                 </Badge>
               )}
@@ -500,7 +490,7 @@ function EventCard({
             </div>
 
             <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
-              <FontAwesomeIcon icon={faCalendarDays} className="text-xs" />
+              <CalendarDays size={12} />
               {formatDate(event.date)}
             </p>
 
@@ -645,12 +635,12 @@ function EventCard({
 
                     <div className="space-y-1 text-sm">
                       <div className="text-text-secondary flex items-center gap-2">
-                        <FontAwesomeIcon icon={faLocationDot} aria-hidden="true" />
+                        <MapPin size={12} aria-hidden="true" />
                         <span>{band.venue_name}</span>
                       </div>
 
                       <div className="text-text-tertiary flex items-center gap-2">
-                        <FontAwesomeIcon icon={faClock} aria-hidden="true" />
+                        <Clock size={12} aria-hidden="true" />
                         <span>{formatTimeRange(band.start_time, band.end_time)}</span>
                       </div>
 

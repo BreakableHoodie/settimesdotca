@@ -1,8 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import Button from './Button'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTriangleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { TriangleAlert, X } from 'lucide-react'
 
 const FOCUSABLE_SELECTORS = [
   'button:not([disabled])',
@@ -95,9 +94,9 @@ export default function ConfirmDialog({
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <FontAwesomeIcon
-              icon={faTriangleExclamation}
-              className={`text-2xl ${variant === 'danger' ? 'text-error-500' : 'text-accent-500'}`}
+            <TriangleAlert
+              size={24}
+              className={variant === 'danger' ? 'text-error-500' : 'text-accent-500'}
             />
             <h2 id="confirm-dialog-title" className="text-xl font-bold text-text-primary">
               {title}
@@ -108,7 +107,7 @@ export default function ConfirmDialog({
             className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded focus:outline-hidden focus:ring-2 focus:ring-accent-500"
             aria-label="Close dialog"
           >
-            <FontAwesomeIcon icon={faXmark} className="text-xl" />
+            <X size={20} />
           </button>
         </div>
 

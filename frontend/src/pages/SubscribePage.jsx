@@ -1,6 +1,5 @@
+import { CalendarDays, Rss } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCalendarDays, faRss } from '@fortawesome/free-solid-svg-icons'
 
 const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 
@@ -245,14 +244,14 @@ export default function SubscribePage() {
               href="/api/feeds/ical?city=portland&genre=all"
               className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition"
             >
-              <FontAwesomeIcon icon={faCalendarDays} className="mr-2" aria-hidden="true" />
+              <CalendarDays size={16} className="mr-2 inline" aria-hidden="true" />
               Subscribe to Calendar
             </a>
             <a
               href="/api/events/public?city=portland&genre=all"
               className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition"
             >
-              <FontAwesomeIcon icon={faRss} className="mr-2" aria-hidden="true" />
+              <Rss size={16} className="mr-2 inline" aria-hidden="true" />
               JSON Feed
             </a>
           </div>

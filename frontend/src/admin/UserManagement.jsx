@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faKey, faUserSlash, faUserCheck, faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { Key, Pencil, Plus, Trash, UserCheck, UserX } from 'lucide-react'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import { usersApi } from '../utils/adminApi'
@@ -269,7 +268,7 @@ export default function UserManagement() {
             }}
             className="bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
           >
-            <FontAwesomeIcon icon={faPlus} />
+            <Plus size={14} />
             Invite User
           </button>
         </div>
@@ -353,7 +352,7 @@ export default function UserManagement() {
                           title="Edit User"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faEdit} />
+                          <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => {
@@ -364,7 +363,7 @@ export default function UserManagement() {
                           title="Reset Password"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faKey} />
+                          <Key size={14} />
                         </button>
                         <button
                           onClick={() => handleToggleUserStatus(user)}
@@ -376,7 +375,7 @@ export default function UserManagement() {
                           title={user.isActive ? 'Deactivate User' : 'Activate User'}
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={user.isActive ? faUserSlash : faUserCheck} />
+                          {user.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
                         </button>
                         <button
                           onClick={() => handleDeleteUser(user)}
@@ -384,7 +383,7 @@ export default function UserManagement() {
                           title="Delete User"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faTrash} />
+                          <Trash size={14} />
                         </button>
                       </div>
                     </td>

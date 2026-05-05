@@ -2,8 +2,7 @@ import PropTypes from 'prop-types'
 import PhotoUpload from './components/PhotoUpload'
 import RichTextEditor from './components/RichTextEditor'
 import { Input, Button, Tooltip } from '../components/ui'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
+import { Info } from 'lucide-react'
 import { FIELD_LIMITS } from '../utils/validation'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 
@@ -142,7 +141,7 @@ export default function BandForm({
               </label>
 
               <Tooltip content="Full name of the band or artist as it should appear publicly">
-                <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+                <Info size={14} className="text-text-tertiary cursor-help" />
               </Tooltip>
             </div>
             <Input
@@ -171,7 +170,7 @@ export default function BandForm({
                   Origin <span className="text-text-tertiary text-xs">(optional)</span>
                 </legend>
                 <Tooltip content="Where the band/artist is from (city and province/state)">
-                  <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+                  <Info size={14} className="text-text-tertiary cursor-help" />
                 </Tooltip>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -220,7 +219,7 @@ export default function BandForm({
                   Genre <span className="text-text-tertiary text-xs">(optional)</span>
                 </label>
                 <Tooltip content="Musical genres, comma-separated (e.g., 'punk, indie rock')">
-                  <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+                  <Info size={14} className="text-text-tertiary cursor-help" />
                 </Tooltip>
               </div>
               <Input

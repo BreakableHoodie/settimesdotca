@@ -8,8 +8,7 @@ import EmbedCodeGenerator from './EmbedCodeGenerator'
 import MetricsDashboard from './MetricsDashboard'
 import ArchivedEventBanner from './components/ArchivedEventBanner'
 import HelpPanel from './components/HelpPanel'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCopy, faLink, faTicketSimple } from '@fortawesome/free-solid-svg-icons'
+import { Copy, Link, Ticket } from 'lucide-react'
 import { formatTimeRange } from '../utils/timeFormat'
 import {
   getEventState,
@@ -239,7 +238,7 @@ const EventRow = memo(function EventRow({
               className={`px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Visit ticket link"
             >
-              <FontAwesomeIcon icon={faLink} className="mr-1" aria-hidden="true" />
+              <Link size={14} className="mr-1" aria-hidden="true" />
               Visit
             </button>
             <button
@@ -250,7 +249,7 @@ const EventRow = memo(function EventRow({
               className={`px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Copy ticket link"
             >
-              <FontAwesomeIcon icon={faCopy} className="mr-1" aria-hidden="true" />
+              <Copy size={14} className="mr-1" aria-hidden="true" />
               Copy
             </button>
           </div>
@@ -763,7 +762,7 @@ export default function EventsTab({
                   }
                   className={`px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
-                  <FontAwesomeIcon icon={faTicketSimple} className="mr-2" aria-hidden="true" />
+                  <Ticket size={14} className="mr-2" aria-hidden="true" />
                   Tickets
                 </button>
               )}

@@ -1,5 +1,4 @@
-import { faClock, faLocationDot, faMusic, faRoute, faStar, faXmark } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { Clock, MapPin, Music, Route, Star, X } from 'lucide-react'
 import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { formatTimeRange } from '../utils/timeFormat'
@@ -40,11 +39,11 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
                 variant === 'now' ? 'bg-accent-500 text-bg-navy' : 'bg-secondary-500/20 text-secondary-500'
               }`}
             >
-              <FontAwesomeIcon icon={variant === 'now' ? faMusic : faClock} aria-hidden="true" />
+              {variant === 'now' ? <Music size={14} aria-hidden="true" /> : <Clock size={14} aria-hidden="true" />}
               {status.label}
             </span>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-bg-navy/60 px-2.5 py-1 text-xs font-medium text-white/80">
-              <FontAwesomeIcon icon={faLocationDot} aria-hidden="true" className="text-accent-400" />
+              <MapPin size={12} aria-hidden="true" className="text-accent-400" />
               {band.venue}
             </span>
           </div>
@@ -72,7 +71,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
               aria-label={toggleLabel}
               title={toggleLabel}
             >
-              <FontAwesomeIcon icon={isSelected ? faXmark : faStar} aria-hidden="true" />
+              {isSelected ? <X size={14} aria-hidden="true" /> : <Star size={14} aria-hidden="true" />}
             </button>
           </div>
         </div>
@@ -80,7 +79,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
 
       {isSelected && (
         <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-accent-500/25 bg-accent-500/10 px-2.5 py-1 text-xs font-medium text-accent-400">
-          <FontAwesomeIcon icon={faRoute} aria-hidden="true" />
+          <Route size={14} aria-hidden="true" />
           In your route
         </div>
       )}

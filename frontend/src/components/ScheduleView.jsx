@@ -24,8 +24,9 @@ function ScheduleView({
   const nowMs = nowDate.getTime()
 
   const finishedCount = bands.reduce((count, band) => {
-    const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-    return bandEndMs <= nowMs ? count + 1 : count
+    if (!band.endTime || band.endTime === 'TBD') return count
+    const bandEndMs = band.endMs > 0 ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+    return Number.isFinite(bandEndMs) && bandEndMs <= nowMs ? count + 1 : count
   }, 0)
 
   // First apply time filter, then apply showPast filter
@@ -42,7 +43,7 @@ function ScheduleView({
         return bandEndMs > nowMs
       })
 
-  const uniqueVenues = useMemo(() => [...new Set(bands.map(b => b.venue))].sort(), [bands])
+  const uniqueVenues = useMemo(() => [...new Set(bands.map(b => b.venue).filter(Boolean))].sort(), [bands])
   const uniqueGenres = useMemo(() => [...new Set(bands.filter(b => b.genre).map(b => b.genre))].sort(), [bands])
 
   const filteredBands = visibleBands.filter(

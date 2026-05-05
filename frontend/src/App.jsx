@@ -15,6 +15,7 @@ import ScheduleView from './components/ScheduleView'
 import ScheduleSkeleton from './components/ScheduleSkeleton'
 import { trackEventView, trackPageView } from './utils/metrics'
 import { validateBandsData } from './utils/validation'
+import { prepareBands } from './utils/bandUtils'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 
@@ -22,23 +23,6 @@ const MySchedule = lazy(() => import('./components/MySchedule'))
 const VenueInfo = lazy(() => import('./components/VenueInfo'))
 
 const DEBUG_TIME_STORAGE_KEY = 'debugScheduleTime'
-
-function prepareBands(list) {
-  return list.map(band => {
-    const startMs = Date.parse(`${band.date}T${band.startTime}:00`)
-    let endMs = Date.parse(`${band.date}T${band.endTime}:00`)
-
-    if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs < startMs) {
-      endMs += 24 * 60 * 60 * 1000
-    }
-
-    return {
-      ...band,
-      startMs: Number.isNaN(startMs) ? 0 : startMs,
-      endMs: Number.isNaN(endMs) ? 0 : endMs,
-    }
-  })
-}
 
 const FALLBACK_BANDS = []
 const HAS_FALLBACK = false

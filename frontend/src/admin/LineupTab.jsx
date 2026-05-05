@@ -77,7 +77,7 @@ export default function LineupTab({
   })
   const [submitting, setSubmitting] = useState(false)
   const [togglingId, setTogglingId] = useState(null)
-  const [serverConflicts, setServerConflicts] = useState([])
+  const [serverConflicts, setServerConflicts] = useState({ overlaps: [], conflicts: [] })
 
   // Selected IDs for bulk delete within event
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -180,8 +180,8 @@ export default function LineupTab({
     }
 
     setFormData(prev => {
-      if (serverConflicts.length) {
-        setServerConflicts([])
+      if (serverConflicts.overlaps.length || serverConflicts.conflicts.length) {
+        setServerConflicts({ overlaps: [], conflicts: [] })
       }
       const next = { ...prev, [name]: name === 'is_active' ? Number(value) : value }
       const durationMinutes = parseDuration(next.duration)
@@ -239,7 +239,7 @@ export default function LineupTab({
 
   // Picker selection handler
   const handlePickerSelect = (artist, newName) => {
-    setServerConflicts([])
+    setServerConflicts({ overlaps: [], conflicts: [] })
     if (artist) {
       // Selected existing artist from roster
       setSelectedProfile(artist)
@@ -346,14 +346,17 @@ export default function LineupTab({
       loadData()
     } catch (err) {
       if (err.status === 409 && err.details?.conflicts?.length) {
-        const conflictNames = err.details.conflicts
-          .map(conflict => {
-            const range = conflict.startTime && conflict.endTime ? `${conflict.startTime}-${conflict.endTime}` : ''
-            return range ? `${conflict.name} (${range})` : conflict.name
+        const serverOverlaps = err.details.conflicts.filter(c => c.type === 'overlap').map(c => c.name)
+        const serverExact = err.details.conflicts.filter(c => c.type === 'conflict').map(c => c.name)
+        setServerConflicts({ overlaps: serverOverlaps, conflicts: serverExact })
+        const allNames = err.details.conflicts
+          .map(c => {
+            const range = c.startTime && c.endTime ? `${c.startTime}-${c.endTime}` : ''
+            const label = c.type === 'conflict' ? 'exact conflict' : 'overlap'
+            return range ? `${c.name} (${label}: ${range})` : c.name
           })
           .join(', ')
-        setServerConflicts(err.details.conflicts.map(conflict => conflict.name))
-        showToast(`Time conflict: ${conflictNames}`, 'error')
+        showToast(`Scheduling issue: ${allNames}`, 'error')
       } else {
         showToast(err.message, 'error')
       }
@@ -391,7 +394,7 @@ export default function LineupTab({
   }
 
   const startEdit = band => {
-    setServerConflicts([])
+    setServerConflicts({ overlaps: [], conflicts: [] })
     setEditingId(band.id)
     setSelectedProfile(null) // Editing existing performance implies we have the data
     const durationMinutes = deriveDurationMinutes(band.start_time, band.end_time)
@@ -487,7 +490,7 @@ export default function LineupTab({
   }
 
   const formConflicts = useMemo(() => {
-    if (!formData.venue_id || !formData.start_time || !formData.end_time) return []
+    if (!formData.venue_id || !formData.start_time || !formData.end_time) return { overlaps: [], conflicts: [] }
     return detectConflicts(
       {
         id: editingId,
@@ -500,10 +503,13 @@ export default function LineupTab({
     )
   }, [bands, editingId, formData.event_id, formData.venue_id, formData.start_time, formData.end_time])
 
-  const combinedConflicts = useMemo(() => {
-    const merged = new Set([...formConflicts, ...serverConflicts])
-    return Array.from(merged)
-  }, [formConflicts, serverConflicts])
+  const combinedConflicts = useMemo(
+    () => ({
+      overlaps: [...new Set([...formConflicts.overlaps, ...serverConflicts.overlaps])],
+      conflicts: [...new Set([...formConflicts.conflicts, ...serverConflicts.conflicts])],
+    }),
+    [formConflicts, serverConflicts]
+  )
 
   // Select logic
   const handleSelect = (id, checked) => {
@@ -773,11 +779,16 @@ export default function LineupTab({
                     </thead>
                     <tbody className="divide-y divide-accent-500/10">
                       {sortedBands.map(band => {
-                        const conflicts = detectConflicts(band, bands)
+                        const { overlaps, conflicts: exactConflicts } = detectConflicts(band, bands)
+                        const rowHighlight = exactConflicts.length
+                          ? 'bg-red-900/20'
+                          : overlaps.length
+                            ? 'bg-yellow-900/10'
+                            : ''
                         return (
                           <tr
                             key={band.id}
-                            className={`hover:bg-bg-navy/30 transition-colors ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
+                            className={`hover:bg-bg-navy/30 transition-colors ${rowHighlight} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
                           >
                             {!readOnly && (
                               <td className="px-4 py-3">
@@ -795,8 +806,10 @@ export default function LineupTab({
                               {formatTimeRangeLabel(band.start_time, band.end_time)}
                             </td>
                             <td className="px-4 py-3 text-white/70">
-                              {conflicts.length ? (
+                              {exactConflicts.length ? (
                                 <span className="text-red-400 font-bold">CONFLICT</span>
+                              ) : overlaps.length ? (
+                                <span className="text-yellow-400 font-bold">OVERLAP</span>
                               ) : (
                                 formatDurationLabel(band.start_time, band.end_time)
                               )}
@@ -856,11 +869,16 @@ export default function LineupTab({
                     </div>
                   )}
                   {sortedBands.map(band => {
-                    const conflicts = detectConflicts(band, bands)
+                    const { overlaps, conflicts: exactConflicts } = detectConflicts(band, bands)
+                    const cardHighlight = exactConflicts.length
+                      ? 'bg-red-900/20'
+                      : overlaps.length
+                        ? 'bg-yellow-900/10'
+                        : ''
                     return (
                       <div
                         key={band.id}
-                        className={`px-4 py-3 space-y-2 ${conflicts.length ? 'bg-red-900/20' : ''} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
+                        className={`px-4 py-3 space-y-2 ${cardHighlight} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <label className="flex items-center gap-3 text-white">
@@ -874,8 +892,10 @@ export default function LineupTab({
                             )}
                             <span className="font-medium">{band.name}</span>
                           </label>
-                          {conflicts.length ? (
+                          {exactConflicts.length ? (
                             <span className="text-xs font-bold text-red-400">CONFLICT</span>
+                          ) : overlaps.length ? (
+                            <span className="text-xs font-bold text-yellow-400">OVERLAP</span>
                           ) : (
                             <span className="text-xs text-text-tertiary">
                               {formatDurationLabel(band.start_time, band.end_time)}

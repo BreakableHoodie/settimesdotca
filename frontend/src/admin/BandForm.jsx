@@ -477,10 +477,16 @@ export default function BandForm({
         </div>
       </div>
 
-      {requireSchedule && conflicts.length > 0 && (
+      {requireSchedule && conflicts.conflicts.length > 0 && (
         <div className="bg-red-900/30 border border-red-600 rounded p-3 mb-4">
-          <p className="text-red-200 text-sm font-semibold mb-1">Time Conflict Detected!</p>
-          <p className="text-red-200 text-sm">This time overlaps with: {conflicts.join(', ')}</p>
+          <p className="text-red-200 text-sm font-semibold mb-1">Exact Time Conflict!</p>
+          <p className="text-red-200 text-sm">Same time as: {conflicts.conflicts.join(', ')}</p>
+        </div>
+      )}
+      {requireSchedule && conflicts.overlaps.length > 0 && (
+        <div className="bg-yellow-900/30 border border-yellow-600 rounded p-3 mb-4">
+          <p className="text-yellow-200 text-sm font-semibold mb-1">Time Overlap Detected</p>
+          <p className="text-yellow-200 text-sm">Overlaps with: {conflicts.overlaps.join(', ')}</p>
         </div>
       )}
 
@@ -526,7 +532,10 @@ BandForm.propTypes = {
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   onCancel: PropTypes.func.isRequired,
-  conflicts: PropTypes.arrayOf(PropTypes.string),
+  conflicts: PropTypes.shape({
+    overlaps: PropTypes.arrayOf(PropTypes.string),
+    conflicts: PropTypes.arrayOf(PropTypes.string),
+  }),
   globalView: PropTypes.bool,
   selectedProfile: PropTypes.object,
   originCitySuggestions: PropTypes.arrayOf(PropTypes.string),
@@ -536,5 +545,5 @@ BandForm.propTypes = {
 
 BandForm.defaultProps = {
   showEventIntro: false,
-  conflicts: [],
+  conflicts: { overlaps: [], conflicts: [] },
 }

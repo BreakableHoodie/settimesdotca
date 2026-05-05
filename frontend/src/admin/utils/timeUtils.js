@@ -102,33 +102,38 @@ export const deriveDurationMinutes = (startTime, endTime) => {
 
 const intervalsOverlap = (intervalA, intervalB) => intervalA[0] < intervalB[1] && intervalB[0] < intervalA[1]
 
+// Returns { overlaps: string[], conflicts: string[] }
+// conflicts = exact same start AND end time; overlaps = any other time intersection
 export const detectConflicts = (candidateBand, bands) => {
-  if (!candidateBand || !bands?.length) {
-    return []
-  }
+  const empty = { overlaps: [], conflicts: [] }
+  if (!candidateBand || !bands?.length) return empty
 
   const { event_id: eventId, venue_id: venueId, start_time: startTime, end_time: endTime, id } = candidateBand
-  if (!eventId || !venueId || !startTime || !endTime) {
-    return []
-  }
+  if (!eventId || !venueId || !startTime || !endTime) return empty
 
   const bandIntervals = buildTimeIntervals(startTime, endTime)
-  if (!bandIntervals.length) {
-    return []
+  if (!bandIntervals.length) return empty
+
+  const overlaps = []
+  const conflicts = []
+
+  for (const other of bands) {
+    if (!other) continue
+    if (id != null && other.id === id) continue
+    if (!other.event_id || !other.venue_id) continue
+    if (Number(other.event_id) !== Number(eventId) || Number(other.venue_id) !== Number(venueId)) continue
+
+    const otherIntervals = buildTimeIntervals(other.start_time, other.end_time)
+    if (!otherIntervals.some(b => bandIntervals.some(a => intervalsOverlap(a, b)))) continue
+
+    if (other.start_time === startTime && other.end_time === endTime) {
+      conflicts.push(other.name)
+    } else {
+      overlaps.push(other.name)
+    }
   }
 
-  return bands
-    .filter(other => {
-      if (!other) return false
-      if (id != null && other.id === id) return false
-      if (!other.event_id || !other.venue_id) return false
-      return Number(other.event_id) === Number(eventId) && Number(other.venue_id) === Number(venueId)
-    })
-    .filter(other => {
-      const otherIntervals = buildTimeIntervals(other.start_time, other.end_time)
-      return otherIntervals.some(intervalB => bandIntervals.some(intervalA => intervalsOverlap(intervalA, intervalB)))
-    })
-    .map(other => other.name)
+  return { overlaps, conflicts }
 }
 
 export const formatTimeLabel = time => {

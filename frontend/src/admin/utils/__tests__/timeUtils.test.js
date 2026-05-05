@@ -81,48 +81,70 @@ const band = (id, start, end) => ({
   end_time: end,
 })
 
+const noIssues = result => result.overlaps.length === 0 && result.conflicts.length === 0
+
 describe('detectConflicts — zero-duration bands', () => {
   it('does not conflict when start_time equals end_time (was falsely treated as 24h)', () => {
     const zeroDuration = band(1, '22:00', '22:00')
     const other = band(2, '21:00', '23:00')
-    // Zero-duration band should not conflict with anything
-    expect(detectConflicts(zeroDuration, [zeroDuration, other])).toHaveLength(0)
+    expect(noIssues(detectConflicts(zeroDuration, [zeroDuration, other]))).toBe(true)
   })
 
   it('does not cause others to falsely conflict with a zero-duration band', () => {
     const zeroDuration = band(1, '22:00', '22:00')
     const other = band(2, '21:00', '23:00')
-    expect(detectConflicts(other, [zeroDuration, other])).toHaveLength(0)
+    expect(noIssues(detectConflicts(other, [zeroDuration, other]))).toBe(true)
+  })
+})
+
+describe('detectConflicts — overlaps vs exact conflicts', () => {
+  it('classifies partial time overlap as overlap (not conflict)', () => {
+    const nightSet = band(1, '23:30', '00:30')
+    const earlySet = band(2, '00:00', '01:00')
+    const result1 = detectConflicts(nightSet, [nightSet, earlySet])
+    expect(result1.overlaps).toEqual(['Band 2'])
+    expect(result1.conflicts).toHaveLength(0)
+    const result2 = detectConflicts(earlySet, [nightSet, earlySet])
+    expect(result2.overlaps).toEqual(['Band 1'])
+    expect(result2.conflicts).toHaveLength(0)
+  })
+
+  it('classifies identical start AND end time as conflict (not overlap)', () => {
+    const setA = band(1, '21:00', '22:00')
+    const setB = band(2, '21:00', '22:00')
+    const result = detectConflicts(setA, [setA, setB])
+    expect(result.conflicts).toEqual(['Band 2'])
+    expect(result.overlaps).toHaveLength(0)
+  })
+
+  it('classifies same start but different end as overlap (not conflict)', () => {
+    const setA = band(1, '21:00', '22:00')
+    const setB = band(2, '21:00', '22:30')
+    const result = detectConflicts(setA, [setA, setB])
+    expect(result.overlaps).toEqual(['Band 2'])
+    expect(result.conflicts).toHaveLength(0)
   })
 })
 
 describe('detectConflicts — after-midnight sets', () => {
-  it('detects overlap between a midnight-spanning set and a late-night set', () => {
-    const nightSet = band(1, '23:30', '00:30') // spans midnight
-    const earlySet = band(2, '00:00', '01:00') // starts after midnight
-    // 00:00–00:30 overlap
-    expect(detectConflicts(nightSet, [nightSet, earlySet])).toEqual(['Band 2'])
-    expect(detectConflicts(earlySet, [nightSet, earlySet])).toEqual(['Band 1'])
-  })
-
   it('does not flag non-overlapping after-midnight sets as conflicts', () => {
     const setA = band(1, '23:00', '00:00') // ends exactly at midnight
     const setB = band(2, '00:00', '01:00') // starts exactly at midnight
     // Touching endpoints — strict inequality means no overlap
-    expect(detectConflicts(setA, [setA, setB])).toHaveLength(0)
-    expect(detectConflicts(setB, [setA, setB])).toHaveLength(0)
+    expect(noIssues(detectConflicts(setA, [setA, setB]))).toBe(true)
+    expect(noIssues(detectConflicts(setB, [setA, setB]))).toBe(true)
   })
 
   it('does not conflict across different venues', () => {
     const setA = { ...band(1, '23:00', '00:30'), venue_id: 1 }
     const setB = { ...band(2, '23:00', '00:30'), venue_id: 2 }
-    expect(detectConflicts(setA, [setA, setB])).toHaveLength(0)
+    expect(noIssues(detectConflicts(setA, [setA, setB]))).toBe(true)
   })
 
   it('does not conflict across different events', () => {
     const setA = { ...band(1, '23:00', '00:30'), event_id: 1 }
     const setB = { ...band(2, '23:00', '00:30'), event_id: 2 }
-    expect(detectConflicts(setA, [setA, setB])).toHaveLength(0)
+    expect(noIssues(detectConflicts(setA, [setA, setB]))).toBe(true)
   })
 })
 
@@ -130,6 +152,6 @@ describe('detectConflicts — requires event_id on candidate', () => {
   it('returns empty when candidate is missing event_id (guards against the form bug)', () => {
     const noEventId = { id: 1, name: 'X', venue_id: VENUE_ID, start_time: '22:00', end_time: '23:00' }
     const other = band(2, '22:30', '23:30')
-    expect(detectConflicts(noEventId, [other])).toHaveLength(0)
+    expect(noIssues(detectConflicts(noEventId, [other]))).toBe(true)
   })
 })

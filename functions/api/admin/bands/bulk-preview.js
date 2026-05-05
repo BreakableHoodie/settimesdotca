@@ -129,9 +129,15 @@ export async function onRequestPost(context) {
         .all();
 
       overlaps.results.forEach((conflict) => {
+        const isExact =
+          conflict.start_time === band.start_time &&
+          conflict.end_time === band.end_time;
         conflicts.push({
           band_id: band.id,
-          message: `"${band.name}" overlaps with "${conflict.name}" at new venue (${conflict.start_time}-${conflict.end_time})`,
+          type: isExact ? "conflict" : "overlap",
+          message: isExact
+            ? `"${band.name}" has the exact same time as "${conflict.name}" at the new venue (${conflict.start_time}-${conflict.end_time})`
+            : `"${band.name}" overlaps with "${conflict.name}" at new venue (${conflict.start_time}-${conflict.end_time})`,
           severity: "error",
         });
       });
@@ -186,9 +192,15 @@ export async function onRequestPost(context) {
         .all();
 
       overlaps.results.forEach((conflict) => {
+        const isExact =
+          conflict.start_time === start_time &&
+          conflict.end_time === newEndTime;
         conflicts.push({
           band_id: band.id,
-          message: `"${band.name}" overlaps with "${conflict.name}" at venue (${conflict.start_time}-${conflict.end_time})`,
+          type: isExact ? "conflict" : "overlap",
+          message: isExact
+            ? `"${band.name}" has the exact same time as "${conflict.name}" at venue (${conflict.start_time}-${conflict.end_time})`
+            : `"${band.name}" overlaps with "${conflict.name}" at venue (${conflict.start_time}-${conflict.end_time})`,
           severity: "error",
         });
       });

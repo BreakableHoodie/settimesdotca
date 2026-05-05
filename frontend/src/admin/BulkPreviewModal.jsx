@@ -42,9 +42,13 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
                 <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
                   <h4 className="text-red-400 font-semibold mb-3">⚠️ Exact time conflicts</h4>
                   <div className="space-y-2">
-                    {conflicts.filter(c => c.type === 'conflict').map((conflict, idx) => (
-                      <div key={idx} className="text-sm text-red-300">• {conflict.message}</div>
-                    ))}
+                    {conflicts
+                      .filter(c => c.type === 'conflict')
+                      .map((conflict, idx) => (
+                        <div key={idx} className="text-sm text-red-300">
+                          • {conflict.message}
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}
@@ -52,9 +56,13 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
                 <div className="bg-yellow-900/20 border border-yellow-600 rounded-lg p-4">
                   <h4 className="text-yellow-400 font-semibold mb-3">⚠️ Time overlaps</h4>
                   <div className="space-y-2">
-                    {conflicts.filter(c => c.type === 'overlap').map((conflict, idx) => (
-                      <div key={idx} className="text-sm text-yellow-300">• {conflict.message}</div>
-                    ))}
+                    {conflicts
+                      .filter(c => c.type === 'overlap')
+                      .map((conflict, idx) => (
+                        <div key={idx} className="text-sm text-yellow-300">
+                          • {conflict.message}
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}
@@ -62,9 +70,13 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
                 <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
                   <h4 className="text-red-400 font-semibold mb-3">⚠️ Issues detected</h4>
                   <div className="space-y-2">
-                    {conflicts.filter(c => c.type !== 'conflict' && c.type !== 'overlap').map((conflict, idx) => (
-                      <div key={idx} className="text-sm text-red-300">• {conflict.message}</div>
-                    ))}
+                    {conflicts
+                      .filter(c => c.type !== 'conflict' && c.type !== 'overlap')
+                      .map((conflict, idx) => (
+                        <div key={idx} className="text-sm text-red-300">
+                          • {conflict.message}
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}

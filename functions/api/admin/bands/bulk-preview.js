@@ -129,7 +129,9 @@ export async function onRequestPost(context) {
         .all();
 
       overlaps.results.forEach((conflict) => {
-        const isExact = conflict.start_time === band.start_time && conflict.end_time === band.end_time;
+        const isExact =
+          conflict.start_time === band.start_time &&
+          conflict.end_time === band.end_time;
         conflicts.push({
           band_id: band.id,
           type: isExact ? "conflict" : "overlap",
@@ -190,7 +192,9 @@ export async function onRequestPost(context) {
         .all();
 
       overlaps.results.forEach((conflict) => {
-        const isExact = conflict.start_time === start_time && conflict.end_time === newEndTime;
+        const isExact =
+          conflict.start_time === start_time &&
+          conflict.end_time === newEndTime;
         conflicts.push({
           band_id: band.id,
           type: isExact ? "conflict" : "overlap",

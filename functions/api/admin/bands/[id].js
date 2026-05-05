@@ -117,11 +117,13 @@ async function checkConflicts(
     );
 
     if (hasOverlap) {
+      const isExact = band.start_time === startTime && band.end_time === endTime;
       conflicts.push({
         id: band.id,
         name: band.name,
         startTime: band.start_time,
         endTime: band.end_time,
+        type: isExact ? "conflict" : "overlap",
       });
     }
   }

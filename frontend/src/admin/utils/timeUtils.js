@@ -1,4 +1,6 @@
 const MINUTES_PER_DAY = 24 * 60
+// Bands starting before this hour are treated as after-midnight (same night as the preceding evening)
+export const AFTER_MIDNIGHT_THRESHOLD_MINUTES = 6 * 60
 
 const isNumber = value => typeof value === 'number' && Number.isFinite(value)
 
@@ -15,7 +17,7 @@ const normalizeEndMinutes = (startMinutes, endMinutes) => {
   if (!isNumber(startMinutes) || !isNumber(endMinutes)) {
     return null
   }
-  return endMinutes <= startMinutes ? endMinutes + MINUTES_PER_DAY : endMinutes
+  return endMinutes < startMinutes ? endMinutes + MINUTES_PER_DAY : endMinutes
 }
 
 export const buildTimeIntervals = (startTime, endTime) => {
@@ -26,7 +28,7 @@ export const buildTimeIntervals = (startTime, endTime) => {
   }
 
   const normalizedEnd = normalizeEndMinutes(startMinutes, endMinutes)
-  if (normalizedEnd == null) {
+  if (normalizedEnd == null || normalizedEnd === startMinutes) {
     return []
   }
 
@@ -159,6 +161,9 @@ export const formatDurationLabel = (startTime, endTime) => {
   return `${durationMinutes} min`
 }
 
+const adjustForMidnight = mins =>
+  mins !== null && mins < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? mins + MINUTES_PER_DAY : mins
+
 export const sortBandsByStart = bands => {
   if (!Array.isArray(bands)) {
     return []
@@ -175,10 +180,13 @@ export const sortBandsByStart = bands => {
     if (aMinutes == null) return 1
     if (bMinutes == null) return -1
 
-    if (aMinutes === bMinutes) {
+    const aAdj = adjustForMidnight(aMinutes)
+    const bAdj = adjustForMidnight(bMinutes)
+
+    if (aAdj === bAdj) {
       return (bandA?.name || '').localeCompare(bandB?.name || '')
     }
 
-    return aMinutes - bMinutes
+    return aAdj - bAdj
   })
 }

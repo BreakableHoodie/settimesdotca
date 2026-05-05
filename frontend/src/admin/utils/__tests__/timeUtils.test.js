@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AFTER_MIDNIGHT_THRESHOLD_MINUTES, detectConflicts, parseTimeToMinutes, sortBandsByStart } from '../timeUtils'
+import { adjustForMidnight, detectConflicts, parseTimeToMinutes, sortBandsByStart } from '../timeUtils'
 
 // ─── sortBandsByStart ────────────────────────────────────────────────────────
 
@@ -49,8 +49,8 @@ describe('sortBandsByStart — after-midnight ordering', () => {
       if (aMin == null && bMin == null) return 0
       if (aMin == null) return 1
       if (bMin == null) return -1
-      const aAdj = aMin < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? aMin + 1440 : aMin
-      const bAdj = bMin < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? bMin + 1440 : bMin
+      const aAdj = adjustForMidnight(aMin)
+      const bAdj = adjustForMidnight(bMin)
       return (aAdj - bAdj) * direction
     })
     expect(sorted[sorted.length - 1].name).toBe('TBD')

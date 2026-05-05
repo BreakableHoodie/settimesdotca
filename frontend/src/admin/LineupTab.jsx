@@ -8,7 +8,7 @@ import ArtistPicker from './components/ArtistPicker'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import {
-  AFTER_MIDNIGHT_THRESHOLD_MINUTES,
+  adjustForMidnight,
   calculateEndTimeFromDuration,
   calculateStartTimeFromDuration,
   deriveDurationMinutes,
@@ -473,8 +473,8 @@ export default function LineupTab({
       if (aMin == null && bMin == null) return 0
       if (aMin == null) return 1
       if (bMin == null) return -1
-      const aAdj = aMin < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? aMin + 1440 : aMin
-      const bAdj = bMin < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? bMin + 1440 : bMin
+      const aAdj = adjustForMidnight(aMin)
+      const bAdj = adjustForMidnight(bMin)
       return (aAdj - bAdj) * direction
     })
   }, [filteredBands, sortConfig, getVenueName])

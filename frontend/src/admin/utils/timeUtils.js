@@ -161,7 +161,7 @@ export const formatDurationLabel = (startTime, endTime) => {
   return `${durationMinutes} min`
 }
 
-const adjustForMidnight = mins =>
+export const adjustForMidnight = mins =>
   mins !== null && mins < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? mins + MINUTES_PER_DAY : mins
 
 export const sortBandsByStart = bands => {

@@ -3,9 +3,8 @@ import { bandsApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faGlobe } from '@fortawesome/free-solid-svg-icons'
-import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
+import { Globe } from 'lucide-react'
+import { BandcampIcon, FacebookIcon, InstagramIcon } from '../components/ui/SocialIcons'
 
 function parseSocialLinks(band) {
   let links = {}
@@ -38,7 +37,7 @@ function SocialLinksIcons({ band }) {
           title="Website"
           aria-label={`Open website for ${band.name}`}
         >
-          <FontAwesomeIcon icon={faGlobe} />
+          <Globe size={14} />
         </a>
       )}
       {instagramHref !== '#' && (
@@ -50,7 +49,7 @@ function SocialLinksIcons({ band }) {
           title="Instagram"
           aria-label={`Open Instagram for ${band.name}`}
         >
-          <FontAwesomeIcon icon={faInstagram} />
+          <InstagramIcon size={14} />
         </a>
       )}
       {bandcampHref !== '#' && (
@@ -62,7 +61,7 @@ function SocialLinksIcons({ band }) {
           title="Bandcamp"
           aria-label={`Open Bandcamp for ${band.name}`}
         >
-          <FontAwesomeIcon icon={faBandcamp} />
+          <BandcampIcon size={14} />
         </a>
       )}
       {facebookHref !== '#' && (
@@ -74,7 +73,7 @@ function SocialLinksIcons({ band }) {
           title="Facebook"
           aria-label={`Open Facebook for ${band.name}`}
         >
-          <FontAwesomeIcon icon={faFacebook} />
+          <FacebookIcon size={14} />
         </a>
       )}
     </div>

@@ -1,5 +1,4 @@
-import { faLocationDot } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { MapPin } from 'lucide-react'
 import { safeExternalHref } from '../utils/urlSafety'
 
 function VenueInfo({ eventData }) {
@@ -31,7 +30,7 @@ function VenueInfo({ eventData }) {
                 <div key={venue.name} className={cardClassName}>
                   <h4 className="font-bold text-white text-sm mb-2">{venue.name}</h4>
                   <p className="text-accent-400 text-xs mb-1 flex items-center justify-center gap-2">
-                    <FontAwesomeIcon icon={faLocationDot} aria-hidden="true" />
+                    <MapPin size={12} aria-hidden="true" />
                     <span>{venue.address}</span>
                   </p>
                   {venue.note && <p className="text-text-tertiary text-xs italic mt-2">{venue.note}</p>}
@@ -51,7 +50,7 @@ function VenueInfo({ eventData }) {
               >
                 <h4 className="font-bold text-white text-sm mb-2">{venue.name}</h4>
                 <p className="text-accent-400 text-xs mb-1 flex items-center justify-center gap-2">
-                  <FontAwesomeIcon icon={faLocationDot} aria-hidden="true" />
+                  <MapPin size={14} aria-hidden="true" />
                   <span>{venue.address}</span>
                 </p>
                 {venue.note && <p className="text-text-tertiary text-xs italic mt-2">{venue.note}</p>}

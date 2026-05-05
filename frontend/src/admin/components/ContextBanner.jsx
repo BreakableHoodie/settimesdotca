@@ -1,6 +1,5 @@
+import { ArrowLeft, Target } from 'lucide-react'
 import { Button } from '../../components/ui'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowLeft, faBullseye } from '@fortawesome/free-solid-svg-icons'
 import EventStatusBadge from './EventStatusBadge'
 
 /**
@@ -20,7 +19,7 @@ export default function ContextBanner({ event, onClear }) {
     <div className="bg-accent-500/10 border-l-2 border-accent-500 px-4 py-2 mb-4 rounded-r animate-slide-down shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <FontAwesomeIcon icon={faBullseye} className="text-accent-500 text-lg" />
+          <Target size={18} className="text-accent-500" />
           <span className="text-text-secondary text-xs uppercase tracking-wide">Event</span>
           <span className="text-accent-500 font-semibold text-sm">{event.name}</span>
           <EventStatusBadge status={event.status} />
@@ -29,7 +28,7 @@ export default function ContextBanner({ event, onClear }) {
           onClick={onClear}
           variant="secondary"
           size="sm"
-          icon={<FontAwesomeIcon icon={faArrowLeft} />}
+          icon={<ArrowLeft size={14} />}
           iconPosition="left"
           className="whitespace-nowrap"
         >

@@ -1,7 +1,6 @@
+import { Lightbulb } from 'lucide-react'
 import PropTypes from 'prop-types'
 import { Card } from './ui'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faLightbulb } from '@fortawesome/free-solid-svg-icons'
 
 function buildFacts(band = {}, stats = {}) {
   const facts = []
@@ -49,7 +48,7 @@ export default function BandFacts({ band, stats }) {
   return (
     <Card variant="elevated">
       <h3 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
-        <FontAwesomeIcon icon={faLightbulb} className="text-accent-500" />
+        <Lightbulb size={18} className="text-accent-500" />
         Fast Facts
       </h3>
       <ul className="space-y-2">

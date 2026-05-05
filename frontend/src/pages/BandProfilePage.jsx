@@ -1,17 +1,5 @@
-import { faBandcamp, faFacebook, faInstagram } from '@fortawesome/free-brands-svg-icons'
-import {
-  faArrowLeft,
-  faCalendarDays,
-  faChartLine,
-  faCheck,
-  faClock,
-  faGlobe,
-  faGuitar,
-  faLocationDot,
-  faPlus,
-  faArchive,
-} from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { Archive, ArrowLeft, CalendarDays, Check, Clock, Globe, Guitar, MapPin, Plus, TrendingUp } from 'lucide-react'
+import { BandcampIcon, FacebookIcon, InstagramIcon } from '../components/ui/SocialIcons'
 import DOMPurify from 'dompurify'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Helmet, HelmetProvider } from 'react-helmet-async'
@@ -413,13 +401,7 @@ export default function BandProfilePage() {
             </p>
           </Alert>
           <div className="text-center">
-            <Button
-              as={Link}
-              to="/"
-              variant="secondary"
-              icon={<FontAwesomeIcon icon={faArrowLeft} />}
-              iconPosition="left"
-            >
+            <Button as={Link} to="/" variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
               Back to Schedule
             </Button>
           </div>
@@ -497,7 +479,7 @@ export default function BandProfilePage() {
                   to={scheduleEventSlug ? `/event/${scheduleEventSlug}` : '/'}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-500/20 text-accent-400 hover:bg-accent-500/30 transition-colors text-sm font-medium"
                 >
-                  <FontAwesomeIcon icon={faCalendarDays} />
+                  <CalendarDays size={14} />
                   My Schedule
                 </Link>
               )}
@@ -536,13 +518,13 @@ export default function BandProfilePage() {
                   <div className="flex flex-wrap gap-3">
                     {profile.genre && (
                       <span className="px-4 py-2 bg-accent-500 text-white rounded-lg font-bold text-sm shadow-lg">
-                        <FontAwesomeIcon icon={faGuitar} className="mr-2" aria-hidden="true" />
+                        <Guitar size={14} className="mr-2" aria-hidden="true" />
                         {profile.genre}
                       </span>
                     )}
                     {profile.origin && (
                       <span className="px-4 py-2 bg-bg-purple border-2 border-white/30 text-white rounded-lg font-bold text-sm shadow-lg">
-                        <FontAwesomeIcon icon={faLocationDot} className="mr-2" aria-hidden="true" />
+                        <MapPin size={14} className="mr-2" aria-hidden="true" />
                         {profile.origin}
                       </span>
                     )}
@@ -555,13 +537,13 @@ export default function BandProfilePage() {
                 <div className="flex flex-wrap gap-3">
                   {profile.genre && (
                     <span className="px-4 py-2 bg-accent-500 text-white rounded-lg font-bold text-sm">
-                      <FontAwesomeIcon icon={faGuitar} className="mr-2" aria-hidden="true" />
+                      <Guitar size={14} className="mr-2 inline" aria-hidden="true" />
                       {profile.genre}
                     </span>
                   )}
                   {profile.origin && (
                     <span className="px-4 py-2 bg-bg-navy border-2 border-white/30 text-white rounded-lg font-bold text-sm">
-                      <FontAwesomeIcon icon={faLocationDot} className="mr-2" aria-hidden="true" />
+                      <MapPin size={14} className="mr-2 inline" aria-hidden="true" />
                       {profile.origin}
                     </span>
                   )}
@@ -598,7 +580,7 @@ export default function BandProfilePage() {
                       className="px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
                       onClick={() => trackSocialClick(profile.id, 'website')}
                     >
-                      <FontAwesomeIcon icon={faGlobe} />
+                      <Globe size={16} />
                       Website
                     </a>
                   )}
@@ -610,7 +592,7 @@ export default function BandProfilePage() {
                       className="px-4 py-2 bg-linear-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
                       onClick={() => trackSocialClick(profile.id, 'instagram')}
                     >
-                      <FontAwesomeIcon icon={faInstagram} />
+                      <InstagramIcon size={16} />
                       Instagram
                     </a>
                   )}
@@ -622,7 +604,7 @@ export default function BandProfilePage() {
                       className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
                       onClick={() => trackSocialClick(profile.id, 'bandcamp')}
                     >
-                      <FontAwesomeIcon icon={faBandcamp} />
+                      <BandcampIcon size={16} />
                       Bandcamp
                     </a>
                   )}
@@ -634,7 +616,7 @@ export default function BandProfilePage() {
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
                       onClick={() => trackSocialClick(profile.id, 'facebook')}
                     >
-                      <FontAwesomeIcon icon={faFacebook} />
+                      <FacebookIcon size={16} />
                       Facebook
                     </a>
                   )}
@@ -651,7 +633,7 @@ export default function BandProfilePage() {
             <p className="text-xs text-text-secondary mb-3">Get notified when they join a new lineup.</p>
             {followStatus === 'success' ? (
               <p className="text-sm text-green-400">
-                <FontAwesomeIcon icon={faCheck} className="mr-1.5" />
+                <Check size={14} className="mr-1.5" />
                 You&apos;re following {profile.name}! We&apos;ll email you when they join a lineup.
               </p>
             ) : (
@@ -695,7 +677,7 @@ export default function BandProfilePage() {
                 <Card variant="elevated" className="border-2 border-accent-500/30">
                   <div className="pb-4 mb-4 border-b border-white/10">
                     <h2 className="text-2xl font-bold text-accent-500 flex items-center gap-2">
-                      <FontAwesomeIcon icon={faCalendarDays} />
+                      <CalendarDays size={14} />
                       <span>Upcoming Shows</span>
                       <Badge variant="primary" className="ml-2">
                         {profile.upcoming.length}
@@ -711,7 +693,7 @@ export default function BandProfilePage() {
                             <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
                               {performance.event_date && (
                                 <span className="flex items-center gap-2">
-                                  <FontAwesomeIcon icon={faCalendarDays} className="text-accent-500" />
+                                  <CalendarDays size={14} className="text-accent-500" />
                                   {(
                                     parseLocalDate(performance.event_date) || new Date(performance.event_date)
                                   ).toLocaleDateString('en-US', {
@@ -723,13 +705,13 @@ export default function BandProfilePage() {
                               )}
                               {performance.venue_name && (
                                 <span className="flex items-center gap-2">
-                                  <FontAwesomeIcon icon={faLocationDot} className="text-accent-500" />
+                                  <MapPin size={14} className="text-accent-500" />
                                   {performance.venue_name}
                                 </span>
                               )}
                               {performance.start_time && performance.end_time && (
                                 <span className="flex items-center gap-2">
-                                  <FontAwesomeIcon icon={faClock} className="text-accent-500" />
+                                  <Clock size={14} className="text-accent-500" />
                                   {formatTimeRange(performance.start_time, performance.end_time)}
                                 </span>
                               )}
@@ -742,7 +724,11 @@ export default function BandProfilePage() {
                               size="sm"
                               className="whitespace-nowrap"
                             >
-                              <FontAwesomeIcon icon={isInSchedule(performance) ? faCheck : faPlus} className="mr-2" />
+                              {isInSchedule(performance) ? (
+                                <Check size={14} className="mr-2" />
+                              ) : (
+                                <Plus size={14} className="mr-2" />
+                              )}
                               {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
                             </Button>
                             {performance.event_slug && (
@@ -763,7 +749,7 @@ export default function BandProfilePage() {
                 <Card variant="elevated">
                   <div className="pb-4 mb-4 border-b border-white/10">
                     <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-                      <FontAwesomeIcon icon={faChartLine} />
+                      <TrendingUp size={14} />
                       <span>Performance History</span>
                       <Badge variant="secondary" className="ml-2">
                         {profile.past.length}
@@ -779,7 +765,7 @@ export default function BandProfilePage() {
                               <h3 className="text-xl font-semibold text-accent-500">{performance.event_name}</h3>
                               {performance.event_status === 'archived' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-white/10 text-white/50 border border-white/10">
-                                  <FontAwesomeIcon icon={faArchive} className="text-xs" aria-hidden="true" />
+                                  <Archive size={12} aria-hidden="true" />
                                   Archived
                                 </span>
                               )}
@@ -787,7 +773,7 @@ export default function BandProfilePage() {
                             <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
                               {performance.event_date && (
                                 <span className="flex items-center gap-2">
-                                  <FontAwesomeIcon icon={faCalendarDays} className="text-text-tertiary" />
+                                  <CalendarDays size={14} className="text-text-tertiary" />
                                   {(
                                     parseLocalDate(performance.event_date) || new Date(performance.event_date)
                                   ).toLocaleDateString('en-US', {
@@ -799,13 +785,13 @@ export default function BandProfilePage() {
                               )}
                               {performance.venue_name && (
                                 <span className="flex items-center gap-2">
-                                  <FontAwesomeIcon icon={faLocationDot} className="text-text-tertiary" />
+                                  <MapPin size={14} className="text-text-tertiary" />
                                   {performance.venue_name}
                                 </span>
                               )}
                               {performance.start_time && performance.end_time && (
                                 <span className="flex items-center gap-2">
-                                  <FontAwesomeIcon icon={faClock} className="text-text-tertiary" />
+                                  <Clock size={14} className="text-text-tertiary" />
                                   {formatTimeRange(performance.start_time, performance.end_time)}
                                 </span>
                               )}
@@ -837,13 +823,7 @@ export default function BandProfilePage() {
 
           {/* Back to Events */}
           <div className="mt-6 text-center">
-            <Button
-              as={Link}
-              to="/"
-              variant="secondary"
-              icon={<FontAwesomeIcon icon={faArrowLeft} />}
-              iconPosition="left"
-            >
+            <Button as={Link} to="/" variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
               Back to Events
             </Button>
           </div>

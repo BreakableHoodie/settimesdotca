@@ -1,5 +1,4 @@
-import { faArrowUp } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { ArrowUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 const PRIVACY_KEY = 'privacy-acknowledged'
@@ -53,7 +52,7 @@ export default function BackToTop() {
         bannerVisible ? 'bottom-20' : 'bottom-6'
       } ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'}`}
     >
-      <FontAwesomeIcon icon={faArrowUp} />
+      <ArrowUp size={18} />
     </button>
   )
 }

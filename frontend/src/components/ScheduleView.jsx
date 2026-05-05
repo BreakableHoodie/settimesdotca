@@ -1,5 +1,4 @@
-import { faCheck, faCopy, faMusic } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { Check, Copy, Music } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
 import { copyToClipboard } from '../utils/clipboard'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
@@ -186,7 +185,11 @@ function ScheduleView({
             aria-label="Copy the full schedule"
             disabled={isCopyingAll}
           >
-            <FontAwesomeIcon icon={copyAllLabel === 'Copied!' ? faCheck : faCopy} aria-hidden="true" />
+            {copyAllLabel === 'Copied!' ? (
+              <Check size={14} aria-hidden="true" />
+            ) : (
+              <Copy size={14} aria-hidden="true" />
+            )}
             <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
           </button>
           {onSelectAll && (
@@ -273,7 +276,7 @@ function ScheduleView({
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-bg-navy/60"></span>
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-bg-navy"></span>
                   </span>
-                  <FontAwesomeIcon icon={faMusic} aria-hidden="true" />
+                  <Music size={16} aria-hidden="true" />
                   NOW PLAYING
                 </div>
                 <div className="flex-1 h-1 bg-accent-500 ml-4"></div>

@@ -1,26 +1,24 @@
 import {
-  faBell,
-  faBolt,
-  faCalendarPlus,
-  faCamera,
-  faCameraRetro,
-  faCheck,
-  faClock,
-  faCopy,
-  faDroplet,
-  faFaceSmile,
-  faGuitar,
-  faHourglassHalf,
-  faLink,
-  faMusic,
-  faPersonWalking,
-  faPizzaSlice,
-  faStar,
-  faTaxi,
-  faTrashCan,
-  faTriangleExclamation,
-} from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+  Bell,
+  CalendarPlus,
+  Camera,
+  Car,
+  Check,
+  Clock,
+  Copy,
+  Droplet,
+  Footprints,
+  Guitar,
+  Hourglass,
+  Link,
+  Music,
+  Pizza,
+  Smile,
+  Star,
+  Trash2,
+  TriangleAlert,
+  Zap,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx'
 import { copyToClipboard } from '../utils/clipboard'
@@ -90,7 +88,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       const minutesLeft = Math.ceil(diffToEnd / 1000 / 60)
       return {
         status: 'now',
-        icon: faGuitar,
+        icon: Guitar,
         text: `Playing now - ${minutesLeft} min left`,
         color: 'bg-green-500/20 border-green-500/50 text-green-200',
       }
@@ -100,7 +98,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     if (diffToEnd <= 0) {
       return {
         status: 'past',
-        icon: faCheck,
+        icon: Check,
         text: 'Finished',
         color: 'bg-gray-500/20 border-gray-500/50 text-gray-400',
       }
@@ -111,14 +109,14 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     if (minutesUntil <= 15) {
       return {
         status: 'soon',
-        icon: faBell,
+        icon: Bell,
         text: 'Starting soon!',
         color: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-200',
       }
     } else if (minutesUntil <= 60) {
       return {
         status: 'upcoming',
-        icon: faClock,
+        icon: Clock,
         text: `In ${minutesUntil} min`,
         color: 'bg-blue-500/20 border-blue-500/50 text-blue-200',
       }
@@ -132,7 +130,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       if (mins > 0) parts.push(`${mins}m`)
       return {
         status: 'later',
-        icon: faHourglassHalf,
+        icon: Hourglass,
         text: `In ${parts.join(' ')}`,
         color: 'bg-blue-500/20 border-blue-500/50 text-blue-200',
       }
@@ -142,7 +140,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       const timeLabel = mins === 0 ? `${hours}h` : `${hours}h ${mins}m`
       return {
         status: 'later',
-        icon: faHourglassHalf,
+        icon: Hourglass,
         text: `In ${timeLabel}`,
         color: 'bg-blue-500/20 border-blue-500/50 text-blue-200',
       }
@@ -196,8 +194,8 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
   if (sortedBands.length === 0) {
     return (
       <div className="py-16 text-center space-y-4">
-        <div className="text-white/20 text-6xl mb-2">
-          <FontAwesomeIcon icon={faCalendarPlus} aria-hidden="true" />
+        <div className="text-white/20 mb-2">
+          <CalendarPlus size={60} aria-hidden="true" />
         </div>
         <p className="text-white text-xl font-semibold">No bands selected yet</p>
         <p className="text-accent-400 text-sm">Tap a band to start building your schedule</p>
@@ -264,32 +262,32 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
     // Show different messages based on context
     if (longestBreak >= 60) {
       return {
-        icon: faPizzaSlice,
+        icon: Pizza,
         text: "You've got some longer breaks - perfect time to grab food or hang with friends!",
       }
     } else if (currentHour >= 21 && currentHour < 22) {
       return {
-        icon: faDroplet,
+        icon: Droplet,
         text: 'Stay hydrated! Grab some water and maybe a snack',
       }
     } else if (currentHour >= 22 && currentHour < 23) {
       return {
-        icon: faCamera,
+        icon: Camera,
         text: "Don't forget to take some pictures and videos!",
       }
     } else if (currentHour >= 23 || currentHour < 1) {
       return {
-        icon: faCameraRetro,
+        icon: Camera,
         text: 'Capture the memories - snap some selfies with your friends!',
       }
     } else if (currentHour >= 1 && currentHour < 3) {
       return {
-        icon: faMusic,
+        icon: Music,
         text: 'Late night energy! Have fun and enjoy the music!',
       }
     } else if (visibleBands.length >= 5) {
       return {
-        icon: faStar,
+        icon: Star,
         text: 'Stacked lineup! Keep the fun rolling all night.',
       }
     }
@@ -384,7 +382,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                 title={copyButtonLabel === 'Copied!' ? 'Schedule copied to clipboard' : 'Copy your schedule'}
                 disabled={isCopyingSchedule}
               >
-                <FontAwesomeIcon icon={copyButtonLabel === 'Copied!' ? faCheck : faCopy} aria-hidden="true" />
+                {copyButtonLabel === 'Copied!' ? (
+                  <Check size={14} aria-hidden="true" />
+                ) : (
+                  <Copy size={14} aria-hidden="true" />
+                )}
                 <span className="transition-opacity duration-200 ease-in-out">{copyButtonLabel}</span>
               </button>
               {bands.length > 0 && (
@@ -394,7 +396,11 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                   title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Share your schedule'}
                   aria-label="Copy shareable link to your schedule"
                 >
-                  <FontAwesomeIcon icon={shareButtonLabel === 'Link Copied!' ? faCheck : faLink} aria-hidden="true" />
+                  {shareButtonLabel === 'Link Copied!' ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <Link size={14} aria-hidden="true" />
+                  )}
                   <span className="transition-opacity duration-200 ease-in-out">{shareButtonLabel}</span>
                 </button>
               )}
@@ -403,7 +409,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                 className="text-xs px-3 py-1.5 rounded bg-red-500/20 border border-red-500/50 text-red-200 flex items-center gap-2 transition-transform duration-150 hover:bg-red-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300"
                 title="Clear all selected bands"
               >
-                <FontAwesomeIcon icon={faTrashCan} aria-hidden="true" />
+                <Trash2 size={14} aria-hidden="true" />
                 <span>Clear All</span>
               </button>
             </div>
@@ -415,7 +421,10 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       {reminder && (
         <div className="max-w-5xl mx-auto">
           <div className="text-xs text-green-300 bg-green-900/20 px-4 py-2 rounded border border-green-500/30 text-center flex items-center justify-center gap-2 leading-normal">
-            <FontAwesomeIcon icon={reminder.icon} aria-hidden="true" />
+            {(() => {
+              const ReminderIcon = reminder.icon
+              return <ReminderIcon size={14} aria-hidden="true" />
+            })()}
             <span>{reminder.text}</span>
           </div>
         </div>
@@ -426,7 +435,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           {overlaps.length > 0 && (
             <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
               <div className="flex items-center gap-3 text-yellow-200 font-semibold">
-                <FontAwesomeIcon icon={faBolt} className="text-yellow-300 text-xl shrink-0" aria-hidden="true" />
+                <Zap size={20} className="text-yellow-300 shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
                   {overlaps.length} band{overlaps.length !== 1 ? 's' : ''} happening at the same time — you&apos;ll need
                   to choose!
@@ -437,11 +446,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
           {conflicts.length > 0 && (
             <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 leading-normal">
               <div className="flex items-center gap-3 text-red-200 font-semibold">
-                <FontAwesomeIcon
-                  icon={faTriangleExclamation}
-                  className="text-red-300 text-xl shrink-0"
-                  aria-hidden="true"
-                />
+                <TriangleAlert size={20} className="text-red-300 shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
                   {conflicts.length} overlapping set{conflicts.length !== 1 ? 's' : ''} — you may not catch every full
                   set.
@@ -484,7 +489,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
               {timeGap && <div className="text-center text-white/50 text-xs italic py-3">{timeGap}</div>}
               {showDreReminder && (
                 <div className="text-center text-white/80 text-xs italic pb-2 flex items-center justify-center gap-2">
-                  <FontAwesomeIcon icon={faFaceSmile} className="text-yellow-300" aria-hidden="true" />
+                  <Smile size={14} className="text-yellow-300" aria-hidden="true" />
                   <span>{getHighlightMessage()}</span>
                 </div>
               )}
@@ -492,7 +497,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                 {/* Travel warning - appears ABOVE the band card */}
                 {travelWarning && (
                   <div className="text-xs text-blue-300 bg-blue-900/30 px-3 py-1.5 rounded border border-blue-500/30 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faPersonWalking} aria-hidden="true" title="Travel time alert" />
+                    <Footprints size={14} aria-hidden="true" title="Travel time alert" />
                     <span>Heads up, the next show at {travelWarning}</span>
                   </div>
                 )}
@@ -533,7 +538,10 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                     <div
                       className={`text-xs font-semibold px-3 py-1.5 rounded border ${timeStatus.color} flex items-center gap-2 leading-normal`}
                     >
-                      <FontAwesomeIcon icon={timeStatus.icon} aria-hidden="true" />
+                      {(() => {
+                        const StatusIcon = timeStatus.icon
+                        return <StatusIcon size={14} aria-hidden="true" />
+                      })()}
                       <span>{timeStatus.text}</span>
                     </div>
                   )
@@ -545,7 +553,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
       </div>
 
       <div className="max-w-5xl mx-auto mt-8 text-center text-xs text-white/60">
-        <FontAwesomeIcon icon={faTaxi} aria-hidden="true" className="mr-2" />
+        <Car size={14} aria-hidden="true" className="mr-2 inline" />
         Home safe plan: grab a rideshare, call a friend, or line up a sober ride—no drinking and driving.
       </div>
     </div>

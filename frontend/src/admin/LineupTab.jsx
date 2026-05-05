@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
+import { Eye, EyeOff } from 'lucide-react'
 import { bandsApi, venuesApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
@@ -810,7 +809,7 @@ export default function LineupTab({
                                     } ${togglingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
                                   >
-                                    <FontAwesomeIcon icon={band.is_announced ? faEye : faEyeSlash} />
+                                    {band.is_announced ? <Eye size={14} /> : <EyeOff size={14} />}
                                   </button>
                                 )}
                                 <button
@@ -893,7 +892,7 @@ export default function LineupTab({
                                 } ${togglingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
                               >
-                                <FontAwesomeIcon icon={band.is_announced ? faEye : faEyeSlash} />
+                                {band.is_announced ? <Eye size={14} /> : <EyeOff size={14} />}
                               </button>
                             )}
                             <button

@@ -1,6 +1,5 @@
+import { Plus, TriangleAlert, X, Zap } from 'lucide-react'
 import { memo } from 'react'
-import { faBolt, faPlus, faTriangleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { Link } from 'react-router-dom'
 import { slugifyBandName } from '../utils/slugify'
 import { getTimeDescription, isHappeningNow, isStartingSoon } from '../utils/timeFilter'
@@ -72,7 +71,7 @@ function BandCard({
         aria-label={labelBase}
         title={labelBase}
       >
-        <FontAwesomeIcon icon={isSelected ? faXmark : faPlus} aria-hidden="true" />
+        {isSelected ? <X size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
       </button>
 
       <div className="flex flex-col items-center gap-2 pr-10">
@@ -129,7 +128,11 @@ function BandCard({
               warningType === 'overlap' ? 'bg-yellow-500/30 text-yellow-200' : 'bg-red-500/30 text-red-200'
             }`}
           >
-            <FontAwesomeIcon icon={warningType === 'overlap' ? faBolt : faTriangleExclamation} aria-hidden="true" />
+            {warningType === 'overlap' ? (
+              <Zap size={14} aria-hidden="true" />
+            ) : (
+              <TriangleAlert size={14} aria-hidden="true" />
+            )}
             <span>{warningText}</span>
           </div>
         )}

@@ -1,23 +1,14 @@
-import {
-  faCalendarDays,
-  faGuitar,
-  faUsers,
-  faWarehouse,
-  faGear,
-  faList,
-  faSliders,
-} from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { CalendarDays, Guitar, List, Settings, SlidersHorizontal, Users, Warehouse } from 'lucide-react'
 import PropTypes from 'prop-types'
 
 const buildNavItems = ({ showLineup, showUsers, showPlatform }) => [
-  { id: 'events', label: 'Events', icon: faCalendarDays },
-  ...(showLineup ? [{ id: 'lineup', label: 'Lineup', icon: faList }] : []),
-  { id: 'roster', label: 'Roster', icon: faGuitar },
-  { id: 'venues', label: 'Venues', icon: faWarehouse },
-  ...(showUsers ? [{ id: 'users', label: 'Users', icon: faUsers }] : []),
-  { id: 'settings', label: 'Settings', icon: faGear },
-  ...(showPlatform ? [{ id: 'platform', label: 'Platform', icon: faSliders }] : []),
+  { id: 'events', label: 'Events', icon: CalendarDays },
+  ...(showLineup ? [{ id: 'lineup', label: 'Lineup', icon: List }] : []),
+  { id: 'roster', label: 'Roster', icon: Guitar },
+  { id: 'venues', label: 'Venues', icon: Warehouse },
+  ...(showUsers ? [{ id: 'users', label: 'Users', icon: Users }] : []),
+  { id: 'settings', label: 'Settings', icon: Settings },
+  ...(showPlatform ? [{ id: 'platform', label: 'Platform', icon: SlidersHorizontal }] : []),
 ]
 
 export default function BottomNav({ activeTab, onTabChange, showLineup, showUsers, showPlatform }) {
@@ -34,7 +25,7 @@ export default function BottomNav({ activeTab, onTabChange, showLineup, showUser
               activeTab === item.id ? 'text-accent-500 bg-accent-500/10' : 'text-text-tertiary hover:text-white'
             }`}
           >
-            <FontAwesomeIcon icon={item.icon} className="text-lg mb-1" />
+            <item.icon size={18} className="mb-1" />
             {item.label}
           </button>
         ))}

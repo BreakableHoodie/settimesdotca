@@ -503,13 +503,10 @@ export default function LineupTab({
     )
   }, [bands, editingId, formData.event_id, formData.venue_id, formData.start_time, formData.end_time])
 
-  const combinedConflicts = useMemo(
-    () => ({
-      overlaps: [...new Set([...formConflicts.overlaps, ...serverConflicts.overlaps])],
-      conflicts: [...new Set([...formConflicts.conflicts, ...serverConflicts.conflicts])],
-    }),
-    [formConflicts, serverConflicts]
-  )
+  const combinedConflicts = useMemo(() => ({
+    overlaps: [...new Set([...formConflicts.overlaps, ...serverConflicts.overlaps])],
+    conflicts: [...new Set([...formConflicts.conflicts, ...serverConflicts.conflicts])],
+  }), [formConflicts, serverConflicts])
 
   // Select logic
   const handleSelect = (id, checked) => {
@@ -780,11 +777,7 @@ export default function LineupTab({
                     <tbody className="divide-y divide-accent-500/10">
                       {sortedBands.map(band => {
                         const { overlaps, conflicts: exactConflicts } = detectConflicts(band, bands)
-                        const rowHighlight = exactConflicts.length
-                          ? 'bg-red-900/20'
-                          : overlaps.length
-                            ? 'bg-yellow-900/10'
-                            : ''
+                        const rowHighlight = exactConflicts.length ? 'bg-red-900/20' : overlaps.length ? 'bg-yellow-900/10' : ''
                         return (
                           <tr
                             key={band.id}
@@ -870,11 +863,7 @@ export default function LineupTab({
                   )}
                   {sortedBands.map(band => {
                     const { overlaps, conflicts: exactConflicts } = detectConflicts(band, bands)
-                    const cardHighlight = exactConflicts.length
-                      ? 'bg-red-900/20'
-                      : overlaps.length
-                        ? 'bg-yellow-900/10'
-                        : ''
+                    const cardHighlight = exactConflicts.length ? 'bg-red-900/20' : overlaps.length ? 'bg-yellow-900/10' : ''
                     return (
                       <div
                         key={band.id}

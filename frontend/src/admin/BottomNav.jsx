@@ -14,7 +14,10 @@ const buildNavItems = ({ showLineup, showUsers, showPlatform }) => [
 export default function BottomNav({ activeTab, onTabChange, showLineup, showUsers, showPlatform }) {
   const navItems = buildNavItems({ showLineup, showUsers, showPlatform })
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-bg-purple/95 border-t border-white/10 backdrop-blur-xs z-40">
+    <nav
+      className="md:hidden fixed bottom-0 left-0 right-0 bg-bg-purple/95 border-t border-white/10 backdrop-blur-xs z-40"
+      style={{ paddingBottom: 'var(--spacing-safe-bottom)' }}
+    >
       <div className="grid grid-flow-col auto-cols-fr">
         {navItems.map(item => (
           <button

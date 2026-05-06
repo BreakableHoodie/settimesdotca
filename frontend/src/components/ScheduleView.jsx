@@ -6,6 +6,7 @@ import { filterPerformancesByTime } from '../utils/timeFilter'
 import BandCard from './BandCard'
 
 const UNSCHEDULED = Symbol('unscheduled')
+const UNSCHEDULED_FILTER_VALUE = '__unscheduled__'
 
 function groupByTime(bands) {
   const timeGroups = new Map()
@@ -34,11 +35,16 @@ function ScheduleView({
   showPast,
   onToggleShowPast,
   timeFilter = 'all',
+  venueFilter: controlledVenueFilter,
+  onVenueFilterChange,
+  showVenueFilter = true,
+  eventSlug,
 }) {
-  const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
+  const [copyAllLabel, setCopyAllLabel] = useState('Copy Visible Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
-  const [venueFilter, setVenueFilter] = useState(null)
+  const [localVenueFilter, setLocalVenueFilter] = useState(null)
   const [genreFilter, setGenreFilter] = useState(null)
+  const venueFilter = controlledVenueFilter === undefined ? localVenueFilter : controlledVenueFilter
   const nowMs = useMemo(() => {
     const d = currentTime instanceof Date ? currentTime : new Date(currentTime)
     return d.getTime()
@@ -126,32 +132,64 @@ function ScheduleView({
   const pastByTime = useMemo(() => groupByTime(pastBands).reverse(), [pastBands])
 
   const selectedBandsSet = useMemo(() => new Set(selectedBands), [selectedBands])
+  const visibleBandIds = useMemo(() => visibleBands.map(band => band.id), [visibleBands])
+  const canToggleBands = typeof onToggleBand === 'function'
+  const canTogglePast = typeof onToggleShowPast === 'function'
+  const canSelectAll = typeof onSelectAll === 'function' && visibleBands.length > 0
 
-  const allSelected = bands.length > 0 && selectedBands.length === bands.length
+  const allSelected = visibleBandIds.length > 0 && visibleBandIds.every(id => selectedBandsSet.has(id))
+  const canCopyVisible = sortedBands.length > 0
   const hiddenFinished = !showPast ? finishedCount : 0
   const noVisibleBands = sortedBands.length === 0
 
   const copyBands = async bandsToCopy => {
     if (bandsToCopy.length === 0) return false
     const text = bandsToCopy
-      .map(band => `${band.name} — ${formatTimeRange(band.startTime, band.endTime)} @ ${band.venue}`)
+      .map(band => {
+        const venuePart = band.venue ? ` @ ${band.venue}` : ''
+        return `${band.name} — ${formatTimeRange(band.startTime, band.endTime)}${venuePart}`
+      })
       .join('\n')
     return copyToClipboard(text)
   }
 
   const handleCopyAll = async () => {
-    if (isCopyingAll) return
+    if (isCopyingAll || !canCopyVisible) return
     setIsCopyingAll(true)
-    const success = await copyBands(bands)
+    const success = await copyBands(sortedBands)
     if (success) {
       setCopyAllLabel('Copied!')
       setTimeout(() => {
-        setCopyAllLabel('Copy Full Schedule')
+        setCopyAllLabel('Copy Visible Schedule')
         setIsCopyingAll(false)
       }, 2000)
     } else {
       setIsCopyingAll(false)
     }
+  }
+
+  const handleSelectAll = () => {
+    if (!canSelectAll) return
+    onSelectAll(visibleBands)
+  }
+
+  const handleVenueFilterToggle = nextVenue => {
+    const nextValue = venueFilter === nextVenue ? null : nextVenue
+    if (typeof onVenueFilterChange === 'function') {
+      onVenueFilterChange(nextValue)
+      return
+    }
+    setLocalVenueFilter(nextValue)
+  }
+
+  const handleVenueSelectChange = event => {
+    const nextValue = event.target.value
+    if (nextValue === '') {
+      handleVenueFilterToggle(venueFilter)
+      return
+    }
+
+    handleVenueFilterToggle(nextValue === UNSCHEDULED_FILTER_VALUE ? UNSCHEDULED : nextValue)
   }
 
   return (
@@ -166,7 +204,7 @@ function ScheduleView({
           )}
         </div>
         <div className="flex justify-center sm:justify-end gap-3 flex-wrap">
-          {finishedCount > 0 && (
+          {finishedCount > 0 && canTogglePast && (
             <button
               onClick={onToggleShowPast}
               className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
@@ -182,10 +220,20 @@ function ScheduleView({
           )}
           <button
             onClick={handleCopyAll}
-            className="text-xs px-3 py-1.5 min-h-[44px] rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400"
-            title={copyAllLabel === 'Copied!' ? 'Full schedule copied to clipboard' : 'Copy the full schedule'}
-            aria-label="Copy the full schedule"
-            disabled={isCopyingAll}
+            className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-white flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+              canCopyVisible
+                ? 'bg-bg-purple/60 border-bg-purple/40 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95'
+                : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
+            }`}
+            title={
+              !canCopyVisible
+                ? 'No visible bands to copy'
+                : copyAllLabel === 'Copied!'
+                  ? 'Visible schedule copied to clipboard'
+                  : 'Copy the visible schedule'
+            }
+            aria-label="Copy the visible schedule"
+            disabled={isCopyingAll || !canCopyVisible}
           >
             {copyAllLabel === 'Copied!' ? (
               <Check size={14} aria-hidden="true" />
@@ -194,16 +242,16 @@ function ScheduleView({
             )}
             <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
           </button>
-          {onSelectAll && (
+          {canSelectAll && (
             <button
-              onClick={onSelectAll}
+              onClick={handleSelectAll}
               disabled={allSelected}
               className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 allSelected
                   ? 'bg-gray-500/20 border border-gray-500/50 text-gray-400 cursor-not-allowed'
                   : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
               }`}
-              title={allSelected ? 'All bands already selected' : 'Select all bands'}
+              title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}
             >
               {allSelected ? 'All Selected' : 'Select All'}
             </button>
@@ -212,65 +260,111 @@ function ScheduleView({
       </div>
 
       {/* Filter pills */}
-      {(uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
-        <div className="space-y-3">
-          {(uniqueVenues.length > 1 || hasUnscheduled) && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
-              <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
-                {uniqueVenues.map(venue => (
-                  <button
-                    key={venue}
-                    onClick={() => setVenueFilter(prev => (prev === venue ? null : venue))}
-                    aria-pressed={venueFilter === venue}
-                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
-                      venueFilter === venue
-                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
-                    }`}
+      {(showVenueFilter || uniqueGenres.length > 0) &&
+        (uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
+          <div className="space-y-3">
+            <div className="grid gap-2 sm:hidden">
+              {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
+                <div className="space-y-1.5">
+                  <label htmlFor="schedule-venue-filter" className="sr-only">
+                    Venue filter
+                  </label>
+                  <select
+                    id="schedule-venue-filter"
+                    value={venueFilter === UNSCHEDULED ? UNSCHEDULED_FILTER_VALUE : venueFilter || ''}
+                    onChange={handleVenueSelectChange}
+                    className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
                   >
-                    {venue}
-                  </button>
-                ))}
-                {hasUnscheduled && (
-                  <button
-                    onClick={() => setVenueFilter(prev => (prev === UNSCHEDULED ? null : UNSCHEDULED))}
-                    aria-pressed={venueFilter === UNSCHEDULED}
-                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
-                      venueFilter === UNSCHEDULED
-                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
-                    }`}
+                    <option value="">All Venues</option>
+                    {uniqueVenues.map(venue => (
+                      <option key={venue} value={venue}>
+                        {venue}
+                      </option>
+                    ))}
+                    {hasUnscheduled && <option value={UNSCHEDULED_FILTER_VALUE}>Unscheduled</option>}
+                  </select>
+                </div>
+              )}
+
+              {uniqueGenres.length > 0 && (
+                <div className="space-y-1.5">
+                  <label htmlFor="schedule-genre-filter" className="sr-only">
+                    Genre filter
+                  </label>
+                  <select
+                    id="schedule-genre-filter"
+                    value={genreFilter || ''}
+                    onChange={event => setGenreFilter(event.target.value || null)}
+                    className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
                   >
-                    Unscheduled
-                  </button>
-                )}
-              </div>
+                    <option value="">All Genres</option>
+                    {uniqueGenres.map(genre => (
+                      <option key={genre} value={genre}>
+                        {genre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-          )}
-          {uniqueGenres.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Genre</span>
-              <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
-                {uniqueGenres.map(genre => (
-                  <button
-                    key={genre}
-                    onClick={() => setGenreFilter(prev => (prev === genre ? null : genre))}
-                    aria-pressed={genreFilter === genre}
-                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
-                      genreFilter === genre
-                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
-                    }`}
-                  >
-                    {genre}
-                  </button>
-                ))}
+
+            {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
+              <div className="hidden items-center gap-2 sm:flex">
+                <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
+                <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
+                  {uniqueVenues.map(venue => (
+                    <button
+                      key={venue}
+                      onClick={() => handleVenueFilterToggle(venue)}
+                      aria-pressed={venueFilter === venue}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        venueFilter === venue
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      {venue}
+                    </button>
+                  ))}
+                  {hasUnscheduled && (
+                    <button
+                      onClick={() => handleVenueFilterToggle(UNSCHEDULED)}
+                      aria-pressed={venueFilter === UNSCHEDULED}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        venueFilter === UNSCHEDULED
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      Unscheduled
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+            {uniqueGenres.length > 0 && (
+              <div className="hidden items-center gap-2 sm:flex">
+                <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Genre</span>
+                <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
+                  {uniqueGenres.map(genre => (
+                    <button
+                      key={genre}
+                      onClick={() => setGenreFilter(prev => (prev === genre ? null : genre))}
+                      aria-pressed={genreFilter === genre}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        genreFilter === genre
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      {genre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       {noVisibleBands ? (
         <div className="text-center text-white/70 py-12">
@@ -303,7 +397,9 @@ function ScheduleView({
                     band={band}
                     isSelected={selectedBandsSet.has(band.id)}
                     onToggle={onToggleBand}
-                    clickable={!!onToggleBand}
+                    clickable={canToggleBands}
+                    showToggleButton={canToggleBands}
+                    eventSlug={eventSlug}
                     showVenue={true}
                     currentTime={currentTime}
                   />
@@ -336,6 +432,9 @@ function ScheduleView({
                         band={band}
                         isSelected={selectedBandsSet.has(band.id)}
                         onToggle={onToggleBand}
+                        clickable={canToggleBands}
+                        showToggleButton={canToggleBands}
+                        eventSlug={eventSlug}
                         showVenue={true}
                         currentTime={currentTime}
                       />
@@ -370,6 +469,9 @@ function ScheduleView({
                         band={band}
                         isSelected={selectedBandsSet.has(band.id)}
                         onToggle={onToggleBand}
+                        clickable={canToggleBands}
+                        showToggleButton={canToggleBands}
+                        eventSlug={eventSlug}
                         showVenue={true}
                         currentTime={currentTime}
                       />

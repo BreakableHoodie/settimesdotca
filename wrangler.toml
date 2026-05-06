@@ -9,6 +9,7 @@ name = "settimesdotca"
 compatibility_date = "2025-10-08"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "frontend/dist"
+
 # Note: Cloudflare Pages ignores wrangler [build] configs and expects the final
 # artifacts to be present in pages_build_output_dir. The GitHub Actions workflow
 # handles installing dependencies and running `npm run build` before deploying.

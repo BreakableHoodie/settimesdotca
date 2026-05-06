@@ -145,7 +145,10 @@ function ScheduleView({
   const copyBands = async bandsToCopy => {
     if (bandsToCopy.length === 0) return false
     const text = bandsToCopy
-      .map(band => `${band.name} — ${formatTimeRange(band.startTime, band.endTime)} @ ${band.venue}`)
+      .map(band => {
+        const venuePart = band.venue ? ` @ ${band.venue}` : ''
+        return `${band.name} — ${formatTimeRange(band.startTime, band.endTime)}${venuePart}`
+      })
       .join('\n')
     return copyToClipboard(text)
   }

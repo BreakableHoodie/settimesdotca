@@ -663,7 +663,6 @@ function EventCard({
             </div>
           )}
 
-          {detailsLoading && <div className="p-6 text-text-tertiary text-sm">Loading event details...</div>}
         </div>
       )}
     </Card>

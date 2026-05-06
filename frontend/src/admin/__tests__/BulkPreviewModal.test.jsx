@@ -4,7 +4,9 @@ import '@testing-library/jest-dom'
 import BulkPreviewModal from '../BulkPreviewModal'
 
 const makePreview = ({ conflicts = [], changes = [] } = {}) => ({
-  changes: changes.length ? changes : [{ band_id: 1, band_name: 'Test Band', action: 'move_venue', from_venue: 'Stage A', to_venue: 'Stage B' }],
+  changes: changes.length
+    ? changes
+    : [{ band_id: 1, band_name: 'Test Band', action: 'move_venue', from_venue: 'Stage A', to_venue: 'Stage B' }],
   conflicts,
 })
 

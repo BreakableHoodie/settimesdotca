@@ -80,7 +80,8 @@ export async function onRequestDelete(context) {
 
     const performanceIds = band_ids
       .filter((id) => !id.toString().startsWith("profile_"))
-      .map(Number);
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0);
     const archivedPerformances = await getArchivedPerformancesByPerformanceIds(
       DB,
       performanceIds,

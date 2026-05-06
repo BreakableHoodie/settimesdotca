@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import MySchedule from '../components/MySchedule'
 
-const makeMs = (timeStr) => new Date(`2026-05-17T${timeStr}:00`).getTime()
+const makeMs = timeStr => new Date(`2026-05-17T${timeStr}:00`).getTime()
 
 const makeBand = (id, name, venue, startTime, endTime) => ({
   id: `event-test-perf-${id}`,
@@ -14,9 +14,7 @@ const makeBand = (id, name, venue, startTime, endTime) => ({
   startTime,
   endTime,
   startMs: makeMs(startTime),
-  endMs: makeMs(endTime) > makeMs(startTime)
-    ? makeMs(endTime)
-    : makeMs(endTime) + 24 * 60 * 60 * 1000,
+  endMs: makeMs(endTime) > makeMs(startTime) ? makeMs(endTime) : makeMs(endTime) + 24 * 60 * 60 * 1000,
   genre: null,
   performance_id: id,
 })
@@ -35,7 +33,11 @@ describe('MySchedule — conflict vs overlap severity', () => {
       makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30'),
       makeBand(2, 'Band Beta', 'Stage B', '20:00', '20:30'),
     ]
-    render(<MemoryRouter><MySchedule {...defaultProps} bands={bands} /></MemoryRouter>)
+    render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
 
     // "Same time as" text must exist
     const warnings = screen.getAllByText(/Same time as/i)
@@ -52,7 +54,11 @@ describe('MySchedule — conflict vs overlap severity', () => {
       makeBand(1, 'Band Alpha', 'Stage A', '19:00', '19:30'),
       makeBand(2, 'Band Beta', 'Stage B', '19:15', '19:45'),
     ]
-    render(<MemoryRouter><MySchedule {...defaultProps} bands={bands} /></MemoryRouter>)
+    render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
 
     const warnings = screen.getAllByText(/Overlaps with/i)
     expect(warnings.length).toBeGreaterThan(0)
@@ -69,7 +75,11 @@ describe('MySchedule — conflict vs overlap severity', () => {
       makeBand(2, 'Band Beta', 'Stage B', '20:00', '20:45'), // same start as Alpha
       makeBand(3, 'Band Gamma', 'Stage C', '19:45', '20:15'), // partial overlap with Alpha
     ]
-    render(<MemoryRouter><MySchedule {...defaultProps} bands={bands} /></MemoryRouter>)
+    render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
 
     // Alpha is in both buckets — its pill must be red (conflict = more severe)
     const alphaCard = screen.getByText('Band Alpha').closest('[class*="rounded-xl"]')
@@ -82,7 +92,11 @@ describe('MySchedule — conflict vs overlap severity', () => {
       makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30'),
       makeBand(2, 'Band Beta', 'Stage B', '20:00', '20:30'),
     ]
-    render(<MemoryRouter><MySchedule {...defaultProps} bands={bands} /></MemoryRouter>)
+    render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
 
     // The red summary banner must mention "same time"
     expect(screen.getByText(/happening at the same time/i)).toBeInTheDocument()
@@ -95,7 +109,11 @@ describe('MySchedule — conflict vs overlap severity', () => {
       makeBand(1, 'Band Alpha', 'Stage A', '19:00', '19:30'),
       makeBand(2, 'Band Beta', 'Stage B', '19:15', '19:45'),
     ]
-    render(<MemoryRouter><MySchedule {...defaultProps} bands={bands} /></MemoryRouter>)
+    render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
 
     // The yellow summary banner must mention "overlapping set"
     expect(screen.getByText(/overlapping set/i)).toBeInTheDocument()

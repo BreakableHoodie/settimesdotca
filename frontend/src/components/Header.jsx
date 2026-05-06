@@ -69,10 +69,7 @@ function Header({ view, setView, selectedCount = 0, eventName, eventDate }) {
           </h1>
         </div>
 
-        <p
-          className="text-accent-400 text-sm md:text-base font-medium text-center"
-          style={collapseStyle}
-        >
+        <p className="text-accent-400 text-sm md:text-base font-medium text-center" style={collapseStyle}>
           {eventName ? (
             <>
               <span className="font-semibold text-white">{eventName}</span>

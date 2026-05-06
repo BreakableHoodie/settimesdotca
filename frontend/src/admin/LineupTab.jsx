@@ -33,13 +33,7 @@ function SortIcon({ col, sortConfig }) {
  * LineupTab - Manage Event Schedule
  * Replaces the event-mode of BandsTab.
  */
-export default function LineupTab({
-  selectedEventId,
-  selectedEvent,
-  events,
-  showToast,
-  readOnly = false,
-}) {
+export default function LineupTab({ selectedEventId, selectedEvent, events, showToast, readOnly = false }) {
   const [bands, setBands] = useState([]) // Current event performances
   const [allBands, setAllBands] = useState([]) // For picker (all roster)
   const [venues, setVenues] = useState([])
@@ -738,7 +732,10 @@ export default function LineupTab({
                     </thead>
                     <tbody className="divide-y divide-accent-500/10">
                       {sortedBands.map(band => {
-                        const { overlaps, conflicts: exactConflicts } = conflictsByBandId.get(band.id) ?? { overlaps: [], conflicts: [] }
+                        const { overlaps, conflicts: exactConflicts } = conflictsByBandId.get(band.id) ?? {
+                          overlaps: [],
+                          conflicts: [],
+                        }
                         const rowHighlight = exactConflicts.length
                           ? 'bg-red-900/20'
                           : overlaps.length
@@ -828,7 +825,10 @@ export default function LineupTab({
                     </div>
                   )}
                   {sortedBands.map(band => {
-                    const { overlaps, conflicts: exactConflicts } = conflictsByBandId.get(band.id) ?? { overlaps: [], conflicts: [] }
+                    const { overlaps, conflicts: exactConflicts } = conflictsByBandId.get(band.id) ?? {
+                      overlaps: [],
+                      conflicts: [],
+                    }
                     const cardHighlight = exactConflicts.length
                       ? 'bg-red-900/20'
                       : overlaps.length

@@ -5,6 +5,8 @@ import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
 import BandCard from './BandCard'
 
+const UNSCHEDULED = Symbol('unscheduled')
+
 function groupByTime(bands) {
   const timeGroups = new Map()
   const grouped = []
@@ -49,50 +51,53 @@ function ScheduleView({
   // Apply time filter first, then venue/genre filter (before showPast so finishedCount is accurate)
   const timeFilteredBands = useMemo(() => filterPerformancesByTime(bands, timeFilter), [bands, timeFilter])
 
-  const UNSCHEDULED = '__unscheduled__'
-
   const venueGenreFilteredBands = useMemo(
-    () => timeFilteredBands.filter(b => {
-      if (venueFilter === UNSCHEDULED) return !b.venue
-      if (venueFilter && b.venue !== venueFilter) return false
-      if (genreFilter && b.genre !== genreFilter) return false
-      return true
-    }),
+    () =>
+      timeFilteredBands.filter(b => {
+        if (venueFilter === UNSCHEDULED) return !b.venue
+        if (venueFilter && b.venue !== venueFilter) return false
+        if (genreFilter && b.genre !== genreFilter) return false
+        return true
+      }),
     [timeFilteredBands, venueFilter, genreFilter]
   )
 
   // Count finished sets within the active venue/genre filter (not affected by showPast toggle)
   const finishedCount = useMemo(
-    () => venueGenreFilteredBands.reduce((count, band) => {
-      if (!band.endTime || band.endTime === 'TBD') return count
-      const bandEndMs = band.endMs > 0 ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-      return Number.isFinite(bandEndMs) && bandEndMs <= nowMs ? count + 1 : count
-    }, 0),
+    () =>
+      venueGenreFilteredBands.reduce((count, band) => {
+        if (!band.endTime || band.endTime === 'TBD') return count
+        const bandEndMs = band.endMs > 0 ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+        return Number.isFinite(bandEndMs) && bandEndMs <= nowMs ? count + 1 : count
+      }, 0),
     [venueGenreFilteredBands, nowMs]
   )
 
   const visibleBands = useMemo(
-    () => showPast
-      ? venueGenreFilteredBands
-      : venueGenreFilteredBands.filter(band => {
-          if (!band.endTime || band.endTime === 'TBD') return true
-          const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-          return bandEndMs > nowMs
-        }),
+    () =>
+      showPast
+        ? venueGenreFilteredBands
+        : venueGenreFilteredBands.filter(band => {
+            if (!band.endTime || band.endTime === 'TBD') return true
+            const bandEndMs =
+              typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+            return bandEndMs > nowMs
+          }),
     [venueGenreFilteredBands, showPast, nowMs]
   )
 
   const sortedBands = useMemo(
-    () => [...visibleBands].sort((a, b) => {
-      const aTBD = !a.startTime || a.startTime === 'TBD'
-      const bTBD = !b.startTime || b.startTime === 'TBD'
-      if (aTBD && !bTBD) return 1
-      if (!aTBD && bTBD) return -1
-      if (aTBD && bTBD) return a.name.localeCompare(b.name)
-      const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
-      const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
-      return aTime === bTime ? (a.venue ?? '').localeCompare(b.venue ?? '') : aTime - bTime
-    }),
+    () =>
+      [...visibleBands].sort((a, b) => {
+        const aTBD = !a.startTime || a.startTime === 'TBD'
+        const bTBD = !b.startTime || b.startTime === 'TBD'
+        if (aTBD && !bTBD) return 1
+        if (!aTBD && bTBD) return -1
+        if (aTBD && bTBD) return a.name.localeCompare(b.name)
+        const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
+        const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
+        return aTime === bTime ? (a.venue ?? '').localeCompare(b.venue ?? '') : aTime - bTime
+      }),
     [visibleBands]
   )
 

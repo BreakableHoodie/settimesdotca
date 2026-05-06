@@ -22,9 +22,12 @@ describe('EmbedPage', () => {
     render(<EmbedPage />)
 
     // Should NOT stay in loading state forever
-    await waitFor(() => {
-      expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
-    }, { timeout: 2000 })
+    await waitFor(
+      () => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+      },
+      { timeout: 2000 }
+    )
 
     // Should show an error message
     expect(screen.getByText(/no event slug/i)).toBeInTheDocument()

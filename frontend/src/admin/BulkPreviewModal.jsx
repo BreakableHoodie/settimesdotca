@@ -16,7 +16,9 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
 
         {/* Changes list */}
         <div className="p-6">
-          <h4 className="text-white font-semibold mb-3">✓ {changes.length} performance{changes.length !== 1 ? 's' : ''} will be updated</h4>
+          <h4 className="text-white font-semibold mb-3">
+            ✓ {changes.length} performance{changes.length !== 1 ? 's' : ''} will be updated
+          </h4>
           <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
             {changes.map(change => (
               <div key={change.band_id} className="bg-gray-800 p-3 rounded">

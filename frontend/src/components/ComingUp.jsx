@@ -59,9 +59,7 @@ function ComingUp({ bands, currentTime }) {
 
   const hasNext = nextBand && minutesUntil !== null
   const venueLabel = nextBand?.venue ? ` at ${nextBand.venue}` : ''
-  const message = hasNext
-    ? `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name}${venueLabel}`
-    : undefined
+  const message = hasNext ? `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name}${venueLabel}` : undefined
 
   return (
     <div

@@ -130,29 +130,34 @@ export default function EventTimeline() {
   }, [])
 
   // Filter events
-  const filterEvents = useCallback(events => {
-    if (!events) return []
+  const filterEvents = useCallback(
+    events => {
+      if (!events) return []
 
-    return events.filter(event => {
-      if (filters.venue && !event.venues.some(v => v.id === filters.venue)) {
-        return false
-      }
-      if (filters.month) {
-        const eventMonth = event.date?.slice(0, 7)
-        if (eventMonth !== filters.month) {
+      return events.filter(event => {
+        if (filters.venue && !event.venues.some(v => v.id === filters.venue)) {
           return false
         }
-      }
-      return true
-    })
-  }, [filters])
+        if (filters.month) {
+          const eventMonth = event.date?.slice(0, 7)
+          if (eventMonth !== filters.month) {
+            return false
+          }
+        }
+        return true
+      })
+    },
+    [filters]
+  )
 
   // Get unique venues and months for filters
   const allVenues = useMemo(() => {
     const seen = new Map()
     ;[...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
       .flatMap(event => event.venues || [])
-      .forEach(v => { if (!seen.has(v.id)) seen.set(v.id, { id: v.id, name: v.name }) })
+      .forEach(v => {
+        if (!seen.has(v.id)) seen.set(v.id, { id: v.id, name: v.name })
+      })
     return Array.from(seen.values())
   }, [timeline])
 

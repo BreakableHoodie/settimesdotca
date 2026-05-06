@@ -1,8 +1,4 @@
-function splitOrigin(origin) {
-  if (!origin) return { city: '', region: '' }
-  const [city, region] = origin.split(',').map(part => part.trim())
-  return { city: city || '', region: region || '' }
-}
+import { parseOrigin } from '../../utils/parseOrigin'
 
 function parseSocialLinks(raw) {
   try {
@@ -21,7 +17,7 @@ const BLANK_SCHEDULE = {
 }
 
 export function buildPickerFormData(artist, eventId) {
-  const parsedOrigin = splitOrigin(artist.origin)
+  const parsedOrigin = parseOrigin(artist.origin)
   const socialLinks = parseSocialLinks(artist.social_links)
 
   return {

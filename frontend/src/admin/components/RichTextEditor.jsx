@@ -18,6 +18,10 @@ export default function RichTextEditor({
   const modules = useMemo(
     () => ({
       toolbar: [['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet' }], ['link'], ['clean']],
+      // Prevents Quill from doing expensive visual-style matching on paste, which with
+      // complex clipboard HTML (websites, Word docs) blocks the main thread long enough
+      // to freeze the tab. Pasted content arrives as plain text; formatting via toolbar still works.
+      clipboard: { matchVisual: false },
     }),
     []
   )

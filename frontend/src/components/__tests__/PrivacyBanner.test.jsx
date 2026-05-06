@@ -20,15 +20,15 @@ class ResizeObserverMock {
 }
 
 describe('Privacy banner layout coordination', () => {
-  const originalResizeObserver = global.ResizeObserver
-  const originalOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+  const originalResizeObserver = window.ResizeObserver
+  const originalOffsetHeight = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'offsetHeight')
   const originalOnLine = Object.getOwnPropertyDescriptor(window.navigator, 'onLine')
 
   beforeEach(() => {
     window.localStorage.clear()
     document.documentElement.style.removeProperty(PRIVACY_BANNER_HEIGHT_VAR)
-    global.ResizeObserver = ResizeObserverMock
-    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    window.ResizeObserver = ResizeObserverMock
+    Object.defineProperty(window.HTMLElement.prototype, 'offsetHeight', {
       configurable: true,
       get() {
         return 72
@@ -40,15 +40,15 @@ describe('Privacy banner layout coordination', () => {
     document.documentElement.style.removeProperty(PRIVACY_BANNER_HEIGHT_VAR)
 
     if (originalResizeObserver) {
-      global.ResizeObserver = originalResizeObserver
+      window.ResizeObserver = originalResizeObserver
     } else {
-      delete global.ResizeObserver
+      delete window.ResizeObserver
     }
 
     if (originalOffsetHeight) {
-      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', originalOffsetHeight)
+      Object.defineProperty(window.HTMLElement.prototype, 'offsetHeight', originalOffsetHeight)
     } else {
-      delete HTMLElement.prototype.offsetHeight
+      delete window.HTMLElement.prototype.offsetHeight
     }
 
     if (originalOnLine) {

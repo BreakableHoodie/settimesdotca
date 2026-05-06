@@ -32,9 +32,10 @@ export default function PrivacyBanner() {
     }
 
     updateHeight()
+    const resizeObserverCtor = typeof window !== 'undefined' ? window.ResizeObserver : undefined
 
-    if (typeof ResizeObserver !== 'undefined' && bannerRef.current) {
-      const resizeObserver = new ResizeObserver(() => {
+    if (typeof resizeObserverCtor !== 'undefined' && bannerRef.current) {
+      const resizeObserver = new resizeObserverCtor(() => {
         updateHeight()
       })
       resizeObserver.observe(bannerRef.current)

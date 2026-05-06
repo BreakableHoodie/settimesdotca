@@ -63,7 +63,9 @@ function ComingUp({ bands, currentTime }) {
 
   return (
     <div
-      className={`overflow-hidden transition-all duration-300 ease-out ${hasNext ? 'max-h-28 sm:max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}
+      className={`overflow-hidden transition-all duration-300 ease-out ${
+        hasNext ? 'max-h-28 sm:max-h-32 opacity-100' : 'max-h-0 opacity-0'
+      }`}
     >
       {hasNext && (
         <div
@@ -73,9 +75,7 @@ function ComingUp({ bands, currentTime }) {
         >
           <div className="container mx-auto max-w-(--breakpoint-2xl)" title={message}>
             <div className="flex items-center gap-2 sm:hidden">
-              <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">
-                Up Next
-              </span>
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">Up Next</span>
               <span className="shrink-0 rounded-full bg-white/15 px-2 py-1 text-xs font-semibold text-white">
                 {formatTimeUntil(minutesUntil)}
               </span>

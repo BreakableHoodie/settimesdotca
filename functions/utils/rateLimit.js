@@ -15,16 +15,25 @@ import { logger } from './logger.js';
 
 const RATE_LIMIT_PREFIX = 'rate-limit:';
 
-// Rate limit configurations by endpoint pattern
+// Rate limit configurations by endpoint pattern.
+// Order matters: more-specific prefixes must appear before less-specific ones.
 const RATE_LIMITS = {
+  // Admin auth endpoints — tight limits, fail-closed via D1
+  '/api/admin/auth/login':  { requests: 5,   window: 60  }, // 5 per minute
+  '/api/admin/auth/signup': { requests: 3,   window: 300 }, // 3 per 5 min
+  '/api/admin/auth/':       { requests: 10,  window: 60  }, // logout, MFA, etc.
+
+  // Other admin CRUD — generous limit for legitimate editor activity
+  '/api/admin/': { requests: 300, window: 60 },
+
   // Public API endpoints
-  '/api/events': { requests: 60, window: 60 },      // 60 req/min
-  '/api/schedule': { requests: 30, window: 60 },    // 30 req/min
-  '/api/feeds': { requests: 20, window: 60 },       // 20 req/min
-  '/api/subscriptions': { requests: 10, window: 60 }, // 10 req/min (signup)
-  '/api/metrics': { requests: 40, window: 60 },    // 40 req/min (beacons)
-  '/api/auth/activate': { requests: 10, window: 60 }, // 10 req/min
-  '/api/auth/resend': { requests: 3, window: 300 },  // 3 per 5 min
+  '/api/events': { requests: 60, window: 60 },
+  '/api/schedule': { requests: 30, window: 60 },
+  '/api/feeds': { requests: 20, window: 60 },
+  '/api/subscriptions': { requests: 10, window: 60 },
+  '/api/metrics': { requests: 40, window: 60 },
+  '/api/auth/activate': { requests: 10, window: 60 },
+  '/api/auth/resend': { requests: 3, window: 300 },
 
   // Default for unmatched public APIs
   'default': { requests: 30, window: 60 },
@@ -32,13 +41,13 @@ const RATE_LIMITS = {
 
 // Endpoints to skip rate limiting
 const SKIP_PATTERNS = [
-  '/api/admin/',  // Admin APIs use session auth
   '/_',           // Cloudflare internal
 ];
 
 // Endpoints where a rate-limit failure blocks the request (fail closed).
 // These use D1 for globally-consistent counters.
 const FAIL_CLOSED_PATTERNS = [
+  '/api/admin/auth/',
   '/api/auth/',
   '/api/subscriptions',
 ];
@@ -74,10 +83,15 @@ function getRateLimitConfig(pathname) {
 }
 
 /**
- * Generate a stable key for rate limiting (IP + endpoint base path)
+ * Generate a stable key for rate limiting (IP + endpoint base path).
+ * Auth sub-routes use 5 segments so login and signup get distinct D1 keys.
  */
 function getRateLimitKey(ip, pathname) {
-  const basePath = pathname.split('/').slice(0, 4).join('/');
+  const depth =
+    pathname.startsWith('/api/admin/auth/') || pathname.startsWith('/api/auth/')
+      ? 5
+      : 4;
+  const basePath = pathname.split('/').slice(0, depth).join('/');
   return `${ip}:${basePath}`;
 }
 

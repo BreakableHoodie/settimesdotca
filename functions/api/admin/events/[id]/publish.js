@@ -62,6 +62,13 @@ export async function onRequestPost(context) {
     const body = await request.json().catch(() => ({}));
     const { publish } = body;
 
+    if (typeof publish !== "boolean") {
+      return new Response(
+        JSON.stringify({ error: "Bad request", message: "publish must be a boolean" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     if (event.status === "archived") {
       return new Response(
         JSON.stringify({

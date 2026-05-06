@@ -10,19 +10,12 @@ import {
   sanitizeOptionalHttpUrl,
   sanitizeString,
 } from "../../utils/validation.js";
+import { buildIntervals, intervalsOverlap } from "../../utils/timeConflicts.js";
+import { parseOrigin } from "../../utils/parseOrigin.js";
 
 // Helper to normalize band name
 function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function parseOrigin(origin) {
-  if (!origin) return { city: null, region: null };
-  const [city, region] = origin.split(",").map((part) => part.trim());
-  return {
-    city: city || null,
-    region: region || null,
-  };
 }
 
 async function getEventStatus(DB, eventId) {
@@ -58,7 +51,6 @@ function unpackSocialLinks(band) {
   };
 }
 
-// Helper to check for time conflicts (supports sets that cross midnight)
 async function checkConflicts(
   DB,
   eventId,
@@ -67,29 +59,6 @@ async function checkConflicts(
   endTime,
   excludePerformanceId = null,
 ) {
-  const conflicts = [];
-
-  // Convert HH:MM to minutes for easier comparison
-  const toMinutes = (time) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
-
-  const normalizeEndMinutes = (startMinutes, endMinutes) => {
-    return endMinutes <= startMinutes ? endMinutes + 24 * 60 : endMinutes;
-  };
-
-  const buildIntervals = (start, end) => {
-    const startMinutes = toMinutes(start);
-    const endMinutes = toMinutes(end);
-    const normalizedEnd = normalizeEndMinutes(startMinutes, endMinutes);
-    return [
-      [startMinutes, normalizedEnd],
-      [startMinutes + 24 * 60, normalizedEnd + 24 * 60],
-    ];
-  };
-
-  // Get all performances at the same venue for the same event
   let query = `
     SELECT p.id, p.start_time, p.end_time, bp.name
     FROM performances p
@@ -97,39 +66,28 @@ async function checkConflicts(
     WHERE p.event_id = ? AND p.venue_id = ?
   `;
   const bindings = [eventId, venueId];
-
   if (excludePerformanceId) {
     query += ` AND p.id != ?`;
     bindings.push(excludePerformanceId);
   }
 
-  const result = await DB.prepare(query)
-    .bind(...bindings)
-    .all();
-  const existingPerformances = result.results || [];
-
-  const intervalsOverlap = (intervalA, intervalB) =>
-    intervalA[0] < intervalB[1] && intervalB[0] < intervalA[1];
-
+  const { results: existingPerformances } = await DB.prepare(query).bind(...bindings).all();
   const newIntervals = buildIntervals(startTime, endTime);
+  const conflicts = [];
 
   for (const perf of existingPerformances) {
-    // Skip TBD performances — no times means no interval to compare
     if (!perf.start_time || !perf.end_time) continue;
     const perfIntervals = buildIntervals(perf.start_time, perf.end_time);
-    const hasOverlap = perfIntervals.some((intervalB) =>
-      newIntervals.some((intervalA) => intervalsOverlap(intervalA, intervalB)),
+    const hasOverlap = perfIntervals.some((b) =>
+      newIntervals.some((a) => intervalsOverlap(a, b)),
     );
-
     if (hasOverlap) {
-      const isExact =
-        perf.start_time === startTime && perf.end_time === endTime;
       conflicts.push({
         id: perf.id,
         name: perf.name,
         startTime: perf.start_time,
         endTime: perf.end_time,
-        type: isExact ? "conflict" : "overlap",
+        type: perf.start_time === startTime && perf.end_time === endTime ? "conflict" : "overlap",
       });
     }
   }
@@ -452,11 +410,14 @@ export async function onRequestPost(context) {
       null;
     const resolvedIsActive =
       is_active === undefined ? 1 : Number(is_active) === 1 ? 1 : 0;
-    let bandProfile = await DB.prepare(
+    const existingProfile = await DB.prepare(
       "SELECT id FROM band_profiles WHERE name_normalized = ?",
     )
       .bind(nameNormalized)
       .first();
+
+    let bandProfile = existingProfile;
+    const createdNewProfile = !existingProfile;
 
     if (!bandProfile) {
       // Create new profile
@@ -504,31 +465,57 @@ export async function onRequestPost(context) {
           socialLinksJson || null,
         )
         .first();
+
+      if (!bandProfile) {
+        throw new Error("band_profiles INSERT returned null");
+      }
     }
 
     // 2. Create Performance (only if eventId is provided)
-    let result = { id: `profile_${bandProfile.id}` }; // Default ID if no performance
+    let result = { id: `profile_${bandProfile.id}` };
 
     if (!isGlobalAdd) {
-      result = await DB.prepare(
-        `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
-         VALUES (?, ?, ?, ?, ?)
-         RETURNING id`,
-      )
-        .bind(
-          eventId,
-          resolvedVenueId,
-          bandProfile.id,
-          startTime || null,
-          endTime || null,
+      let perfResult;
+      try {
+        perfResult = await DB.prepare(
+          `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
+           VALUES (?, ?, ?, ?, ?)
+           RETURNING id`,
         )
-        .first();
+          .bind(
+            eventId,
+            resolvedVenueId,
+            bandProfile.id,
+            startTime || null,
+            endTime || null,
+          )
+          .first();
+      } catch (perfError) {
+        // Compensating delete: only undo profiles we just created, not pre-existing ones
+        if (createdNewProfile) {
+          await DB.prepare("DELETE FROM band_profiles WHERE id = ?")
+            .bind(bandProfile.id)
+            .run();
+        }
+        throw perfError;
+      }
+
+      if (!perfResult) {
+        if (createdNewProfile) {
+          await DB.prepare("DELETE FROM band_profiles WHERE id = ?")
+            .bind(bandProfile.id)
+            .run();
+        }
+        throw new Error("performances INSERT returned null");
+      }
+
+      result = perfResult;
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        band: { id: result.id, ...body }, // Return what was sent + new ID
+        band: { id: result.id, ...body },
       }),
       { status: 201, headers: { "Content-Type": "application/json" } },
     );

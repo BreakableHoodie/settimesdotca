@@ -41,17 +41,20 @@ function Header({ view, setView, selectedCount = 0, eventName, eventDate }) {
     backgroundColor: `rgba(8, 16, 32, ${0.65 + 0.25 * scrollProgress})`,
   }
   const titleScale = 1 - 0.2 * scrollProgress
+  // Fade out faster than the space collapses so content is invisible before it gets clipped.
+  const fadeProgress = Math.min(1, scrollProgress * 1.5)
   const collapseStyle = {
-    opacity: 1 - scrollProgress,
+    opacity: 1 - fadeProgress,
     transform: `translateY(${scrollProgress * -8}px)`,
-    maxHeight: `${Math.round(40 * (1 - scrollProgress))}px`,
+    maxHeight: `${Math.round(80 * (1 - scrollProgress))}px`,
+    overflow: 'hidden',
     marginTop: `${Math.round(12 * (1 - scrollProgress))}px`,
-    pointerEvents: scrollProgress > 0.85 ? 'none' : 'auto',
+    pointerEvents: scrollProgress > 0.7 ? 'none' : 'auto',
   }
 
   return (
     <header
-      className="sticky top-0 z-50 border-b-2 border-accent-500/30 transition-all duration-500 ease-out bg-linear-to-b from-bg-navy to-bg-purple backdrop-blur-xs"
+      className="sticky top-0 z-50 border-b-2 border-accent-500/30 transition-[padding,box-shadow,background-color] duration-500 ease-out bg-linear-to-b from-bg-navy to-bg-purple backdrop-blur-xs"
       style={headerStyle}
     >
       <div className="container mx-auto px-4 max-w-6xl">
@@ -66,10 +69,7 @@ function Header({ view, setView, selectedCount = 0, eventName, eventDate }) {
           </h1>
         </div>
 
-        <p
-          className="text-accent-400 text-sm md:text-base font-medium transition-all duration-150 ease-out overflow-hidden text-center"
-          style={collapseStyle}
-        >
+        <p className="text-accent-400 text-sm md:text-base font-medium text-center" style={collapseStyle}>
           {eventName ? (
             <>
               <span className="font-semibold text-white">{eventName}</span>

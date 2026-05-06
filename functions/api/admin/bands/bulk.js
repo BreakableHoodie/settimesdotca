@@ -1,5 +1,7 @@
 import { auditLog, checkPermission } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
+import { computeNewEndTime } from "../../../utils/timeConflicts.js";
+import { isValidTime, validateIdArray } from "../../../utils/validation.js";
 
 const MAX_BULK_BAND_IDS = 200;
 
@@ -37,8 +39,17 @@ export async function onRequestDelete(context) {
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
 
+  let body;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  try {
     const { band_ids } = body;
 
     if (!band_ids || !Array.isArray(band_ids) || band_ids.length === 0) {
@@ -67,9 +78,10 @@ export async function onRequestDelete(context) {
       );
     }
 
-    const performanceIds = band_ids.filter(
-      (id) => !id.toString().startsWith("profile_"),
-    );
+    const performanceIds = band_ids
+      .filter((id) => !id.toString().startsWith("profile_"))
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0);
     const archivedPerformances = await getArchivedPerformancesByPerformanceIds(
       DB,
       performanceIds,
@@ -94,72 +106,70 @@ export async function onRequestDelete(context) {
     let deletedCount = 0;
     const errors = [];
 
-    // Process deletions sequentially to handle logic per item
+    // Separate IDs into two buckets and validate profile IDs are integers
+    const validProfileIds = [];
+    const invalidProfileRaws = [];
+    for (const id of band_ids) {
+      if (id.toString().startsWith("profile_")) {
+        const n = Number(id.toString().split("_")[1]);
+        if (Number.isInteger(n) && n > 0) {
+          validProfileIds.push(n);
+        } else {
+          invalidProfileRaws.push(id);
+        }
+      }
+    }
+    for (const id of invalidProfileRaws) {
+      errors.push(`Invalid profile ID: ${id}`);
+    }
+
+    // Pre-fetch performance counts for all valid profile IDs in one query
+    const profileHasPerformances = new Map();
+    if (validProfileIds.length > 0) {
+      const ph = validProfileIds.map(() => "?").join(",");
+      const counts = await DB.prepare(
+        `SELECT band_profile_id, COUNT(*) as count FROM performances WHERE band_profile_id IN (${ph}) GROUP BY band_profile_id`,
+      )
+        .bind(...validProfileIds)
+        .all();
+      for (const row of counts.results || []) {
+        profileHasPerformances.set(row.band_profile_id, row.count > 0);
+      }
+    }
+
+    // Pre-fetch all performance records for performance IDs in one query
+    const performanceMap = new Map();
+    if (performanceIds.length > 0) {
+      const ph = performanceIds.map(() => "?").join(",");
+      const rows = await DB.prepare(
+        `SELECT p.id, bp.name FROM performances p JOIN band_profiles bp ON p.band_profile_id = bp.id WHERE p.id IN (${ph})`,
+      )
+        .bind(...performanceIds)
+        .all();
+      for (const row of rows.results || []) {
+        performanceMap.set(row.id, row);
+      }
+    }
+
     for (const id of band_ids) {
       try {
-        // Check if ID is a profile ID
-        const isProfileDelete = id.toString().startsWith("profile_");
+        if (id.toString().startsWith("profile_")) {
+          const profileId = Number(id.toString().split("_")[1]);
+          if (!Number.isInteger(profileId) || profileId <= 0) continue; // already pushed to errors above
 
-        if (isProfileDelete) {
-          const bandProfileId = id.split("_")[1];
-
-          // Check if any performances exist
-          const perfCount = await DB.prepare(
-            "SELECT COUNT(*) as count FROM performances WHERE band_profile_id = ?",
-          )
-            .bind(bandProfileId)
-            .first();
-
-          if (perfCount.count > 0) {
-            errors.push(
-              `Cannot delete profile ${id} because it has existing performances`,
-            );
+          if (profileHasPerformances.get(profileId)) {
+            errors.push(`Cannot delete profile ${id} because it has existing performances`);
             continue;
           }
 
-          // Audit log
-          await auditLog(
-            env,
-            user.userId,
-            "band_profile.deleted",
-            "band_profile",
-            bandProfileId,
-            { deletedBy: user.email, bulk: true },
-            ipAddress,
-          );
-
-          // Delete profile
-          await DB.prepare("DELETE FROM band_profiles WHERE id = ?")
-            .bind(bandProfileId)
-            .run();
+          await auditLog(env, user.userId, "band_profile.deleted", "band_profile", profileId, { deletedBy: user.email, bulk: true }, ipAddress);
+          await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(profileId).run();
           deletedCount++;
         } else {
-          // Delete performance
-          // Check if band exists first to get name for audit log
-          const performance = await DB.prepare(
-            `SELECT p.*, bp.name FROM performances p JOIN band_profiles bp ON p.band_profile_id = bp.id WHERE p.id = ?`,
-          )
-            .bind(id)
-            .first();
-
+          const performance = performanceMap.get(Number(id));
           if (performance) {
-            // Audit log
-            await auditLog(
-              env,
-              user.userId,
-              "band.deleted",
-              "band",
-              id,
-              {
-                bandName: performance.name,
-                bulk: true,
-              },
-              ipAddress,
-            );
-
-            await DB.prepare("DELETE FROM performances WHERE id = ?")
-              .bind(id)
-              .run();
+            await auditLog(env, user.userId, "band.deleted", "band", id, { bandName: performance.name, bulk: true }, ipAddress);
+            await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
             deletedCount++;
           }
         }
@@ -293,27 +303,38 @@ export async function onRequestPost(context) {
   const skipped = [];
   const errors = [];
 
+  // Pre-fetch all band profiles in one query
+  const profilePh = band_profile_ids.map(() => "?").join(",");
+  const profileRows = await DB.prepare(
+    `SELECT id, name FROM band_profiles WHERE id IN (${profilePh})`,
+  )
+    .bind(...band_profile_ids)
+    .all();
+  const profileMap = new Map((profileRows.results || []).map((p) => [p.id, p]));
+
+  // Pre-fetch which profiles already have a performance in this event
+  const alreadyInEvent = new Set();
+  if (band_profile_ids.length > 0) {
+    const existingRows = await DB.prepare(
+      `SELECT band_profile_id FROM performances WHERE band_profile_id IN (${profilePh}) AND event_id = ?`,
+    )
+      .bind(...band_profile_ids, event_id)
+      .all();
+    for (const row of existingRows.results || []) {
+      alreadyInEvent.add(row.band_profile_id);
+    }
+  }
+
   for (const profileId of band_profile_ids) {
     try {
-      const profile = await DB.prepare(
-        "SELECT id, name FROM band_profiles WHERE id = ?",
-      )
-        .bind(profileId)
-        .first();
-
+      const numProfileId = Number(profileId);
+      const profile = profileMap.get(numProfileId);
       if (!profile) {
         errors.push(`Profile ${profileId} not found`);
         continue;
       }
 
-      // Skip if already in this event (same profile + event)
-      const existing = await DB.prepare(
-        "SELECT id FROM performances WHERE band_profile_id = ? AND event_id = ?",
-      )
-        .bind(profileId, event_id)
-        .first();
-
-      if (existing) {
+      if (alreadyInEvent.has(numProfileId)) {
         skipped.push(profile.name);
         continue;
       }
@@ -322,13 +343,7 @@ export async function onRequestPost(context) {
         `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
          VALUES (?, ?, ?, ?, ?) RETURNING id`,
       )
-        .bind(
-          event_id,
-          resolvedVenueId,
-          profileId,
-          start_time || null,
-          end_time || null,
-        )
+        .bind(event_id, resolvedVenueId, numProfileId, start_time || null, end_time || null)
         .first();
 
       await auditLog(
@@ -337,15 +352,12 @@ export async function onRequestPost(context) {
         "band.added_to_lineup",
         "band",
         result.id,
-        {
-          bandName: profile.name,
-          eventId: event_id,
-          venueId: resolvedVenueId,
-          bulk: true,
-        },
+        { bandName: profile.name, eventId: event_id, venueId: resolvedVenueId, bulk: true },
         ipAddress,
       );
 
+      // Track the newly inserted profile so duplicate IDs in this request are skipped
+      alreadyInEvent.add(numProfileId);
       added.push(profile.name);
     } catch (err) {
       console.error("Failed to add profile", profileId, err);
@@ -377,8 +389,16 @@ export async function onRequestPatch(context) {
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
 
-  const { band_ids, action, ignore_conflicts, ...params } =
-    await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const { band_ids, action, ignore_conflicts, ...params } = body;
 
   if (!Array.isArray(band_ids) || band_ids.length === 0) {
     return new Response(JSON.stringify({ error: "Invalid band_ids" }), {
@@ -399,9 +419,18 @@ export async function onRequestPatch(context) {
     );
   }
 
+  const idValidation = validateIdArray(band_ids, { maxLength: MAX_BULK_BAND_IDS });
+  if (!idValidation.valid) {
+    return new Response(JSON.stringify({ error: "Invalid band_ids", message: idValidation.error }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const validatedBandIds = idValidation.values;
+
   const archivedPerformances = await getArchivedPerformancesByPerformanceIds(
     env.DB,
-    band_ids,
+    validatedBandIds,
   );
   if (archivedPerformances.length > 0) {
     const lockedNames = archivedPerformances
@@ -442,8 +471,18 @@ export async function onRequestPatch(context) {
     if (action === "move_venue") {
       const { venue_id } = params;
 
+      const venueExists = await env.DB.prepare("SELECT id FROM venues WHERE id = ?")
+        .bind(venue_id)
+        .first();
+      if (!venueExists) {
+        return new Response(
+          JSON.stringify({ error: "Not found", message: "Venue not found" }),
+          { status: 404, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
       // Build batch update statements (ATOMIC - all or nothing)
-      const statements = band_ids.map((id) =>
+      const statements = validatedBandIds.map((id) =>
         env.DB.prepare(
           "UPDATE performances SET venue_id = ? WHERE id = ?",
         ).bind(venue_id, id),
@@ -457,18 +496,32 @@ export async function onRequestPatch(context) {
     } else if (action === "change_time") {
       const { start_time } = params;
 
-      // Preserve duration when changing time
-      const statements = band_ids.map((id) =>
-        env.DB.prepare(
-          `
-          UPDATE performances
-          SET start_time = ?,
-              end_time = strftime('%H:%M', ?, '+' ||
-                (strftime('%s', end_time) - strftime('%s', start_time)) || ' seconds')
-          WHERE id = ?
-        `,
-        ).bind(start_time, start_time, id),
-      );
+      if (!isValidTime(start_time).valid) {
+        return new Response(
+          JSON.stringify({ error: "Bad request", message: "start_time must be in HH:MM format" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      // Fetch current times so we can compute new end_time in JS.
+      // The SQLite strftime arithmetic produces null/negative values for
+      // after-midnight sets (e.g. 23:30–00:30), so we do this in JS instead.
+      const placeholders = validatedBandIds.map(() => "?").join(",");
+      const { results: currentPerfs } = await env.DB.prepare(
+        `SELECT id, start_time, end_time FROM performances WHERE id IN (${placeholders})`,
+      )
+        .bind(...validatedBandIds)
+        .all();
+
+      const statements = currentPerfs.map((perf) => {
+        const newEnd =
+          perf.start_time && perf.end_time
+            ? computeNewEndTime(perf.start_time, perf.end_time, start_time)
+            : null;
+        return env.DB.prepare(
+          "UPDATE performances SET start_time = ?, end_time = ? WHERE id = ?",
+        ).bind(start_time, newEnd, perf.id);
+      });
 
       result = await env.DB.batch(statements);
       rowsAffected = result.reduce(
@@ -476,11 +529,11 @@ export async function onRequestPatch(context) {
         0,
       );
     } else if (action === "delete") {
-      const placeholders = band_ids.map(() => "?").join(",");
+      const placeholders = validatedBandIds.map(() => "?").join(",");
       result = await env.DB.prepare(
         `DELETE FROM performances WHERE id IN (${placeholders})`,
       )
-        .bind(...band_ids)
+        .bind(...validatedBandIds)
         .run();
       rowsAffected = result.meta?.changes ?? 0;
     }
@@ -494,8 +547,8 @@ export async function onRequestPatch(context) {
       null,
       {
         action,
-        bandIds: band_ids,
-        bandCount: band_ids.length,
+        bandIds: validatedBandIds,
+        bandCount: validatedBandIds.length,
         params,
       },
       ipAddress,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import ScheduleView from '../ScheduleView'
@@ -81,17 +81,67 @@ describe('ScheduleView — Bug 4: finished sets hidden count', () => {
   })
 })
 
+describe('ScheduleView — P2-F5: finishedCount respects venue filter', () => {
+  it('shows only the count of finished sets in the active venue when a venue filter is selected', () => {
+    const pastMs = NOW_MS - 2 * 60 * 60 * 1000
+    const bands = [
+      makeBand({
+        id: '1',
+        name: 'Stage A Band',
+        venue: 'Stage A',
+        startTime: '17:00',
+        endTime: '18:00',
+        startMs: pastMs - 60 * 60 * 1000,
+        endMs: pastMs,
+      }),
+      makeBand({
+        id: '2',
+        name: 'Stage B Band',
+        venue: 'Stage B',
+        startTime: '17:00',
+        endTime: '18:00',
+        startMs: pastMs - 60 * 60 * 1000,
+        endMs: pastMs,
+      }),
+    ]
+
+    renderView({ bands, showPast: false })
+
+    // Before filter: both finished sets hidden
+    expect(screen.getByText(/2 finished sets hidden/i)).toBeInTheDocument()
+
+    // Click Stage A filter
+    fireEvent.click(screen.getByRole('button', { name: /Stage A/ }))
+
+    // After filter: only Stage A's finished set should be counted
+    expect(screen.getByText(/1 finished set hidden/i)).toBeInTheDocument()
+    expect(screen.queryByText(/2 finished sets hidden/i)).not.toBeInTheDocument()
+  })
+})
+
 describe('ScheduleView — Bug 5: blank venue filter button', () => {
-  it('does not show venue filter when only one non-null venue exists', () => {
-    // One null venue → filtered out → only one unique venue → filter section hidden
+  it('does not show venue filter when only one venue exists and no unscheduled bands', () => {
+    const bands = [
+      makeBand({ id: '1', name: 'Band A', venue: 'Stage A' }),
+      makeBand({ id: '2', name: 'Band B', venue: 'Stage A' }),
+    ]
+    renderView({ bands })
+    expect(screen.queryByText(/^venue$/i)).not.toBeInTheDocument()
+  })
+
+  it('shows Unscheduled pill and venue buttons when one venue exists with unscheduled bands', () => {
     const bands = [
       makeBand({ id: '1', name: 'Band A', venue: 'Stage A' }),
       makeBand({ id: '2', name: 'Band B', venue: null }),
       makeBand({ id: '3', name: 'Band C', venue: undefined }),
     ]
     renderView({ bands })
-    // Filter section requires 2+ venues to appear
-    expect(screen.queryByText(/^venue$/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /unscheduled/i })).toBeInTheDocument()
+    // Null/undefined venues must not create a blank filter button
+    const blankFilterButtons = screen
+      .queryAllByRole('button')
+      .filter(b => b.getAttribute('aria-pressed') !== null && b.textContent.trim() === '')
+    expect(blankFilterButtons).toHaveLength(0)
   })
 
   it('renders venue filter buttons only for bands with a venue, not for null', () => {

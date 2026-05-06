@@ -49,7 +49,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
       // User can optionally select an event from the dropdown
       setSelectedEventId(null)
     } catch (err) {
-      console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message)
+      if (import.meta.env.DEV) console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message)
       if (err.status === 401 || err.message?.includes('Valid session required')) {
         onLogout()
         return

@@ -93,6 +93,25 @@ describe('Admin user password reset API', () => {
     expect(response.status).toBe(403);
   });
 
+  test('rejects non-integer user id with 400', async () => {
+    const { env, headers } = createTestEnv({ role: 'admin' });
+    const request = new Request(
+      `https://example.test/api/admin/users/1;DROP TABLE users/reset-password`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({}),
+      }
+    );
+    const response = await resetHandler.onRequestPost({
+      request,
+      env,
+      params: { id: '1;DROP TABLE users' },
+      data: { user: { userId: 1, role: 'admin', email: 'admin@test' } },
+    });
+    expect(response.status).toBe(400);
+  });
+
   test('rejects reset for inactive user', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'admin' });
     rawDb

@@ -130,32 +130,35 @@ export default function EventTimeline() {
   }, [])
 
   // Filter events
-  const filterEvents = events => {
-    if (!events) return []
+  const filterEvents = useCallback(
+    events => {
+      if (!events) return []
 
-    return events.filter(event => {
-      if (filters.venue && !event.venues.some(v => v.id === filters.venue)) {
-        return false
-      }
-      if (filters.month) {
-        const eventMonth = event.date?.slice(0, 7)
-        if (eventMonth !== filters.month) {
+      return events.filter(event => {
+        if (filters.venue && !event.venues.some(v => v.id === filters.venue)) {
           return false
         }
-      }
-      return true
-    })
-  }
+        if (filters.month) {
+          const eventMonth = event.date?.slice(0, 7)
+          if (eventMonth !== filters.month) {
+            return false
+          }
+        }
+        return true
+      })
+    },
+    [filters]
+  )
 
   // Get unique venues and months for filters
   const allVenues = useMemo(() => {
-    return Array.from(
-      new Set(
-        [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
-          .flatMap(event => event.venues || [])
-          .map(v => JSON.stringify({ id: v.id, name: v.name }))
-      )
-    ).map(v => JSON.parse(v))
+    const seen = new Map()
+    ;[...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
+      .flatMap(event => event.venues || [])
+      .forEach(v => {
+        if (!seen.has(v.id)) seen.set(v.id, { id: v.id, name: v.name })
+      })
+    return Array.from(seen.values())
   }, [timeline])
 
   const allMonths = useMemo(() => {
@@ -197,6 +200,11 @@ export default function EventTimeline() {
   const hasActiveFilters = filters.venue !== null || filters.month !== null
   const isPublishGateError = error?.status === 503
 
+  // Hooks must be called before any conditional returns (Rules of Hooks)
+  const filteredNow = useMemo(() => filterEvents(timeline.now || []), [filterEvents, timeline.now])
+  const filteredUpcoming = useMemo(() => filterEvents(timeline.upcoming || []), [filterEvents, timeline.upcoming])
+  const filteredPast = useMemo(() => filterEvents(timeline.past || []), [filterEvents, timeline.past])
+
   if (loading) {
     return <EventsPageSkeleton />
   }
@@ -213,11 +221,6 @@ export default function EventTimeline() {
       </div>
     )
   }
-
-  // Apply filters
-  const filteredNow = filterEvents(timeline.now || [])
-  const filteredUpcoming = filterEvents(timeline.upcoming || [])
-  const filteredPast = filterEvents(timeline.past || [])
 
   const hasNow = filteredNow.length > 0
   const hasUpcoming = filteredUpcoming.length > 0

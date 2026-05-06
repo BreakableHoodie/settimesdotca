@@ -1,20 +1,8 @@
 import { checkPermission } from "../_middleware.js";
+import { buildIntervals, computeNewEndTime, intervalsOverlap } from "../../../utils/timeConflicts.js";
+import { validateIdArray } from "../../../utils/validation.js";
 
 const MAX_BULK_PREVIEW_IDS = 200;
-
-// Compute the new end time after shifting start time while preserving duration.
-// Handles sets that span midnight (e.g. 23:40–00:10).
-function computeNewEndTime(oldStart, oldEnd, newStart) {
-  const toMins = (t) => {
-    const [h, m] = t.split(":").map(Number);
-    return h * 60 + m;
-  };
-  const fromMins = (m) =>
-    `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-  let dur = toMins(oldEnd) - toMins(oldStart);
-  if (dur < 0) dur += 24 * 60;
-  return fromMins((toMins(newStart) + dur) % (24 * 60));
-}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -25,7 +13,15 @@ export async function onRequestPost(context) {
     return permCheck.response;
   }
 
-  const { band_ids, action, ...params } = await request.json();
+  let band_ids, action, params;
+  try {
+    ({ band_ids, action, ...params } = await request.json());
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   // Validate inputs
   if (!Array.isArray(band_ids) || band_ids.length === 0) {
@@ -47,11 +43,20 @@ export async function onRequestPost(context) {
     );
   }
 
+  const idValidation = validateIdArray(band_ids, { maxLength: MAX_BULK_PREVIEW_IDS });
+  if (!idValidation.valid) {
+    return new Response(JSON.stringify({ error: "Invalid band_ids", message: idValidation.error }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const validatedBandIds = idValidation.values;
+
   const changes = [];
   const conflicts = [];
 
   // Get current band data
-  const placeholders = band_ids.map(() => "?").join(",");
+  const placeholders = validatedBandIds.map(() => "?").join(",");
   const bands = await env.DB.prepare(
     `SELECT p.*, bp.name, v.name as venue_name, e.status as event_status, e.name as event_name
      FROM performances p
@@ -60,7 +65,7 @@ export async function onRequestPost(context) {
      JOIN events e ON p.event_id = e.id
      WHERE p.id IN (${placeholders})`,
   )
-    .bind(...band_ids)
+    .bind(...validatedBandIds)
     .all();
 
   const bandResults = bands.results || [];
@@ -101,46 +106,43 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Conflict detection: check for time overlaps at target venue
-    for (const band of mutableBandResults) {
-      const overlaps = await env.DB.prepare(
-        `
-        SELECT bp.name, p.start_time, p.end_time
-        FROM performances p
-        JOIN band_profiles bp ON p.band_profile_id = bp.id
-        WHERE p.venue_id = ?
-          AND p.event_id = ?
-          AND p.id NOT IN (${placeholders})
-          AND (
-            (p.start_time < ? AND p.end_time > ?) OR
-            (p.start_time >= ? AND p.start_time < ?)
-          )
-      `,
+    // Conflict detection: fetch all existing performances at target venue per event,
+    // then check for overlaps in JS (handles after-midnight sets correctly).
+    const eventIds = [...new Set(mutableBandResults.map((b) => b.event_id))];
+    const venuePerformancesByEvent = new Map();
+    for (const eventId of eventIds) {
+      const rows = await env.DB.prepare(
+        `SELECT p.id, p.start_time, p.end_time, bp.name
+         FROM performances p
+         JOIN band_profiles bp ON p.band_profile_id = bp.id
+         WHERE p.venue_id = ? AND p.event_id = ? AND p.id NOT IN (${placeholders})`,
       )
-        .bind(
-          venue_id,
-          band.event_id,
-          ...band_ids,
-          band.end_time,
-          band.start_time,
-          band.start_time,
-          band.end_time,
-        )
+        .bind(venue_id, eventId, ...validatedBandIds)
         .all();
+      venuePerformancesByEvent.set(eventId, rows.results || []);
+    }
 
-      overlaps.results.forEach((conflict) => {
-        const isExact =
-          conflict.start_time === band.start_time &&
-          conflict.end_time === band.end_time;
-        conflicts.push({
-          band_id: band.id,
-          type: isExact ? "conflict" : "overlap",
-          message: isExact
-            ? `"${band.name}" has the exact same time as "${conflict.name}" at the new venue (${conflict.start_time}-${conflict.end_time})`
-            : `"${band.name}" overlaps with "${conflict.name}" at new venue (${conflict.start_time}-${conflict.end_time})`,
-          severity: "error",
-        });
-      });
+    for (const band of mutableBandResults) {
+      if (!band.start_time || !band.end_time) continue;
+      const bandIntervals = buildIntervals(band.start_time, band.end_time);
+      const existing = venuePerformancesByEvent.get(band.event_id) || [];
+      for (const other of existing) {
+        if (!other.start_time || !other.end_time) continue;
+        const otherIntervals = buildIntervals(other.start_time, other.end_time);
+        if (bandIntervals.some(a => otherIntervals.some(b => intervalsOverlap(a, b)))) {
+          const isExact =
+            other.start_time === band.start_time &&
+            other.end_time === band.end_time;
+          conflicts.push({
+            band_id: band.id,
+            type: isExact ? "conflict" : "overlap",
+            message: isExact
+              ? `"${band.name}" has the exact same time as "${other.name}" at the new venue (${other.start_time}-${other.end_time})`
+              : `"${band.name}" overlaps with "${other.name}" at new venue (${other.start_time}-${other.end_time})`,
+            severity: "error",
+          });
+        }
+      }
     }
   } else if (action === "change_time") {
     const { start_time } = params;
@@ -155,55 +157,48 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Conflict detection: check for time overlaps at same venue using the
-    // computed new end_time (preserving duration), not the old end_time.
+    // Conflict detection: fetch existing performances at each band's venue per event,
+    // then check overlaps in JS using computeNewEndTime (preserves duration, handles midnight).
+    const changeTimeVenueKey = (venueId, eventId) => `${venueId}:${eventId}`;
+    const changeTimeCache = new Map();
+
     for (const band of mutableBandResults) {
       if (!band.start_time || !band.end_time || !band.venue_id) continue;
 
-      const newEndTime = computeNewEndTime(
-        band.start_time,
-        band.end_time,
-        start_time,
-      );
+      const newEndTime = computeNewEndTime(band.start_time, band.end_time, start_time);
+      const cacheKey = changeTimeVenueKey(band.venue_id, band.event_id);
 
-      const overlaps = await env.DB.prepare(
-        `
-        SELECT bp.name, p.start_time, p.end_time
-        FROM performances p
-        JOIN band_profiles bp ON p.band_profile_id = bp.id
-        WHERE p.venue_id = ?
-          AND p.event_id = ?
-          AND p.id NOT IN (${placeholders})
-          AND (
-            (p.start_time < ? AND p.end_time > ?) OR
-            (p.start_time >= ? AND p.start_time < ?)
-          )
-      `,
-      )
-        .bind(
-          band.venue_id,
-          band.event_id,
-          ...band_ids,
-          newEndTime,
-          start_time,
-          start_time,
-          newEndTime,
+      if (!changeTimeCache.has(cacheKey)) {
+        const rows = await env.DB.prepare(
+          `SELECT p.id, p.start_time, p.end_time, bp.name
+           FROM performances p
+           JOIN band_profiles bp ON p.band_profile_id = bp.id
+           WHERE p.venue_id = ? AND p.event_id = ? AND p.id NOT IN (${placeholders})`,
         )
-        .all();
+          .bind(band.venue_id, band.event_id, ...validatedBandIds)
+          .all();
+        changeTimeCache.set(cacheKey, rows.results || []);
+      }
 
-      overlaps.results.forEach((conflict) => {
-        const isExact =
-          conflict.start_time === start_time &&
-          conflict.end_time === newEndTime;
-        conflicts.push({
-          band_id: band.id,
-          type: isExact ? "conflict" : "overlap",
-          message: isExact
-            ? `"${band.name}" has the exact same time as "${conflict.name}" at venue (${conflict.start_time}-${conflict.end_time})`
-            : `"${band.name}" overlaps with "${conflict.name}" at venue (${conflict.start_time}-${conflict.end_time})`,
-          severity: "error",
-        });
-      });
+      const existing = changeTimeCache.get(cacheKey);
+      const bandIntervals = buildIntervals(start_time, newEndTime);
+
+      for (const other of existing) {
+        if (!other.start_time || !other.end_time) continue;
+        const otherIntervals = buildIntervals(other.start_time, other.end_time);
+        if (bandIntervals.some(a => otherIntervals.some(b => intervalsOverlap(a, b)))) {
+          const isExact =
+            other.start_time === start_time && other.end_time === newEndTime;
+          conflicts.push({
+            band_id: band.id,
+            type: isExact ? "conflict" : "overlap",
+            message: isExact
+              ? `"${band.name}" has the exact same time as "${other.name}" at venue (${other.start_time}-${other.end_time})`
+              : `"${band.name}" overlaps with "${other.name}" at venue (${other.start_time}-${other.end_time})`,
+            severity: "error",
+          });
+        }
+      }
     }
   } else if (action === "delete") {
     // Build changes list for deletion

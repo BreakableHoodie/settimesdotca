@@ -671,17 +671,26 @@ export async function onRequestPost(context) {
         )
         .first();
 
-      // Copy all bands from original event
-      await DB.prepare(
-        `
-        INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes)
-        SELECT ?, venue_id, band_profile_id, start_time, end_time, notes
-        FROM performances
-        WHERE event_id = ?
-      `,
-      )
-        .bind(newEvent.id, eventId)
-        .run();
+      if (!newEvent) {
+        throw new Error("events INSERT returned null");
+      }
+
+      // Copy all bands from original event (compensating delete if this fails)
+      try {
+        await DB.prepare(
+          `
+          INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes)
+          SELECT ?, venue_id, band_profile_id, start_time, end_time, notes
+          FROM performances
+          WHERE event_id = ?
+        `,
+        )
+          .bind(newEvent.id, eventId)
+          .run();
+      } catch (copyError) {
+        await DB.prepare("DELETE FROM events WHERE id = ?").bind(newEvent.id).run();
+        throw copyError;
+      }
 
       // Get band count
       const bandCount = await DB.prepare(

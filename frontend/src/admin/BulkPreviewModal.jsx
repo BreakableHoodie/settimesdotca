@@ -1,8 +1,11 @@
+import { createPortal } from 'react-dom'
+
 function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
   const { changes, conflicts } = previewData
   const hasConflicts = conflicts && conflicts.length > 0
+  const hasExactConflicts = hasConflicts && conflicts.some(c => c.type === 'conflict')
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-bg-navy rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
         {/* Header */}
@@ -13,7 +16,9 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
 
         {/* Changes list */}
         <div className="p-6">
-          <h4 className="text-white font-semibold mb-3">✓ {changes.length} bands will be updated</h4>
+          <h4 className="text-white font-semibold mb-3">
+            ✓ {changes.length} performance{changes.length !== 1 ? 's' : ''} will be updated
+          </h4>
           <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
             {changes.map(change => (
               <div key={change.band_id} className="bg-gray-800 p-3 rounded">
@@ -90,7 +95,7 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
             Cancel
           </button>
 
-          {hasConflicts ? (
+          {hasExactConflicts ? (
             <button onClick={() => onConfirm(true)} className="btn-danger" disabled={isProcessing}>
               {isProcessing ? 'Processing...' : 'Apply Anyway (Override Conflicts)'}
             </button>
@@ -101,7 +106,8 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

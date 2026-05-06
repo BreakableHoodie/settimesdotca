@@ -5,7 +5,7 @@
 
 import { checkPermission, auditLog } from '../../_middleware.js';
 import { generatePasswordResetToken } from '../../../../utils/tokens.js';
-import { sanitizeString } from '../../../../utils/validation.js';
+import { sanitizeString, validateId } from '../../../../utils/validation.js';
 import { getClientIP } from '../../../../utils/request.js';
 import { sendEmail, isEmailConfigured } from '../../../../utils/email.js';
 import { buildResetPasswordEmail } from '../../../../utils/emailTemplates.js';
@@ -25,7 +25,14 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const userId = params.id;
+    const idValidation = validateId(params.id);
+    if (!idValidation.valid) {
+      return new Response(JSON.stringify({ error: 'Bad request', message: idValidation.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const userId = idValidation.value;
     const { reason } = await request.json().catch(() => ({}));
     const sanitizedReason = reason
       ? sanitizeString(reason).slice(0, 500)

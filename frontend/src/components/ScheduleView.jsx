@@ -5,6 +5,26 @@ import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
 import BandCard from './BandCard'
 
+const UNSCHEDULED = Symbol('unscheduled')
+
+function groupByTime(bands) {
+  const timeGroups = new Map()
+  const grouped = []
+  bands.forEach(band => {
+    const slot = !band.startTime || band.startTime === 'TBD' ? 'TBD' : band.startTime
+    if (!timeGroups.has(slot)) {
+      const group = { time: slot, bands: [] }
+      timeGroups.set(slot, group)
+      grouped.push(group)
+    }
+    timeGroups.get(slot).bands.push(band)
+  })
+  grouped.forEach(group => {
+    group.bands.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
+  })
+  return grouped
+}
+
 function ScheduleView({
   bands,
   selectedBands,
@@ -13,117 +33,99 @@ function ScheduleView({
   currentTime,
   showPast,
   onToggleShowPast,
-  timeFilter,
+  timeFilter = 'all',
 }) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
   const [venueFilter, setVenueFilter] = useState(null)
   const [genreFilter, setGenreFilter] = useState(null)
-  const nowDate = currentTime instanceof Date ? currentTime : new Date(currentTime)
-  const nowMs = nowDate.getTime()
-
-  const finishedCount = bands.reduce((count, band) => {
-    if (!band.endTime || band.endTime === 'TBD') return count
-    const bandEndMs = band.endMs > 0 ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-    return Number.isFinite(bandEndMs) && bandEndMs <= nowMs ? count + 1 : count
-  }, 0)
-
-  // First apply time filter, then apply showPast filter
-  const timeFilteredBands = filterPerformancesByTime(bands, timeFilter)
-
-  const visibleBands = showPast
-    ? timeFilteredBands
-    : timeFilteredBands.filter(band => {
-        // If no endTime (TBD), always show the band
-        if (!band.endTime || band.endTime === 'TBD') {
-          return true
-        }
-        const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-        return bandEndMs > nowMs
-      })
+  const nowMs = useMemo(() => {
+    const d = currentTime instanceof Date ? currentTime : new Date(currentTime)
+    return d.getTime()
+  }, [currentTime])
 
   const uniqueVenues = useMemo(() => [...new Set(bands.map(b => b.venue).filter(Boolean))].sort(), [bands])
+  const hasUnscheduled = useMemo(() => bands.some(b => !b.venue), [bands])
   const uniqueGenres = useMemo(() => [...new Set(bands.filter(b => b.genre).map(b => b.genre))].sort(), [bands])
 
-  const filteredBands = visibleBands.filter(
-    b => (!venueFilter || b.venue === venueFilter) && (!genreFilter || b.genre === genreFilter)
+  // Apply time filter first, then venue/genre filter (before showPast so finishedCount is accurate)
+  const timeFilteredBands = useMemo(() => filterPerformancesByTime(bands, timeFilter), [bands, timeFilter])
+
+  const venueGenreFilteredBands = useMemo(
+    () =>
+      timeFilteredBands.filter(b => {
+        if (venueFilter === UNSCHEDULED) return !b.venue
+        if (venueFilter && b.venue !== venueFilter) return false
+        if (genreFilter && b.genre !== genreFilter) return false
+        return true
+      }),
+    [timeFilteredBands, venueFilter, genreFilter]
   )
 
-  const sortedBands = [...filteredBands].sort((a, b) => {
-    // TBD bands go to the end
-    const aTBD = !a.startTime || a.startTime === 'TBD'
-    const bTBD = !b.startTime || b.startTime === 'TBD'
+  // Count finished sets within the active venue/genre filter (not affected by showPast toggle)
+  const finishedCount = useMemo(
+    () =>
+      venueGenreFilteredBands.reduce((count, band) => {
+        if (!band.endTime || band.endTime === 'TBD') return count
+        const bandEndMs = band.endMs > 0 ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+        return Number.isFinite(bandEndMs) && bandEndMs <= nowMs ? count + 1 : count
+      }, 0),
+    [venueGenreFilteredBands, nowMs]
+  )
 
-    if (aTBD && !bTBD) return 1
-    if (!aTBD && bTBD) return -1
-    if (aTBD && bTBD) return a.name.localeCompare(b.name)
+  const visibleBands = useMemo(
+    () =>
+      showPast
+        ? venueGenreFilteredBands
+        : venueGenreFilteredBands.filter(band => {
+            if (!band.endTime || band.endTime === 'TBD') return true
+            const bandEndMs =
+              typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+            return bandEndMs > nowMs
+          }),
+    [venueGenreFilteredBands, showPast, nowMs]
+  )
 
-    // Normal time-based sorting
-    const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
-    const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
-    if (aTime === bTime) {
-      return (a.venue ?? '').localeCompare(b.venue ?? '')
-    }
-    return aTime - bTime
-  })
+  const sortedBands = useMemo(
+    () =>
+      [...visibleBands].sort((a, b) => {
+        const aTBD = !a.startTime || a.startTime === 'TBD'
+        const bTBD = !b.startTime || b.startTime === 'TBD'
+        if (aTBD && !bTBD) return 1
+        if (!aTBD && bTBD) return -1
+        if (aTBD && bTBD) return a.name.localeCompare(b.name)
+        const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
+        const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
+        return aTime === bTime ? (a.venue ?? '').localeCompare(b.venue ?? '') : aTime - bTime
+      }),
+    [visibleBands]
+  )
 
-  // Helper function to group bands by time slot
-  const groupByTime = bands => {
-    const timeGroups = new Map()
-    const grouped = []
-
-    bands.forEach(band => {
-      const slot = !band.startTime || band.startTime === 'TBD' ? 'TBD' : band.startTime
-      if (!timeGroups.has(slot)) {
-        const group = { time: slot, bands: [] }
-        timeGroups.set(slot, group)
-        grouped.push(group)
+  const { nowPlaying, upcomingBands, pastBands } = useMemo(() => {
+    const nowPlaying = []
+    const upcomingBands = []
+    const pastBands = []
+    sortedBands.forEach(band => {
+      if (!band.startTime || band.startTime === 'TBD' || !band.startMs || !band.endMs) {
+        upcomingBands.push(band)
+        return
       }
-      timeGroups.get(slot).bands.push(band)
+      if (band.startMs <= nowMs && band.endMs > nowMs) {
+        nowPlaying.push(band)
+      } else if (band.startMs > nowMs) {
+        upcomingBands.push(band)
+      } else {
+        pastBands.push(band)
+      }
     })
+    nowPlaying.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
+    return { nowPlaying, upcomingBands, pastBands }
+  }, [sortedBands, nowMs])
 
-    grouped.forEach(group => {
-      group.bands.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
-    })
+  const upcomingByTime = useMemo(() => groupByTime(upcomingBands), [upcomingBands])
+  const pastByTime = useMemo(() => groupByTime(pastBands).reverse(), [pastBands])
 
-    return grouped
-  }
-
-  // Categorize bands into Now Playing, Upcoming, and Past
-  const nowPlaying = []
-  const upcomingBands = []
-  const pastBands = []
-
-  sortedBands.forEach(band => {
-    // TBD or missing times go to upcoming
-    if (!band.startTime || band.startTime === 'TBD' || !band.startMs || !band.endMs) {
-      upcomingBands.push(band)
-      return
-    }
-
-    const startMs = band.startMs
-    const endMs = band.endMs
-
-    // Currently performing: started but not finished
-    if (startMs <= nowMs && endMs > nowMs) {
-      nowPlaying.push(band)
-    }
-    // Future performances
-    else if (startMs > nowMs) {
-      upcomingBands.push(band)
-    }
-    // Past performances
-    else if (endMs <= nowMs) {
-      pastBands.push(band)
-    }
-  })
-
-  // Sort Now Playing by venue only (no time grouping)
-  nowPlaying.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
-
-  // Group upcoming and past bands by time
-  const upcomingByTime = groupByTime(upcomingBands)
-  const pastByTime = groupByTime(pastBands).reverse() // Reverse chronological for past events
+  const selectedBandsSet = useMemo(() => new Set(selectedBands), [selectedBands])
 
   const allSelected = bands.length > 0 && selectedBands.length === bands.length
   const hiddenFinished = !showPast ? finishedCount : 0
@@ -210,9 +212,9 @@ function ScheduleView({
       </div>
 
       {/* Filter pills */}
-      {(uniqueVenues.length > 1 || uniqueGenres.length > 0) && (
+      {(uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
         <div className="space-y-3">
-          {uniqueVenues.length > 1 && (
+          {(uniqueVenues.length > 1 || hasUnscheduled) && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
               <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
@@ -230,6 +232,19 @@ function ScheduleView({
                     {venue}
                   </button>
                 ))}
+                {hasUnscheduled && (
+                  <button
+                    onClick={() => setVenueFilter(prev => (prev === UNSCHEDULED ? null : UNSCHEDULED))}
+                    aria-pressed={venueFilter === UNSCHEDULED}
+                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                      venueFilter === UNSCHEDULED
+                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                    }`}
+                  >
+                    Unscheduled
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -286,7 +301,7 @@ function ScheduleView({
                   <BandCard
                     key={band.id}
                     band={band}
-                    isSelected={selectedBands.includes(band.id)}
+                    isSelected={selectedBandsSet.has(band.id)}
                     onToggle={onToggleBand}
                     clickable={!!onToggleBand}
                     showVenue={true}
@@ -319,7 +334,7 @@ function ScheduleView({
                       <BandCard
                         key={band.id}
                         band={band}
-                        isSelected={selectedBands.includes(band.id)}
+                        isSelected={selectedBandsSet.has(band.id)}
                         onToggle={onToggleBand}
                         showVenue={true}
                         currentTime={currentTime}
@@ -353,7 +368,7 @@ function ScheduleView({
                       <BandCard
                         key={band.id}
                         band={band}
-                        isSelected={selectedBands.includes(band.id)}
+                        isSelected={selectedBandsSet.has(band.id)}
                         onToggle={onToggleBand}
                         showVenue={true}
                         currentTime={currentTime}

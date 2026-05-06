@@ -22,7 +22,7 @@ function BulkActionBar({
       <div className="flex flex-col md:flex-row md:items-center gap-3">
         {/* Selection count */}
         <div className="text-white font-semibold min-w-[120px]">
-          {count} band{count !== 1 ? 's' : ''} selected
+          {count} performance{count !== 1 ? 's' : ''} selected
         </div>
 
         {/* Action selector (Step 1) */}
@@ -76,7 +76,9 @@ function BulkActionBar({
 
         {action === 'delete' && (
           <div className="flex items-center gap-2 text-orange-300 bg-orange-900/20 px-3 py-2 rounded">
-            <span>Warning: Permanently delete {count} bands?</span>
+            <span>
+              Warning: Permanently delete {count} performance{count !== 1 ? 's' : ''}?
+            </span>
           </div>
         )}
 

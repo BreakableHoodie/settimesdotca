@@ -33,9 +33,6 @@ function ComingUp({ bands, currentTime }) {
     }
 
     updateNextBand()
-    const interval = setInterval(updateNextBand, 30000) // Update every 30 seconds
-
-    return () => clearInterval(interval)
   }, [bands, currentTime])
 
   // Format time until next band
@@ -61,9 +58,8 @@ function ComingUp({ bands, currentTime }) {
   }
 
   const hasNext = nextBand && minutesUntil !== null
-  const message = hasNext
-    ? `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name} at ${nextBand.venue}`
-    : undefined
+  const venueLabel = nextBand?.venue ? ` at ${nextBand.venue}` : ''
+  const message = hasNext ? `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name}${venueLabel}` : undefined
 
   return (
     <div
@@ -79,7 +75,7 @@ function ComingUp({ bands, currentTime }) {
             <p className="font-bold text-sm md:text-base leading-normal">
               <span className="block">Coming up in {formatTimeUntil(minutesUntil)}:</span>
               <span className="text-lg md:text-xl">{nextBand.name}</span>
-              <span className="block text-sm md:text-base">{nextBand.venue}</span>
+              {nextBand.venue && <span className="block text-sm md:text-base">{nextBand.venue}</span>}
             </p>
           </div>
         </div>

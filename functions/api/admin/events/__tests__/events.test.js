@@ -543,4 +543,77 @@ describe("Event API - handler integration", () => {
     const data = await res.json();
     expect(data.error).toBe("Validation error");
   });
-});
+
+  it("publish endpoint rejects non-boolean publish field (string 'yes')", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "TypeCheckEvent", slug: "type-check-event" });
+    insertBand(rawDb, { name: "A Band", event_id: ev.id });
+
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}/publish`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        body: JSON.stringify({ publish: "yes" }),
+      }
+    );
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+  });
+
+  it("publish endpoint rejects non-boolean publish field (number 1)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "TypeCheckEvent2", slug: "type-check-event-2" });
+    insertBand(rawDb, { name: "A Band 2", event_id: ev.id });
+
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}/publish`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        body: JSON.stringify({ publish: 1 }),
+      }
+    );
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+  });
+})
+
+describe('Event duplication atomicity (P0-B2)', () => {
+  it('cleans up newly created event if performance copy fails', async () => {
+    const rawDb = createTestDB()
+    const env = { DB: createDBEnv(rawDb) }
+
+    const original = insertEvent(rawDb, { name: 'SourceEvent', slug: 'source-event' })
+    insertBand(rawDb, { name: 'BandA', event_id: original.id })
+
+    // Make the performances INSERT...SELECT throw after the event INSERT succeeds
+    const originalPrepare = env.DB.prepare.bind(env.DB)
+    env.DB.prepare = sql => {
+      if (sql.includes('INSERT INTO performances') && sql.includes('SELECT')) {
+        return { bind: () => ({ run: () => { throw new Error('simulated performances copy failure') } }) }
+      }
+      return originalPrepare(sql)
+    }
+
+    const request = new Request(
+      `https://example.test/api/admin/events/${original.id}/duplicate`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-test-role': 'editor' },
+        body: JSON.stringify({ name: 'Copy', date: '2027-01-01', slug: 'copy-event' }),
+      }
+    )
+
+    const res = await eventIdHandler.onRequestPost({ request, env })
+    expect(res.status).toBe(500)
+
+    // The new event must have been cleaned up — no orphan
+    const orphan = rawDb.prepare("SELECT id FROM events WHERE slug = 'copy-event'").get()
+    expect(orphan).toBeUndefined()
+  })
+})

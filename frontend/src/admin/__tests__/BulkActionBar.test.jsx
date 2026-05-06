@@ -23,9 +23,9 @@ const defaultProps = {
 }
 
 describe('BulkActionBar — Bug 2: bulk action flow', () => {
-  it('shows selection count', () => {
+  it('shows selection count using "performances" terminology', () => {
     render(<BulkActionBar {...defaultProps} count={5} />)
-    expect(screen.getByText('5 bands selected')).toBeInTheDocument()
+    expect(screen.getByText('5 performances selected')).toBeInTheDocument()
   })
 
   it('shows More actions dropdown and Cancel button when no action selected', () => {
@@ -77,6 +77,19 @@ describe('BulkActionBar — Bug 2: bulk action flow', () => {
     render(<BulkActionBar {...defaultProps} action="move_venue" params={{ venue_id: 1 }} onSubmit={onSubmit} />)
     fireEvent.click(screen.getByRole('button', { name: /preview changes/i }))
     expect(onSubmit).toHaveBeenCalled()
+  })
+
+  it('onParamsChange is called with venue_id shape when a venue is selected (T9)', () => {
+    const onParamsChange = vi.fn()
+    render(<BulkActionBar {...defaultProps} action="move_venue" params={{}} onParamsChange={onParamsChange} />)
+    const venueSelect = screen.getAllByRole('combobox')[0]
+    fireEvent.change(venueSelect, { target: { value: '1' } })
+    expect(onParamsChange).toHaveBeenCalledWith(expect.objectContaining({ venue_id: expect.anything() }))
+  })
+
+  it('shows delete warning using "performances" terminology (T9/P3-Q7)', () => {
+    render(<BulkActionBar {...defaultProps} action="delete" count={2} />)
+    expect(screen.getByText(/permanently delete 2 performances/i)).toBeInTheDocument()
   })
 
   it('shows Back button when action is active (not Cancel)', () => {

@@ -23,9 +23,10 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
     <div className={`relative ${className}`}>
       {/* Filter Button */}
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-all duration-150 
+          w-full sm:w-auto min-h-[44px] px-4 py-2 rounded-lg font-semibold transition-all duration-150 
           hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 
           focus-visible:ring-offset-2 focus-visible:ring-accent-400
           ${
@@ -62,6 +63,7 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
             {options.map(option => (
               <button
                 key={option.value}
+                type="button"
                 onClick={() => handleSelect(option)}
                 className={`
                   w-full px-4 py-3 text-left hover:bg-bg-purple/30 transition-colors

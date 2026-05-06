@@ -3,7 +3,7 @@ import { BandcampIcon, FacebookIcon, InstagramIcon } from '../components/ui/Soci
 import DOMPurify from 'dompurify'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Helmet, HelmetProvider } from 'react-helmet-async'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import BandFacts from '../components/BandFacts'
 import BandStats from '../components/BandStats'
 import Breadcrumbs from '../components/Breadcrumbs'
@@ -115,6 +115,15 @@ function getScheduleEventSlug() {
   }
 }
 
+function formatEventSlugLabel(eventSlug) {
+  if (!eventSlug) return 'Event Schedule'
+  return eventSlug
+    .split('-')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 /**
  * BandProfilePage - Enhanced band profile with design system
  * Sprint 2.2: SEO optimization, design system integration, performance history
@@ -129,6 +138,8 @@ function getScheduleEventSlug() {
 export default function BandProfilePage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
   const hasRedirectedRef = useRef(false)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -144,8 +155,21 @@ export default function BandProfilePage() {
   const [turnstileToken, setTurnstileToken] = useState('')
   const [userHasSchedule] = useState(() => hasAnySchedule())
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
+  const sourceEventSlug = searchParams.get('fromEvent') || location.state?.fromEventSlug || null
 
   const isNumericId = useMemo(() => /^\d+$/.test(id || ''), [id])
+  const sourceEventContext = useMemo(() => {
+    if (!sourceEventSlug || !profile) return null
+    const allPerformances = [...(profile.upcoming || []), ...(profile.past || [])]
+    return allPerformances.find(performance => performance.event_slug === sourceEventSlug) || null
+  }, [profile, sourceEventSlug])
+  const fallbackEventContext = useMemo(() => {
+    if (!profile) return null
+    return profile.upcoming?.[0] || profile.past?.[0] || null
+  }, [profile])
+  const returnEventSlug = sourceEventSlug || scheduleEventSlug || fallbackEventContext?.event_slug || null
+  const returnEventName = sourceEventContext?.event_name || fallbackEventContext?.event_name || formatEventSlugLabel(returnEventSlug)
+  const returnEventPath = returnEventSlug ? `/event/${returnEventSlug}` : '/'
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const sanitizedDescription = useMemo(() => {
@@ -401,7 +425,7 @@ export default function BandProfilePage() {
             </p>
           </Alert>
           <div className="text-center">
-            <Button as={Link} to="/" variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
+            <Button as={Link} to={returnEventPath} variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
               Back to Schedule
             </Button>
           </div>
@@ -474,13 +498,13 @@ export default function BandProfilePage() {
                 <span className="text-accent-500">Set</span>
                 <span className="text-white">Times</span>
               </Link>
-              {userHasSchedule && (
+              {(returnEventSlug || userHasSchedule) && (
                 <Link
-                  to={scheduleEventSlug ? `/event/${scheduleEventSlug}` : '/'}
+                  to={returnEventPath}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-500/20 text-accent-400 hover:bg-accent-500/30 transition-colors text-sm font-medium"
                 >
                   <CalendarDays size={14} />
-                  My Schedule
+                  {sourceEventSlug ? 'Back to Schedule' : 'My Schedule'}
                 </Link>
               )}
             </div>
@@ -492,9 +516,7 @@ export default function BandProfilePage() {
           <Breadcrumbs
             items={[
               { label: 'Events', href: '/' },
-              ...(profile.upcoming?.[0]?.event_slug
-                ? [{ label: profile.upcoming[0].event_name, href: `/event/${profile.upcoming[0].event_slug}` }]
-                : []),
+              ...(returnEventSlug ? [{ label: returnEventName, href: returnEventPath }] : []),
               { label: profile.name },
             ]}
           />
@@ -823,8 +845,8 @@ export default function BandProfilePage() {
 
           {/* Back to Events */}
           <div className="mt-6 text-center">
-            <Button as={Link} to="/" variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
-              Back to Events
+            <Button as={Link} to={returnEventPath} variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
+              {returnEventSlug ? 'Back to Schedule' : 'Back to Events'}
             </Button>
           </div>
         </div>

@@ -34,11 +34,16 @@ function ScheduleView({
   showPast,
   onToggleShowPast,
   timeFilter = 'all',
+  venueFilter: controlledVenueFilter,
+  onVenueFilterChange,
+  showVenueFilter = true,
+  eventSlug,
 }) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
-  const [venueFilter, setVenueFilter] = useState(null)
+  const [localVenueFilter, setLocalVenueFilter] = useState(null)
   const [genreFilter, setGenreFilter] = useState(null)
+  const venueFilter = controlledVenueFilter === undefined ? localVenueFilter : controlledVenueFilter
   const nowMs = useMemo(() => {
     const d = currentTime instanceof Date ? currentTime : new Date(currentTime)
     return d.getTime()
@@ -126,8 +131,12 @@ function ScheduleView({
   const pastByTime = useMemo(() => groupByTime(pastBands).reverse(), [pastBands])
 
   const selectedBandsSet = useMemo(() => new Set(selectedBands), [selectedBands])
+  const visibleBandIds = useMemo(() => visibleBands.map(band => band.id), [visibleBands])
+  const canToggleBands = typeof onToggleBand === 'function'
+  const canTogglePast = typeof onToggleShowPast === 'function'
+  const canSelectAll = typeof onSelectAll === 'function' && visibleBands.length > 0
 
-  const allSelected = bands.length > 0 && selectedBands.length === bands.length
+  const allSelected = visibleBandIds.length > 0 && visibleBandIds.every(id => selectedBandsSet.has(id))
   const hiddenFinished = !showPast ? finishedCount : 0
   const noVisibleBands = sortedBands.length === 0
 
@@ -154,6 +163,20 @@ function ScheduleView({
     }
   }
 
+  const handleSelectAll = () => {
+    if (!canSelectAll) return
+    onSelectAll(visibleBands)
+  }
+
+  const handleVenueFilterToggle = nextVenue => {
+    const nextValue = venueFilter === nextVenue ? null : nextVenue
+    if (typeof onVenueFilterChange === 'function') {
+      onVenueFilterChange(nextValue)
+      return
+    }
+    setLocalVenueFilter(nextValue)
+  }
+
   return (
     <div className="py-6 space-y-6 sm:space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -166,7 +189,7 @@ function ScheduleView({
           )}
         </div>
         <div className="flex justify-center sm:justify-end gap-3 flex-wrap">
-          {finishedCount > 0 && (
+          {finishedCount > 0 && canTogglePast && (
             <button
               onClick={onToggleShowPast}
               className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
@@ -194,9 +217,9 @@ function ScheduleView({
             )}
             <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
           </button>
-          {onSelectAll && (
+          {canSelectAll && (
             <button
-              onClick={onSelectAll}
+              onClick={handleSelectAll}
               disabled={allSelected}
               className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 allSelected
@@ -212,16 +235,16 @@ function ScheduleView({
       </div>
 
       {/* Filter pills */}
-      {(uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
+      {(showVenueFilter || uniqueGenres.length > 0) && (uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
         <div className="space-y-3">
-          {(uniqueVenues.length > 1 || hasUnscheduled) && (
+          {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
               <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
                 {uniqueVenues.map(venue => (
                   <button
                     key={venue}
-                    onClick={() => setVenueFilter(prev => (prev === venue ? null : venue))}
+                    onClick={() => handleVenueFilterToggle(venue)}
                     aria-pressed={venueFilter === venue}
                     className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                       venueFilter === venue
@@ -234,7 +257,7 @@ function ScheduleView({
                 ))}
                 {hasUnscheduled && (
                   <button
-                    onClick={() => setVenueFilter(prev => (prev === UNSCHEDULED ? null : UNSCHEDULED))}
+                    onClick={() => handleVenueFilterToggle(UNSCHEDULED)}
                     aria-pressed={venueFilter === UNSCHEDULED}
                     className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                       venueFilter === UNSCHEDULED
@@ -303,7 +326,9 @@ function ScheduleView({
                     band={band}
                     isSelected={selectedBandsSet.has(band.id)}
                     onToggle={onToggleBand}
-                    clickable={!!onToggleBand}
+                    clickable={canToggleBands}
+                    showToggleButton={canToggleBands}
+                    eventSlug={eventSlug}
                     showVenue={true}
                     currentTime={currentTime}
                   />
@@ -336,6 +361,9 @@ function ScheduleView({
                         band={band}
                         isSelected={selectedBandsSet.has(band.id)}
                         onToggle={onToggleBand}
+                        clickable={canToggleBands}
+                        showToggleButton={canToggleBands}
+                        eventSlug={eventSlug}
                         showVenue={true}
                         currentTime={currentTime}
                       />
@@ -370,6 +398,9 @@ function ScheduleView({
                         band={band}
                         isSelected={selectedBandsSet.has(band.id)}
                         onToggle={onToggleBand}
+                        clickable={canToggleBands}
+                        showToggleButton={canToggleBands}
+                        eventSlug={eventSlug}
                         showVenue={true}
                         currentTime={currentTime}
                       />

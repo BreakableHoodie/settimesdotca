@@ -75,6 +75,7 @@ describe('GET /api/events/:id/recap', () => {
     expect(payload.bands).toHaveLength(1);
     expect(payload.bands[0]).toMatchObject({
       name: 'Band Alpha',
+      performance_id: expect.any(Number),
       venue_id: venue.id,
       venue_name: 'Main Stage',
       start_time: '19:00',

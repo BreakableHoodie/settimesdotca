@@ -91,13 +91,10 @@ export default function EmbedPage() {
       <ScheduleView
         bands={bands}
         selectedBands={[]}
-        onToggleBand={() => {}} // No-op for embed
-        onSelectAll={() => {}} // No-op for embed
         currentTime={currentTime}
         showPast={false}
-        onToggleShowPast={() => {}} // No-op for embed
         timeFilter="all"
-        embedded={true}
+        eventSlug={slug}
       />
     </div>
   )

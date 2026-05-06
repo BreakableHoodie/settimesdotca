@@ -341,6 +341,42 @@ function App() {
     [clearScheduleToast]
   )
 
+  const trackScheduleBuilds = useCallback(
+    async bandsToTrack => {
+      if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {
+        return
+      }
+
+      const performanceIds = bandsToTrack
+        .map(band => band?.performance_id)
+        .filter(id => typeof id === 'number' && Number.isFinite(id))
+
+      if (performanceIds.length === 0) {
+        return
+      }
+
+      const userSession = getScheduleSessionId()
+      if (!userSession) {
+        return
+      }
+
+      try {
+        await fetch('/api/schedule/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: eventData.id,
+            performance_ids: performanceIds,
+            user_session: userSession,
+          }),
+        })
+      } catch (error) {
+        console.warn('[App] Failed to record schedule build', error)
+      }
+    },
+    [eventData]
+  )
+
   useEffect(() => {
     const sParam = searchParams.get('s')
     if (!sParam || bands.length === 0) return
@@ -397,40 +433,7 @@ function App() {
         { replace: true }
       )
     }
-  }, [bands, searchParams, showScheduleToast, slug])
-
-  const trackScheduleBuilds = async bandsToTrack => {
-    if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {
-      return
-    }
-
-    const performanceIds = bandsToTrack
-      .map(band => band?.performance_id)
-      .filter(id => typeof id === 'number' && Number.isFinite(id))
-
-    if (performanceIds.length === 0) {
-      return
-    }
-
-    const userSession = getScheduleSessionId()
-    if (!userSession) {
-      return
-    }
-
-    try {
-      await fetch('/api/schedule/build', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: eventData.id,
-          performance_ids: performanceIds,
-          user_session: userSession,
-        }),
-      })
-    } catch (error) {
-      console.warn('[App] Failed to record schedule build', error)
-    }
-  }
+  }, [bands, searchParams, setSearchParams, showScheduleToast, slug, trackScheduleBuilds])
 
   const dismissHint = () => {
     setShowHint(false)
@@ -621,10 +624,7 @@ function App() {
           </div>
         </header>
       ) : (
-        <Header
-          eventName={eventData?.name}
-          eventDate={eventData?.date}
-        />
+        <Header eventName={eventData?.name} eventDate={eventData?.date} />
       )}
       {!isArchived && <ComingUp bands={myBands} currentTime={effectiveNow} />}
       {!isArchived && (

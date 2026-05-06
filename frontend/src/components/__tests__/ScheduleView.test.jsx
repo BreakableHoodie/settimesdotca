@@ -198,7 +198,14 @@ describe('ScheduleView — P1: read-only schedule surfaces hide dead actions', (
   it('does not render schedule-building or past-toggle actions when handlers are absent', () => {
     const pastMs = NOW_MS - 2 * 60 * 60 * 1000
     const bands = [
-      makeBand({ id: '1', name: 'Past Band', startTime: '17:00', endTime: '18:00', startMs: pastMs - 60 * 60 * 1000, endMs: pastMs }),
+      makeBand({
+        id: '1',
+        name: 'Past Band',
+        startTime: '17:00',
+        endTime: '18:00',
+        startMs: pastMs - 60 * 60 * 1000,
+        endMs: pastMs,
+      }),
       makeBand({ id: '2', name: 'Future Band', startMs: NOW_MS + 60 * 60 * 1000, endMs: NOW_MS + 2 * 60 * 60 * 1000 }),
     ]
 

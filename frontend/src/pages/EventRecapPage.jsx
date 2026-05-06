@@ -71,7 +71,9 @@ function groupBandsByVenue(bands) {
 function StatCard({ label, value }) {
   return (
     <div className="bg-white/5 rounded-lg p-4 text-center">
-      <div className="sr-only">{label}: {value ?? '—'}</div>
+      <div className="sr-only">
+        {label}: {value ?? '—'}
+      </div>
       <div className="text-3xl font-bold text-white" aria-hidden="true">
         {value ?? '—'}
       </div>
@@ -217,7 +219,8 @@ export default function EventRecapPage() {
                         </Link>
                         <div className="mt-1 text-sm text-white/60">
                           {band.venue_name || 'Unscheduled'}
-                          {(band.start_time || band.end_time) && ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
+                          {(band.start_time || band.end_time) &&
+                            ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
                         </div>
                       </li>
                     ))}
@@ -240,7 +243,8 @@ export default function EventRecapPage() {
                         </Link>
                         <div className="mt-1 text-sm text-white/60">
                           {band.venue_name || 'Unscheduled'}
-                          {(band.start_time || band.end_time) && ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
+                          {(band.start_time || band.end_time) &&
+                            ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
                         </div>
                       </li>
                     ))}
@@ -249,7 +253,8 @@ export default function EventRecapPage() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-white/15 bg-bg-navy/30 p-4 text-sm text-white/70">
-                No saved route was found for this event. The archive still preserves the full lineup, venue recap, and band history.
+                No saved route was found for this event. The archive still preserves the full lineup, venue recap, and
+                band history.
               </div>
             )}
           </section>
@@ -278,11 +283,19 @@ export default function EventRecapPage() {
                   </div>
                   <ul className="space-y-2 text-sm text-white/70">
                     {venue.bands.map(band => (
-                      <li key={band.performance_id} className="flex items-start justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
-                        <Link to={buildBandProfileHref(band.name, event.slug)} className="min-w-0 truncate text-accent-400 hover:underline">
+                      <li
+                        key={band.performance_id}
+                        className="flex items-start justify-between gap-3 rounded-lg bg-white/5 px-3 py-2"
+                      >
+                        <Link
+                          to={buildBandProfileHref(band.name, event.slug)}
+                          className="min-w-0 truncate text-accent-400 hover:underline"
+                        >
                           {band.name}
                         </Link>
-                        <span className="shrink-0 text-white/50">{band.start_time || 'TBD'}–{band.end_time || 'TBD'}</span>
+                        <span className="shrink-0 text-white/50">
+                          {band.start_time || 'TBD'}–{band.end_time || 'TBD'}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -309,7 +322,8 @@ export default function EventRecapPage() {
                       {band.genre && <span className="ml-2 text-white/50 text-sm">{band.genre}</span>}
                       <div className="mt-0.5 text-white/50 text-sm">
                         {band.venue_name || 'Unscheduled'}
-                        {(band.start_time || band.end_time) && ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
+                        {(band.start_time || band.end_time) &&
+                          ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

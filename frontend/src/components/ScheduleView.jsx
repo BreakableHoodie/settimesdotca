@@ -235,65 +235,66 @@ function ScheduleView({
       </div>
 
       {/* Filter pills */}
-      {(showVenueFilter || uniqueGenres.length > 0) && (uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
-        <div className="space-y-3">
-          {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
-              <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
-                {uniqueVenues.map(venue => (
-                  <button
-                    key={venue}
-                    onClick={() => handleVenueFilterToggle(venue)}
-                    aria-pressed={venueFilter === venue}
-                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
-                      venueFilter === venue
-                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
-                    }`}
-                  >
-                    {venue}
-                  </button>
-                ))}
-                {hasUnscheduled && (
-                  <button
-                    onClick={() => handleVenueFilterToggle(UNSCHEDULED)}
-                    aria-pressed={venueFilter === UNSCHEDULED}
-                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
-                      venueFilter === UNSCHEDULED
-                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
-                    }`}
-                  >
-                    Unscheduled
-                  </button>
-                )}
+      {(showVenueFilter || uniqueGenres.length > 0) &&
+        (uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
+          <div className="space-y-3">
+            {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
+                <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
+                  {uniqueVenues.map(venue => (
+                    <button
+                      key={venue}
+                      onClick={() => handleVenueFilterToggle(venue)}
+                      aria-pressed={venueFilter === venue}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        venueFilter === venue
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      {venue}
+                    </button>
+                  ))}
+                  {hasUnscheduled && (
+                    <button
+                      onClick={() => handleVenueFilterToggle(UNSCHEDULED)}
+                      aria-pressed={venueFilter === UNSCHEDULED}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        venueFilter === UNSCHEDULED
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      Unscheduled
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-          {uniqueGenres.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Genre</span>
-              <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
-                {uniqueGenres.map(genre => (
-                  <button
-                    key={genre}
-                    onClick={() => setGenreFilter(prev => (prev === genre ? null : genre))}
-                    aria-pressed={genreFilter === genre}
-                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
-                      genreFilter === genre
-                        ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
-                    }`}
-                  >
-                    {genre}
-                  </button>
-                ))}
+            )}
+            {uniqueGenres.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Genre</span>
+                <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
+                  {uniqueGenres.map(genre => (
+                    <button
+                      key={genre}
+                      onClick={() => setGenreFilter(prev => (prev === genre ? null : genre))}
+                      aria-pressed={genreFilter === genre}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        genreFilter === genre
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      {genre}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
 
       {noVisibleBands ? (
         <div className="text-center text-white/70 py-12">

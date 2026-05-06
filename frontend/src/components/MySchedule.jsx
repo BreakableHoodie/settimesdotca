@@ -25,7 +25,16 @@ import { copyToClipboard } from '../utils/clipboard'
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
 
-function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleShowPast, nowOverride, onBrowseAll, eventSlug }) {
+function MySchedule({
+  bands,
+  onToggleBand,
+  onClearSchedule,
+  showPast,
+  onToggleShowPast,
+  nowOverride,
+  onBrowseAll,
+  eventSlug,
+}) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false)

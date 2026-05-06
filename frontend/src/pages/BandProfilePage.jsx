@@ -168,7 +168,8 @@ export default function BandProfilePage() {
     return profile.upcoming?.[0] || profile.past?.[0] || null
   }, [profile])
   const returnEventSlug = sourceEventSlug || scheduleEventSlug || fallbackEventContext?.event_slug || null
-  const returnEventName = sourceEventContext?.event_name || fallbackEventContext?.event_name || formatEventSlugLabel(returnEventSlug)
+  const returnEventName =
+    sourceEventContext?.event_name || fallbackEventContext?.event_name || formatEventSlugLabel(returnEventSlug)
   const returnEventPath = returnEventSlug ? `/event/${returnEventSlug}` : '/'
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
@@ -230,7 +231,13 @@ export default function BandProfilePage() {
 
         if (!isNumericId && data?.id && !hasRedirectedRef.current) {
           hasRedirectedRef.current = true
-          navigate(`/band/${data.id}`, { replace: true })
+          navigate(
+            {
+              pathname: `/band/${data.id}`,
+              search: location.search,
+            },
+            { replace: true, state: location.state }
+          )
         }
       } catch (err) {
         console.error('Failed to load band profile:', err)
@@ -243,7 +250,7 @@ export default function BandProfilePage() {
     if (id) {
       loadProfile()
     }
-  }, [id, isNumericId, navigate])
+  }, [id, isNumericId, location.search, location.state, navigate])
 
   useEffect(() => {
     trackPageView(`/band/${id || ''}`)
@@ -425,7 +432,13 @@ export default function BandProfilePage() {
             </p>
           </Alert>
           <div className="text-center">
-            <Button as={Link} to={returnEventPath} variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
+            <Button
+              as={Link}
+              to={returnEventPath}
+              variant="secondary"
+              icon={<ArrowLeft size={14} />}
+              iconPosition="left"
+            >
               Back to Schedule
             </Button>
           </div>
@@ -845,7 +858,13 @@ export default function BandProfilePage() {
 
           {/* Back to Events */}
           <div className="mt-6 text-center">
-            <Button as={Link} to={returnEventPath} variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
+            <Button
+              as={Link}
+              to={returnEventPath}
+              variant="secondary"
+              icon={<ArrowLeft size={14} />}
+              iconPosition="left"
+            >
               {returnEventSlug ? 'Back to Schedule' : 'Back to Events'}
             </Button>
           </div>

@@ -179,7 +179,7 @@ Prefer the workflow for normal releases so database and deploy checks stay coupl
 Start Wrangler first:
 
 ```bash
-./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state
+npm run pages:dev
 ```
 
 Then rerun:
@@ -190,7 +190,15 @@ Then rerun:
 
 ### Public endpoints return 503 locally
 
-That is expected until you set:
+That is expected until you enable public data for the local Pages session.
+
+For a temporary local override, run:
+
+```bash
+npm run pages:dev:public
+```
+
+If you want the setting to persist across local runs, set:
 
 ```env
 PUBLIC_DATA_PUBLISH_ENABLED=true

@@ -387,20 +387,19 @@ Target: settimes.ca
 Proxy: Enabled
 ```
 
-### 4. Configure Redirects
+### 4. Configure SPA Asset Routing
 
-Create/update `frontend/public/_redirects`:
+SPA navigation fallback is handled in `wrangler.toml` via:
 
+```toml
+[assets]
+directory = "./frontend/dist"
+not_found_handling = "single-page-application"
 ```
-# Redirect www to non-www
-https://www.settimes.ca/* https://settimes.ca/:splat 301!
 
-# Redirect old domain (if applicable)
-https://lwbc.dredre.net/* https://settimes.ca/:splat 301!
+Do not add `/* /index.html 200` to `frontend/public/_redirects`; Wrangler rejects that pattern because HTML handling already rewrites `/index.html` and `/index`, which creates a redirect loop during local Pages runs.
 
-# SPA fallback (handle all routes)
-/* /index.html 200
-```
+If you need host-level redirects such as `www` to apex, configure them in Cloudflare dashboard rules or your DNS/proxy layer instead of using a blanket SPA fallback rule.
 
 ### 5. Verify SSL Certificate
 

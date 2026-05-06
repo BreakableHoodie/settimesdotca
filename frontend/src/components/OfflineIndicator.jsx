@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 
+const PRIVACY_BANNER_OFFSET = 'calc(1rem + var(--privacy-banner-height, 0px))'
+
 export default function OfflineIndicator() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
 
@@ -19,7 +21,10 @@ export default function OfflineIndicator() {
   if (!isOffline) return null
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 bg-yellow-500 text-black px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
+    <div
+      className="fixed left-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-warning-500 px-4 py-3 text-bg-navy shadow-lg"
+      style={{ bottom: PRIVACY_BANNER_OFFSET }}
+    >
       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
         <path
           fillRule="evenodd"

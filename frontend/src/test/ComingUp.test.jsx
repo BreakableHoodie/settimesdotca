@@ -20,7 +20,7 @@ describe('ComingUp', () => {
   it('shows band name when next band has no venue', () => {
     const bands = makeBand({ name: 'No Venue Band', venue: null })
     render(<ComingUp bands={bands} currentTime={new Date()} />)
-    expect(screen.getByText('No Venue Band')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('No Venue Band')
   })
 
   it('shows venue name when next band has a venue', () => {

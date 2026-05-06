@@ -4,6 +4,8 @@
   "type": "module",
   "description": "SetTimes.ca - Event Schedule & Performance Management Platform",
   "scripts": {
+    "pages:dev": "./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state",
+    "pages:dev:public": "npm run pages:dev -- --binding PUBLIC_DATA_PUBLISH_ENABLED=true",
     "migrate:local": "bash scripts/migrate-local-db.sh",
     "validate:schema": "node scripts/validate-db-schema.js",
     "validate:openapi": "node scripts/validate-openapi.mjs",

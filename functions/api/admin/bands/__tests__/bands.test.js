@@ -555,8 +555,11 @@ describe('Admin bands API - Bulk operations', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
 
-    expect(data.conflicts.some(c => c.band_id === bandA.id && c.type === 'overlap')).toBe(true)
-    expect(data.conflicts.some(c => c.band_id === bandB.id && c.type === 'overlap')).toBe(true)
+    // One entry per pair — message must mention both band names
+    const overlap = data.conflicts.find(c => c.type === 'overlap')
+    expect(overlap).toBeDefined()
+    expect(overlap.message).toContain('Batch A')
+    expect(overlap.message).toContain('Batch B')
   })
 
   it('move_venue preview detects exact conflict when two batch members have identical times', async () => {
@@ -578,8 +581,11 @@ describe('Admin bands API - Bulk operations', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
 
-    expect(data.conflicts.some(c => c.band_id === bandA.id && c.type === 'conflict')).toBe(true)
-    expect(data.conflicts.some(c => c.band_id === bandB.id && c.type === 'conflict')).toBe(true)
+    // One entry per pair — message must mention both band names
+    const conflict = data.conflicts.find(c => c.type === 'conflict')
+    expect(conflict).toBeDefined()
+    expect(conflict.message).toContain('Exact A')
+    expect(conflict.message).toContain('Exact B')
   })
 
   it('change_time preview detects conflict between two batch members at the same venue+event after time shift', async () => {
@@ -600,8 +606,11 @@ describe('Admin bands API - Bulk operations', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
 
-    expect(data.conflicts.some(c => c.band_id === bandA.id && (c.type === 'overlap' || c.type === 'conflict'))).toBe(true)
-    expect(data.conflicts.some(c => c.band_id === bandB.id && (c.type === 'overlap' || c.type === 'conflict'))).toBe(true)
+    // One entry per pair — message must mention both band names
+    const entry = data.conflicts.find(c => c.type === 'overlap' || c.type === 'conflict')
+    expect(entry).toBeDefined()
+    expect(entry.message).toContain('CT Band A')
+    expect(entry.message).toContain('CT Band B')
   })
 })
 

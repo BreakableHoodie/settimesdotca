@@ -169,7 +169,7 @@ function MySchedule({
   }, [visibleBands, highlightedBandIds])
 
   // Detect overlaps and conflicts
-  const { conflicts, overlaps } = useMemo(() => {
+  const { conflicts, overlaps, conflictCount, overlapCount } = useMemo(() => {
     const conflicts = []
     const overlaps = []
 
@@ -197,7 +197,10 @@ function MySchedule({
       }
     }
 
-    return { conflicts, overlaps }
+    const conflictCount = new Set(conflicts.flatMap(c => [c.band1, c.band2])).size
+    const overlapCount = new Set(overlaps.flatMap(c => [c.band1, c.band2])).size
+
+    return { conflicts, overlaps, conflictCount, overlapCount }
   }, [visibleBands])
 
   if (sortedBands.length === 0) {
@@ -441,35 +444,28 @@ function MySchedule({
 
       {(conflicts.length > 0 || overlaps.length > 0) && (
         <div className="space-y-4 max-w-5xl mx-auto">
-          {conflicts.length > 0 &&
-            (() => {
-              const count = new Set(conflicts.flatMap(c => [c.band1, c.band2])).size
-              return (
-                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 leading-normal">
-                  <div className="flex items-center gap-3 text-red-200 font-semibold">
-                    <TriangleAlert size={20} className="text-red-300 shrink-0" aria-hidden="true" />
-                    <p className="text-sm sm:text-base leading-normal">
-                      {count} band{count !== 1 ? 's' : ''} happening at the same time — you&apos;ll need to choose!
-                    </p>
-                  </div>
-                </div>
-              )
-            })()}
-          {overlaps.length > 0 &&
-            (() => {
-              const count = new Set(overlaps.flatMap(c => [c.band1, c.band2])).size
-              return (
-                <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
-                  <div className="flex items-center gap-3 text-yellow-200 font-semibold">
-                    <Zap size={20} className="text-yellow-300 shrink-0" aria-hidden="true" />
-                    <p className="text-sm sm:text-base leading-normal">
-                      {count} band{count !== 1 ? 's' : ''} with overlapping set{count !== 1 ? 's' : ''} — you may not
-                      catch every full set.
-                    </p>
-                  </div>
-                </div>
-              )
-            })()}
+          {conflicts.length > 0 && (
+            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 leading-normal">
+              <div className="flex items-center gap-3 text-red-200 font-semibold">
+                <TriangleAlert size={20} className="text-red-300 shrink-0" aria-hidden="true" />
+                <p className="text-sm sm:text-base leading-normal">
+                  {conflictCount} band{conflictCount !== 1 ? 's' : ''} happening at the same time — you&apos;ll need to
+                  choose!
+                </p>
+              </div>
+            </div>
+          )}
+          {overlaps.length > 0 && (
+            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
+              <div className="flex items-center gap-3 text-yellow-200 font-semibold">
+                <Zap size={20} className="text-yellow-300 shrink-0" aria-hidden="true" />
+                <p className="text-sm sm:text-base leading-normal">
+                  {overlapCount} band{overlapCount !== 1 ? 's' : ''} with overlapping set{overlapCount !== 1 ? 's' : ''}{' '}
+                  — you may not catch every full set.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

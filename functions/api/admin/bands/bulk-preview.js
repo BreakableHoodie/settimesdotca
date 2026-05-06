@@ -148,38 +148,30 @@ export async function onRequestPost(context) {
     // Check pairs within the batch for conflicts at the new venue.
     // The pre-existing query excludes all batch members to avoid false positives from
     // their current positions, so batch members are invisible to each other. We must
-    // compare them pairwise here.
+    // compare them pairwise here. One entry per pair (not two mirror entries) to avoid
+    // duplicate messages in the preview modal.
     for (let i = 0; i < mutableBandResults.length; i++) {
-      const bandA = mutableBandResults[i]
-      if (!bandA.start_time || !bandA.end_time) continue
-      const intervalsA = buildIntervals(bandA.start_time, bandA.end_time)
+      const bandA = mutableBandResults[i];
+      if (!bandA.start_time || !bandA.end_time) continue;
+      const intervalsA = buildIntervals(bandA.start_time, bandA.end_time);
 
       for (let j = i + 1; j < mutableBandResults.length; j++) {
-        const bandB = mutableBandResults[j]
-        if (!bandB.start_time || !bandB.end_time) continue
-        if (bandA.event_id !== bandB.event_id) continue
+        const bandB = mutableBandResults[j];
+        if (!bandB.start_time || !bandB.end_time) continue;
+        if (bandA.event_id !== bandB.event_id) continue;
 
-        const intervalsB = buildIntervals(bandB.start_time, bandB.end_time)
-        if (!intervalsA.some(a => intervalsB.some(b => intervalsOverlap(a, b)))) continue
+        const intervalsB = buildIntervals(bandB.start_time, bandB.end_time);
+        if (!intervalsA.some((a) => intervalsB.some((b) => intervalsOverlap(a, b)))) continue;
 
-        const isExact = bandA.start_time === bandB.start_time && bandA.end_time === bandB.end_time
-        const conflictType = isExact ? 'conflict' : 'overlap'
+        const isExact = bandA.start_time === bandB.start_time && bandA.end_time === bandB.end_time;
         conflicts.push({
           band_id: bandA.id,
-          type: conflictType,
+          type: isExact ? "conflict" : "overlap",
           message: isExact
-            ? `"${bandA.name}" has the exact same time as "${bandB.name}" (both being moved to ${venue.name})`
-            : `"${bandA.name}" overlaps with "${bandB.name}" (both being moved to ${venue.name})`,
-          severity: 'error',
-        })
-        conflicts.push({
-          band_id: bandB.id,
-          type: conflictType,
-          message: isExact
-            ? `"${bandB.name}" has the exact same time as "${bandA.name}" (both being moved to ${venue.name})`
-            : `"${bandB.name}" overlaps with "${bandA.name}" (both being moved to ${venue.name})`,
-          severity: 'error',
-        })
+            ? `"${bandA.name}" and "${bandB.name}" have the exact same time (both being moved to ${venue.name})`
+            : `"${bandA.name}" and "${bandB.name}" overlap (both being moved to ${venue.name})`,
+          severity: "error",
+        });
       }
     }
   } else if (action === "change_time") {
@@ -241,40 +233,32 @@ export async function onRequestPost(context) {
 
     // Check pairs that share venue+event — both receive the same new start_time so they
     // will always overlap at minimum. The pre-existing cache excludes all batch members,
-    // making them invisible to each other.
+    // making them invisible to each other. One entry per pair to avoid duplicate messages
+    // in the preview modal.
     for (let i = 0; i < mutableBandResults.length; i++) {
-      const bandA = mutableBandResults[i]
-      if (!bandA.start_time || !bandA.end_time || !bandA.venue_id) continue
+      const bandA = mutableBandResults[i];
+      if (!bandA.start_time || !bandA.end_time || !bandA.venue_id) continue;
 
       for (let j = i + 1; j < mutableBandResults.length; j++) {
-        const bandB = mutableBandResults[j]
-        if (!bandB.start_time || !bandB.end_time || !bandB.venue_id) continue
-        if (bandA.venue_id !== bandB.venue_id || bandA.event_id !== bandB.event_id) continue
+        const bandB = mutableBandResults[j];
+        if (!bandB.start_time || !bandB.end_time || !bandB.venue_id) continue;
+        if (bandA.venue_id !== bandB.venue_id || bandA.event_id !== bandB.event_id) continue;
 
-        const newEndA = computeNewEndTime(bandA.start_time, bandA.end_time, start_time)
-        const newEndB = computeNewEndTime(bandB.start_time, bandB.end_time, start_time)
-        const intervalsA = buildIntervals(start_time, newEndA)
-        const intervalsB = buildIntervals(start_time, newEndB)
-        if (!intervalsA.some(a => intervalsB.some(b => intervalsOverlap(a, b)))) continue
+        const newEndA = computeNewEndTime(bandA.start_time, bandA.end_time, start_time);
+        const newEndB = computeNewEndTime(bandB.start_time, bandB.end_time, start_time);
+        const intervalsA = buildIntervals(start_time, newEndA);
+        const intervalsB = buildIntervals(start_time, newEndB);
+        if (!intervalsA.some((a) => intervalsB.some((b) => intervalsOverlap(a, b)))) continue;
 
-        const isExact = newEndA === newEndB
-        const conflictType = isExact ? 'conflict' : 'overlap'
+        const isExact = newEndA === newEndB;
         conflicts.push({
           band_id: bandA.id,
-          type: conflictType,
+          type: isExact ? "conflict" : "overlap",
           message: isExact
-            ? `"${bandA.name}" has the exact same time as "${bandB.name}" at venue after time change`
-            : `"${bandA.name}" overlaps with "${bandB.name}" at venue after time change`,
-          severity: 'error',
-        })
-        conflicts.push({
-          band_id: bandB.id,
-          type: conflictType,
-          message: isExact
-            ? `"${bandB.name}" has the exact same time as "${bandA.name}" at venue after time change`
-            : `"${bandB.name}" overlaps with "${bandA.name}" at venue after time change`,
-          severity: 'error',
-        })
+            ? `"${bandA.name}" and "${bandB.name}" have the exact same time at venue after time change`
+            : `"${bandA.name}" and "${bandB.name}" overlap at venue after time change`,
+          severity: "error",
+        });
       }
     }
   } else if (action === "delete") {

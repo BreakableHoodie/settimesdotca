@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { validateCSRFMiddleware } from "../csrf.js";
 
 // Minimal env — local dev so CSRF_SECRET not required

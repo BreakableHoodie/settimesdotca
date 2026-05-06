@@ -535,6 +535,74 @@ describe('Admin bands API - Bulk operations', () => {
     const overlapData = await overlapRes.json()
     expect(overlapData.conflicts[0].type).toBe('overlap')
   })
+
+  it('move_venue preview detects overlap between two batch members moving to the same venue', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'BatchOverlapEvent', slug: 'batch-overlap-event' })
+    const sourceA = insertVenue(rawDb, { name: 'Source A' })
+    const sourceB = insertVenue(rawDb, { name: 'Source B' })
+    const target = insertVenue(rawDb, { name: 'Target Venue' })
+    // Two bands at different venues, overlapping times — moving both to the same target venue
+    const bandA = insertBand(rawDb, { name: 'Batch A', event_id: ev.id, venue_id: sourceA.id, start_time: '21:00', end_time: '22:00' })
+    const bandB = insertBand(rawDb, { name: 'Batch B', event_id: ev.id, venue_id: sourceB.id, start_time: '21:30', end_time: '22:30' })
+
+    const req = new Request('https://example.test/api/admin/bands/bulk-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ band_ids: [bandA.id, bandB.id], action: 'move_venue', venue_id: target.id }),
+    })
+    const res = await bulkPreviewHandler.onRequestPost({ request: req, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(200)
+    const data = await res.json()
+
+    expect(data.conflicts.some(c => c.band_id === bandA.id && c.type === 'overlap')).toBe(true)
+    expect(data.conflicts.some(c => c.band_id === bandB.id && c.type === 'overlap')).toBe(true)
+  })
+
+  it('move_venue preview detects exact conflict when two batch members have identical times', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'BatchExactEvent', slug: 'batch-exact-event' })
+    const sourceA = insertVenue(rawDb, { name: 'Exact Source A' })
+    const sourceB = insertVenue(rawDb, { name: 'Exact Source B' })
+    const target = insertVenue(rawDb, { name: 'Exact Target' })
+    // Same time slot at different venues — should become an exact conflict when co-located
+    const bandA = insertBand(rawDb, { name: 'Exact A', event_id: ev.id, venue_id: sourceA.id, start_time: '21:00', end_time: '22:00' })
+    const bandB = insertBand(rawDb, { name: 'Exact B', event_id: ev.id, venue_id: sourceB.id, start_time: '21:00', end_time: '22:00' })
+
+    const req = new Request('https://example.test/api/admin/bands/bulk-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ band_ids: [bandA.id, bandB.id], action: 'move_venue', venue_id: target.id }),
+    })
+    const res = await bulkPreviewHandler.onRequestPost({ request: req, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(200)
+    const data = await res.json()
+
+    expect(data.conflicts.some(c => c.band_id === bandA.id && c.type === 'conflict')).toBe(true)
+    expect(data.conflicts.some(c => c.band_id === bandB.id && c.type === 'conflict')).toBe(true)
+  })
+
+  it('change_time preview detects conflict between two batch members at the same venue+event after time shift', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'ChangeTimeBatchEvent', slug: 'change-time-batch-event' })
+    const venue = insertVenue(rawDb, { name: 'Shared Venue' })
+    // Two bands at the same venue+event with different durations — moving both to the same start time
+    const bandA = insertBand(rawDb, { name: 'CT Band A', event_id: ev.id, venue_id: venue.id, start_time: '20:00', end_time: '21:00' })  // 60 min
+    const bandB = insertBand(rawDb, { name: 'CT Band B', event_id: ev.id, venue_id: venue.id, start_time: '20:00', end_time: '21:30' })  // 90 min
+
+    // Both shifted to 23:00 → A: 23:00-00:00, B: 23:00-00:30 → overlap
+    const req = new Request('https://example.test/api/admin/bands/bulk-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ band_ids: [bandA.id, bandB.id], action: 'change_time', start_time: '23:00' }),
+    })
+    const res = await bulkPreviewHandler.onRequestPost({ request: req, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(200)
+    const data = await res.json()
+
+    expect(data.conflicts.some(c => c.band_id === bandA.id && (c.type === 'overlap' || c.type === 'conflict'))).toBe(true)
+    expect(data.conflicts.some(c => c.band_id === bandB.id && (c.type === 'overlap' || c.type === 'conflict'))).toBe(true)
+  })
 })
 
 describe('Admin bands API - Atomicity (P0-B1, P1-B6)', () => {

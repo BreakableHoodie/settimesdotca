@@ -83,10 +83,15 @@ function getRateLimitConfig(pathname) {
 }
 
 /**
- * Generate a stable key for rate limiting (IP + endpoint base path)
+ * Generate a stable key for rate limiting (IP + endpoint base path).
+ * Auth sub-routes use 5 segments so login and signup get distinct D1 keys.
  */
 function getRateLimitKey(ip, pathname) {
-  const basePath = pathname.split('/').slice(0, 4).join('/');
+  const depth =
+    pathname.startsWith('/api/admin/auth/') || pathname.startsWith('/api/auth/')
+      ? 5
+      : 4;
+  const basePath = pathname.split('/').slice(0, depth).join('/');
   return `${ip}:${basePath}`;
 }
 

@@ -207,9 +207,9 @@ function ScheduleView({
       </div>
 
       {/* Filter pills */}
-      {(uniqueVenues.length > 1 || uniqueGenres.length > 0) && (
+      {(uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
         <div className="space-y-3">
-          {uniqueVenues.length > 1 && (
+          {(uniqueVenues.length > 1 || hasUnscheduled) && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
               <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">

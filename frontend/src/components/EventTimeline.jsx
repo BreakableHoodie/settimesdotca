@@ -195,6 +195,11 @@ export default function EventTimeline() {
   const hasActiveFilters = filters.venue !== null || filters.month !== null
   const isPublishGateError = error?.status === 503
 
+  // Hooks must be called before any conditional returns (Rules of Hooks)
+  const filteredNow = useMemo(() => filterEvents(timeline.now || []), [filterEvents, timeline.now])
+  const filteredUpcoming = useMemo(() => filterEvents(timeline.upcoming || []), [filterEvents, timeline.upcoming])
+  const filteredPast = useMemo(() => filterEvents(timeline.past || []), [filterEvents, timeline.past])
+
   if (loading) {
     return <EventsPageSkeleton />
   }
@@ -211,11 +216,6 @@ export default function EventTimeline() {
       </div>
     )
   }
-
-  // Apply filters (memoized to avoid recomputing on every render)
-  const filteredNow = useMemo(() => filterEvents(timeline.now || []), [filterEvents, timeline.now])
-  const filteredUpcoming = useMemo(() => filterEvents(timeline.upcoming || []), [filterEvents, timeline.upcoming])
-  const filteredPast = useMemo(() => filterEvents(timeline.past || []), [filterEvents, timeline.past])
 
   const hasNow = filteredNow.length > 0
   const hasUpcoming = filteredUpcoming.length > 0

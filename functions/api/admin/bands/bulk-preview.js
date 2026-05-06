@@ -129,7 +129,7 @@ export async function onRequestPost(context) {
       for (const other of existing) {
         if (!other.start_time || !other.end_time) continue;
         const otherIntervals = buildIntervals(other.start_time, other.end_time);
-        if (intervalsOverlap(bandIntervals, otherIntervals)) {
+        if (bandIntervals.some(a => otherIntervals.some(b => intervalsOverlap(a, b)))) {
           const isExact =
             other.start_time === band.start_time &&
             other.end_time === band.end_time;
@@ -186,7 +186,7 @@ export async function onRequestPost(context) {
       for (const other of existing) {
         if (!other.start_time || !other.end_time) continue;
         const otherIntervals = buildIntervals(other.start_time, other.end_time);
-        if (intervalsOverlap(bandIntervals, otherIntervals)) {
+        if (bandIntervals.some(a => otherIntervals.some(b => intervalsOverlap(a, b)))) {
           const isExact =
             other.start_time === start_time && other.end_time === newEndTime;
           conflicts.push({

@@ -12,6 +12,8 @@ import {
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 import { sendEmail, isEmailConfigured } from "../../../utils/email.js";
+import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
+import { parseOrigin } from "../../../utils/parseOrigin.js";
 
 const escapeHtml = (s) =>
   String(s ?? "")
@@ -34,15 +36,6 @@ function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function parseOrigin(origin) {
-  if (!origin) return { city: null, region: null };
-  const [city, region] = origin.split(",").map((part) => part.trim());
-  return {
-    city: city || null,
-    region: region || null,
-  };
-}
-
 async function getEventForPerformance(DB, performanceId) {
   if (!performanceId) return null;
 
@@ -58,7 +51,6 @@ async function getEventForPerformance(DB, performanceId) {
     .first();
 }
 
-// Helper to check for time conflicts (supports sets that cross midnight)
 async function checkConflicts(
   DB,
   eventId,
@@ -67,28 +59,6 @@ async function checkConflicts(
   endTime,
   excludePerformanceId = null,
 ) {
-  const conflicts = [];
-
-  // Convert HH:MM to minutes for easier comparison
-  const toMinutes = (time) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
-
-  const normalizeEndMinutes = (startMinutes, endMinutes) => {
-    return endMinutes <= startMinutes ? endMinutes + 24 * 60 : endMinutes;
-  };
-
-  const buildIntervals = (start, end) => {
-    const startMinutes = toMinutes(start);
-    const endMinutes = toMinutes(end);
-    const normalizedEnd = normalizeEndMinutes(startMinutes, endMinutes);
-    return [
-      [startMinutes, normalizedEnd],
-      [startMinutes + 24 * 60, normalizedEnd + 24 * 60],
-    ];
-  };
-
   const query = excludePerformanceId
     ? `SELECT p.id, p.start_time, p.end_time, bp.name
        FROM performances p
@@ -103,32 +73,23 @@ async function checkConflicts(
     ? [eventId, venueId, excludePerformanceId]
     : [eventId, venueId];
 
-  const result = await DB.prepare(query)
-    .bind(...bindings)
-    .all();
-  const existingBands = result.results || [];
-
-  const intervalsOverlap = (intervalA, intervalB) =>
-    intervalA[0] < intervalB[1] && intervalB[0] < intervalA[1];
-
+  const { results: existingBands } = await DB.prepare(query).bind(...bindings).all();
   const newIntervals = buildIntervals(startTime, endTime);
+  const conflicts = [];
 
   for (const band of existingBands) {
     if (!band.start_time || !band.end_time) continue;
     const bandIntervals = buildIntervals(band.start_time, band.end_time);
-    const hasOverlap = bandIntervals.some((intervalB) =>
-      newIntervals.some((intervalA) => intervalsOverlap(intervalA, intervalB)),
+    const hasOverlap = bandIntervals.some((b) =>
+      newIntervals.some((a) => intervalsOverlap(a, b)),
     );
-
     if (hasOverlap) {
-      const isExact =
-        band.start_time === startTime && band.end_time === endTime;
       conflicts.push({
         id: band.id,
         name: band.name,
         startTime: band.start_time,
         endTime: band.end_time,
-        type: isExact ? "conflict" : "overlap",
+        type: band.start_time === startTime && band.end_time === endTime ? "conflict" : "overlap",
       });
     }
   }
@@ -206,7 +167,14 @@ export async function onRequestPut(context) {
     let bandProfileId = null;
 
     if (isProfileUpdate) {
-      bandProfileId = performanceId.split("_")[1];
+      const parsed = Number(performanceId.toString().split("_")[1]);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        return new Response(
+          JSON.stringify({ error: "Bad request", message: "Invalid profile ID" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      bandProfileId = parsed;
       realPerformanceId = null;
     }
 
@@ -938,7 +906,13 @@ export async function onRequestDelete(context) {
     }
 
     if (isProfileDelete) {
-      const bandProfileId = performanceId.split("_")[1];
+      const bandProfileId = Number(performanceId.toString().split("_")[1]);
+      if (!Number.isInteger(bandProfileId) || bandProfileId <= 0) {
+        return new Response(
+          JSON.stringify({ error: "Bad request", message: "Invalid profile ID" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
       // Check if any performances exist
       const perfCount = await DB.prepare(
         "SELECT COUNT(*) as count FROM performances WHERE band_profile_id = ?",

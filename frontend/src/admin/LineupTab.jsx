@@ -7,6 +7,7 @@ import BulkPreviewModal from './BulkPreviewModal'
 import ArtistPicker from './components/ArtistPicker'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
+import { parseOrigin } from '../utils/parseOrigin'
 import {
   adjustForMidnight,
   calculateEndTimeFromDuration,
@@ -18,6 +19,7 @@ import {
   parseTimeToMinutes,
   sortBandsByStart,
 } from './utils/timeUtils'
+import { buildPickerFormData, buildEmptyPickerFormData } from './utils/pickerFormData'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -36,7 +38,6 @@ export default function LineupTab({
   selectedEvent,
   events,
   showToast,
-  onEventFilterChange: _onEventFilterChange,
   readOnly = false,
 }) {
   const [bands, setBands] = useState([]) // Current event performances
@@ -88,12 +89,6 @@ export default function LineupTab({
   const [bulkApplying, setBulkApplying] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: () => {} })
 
-  const splitOrigin = origin => {
-    if (!origin) return { city: '', region: '' }
-    const [city, region] = origin.split(',').map(part => part.trim())
-    return { city: city || '', region: region || '' }
-  }
-
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
@@ -126,7 +121,7 @@ export default function LineupTab({
     allBands.forEach(band => {
       if (band.origin_city) values.add(band.origin_city)
       if (!band.origin_city && band.origin) {
-        const parsed = splitOrigin(band.origin)
+        const parsed = parseOrigin(band.origin)
         if (parsed.city) values.add(parsed.city)
       }
     })
@@ -138,7 +133,7 @@ export default function LineupTab({
     allBands.forEach(band => {
       if (band.origin_region) values.add(band.origin_region)
       if (!band.origin_region && band.origin) {
-        const parsed = splitOrigin(band.origin)
+        const parsed = parseOrigin(band.origin)
         if (parsed.region) values.add(parsed.region)
       }
     })
@@ -243,56 +238,12 @@ export default function LineupTab({
     if (artist) {
       // Selected existing artist from roster
       setSelectedProfile(artist)
-      const parsedOrigin = splitOrigin(artist.origin)
-
-      // Pre-fill form with existing profile data
-      let socialLinks = {}
-      try {
-        socialLinks = JSON.parse(artist.social_links || '{}')
-      } catch {
-        /* Invalid JSON, use empty object */
-      }
-
-      setFormData({
-        ...formData,
-        name: artist.name,
-        genre: artist.genre || '',
-        origin: artist.origin || '',
-        origin_city: artist.origin_city || parsedOrigin.city,
-        origin_region: artist.origin_region || parsedOrigin.region,
-        contact_email: artist.contact_email || '',
-        is_active: artist.is_active ?? 1,
-        description: artist.description || '',
-        photo_url: artist.photo_url || '',
-        url: artist.url || '',
-        website: socialLinks.website || '',
-        instagram: socialLinks.instagram || '',
-        bandcamp: socialLinks.bandcamp || '',
-        facebook: socialLinks.facebook || '',
-        // Ensure event_id is set
-        event_id: selectedEventId.toString(),
-      })
+      // Pre-fill form with existing profile data (scheduling fields always start blank)
+      setFormData(buildPickerFormData(artist, selectedEventId))
     } else {
-      // Create new
+      // Create new (scheduling fields always start blank)
       setSelectedProfile(null)
-      setFormData({
-        ...formData,
-        name: newName || '',
-        genre: '',
-        origin: '',
-        origin_city: '',
-        origin_region: '',
-        contact_email: '',
-        is_active: 1,
-        description: '',
-        photo_url: '',
-        url: '',
-        website: '',
-        instagram: '',
-        bandcamp: '',
-        facebook: '',
-        event_id: selectedEventId.toString(),
-      })
+      setFormData(buildEmptyPickerFormData(newName, selectedEventId))
     }
     setViewMode('form')
   }
@@ -405,7 +356,7 @@ export default function LineupTab({
       /* Invalid JSON, use empty object */
     }
 
-    const parsedOrigin = splitOrigin(band.origin)
+    const parsedOrigin = parseOrigin(band.origin)
 
     setFormData({
       id: band.id,
@@ -488,6 +439,14 @@ export default function LineupTab({
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }))
   }
+
+  // Pre-compute conflict results for all bands once, keyed by band id.
+  // Avoids O(n²) detectConflicts calls inside the render loop.
+  const conflictsByBandId = useMemo(() => {
+    const map = new Map()
+    for (const band of bands) map.set(band.id, detectConflicts(band, bands))
+    return map
+  }, [bands])
 
   const formConflicts = useMemo(() => {
     if (!formData.venue_id || !formData.start_time || !formData.end_time) return { overlaps: [], conflicts: [] }
@@ -779,7 +738,7 @@ export default function LineupTab({
                     </thead>
                     <tbody className="divide-y divide-accent-500/10">
                       {sortedBands.map(band => {
-                        const { overlaps, conflicts: exactConflicts } = detectConflicts(band, bands)
+                        const { overlaps, conflicts: exactConflicts } = conflictsByBandId.get(band.id) ?? { overlaps: [], conflicts: [] }
                         const rowHighlight = exactConflicts.length
                           ? 'bg-red-900/20'
                           : overlaps.length
@@ -869,7 +828,7 @@ export default function LineupTab({
                     </div>
                   )}
                   {sortedBands.map(band => {
-                    const { overlaps, conflicts: exactConflicts } = detectConflicts(band, bands)
+                    const { overlaps, conflicts: exactConflicts } = conflictsByBandId.get(band.id) ?? { overlaps: [], conflicts: [] }
                     const cardHighlight = exactConflicts.length
                       ? 'bg-red-900/20'
                       : overlaps.length

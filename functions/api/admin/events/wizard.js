@@ -18,30 +18,10 @@ import {
   FIELD_LIMITS,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
+import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
 
 function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-// Returns minutes-since-midnight, wrapping end times that cross midnight.
-function toMinutes(t) {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function intervalsOverlap([a0, a1], [b0, b1]) {
-  return a0 < b1 && b0 < a1;
-}
-
-// Build two canonical intervals to handle midnight crossover (mirrors bands.js logic).
-function buildIntervals(start, end) {
-  const s = toMinutes(start);
-  const e = toMinutes(end);
-  const ne = e <= s ? e + 24 * 60 : e;
-  return [
-    [s, ne],
-    [s + 24 * 60, ne + 24 * 60],
-  ];
 }
 
 // Detect scheduling conflicts within the submitted band list (all for a new event).

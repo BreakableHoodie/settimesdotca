@@ -130,7 +130,7 @@ export default function EventTimeline() {
   }, [])
 
   // Filter events
-  const filterEvents = events => {
+  const filterEvents = useCallback(events => {
     if (!events) return []
 
     return events.filter(event => {
@@ -145,17 +145,15 @@ export default function EventTimeline() {
       }
       return true
     })
-  }
+  }, [filters])
 
   // Get unique venues and months for filters
   const allVenues = useMemo(() => {
-    return Array.from(
-      new Set(
-        [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
-          .flatMap(event => event.venues || [])
-          .map(v => JSON.stringify({ id: v.id, name: v.name }))
-      )
-    ).map(v => JSON.parse(v))
+    const seen = new Map()
+    ;[...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
+      .flatMap(event => event.venues || [])
+      .forEach(v => { if (!seen.has(v.id)) seen.set(v.id, { id: v.id, name: v.name }) })
+    return Array.from(seen.values())
   }, [timeline])
 
   const allMonths = useMemo(() => {
@@ -214,10 +212,10 @@ export default function EventTimeline() {
     )
   }
 
-  // Apply filters
-  const filteredNow = filterEvents(timeline.now || [])
-  const filteredUpcoming = filterEvents(timeline.upcoming || [])
-  const filteredPast = filterEvents(timeline.past || [])
+  // Apply filters (memoized to avoid recomputing on every render)
+  const filteredNow = useMemo(() => filterEvents(timeline.now || []), [filterEvents, timeline.now])
+  const filteredUpcoming = useMemo(() => filterEvents(timeline.upcoming || []), [filterEvents, timeline.upcoming])
+  const filteredPast = useMemo(() => filterEvents(timeline.past || []), [filterEvents, timeline.past])
 
   const hasNow = filteredNow.length > 0
   const hasUpcoming = filteredUpcoming.length > 0

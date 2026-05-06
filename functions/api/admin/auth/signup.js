@@ -297,7 +297,7 @@ export async function onRequestPost(context) {
         message:
           "Account created. Please check your email to activate your account.",
         requiresActivation: true,
-        email: emailResult,
+        email: { delivered: !!emailResult?.delivered },
       }),
       {
         status: 201,

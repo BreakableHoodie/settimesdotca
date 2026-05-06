@@ -59,6 +59,9 @@ export default function EmbedPage() {
 
     if (slug) {
       loadEventData()
+    } else {
+      setLoading(false)
+      setError('No event slug provided.')
     }
 
     return () => controller.abort()

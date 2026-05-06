@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import ScheduleView from '../ScheduleView'
@@ -78,6 +78,28 @@ describe('ScheduleView — Bug 4: finished sets hidden count', () => {
     })
     renderView({ bands: [futureBand] })
     expect(screen.queryByText(/finished sets hidden/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView — P2-F5: finishedCount respects venue filter', () => {
+  it('shows only the count of finished sets in the active venue when a venue filter is selected', () => {
+    const pastMs = NOW_MS - 2 * 60 * 60 * 1000
+    const bands = [
+      makeBand({ id: '1', name: 'Stage A Band', venue: 'Stage A', startTime: '17:00', endTime: '18:00', startMs: pastMs - 60 * 60 * 1000, endMs: pastMs }),
+      makeBand({ id: '2', name: 'Stage B Band', venue: 'Stage B', startTime: '17:00', endTime: '18:00', startMs: pastMs - 60 * 60 * 1000, endMs: pastMs }),
+    ]
+
+    renderView({ bands, showPast: false })
+
+    // Before filter: both finished sets hidden
+    expect(screen.getByText(/2 finished sets hidden/i)).toBeInTheDocument()
+
+    // Click Stage A filter
+    fireEvent.click(screen.getByRole('button', { name: /Stage A/ }))
+
+    // After filter: only Stage A's finished set should be counted
+    expect(screen.getByText(/1 finished set hidden/i)).toBeInTheDocument()
+    expect(screen.queryByText(/2 finished sets hidden/i)).not.toBeInTheDocument()
   })
 })
 

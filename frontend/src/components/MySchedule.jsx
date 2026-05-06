@@ -177,12 +177,12 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
 
         // Check if times overlap
         if (currentStart < otherEnd && otherStart < currentEnd) {
-          // Complete overlap (same start time)
           if (currentStart === otherStart) {
-            overlaps.push({ band1: current.id, band2: other.id })
-          } else {
-            // Partial conflict
+            // Same start time = must choose = red conflict
             conflicts.push({ band1: current.id, band2: other.id })
+          } else {
+            // Partial overlap = can catch most of both = yellow warning
+            overlaps.push({ band1: current.id, band2: other.id })
           }
         }
       }
@@ -432,23 +432,23 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
 
       {(conflicts.length > 0 || overlaps.length > 0) && (
         <div className="space-y-4 max-w-5xl mx-auto">
-          {overlaps.length > 0 && (
-            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
-              <div className="flex items-center gap-3 text-yellow-200 font-semibold">
-                <Zap size={20} className="text-yellow-300 shrink-0" aria-hidden="true" />
-                <p className="text-sm sm:text-base leading-normal">
-                  {overlaps.length} band{overlaps.length !== 1 ? 's' : ''} happening at the same time — you&apos;ll need
-                  to choose!
-                </p>
-              </div>
-            </div>
-          )}
           {conflicts.length > 0 && (
             <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 leading-normal">
               <div className="flex items-center gap-3 text-red-200 font-semibold">
                 <TriangleAlert size={20} className="text-red-300 shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
-                  {conflicts.length} overlapping set{conflicts.length !== 1 ? 's' : ''} — you may not catch every full
+                  {conflicts.length} band{conflicts.length !== 1 ? 's' : ''} happening at the same time — you&apos;ll
+                  need to choose!
+                </p>
+              </div>
+            </div>
+          )}
+          {overlaps.length > 0 && (
+            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
+              <div className="flex items-center gap-3 text-yellow-200 font-semibold">
+                <Zap size={20} className="text-yellow-300 shrink-0" aria-hidden="true" />
+                <p className="text-sm sm:text-base leading-normal">
+                  {overlaps.length} overlapping set{overlaps.length !== 1 ? 's' : ''} — you may not catch every full
                   set.
                 </p>
               </div>
@@ -511,14 +511,10 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                     showVenue={true}
                     clickable={false}
                     currentTime={effectiveNow}
-                    warningType={(() => {
-                      if (hasOverlap) return 'overlap'
-                      if (hasConflict) return 'conflict'
-                      return null
-                    })()}
+                    warningType={hasConflict ? 'conflict' : hasOverlap ? 'overlap' : null}
                     warningText={(() => {
-                      if (!hasOverlap && !hasConflict) return null
-                      const allMatches = [...overlaps, ...conflicts]
+                      if (!hasConflict && !hasOverlap) return null
+                      const allMatches = [...conflicts, ...overlaps]
                         .filter(c => c.band1 === band.id || c.band2 === band.id)
                         .map(c => {
                           const otherId = c.band1 === band.id ? c.band2 : c.band1
@@ -526,7 +522,7 @@ function MySchedule({ bands, onToggleBand, onClearSchedule, showPast, onToggleSh
                         })
                         .filter(Boolean)
                       const uniqueNames = [...new Set(allMatches.map(b => b.name))].join(', ')
-                      return hasOverlap ? `Same time as ${uniqueNames}` : `Overlaps with ${uniqueNames}`
+                      return hasConflict ? `Same time as ${uniqueNames}` : `Overlaps with ${uniqueNames}`
                     })()}
                   />
                 </div>

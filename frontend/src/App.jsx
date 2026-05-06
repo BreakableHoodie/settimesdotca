@@ -132,7 +132,6 @@ function App() {
   const [showHint, setShowHint] = useState(
     () => typeof window !== 'undefined' && !localStorage.getItem(HINT_DISMISSED_KEY)
   )
-  const [timeFilter] = useState('all')
   const [loading, setLoading] = useState(!HAS_FALLBACK)
   const [error, setError] = useState(null)
   const [showPast, setShowPast] = useState(false)
@@ -565,7 +564,6 @@ function App() {
             currentTime={effectiveNow}
             showPast={showPast}
             onToggleShowPast={toggleShowPast}
-            timeFilter={timeFilter}
           />
         ) : (
           <Suspense

@@ -17,6 +17,7 @@ import {
   isValidEmail,
 } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
+import { parseOrigin } from "../../utils/parseOrigin.js";
 
 const ROLE_LEVELS = { admin: 3, editor: 2, viewer: 1 };
 
@@ -36,14 +37,6 @@ function normalizeName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function parseOrigin(origin) {
-  if (!origin) return { city: null, region: null };
-  const [city, region] = origin.split(",").map((part) => part.trim());
-  return {
-    city: city || null,
-    region: region || null,
-  };
-}
 
 // Helper to unpack social links
 function unpackSocialLinks(performer) {

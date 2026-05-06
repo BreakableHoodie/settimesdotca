@@ -4,6 +4,7 @@ import BandForm from './BandForm'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
 import { Globe } from 'lucide-react'
+import { parseOrigin } from '../utils/parseOrigin'
 import { BandcampIcon, FacebookIcon, InstagramIcon } from '../components/ui/SocialIcons'
 
 function parseSocialLinks(band) {
@@ -174,12 +175,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
     return [band.origin_city, band.origin_region].filter(Boolean).join(', ') || band.origin || ''
   }
 
-  const splitOrigin = origin => {
-    if (!origin) return { city: '', region: '' }
-    const [city, region] = origin.split(',').map(part => part.trim())
-    return { city: city || '', region: region || '' }
-  }
-
   const filteredBands = useMemo(() => {
     if (!searchTerm.trim()) return bands
     const query = searchTerm.trim().toLowerCase()
@@ -331,7 +326,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
     } catch (_e) {
       /* ignore */
     }
-    const parsedOrigin = splitOrigin(band.origin)
+    const parsedOrigin = parseOrigin(band.origin)
 
     setFormData({
       id: band.id,
@@ -389,7 +384,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
     bands.forEach(band => {
       if (band.origin_city) values.add(band.origin_city)
       if (!band.origin_city && band.origin) {
-        const parsed = splitOrigin(band.origin)
+        const parsed = parseOrigin(band.origin)
         if (parsed.city) values.add(parsed.city)
       }
     })
@@ -401,7 +396,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
     bands.forEach(band => {
       if (band.origin_region) values.add(band.origin_region)
       if (!band.origin_region && band.origin) {
-        const parsed = splitOrigin(band.origin)
+        const parsed = parseOrigin(band.origin)
         if (parsed.region) values.add(parsed.region)
       }
     })

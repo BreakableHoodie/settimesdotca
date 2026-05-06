@@ -78,9 +78,9 @@ export async function onRequestDelete(context) {
       );
     }
 
-    const performanceIds = band_ids.filter(
-      (id) => !id.toString().startsWith("profile_"),
-    );
+    const performanceIds = band_ids
+      .filter((id) => !id.toString().startsWith("profile_"))
+      .map(Number);
     const archivedPerformances = await getArchivedPerformancesByPerformanceIds(
       DB,
       performanceIds,
@@ -165,7 +165,7 @@ export async function onRequestDelete(context) {
           await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(profileId).run();
           deletedCount++;
         } else {
-          const performance = performanceMap.get(id);
+          const performance = performanceMap.get(Number(id));
           if (performance) {
             await auditLog(env, user.userId, "band.deleted", "band", id, { bandName: performance.name, bulk: true }, ipAddress);
             await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
@@ -326,13 +326,14 @@ export async function onRequestPost(context) {
 
   for (const profileId of band_profile_ids) {
     try {
-      const profile = profileMap.get(profileId);
+      const numProfileId = Number(profileId);
+      const profile = profileMap.get(numProfileId);
       if (!profile) {
         errors.push(`Profile ${profileId} not found`);
         continue;
       }
 
-      if (alreadyInEvent.has(profileId)) {
+      if (alreadyInEvent.has(numProfileId)) {
         skipped.push(profile.name);
         continue;
       }
@@ -341,7 +342,7 @@ export async function onRequestPost(context) {
         `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
          VALUES (?, ?, ?, ?, ?) RETURNING id`,
       )
-        .bind(event_id, resolvedVenueId, profileId, start_time || null, end_time || null)
+        .bind(event_id, resolvedVenueId, numProfileId, start_time || null, end_time || null)
         .first();
 
       await auditLog(
@@ -355,7 +356,7 @@ export async function onRequestPost(context) {
       );
 
       // Track the newly inserted profile so duplicate IDs in this request are skipped
-      alreadyInEvent.add(profileId);
+      alreadyInEvent.add(numProfileId);
       added.push(profile.name);
     } catch (err) {
       console.error("Failed to add profile", profileId, err);

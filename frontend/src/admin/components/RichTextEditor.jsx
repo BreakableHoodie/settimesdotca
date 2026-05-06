@@ -5,15 +5,7 @@ import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import DOMPurify from 'dompurify'
-import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  List,
-  ListOrdered,
-  Link as LinkIcon,
-  Eraser,
-} from 'lucide-react'
+import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Link as LinkIcon, Eraser } from 'lucide-react'
 import './RichTextEditor.css'
 
 const SANITIZE_OPTIONS = {

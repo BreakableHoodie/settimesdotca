@@ -1,6 +1,7 @@
 import { CalendarDays, Clock, Route, Warehouse } from 'lucide-react'
 import { memo, useMemo } from 'react'
 import { getEventState } from '../utils/eventLifecycle'
+import TimeFilter from './TimeFilter'
 
 function parseVenueInfo(venueInfo) {
   if (!venueInfo) return []
@@ -48,15 +49,27 @@ function getLifecycleLabel(eventDate, currentTime) {
   return { label: 'Upcoming', classes: 'bg-blue-500/15 text-blue-300 border-blue-500/30' }
 }
 
-function LiveContextBar({ eventData, currentTime, bands = [], selectedCount = 0 }) {
+function LiveContextBar({
+  eventData,
+  currentTime,
+  bands = [],
+  selectedCount = 0,
+  view = 'all',
+  onViewChange,
+  venueFilter = null,
+  onVenueFilterChange,
+  timeFilter = 'all',
+  onTimeFilterChange,
+}) {
+  const venueOptions = useMemo(() => [...new Set(bands.map(band => band.venue).filter(Boolean))].sort(), [bands])
   const uniqueVenues = useMemo(() => {
     const venueInfo = parseVenueInfo(eventData?.venue_info)
     if (venueInfo.length > 0) {
       return venueInfo.length
     }
 
-    return new Set(bands.map(band => band.venue).filter(Boolean)).size
-  }, [bands, eventData?.venue_info])
+    return venueOptions.length
+  }, [eventData?.venue_info, venueOptions.length])
 
   const lifecycle = useMemo(() => getLifecycleLabel(eventData?.date, currentTime), [currentTime, eventData?.date])
 
@@ -122,6 +135,59 @@ function LiveContextBar({ eventData, currentTime, bands = [], selectedCount = 0 
               </div>
             )}
           </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 p-1">
+            <button
+              type="button"
+              onClick={() => onViewChange?.('all')}
+              aria-pressed={view === 'all'}
+              className={`min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
+                view === 'all' ? 'bg-accent-500 text-bg-navy' : 'text-white/70 hover:text-white'
+              }`}
+            >
+              Live Lineup
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewChange?.('mine')}
+              aria-pressed={view === 'mine'}
+              className={`relative min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
+                view === 'mine' ? 'bg-accent-500 text-bg-navy' : 'text-white/70 hover:text-white'
+              }`}
+            >
+              My Route
+              {selectedCount > 0 && (
+                <span className="ml-2 inline-flex min-w-[20px] items-center justify-center rounded-full bg-bg-navy/80 px-1.5 py-0.5 text-xs font-bold text-white">
+                  {selectedCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {venueOptions.length > 1 && (
+            <div className="min-w-[170px]">
+              <label htmlFor="live-venue-switcher" className="sr-only">
+                Venue switcher
+              </label>
+              <select
+                id="live-venue-switcher"
+                value={venueFilter || ''}
+                onChange={event => onVenueFilterChange?.(event.target.value || null)}
+                className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+              >
+                <option value="">All Venues</option>
+                {venueOptions.map(venue => (
+                  <option key={venue} value={venue}>
+                    {venue}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <TimeFilter selectedFilter={timeFilter} onFilterChange={onTimeFilterChange} className="min-w-[180px]" />
         </div>
       </div>
     </section>

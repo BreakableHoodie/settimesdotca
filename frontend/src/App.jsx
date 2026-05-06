@@ -1,5 +1,5 @@
 import { Archive, Bell, CircleAlert, X } from 'lucide-react'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import Breadcrumbs from './components/Breadcrumbs'
@@ -8,15 +8,19 @@ import Footer from './components/Footer'
 import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
 import PrivacyBanner from './components/PrivacyBanner'
-import ConfirmDialog from './components/ui/ConfirmDialog'
 import LiveContextBar from './components/LiveContextBar'
 import ScheduleView from './components/ScheduleView'
 import ScheduleSkeleton from './components/ScheduleSkeleton'
+import { Modal } from './components/ui'
 import { trackEventView, trackPageView } from './utils/metrics'
+import { getTimeFilterOptions } from './utils/timeFilter'
 import { validateBandsData } from './utils/validation'
 import { prepareBands } from './utils/bandUtils'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
+const TIME_FILTERS_STORAGE_KEY = 'timeFiltersByEvent'
+const SCHEDULE_TOAST_DURATION_MS = 5000
+const VALID_TIME_FILTERS = new Set(getTimeFilterOptions().map(option => option.value))
 
 const MySchedule = lazy(() => import('./components/MySchedule'))
 const VenueInfo = lazy(() => import('./components/VenueInfo'))
@@ -28,6 +32,27 @@ const HAS_FALLBACK = false
 const SCHEDULE_SESSION_KEY = 'scheduleSessionId'
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const LEGACY_SELECTED_BANDS_KEY = 'selectedBands'
+
+const getStoredTimeFilter = slug => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return 'all'
+  }
+
+  try {
+    const stored = window.localStorage.getItem(TIME_FILTERS_STORAGE_KEY)
+    if (!stored) return 'all'
+
+    const parsed = JSON.parse(stored)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return 'all'
+    }
+
+    const nextFilter = parsed[slug || 'default']
+    return VALID_TIME_FILTERS.has(nextFilter) ? nextFilter : 'all'
+  } catch {
+    return 'all'
+  }
+}
 
 const generateSecureSessionId = () => {
   if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
@@ -135,11 +160,15 @@ function App() {
   const [loading, setLoading] = useState(!HAS_FALLBACK)
   const [error, setError] = useState(null)
   const [showPast, setShowPast] = useState(false)
+  const [timeFilter, setTimeFilter] = useState(() => getStoredTimeFilter(slug))
+  const [venueFilter, setVenueFilter] = useState(null)
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [debugTime, setDebugTime] = useState(() => getInitialDebugTime())
-  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [sharedScheduleConfirmOpen, setSharedScheduleConfirmOpen] = useState(false)
   const [pendingSharedBands, setPendingSharedBands] = useState([])
+  const [lastClearedBands, setLastClearedBands] = useState([])
+  const [scheduleToast, setScheduleToast] = useState(null)
+  const scheduleToastTimeoutRef = useRef(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -223,7 +252,40 @@ function App() {
     const stored = getStoredSelection(slug)
     setSelectedBands(stored)
     setView(stored.length > 0 ? 'mine' : 'all')
+    setTimeFilter(getStoredTimeFilter(slug))
+    setVenueFilter(null)
   }, [slug])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+      return
+    }
+
+    try {
+      const key = slug || 'default'
+      let nextState = {}
+      const existing = window.localStorage.getItem(TIME_FILTERS_STORAGE_KEY)
+      if (existing) {
+        const parsed = JSON.parse(existing)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          nextState = { ...parsed }
+        }
+      }
+
+      nextState[key] = VALID_TIME_FILTERS.has(timeFilter) ? timeFilter : 'all'
+      window.localStorage.setItem(TIME_FILTERS_STORAGE_KEY, JSON.stringify(nextState))
+    } catch (error) {
+      console.warn('[App] Failed to persist timeFilter', error)
+    }
+  }, [slug, timeFilter])
+
+  useEffect(() => {
+    return () => {
+      if (scheduleToastTimeoutRef.current) {
+        window.clearTimeout(scheduleToastTimeoutRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
@@ -247,6 +309,73 @@ function App() {
       console.warn('[App] Failed to persist selectedBands', error)
     }
   }, [selectedBands, slug])
+
+  const clearScheduleToast = useCallback(({ clearUndoState = false } = {}) => {
+    if (scheduleToastTimeoutRef.current) {
+      window.clearTimeout(scheduleToastTimeoutRef.current)
+      scheduleToastTimeoutRef.current = null
+    }
+    setScheduleToast(null)
+    if (clearUndoState) {
+      setLastClearedBands([])
+    }
+  }, [])
+
+  const showScheduleToast = useCallback(
+    (nextToast, { duration = SCHEDULE_TOAST_DURATION_MS, clearUndoStateOnDismiss = false } = {}) => {
+      clearScheduleToast()
+      setScheduleToast(nextToast)
+
+      if (duration <= 0 || typeof window === 'undefined') {
+        return
+      }
+
+      scheduleToastTimeoutRef.current = window.setTimeout(() => {
+        setScheduleToast(null)
+        if (clearUndoStateOnDismiss) {
+          setLastClearedBands([])
+        }
+        scheduleToastTimeoutRef.current = null
+      }, duration)
+    },
+    [clearScheduleToast]
+  )
+
+  const trackScheduleBuilds = useCallback(
+    async bandsToTrack => {
+      if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {
+        return
+      }
+
+      const performanceIds = bandsToTrack
+        .map(band => band?.performance_id)
+        .filter(id => typeof id === 'number' && Number.isFinite(id))
+
+      if (performanceIds.length === 0) {
+        return
+      }
+
+      const userSession = getScheduleSessionId()
+      if (!userSession) {
+        return
+      }
+
+      try {
+        await fetch('/api/schedule/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: eventData.id,
+            performance_ids: performanceIds,
+            user_session: userSession,
+          }),
+        })
+      } catch (error) {
+        console.warn('[App] Failed to record schedule build', error)
+      }
+    },
+    [eventData]
+  )
 
   useEffect(() => {
     const sParam = searchParams.get('s')
@@ -272,8 +401,14 @@ function App() {
     const existing = getStoredSelection(slug)
 
     const applySelection = () => {
+      const importedBands = bands.filter(band => matchedStringIds.includes(band.id))
+      trackScheduleBuilds(importedBands)
       setSelectedBands(matchedStringIds)
       setView('mine')
+      showScheduleToast({
+        type: 'success',
+        message: `Loaded ${matchedStringIds.length} shared ${matchedStringIds.length === 1 ? 'stop' : 'stops'}.`,
+      })
       setSearchParams(
         prev => {
           const next = new URLSearchParams(prev)
@@ -298,44 +433,36 @@ function App() {
         { replace: true }
       )
     }
-  }, [bands, searchParams, slug])
-
-  const trackScheduleBuilds = async bandsToTrack => {
-    if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {
-      return
-    }
-
-    const performanceIds = bandsToTrack
-      .map(band => band?.performance_id)
-      .filter(id => typeof id === 'number' && Number.isFinite(id))
-
-    if (performanceIds.length === 0) {
-      return
-    }
-
-    const userSession = getScheduleSessionId()
-    if (!userSession) {
-      return
-    }
-
-    try {
-      await fetch('/api/schedule/build', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: eventData.id,
-          performance_ids: performanceIds,
-          user_session: userSession,
-        }),
-      })
-    } catch (error) {
-      console.warn('[App] Failed to record schedule build', error)
-    }
-  }
+  }, [bands, searchParams, setSearchParams, showScheduleToast, slug, trackScheduleBuilds])
 
   const dismissHint = () => {
     setShowHint(false)
     localStorage.setItem(HINT_DISMISSED_KEY, '1')
+  }
+
+  const applySharedSchedule = mode => {
+    const selectedBandIds = new Set(selectedBands)
+    const importedBands = bands.filter(
+      band => pendingSharedBands.includes(band.id) && (mode === 'replace' || !selectedBandIds.has(band.id))
+    )
+    const nextSelectedBands =
+      mode === 'merge' ? Array.from(new Set([...selectedBands, ...pendingSharedBands])) : [...pendingSharedBands]
+
+    if (importedBands.length > 0) {
+      trackScheduleBuilds(importedBands)
+    }
+
+    setSharedScheduleConfirmOpen(false)
+    setSelectedBands(nextSelectedBands)
+    setView('mine')
+    setPendingSharedBands([])
+    showScheduleToast({
+      type: 'success',
+      message:
+        mode === 'merge'
+          ? `Merged ${importedBands.length} new ${importedBands.length === 1 ? 'stop' : 'stops'} into your route.`
+          : `Replaced your route with ${pendingSharedBands.length} shared ${pendingSharedBands.length === 1 ? 'stop' : 'stops'}.`,
+    })
   }
 
   const toggleBand = bandId => {
@@ -354,17 +481,65 @@ function App() {
   }
 
   const clearSchedule = () => {
-    setClearConfirmOpen(true)
+    if (selectedBands.length === 0) {
+      return
+    }
+
+    const clearedBands = [...selectedBands]
+    setLastClearedBands(clearedBands)
+    setSelectedBands([])
+    setView('all')
+    showScheduleToast(
+      {
+        type: 'undo',
+        message: `Cleared ${clearedBands.length} ${clearedBands.length === 1 ? 'stop' : 'stops'} from your route.`,
+      },
+      { clearUndoStateOnDismiss: true }
+    )
   }
 
-  const selectAll = () => {
-    const allBandIds = bands.map(band => band.id)
-    trackScheduleBuilds(bands)
-    setSelectedBands(allBandIds)
+  const undoClearSchedule = () => {
+    if (lastClearedBands.length === 0) {
+      return
+    }
+
+    setSelectedBands(lastClearedBands)
+    setView('mine')
+    clearScheduleToast({ clearUndoState: true })
+  }
+
+  const selectAll = (bandsToSelect = bands) => {
+    const normalizedBands = Array.isArray(bandsToSelect)
+      ? bandsToSelect.filter(band => band && typeof band.id === 'string')
+      : []
+
+    if (normalizedBands.length === 0) {
+      return
+    }
+
+    const selectedBandIds = new Set(selectedBands)
+    const newlySelectedBands = normalizedBands.filter(band => !selectedBandIds.has(band.id))
+
+    if (newlySelectedBands.length === 0) {
+      return
+    }
+
+    if (showHint) {
+      dismissHint()
+    }
+
+    trackScheduleBuilds(newlySelectedBands)
+    setSelectedBands(prev => {
+      const nextSelectedBandIds = new Set(prev)
+      normalizedBands.forEach(band => nextSelectedBandIds.add(band.id))
+      return Array.from(nextSelectedBandIds)
+    })
   }
 
   const isArchived = Boolean(eventData?.is_archived)
   const myBands = bands.filter(band => selectedBands.includes(band.id))
+  const sharedBandsAlreadySelectedCount = pendingSharedBands.filter(id => selectedBands.includes(id)).length
+  const sharedBandsNewCount = pendingSharedBands.length - sharedBandsAlreadySelectedCount
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
   const effectiveNow = debugTime || currentTime
@@ -449,17 +624,22 @@ function App() {
           </div>
         </header>
       ) : (
-        <Header
-          view={view}
-          setView={setView}
-          selectedCount={myBands.length}
-          eventName={eventData?.name}
-          eventDate={eventData?.date}
-        />
+        <Header eventName={eventData?.name} eventDate={eventData?.date} />
       )}
       {!isArchived && <ComingUp bands={myBands} currentTime={effectiveNow} />}
       {!isArchived && (
-        <LiveContextBar eventData={eventData} currentTime={effectiveNow} bands={bands} selectedCount={myBands.length} />
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={effectiveNow}
+          bands={bands}
+          selectedCount={myBands.length}
+          view={view}
+          onViewChange={setView}
+          venueFilter={venueFilter}
+          onVenueFilterChange={setVenueFilter}
+          timeFilter={timeFilter}
+          onTimeFilterChange={setTimeFilter}
+        />
       )}
       <main
         id="main-content"
@@ -564,6 +744,11 @@ function App() {
             currentTime={effectiveNow}
             showPast={showPast}
             onToggleShowPast={toggleShowPast}
+            timeFilter={timeFilter}
+            venueFilter={venueFilter}
+            onVenueFilterChange={setVenueFilter}
+            showVenueFilter={false}
+            eventSlug={slug || eventData?.slug}
           />
         ) : (
           <Suspense
@@ -580,6 +765,8 @@ function App() {
               showPast={showPast}
               onToggleShowPast={toggleShowPast}
               nowOverride={debugTime}
+              onBrowseAll={() => setView('all')}
+              eventSlug={slug || eventData?.slug}
             />
           </Suspense>
         )}
@@ -595,35 +782,92 @@ function App() {
       </Suspense>
       <Footer />
       <PrivacyBanner />
-      <ConfirmDialog
-        isOpen={clearConfirmOpen}
-        title="Clear Schedule"
-        message="Are you sure you want to clear your entire schedule?"
-        confirmText="Clear"
-        onConfirm={() => {
-          setClearConfirmOpen(false)
-          setSelectedBands([])
-          setView('all')
-        }}
-        onCancel={() => setClearConfirmOpen(false)}
-        variant="danger"
-      />
-      <ConfirmDialog
+      <Modal
         isOpen={sharedScheduleConfirmOpen}
-        title="Load Shared Schedule?"
-        message="Loading this shared schedule will replace your current picks."
-        confirmText="Load"
-        onConfirm={() => {
-          setSharedScheduleConfirmOpen(false)
-          setSelectedBands(pendingSharedBands)
-          setView('mine')
-          setPendingSharedBands([])
-        }}
-        onCancel={() => {
+        onClose={() => {
           setSharedScheduleConfirmOpen(false)
           setPendingSharedBands([])
         }}
-      />
+        title="Load Shared Route"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setSharedScheduleConfirmOpen(false)
+                setPendingSharedBands([])
+              }}
+              className="min-h-[44px] rounded-lg border border-white/15 px-4 py-2 text-white/80 transition-colors hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => applySharedSchedule('merge')}
+              className="min-h-[44px] rounded-lg border border-accent-500/30 bg-accent-500/10 px-4 py-2 font-semibold text-accent-400 transition-colors hover:bg-accent-500/20"
+            >
+              Merge
+            </button>
+            <button
+              type="button"
+              onClick={() => applySharedSchedule('replace')}
+              className="min-h-[44px] rounded-lg bg-accent-500 px-4 py-2 font-semibold text-bg-navy transition-colors hover:brightness-110"
+            >
+              Replace
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm text-text-secondary">
+          <p>Choose how to apply this shared route to your current picks.</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="text-xs uppercase tracking-wide text-white/50">Incoming stops</div>
+              <div className="mt-1 text-2xl font-semibold text-white">{pendingSharedBands.length}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="text-xs uppercase tracking-wide text-white/50">Already in your route</div>
+              <div className="mt-1 text-2xl font-semibold text-white">{sharedBandsAlreadySelectedCount}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="text-xs uppercase tracking-wide text-white/50">New to add</div>
+              <div className="mt-1 text-2xl font-semibold text-white">{sharedBandsNewCount}</div>
+            </div>
+          </div>
+          <p className="text-white/70">
+            <span className="font-semibold text-white">Merge</span> keeps your current route and adds only the new
+            shared stops. <span className="font-semibold text-white">Replace</span> swaps your route for the shared one.
+          </p>
+        </div>
+      </Modal>
+      {scheduleToast && (
+        <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">
+          <div className="rounded-xl border border-white/10 bg-bg-purple/95 px-4 py-3 shadow-xl backdrop-blur-xs">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-white/85">{scheduleToast.message}</p>
+              {scheduleToast.type === 'undo' ? (
+                <button
+                  type="button"
+                  onClick={undoClearSchedule}
+                  className="min-h-[44px] shrink-0 rounded-lg border border-accent-500/30 bg-accent-500/10 px-3 py-2 text-sm font-semibold text-accent-400 transition-colors hover:bg-accent-500/20"
+                >
+                  Undo
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => clearScheduleToast({ clearUndoState: true })}
+                  className="text-white/50 transition-colors hover:text-white"
+                  aria-label="Dismiss message"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

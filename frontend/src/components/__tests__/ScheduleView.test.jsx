@@ -159,3 +159,65 @@ describe('ScheduleView — Bug 5: blank venue filter button', () => {
     expect(emptyFilterButtons).toHaveLength(0)
   })
 })
+
+describe('ScheduleView — P1: Select All respects visible filters', () => {
+  it('passes only the visible filtered bands to the bulk select handler', () => {
+    const onSelectAll = vi.fn()
+    const bands = [
+      makeBand({ id: '1', name: 'Stage A Band', venue: 'Stage A' }),
+      makeBand({ id: '2', name: 'Stage B Band', venue: 'Stage B' }),
+    ]
+
+    renderView({ bands, onSelectAll })
+
+    fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Select All/i }))
+
+    expect(onSelectAll).toHaveBeenCalledTimes(1)
+    expect(onSelectAll).toHaveBeenCalledWith([
+      expect.objectContaining({ id: '1', name: 'Stage A Band', venue: 'Stage A' }),
+    ])
+  })
+
+  it('treats all visible bands as selected even when hidden bands remain unselected', () => {
+    const bands = [
+      makeBand({ id: '1', name: 'Stage A Band', venue: 'Stage A' }),
+      makeBand({ id: '2', name: 'Stage B Band', venue: 'Stage B' }),
+    ]
+
+    renderView({ bands, selectedBands: ['1'] })
+
+    fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
+
+    expect(screen.getByRole('button', { name: /All Selected/i })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^Select All$/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView — P1: read-only schedule surfaces hide dead actions', () => {
+  it('does not render schedule-building or past-toggle actions when handlers are absent', () => {
+    const pastMs = NOW_MS - 2 * 60 * 60 * 1000
+    const bands = [
+      makeBand({
+        id: '1',
+        name: 'Past Band',
+        startTime: '17:00',
+        endTime: '18:00',
+        startMs: pastMs - 60 * 60 * 1000,
+        endMs: pastMs,
+      }),
+      makeBand({ id: '2', name: 'Future Band', startMs: NOW_MS + 60 * 60 * 1000, endMs: NOW_MS + 2 * 60 * 60 * 1000 }),
+    ]
+
+    renderView({
+      bands,
+      onToggleBand: undefined,
+      onSelectAll: undefined,
+      onToggleShowPast: undefined,
+    })
+
+    expect(screen.queryByRole('button', { name: /Select All/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Show finished sets/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/add .* to my schedule/i)).not.toBeInTheDocument()
+  })
+})

@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-function Header({ view, setView, selectedCount = 0, eventName, eventDate }) {
+function Header({ eventName, eventDate }) {
   const formattedDate = eventDate
     ? new Date(`${eventDate}T12:00:00`).toLocaleDateString('en-US', {
         weekday: 'long',
@@ -79,42 +79,6 @@ function Header({ view, setView, selectedCount = 0, eventName, eventDate }) {
             'Discover · Plan · Experience'
           )}
         </p>
-        <div
-          className="flex flex-col sm:flex-row justify-center items-center gap-3 transition-all duration-300 ease-out"
-          style={{ marginTop: `${Math.round(12 * (1 - scrollProgress))}px` }}
-        >
-          <div className="flex gap-2">
-            <button
-              onClick={() => setView('all')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-                view === 'all'
-                  ? 'bg-accent-400 text-bg-navy shadow-lg'
-                  : 'bg-bg-purple/50 text-white hover:bg-bg-purple'
-              }`}
-              title="View all performances"
-              aria-pressed={view === 'all'}
-            >
-              All Performances
-            </button>
-            <button
-              onClick={() => setView('mine')}
-              className={`relative px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-                view === 'mine'
-                  ? 'bg-accent-400 text-bg-navy shadow-lg'
-                  : 'bg-bg-purple/50 text-white hover:bg-bg-purple'
-              }`}
-              title="View my schedule"
-              aria-pressed={view === 'mine'}
-            >
-              My Schedule
-              {selectedCount > 0 && (
-                <span className="absolute -top-2 -right-2 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-warning-400 text-bg-navy text-xs font-bold leading-none">
-                  {selectedCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
       </div>
     </header>
   )

@@ -2,7 +2,7 @@ import { Archive, CalendarDays, Clock, Funnel, History, MapPin, X } from 'lucide
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
-import { slugifyBandName } from '../utils/slugify'
+import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
@@ -561,7 +561,7 @@ function EventCard({
                 <Badge
                   key={band.id}
                   as="a"
-                  href={`/band/${slugifyBandName(band.name)}`}
+                  href={buildBandProfileHref(band.name, event.slug)}
                   variant="default"
                   size="md"
                   className="hover:bg-primary-500/20 cursor-pointer transition-colors"
@@ -610,7 +610,7 @@ function EventCard({
                   <Card
                     key={band.id}
                     as={Link}
-                    to={`/band/${slugifyBandName(band.name)}`}
+                    to={buildBandProfileHref(band.name, event.slug)}
                     padding="sm"
                     hoverable
                     className="group"

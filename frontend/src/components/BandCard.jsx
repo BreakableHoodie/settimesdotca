@@ -1,7 +1,7 @@
 import { Plus, TriangleAlert, X, Zap } from 'lucide-react'
 import { memo } from 'react'
 import { Link } from 'react-router-dom'
-import { slugifyBandName } from '../utils/slugify'
+import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { getTimeDescription, isHappeningNow, isStartingSoon } from '../utils/timeFilter'
 
 function BandCard({
@@ -10,6 +10,8 @@ function BandCard({
   onToggle,
   showVenue = true,
   clickable = true,
+  showToggleButton = true,
+  eventSlug,
   onRemove,
   warningType,
   warningText,
@@ -48,6 +50,7 @@ function BandCard({
   } relative`
 
   const labelBase = isSelected ? `Remove ${band.name} from my schedule` : `Add ${band.name} to my schedule`
+  const bandProfileHref = band.name ? buildBandProfileHref(band.name, eventSlug) : null
 
   return (
     <div
@@ -60,21 +63,23 @@ function BandCard({
       role={clickable ? undefined : 'group'}
       aria-label={clickable ? undefined : `${band.name} at ${band.venue}`}
     >
-      <button
-        type="button"
-        onClick={handleRemove}
-        className={`absolute top-2 right-2 h-11 w-11 flex items-center justify-center text-lg font-bold rounded-full transition-all duration-150 z-10 ${
-          isSelected
-            ? 'bg-white/20 hover:bg-white/30 text-white'
-            : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white'
-        } focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500`}
-        aria-label={labelBase}
-        title={labelBase}
-      >
-        {isSelected ? <X size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
-      </button>
+      {showToggleButton && (
+        <button
+          type="button"
+          onClick={handleRemove}
+          className={`absolute top-2 right-2 h-11 w-11 flex items-center justify-center text-lg font-bold rounded-full transition-all duration-150 z-10 ${
+            isSelected
+              ? 'bg-white/20 hover:bg-white/30 text-white'
+              : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white'
+          } focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500`}
+          aria-label={labelBase}
+          title={labelBase}
+        >
+          {isSelected ? <X size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
+        </button>
+      )}
 
-      <div className="flex flex-col items-center gap-2 pr-10">
+      <div className={`flex flex-col items-center gap-2 ${showToggleButton ? 'pr-10' : ''}`}>
         {startingSoon && (
           <span
             className="soon-pill"
@@ -86,7 +91,8 @@ function BandCard({
         <div className={`inline-block px-3 py-1.5 rounded-lg mb-1 ${isSelected ? 'bg-white/20' : 'bg-bg-navy/60'}`}>
           {band.name ? (
             <Link
-              to={`/band/${slugifyBandName(band.name)}`}
+              to={bandProfileHref}
+              state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
               onClick={e => e.stopPropagation()}
               className="font-display font-bold text-white text-base md:text-lg leading-snug hover:text-accent-400 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
             >
@@ -111,7 +117,8 @@ function BandCard({
         )}
         {band.name && (
           <Link
-            to={`/band/${slugifyBandName(band.name)}`}
+            to={bandProfileHref}
+            state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
             onClick={e => e.stopPropagation()}
             className={`text-xs underline underline-offset-4 ${
               isSelected ? 'text-white hover:text-white/80' : 'text-accent-400 hover:text-accent-300'

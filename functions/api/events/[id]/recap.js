@@ -47,6 +47,7 @@ export async function onRequestGet(context) {
       `
       SELECT
         bp.id   AS band_id,
+        p.id    AS performance_id,
         bp.name AS band_name,
         bp.genre,
         bp.photo_url,
@@ -91,6 +92,7 @@ export async function onRequestGet(context) {
 
       return {
         id: row.band_id,
+        performance_id: row.performance_id,
         name: row.band_name,
         genre: row.genre,
         photo_url: row.photo_url,

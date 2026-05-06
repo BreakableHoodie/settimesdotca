@@ -643,9 +643,11 @@ function App() {
       )}
       <main
         id="main-content"
-        className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-4 sm:mt-6 space-y-6 sm:space-y-8"
+        className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-3 sm:mt-6 space-y-6 sm:space-y-8"
       >
-        <Breadcrumbs items={breadcrumbs} />
+        <div className="hidden sm:block">
+          <Breadcrumbs items={breadcrumbs} />
+        </div>
 
         {/* Archived event banner */}
         {isArchived && (
@@ -660,7 +662,7 @@ function App() {
 
         {/* First-time onboarding hint */}
         {!isArchived && showHint && selectedBands.length === 0 && bands.length > 0 && (
-          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-accent-500/10 border border-accent-500/20 text-sm">
+          <div className="flex items-start justify-between gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
             <p className="text-accent-300">
               <span className="font-semibold">How it works:</span> Tap any performer to add them to{' '}
               <span className="font-semibold">My Schedule</span> — your personal lineup for the night.
@@ -668,7 +670,7 @@ function App() {
             <button
               onClick={dismissHint}
               aria-label="Dismiss tip"
-              className="shrink-0 text-accent-400 hover:text-white transition-colors p-1"
+              className="shrink-0 p-1 text-accent-400 transition-colors hover:text-white sm:p-1.5"
             >
               <X size={16} />
             </button>
@@ -677,8 +679,8 @@ function App() {
 
         {/* Reveal mode teaser — more bands dropping soon */}
         {!isArchived && eventData?.reveal_mode === 1 && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-accent-500/10 border border-accent-500/20 text-sm">
-            <Bell size={16} className="text-accent-400 shrink-0" aria-hidden="true" />
+          <div className="flex items-start gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
+            <Bell size={16} className="shrink-0 text-accent-400" aria-hidden="true" />
             <p className="text-accent-300">
               <span className="font-semibold">More bands dropping soon.</span>{' '}
               <a href="/subscribe" className="underline hover:text-accent-200 transition-colors">

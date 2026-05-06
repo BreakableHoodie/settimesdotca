@@ -67,10 +67,18 @@ Wrangler serves `frontend/dist`, so rebuild before restarting Wrangler after fro
 ### 4. Start the full local Pages runtime
 
 ```bash
-./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state
+npm run pages:dev
 ```
 
 This runs the static app and Pages Functions together at `http://localhost:8788`.
+
+If you need public discovery routes enabled locally without editing `.dev.vars`, use:
+
+```bash
+npm run pages:dev:public
+```
+
+That adds a temporary Wrangler binding for `PUBLIC_DATA_PUBLISH_ENABLED=true` while keeping the default local runtime private.
 
 ### 5. Bootstrap the local D1 database
 
@@ -170,6 +178,8 @@ Required GitHub configuration is documented in [docs/DEPLOYMENT.md](docs/DEPLOYM
 - `CF_DEVELOPMENT_SMOKE_URL`
 
 Public discovery endpoints remain disabled until `PUBLIC_DATA_PUBLISH_ENABLED=true` is set explicitly in the target environment.
+
+For local Pages development, prefer `npm run pages:dev:public` when you want to inspect real public routes without changing the repo-local default in `.dev.vars`.
 
 ## Repository Layout
 

@@ -1,8 +1,17 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
+import { copyToClipboard } from '../../utils/clipboard'
 import ScheduleView from '../ScheduleView'
+
+vi.mock('../../utils/clipboard', () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}))
+
+afterEach(() => {
+  vi.clearAllMocks()
+})
 
 const NOW = new Date('2024-06-01T20:00:00')
 const NOW_MS = NOW.getTime()
@@ -191,6 +200,42 @@ describe('ScheduleView — P1: Select All respects visible filters', () => {
 
     expect(screen.getByRole('button', { name: /All Selected/i })).toBeDisabled()
     expect(screen.queryByRole('button', { name: /^Select All$/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView — P2: copy action respects visible filters', () => {
+  it('copies only the visible filtered bands', async () => {
+    const bands = [
+      makeBand({ id: '1', name: 'Stage A Band', venue: 'Stage A' }),
+      makeBand({ id: '2', name: 'Stage B Band', venue: 'Stage B' }),
+    ]
+
+    renderView({ bands })
+
+    fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy the visible schedule/i }))
+
+    await waitFor(() => expect(copyToClipboard).toHaveBeenCalledTimes(1))
+
+    const copiedText = copyToClipboard.mock.calls[0][0]
+    expect(copiedText).toContain('Stage A Band')
+    expect(copiedText).not.toContain('Stage B Band')
+  })
+
+  it('filters the visible lineup from the mobile genre select', () => {
+    const bands = [
+      makeBand({ id: '1', name: 'Dream Pop Band', genre: 'Dream Pop' }),
+      makeBand({ id: '2', name: 'Garage Band', genre: 'Garage' }),
+    ]
+
+    renderView({ bands, showVenueFilter: false })
+
+    fireEvent.change(screen.getByLabelText(/Genre filter/i), {
+      target: { value: 'Garage' },
+    })
+
+    expect(screen.getByText('Garage Band')).toBeInTheDocument()
+    expect(screen.queryByText('Dream Pop Band')).not.toBeInTheDocument()
   })
 })
 

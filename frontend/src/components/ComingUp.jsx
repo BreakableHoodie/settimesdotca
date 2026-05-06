@@ -63,16 +63,28 @@ function ComingUp({ bands, currentTime }) {
 
   return (
     <div
-      className={`overflow-hidden transition-all duration-300 ease-out ${hasNext ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}
+      className={`overflow-hidden transition-all duration-300 ease-out ${hasNext ? 'max-h-28 sm:max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}
     >
       {hasNext && (
         <div
-          className="bg-linear-to-r from-accent-500 to-primary-600 text-white py-3 px-4 shadow-lg"
+          className="bg-linear-to-r from-accent-500 to-primary-600 px-4 py-2.5 text-white shadow-lg sm:py-3"
           role="status"
           aria-live="polite"
         >
-          <div className="container mx-auto max-w-6xl text-center" title={message}>
-            <p className="font-bold text-sm md:text-base leading-normal">
+          <div className="container mx-auto max-w-(--breakpoint-2xl)" title={message}>
+            <div className="flex items-center gap-2 sm:hidden">
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">
+                Up Next
+              </span>
+              <span className="shrink-0 rounded-full bg-white/15 px-2 py-1 text-xs font-semibold text-white">
+                {formatTimeUntil(minutesUntil)}
+              </span>
+              <span className="min-w-0 truncate text-sm font-semibold text-white">
+                {nextBand.name}
+                {nextBand.venue && <span className="text-white/75"> · {nextBand.venue}</span>}
+              </span>
+            </div>
+            <p className="hidden text-center font-bold leading-normal sm:block sm:text-sm md:text-base">
               <span className="block">Coming up in {formatTimeUntil(minutesUntil)}:</span>
               <span className="text-lg md:text-xl">{nextBand.name}</span>
               {nextBand.venue && <span className="block text-sm md:text-base">{nextBand.venue}</span>}

@@ -6,6 +6,7 @@ import { filterPerformancesByTime } from '../utils/timeFilter'
 import BandCard from './BandCard'
 
 const UNSCHEDULED = Symbol('unscheduled')
+const UNSCHEDULED_FILTER_VALUE = '__unscheduled__'
 
 function groupByTime(bands) {
   const timeGroups = new Map()
@@ -39,7 +40,7 @@ function ScheduleView({
   showVenueFilter = true,
   eventSlug,
 }) {
-  const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
+  const [copyAllLabel, setCopyAllLabel] = useState('Copy Visible Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
   const [localVenueFilter, setLocalVenueFilter] = useState(null)
   const [genreFilter, setGenreFilter] = useState(null)
@@ -137,6 +138,7 @@ function ScheduleView({
   const canSelectAll = typeof onSelectAll === 'function' && visibleBands.length > 0
 
   const allSelected = visibleBandIds.length > 0 && visibleBandIds.every(id => selectedBandsSet.has(id))
+  const canCopyVisible = sortedBands.length > 0
   const hiddenFinished = !showPast ? finishedCount : 0
   const noVisibleBands = sortedBands.length === 0
 
@@ -149,13 +151,13 @@ function ScheduleView({
   }
 
   const handleCopyAll = async () => {
-    if (isCopyingAll) return
+    if (isCopyingAll || !canCopyVisible) return
     setIsCopyingAll(true)
-    const success = await copyBands(bands)
+    const success = await copyBands(sortedBands)
     if (success) {
       setCopyAllLabel('Copied!')
       setTimeout(() => {
-        setCopyAllLabel('Copy Full Schedule')
+        setCopyAllLabel('Copy Visible Schedule')
         setIsCopyingAll(false)
       }, 2000)
     } else {
@@ -175,6 +177,16 @@ function ScheduleView({
       return
     }
     setLocalVenueFilter(nextValue)
+  }
+
+  const handleVenueSelectChange = event => {
+    const nextValue = event.target.value
+    if (nextValue === '') {
+      handleVenueFilterToggle(venueFilter)
+      return
+    }
+
+    handleVenueFilterToggle(nextValue === UNSCHEDULED_FILTER_VALUE ? UNSCHEDULED : nextValue)
   }
 
   return (
@@ -205,10 +217,20 @@ function ScheduleView({
           )}
           <button
             onClick={handleCopyAll}
-            className="text-xs px-3 py-1.5 min-h-[44px] rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400"
-            title={copyAllLabel === 'Copied!' ? 'Full schedule copied to clipboard' : 'Copy the full schedule'}
-            aria-label="Copy the full schedule"
-            disabled={isCopyingAll}
+            className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-white flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+              canCopyVisible
+                ? 'bg-bg-purple/60 border-bg-purple/40 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95'
+                : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
+            }`}
+            title={
+              !canCopyVisible
+                ? 'No visible bands to copy'
+                : copyAllLabel === 'Copied!'
+                  ? 'Visible schedule copied to clipboard'
+                  : 'Copy the visible schedule'
+            }
+            aria-label="Copy the visible schedule"
+            disabled={isCopyingAll || !canCopyVisible}
           >
             {copyAllLabel === 'Copied!' ? (
               <Check size={14} aria-hidden="true" />
@@ -226,7 +248,7 @@ function ScheduleView({
                   ? 'bg-gray-500/20 border border-gray-500/50 text-gray-400 cursor-not-allowed'
                   : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
               }`}
-              title={allSelected ? 'All bands already selected' : 'Select all bands'}
+              title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}
             >
               {allSelected ? 'All Selected' : 'Select All'}
             </button>
@@ -238,8 +260,53 @@ function ScheduleView({
       {(showVenueFilter || uniqueGenres.length > 0) &&
         (uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
           <div className="space-y-3">
+            <div className="grid gap-2 sm:hidden">
+              {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
+                <div className="space-y-1.5">
+                  <label htmlFor="schedule-venue-filter" className="sr-only">
+                    Venue filter
+                  </label>
+                  <select
+                    id="schedule-venue-filter"
+                    value={venueFilter === UNSCHEDULED ? UNSCHEDULED_FILTER_VALUE : venueFilter || ''}
+                    onChange={handleVenueSelectChange}
+                    className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+                  >
+                    <option value="">All Venues</option>
+                    {uniqueVenues.map(venue => (
+                      <option key={venue} value={venue}>
+                        {venue}
+                      </option>
+                    ))}
+                    {hasUnscheduled && <option value={UNSCHEDULED_FILTER_VALUE}>Unscheduled</option>}
+                  </select>
+                </div>
+              )}
+
+              {uniqueGenres.length > 0 && (
+                <div className="space-y-1.5">
+                  <label htmlFor="schedule-genre-filter" className="sr-only">
+                    Genre filter
+                  </label>
+                  <select
+                    id="schedule-genre-filter"
+                    value={genreFilter || ''}
+                    onChange={event => setGenreFilter(event.target.value || null)}
+                    className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+                  >
+                    <option value="">All Genres</option>
+                    {uniqueGenres.map(genre => (
+                      <option key={genre} value={genre}>
+                        {genre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
             {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
-              <div className="flex items-center gap-2">
+              <div className="hidden items-center gap-2 sm:flex">
                 <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
                 <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
                   {uniqueVenues.map(venue => (
@@ -273,7 +340,7 @@ function ScheduleView({
               </div>
             )}
             {uniqueGenres.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="hidden items-center gap-2 sm:flex">
                 <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Genre</span>
                 <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
                   {uniqueGenres.map(genre => (

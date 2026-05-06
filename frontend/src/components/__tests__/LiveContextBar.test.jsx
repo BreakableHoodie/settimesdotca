@@ -41,8 +41,9 @@ describe('LiveContextBar', () => {
     })
     expect(onVenueFilterChange).toHaveBeenCalledWith('Stage B')
 
-    fireEvent.click(screen.getByRole('button', { name: /Any Time/i }))
-    fireEvent.click(screen.getByRole('option', { name: /Happening Now/i }))
+    fireEvent.change(screen.getByLabelText(/Time filter/i), {
+      target: { value: 'now' },
+    })
 
     expect(onTimeFilterChange).toHaveBeenCalledWith('now')
   })

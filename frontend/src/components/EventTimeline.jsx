@@ -6,7 +6,7 @@ import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
-import { Alert, Badge, Button, Card } from './ui'
+import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
 
 /**
@@ -433,6 +433,7 @@ function EventCard({
 
   const featuredBands = event.bands || []
   const resolvedDetails = details
+  const isLoadingDetails = expanded && detailsLoading && !resolvedDetails
   const venueList = resolvedDetails?.venues || event.venues || []
   const allBands = resolvedDetails?.bands || []
   const allBandCount = resolvedDetails?.band_count ?? event.band_count
@@ -547,7 +548,7 @@ function EventCard({
                 }
               }}
             >
-              {expanded ? 'Hide Details' : 'View Details'}
+              {isLoadingDetails ? 'Loading Details...' : expanded ? 'Hide Details' : 'View Details'}
             </Button>
           </div>
         </div>
@@ -583,6 +584,12 @@ function EventCard({
       {/* Expanded Details */}
       {expanded && (
         <div className="border-t border-white/10 bg-white/5">
+          {isLoadingDetails && (
+            <div className="border-b border-white/10 px-6 py-5">
+              <Loading size="sm" text="Loading performers and venues..." className="sm:items-start" />
+            </div>
+          )}
+
           {/* Venues */}
           {venueList && venueList.length > 0 && (
             <div className="p-6 border-b border-white/10">

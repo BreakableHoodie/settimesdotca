@@ -461,7 +461,7 @@ function MySchedule({
                 <div className="flex items-center gap-3 text-yellow-200 font-semibold">
                   <Zap size={20} className="text-yellow-300 shrink-0" aria-hidden="true" />
                   <p className="text-sm sm:text-base leading-normal">
-                    {count} overlapping set{count !== 1 ? 's' : ''} — you may not catch every full set.
+                    {count} band{count !== 1 ? 's' : ''} with overlapping set{count !== 1 ? 's' : ''} — you may not catch every full set.
                   </p>
                 </div>
               </div>

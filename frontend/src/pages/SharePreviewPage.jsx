@@ -2,7 +2,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { BandCardSkeleton } from '../components/ui'
+import { Alert, BandCardSkeleton } from '../components/ui'
 import { fetchPublicJson } from '../utils/publicApi'
 
 export default function SharePreviewPage() {
@@ -11,14 +11,19 @@ export default function SharePreviewPage() {
   const [shareData, setShareData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     fetchPublicJson(`/api/schedule/share/${encodeURIComponent(slug)}`)
-      .then(setShareData)
+      .then(data => { if (!cancelled) setShareData(data) })
       .catch(err => {
+        if (cancelled) return
         if (err.status === 404) setNotFound(true)
+        else setError(true)
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [slug])
 
   const handleImport = () => {
@@ -41,13 +46,24 @@ export default function SharePreviewPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-linear-to-br from-bg-navy to-bg-purple px-4 text-center">
         <Helmet>
-          <title>Route Not Found | SetTimes</title>
+          <title>Shared Route Not Found | SetTimes</title>
         </Helmet>
         <p className="text-2xl font-semibold text-white">This route has expired or doesn&apos;t exist.</p>
         <p className="mt-2 text-text-secondary">Share links are valid for 30 days.</p>
         <Link to="/" className="mt-6 text-accent-400 hover:underline">
           Browse events
         </Link>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple p-6">
+        <Helmet>
+          <title>Error | SetTimes</title>
+        </Helmet>
+        <Alert variant="error">Unable to load this shared route. Please try again later.</Alert>
       </div>
     )
   }
@@ -74,16 +90,16 @@ export default function SharePreviewPage() {
           <p className="mt-1 text-text-secondary">{shareData.event_name}</p>
         </div>
 
-        <div className="mb-8 space-y-3">
+        <ul aria-label="Bands in this route" className="mb-8 list-none space-y-3 p-0">
           {shareData.band_names.map((name, i) => (
-            <div
+            <li
               key={i}
               className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
             >
               <p className="font-semibold text-white">{name}</p>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
 
         <button
           type="button"

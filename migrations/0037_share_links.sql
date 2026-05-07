@@ -17,4 +17,7 @@ CREATE TABLE share_links (
   expires_at      TEXT    NOT NULL
 );
 
+-- UNIQUE on slug already creates an implicit index; this explicit one is redundant but
+-- harmless on SQLite/D1. Added for portability and named-index visibility in tooling.
 CREATE INDEX IF NOT EXISTS idx_share_links_slug ON share_links(slug);
+CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);

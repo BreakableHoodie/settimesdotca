@@ -58,6 +58,9 @@ export async function onRequest(context) {
   const origin = new URL(request.url).origin
   const ogUrl = `${origin}/s/${slug}`
   const indexResponse = await env.ASSETS.fetch(new Request(`${origin}/`))
+  if (!indexResponse.ok) {
+    return env.ASSETS.fetch(request)
+  }
   const html = await indexResponse.text()
 
   const metaTags = [
@@ -72,10 +75,10 @@ export async function onRequest(context) {
 
   const injected = html.replace('</head>', `    ${metaTags}\n  </head>`)
 
-  return new Response(injected, {
-    headers: {
-      'Content-Type': 'text/html;charset=UTF-8',
-      'Cache-Control': 'public, max-age=300',
-    },
-  })
+  // Preserve original headers (CSP, ETag, etc.) and override content-type and cache
+  const headers = new Headers(indexResponse.headers)
+  headers.set('Content-Type', 'text/html;charset=UTF-8')
+  headers.set('Cache-Control', 'public, max-age=300')
+
+  return new Response(injected, { headers })
 }

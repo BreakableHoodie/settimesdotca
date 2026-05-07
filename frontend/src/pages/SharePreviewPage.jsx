@@ -15,15 +15,25 @@ export default function SharePreviewPage() {
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setNotFound(false)
+    setError(false)
+    setShareData(null)
     fetchPublicJson(`/api/schedule/share/${encodeURIComponent(slug)}`)
-      .then(data => { if (!cancelled) setShareData(data) })
+      .then(data => {
+        if (!cancelled) setShareData(data)
+      })
       .catch(err => {
         if (cancelled) return
         if (err.status === 404) setNotFound(true)
         else setError(true)
       })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [slug])
 
   const handleImport = () => {
@@ -85,18 +95,13 @@ export default function SharePreviewPage() {
         </Link>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white">
-            {shareData.band_names.length}-stop route
-          </h1>
+          <h1 className="text-2xl font-bold text-white">{shareData.band_names.length}-stop route</h1>
           <p className="mt-1 text-text-secondary">{shareData.event_name}</p>
         </div>
 
         <ul aria-label="Bands in this route" className="mb-8 list-none space-y-3 p-0">
           {shareData.band_names.map((name, i) => (
-            <li
-              key={i}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-            >
+            <li key={i} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
               <p className="font-semibold text-white">{name}</p>
             </li>
           ))}
@@ -107,7 +112,8 @@ export default function SharePreviewPage() {
           onClick={handleImport}
           className="w-full min-h-[48px] rounded-xl bg-accent-500 px-6 py-3 font-semibold text-bg-navy transition-colors hover:brightness-110"
         >
-          Add {shareData.band_names.length} stop{shareData.band_names.length !== 1 ? 's' : ''} to my route for {shareData.event_name}
+          Add {shareData.band_names.length} stop{shareData.band_names.length !== 1 ? 's' : ''} to my route for{' '}
+          {shareData.event_name}
         </button>
       </div>
     </div>

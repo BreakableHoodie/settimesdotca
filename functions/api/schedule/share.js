@@ -59,7 +59,9 @@ export async function onRequestPost(context) {
       return json({ error: `Band names must not exceed ${MAX_BAND_NAME_LENGTH} characters` }, 400)
     }
 
-    const event = await DB.prepare('SELECT id FROM events WHERE id = ?')
+    const event = await DB.prepare(
+      `SELECT id FROM events WHERE id = ? AND (is_published = 1 OR status = 'archived')`
+    )
       .bind(Number(event_id))
       .first()
     if (!event) {

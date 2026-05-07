@@ -10,6 +10,7 @@ describe('GET /api/schedule/share/[slug]', () => {
   test('returns share link data for a valid slug', async () => {
     const { env, rawDb } = createTestEnv()
     const event = insertEvent(rawDb, { name: 'My Fest', slug: 'my-fest' })
+    rawDb.prepare('UPDATE events SET is_published = 1 WHERE id = ?').run(event.id)
     insertShareLink(rawDb, {
       slug: 'abc12345',
       event_id: event.id,

@@ -453,18 +453,18 @@ function App() {
     fetch(`/api/schedule/share/${encodeURIComponent(shareSlug)}`)
       .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then(data => {
-        const matchedIds = bands
-          .filter(band => {
-            const parts = band.id.split('-')
-            const perfId = Number(parts[parts.length - 1])
-            return data.performance_ids.includes(perfId)
-          })
-          .map(band => band.id)
+        const matchedBands = bands.filter(band => {
+          const parts = band.id.split('-')
+          const perfId = Number(parts[parts.length - 1])
+          return data.performance_ids.includes(perfId)
+        })
+        const matchedIds = matchedBands.map(band => band.id)
+        const matchedNames = matchedBands.map(band => band.name || '')
 
         if (matchedIds.length === 0) return
 
         setPendingSharedBands(matchedIds)
-        setPendingSharedBandNames(data.band_names)
+        setPendingSharedBandNames(matchedNames)
         setSharedScheduleConfirmOpen(true)
       })
       .catch(err => {

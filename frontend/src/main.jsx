@@ -18,6 +18,7 @@ import './index.css'
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
 const BandProfilePage = lazy(() => import('./pages/BandProfilePage.jsx'))
 const EventRecapPage = lazy(() => import('./pages/EventRecapPage.jsx'))
+const SharePreviewPage = lazy(() => import('./pages/SharePreviewPage.jsx'))
 
 const hostname = typeof window !== 'undefined' ? window.location.hostname || '' : ''
 const isPreviewBuild = hostname.startsWith('dev.') || hostname.endsWith('.pages.dev')
@@ -100,6 +101,18 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
                   <Suspense fallback={<LoadingFallback />}>
                     <BandProfilePage />
+                  </Suspense>
+                </ErrorBoundary>
+              }
+            />
+
+            {/* Share preview: Lazy loaded */}
+            <Route
+              path="/s/:slug"
+              element={
+                <ErrorBoundary title="Share Preview Error" message="Unable to load this shared route.">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SharePreviewPage />
                   </Suspense>
                 </ErrorBoundary>
               }

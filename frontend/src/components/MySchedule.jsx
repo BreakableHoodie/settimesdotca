@@ -527,18 +527,17 @@ function MySchedule({
                     warningType={hasConflict ? 'conflict' : hasOverlap ? 'overlap' : null}
                     warningText={(() => {
                       if (!hasConflict && !hasOverlap) return null
-                      const getNamesFrom = list =>
-                        [
-                          ...new Set(
-                            list
-                              .filter(c => c.band1 === band.id || c.band2 === band.id)
-                              .map(c => {
-                                const otherId = c.band1 === band.id ? c.band2 : c.band1
-                                return visibleBands.find(b => b.id === otherId)?.name
-                              })
-                              .filter(Boolean),
-                          ),
-                        ]
+                      const getNamesFrom = list => [
+                        ...new Set(
+                          list
+                            .filter(c => c.band1 === band.id || c.band2 === band.id)
+                            .map(c => {
+                              const otherId = c.band1 === band.id ? c.band2 : c.band1
+                              return visibleBands.find(b => b.id === otherId)?.name
+                            })
+                            .filter(Boolean)
+                        ),
+                      ]
                       const conflictNames = getNamesFrom(conflicts)
                       const overlapNames = getNamesFrom(overlaps)
                       const parts = []

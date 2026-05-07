@@ -207,73 +207,73 @@ function LiveContextBar({
         </div>
 
         {isFiltersOpen && (
-        <div className="mt-3 border-t border-white/10 pt-3">
-          <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
-            <div className="grid grid-cols-2 items-center rounded-full border border-white/10 bg-white/5 p-1">
-              <button
-                type="button"
-                onClick={() => onViewChange?.('all')}
-                aria-pressed={view === 'all'}
-                className={`min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
-                  view === 'all' ? 'bg-accent-500 text-bg-navy' : 'text-white/70 hover:text-white'
-                }`}
+          <div className="mt-3 border-t border-white/10 pt-3">
+            <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <div className="grid grid-cols-2 items-center rounded-full border border-white/10 bg-white/5 p-1">
+                <button
+                  type="button"
+                  onClick={() => onViewChange?.('all')}
+                  aria-pressed={view === 'all'}
+                  className={`min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
+                    view === 'all' ? 'bg-accent-500 text-bg-navy' : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  Live Lineup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onViewChange?.('mine')}
+                  aria-pressed={view === 'mine'}
+                  className={`relative min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
+                    view === 'mine' ? 'bg-accent-500 text-bg-navy' : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  My Route
+                  {selectedCount > 0 && (
+                    <span className="ml-2 inline-flex min-w-[20px] items-center justify-center rounded-full bg-bg-navy/80 px-1.5 py-0.5 text-xs font-bold text-white">
+                      {selectedCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              <div
+                className={`grid gap-2 ${hasVenueFilter ? 'grid-cols-2' : 'grid-cols-1'} sm:flex sm:flex-wrap sm:items-center`}
               >
-                Live Lineup
-              </button>
-              <button
-                type="button"
-                onClick={() => onViewChange?.('mine')}
-                aria-pressed={view === 'mine'}
-                className={`relative min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
-                  view === 'mine' ? 'bg-accent-500 text-bg-navy' : 'text-white/70 hover:text-white'
-                }`}
-              >
-                My Route
-                {selectedCount > 0 && (
-                  <span className="ml-2 inline-flex min-w-[20px] items-center justify-center rounded-full bg-bg-navy/80 px-1.5 py-0.5 text-xs font-bold text-white">
-                    {selectedCount}
-                  </span>
+                {hasVenueFilter && (
+                  <div className="relative min-w-0 sm:min-w-[170px]">
+                    <label htmlFor="live-venue-switcher" className="sr-only">
+                      Venue switcher
+                    </label>
+                    <select
+                      id="live-venue-switcher"
+                      value={venueFilter || ''}
+                      onChange={event => onVenueFilterChange?.(event.target.value || null)}
+                      className="min-h-[44px] w-full appearance-none rounded-full border border-white/10 bg-white/5 px-4 py-2 pr-10 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+                    >
+                      <option value="">All Venues</option>
+                      {venueOptions.map(venue => (
+                        <option key={venue} value={venue}>
+                          {venue}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={16}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
+                    />
+                  </div>
                 )}
-              </button>
-            </div>
 
-            <div
-              className={`grid gap-2 ${hasVenueFilter ? 'grid-cols-2' : 'grid-cols-1'} sm:flex sm:flex-wrap sm:items-center`}
-            >
-              {hasVenueFilter && (
-                <div className="relative min-w-0 sm:min-w-[170px]">
-                  <label htmlFor="live-venue-switcher" className="sr-only">
-                    Venue switcher
-                  </label>
-                  <select
-                    id="live-venue-switcher"
-                    value={venueFilter || ''}
-                    onChange={event => onVenueFilterChange?.(event.target.value || null)}
-                    className="min-h-[44px] w-full appearance-none rounded-full border border-white/10 bg-white/5 px-4 py-2 pr-10 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
-                  >
-                    <option value="">All Venues</option>
-                    {venueOptions.map(venue => (
-                      <option key={venue} value={venue}>
-                        {venue}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    aria-hidden="true"
-                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
-                  />
-                </div>
-              )}
-
-              <TimeFilter
-                selectedFilter={timeFilter}
-                onFilterChange={onTimeFilterChange}
-                className="min-w-0 sm:min-w-[180px]"
-              />
+                <TimeFilter
+                  selectedFilter={timeFilter}
+                  onFilterChange={onTimeFilterChange}
+                  className="min-w-0 sm:min-w-[180px]"
+                />
+              </div>
             </div>
           </div>
-        </div>
         )}
       </div>
     </section>

@@ -1,6 +1,6 @@
 import { checkPermission } from "../_middleware.js";
 import { buildIntervals, computeNewEndTime, intervalsOverlap } from "../../../utils/timeConflicts.js";
-import { validateIdArray } from "../../../utils/validation.js";
+import { validateIdArray, isValidTime } from "../../../utils/validation.js";
 
 const MAX_BULK_PREVIEW_IDS = 200;
 
@@ -176,6 +176,14 @@ export async function onRequestPost(context) {
     }
   } else if (action === "change_time") {
     const { start_time } = params;
+
+    const timeValidation = isValidTime(start_time);
+    if (!timeValidation.valid) {
+      return new Response(JSON.stringify({ error: timeValidation.error }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // Build changes list
     for (const band of mutableBandResults) {

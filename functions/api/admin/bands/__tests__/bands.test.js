@@ -588,7 +588,7 @@ describe('Admin bands API - Bulk operations', () => {
     expect(conflict.message).toContain('Exact B')
   })
 
-  it('change_time preview detects conflict between two batch members at the same venue+event after time shift', async () => {
+  it('change_time preview detects overlap between two batch members at the same venue+event after time shift', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
     const ev = insertEvent(rawDb, { name: 'ChangeTimeBatchEvent', slug: 'change-time-batch-event' })
     const venue = insertVenue(rawDb, { name: 'Shared Venue' })

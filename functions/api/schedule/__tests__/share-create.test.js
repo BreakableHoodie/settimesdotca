@@ -131,4 +131,13 @@ describe('POST /api/schedule/share', () => {
     })
     expect(res.status).toBe(404)
   })
+
+  test('rejects null event_id', async () => {
+    const { env } = createTestEnv()
+    const res = await onRequestPost({
+      request: makeRequest({ event_id: null, event_slug: 'e', performance_ids: [1], band_names: ['B'] }),
+      env,
+    })
+    expect(res.status).toBe(400)
+  })
 })

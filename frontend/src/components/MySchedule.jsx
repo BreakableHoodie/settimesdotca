@@ -326,16 +326,20 @@ function MySchedule({
   }
 
   const handleShareSchedule = async () => {
-    const performanceIds = bands
-      .map(band => {
+    const { performanceIds, bandNames } = bands.reduce(
+      (acc, band) => {
         const parts = band.id.split('-')
-        return parseInt(parts[parts.length - 1], 10)
-      })
-      .filter(id => Number.isFinite(id) && id > 0)
+        const id = parseInt(parts[parts.length - 1], 10)
+        if (Number.isFinite(id) && id > 0) {
+          acc.performanceIds.push(id)
+          acc.bandNames.push(band.name || '')
+        }
+        return acc
+      },
+      { performanceIds: [], bandNames: [] }
+    )
 
     if (performanceIds.length === 0) return
-
-    const bandNames = bands.map(band => band.name || '')
 
     try {
       const res = await fetch('/api/schedule/share', {

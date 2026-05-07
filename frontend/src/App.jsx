@@ -451,7 +451,7 @@ function App() {
     )
 
     fetch(`/api/schedule/share/${encodeURIComponent(shareSlug)}`)
-      .then(res => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then(data => {
         const matchedIds = bands
           .filter(band => {

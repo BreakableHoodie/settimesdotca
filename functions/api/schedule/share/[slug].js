@@ -18,6 +18,8 @@ export async function onRequestGet(context) {
   }
 
   try {
+    // ON DELETE CASCADE on event_id means a deleted event also removes its share_links rows,
+    // so a missing event naturally produces a 404 via the INNER JOIN returning no row.
     const row = await DB.prepare(
       `SELECT sl.slug, sl.event_slug, sl.performance_ids, sl.band_names, e.name AS event_name
        FROM share_links sl
@@ -31,12 +33,21 @@ export async function onRequestGet(context) {
       return json({ error: 'Share link not found or expired' }, 404)
     }
 
+    let performance_ids, band_names
+    try {
+      performance_ids = JSON.parse(row.performance_ids)
+      band_names = JSON.parse(row.band_names)
+    } catch (_err) {
+      console.error('Share link data is corrupted:', row.slug)
+      return json({ error: 'Share link data is corrupted' }, 500)
+    }
+
     return json({
       slug: row.slug,
       event_slug: row.event_slug,
       event_name: row.event_name,
-      performance_ids: JSON.parse(row.performance_ids),
-      band_names: JSON.parse(row.band_names),
+      performance_ids,
+      band_names,
     })
   } catch (err) {
     console.error('Share link fetch error:', err)

@@ -37,15 +37,26 @@ export async function onRequest(context) {
     return env.ASSETS.fetch(request)
   }
 
-  const bandNames = JSON.parse(row.band_names)
+  let bandNames
+  try {
+    bandNames = JSON.parse(row.band_names)
+  } catch (_err) {
+    console.error('Share link band_names corrupted:', row.slug)
+    return env.ASSETS.fetch(request)
+  }
+
+  if (!Array.isArray(bandNames) || bandNames.length === 0) {
+    return env.ASSETS.fetch(request)
+  }
+
   const count = bandNames.length
   const ogTitle = `${count}-stop route for ${row.event_name}`
   const featured = bandNames.slice(0, 3).join(', ')
   const remainder = count > 3 ? ` and ${count - 3} more` : ''
   const ogDescription = `Featuring ${featured}${remainder}`
-  const ogUrl = `https://settimes.ca/s/${slug}`
 
   const origin = new URL(request.url).origin
+  const ogUrl = `${origin}/s/${slug}`
   const indexResponse = await env.ASSETS.fetch(new Request(`${origin}/`))
   const html = await indexResponse.text()
 

@@ -134,7 +134,7 @@ function LiveContextBar({
               aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
               aria-expanded={isFiltersOpen}
               aria-controls="live-filter-panel"
-              className="shrink-0 flex items-center gap-1 text-xs text-white/50 hover:text-white/80 transition-colors"
+              className="shrink-0 flex min-h-[36px] items-center gap-1 px-2 text-xs text-white/50 hover:text-white/80 transition-colors"
             >
               <ChevronDown
                 size={14}

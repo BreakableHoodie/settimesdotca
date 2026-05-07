@@ -168,6 +168,8 @@ function MySchedule({
     return visibleBands.find(band => highlightedBandIds.has(band.id))?.id || null
   }, [visibleBands, highlightedBandIds])
 
+  const bandNameById = useMemo(() => new Map(visibleBands.map(b => [b.id, b.name])), [visibleBands])
+
   // Detect overlaps and conflicts
   const { conflicts, overlaps, conflictCount, overlapCount } = useMemo(() => {
     const conflicts = []
@@ -533,7 +535,7 @@ function MySchedule({
                             .filter(c => c.band1 === band.id || c.band2 === band.id)
                             .map(c => {
                               const otherId = c.band1 === band.id ? c.band2 : c.band1
-                              return visibleBands.find(b => b.id === otherId)?.name
+                              return bandNameById.get(otherId)
                             })
                             .filter(Boolean)
                         ),

@@ -120,4 +120,25 @@ describe('MySchedule — conflict vs overlap severity', () => {
     // And must NOT say "same time" (that's for exact conflicts)
     expect(screen.queryByText(/happening at the same time/i)).not.toBeInTheDocument()
   })
+
+  it('shows combined "Same time as X · Overlaps with Y" when a band has both a conflict and a partial overlap', () => {
+    // Band A and Band B start at the same time → conflict with each other
+    // Band C starts 15 min later → overlap with both, not a conflict
+    const bands = [
+      makeBand(1, 'Band A', 'Stage A', '20:00', '20:30'),
+      makeBand(2, 'Band B', 'Stage B', '20:00', '20:30'),
+      makeBand(3, 'Band C', 'Stage C', '20:15', '20:45'),
+    ]
+    render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
+
+    // Band A card must show both labels separated by the dot
+    expect(screen.getAllByText(/Same time as Band B · Overlaps with Band C/i).length).toBeGreaterThan(0)
+    // Band C must show only an overlap warning, no conflict label
+    expect(screen.getAllByText(/Overlaps with Band A, Band B/i).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Same time as Band C/i)).not.toBeInTheDocument()
+  })
 })

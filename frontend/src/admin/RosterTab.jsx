@@ -233,6 +233,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
         instagram: formData.instagram || '',
         bandcamp: formData.bandcamp || '',
         facebook: formData.facebook || '',
+        youtube: formData.youtube || '',
+        spotify: formData.spotify || '',
+        apple_music: formData.apple_music || '',
+        linktree: formData.linktree || '',
       }
       const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
 
@@ -272,6 +276,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
         instagram: formData.instagram || '',
         bandcamp: formData.bandcamp || '',
         facebook: formData.facebook || '',
+        youtube: formData.youtube || '',
+        spotify: formData.spotify || '',
+        apple_music: formData.apple_music || '',
+        linktree: formData.linktree || '',
       }
       const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
 
@@ -343,6 +351,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
       instagram: socialLinks.instagram || '',
       bandcamp: socialLinks.bandcamp || '',
       facebook: socialLinks.facebook || '',
+      youtube: socialLinks.youtube || '',
+      spotify: socialLinks.spotify || '',
+      apple_music: socialLinks.apple_music || '',
+      linktree: socialLinks.linktree || '',
     })
     setShowAddForm(false)
     // scroll to form
@@ -365,6 +377,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
       instagram: '',
       bandcamp: '',
       facebook: '',
+      youtube: '',
+      spotify: '',
+      apple_music: '',
+      linktree: '',
     })
     setEditingId(null)
     setShowAddForm(false)

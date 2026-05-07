@@ -69,6 +69,10 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     instagram: '',
     bandcamp: '',
     facebook: '',
+    youtube: '',
+    spotify: '',
+    apple_music: '',
+    linktree: '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [togglingId, setTogglingId] = useState(null)
@@ -256,6 +260,10 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         instagram: formData.instagram || '',
         bandcamp: formData.bandcamp || '',
         facebook: formData.facebook || '',
+        youtube: formData.youtube || '',
+        spotify: formData.spotify || '',
+        apple_music: formData.apple_music || '',
+        linktree: formData.linktree || '',
       }
 
       const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
@@ -339,6 +347,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   }
 
   const startEdit = band => {
+    if (!allBands.length) loadRoster()
     setServerConflicts({ overlaps: [], conflicts: [] })
     setEditingId(band.id)
     setSelectedProfile(null) // Editing existing performance implies we have the data
@@ -373,6 +382,10 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       instagram: socialLinks.instagram || '',
       bandcamp: socialLinks.bandcamp || '',
       facebook: socialLinks.facebook || '',
+      youtube: socialLinks.youtube || '',
+      spotify: socialLinks.spotify || '',
+      apple_music: socialLinks.apple_music || '',
+      linktree: socialLinks.linktree || '',
     })
     setViewMode('form')
   }

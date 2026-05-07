@@ -34,6 +34,7 @@ function MySchedule({
   nowOverride,
   onBrowseAll,
   eventSlug,
+  eventId,
 }) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
@@ -325,18 +326,50 @@ function MySchedule({
   }
 
   const handleShareSchedule = async () => {
-    const performanceIds = bands
-      .map(band => {
+    const { performanceIds, bandNames } = bands.reduce(
+      (acc, band) => {
         const parts = band.id.split('-')
-        return parts[parts.length - 1]
+        const id = parseInt(parts[parts.length - 1], 10)
+        if (Number.isFinite(id) && id > 0) {
+          acc.performanceIds.push(id)
+          acc.bandNames.push(band.name || '')
+        }
+        return acc
+      },
+      { performanceIds: [], bandNames: [] }
+    )
+
+    if (performanceIds.length === 0) return
+
+    try {
+      const res = await fetch('/api/schedule/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventId,
+          event_slug: eventSlug,
+          performance_ids: performanceIds,
+          band_names: bandNames,
+        }),
       })
-      .filter(id => /^\d+$/.test(id))
-      .join(',')
 
-    if (!performanceIds) return
+      if (res.ok) {
+        const { slug } = await res.json()
+        const url = `${window.location.origin}/s/${slug}`
+        const success = await copyToClipboard(url)
+        if (success) {
+          setShareButtonLabel('Link Copied!')
+          setTimeout(() => setShareButtonLabel('Share Schedule'), 2000)
+        }
+        return
+      }
+    } catch (_err) {
+      // fall through to legacy ?s= URL
+    }
 
-    const url = `${window.location.origin}${window.location.pathname}?s=${performanceIds}`
-    const success = await copyToClipboard(url)
+    const legacyIds = performanceIds.join(',')
+    const fallbackUrl = `${window.location.origin}${window.location.pathname}?s=${legacyIds}`
+    const success = await copyToClipboard(fallbackUrl)
     if (success) {
       setShareButtonLabel('Link Copied!')
       setTimeout(() => setShareButtonLabel('Share Schedule'), 2000)

@@ -28,6 +28,8 @@ const RATE_LIMITS = {
 
   // Public API endpoints
   '/api/events': { requests: 60, window: 60 },
+  '/api/schedule/share/': { requests: 60, window: 60 }, // GET /api/schedule/share/[slug]
+  '/api/schedule/share':  { requests: 10, window: 60 }, // POST /api/schedule/share
   '/api/schedule': { requests: 30, window: 60 },
   '/api/feeds': { requests: 20, window: 60 },
   '/api/subscriptions': { requests: 10, window: 60 },

@@ -301,6 +301,17 @@ export function createTestDB() {
       window_start INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE share_links (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug            TEXT    NOT NULL UNIQUE,
+      event_id        INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      event_slug      TEXT    NOT NULL,
+      performance_ids TEXT    NOT NULL,
+      band_names      TEXT    NOT NULL,
+      created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+      expires_at      TEXT    NOT NULL
+    );
   `);
 
   const insertUser = db.prepare(
@@ -578,4 +589,37 @@ export function createTestEnv({ role = 'editor' } = {}) {
       Authorization: `Bearer ${sessionId}`,
     },
   };
+}
+
+export function insertShareLink(
+  db,
+  {
+    slug = 'testslug',
+    event_id,
+    event_slug = 'test-event',
+    performance_ids = [1],
+    band_names = ['Test Band'],
+    expires_at = null,
+  } = {}
+) {
+  const expiresAt =
+    expires_at ??
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .replace('T', ' ')
+      .replace(/\.\d+Z$/, '')
+
+  const stmt = db.prepare(
+    `INSERT INTO share_links (slug, event_id, event_slug, performance_ids, band_names, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  )
+  const info = stmt.run(
+    slug,
+    event_id,
+    event_slug,
+    JSON.stringify(performance_ids),
+    JSON.stringify(band_names),
+    expiresAt
+  )
+  return db.prepare('SELECT * FROM share_links WHERE id = ?').get(info.lastInsertRowid)
 }

@@ -397,6 +397,20 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 );
 CREATE INDEX IF NOT EXISTS idx_rate_limits_updated_at ON rate_limits (updated_at);
 
+-- Schedule share link snapshots (server-side /s/[slug] sharing)
+CREATE TABLE IF NOT EXISTS share_links (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug            TEXT    NOT NULL UNIQUE,
+  event_id        INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  event_slug      TEXT    NOT NULL,
+  performance_ids TEXT    NOT NULL,
+  band_names      TEXT    NOT NULL,
+  created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+  expires_at      TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_share_links_slug ON share_links(slug);
+CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

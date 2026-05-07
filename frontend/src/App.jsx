@@ -167,6 +167,7 @@ function App() {
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [sharedScheduleConfirmOpen, setSharedScheduleConfirmOpen] = useState(false)
   const [pendingSharedBands, setPendingSharedBands] = useState([])
+  const [pendingSharedBandNames, setPendingSharedBandNames] = useState([])
   const [lastClearedBands, setLastClearedBands] = useState([])
   const [scheduleToast, setScheduleToast] = useState(null)
   const scheduleToastTimeoutRef = useRef(null)
@@ -436,6 +437,41 @@ function App() {
     }
   }, [bands, searchParams, setSearchParams, showScheduleToast, slug, trackScheduleBuilds])
 
+  useEffect(() => {
+    const shareSlug = searchParams.get('share')
+    if (!shareSlug || bands.length === 0) return
+
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev)
+        next.delete('share')
+        return next
+      },
+      { replace: true }
+    )
+
+    fetch(`/api/schedule/share/${encodeURIComponent(shareSlug)}`)
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then(data => {
+        const matchedBands = bands.filter(band => {
+          const parts = band.id.split('-')
+          const perfId = Number(parts[parts.length - 1])
+          return data.performance_ids.includes(perfId)
+        })
+        const matchedIds = matchedBands.map(band => band.id)
+        const matchedNames = matchedBands.map(band => band.name || '')
+
+        if (matchedIds.length === 0) return
+
+        setPendingSharedBands(matchedIds)
+        setPendingSharedBandNames(matchedNames)
+        setSharedScheduleConfirmOpen(true)
+      })
+      .catch(err => {
+        console.warn('[App] Failed to load share link', err)
+      })
+  }, [bands, searchParams, setSearchParams])
+
   const dismissHint = () => {
     setShowHint(false)
     localStorage.setItem(HINT_DISMISSED_KEY, '1')
@@ -457,6 +493,7 @@ function App() {
     setSelectedBands(nextSelectedBands)
     setView('mine')
     setPendingSharedBands([])
+    setPendingSharedBandNames([])
     showScheduleToast({
       type: 'success',
       message:
@@ -774,6 +811,7 @@ function App() {
               nowOverride={debugTime}
               onBrowseAll={() => setView('all')}
               eventSlug={slug || eventData?.slug}
+              eventId={eventData?.id}
             />
           </Suspense>
         )}
@@ -794,6 +832,7 @@ function App() {
         onClose={() => {
           setSharedScheduleConfirmOpen(false)
           setPendingSharedBands([])
+          setPendingSharedBandNames([])
         }}
         title="Load Shared Route"
         size="sm"
@@ -804,6 +843,7 @@ function App() {
               onClick={() => {
                 setSharedScheduleConfirmOpen(false)
                 setPendingSharedBands([])
+                setPendingSharedBandNames([])
               }}
               className="min-h-[44px] rounded-lg border border-white/15 px-4 py-2 text-white/80 transition-colors hover:bg-white/10"
             >
@@ -846,6 +886,16 @@ function App() {
             <span className="font-semibold text-white">Merge</span> keeps your current route and adds only the new
             shared stops. <span className="font-semibold text-white">Replace</span> swaps your route for the shared one.
           </p>
+          {pendingSharedBandNames.length > 0 && (
+            <ul className="space-y-1 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/80 list-none">
+              {pendingSharedBandNames.slice(0, 5).map((name, i) => (
+                <li key={i}>{name}</li>
+              ))}
+              {pendingSharedBandNames.length > 5 && (
+                <li className="text-white/50">and {pendingSharedBandNames.length - 5} more…</li>
+              )}
+            </ul>
+          )}
         </div>
       </Modal>
       <ConfirmDialog

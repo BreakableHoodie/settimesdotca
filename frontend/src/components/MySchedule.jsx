@@ -168,6 +168,8 @@ function MySchedule({
     return visibleBands.find(band => highlightedBandIds.has(band.id))?.id || null
   }, [visibleBands, highlightedBandIds])
 
+  const bandNameById = useMemo(() => new Map(visibleBands.map(b => [b.id, b.name])), [visibleBands])
+
   // Detect overlaps and conflicts
   const { conflicts, overlaps, conflictCount, overlapCount } = useMemo(() => {
     const conflicts = []
@@ -527,15 +529,23 @@ function MySchedule({
                     warningType={hasConflict ? 'conflict' : hasOverlap ? 'overlap' : null}
                     warningText={(() => {
                       if (!hasConflict && !hasOverlap) return null
-                      const allMatches = [...conflicts, ...overlaps]
-                        .filter(c => c.band1 === band.id || c.band2 === band.id)
-                        .map(c => {
-                          const otherId = c.band1 === band.id ? c.band2 : c.band1
-                          return visibleBands.find(b => b.id === otherId)
-                        })
-                        .filter(Boolean)
-                      const uniqueNames = [...new Set(allMatches.map(b => b.name))].join(', ')
-                      return hasConflict ? `Same time as ${uniqueNames}` : `Overlaps with ${uniqueNames}`
+                      const getNamesFrom = list => [
+                        ...new Set(
+                          list
+                            .filter(c => c.band1 === band.id || c.band2 === band.id)
+                            .map(c => {
+                              const otherId = c.band1 === band.id ? c.band2 : c.band1
+                              return bandNameById.get(otherId)
+                            })
+                            .filter(Boolean)
+                        ),
+                      ]
+                      const conflictNames = getNamesFrom(conflicts)
+                      const overlapNames = getNamesFrom(overlaps)
+                      const parts = []
+                      if (conflictNames.length > 0) parts.push(`Same time as ${conflictNames.join(', ')}`)
+                      if (overlapNames.length > 0) parts.push(`Overlaps with ${overlapNames.join(', ')}`)
+                      return parts.join(' · ')
                     })()}
                   />
                 </div>

@@ -47,4 +47,35 @@ describe('LiveContextBar', () => {
 
     expect(onTimeFilterChange).toHaveBeenCalledWith('now')
   })
+
+  it('collapses and expands the filter panel when the toggle is clicked', () => {
+    render(
+      <LiveContextBar
+        eventData={eventData}
+        currentTime={new Date('2026-05-06T19:30:00')}
+        bands={bands}
+        selectedCount={0}
+        view="all"
+        onViewChange={vi.fn()}
+        venueFilter={null}
+        onVenueFilterChange={vi.fn()}
+        timeFilter="all"
+        onTimeFilterChange={vi.fn()}
+      />
+    )
+
+    // Filters are open by default — panel and aria-expanded=true are present
+    const toggles = screen.getAllByRole('button', { name: /hide filters/i })
+    expect(toggles[0]).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText(/Time filter/i)).toBeInTheDocument()
+
+    // Click to collapse
+    fireEvent.click(toggles[0])
+    expect(screen.getAllByRole('button', { name: /show filters/i })[0]).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText(/Time filter/i)).not.toBeInTheDocument()
+
+    // Click again to re-expand
+    fireEvent.click(screen.getAllByRole('button', { name: /show filters/i })[0])
+    expect(screen.getByLabelText(/Time filter/i)).toBeInTheDocument()
+  })
 })

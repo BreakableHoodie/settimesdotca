@@ -416,6 +416,22 @@ describe('Admin bands API - Bulk operations', () => {
     expect(data.changes).toHaveLength(0)
   })
 
+  it('bulk preview change_time returns 400 for invalid start_time', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'PreviewValidateEvent', slug: 'preview-validate-event' })
+    const venue = insertVenue(rawDb, { name: 'Preview Validate Venue' })
+    const band = insertBand(rawDb, { name: 'Preview Validate Band', event_id: ev.id, venue_id: venue.id, start_time: '18:00', end_time: '19:00' })
+
+    const request = new Request('https://example.test/api/admin/bands/bulk-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ band_ids: [band.id], action: 'change_time', start_time: '6pm' }),
+    })
+
+    const res = await bulkPreviewHandler.onRequestPost({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(400)
+  })
+
   it('bulk change_time preserves duration for after-midnight sets', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
     const ev = insertEvent(rawDb, { name: 'MidnightEvent', slug: 'midnight-event' })

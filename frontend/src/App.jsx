@@ -11,7 +11,7 @@ import PrivacyBanner from './components/PrivacyBanner'
 import LiveContextBar from './components/LiveContextBar'
 import ScheduleView from './components/ScheduleView'
 import ScheduleSkeleton from './components/ScheduleSkeleton'
-import { Modal } from './components/ui'
+import { ConfirmDialog, Modal } from './components/ui'
 import { trackEventView, trackPageView } from './utils/metrics'
 import { getTimeFilterOptions } from './utils/timeFilter'
 import { validateBandsData } from './utils/validation'
@@ -164,6 +164,7 @@ function App() {
   const [venueFilter, setVenueFilter] = useState(null)
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [debugTime, setDebugTime] = useState(() => getInitialDebugTime())
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [sharedScheduleConfirmOpen, setSharedScheduleConfirmOpen] = useState(false)
   const [pendingSharedBands, setPendingSharedBands] = useState([])
   const [lastClearedBands, setLastClearedBands] = useState([])
@@ -484,11 +485,15 @@ function App() {
     if (selectedBands.length === 0) {
       return
     }
+    setClearConfirmOpen(true)
+  }
 
+  const doActualClear = () => {
     const clearedBands = [...selectedBands]
     setLastClearedBands(clearedBands)
     setSelectedBands([])
     setView('all')
+    setClearConfirmOpen(false)
     showScheduleToast(
       {
         type: 'undo',
@@ -843,6 +848,14 @@ function App() {
           </p>
         </div>
       </Modal>
+      <ConfirmDialog
+        isOpen={clearConfirmOpen}
+        title="Clear Route"
+        message="Are you sure you want to clear your entire route?"
+        confirmText="Clear"
+        onConfirm={doActualClear}
+        onCancel={() => setClearConfirmOpen(false)}
+      />
       {scheduleToast && (
         <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">
           <div className="rounded-xl border border-white/10 bg-bg-purple/95 px-4 py-3 shadow-xl backdrop-blur-xs">

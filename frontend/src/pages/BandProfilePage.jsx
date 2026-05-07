@@ -698,7 +698,7 @@ export default function BandProfilePage() {
           </div>
 
           {/* Two Column Layout: Stats/Facts + Shows */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             {/* Left Column - Stats & Facts */}
             <div className="lg:col-span-1 space-y-6">
               {profile.stats && <BandStats stats={profile.stats} />}
@@ -757,13 +757,8 @@ export default function BandProfilePage() {
                               onClick={() => toggleSchedule(performance)}
                               variant={isInSchedule(performance) ? 'success' : 'secondary'}
                               size="sm"
-                              className="whitespace-nowrap"
+                              icon={isInSchedule(performance) ? <Check size={14} /> : <Plus size={14} />}
                             >
-                              {isInSchedule(performance) ? (
-                                <Check size={14} className="mr-2" />
-                              ) : (
-                                <Plus size={14} className="mr-2" />
-                              )}
                               {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
                             </Button>
                             {performance.event_slug && (

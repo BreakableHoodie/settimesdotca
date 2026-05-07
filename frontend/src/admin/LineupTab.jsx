@@ -347,7 +347,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   }
 
   const startEdit = band => {
-    if (!allBands.length) loadRoster()
+    if (!allBands.length && !rosterLoading) loadRoster()
     setServerConflicts({ overlaps: [], conflicts: [] })
     setEditingId(band.id)
     setSelectedProfile(null) // Editing existing performance implies we have the data

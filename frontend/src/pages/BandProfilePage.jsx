@@ -505,9 +505,15 @@ export default function BandProfilePage() {
             ...(profile.social && {
               sameAs: [
                 profile.social.website,
-                profile.social.instagram && `https://instagram.com/${profile.social.instagram.replace('@', '')}`,
+                safeInstagramHref(profile.social.instagram) !== '#'
+                  ? safeInstagramHref(profile.social.instagram)
+                  : null,
                 profile.social.facebook,
                 profile.social.bandcamp,
+                profile.social.youtube,
+                profile.social.spotify,
+                profile.social.apple_music,
+                profile.social.linktree,
               ].filter(Boolean),
             }),
           })}

@@ -77,13 +77,17 @@ function LiveContextBar({
   const [isFiltersOpen, setIsFiltersOpen] = useState(true)
   const [showGhost, setShowGhost] = useState(false)
   const tapCountRef = useRef(0)
-  const tapTimeRef = useRef(0)
+  const firstTapTimeRef = useRef(0)
 
   const handleLifecycleTap = () => {
     const now = Date.now()
-    if (now - tapTimeRef.current > 3000) tapCountRef.current = 0
-    tapTimeRef.current = now
-    tapCountRef.current += 1
+    if (tapCountRef.current === 0) firstTapTimeRef.current = now
+    if (now - firstTapTimeRef.current > 3000) {
+      tapCountRef.current = 1
+      firstTapTimeRef.current = now
+    } else {
+      tapCountRef.current += 1
+    }
     if (tapCountRef.current >= 7) {
       tapCountRef.current = 0
       setShowGhost(true)
@@ -151,7 +155,10 @@ function LiveContextBar({
           <div className="flex items-center justify-between gap-3">
             <span
               className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+              role="button"
+              tabIndex={0}
               onClick={handleLifecycleTap}
+              onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleLifecycleTap()}
             >
               {lifecycle.label}
             </span>
@@ -195,7 +202,10 @@ function LiveContextBar({
             <div className="flex flex-wrap items-center gap-2">
               <span
                 className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+                role="button"
+                tabIndex={0}
                 onClick={handleLifecycleTap}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleLifecycleTap()}
               >
                 {lifecycle.label}
               </span>

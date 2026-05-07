@@ -1,6 +1,6 @@
 import { checkPermission } from "../_middleware.js";
 import { buildIntervals, computeNewEndTime, intervalsOverlap } from "../../../utils/timeConflicts.js";
-import { validateIdArray } from "../../../utils/validation.js";
+import { validateIdArray, isValidTime } from "../../../utils/validation.js";
 
 const MAX_BULK_PREVIEW_IDS = 200;
 
@@ -144,8 +144,46 @@ export async function onRequestPost(context) {
         }
       }
     }
+
+    // Check pairs within the batch for conflicts at the new venue.
+    // The pre-existing query excludes all batch members to avoid false positives from
+    // their current positions, so batch members are invisible to each other. We must
+    // compare them pairwise here. One entry per pair (not two mirror entries) to avoid
+    // duplicate messages in the preview modal.
+    for (let i = 0; i < mutableBandResults.length; i++) {
+      const bandA = mutableBandResults[i];
+      if (!bandA.start_time || !bandA.end_time) continue;
+      const intervalsA = buildIntervals(bandA.start_time, bandA.end_time);
+
+      for (let j = i + 1; j < mutableBandResults.length; j++) {
+        const bandB = mutableBandResults[j];
+        if (!bandB.start_time || !bandB.end_time) continue;
+        if (bandA.event_id !== bandB.event_id) continue;
+
+        const intervalsB = buildIntervals(bandB.start_time, bandB.end_time);
+        if (!intervalsA.some((a) => intervalsB.some((b) => intervalsOverlap(a, b)))) continue;
+
+        const isExact = bandA.start_time === bandB.start_time && bandA.end_time === bandB.end_time;
+        conflicts.push({
+          band_id: bandA.id,
+          type: isExact ? "conflict" : "overlap",
+          message: isExact
+            ? `"${bandA.name}" and "${bandB.name}" have the exact same time (both being moved to ${venue.name})`
+            : `"${bandA.name}" and "${bandB.name}" overlap (both being moved to ${venue.name})`,
+          severity: "error",
+        });
+      }
+    }
   } else if (action === "change_time") {
     const { start_time } = params;
+
+    const timeValidation = isValidTime(start_time);
+    if (!timeValidation.valid) {
+      return new Response(JSON.stringify({ error: timeValidation.error }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // Build changes list
     for (const band of mutableBandResults) {
@@ -198,6 +236,37 @@ export async function onRequestPost(context) {
             severity: "error",
           });
         }
+      }
+    }
+
+    // Check pairs that share venue+event — both receive the same new start_time so they
+    // will always overlap at minimum. The pre-existing cache excludes all batch members,
+    // making them invisible to each other. One entry per pair to avoid duplicate messages
+    // in the preview modal.
+    for (let i = 0; i < mutableBandResults.length; i++) {
+      const bandA = mutableBandResults[i];
+      if (!bandA.start_time || !bandA.end_time || !bandA.venue_id) continue;
+
+      for (let j = i + 1; j < mutableBandResults.length; j++) {
+        const bandB = mutableBandResults[j];
+        if (!bandB.start_time || !bandB.end_time || !bandB.venue_id) continue;
+        if (bandA.venue_id !== bandB.venue_id || bandA.event_id !== bandB.event_id) continue;
+
+        const newEndA = computeNewEndTime(bandA.start_time, bandA.end_time, start_time);
+        const newEndB = computeNewEndTime(bandB.start_time, bandB.end_time, start_time);
+        const intervalsA = buildIntervals(start_time, newEndA);
+        const intervalsB = buildIntervals(start_time, newEndB);
+        if (!intervalsA.some((a) => intervalsB.some((b) => intervalsOverlap(a, b)))) continue;
+
+        const isExact = newEndA === newEndB;
+        conflicts.push({
+          band_id: bandA.id,
+          type: isExact ? "conflict" : "overlap",
+          message: isExact
+            ? `"${bandA.name}" and "${bandB.name}" have the exact same time at venue after time change`
+            : `"${bandA.name}" and "${bandB.name}" overlap at venue after time change`,
+          severity: "error",
+        });
       }
     }
   } else if (action === "delete") {

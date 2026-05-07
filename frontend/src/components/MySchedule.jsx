@@ -169,7 +169,7 @@ function MySchedule({
   }, [visibleBands, highlightedBandIds])
 
   // Detect overlaps and conflicts
-  const { conflicts, overlaps } = useMemo(() => {
+  const { conflicts, overlaps, conflictCount, overlapCount } = useMemo(() => {
     const conflicts = []
     const overlaps = []
 
@@ -197,7 +197,10 @@ function MySchedule({
       }
     }
 
-    return { conflicts, overlaps }
+    const conflictCount = new Set(conflicts.flatMap(c => [c.band1, c.band2])).size
+    const overlapCount = new Set(overlaps.flatMap(c => [c.band1, c.band2])).size
+
+    return { conflicts, overlaps, conflictCount, overlapCount }
   }, [visibleBands])
 
   if (sortedBands.length === 0) {
@@ -446,8 +449,8 @@ function MySchedule({
               <div className="flex items-center gap-3 text-red-200 font-semibold">
                 <TriangleAlert size={20} className="text-red-300 shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
-                  {conflicts.length} band{conflicts.length !== 1 ? 's' : ''} happening at the same time — you&apos;ll
-                  need to choose!
+                  {conflictCount} band{conflictCount !== 1 ? 's' : ''} happening at the same time — you&apos;ll need to
+                  choose!
                 </p>
               </div>
             </div>
@@ -457,8 +460,8 @@ function MySchedule({
               <div className="flex items-center gap-3 text-yellow-200 font-semibold">
                 <Zap size={20} className="text-yellow-300 shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
-                  {overlaps.length} overlapping set{overlaps.length !== 1 ? 's' : ''} — you may not catch every full
-                  set.
+                  {overlapCount} band{overlapCount !== 1 ? 's' : ''} with overlapping set{overlapCount !== 1 ? 's' : ''}{' '}
+                  — you may not catch every full set.
                 </p>
               </div>
             </div>

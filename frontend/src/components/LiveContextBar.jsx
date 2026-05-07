@@ -1,6 +1,7 @@
 import { CalendarDays, ChevronDown, Clock, Route, Warehouse } from 'lucide-react'
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { getEventState } from '../utils/eventLifecycle'
+import GhostEasterEgg from './GhostEasterEgg'
 import TimeFilter from './TimeFilter'
 
 function parseVenueInfo(venueInfo) {
@@ -74,6 +75,53 @@ function LiveContextBar({
 
   const lifecycle = useMemo(() => getLifecycleLabel(eventData?.date, currentTime), [currentTime, eventData?.date])
   const [isFiltersOpen, setIsFiltersOpen] = useState(true)
+  const [showGhost, setShowGhost] = useState(false)
+  const tapCountRef = useRef(0)
+  const firstTapTimeRef = useRef(0)
+
+  const handleLifecycleTap = () => {
+    const now = Date.now()
+    if (tapCountRef.current === 0) firstTapTimeRef.current = now
+    if (now - firstTapTimeRef.current > 3000) {
+      tapCountRef.current = 1
+      firstTapTimeRef.current = now
+    } else {
+      tapCountRef.current += 1
+    }
+    if (tapCountRef.current >= 7) {
+      tapCountRef.current = 0
+      setShowGhost(true)
+    }
+  }
+
+  useEffect(() => {
+    const KONAMI = [
+      'ArrowUp',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowLeft',
+      'ArrowRight',
+      'b',
+      'a',
+    ]
+    let pos = 0
+    const onKey = e => {
+      if (e.key === KONAMI[pos]) {
+        pos += 1
+        if (pos === KONAMI.length) {
+          pos = 0
+          setShowGhost(true)
+        }
+      } else {
+        pos = e.key === KONAMI[0] ? 1 : 0
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const daysUntil = (() => {
     if (lifecycle.label !== 'Upcoming' || !eventData?.date) return null
@@ -107,6 +155,10 @@ function LiveContextBar({
           <div className="flex items-center justify-between gap-3">
             <span
               className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+              role="button"
+              tabIndex={0}
+              onClick={handleLifecycleTap}
+              onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleLifecycleTap()}
             >
               {lifecycle.label}
             </span>
@@ -150,6 +202,10 @@ function LiveContextBar({
             <div className="flex flex-wrap items-center gap-2">
               <span
                 className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+                role="button"
+                tabIndex={0}
+                onClick={handleLifecycleTap}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleLifecycleTap()}
               >
                 {lifecycle.label}
               </span>
@@ -282,6 +338,7 @@ function LiveContextBar({
           </div>
         )}
       </div>
+      {showGhost && <GhostEasterEgg onDismiss={() => setShowGhost(false)} />}
     </section>
   )
 }

@@ -132,10 +132,13 @@ function LiveContextBar({
               type="button"
               onClick={() => setIsFiltersOpen(v => !v)}
               aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
+              aria-expanded={isFiltersOpen}
+              aria-controls="live-filter-panel"
               className="shrink-0 flex items-center gap-1 text-xs text-white/50 hover:text-white/80 transition-colors"
             >
               <ChevronDown
                 size={14}
+                aria-hidden="true"
                 className={`transition-transform duration-200 ${isFiltersOpen ? 'rotate-180' : ''}`}
               />
             </button>
@@ -196,18 +199,21 @@ function LiveContextBar({
             type="button"
             onClick={() => setIsFiltersOpen(v => !v)}
             aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
-            className="ml-auto inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 hover:text-white/80 transition-colors"
+            aria-expanded={isFiltersOpen}
+            aria-controls="live-filter-panel"
+            className="ml-auto inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 hover:text-white/80 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/30"
           >
             <span>Filters</span>
             <ChevronDown
               size={14}
+              aria-hidden="true"
               className={`transition-transform duration-200 ${isFiltersOpen ? 'rotate-180' : ''}`}
             />
           </button>
         </div>
 
         {isFiltersOpen && (
-          <div className="mt-3 border-t border-white/10 pt-3">
+          <div id="live-filter-panel" className="mt-3 border-t border-white/10 pt-3">
             <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
               <div className="grid grid-cols-2 items-center rounded-full border border-white/10 bg-white/5 p-1">
                 <button

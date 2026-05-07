@@ -27,6 +27,7 @@ export default function SharePreviewPage() {
   }, [slug])
 
   const handleImport = () => {
+    if (!shareData) return
     navigate(`/event/${shareData.event_slug}?share=${slug}`)
   }
 

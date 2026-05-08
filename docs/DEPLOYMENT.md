@@ -201,27 +201,12 @@ wrangler d1 execute settimes-production-db --env production --file=database/seed
 
 ### 5. Create Initial Admin User
 
-```bash
-# Connect to database
-wrangler d1 execute settimes-production-db --env production --command="
-INSERT INTO users (email, name, password_hash, role, is_active)
-VALUES (
-  'admin@settimes.ca',
-  'Admin User',
-  '\$2a\$10\$YourBcryptHashHere',  -- Generate using bcrypt
-  'admin',
-  1
-)"
-```
+The system uses invite codes for admin account creation — do **not** insert password hashes directly into the database. The hash algorithm is PBKDF2 (not bcrypt), so any manually inserted bcrypt hash will fail authentication.
 
-**Generate password hash:**
-
-```javascript
-// Use Node.js with bcrypt
-const bcrypt = require("bcrypt");
-const hash = bcrypt.hashSync("your-secure-password", 10);
-console.log(hash);
-```
+1. In the Cloudflare Dashboard, set `ALLOW_ADMIN_SIGNUP=true` under your Pages project's environment variables for the production environment.
+2. With `ALLOW_ADMIN_SIGNUP=true`, navigate to the signup page and create the first admin account. The password is hashed with PBKDF2 automatically — do not insert password hashes directly into the database.
+3. Once logged in, generate additional invite codes from the admin panel under **Settings → Invite Codes** for any other admins.
+4. Remove `ALLOW_ADMIN_SIGNUP` (or set it to `false`) immediately after the first account is created. Leave it unset in production at all times.
 
 ---
 

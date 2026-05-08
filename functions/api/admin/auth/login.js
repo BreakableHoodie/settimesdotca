@@ -303,6 +303,7 @@ export async function onRequestPost(context) {
     }
 
     const lucia = initializeLucia(DB, request, env);
+    await lucia.invalidateUserSessions(user.id);
     const session = await lucia.createSession(user.id, {});
 
     await DB.prepare(

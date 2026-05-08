@@ -1,6 +1,8 @@
 // Revoke all sessions except the current one
 // POST /api/admin/sessions/revoke-all
 
+import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
+
 export async function onRequestPost(context) {
   const { env, data, request } = context;
   const { lucia, user } = data;
@@ -22,18 +24,17 @@ export async function onRequestPost(context) {
     )
     .run();
 
-  const cookie = lucia.createSessionCookie(newSession.id);
+  const csrfToken = generateCSRFToken(request, env, newSession.id);
+
+  const headers = new Headers({ "Content-Type": "application/json" });
+  headers.append("Set-Cookie", lucia.createSessionCookie(newSession.id).serialize());
+  headers.append("Set-Cookie", setCSRFCookie(csrfToken, request, env));
 
   return new Response(
     JSON.stringify({
       success: true,
       message: "All other sessions revoked",
     }),
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "Set-Cookie": cookie.serialize(),
-      },
-    }
+    { headers }
   );
 }

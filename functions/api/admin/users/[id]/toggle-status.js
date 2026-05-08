@@ -4,6 +4,7 @@
 
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP } from "../../../../utils/request.js";
+import { validateId } from "../../../../utils/validation.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
@@ -20,7 +21,14 @@ export async function onRequestPost(context) {
 
   try {
 
-    const userId = params.id;
+    const idResult = validateId(params.id);
+    if (!idResult.valid) {
+      return new Response(JSON.stringify({ error: idResult.error }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const userId = idResult.value;
 
     // Get target user
     const targetUser = await DB.prepare(

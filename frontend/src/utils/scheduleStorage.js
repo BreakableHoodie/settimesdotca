@@ -60,11 +60,7 @@ export function hasAnySchedule() {
     const parsed = JSON.parse(data)
     if (!parsed || typeof parsed !== 'object') return false
     return Object.entries(parsed).some(
-      ([slug, arr]) =>
-        slug !== DATES_KEY &&
-        Array.isArray(arr) &&
-        arr.length > 0 &&
-        !isEventStale(parsed, slug)
+      ([slug, arr]) => slug !== DATES_KEY && Array.isArray(arr) && arr.length > 0 && !isEventStale(parsed, slug)
     )
   } catch {
     return false

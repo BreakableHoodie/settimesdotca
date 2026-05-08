@@ -19,12 +19,7 @@ import PrivacyBanner from '../components/PrivacyBanner'
 import { Alert, Badge, Button, Card, BandProfileSkeleton } from '../components/ui'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
 import { fetchPublicJson } from '../utils/publicApi'
-import {
-  getSelectedBands,
-  saveSelectedBands,
-  hasAnySchedule,
-  getScheduleEventSlug,
-} from '../utils/scheduleStorage'
+import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
 
@@ -67,7 +62,6 @@ function hasAnySocial(social) {
 function generateScheduleId(bandName, performanceId) {
   return `${bandName.toLowerCase().replace(/\s+/g, '-')}-${performanceId}`
 }
-
 
 function formatEventSlugLabel(eventSlug) {
   if (!eventSlug) return 'Event Schedule'

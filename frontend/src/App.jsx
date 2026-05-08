@@ -627,13 +627,30 @@ function App() {
   const eventJsonLd = eventData
     ? JSON.stringify({
         '@context': 'https://schema.org',
-        '@type': 'Event',
+        '@type': 'MusicEvent',
         name: eventData.name,
         startDate: eventData.date,
+        endDate: eventData.end_date || eventData.date,
         url: `https://settimes.ca/event/${slug}`,
         description: `Full set times and schedule for ${eventData.name}.`,
-        ...(eventData.city && { location: { '@type': 'Place', address: eventData.city } }),
+        image: 'https://settimes.ca/android-chrome-512x512.png',
+        ...(eventData.city && {
+          location: {
+            '@type': 'Place',
+            address: { '@type': 'PostalAddress', addressLocality: eventData.city, addressCountry: 'CA' },
+          },
+        }),
         organizer: { '@type': 'Organization', name: 'SetTimes', url: 'https://settimes.ca' },
+        ...(eventData.ticket_url && {
+          offers: {
+            '@type': 'Offer',
+            url: eventData.ticket_url,
+            availability: 'https://schema.org/InStock',
+          },
+        }),
+        ...(bands?.length && {
+          performer: bands.filter(b => b.name).map(b => ({ '@type': 'MusicGroup', name: b.name })),
+        }),
       })
     : null
 
@@ -645,7 +662,7 @@ function App() {
         {slug && <link rel="canonical" href={`https://settimes.ca/event/${slug}`} />}
         {eventData && <meta property="og:title" content={`${eventData.name} | SetTimes`} />}
         {eventDescription && <meta property="og:description" content={eventDescription} />}
-        <meta property="og:type" content="website" />
+        <meta property="og:type" content="event" />
         {slug && <meta property="og:url" content={`https://settimes.ca/event/${slug}`} />}
         <meta property="og:site_name" content="SetTimes" />
         <meta name="twitter:card" content="summary" />

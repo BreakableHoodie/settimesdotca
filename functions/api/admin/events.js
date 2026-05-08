@@ -116,6 +116,7 @@ export async function onRequestPost(context) {
     const {
       name,
       date,
+      end_date,
       slug,
       status,
       description,
@@ -187,6 +188,7 @@ export async function onRequestPost(context) {
       INSERT INTO events (
         name,
         date,
+        end_date,
         slug,
         status,
         is_published,
@@ -198,13 +200,14 @@ export async function onRequestPost(context) {
         theme_colors,
         created_by_user_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
       .bind(
         name,
         date,
+        end_date,
         slug,
         status,
         status === "published" ? 1 : 0,

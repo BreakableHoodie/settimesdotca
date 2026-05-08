@@ -105,6 +105,7 @@ export async function onRequestPatch(context) {
     const {
       name,
       date,
+      end_date,
       status,
       description,
       city,
@@ -164,6 +165,23 @@ export async function onRequestPatch(context) {
       }
       updates.push("date = ?");
       params.push(date);
+    }
+
+    if (end_date !== undefined) {
+      if (end_date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "End date must be in YYYY-MM-DD format",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      updates.push("end_date = ?");
+      params.push(end_date || null);
     }
 
     if (status !== undefined) {

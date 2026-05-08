@@ -16,18 +16,20 @@ export default function Combobox({
   maxLength,
   className = '',
   disabled = false,
-  fullWidth,
 }) {
   const [open, setOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const containerRef = useRef(null)
   const inputRef = useRef(null)
   const listRef = useRef(null)
+  const blurTimerRef = useRef(null)
   const [activeIndex, setActiveIndex] = useState(-1)
 
-  const filtered = options
-    .filter(opt => !value || opt.toLowerCase().includes(value.toLowerCase()))
-    .slice(0, 12)
+  useEffect(() => {
+    return () => clearTimeout(blurTimerRef.current)
+  }, [])
+
+  const filtered = options.filter(opt => !value || opt.toLowerCase().includes(value.toLowerCase())).slice(0, 12)
 
   const shouldShow = open && focused && filtered.length > 0
 
@@ -98,19 +100,20 @@ export default function Combobox({
           setActiveIndex(-1)
         }}
         onFocus={() => {
+          clearTimeout(blurTimerRef.current)
           setFocused(true)
           setOpen(true)
           setActiveIndex(-1)
         }}
         onBlur={() => {
           setFocused(false)
-          // delay so click on option registers first
-          setTimeout(() => setOpen(false), 150)
+          blurTimerRef.current = setTimeout(() => setOpen(false), 150)
         }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         maxLength={maxLength}
         disabled={disabled}
+        role="combobox"
         autoComplete="off"
         aria-autocomplete="list"
         aria-expanded={shouldShow}
@@ -135,9 +138,7 @@ export default function Combobox({
               onMouseDown={() => pick(opt)}
               onMouseEnter={() => setActiveIndex(i)}
               className={`px-4 py-2 text-sm cursor-pointer select-none ${
-                i === activeIndex
-                  ? 'bg-accent-500/20 text-accent-300'
-                  : 'text-text-primary hover:bg-white/5'
+                i === activeIndex ? 'bg-accent-500/20 text-accent-300' : 'text-text-primary hover:bg-white/5'
               }`}
             >
               {opt}

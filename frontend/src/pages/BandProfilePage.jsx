@@ -232,6 +232,14 @@ export default function BandProfilePage() {
   const isPublishGateError = errorStatus === 503
   const isNotFoundError = errorStatus === 404 || (!error && !profile)
 
+  const pageTitle = loading
+    ? 'Band Profile | SetTimes'
+    : error || !profile
+      ? isNotFoundError
+        ? 'Band Not Found | SetTimes'
+        : 'Band Profile | SetTimes'
+      : `${profile.name} - Band Profile | SetTimes`
+
   useEffect(() => {
     const loadProfile = async () => {
       try {
@@ -384,6 +392,16 @@ export default function BandProfilePage() {
     }
   }, [turnstileEnabled, turnstileSiteKey])
 
+  useEffect(() => {
+    document.title = pageTitle
+  }, [pageTitle])
+
+  useEffect(() => {
+    return () => {
+      document.title = 'SetTimes – Live Music Events & Show Schedules'
+    }
+  }, [])
+
   const submitFollow = async e => {
     e.preventDefault()
     if (!followEmail.trim()) return
@@ -420,54 +438,42 @@ export default function BandProfilePage() {
   }
 
   if (loading) {
-    return (
-      <>
-        <Helmet>
-          <title>Band Profile | SetTimes</title>
-        </Helmet>
-        <BandProfileSkeleton />
-      </>
-    )
+    return <BandProfileSkeleton />
   }
 
   if (error || !profile) {
     return (
-      <>
-        <Helmet>
-          <title>{isNotFoundError ? 'Band Not Found | SetTimes' : 'Band Profile | SetTimes'}</title>
-        </Helmet>
-        <div className="min-h-screen bg-bg-navy">
-          <div className="container mx-auto px-4 py-12 max-w-2xl">
-            <Alert variant="error" className="mb-6">
-              <h2 className="text-xl font-bold mb-2">
-                {isPublishGateError
-                  ? 'Band Profiles Unavailable'
-                  : isNotFoundError
-                    ? 'Band Not Found'
-                    : 'Failed to load band profile'}
-              </h2>
-              <p>
-                {isPublishGateError
-                  ? error.message
-                  : isNotFoundError
-                    ? `We couldn't find a profile for this band.${error ? ` Error: ${error.message}` : ''}`
-                    : error?.message || "We couldn't load this band profile right now."}
-              </p>
-            </Alert>
-            <div className="text-center">
-              <Button
-                as={Link}
-                to={returnEventPath}
-                variant="secondary"
-                icon={<ArrowLeft size={14} />}
-                iconPosition="left"
-              >
-                Back to Schedule
-              </Button>
-            </div>
+      <div className="min-h-screen bg-bg-navy">
+        <div className="container mx-auto px-4 py-12 max-w-2xl">
+          <Alert variant="error" className="mb-6">
+            <h2 className="text-xl font-bold mb-2">
+              {isPublishGateError
+                ? 'Band Profiles Unavailable'
+                : isNotFoundError
+                  ? 'Band Not Found'
+                  : 'Failed to load band profile'}
+            </h2>
+            <p>
+              {isPublishGateError
+                ? error.message
+                : isNotFoundError
+                  ? `We couldn't find a profile for this band.${error ? ` Error: ${error.message}` : ''}`
+                  : error?.message || "We couldn't load this band profile right now."}
+            </p>
+          </Alert>
+          <div className="text-center">
+            <Button
+              as={Link}
+              to={returnEventPath}
+              variant="secondary"
+              icon={<ArrowLeft size={14} />}
+              iconPosition="left"
+            >
+              Back to Schedule
+            </Button>
           </div>
         </div>
-      </>
+      </div>
     )
   }
 
@@ -475,7 +481,6 @@ export default function BandProfilePage() {
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-bg-navy">
       {/* SEO Meta Tags */}
       <Helmet>
-        <title>{profile.name} - Band Profile | SetTimes</title>
         <meta
           name="description"
           content={

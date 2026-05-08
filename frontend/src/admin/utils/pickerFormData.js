@@ -37,6 +37,10 @@ export function buildPickerFormData(artist, eventId) {
     instagram: socialLinks.instagram || '',
     bandcamp: socialLinks.bandcamp || '',
     facebook: socialLinks.facebook || '',
+    youtube: socialLinks.youtube || '',
+    spotify: socialLinks.spotify || '',
+    apple_music: socialLinks.apple_music || '',
+    linktree: socialLinks.linktree || '',
   }
 }
 
@@ -58,5 +62,9 @@ export function buildEmptyPickerFormData(name, eventId) {
     instagram: '',
     bandcamp: '',
     facebook: '',
+    youtube: '',
+    spotify: '',
+    apple_music: '',
+    linktree: '',
   }
 }

@@ -475,6 +475,70 @@ export default function BandForm({
             placeholder="https://facebook.com/bandname"
           />
         </div>
+
+        <div>
+          <label htmlFor="band-youtube" className="block text-white mb-2 text-sm">
+            YouTube <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-youtube"
+            type="url"
+            name="youtube"
+            value={formData.youtube || ''}
+            onChange={onChange}
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            placeholder="https://youtube.com/@bandname"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-spotify" className="block text-white mb-2 text-sm">
+            Spotify <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-spotify"
+            type="url"
+            name="spotify"
+            value={formData.spotify || ''}
+            onChange={onChange}
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            placeholder="https://open.spotify.com/artist/..."
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-apple-music" className="block text-white mb-2 text-sm">
+            Apple Music <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-apple-music"
+            type="url"
+            name="apple_music"
+            value={formData.apple_music || ''}
+            onChange={onChange}
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            placeholder="https://music.apple.com/artist/..."
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-linktree" className="block text-white mb-2 text-sm">
+            Linktree <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-linktree"
+            type="url"
+            name="linktree"
+            value={formData.linktree || ''}
+            onChange={onChange}
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            placeholder="https://linktr.ee/bandname"
+          />
+        </div>
       </div>
 
       {requireSchedule && conflicts.conflicts.length > 0 && (
@@ -523,6 +587,10 @@ BandForm.propTypes = {
     instagram: PropTypes.string,
     bandcamp: PropTypes.string,
     facebook: PropTypes.string,
+    youtube: PropTypes.string,
+    spotify: PropTypes.string,
+    apple_music: PropTypes.string,
+    linktree: PropTypes.string,
     contact_email: PropTypes.string,
     is_active: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
   }).isRequired,

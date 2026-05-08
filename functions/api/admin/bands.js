@@ -48,6 +48,10 @@ function unpackSocialLinks(band) {
     instagram: social.instagram || "",
     bandcamp: social.bandcamp || "",
     facebook: social.facebook || "",
+    youtube: social.youtube || "",
+    spotify: social.spotify || "",
+    apple_music: social.apple_music || "",
+    linktree: social.linktree || "",
   };
 }
 

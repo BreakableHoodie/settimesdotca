@@ -22,9 +22,14 @@ function formatOrigin(profile) {
 
 function formatVenueAddress(venue) {
   if (!venue) return null;
-  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+  const line1 = [venue.address_line1, venue.address_line2]
+    .filter(Boolean)
+    .join(", ");
   const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+  const line3 = [venue.postal_code, venue.country]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   return [line1, line2, line3].filter(Boolean).join(", ");
 }
 
@@ -84,10 +89,10 @@ export async function onRequestGet(context) {
     }
 
     if (!bandProfile) {
-      return new Response(
-        JSON.stringify({ error: "Band not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Band not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Get all performances for this band profile
@@ -177,9 +182,7 @@ export async function onRequestGet(context) {
 
     const averageSetMinutes =
       setTimes.length > 0
-        ? Math.round(
-            setTimes.reduce((sum, t) => sum + t, 0) / setTimes.length,
-          )
+        ? Math.round(setTimes.reduce((sum, t) => sum + t, 0) / setTimes.length)
         : null;
 
     // Get debut and latest dates
@@ -214,6 +217,10 @@ export async function onRequestGet(context) {
         instagram: socialLinks.instagram || null,
         bandcamp: socialLinks.bandcamp || null,
         facebook: socialLinks.facebook || null,
+        youtube: socialLinks.youtube || null,
+        spotify: socialLinks.spotify || null,
+        apple_music: socialLinks.apple_music || null,
+        linktree: socialLinks.linktree || null,
       },
       stats: {
         total_performances: allPerformances.length,
@@ -266,7 +273,12 @@ export async function onRequestGet(context) {
       },
     });
   } catch (error) {
-    console.error("Error fetching band stats:", error, error.message, error.stack);
+    console.error(
+      "Error fetching band stats:",
+      error,
+      error.message,
+      error.stack,
+    );
 
     return new Response(
       JSON.stringify({

@@ -11,6 +11,7 @@ import {
   sanitizeEventSocialLinks,
   sanitizeString,
   sanitizeVenueInfo,
+  validateDate,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 
@@ -168,20 +169,25 @@ export async function onRequestPatch(context) {
     }
 
     if (end_date !== undefined) {
-      if (end_date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) {
-        return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: "End date must be in YYYY-MM-DD format",
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
+      const normalizedEndDate = end_date || null;
+      if (normalizedEndDate !== null) {
+        const endDateResult = validateDate(normalizedEndDate);
+        if (!endDateResult.valid) {
+          return new Response(
+            JSON.stringify({ error: "Validation error", message: endDateResult.error }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const effectiveStartDate = date ?? event.date;
+        if (normalizedEndDate < effectiveStartDate) {
+          return new Response(
+            JSON.stringify({ error: "Validation error", message: "End date must be on or after the event start date" }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
       }
       updates.push("end_date = ?");
-      params.push(end_date || null);
+      params.push(normalizedEndDate);
     }
 
     if (status !== undefined) {

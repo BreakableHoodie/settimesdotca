@@ -184,6 +184,11 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
       return false
     }
 
+    if (formData.end_date && formData.end_date < formData.date) {
+      setError('End date must be on or after the event start date')
+      return false
+    }
+
     if (!isEditing && formData.status === 'archived' && !canCreateArchived) {
       setError('Only admins can create archived events directly')
       return false

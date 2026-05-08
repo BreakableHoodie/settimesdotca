@@ -160,6 +160,10 @@ export async function onRequestPost(context) {
       );
     }
 
+    if (end_date && end_date < date) {
+      return validationErrorResponse("End date must be on or after the event start date");
+    }
+
     // Check if slug already exists
     const existingEvent = await DB.prepare(
       `

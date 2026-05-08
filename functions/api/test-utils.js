@@ -97,6 +97,7 @@ export function createTestDB() {
       name TEXT NOT NULL,
       slug TEXT UNIQUE NOT NULL,
       date TEXT NOT NULL,
+      end_date TEXT,
       status TEXT DEFAULT 'draft',
       is_published INTEGER DEFAULT 0,
       description TEXT,

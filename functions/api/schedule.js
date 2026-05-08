@@ -31,7 +31,7 @@ export async function onRequestGet(context) {
       // sets that span past midnight (e.g. 11:30pm-12:30am)
       event = await DB.prepare(
         `
-        SELECT id, name, date, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
+        SELECT id, name, date, end_date, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
         FROM events
         WHERE is_published = 1
           AND date >= date('now', '-6 hours')
@@ -43,7 +43,7 @@ export async function onRequestGet(context) {
       // Get event by slug — includes archived events for read-only history browsing
       event = await DB.prepare(
         `
-        SELECT id, name, date, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
+        SELECT id, name, date, end_date, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
         FROM events
         WHERE slug = ? AND (is_published = 1 OR status = 'archived')
       `,

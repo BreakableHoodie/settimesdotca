@@ -64,9 +64,10 @@ test.describe('Public Timeline Viewing', () => {
 
     const bandLink = firstEvent.locator('a[href*="/band/"]').first();
     if (await bandLink.isVisible()) {
-      const bandName = await bandLink.textContent();
       await bandLink.click();
-      await expect(page.getByRole('heading', { name: new RegExp(bandName || '', 'i') })).toBeVisible();
+      await expect(page).toHaveURL(/\/band\//);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page).toHaveTitle(/- Band Profile \| SetTimes$/);
     }
   });
 

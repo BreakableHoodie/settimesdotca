@@ -5,7 +5,15 @@ import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
 import { Globe } from 'lucide-react'
 import { parseOrigin } from '../utils/parseOrigin'
-import { BandcampIcon, FacebookIcon, InstagramIcon } from '../components/ui/SocialIcons'
+import {
+  AppleMusicIcon,
+  BandcampIcon,
+  FacebookIcon,
+  InstagramIcon,
+  LinktreeIcon,
+  SpotifyIcon,
+  YouTubeIcon,
+} from '../components/ui/SocialIcons'
 
 function parseSocialLinks(band) {
   let links = {}
@@ -23,12 +31,25 @@ function SocialLinksIcons({ band }) {
   const instagramHref = safeInstagramHref(links.instagram)
   const bandcampHref = safeHttpsFallbackHref(links.bandcamp)
   const facebookHref = safeExternalHref(links.facebook)
-  const hasAnyLink = [websiteHref, instagramHref, bandcampHref, facebookHref].some(href => href !== '#')
+  const youtubeHref = safeExternalHref(links.youtube)
+  const spotifyHref = safeExternalHref(links.spotify)
+  const appleMusicHref = safeExternalHref(links.apple_music)
+  const linktreeHref = safeExternalHref(links.linktree)
+  const hasAnyLink = [
+    websiteHref,
+    instagramHref,
+    bandcampHref,
+    facebookHref,
+    youtubeHref,
+    spotifyHref,
+    appleMusicHref,
+    linktreeHref,
+  ].some(href => href !== '#')
 
   if (!hasAnyLink) return <span className="text-white/30">-</span>
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 flex-wrap">
       {websiteHref !== '#' && (
         <a
           href={websiteHref}
@@ -75,6 +96,54 @@ function SocialLinksIcons({ band }) {
           aria-label={`Open Facebook for ${band.name}`}
         >
           <FacebookIcon size={14} />
+        </a>
+      )}
+      {youtubeHref !== '#' && (
+        <a
+          href={youtubeHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-red-500 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+          title="YouTube"
+          aria-label={`Open YouTube for ${band.name}`}
+        >
+          <YouTubeIcon size={14} />
+        </a>
+      )}
+      {spotifyHref !== '#' && (
+        <a
+          href={spotifyHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-green-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-400"
+          title="Spotify"
+          aria-label={`Open Spotify for ${band.name}`}
+        >
+          <SpotifyIcon size={14} />
+        </a>
+      )}
+      {appleMusicHref !== '#' && (
+        <a
+          href={appleMusicHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-rose-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+          title="Apple Music"
+          aria-label={`Open Apple Music for ${band.name}`}
+        >
+          <AppleMusicIcon size={14} />
+        </a>
+      )}
+      {linktreeHref !== '#' && (
+        <a
+          href={linktreeHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-lime-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-400"
+          title="Linktree"
+          aria-label={`Open Linktree for ${band.name}`}
+        >
+          <LinktreeIcon size={14} />
         </a>
       )}
     </div>
@@ -127,6 +196,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
     instagram: '',
     bandcamp: '',
     facebook: '',
+    youtube: '',
+    spotify: '',
+    apple_music: '',
+    linktree: '',
   })
   const [submitting, setSubmitting] = useState(false)
 

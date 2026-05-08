@@ -420,42 +420,54 @@ export default function BandProfilePage() {
   }
 
   if (loading) {
-    return <BandProfileSkeleton />
+    return (
+      <>
+        <Helmet>
+          <title>Band Profile | SetTimes</title>
+        </Helmet>
+        <BandProfileSkeleton />
+      </>
+    )
   }
 
   if (error || !profile) {
     return (
-      <div className="min-h-screen bg-bg-navy">
-        <div className="container mx-auto px-4 py-12 max-w-2xl">
-          <Alert variant="error" className="mb-6">
-            <h2 className="text-xl font-bold mb-2">
-              {isPublishGateError
-                ? 'Band Profiles Unavailable'
-                : isNotFoundError
-                  ? 'Band Not Found'
-                  : 'Failed to load band profile'}
-            </h2>
-            <p>
-              {isPublishGateError
-                ? error.message
-                : isNotFoundError
-                  ? `We couldn't find a profile for this band.${error ? ` Error: ${error.message}` : ''}`
-                  : error?.message || "We couldn't load this band profile right now."}
-            </p>
-          </Alert>
-          <div className="text-center">
-            <Button
-              as={Link}
-              to={returnEventPath}
-              variant="secondary"
-              icon={<ArrowLeft size={14} />}
-              iconPosition="left"
-            >
-              Back to Schedule
-            </Button>
+      <>
+        <Helmet>
+          <title>{isNotFoundError ? 'Band Not Found | SetTimes' : 'Band Profile | SetTimes'}</title>
+        </Helmet>
+        <div className="min-h-screen bg-bg-navy">
+          <div className="container mx-auto px-4 py-12 max-w-2xl">
+            <Alert variant="error" className="mb-6">
+              <h2 className="text-xl font-bold mb-2">
+                {isPublishGateError
+                  ? 'Band Profiles Unavailable'
+                  : isNotFoundError
+                    ? 'Band Not Found'
+                    : 'Failed to load band profile'}
+              </h2>
+              <p>
+                {isPublishGateError
+                  ? error.message
+                  : isNotFoundError
+                    ? `We couldn't find a profile for this band.${error ? ` Error: ${error.message}` : ''}`
+                    : error?.message || "We couldn't load this band profile right now."}
+              </p>
+            </Alert>
+            <div className="text-center">
+              <Button
+                as={Link}
+                to={returnEventPath}
+                variant="secondary"
+                icon={<ArrowLeft size={14} />}
+                iconPosition="left"
+              >
+                Back to Schedule
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     )
   }
 

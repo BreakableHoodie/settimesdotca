@@ -184,7 +184,6 @@ export default function BandForm({
                     options={mergedOriginCitySuggestions}
                     maxLength={FIELD_LIMITS.bandOriginCity.max}
                     placeholder="City"
-                    fullWidth
                   />
                 </div>
                 <div>
@@ -196,7 +195,6 @@ export default function BandForm({
                     options={mergedOriginRegionSuggestions}
                     maxLength={FIELD_LIMITS.bandOriginRegion.max}
                     placeholder="Province/State"
-                    fullWidth
                   />
                 </div>
               </div>
@@ -219,7 +217,6 @@ export default function BandForm({
                 options={mergedGenreSuggestions}
                 maxLength={FIELD_LIMITS.bandGenre.max}
                 placeholder="punk, indie rock, etc."
-                fullWidth
               />
             </div>
 

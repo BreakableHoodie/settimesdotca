@@ -73,7 +73,7 @@ export default function Combobox({
         e.preventDefault()
         break
       case 'Enter':
-        if (activeIndex >= 0) {
+        if (activeIndex >= 0 && activeIndex < filtered.length) {
           pick(filtered[activeIndex])
           e.preventDefault()
         }

@@ -2,6 +2,7 @@ import PropTypes from 'prop-types'
 import PhotoUpload from './components/PhotoUpload'
 import RichTextEditor from './components/RichTextEditor'
 import { Input, Button, Tooltip } from '../components/ui'
+import Combobox from '../components/ui/Combobox'
 import { Info } from 'lucide-react'
 import { FIELD_LIMITS } from '../utils/validation'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
@@ -175,42 +176,28 @@ export default function BandForm({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Input
+                  <Combobox
                     id="band-origin-city"
-                    type="text"
                     name="origin_city"
                     value={formData.origin_city || ''}
                     onChange={onChange}
+                    options={mergedOriginCitySuggestions}
                     maxLength={FIELD_LIMITS.bandOriginCity.max}
                     placeholder="City"
-                    list="band-origin-city-list"
-                    fullWidth
                   />
                 </div>
                 <div>
-                  <Input
+                  <Combobox
                     id="band-origin-region"
-                    type="text"
                     name="origin_region"
                     value={formData.origin_region || ''}
                     onChange={onChange}
+                    options={mergedOriginRegionSuggestions}
                     maxLength={FIELD_LIMITS.bandOriginRegion.max}
                     placeholder="Province/State"
-                    list="band-origin-region-list"
-                    fullWidth
                   />
                 </div>
               </div>
-              <datalist id="band-origin-city-list">
-                {mergedOriginCitySuggestions.map(city => (
-                  <option key={city} value={city} />
-                ))}
-              </datalist>
-              <datalist id="band-origin-region-list">
-                {mergedOriginRegionSuggestions.map(region => (
-                  <option key={region} value={region} />
-                ))}
-              </datalist>
             </fieldset>
 
             <div className="sm:col-span-2">
@@ -222,22 +209,15 @@ export default function BandForm({
                   <Info size={14} className="text-text-tertiary cursor-help" />
                 </Tooltip>
               </div>
-              <Input
+              <Combobox
                 id="band-genre"
-                type="text"
                 name="genre"
                 value={formData.genre || ''}
                 onChange={onChange}
+                options={mergedGenreSuggestions}
                 maxLength={FIELD_LIMITS.bandGenre.max}
                 placeholder="punk, indie rock, etc."
-                list="band-genre-list"
-                fullWidth
               />
-              <datalist id="band-genre-list">
-                {mergedGenreSuggestions.map(genre => (
-                  <option key={genre} value={genre} />
-                ))}
-              </datalist>
             </div>
 
             <div className="sm:col-span-2">

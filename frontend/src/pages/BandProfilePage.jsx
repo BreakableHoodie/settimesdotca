@@ -396,12 +396,6 @@ export default function BandProfilePage() {
     document.title = pageTitle
   }, [pageTitle])
 
-  useEffect(() => {
-    return () => {
-      document.title = 'SetTimes – Live Music Events & Show Schedules'
-    }
-  }, [])
-
   const submitFollow = async e => {
     e.preventDefault()
     if (!followEmail.trim()) return

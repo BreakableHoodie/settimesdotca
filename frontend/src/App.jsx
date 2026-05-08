@@ -633,13 +633,12 @@ function App() {
         endDate: eventData.end_date || eventData.date,
         url: `https://settimes.ca/event/${slug}`,
         description: `Full set times and schedule for ${eventData.name}.`,
-        image: 'https://settimes.ca/android-chrome-512x512.png',
-        ...(eventData.city && {
-          location: {
-            '@type': 'Place',
-            address: { '@type': 'PostalAddress', addressLocality: eventData.city, addressCountry: 'CA' },
-          },
-        }),
+        location: {
+          '@type': 'Place',
+          ...(eventData.city
+            ? { address: { '@type': 'PostalAddress', addressLocality: eventData.city, addressCountry: 'CA' } }
+            : { name: 'Canada', address: { '@type': 'PostalAddress', addressCountry: 'CA' } }),
+        },
         organizer: { '@type': 'Organization', name: 'SetTimes', url: 'https://settimes.ca' },
         ...(eventData.ticket_url && {
           offers: {

@@ -9,6 +9,8 @@ import {
   isValidISODate,
   isValidPostalCode,
   normalizePostalCode,
+  validateEntity,
+  VALIDATION_SCHEMAS,
 } from "../validation.js";
 
 describe("Email Validation", () => {
@@ -182,5 +184,43 @@ describe("Postal Code Normalization", () => {
     expect(normalizePostalCode("")).toBe(null);
     expect(normalizePostalCode(null)).toBe(null);
     expect(normalizePostalCode("   ")).toBe(null);
+  });
+});
+
+describe("Event schema end_date validation", () => {
+  const validBase = {
+    name: "Test Event",
+    slug: "test-event",
+    date: "2099-06-15",
+  };
+
+  it("omitted end_date defaults to null", () => {
+    const result = validateEntity(validBase, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(true);
+    expect(result.sanitized.end_date).toBeNull();
+  });
+
+  it("empty string end_date defaults to null", () => {
+    const result = validateEntity({ ...validBase, end_date: "" }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(true);
+    expect(result.sanitized.end_date).toBeNull();
+  });
+
+  it("valid end_date is accepted", () => {
+    const result = validateEntity({ ...validBase, end_date: "2099-06-17" }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(true);
+    expect(result.sanitized.end_date).toBe("2099-06-17");
+  });
+
+  it("invalid calendar date is rejected", () => {
+    const result = validateEntity({ ...validBase, end_date: "2099-99-99" }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(false);
+    expect(result.errors.end_date).toBeDefined();
+  });
+
+  it("non-date string is rejected", () => {
+    const result = validateEntity({ ...validBase, end_date: "not-a-date" }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(false);
+    expect(result.errors.end_date).toBeDefined();
   });
 });

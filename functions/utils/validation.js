@@ -1034,6 +1034,12 @@ export const VALIDATION_SCHEMAS = {
       required: true,
       label: "Date",
     },
+    end_date: {
+      type: "date",
+      required: false,
+      label: "End date",
+      default: null,
+    },
     status: {
       type: "enum",
       required: false,

@@ -11,6 +11,7 @@ import {
   sanitizeEventSocialLinks,
   sanitizeString,
   sanitizeVenueInfo,
+  validateDate,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 
@@ -105,6 +106,7 @@ export async function onRequestPatch(context) {
     const {
       name,
       date,
+      end_date,
       status,
       description,
       city,
@@ -149,21 +151,37 @@ export async function onRequestPatch(context) {
     }
 
     if (date !== undefined) {
-      // Validate date format
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const dateResult = validateDate(date);
+      if (!dateResult.valid) {
         return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: "Date must be in YYYY-MM-DD format",
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
+          JSON.stringify({ error: "Validation error", message: dateResult.error }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
       updates.push("date = ?");
       params.push(date);
+    }
+
+    if (end_date !== undefined) {
+      const normalizedEndDate = end_date || null;
+      if (normalizedEndDate !== null) {
+        const endDateResult = validateDate(normalizedEndDate);
+        if (!endDateResult.valid) {
+          return new Response(
+            JSON.stringify({ error: "Validation error", message: endDateResult.error }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const effectiveStartDate = date ?? event.date;
+        if (normalizedEndDate < effectiveStartDate) {
+          return new Response(
+            JSON.stringify({ error: "Validation error", message: "End date must be on or after the event start date" }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+      }
+      updates.push("end_date = ?");
+      params.push(normalizedEndDate);
     }
 
     if (status !== undefined) {

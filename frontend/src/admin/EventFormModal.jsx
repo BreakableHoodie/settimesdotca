@@ -31,6 +31,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
     name: '',
     slug: '',
     date: '',
+    end_date: '',
     status: 'draft',
     description: '',
     city: '',
@@ -88,6 +89,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         name: event.name || '',
         slug: event.slug || '',
         date: event.date || '',
+        end_date: event.end_date || '',
         status: event.status || 'draft',
         description: event.description || '',
         city: event.city || '',
@@ -106,6 +108,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         name: '',
         slug: '',
         date: '',
+        end_date: '',
         status: 'draft',
         description: '',
         city: '',
@@ -181,6 +184,11 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
       return false
     }
 
+    if (formData.end_date && formData.end_date < formData.date) {
+      setError('End date must be on or after the event start date')
+      return false
+    }
+
     if (!isEditing && formData.status === 'archived' && !canCreateArchived) {
       setError('Only admins can create archived events directly')
       return false
@@ -242,6 +250,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         name: formData.name,
         slug: formData.slug,
         date: formData.date,
+        end_date: formData.end_date || null,
         status: formData.status,
         description: formData.description,
         city: formData.city,
@@ -387,6 +396,22 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
                     : 'Date cannot be in the past'}
                 </p>
               )}
+            </div>
+
+            {/* End Date */}
+            <div>
+              <label htmlFor="event-end-date" className="block text-white mb-2 text-sm font-medium">
+                End Date <span className="text-white/50 text-xs">(optional — used for Google rich results)</span>
+              </label>
+              <input
+                id="event-end-date"
+                type="date"
+                name="end_date"
+                value={formData.end_date}
+                onChange={handleInputChange}
+                min={formData.date || undefined}
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
+              />
             </div>
 
             {/* Description */}

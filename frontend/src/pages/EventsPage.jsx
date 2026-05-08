@@ -37,7 +37,7 @@ export default function EventsPage() {
   }, [refreshBanner])
 
   return (
-    <div id="main-content" className="min-h-screen bg-gradient-dark">
+    <main id="main-content" className="min-h-screen bg-gradient-dark">
       <Helmet>
         <title>SetTimes – Live Music Events &amp; Show Schedules</title>
         <meta
@@ -97,6 +97,6 @@ export default function EventsPage() {
       <EventTimeline />
       <Footer />
       <PrivacyBanner />
-    </div>
+    </main>
   )
 }

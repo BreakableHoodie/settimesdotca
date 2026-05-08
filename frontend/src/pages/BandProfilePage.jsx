@@ -460,7 +460,7 @@ export default function BandProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-navy">
+    <main className="min-h-screen bg-bg-navy">
       {/* SEO Meta Tags */}
       <Helmet>
         <title>{profile.name} - Band Profile | SetTimes</title>
@@ -924,6 +924,6 @@ export default function BandProfilePage() {
         </div>
       </div>
       <PrivacyBanner />
-    </div>
+    </main>
   )
 }

@@ -151,17 +151,11 @@ export async function onRequestPatch(context) {
     }
 
     if (date !== undefined) {
-      // Validate date format
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const dateResult = validateDate(date);
+      if (!dateResult.valid) {
         return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: "Date must be in YYYY-MM-DD format",
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
+          JSON.stringify({ error: "Validation error", message: dateResult.error }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
       updates.push("date = ?");

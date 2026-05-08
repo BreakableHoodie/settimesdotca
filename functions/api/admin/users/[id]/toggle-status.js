@@ -23,10 +23,10 @@ export async function onRequestPost(context) {
 
     const idResult = validateId(params.id);
     if (!idResult.valid) {
-      return new Response(JSON.stringify({ error: idResult.error }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Bad request", message: idResult.error }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
     const userId = idResult.value;
 

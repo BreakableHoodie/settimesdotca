@@ -124,7 +124,7 @@ export async function onRequestPost(context) {
     const expiresInDays = 7;
     const expiresAt = new Date(
       Date.now() + expiresInDays * 24 * 60 * 60 * 1000
-    ).toISOString();
+    ).toISOString().replace("T", " ").slice(0, 19);
 
     // Create invite code
     const invite = await DB.prepare(

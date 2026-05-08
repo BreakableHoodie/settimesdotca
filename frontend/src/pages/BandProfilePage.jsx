@@ -460,7 +460,7 @@ export default function BandProfilePage() {
   }
 
   return (
-    <main className="min-h-screen bg-bg-navy">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-bg-navy">
       {/* SEO Meta Tags */}
       <Helmet>
         <title>{profile.name} - Band Profile | SetTimes</title>

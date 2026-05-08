@@ -37,7 +37,7 @@ export default function EventsPage() {
   }, [refreshBanner])
 
   return (
-    <main id="main-content" className="min-h-screen bg-gradient-dark">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
       <Helmet>
         <title>SetTimes – Live Music Events &amp; Show Schedules</title>
         <meta

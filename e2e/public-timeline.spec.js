@@ -67,6 +67,7 @@ test.describe('Public Timeline Viewing', () => {
       await bandLink.click();
       await expect(page).toHaveURL(/\/band\//);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page).toHaveTitle(/- Band Profile \| SetTimes$/);
     }
   });
 

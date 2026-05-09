@@ -175,6 +175,13 @@ export async function checkRateLimit(request, env = null) {
              request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
              'unknown';
 
+  // No real IP means we're running outside the Cloudflare edge (wrangler dev / CI).
+  // In production CF-Connecting-IP is always set, so this sentinel never appears there.
+  // The auth_attempts layer still provides per-account brute-force protection.
+  if (ip === 'unknown') {
+    return { allowed: true, remaining: -1, resetAt: 0 };
+  }
+
   // Security-sensitive endpoints use D1 for globally-consistent counters.
   if (shouldFailClosed(pathname) && env?.DB) {
     return await checkRateLimitD1(env.DB, ip, pathname, config);

@@ -246,6 +246,54 @@ describe('Rate Limiting', () => {
     });
   });
 
+  describe('IP bypass behaviour', () => {
+    it('loopback 127.0.0.1 skips rate limiting entirely (wrangler dev / CI)', async () => {
+      const db = makeMockDB({ count: 100 });
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/admin/auth/login', {
+        headers: { 'CF-Connecting-IP': '127.0.0.1' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(-1);
+      expect(db.prepare).not.toHaveBeenCalled();
+    });
+
+    it('loopback ::1 skips rate limiting entirely', async () => {
+      const request = new Request('https://example.com/api/events', {
+        headers: { 'CF-Connecting-IP': '::1' },
+      });
+
+      const result = await checkRateLimit(request);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(-1);
+    });
+
+    it('unknown IP fails closed on fail-closed (auth) endpoints', async () => {
+      const db = makeMockDB({ count: 0 });
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/admin/auth/login', {}); // no IP headers
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(false);
+      expect(result.remaining).toBe(0);
+      expect(db.prepare).not.toHaveBeenCalled(); // blocked before hitting D1
+    });
+
+    it('unknown IP fails open on non-sensitive endpoints', async () => {
+      const request = new Request('https://example.com/api/events', {}); // no IP headers
+
+      const result = await checkRateLimit(request);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(-1);
+    });
+  });
+
   describe('rateLimitHeaders', () => {
     it('should return empty object for skipped rate limits', () => {
       const result = { allowed: true, remaining: -1, resetAt: 0 };

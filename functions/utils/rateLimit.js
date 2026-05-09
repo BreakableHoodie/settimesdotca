@@ -175,6 +175,21 @@ export async function checkRateLimit(request, env = null) {
              request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
              'unknown';
 
+  // Loopback IPs (127.0.0.1/::1) only appear in wrangler dev / CI, where miniflare
+  // injects the socket's local address. Skip rate limiting entirely — no real IP is available.
+  if (ip === '127.0.0.1' || ip === '::1') {
+    return { allowed: true, remaining: -1, resetAt: 0 };
+  }
+
+  // In production, CF-Connecting-IP is always present. If both IP headers are absent,
+  // fail closed on auth endpoints (misconfiguration safety) and fail open elsewhere.
+  if (ip === 'unknown') {
+    if (shouldFailClosed(pathname)) {
+      return { allowed: false, remaining: 0, resetAt: Math.floor(Date.now() / 1000) + 60, limit: config.requests };
+    }
+    return { allowed: true, remaining: -1, resetAt: 0 };
+  }
+
   // Security-sensitive endpoints use D1 for globally-consistent counters.
   if (shouldFailClosed(pathname) && env?.DB) {
     return await checkRateLimitD1(env.DB, ip, pathname, config);

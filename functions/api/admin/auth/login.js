@@ -22,9 +22,9 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { email, password } = body;
+    const { email: rawEmail, password } = body;
 
-    if (!email || !password) {
+    if (!rawEmail || !password) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -37,18 +37,42 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Check rate limit
-    const rateCheck = await checkAuthRateLimit(DB, {
+    const email = rawEmail.trim().toLowerCase();
+
+    // Per-email rate limit: blocks targeted attacks on a known account (5 failures)
+    const emailRateCheck = await checkAuthRateLimit(DB, {
       attemptType: AUTH_ATTEMPT_TYPES.login,
       email,
       ipAddress,
-      scope: "email-or-ip",
+      scope: "email",
+      maxFailures: 5,
     });
-    if (!rateCheck.allowed) {
+    if (!emailRateCheck.allowed) {
       return new Response(
         JSON.stringify({
           error: "Too many attempts",
-          message: `Too many failed login attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
+          message: `Too many failed login attempts. Please try again in ${emailRateCheck.remainingMinutes} minutes.`,
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Per-IP rate limit: blocks credential-stuffing across many accounts (20 failures)
+    const ipRateCheck = await checkAuthRateLimit(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.login,
+      email,
+      ipAddress,
+      scope: "ip",
+      maxFailures: 20,
+    });
+    if (!ipRateCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "Too many attempts",
+          message: `Too many failed login attempts. Please try again in ${ipRateCheck.remainingMinutes} minutes.`,
         }),
         {
           status: 429,
@@ -64,7 +88,7 @@ export async function onRequestPost(context) {
              activation_token, activation_token_expires_at, activated_at,
              totp_enabled, totp_secret
       FROM users
-      WHERE email = ?
+      WHERE LOWER(email) = ?
     `
     )
       .bind(email)
@@ -303,6 +327,7 @@ export async function onRequestPost(context) {
     }
 
     const lucia = initializeLucia(DB, request, env);
+    await lucia.invalidateUserSessions(user.id);
     const session = await lucia.createSession(user.id, {});
 
     await DB.prepare(

@@ -201,27 +201,32 @@ wrangler d1 execute settimes-production-db --env production --file=database/seed
 
 ### 5. Create Initial Admin User
 
-```bash
-# Connect to database
-wrangler d1 execute settimes-production-db --env production --command="
-INSERT INTO users (email, name, password_hash, role, is_active)
-VALUES (
-  'admin@settimes.ca',
-  'Admin User',
-  '\$2a\$10\$YourBcryptHashHere',  -- Generate using bcrypt
-  'admin',
-  1
-)"
-```
+The system uses invite codes for admin account creation — do **not** insert password hashes directly into the database. The hash algorithm is PBKDF2 (not bcrypt), so any manually inserted bcrypt hash will fail authentication.
 
-**Generate password hash:**
+> **Note:** `ALLOW_ADMIN_SIGNUP` is a test-only env var that bypasses invite codes. It does not exist in the production functions and must **never** be set in a production environment.
 
-```javascript
-// Use Node.js with bcrypt
-const bcrypt = require("bcrypt");
-const hash = bcrypt.hashSync("your-secure-password", 10);
-console.log(hash);
-```
+**Production bootstrap procedure (one-time):**
+
+1. After deploying, open the Cloudflare D1 dashboard (or use `wrangler d1 execute`) and insert a bootstrap invite code:
+
+   ```sql
+   INSERT INTO invite_codes (code, email, role, created_by_user_id, expires_at)
+   VALUES (
+     'REPLACE-WITH-SECURE-UUID',
+     'admin@yourdomain.com',
+     'admin',
+     NULL,
+     datetime('now', '+7 days')
+   );
+   ```
+
+   Generate a secure UUID locally (e.g. `node -e "console.log(crypto.randomUUID())"`).
+
+2. Navigate to `/admin/signup?code=REPLACE-WITH-SECURE-UUID` and complete account creation. The password is hashed with PBKDF2 automatically.
+
+3. Once logged in, generate additional invite codes from the admin panel under **Settings → Invite Codes** for any other admins.
+
+4. The bootstrap invite code is consumed on use and expires automatically — no cleanup needed.
 
 ---
 

@@ -16,6 +16,7 @@ import { trackEventView, trackPageView } from './utils/metrics'
 import { getTimeFilterOptions } from './utils/timeFilter'
 import { validateBandsData } from './utils/validation'
 import { prepareBands } from './utils/bandUtils'
+import { saveSelectedBands } from './utils/scheduleStorage'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 const TIME_FILTERS_STORAGE_KEY = 'timeFiltersByEvent'
@@ -290,27 +291,8 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-      return
-    }
-
-    try {
-      const key = slug || 'default'
-      let nextState = {}
-      const existing = window.localStorage.getItem(SELECTED_BANDS_KEY)
-      if (existing) {
-        const parsed = JSON.parse(existing)
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          nextState = { ...parsed }
-        }
-      }
-
-      nextState[key] = selectedBands
-      window.localStorage.setItem(SELECTED_BANDS_KEY, JSON.stringify(nextState))
-    } catch (error) {
-      console.warn('[App] Failed to persist selectedBands', error)
-    }
-  }, [selectedBands, slug])
+    saveSelectedBands(slug || 'default', selectedBands, eventData?.date)
+  }, [selectedBands, slug, eventData?.date])
 
   const clearScheduleToast = useCallback(({ clearUndoState = false } = {}) => {
     if (scheduleToastTimeoutRef.current) {

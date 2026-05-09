@@ -417,7 +417,7 @@ Bind in Cloudflare Pages dashboard: Settings > Functions > R2 bucket bindings
 ### For Administrators
 
 1. **Use strong passwords** - 16+ characters, password manager
-2. **Enable 2FA** - When implemented (future)
+2. **Enable 2FA** - Use TOTP via the admin panel settings
 3. **Rotate passwords** - Every 3-6 months
 4. **Review audit logs** - Monthly security review
 5. **Limit admin accounts** - Only trusted personnel
@@ -483,7 +483,6 @@ Bind in Cloudflare Pages dashboard: Settings > Functions > R2 bucket bindings
 
 ### Priority 1 (Next Sprint)
 - [ ] Implement email verification
-- [ ] Add 2FA/TOTP support
 - [ ] Sliding session expiration
 - [ ] Account lockout after failed logins
 - [ ] Password complexity requirements (12+ chars, mixed case, numbers, symbols)

@@ -21,6 +21,15 @@ function getRateLimitQuery(scope) {
       AND created_at > ?`;
   }
 
+  if (scope === "email") {
+    return `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
+      FROM auth_attempts
+      WHERE email = ?
+      AND attempt_type = ?
+      AND success = 0
+      AND created_at > ?`;
+  }
+
   if (scope === "email-or-ip") {
     return `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
       FROM auth_attempts
@@ -52,6 +61,10 @@ function getRateLimitBindings(scope, { email, ipAddress, userId, attemptType, wi
     return [ipAddress, attemptType, windowStart];
   }
 
+  if (scope === "email") {
+    return [email, attemptType, windowStart];
+  }
+
   if (scope === "email-or-ip") {
     return [email, ipAddress, attemptType, windowStart];
   }
@@ -72,6 +85,10 @@ export async function checkAuthRateLimit(DB, {
   userId = null,
   windowMs = DEFAULT_WINDOW_MS,
 }) {
+  if (scope === 'email' && !email) {
+    throw new Error(`checkAuthRateLimit: email is required for scope "email"`);
+  }
+
   const windowStart = toSqliteDateTime(new Date(Date.now() - windowMs));
   const query = getRateLimitQuery(scope);
   const bindings = getRateLimitBindings(scope, {

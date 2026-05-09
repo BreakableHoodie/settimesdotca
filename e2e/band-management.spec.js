@@ -3,11 +3,13 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from './credentials';
 
 const loginAsAdmin = async (page) => {
   await page.goto('/admin');
-  if (await page.locator('input[type="email"]').isVisible({ timeout: 3000 }).catch(() => false)) {
+  // Wait for either admin tab buttons (valid session) or login form (session expired/invalidated)
+  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: 'visible', timeout: 15000 }).catch(() => {});
+  if (await page.locator('input[type="email"]').isVisible()) {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/admin$/);
+    await page.waitForSelector('button[role="tab"]', { state: 'visible', timeout: 15000 });
   }
 };
 

@@ -51,11 +51,11 @@ Password hashing uses PBKDF2-SHA256 via the Web Crypto API (`functions/utils/cry
 
 bcrypt requires a native binary (`better-sqlite3` style) that cannot run on Cloudflare Workers. Do not introduce bcrypt anywhere in `functions/`.
 
-### D1 has no real transactions — use compensating deletes
+### D1 transactions: no BEGIN/COMMIT, but `DB.batch()` is atomic
 
-The Cloudflare Workers D1 binding does not support multi-statement transactions in the same way as a local SQLite connection. Multi-step mutations use compensating deletes: if step N fails, manually undo steps 1…N-1.
+The Cloudflare Workers D1 binding does not support explicit `BEGIN`/`COMMIT` transaction syntax. However, `env.DB.batch([stmt1, stmt2, ...])` executes all statements atomically — if any fails, all are rolled back. Prefer `DB.batch()` for multi-statement mutations.
 
-See `functions/api/admin/events/[id].js` for the event-duplication pattern.
+For mutations that cannot be expressed as a single batch (e.g., the event-duplication pattern in `functions/api/admin/events/[id].js`), use compensating deletes: if step N fails, manually undo steps 1…N-1.
 
 ### PRAGMA `foreign_keys = ON` is NOT set in production
 

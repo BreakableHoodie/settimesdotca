@@ -85,6 +85,10 @@ export async function checkAuthRateLimit(DB, {
   userId = null,
   windowMs = DEFAULT_WINDOW_MS,
 }) {
+  if (scope === 'email' && !email) {
+    throw new Error(`checkAuthRateLimit: email is required for scope "email"`);
+  }
+
   const windowStart = toSqliteDateTime(new Date(Date.now() - windowMs));
   const query = getRateLimitQuery(scope);
   const bindings = getRateLimitBindings(scope, {

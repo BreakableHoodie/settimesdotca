@@ -22,9 +22,9 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { email, password } = body;
+    const { email: rawEmail, password } = body;
 
-    if (!email || !password) {
+    if (!rawEmail || !password) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -36,6 +36,8 @@ export async function onRequestPost(context) {
         }
       );
     }
+
+    const email = rawEmail.trim().toLowerCase();
 
     // Per-email rate limit: blocks targeted attacks on a known account (5 failures)
     const emailRateCheck = await checkAuthRateLimit(DB, {
@@ -86,7 +88,7 @@ export async function onRequestPost(context) {
              activation_token, activation_token_expires_at, activated_at,
              totp_enabled, totp_secret
       FROM users
-      WHERE email = ?
+      WHERE LOWER(email) = ?
     `
     )
       .bind(email)

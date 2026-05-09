@@ -203,10 +203,30 @@ wrangler d1 execute settimes-production-db --env production --file=database/seed
 
 The system uses invite codes for admin account creation — do **not** insert password hashes directly into the database. The hash algorithm is PBKDF2 (not bcrypt), so any manually inserted bcrypt hash will fail authentication.
 
-1. In the Cloudflare Dashboard, set `ALLOW_ADMIN_SIGNUP=true` under your Pages project's environment variables for the production environment.
-2. With `ALLOW_ADMIN_SIGNUP=true`, navigate to the signup page and create the first admin account. The password is hashed with PBKDF2 automatically — do not insert password hashes directly into the database.
+> **Note:** `ALLOW_ADMIN_SIGNUP` is a test-only env var that bypasses invite codes. It does not exist in the production functions and must **never** be set in a production environment.
+
+**Production bootstrap procedure (one-time):**
+
+1. After deploying, open the Cloudflare D1 dashboard (or use `wrangler d1 execute`) and insert a bootstrap invite code:
+
+   ```sql
+   INSERT INTO invite_codes (code, email, role, created_by_user_id, expires_at)
+   VALUES (
+     'REPLACE-WITH-SECURE-UUID',
+     'admin@yourdomain.com',
+     'admin',
+     NULL,
+     datetime('now', '+7 days')
+   );
+   ```
+
+   Generate a secure UUID locally (e.g. `node -e "console.log(crypto.randomUUID())"`).
+
+2. Navigate to `/admin/signup?code=REPLACE-WITH-SECURE-UUID` and complete account creation. The password is hashed with PBKDF2 automatically.
+
 3. Once logged in, generate additional invite codes from the admin panel under **Settings → Invite Codes** for any other admins.
-4. Remove `ALLOW_ADMIN_SIGNUP` (or set it to `false`) immediately after the first account is created. Leave it unset in production at all times.
+
+4. The bootstrap invite code is consumed on use and expires automatically — no cleanup needed.
 
 ---
 

@@ -21,6 +21,15 @@ function getRateLimitQuery(scope) {
       AND created_at > ?`;
   }
 
+  if (scope === "email") {
+    return `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
+      FROM auth_attempts
+      WHERE email = ?
+      AND attempt_type = ?
+      AND success = 0
+      AND created_at > ?`;
+  }
+
   if (scope === "email-or-ip") {
     return `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
       FROM auth_attempts
@@ -50,6 +59,10 @@ function toSqliteDateTime(date) {
 function getRateLimitBindings(scope, { email, ipAddress, userId, attemptType, windowStart }) {
   if (scope === "ip") {
     return [ipAddress, attemptType, windowStart];
+  }
+
+  if (scope === "email") {
+    return [email, attemptType, windowStart];
   }
 
   if (scope === "email-or-ip") {

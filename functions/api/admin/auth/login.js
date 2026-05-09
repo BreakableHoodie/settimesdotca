@@ -37,18 +37,40 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Check rate limit
-    const rateCheck = await checkAuthRateLimit(DB, {
+    // Per-email rate limit: blocks targeted attacks on a known account (5 failures)
+    const emailRateCheck = await checkAuthRateLimit(DB, {
       attemptType: AUTH_ATTEMPT_TYPES.login,
       email,
       ipAddress,
-      scope: "email-or-ip",
+      scope: "email",
+      maxFailures: 5,
     });
-    if (!rateCheck.allowed) {
+    if (!emailRateCheck.allowed) {
       return new Response(
         JSON.stringify({
           error: "Too many attempts",
-          message: `Too many failed login attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
+          message: `Too many failed login attempts. Please try again in ${emailRateCheck.remainingMinutes} minutes.`,
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Per-IP rate limit: blocks credential-stuffing across many accounts (20 failures)
+    const ipRateCheck = await checkAuthRateLimit(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.login,
+      email,
+      ipAddress,
+      scope: "ip",
+      maxFailures: 20,
+    });
+    if (!ipRateCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "Too many attempts",
+          message: `Too many failed login attempts. Please try again in ${ipRateCheck.remainingMinutes} minutes.`,
         }),
         {
           status: 429,

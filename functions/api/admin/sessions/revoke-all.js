@@ -1,4 +1,4 @@
-// Revoke all sessions except the current one
+// Revoke all sessions and issue a fresh one so the caller stays logged in
 // POST /api/admin/sessions/revoke-all
 
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";

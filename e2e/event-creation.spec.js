@@ -4,7 +4,7 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from './credentials';
 const loginAsAdmin = async (page) => {
   await page.goto('/admin');
   // Wait for either admin tab buttons (valid session) or login form (session expired/invalidated)
-  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: 'visible', timeout: 15000 }).catch(() => {});
+  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: 'visible', timeout: 15000 });
   if (await page.locator('input[type="email"]').isVisible()) {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);

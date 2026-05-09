@@ -175,10 +175,11 @@ export async function checkRateLimit(request, env = null) {
              request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
              'unknown';
 
-  // No real IP means we're running outside the Cloudflare edge (wrangler dev / CI).
-  // In production CF-Connecting-IP is always set, so this sentinel never appears there.
-  // The auth_attempts layer still provides per-account brute-force protection.
-  if (ip === 'unknown') {
+  // In production, CF-Connecting-IP is always a real internet IP.
+  // Loopback (127.0.0.1/::1) and unresolved IPs only appear in wrangler dev / CI,
+  // where miniflare injects the socket's local address for loopback connections.
+  // The auth_attempts layer still enforces per-account brute-force protection.
+  if (ip === 'unknown' || ip === '127.0.0.1' || ip === '::1') {
     return { allowed: true, remaining: -1, resetAt: 0 };
   }
 

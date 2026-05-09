@@ -66,8 +66,11 @@ test.describe('Public Timeline Viewing', () => {
     if (await bandLink.isVisible()) {
       await bandLink.click();
       await expect(page).toHaveURL(/\/band\//);
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      // Wait for the band profile to fully render before asserting content.
+      // toHaveTitle waits for the useEffect title update; only then is the page settled.
+      // Scoping to main h1 avoids the Header's "SetTimes" h1 (strict mode violation).
       await expect(page).toHaveTitle(/- Band Profile \| SetTimes$/);
+      await expect(page.locator('main h1')).toBeVisible();
     }
   });
 

@@ -104,7 +104,9 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
 
   if (!device) return null;
 
-  // Validate IP and UA independently using constant-time comparison
+  // Trust policy:
+  //   New rows (ua_hash present): UA must match; IP change is tolerated (DHCP, mobile, VPN).
+  //   Legacy rows (no ua_hash):   full IP+UA fingerprint must match.
   const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
   const currentUaHash = await generateUaHash(userAgent);
 
@@ -113,8 +115,6 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
     currentFingerprint,
   );
 
-  // If stored ua_hash exists, validate UA independently (new schema)
-  // Otherwise fall back to full fingerprint check (pre-migration rows)
   if (device.ua_hash) {
     const uaMatch = timingSafeStringEqual(device.ua_hash, currentUaHash);
     if (!uaMatch) {

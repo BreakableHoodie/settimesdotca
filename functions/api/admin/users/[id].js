@@ -287,7 +287,7 @@ export async function onRequestPatch(context) {
   }
 }
 
-// DELETE - Soft delete user (admin only)
+// DELETE - Hard delete user (admin only)
 export async function onRequestDelete(context) {
   const { request, env, params } = context;
   const { DB } = env;

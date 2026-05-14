@@ -11,7 +11,7 @@ import { FIELD_LIMITS } from '../utils/validation'
  * - Create new event or edit existing event
  * - Auto-generate slug from name
  * - Date picker with validation (no past dates)
- * - Status selector (draft, published, archived)
+ * - Status selector for draft/published, with optional archived creation for admins
  * - Form validation
  * - Shows creator info when editing
  *
@@ -19,16 +19,19 @@ import { FIELD_LIMITS } from '../utils/validation'
  * @param {function} onClose - Callback when modal closes
  * @param {object} event - Event object for editing (null for create)
  * @param {function} onSave - Callback when event is saved
+ * @param {boolean} canCreateArchived - Allow creating archived events directly
  */
-export default function EventFormModal({ isOpen, onClose, event = null, onSave }) {
+export default function EventFormModal({ isOpen, onClose, event = null, onSave, canCreateArchived = false }) {
   const isEditing = !!event
   const isPublished = event?.status === 'published' || Number(event?.is_published) === 1
+  const isArchivedEvent = event?.status === 'archived'
   const canEditSlug = !isEditing || !isPublished
 
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
     date: '',
+    end_date: '',
     status: 'draft',
     description: '',
     city: '',
@@ -39,6 +42,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
     social_x: '',
     social_tiktok: '',
     social_youtube: '',
+    reveal_mode: false,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -85,6 +89,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         name: event.name || '',
         slug: event.slug || '',
         date: event.date || '',
+        end_date: event.end_date || '',
         status: event.status || 'draft',
         description: event.description || '',
         city: event.city || '',
@@ -95,6 +100,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         social_x: socialLinks.x || socialLinks.twitter || '',
         social_tiktok: socialLinks.tiktok || '',
         social_youtube: socialLinks.youtube || '',
+        reveal_mode: event?.reveal_mode === 1 || event?.reveal_mode === true,
       })
       setSlugEdited(true) // Prevent auto-generation when editing
     } else {
@@ -102,6 +108,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         name: '',
         slug: '',
         date: '',
+        end_date: '',
         status: 'draft',
         description: '',
         city: '',
@@ -112,6 +119,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         social_x: '',
         social_tiktok: '',
         social_youtube: '',
+        reveal_mode: false,
       })
       setSlugEdited(false)
     }
@@ -176,13 +184,27 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
       return false
     }
 
-    // Check date is not in past (only for new events, unless status is archived)
+    if (formData.end_date && formData.end_date < formData.date) {
+      setError('End date must be on or after the event start date')
+      return false
+    }
+
+    if (!isEditing && formData.status === 'archived' && !canCreateArchived) {
+      setError('Only admins can create archived events directly')
+      return false
+    }
+
+    // Check date is not in past for normal event creation.
     if (!isEditing && formData.status !== 'archived') {
-      const eventDate = new Date(formData.date)
+      const eventDate = new Date(formData.date + 'T00:00:00')
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       if (eventDate < today) {
-        setError('Date cannot be in the past (use archived status for past events)')
+        setError(
+          canCreateArchived
+            ? 'Date cannot be in the past unless you are intentionally creating an archived historical event.'
+            : 'Date cannot be in the past. Archive historical events through an admin workflow.'
+        )
         return false
       }
     }
@@ -228,6 +250,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         name: formData.name,
         slug: formData.slug,
         date: formData.date,
+        end_date: formData.end_date || null,
         status: formData.status,
         description: formData.description,
         city: formData.city,
@@ -235,11 +258,21 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
         social_links: socialLinksPayload,
       }
 
+      if (isEditing && formData.status === 'archived') {
+        delete payload.status
+      }
+
       let data
       if (isEditing) {
         data = await eventsApi.update(event.id, payload)
       } else {
         data = await eventsApi.create(payload)
+      }
+
+      // Update reveal mode if it changed (editing only — new events default to off)
+      const originalRevealMode = event?.reveal_mode === 1 || event?.reveal_mode === true
+      if (isEditing && formData.reveal_mode !== originalRevealMode) {
+        await eventsApi.setRevealMode(event.id, formData.reveal_mode)
       }
 
       // Success!
@@ -262,11 +295,11 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-band-orange/30">
+      <div className="bg-bg-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-accent-500/30">
         <div className="p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-band-orange">{isEditing ? 'Edit Event' : 'Create New Event'}</h2>
+            <h2 className="text-2xl font-bold text-accent-400">{isEditing ? 'Edit Event' : 'Create New Event'}</h2>
             <button
               onClick={onClose}
               className="text-white/50 hover:text-white text-2xl transition-colors"
@@ -278,7 +311,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
 
           {/* Creator Info (when editing) */}
           {isEditing && event.created_at && (
-            <div className="mb-4 p-3 bg-band-navy/30 rounded border border-band-orange/10 text-sm text-white/70">
+            <div className="mb-4 p-3 bg-bg-navy/30 rounded border border-accent-500/10 text-sm text-white/70">
               <div>Created: {new Date(event.created_at).toLocaleString()}</div>
               {event.updated_at && event.updated_at !== event.created_at && (
                 <div>Last updated: {new Date(event.updated_at).toLocaleString()}</div>
@@ -304,7 +337,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="name"
                 value={formData.name}
                 onChange={handleNameChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 required
                 placeholder="Long Weekend Band Crawl Vol. 6"
                 minLength={FIELD_LIMITS.eventName.min}
@@ -326,7 +359,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="slug"
                 value={formData.slug}
                 onChange={handleSlugChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange font-mono text-sm"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500 font-mono text-sm"
                 required
                 placeholder="vol-6"
                 pattern="[a-z0-9\-]+"
@@ -352,17 +385,33 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="date"
                 value={formData.date}
                 onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 required
-                min={!isEditing && formData.status !== 'archived' ? today : undefined}
+                min={!isEditing && !(canCreateArchived && formData.status === 'archived') ? today : undefined}
               />
               {!isEditing && (
                 <p className="text-xs text-white/50 mt-1">
-                  {formData.status === 'archived'
-                    ? 'Past dates allowed for archived events'
+                  {formData.status === 'archived' && canCreateArchived
+                    ? 'Past dates are allowed when creating an archived historical event.'
                     : 'Date cannot be in the past'}
                 </p>
               )}
+            </div>
+
+            {/* End Date */}
+            <div>
+              <label htmlFor="event-end-date" className="block text-white mb-2 text-sm font-medium">
+                End Date <span className="text-white/50 text-xs">(optional — used for Google rich results)</span>
+              </label>
+              <input
+                id="event-end-date"
+                type="date"
+                name="end_date"
+                value={formData.end_date}
+                onChange={handleInputChange}
+                min={formData.date || undefined}
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
+              />
             </div>
 
             {/* Description */}
@@ -375,7 +424,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
-                className="w-full min-h-[120px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[120px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 rows={4}
                 maxLength={FIELD_LIMITS.eventDescription.max}
                 placeholder="Describe the event..."
@@ -396,7 +445,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="city"
                 value={formData.city}
                 onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 maxLength={FIELD_LIMITS.eventCity.max}
                 placeholder="Kitchener"
               />
@@ -416,7 +465,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                 name="ticket_url"
                 value={formData.ticket_url}
                 onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 maxLength={FIELD_LIMITS.ticketLink.max}
                 placeholder="https://tickets.example.com"
               />
@@ -437,7 +486,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_website"
                   value={formData.social_website}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="Website URL"
                 />
@@ -447,7 +496,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_instagram"
                   value={formData.social_instagram}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="Instagram (@handle or URL)"
                 />
@@ -457,7 +506,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_facebook"
                   value={formData.social_facebook}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="Facebook URL"
                 />
@@ -467,7 +516,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_x"
                   value={formData.social_x}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="X / Twitter (@handle or URL)"
                 />
@@ -477,7 +526,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_tiktok"
                   value={formData.social_tiktok}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="TikTok (@handle or URL)"
                 />
@@ -487,7 +536,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
                   name="social_youtube"
                   value={formData.social_youtube}
                   onChange={handleInputChange}
-                  className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                   maxLength={FIELD_LIMITS.ticketLink.max}
                   placeholder="YouTube URL"
                 />
@@ -502,21 +551,67 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave }
               <label htmlFor="event-status" className="block text-white mb-2 text-sm font-medium">
                 Status
               </label>
-              <select
-                id="event-status"
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                className="w-full min-h-[44px] px-4 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none focus:ring-1 focus:ring-band-orange"
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-                <option value="archived">Archived</option>
-              </select>
+              {isEditing && isArchivedEvent ? (
+                <div className="space-y-2">
+                  <div className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy/70 text-white border border-gray-600 flex items-center">
+                    Archived
+                  </div>
+                  <p className="text-xs text-white/50">
+                    Archived status is locked. Use the archive action to move an active event into history.
+                  </p>
+                </div>
+              ) : (
+                <select
+                  id="event-status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  {!isEditing && canCreateArchived && <option value="archived">Archived</option>}
+                </select>
+              )}
               <div className="mt-2">
                 <EventStatusBadge status={formData.status} />
               </div>
+              {!isEditing && !canCreateArchived && (
+                <p className="text-xs text-white/50 mt-2">
+                  Archive is handled separately after creation to preserve event history rules.
+                </p>
+              )}
             </div>
+
+            {/* Reveal Mode (editing only) */}
+            {isEditing && (
+              <div className="flex items-center justify-between py-3 border-t border-white/10">
+                <div>
+                  <label className="text-sm font-medium text-text-primary" htmlFor="reveal-mode">
+                    Reveal mode
+                  </label>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    When on, only announced bands appear on the public schedule.
+                  </p>
+                </div>
+                <button
+                  id="reveal-mode"
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.reveal_mode}
+                  onClick={() => setFormData(prev => ({ ...prev, reveal_mode: !prev.reveal_mode }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 ${
+                    formData.reveal_mode ? 'bg-accent-500' : 'bg-white/20'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.reveal_mode ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">

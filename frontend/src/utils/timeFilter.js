@@ -195,6 +195,20 @@ export function getTimeFilterOptions() {
 }
 
 /**
+ * Check if a band is starting soon (within the specified threshold from current time)
+ * @param {Object} band - Band object with startMs property
+ * @param {Date|number} currentTime - Current time as a Date or ms timestamp; unary + coerces both (allows time injection in tests)
+ * @param {number} thresholdMinutes - Minutes threshold (default: 30)
+ * @returns {boolean} True if band starts within the threshold and hasn't already started
+ */
+export function isStartingSoon(band, currentTime, thresholdMinutes = 30) {
+  if (!band.startMs) return false
+  const nowMs = +currentTime
+  const diff = band.startMs - nowMs
+  return diff > 0 && diff <= thresholdMinutes * 60000
+}
+
+/**
  * Calculate duration in minutes between start and end times
  */
 function getDurationMinutes(startMs, endMs) {
@@ -244,19 +258,19 @@ export function getTimeDescription(performance) {
   // If performance is today
   if (isHappeningToday(performance)) {
     const startDate = new Date(startTime)
-    return `Today at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
+    return `Today at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // If performance is this week
   if (isHappeningThisWeek(performance)) {
     const startDate = new Date(startTime)
-    return `${startDate.toLocaleDateString([], { weekday: 'long' })} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
+    return `${startDate.toLocaleDateString([], { weekday: 'long' })} ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // If performance is next week
   if (isHappeningNextWeek(performance)) {
     const startDate = new Date(startTime)
-    return `Next ${startDate.toLocaleDateString([], { weekday: 'long' })} at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
+    return `Next ${startDate.toLocaleDateString([], { weekday: 'long' })} at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // Default to formatted date and time
@@ -264,5 +278,5 @@ export function getTimeDescription(performance) {
   return `${startDate.toLocaleDateString([], {
     month: 'short',
     day: 'numeric',
-  })} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}${durationStr}`
+  })} ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
 }

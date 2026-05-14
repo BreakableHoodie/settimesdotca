@@ -1,12 +1,5 @@
+import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
 import PropTypes from 'prop-types'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import {
-  faCircleCheck,
-  faCircleExclamation,
-  faCircleInfo,
-  faTriangleExclamation,
-  faXmark,
-} from '@fortawesome/free-solid-svg-icons'
 
 /**
  * Alert Component - Design System v1.0
@@ -28,15 +21,14 @@ export default function Alert({
   icon: customIcon,
   ...props
 }) {
-  // Icon mapping
-  const icons = {
-    success: faCircleCheck,
-    warning: faTriangleExclamation,
-    error: faCircleExclamation,
-    info: faCircleInfo,
+  const iconMap = {
+    success: CircleCheck,
+    warning: TriangleAlert,
+    error: CircleAlert,
+    info: Info,
   }
 
-  const icon = customIcon || icons[variant]
+  const IconComponent = customIcon || iconMap[variant]
 
   // Base classes
   const baseClasses = 'flex items-start gap-3 p-4 rounded-lg border'
@@ -60,17 +52,17 @@ export default function Alert({
 
   return (
     <div className={classes} role="alert" aria-live={variant === 'error' ? 'assertive' : 'polite'} {...props}>
-      {icon && <FontAwesomeIcon icon={icon} className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true" />}
+      {IconComponent && <IconComponent size={20} className="shrink-0 mt-0.5" aria-hidden="true" />}
 
       <div className="flex-1 text-text-primary">{children}</div>
 
       {dismissible && onClose && (
         <button
           onClick={onClose}
-          className="flex-shrink-0 p-1 hover:bg-white/10 rounded transition-colors"
+          className="shrink-0 p-1 hover:bg-white/10 rounded transition-colors"
           aria-label="Dismiss alert"
         >
-          <FontAwesomeIcon icon={faXmark} className="text-lg" />
+          <X size={18} />
         </button>
       )}
     </div>
@@ -83,5 +75,5 @@ Alert.propTypes = {
   dismissible: PropTypes.bool,
   onClose: PropTypes.func,
   className: PropTypes.string,
-  icon: PropTypes.object,
+  icon: PropTypes.elementType,
 }

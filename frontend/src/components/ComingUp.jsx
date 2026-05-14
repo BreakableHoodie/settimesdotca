@@ -33,14 +33,7 @@ function ComingUp({ bands, currentTime }) {
     }
 
     updateNextBand()
-    const interval = setInterval(updateNextBand, 30000) // Update every 30 seconds
-
-    return () => clearInterval(interval)
   }, [bands, currentTime])
-
-  if (!nextBand || minutesUntil === null) {
-    return null
-  }
 
   // Format time until next band
   const formatTimeUntil = minutes => {
@@ -64,21 +57,41 @@ function ComingUp({ bands, currentTime }) {
     return parts.join(' ')
   }
 
-  const message = `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name} at ${nextBand.venue}`
+  const hasNext = nextBand && minutesUntil !== null
+  const venueLabel = nextBand?.venue ? ` at ${nextBand.venue}` : ''
+  const message = hasNext ? `Coming up in ${formatTimeUntil(minutesUntil)}: ${nextBand.name}${venueLabel}` : undefined
 
   return (
     <div
-      className="bg-gradient-to-r from-band-orange to-yellow-500 text-band-navy py-3 px-4 shadow-lg"
-      role="status"
-      aria-live="polite"
+      className={`overflow-hidden transition-all duration-300 ease-out ${
+        hasNext ? 'max-h-28 sm:max-h-32 opacity-100' : 'max-h-0 opacity-0'
+      }`}
     >
-      <div className="container mx-auto max-w-6xl text-center" title={message}>
-        <p className="font-bold text-sm md:text-base leading-normal">
-          <span className="block">Coming up in {formatTimeUntil(minutesUntil)}:</span>
-          <span className="text-lg md:text-xl">{nextBand.name}</span>
-          <span className="block text-sm md:text-base">{nextBand.venue}</span>
-        </p>
-      </div>
+      {hasNext && (
+        <div
+          className="bg-linear-to-r from-accent-500 to-primary-600 px-4 py-2.5 text-white shadow-lg sm:py-3"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="container mx-auto max-w-(--breakpoint-2xl)" title={message}>
+            <div className="flex items-center gap-2 sm:hidden">
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">Up Next</span>
+              <span className="shrink-0 rounded-full bg-white/15 px-2 py-1 text-xs font-semibold text-white">
+                {formatTimeUntil(minutesUntil)}
+              </span>
+              <span className="min-w-0 truncate text-sm font-semibold text-white">
+                {nextBand.name}
+                {nextBand.venue && <span className="text-white/75"> · {nextBand.venue}</span>}
+              </span>
+            </div>
+            <p className="hidden text-center font-bold leading-normal sm:block sm:text-sm md:text-base">
+              <span className="block">Coming up in {formatTimeUntil(minutesUntil)}:</span>
+              <span className="text-lg md:text-xl">{nextBand.name}</span>
+              {nextBand.venue && <span className="block text-sm md:text-base">{nextBand.venue}</span>}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,13 +1,6 @@
+import { Lightbulb } from 'lucide-react'
 import PropTypes from 'prop-types'
 import { Card } from './ui'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faLightbulb } from '@fortawesome/free-solid-svg-icons'
-import DOMPurify from 'dompurify'
-
-const stripHtml = value => {
-  if (!value) return ''
-  return DOMPurify.sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).replace(/\s+/g, ' ').trim()
-}
 
 function buildFacts(band = {}, stats = {}) {
   const facts = []
@@ -38,13 +31,6 @@ function buildFacts(band = {}, stats = {}) {
     facts.push(`Most played venue: ${stats.signature_venue.name}.`)
   }
 
-  if (!facts.length && band.description) {
-    const plainDescription = stripHtml(band.description)
-    if (plainDescription) {
-      facts.push(plainDescription)
-    }
-  }
-
   if (!facts.length) {
     return []
   }
@@ -62,7 +48,7 @@ export default function BandFacts({ band, stats }) {
   return (
     <Card variant="elevated">
       <h3 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
-        <FontAwesomeIcon icon={faLightbulb} className="text-accent-500" />
+        <Lightbulb size={18} className="text-accent-500" />
         Fast Facts
       </h3>
       <ul className="space-y-2">

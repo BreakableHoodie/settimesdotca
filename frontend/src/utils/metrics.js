@@ -1,6 +1,6 @@
 // Privacy-first metrics collector
 // Uses Beacon API for non-blocking sends
-/* global crypto */
+/* global crypto, Blob */
 
 const METRICS_ENDPOINT = '/api/metrics'
 const BATCH_INTERVAL = 5000
@@ -11,6 +11,7 @@ const ALLOWED_EVENTS = new Set([
   'event_view',
   'artist_profile_view',
   'social_link_click',
+  'ticket_click',
   'share_event',
   'filter_use',
 ])
@@ -77,7 +78,8 @@ function flushEvents() {
   const payload = JSON.stringify({ events })
 
   if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-    navigator.sendBeacon(METRICS_ENDPOINT, payload)
+    const blob = new Blob([payload], { type: 'application/json' })
+    navigator.sendBeacon(METRICS_ENDPOINT, blob)
     return
   }
 
@@ -102,3 +104,4 @@ export const trackEventView = eventId => trackEvent('event_view', { event_id: ev
 export const trackArtistView = bandProfileId => trackEvent('artist_profile_view', { band_profile_id: bandProfileId })
 export const trackSocialClick = (bandProfileId, linkType) =>
   trackEvent('social_link_click', { band_profile_id: bandProfileId, link_type: linkType })
+export const trackTicketClick = eventId => trackEvent('ticket_click', { event_id: eventId })

@@ -1,80 +1,107 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { onRequestPost } from '../subscribe.js'
-import { MockD1Database } from './mocks/d1.js'
-import { createMockRequest, createMockContext, VALID_SUBSCRIPTION, INVALID_PAYLOADS } from './helpers.js'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { onRequestPost } from '../subscribe.js';
+import { MockD1Database } from './mocks/d1.js';
+import {
+  createMockRequest,
+  createMockContext,
+  VALID_SUBSCRIPTION,
+  INVALID_PAYLOADS,
+} from './helpers.js';
 
 describe('POST /api/subscriptions/subscribe', () => {
-  let mockDB
-  let mockContext
+  let mockDB;
+  let mockContext;
 
   beforeEach(() => {
     // Reset mocks before each test
-    mockDB = new MockD1Database()
-    mockContext = createMockContext(mockDB)
-    
+    mockDB = new MockD1Database();
+    mockContext = createMockContext(mockDB);
+
     // Mock console.log and info to suppress logs
-    vi.spyOn(console, 'log').mockImplementation(() => {})
-    vi.spyOn(console, 'info').mockImplementation(() => {})
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-  })
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
 
   afterEach(() => {
-    vi.restoreAllMocks()
-  })
+    vi.restoreAllMocks();
+  });
 
   it('should create new subscription successfully', async () => {
-    const request = createMockRequest('POST', '/api/subscriptions/subscribe', VALID_SUBSCRIPTION)
-    mockContext.request = request
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      VALID_SUBSCRIPTION
+    );
+    mockContext.request = request;
 
-    const response = await onRequestPost(mockContext)
+    const response = await onRequestPost(mockContext);
 
-    expect(response.status).toBe(201)
-    const data = await response.json()
-    expect(data.message).toContain('Subscription created')
-    
-    expect(mockDB.data.email_subscriptions).toHaveLength(1)
+    expect(response.status).toBe(201);
+    const data = await response.json();
+    expect(data.message).toContain('Subscription created');
+    // When email is not configured the response includes a verificationUrl
+    // so developers/local environments can complete verification without email
+    expect(data.verificationUrl).toMatch(
+      /^https:\/\/example\.com\/verify\?token=/
+    );
+
+    expect(mockDB.data.email_subscriptions).toHaveLength(1);
     expect(mockDB.data.email_subscriptions[0]).toMatchObject({
       email: 'test@example.com',
       city: 'portland',
       genre: 'punk',
       frequency: 'weekly',
-      verified: false
-    })
-  })
+      verified: false,
+    });
+  });
 
   it('should reject request with missing email', async () => {
-    const request = createMockRequest('POST', '/api/subscriptions/subscribe', INVALID_PAYLOADS.missingEmail)
-    mockContext.request = request
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      INVALID_PAYLOADS.missingEmail
+    );
+    mockContext.request = request;
 
-    const response = await onRequestPost(mockContext)
+    const response = await onRequestPost(mockContext);
 
-    expect(response.status).toBe(400)
-    const data = await response.json()
-    expect(data.error).toBe('Invalid email address')
-    expect(mockDB.data.email_subscriptions).toHaveLength(0)
-  })
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe('Invalid email address');
+    expect(mockDB.data.email_subscriptions).toHaveLength(0);
+  });
 
   it('should reject request with invalid email format', async () => {
-    const request = createMockRequest('POST', '/api/subscriptions/subscribe', INVALID_PAYLOADS.invalidEmail)
-    mockContext.request = request
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      INVALID_PAYLOADS.invalidEmail
+    );
+    mockContext.request = request;
 
-    const response = await onRequestPost(mockContext)
+    const response = await onRequestPost(mockContext);
 
-    expect(response.status).toBe(400)
-    const data = await response.json()
-    expect(data.error).toBe('Invalid email address')
-  })
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe('Invalid email address');
+  });
 
   it('should reject request with missing city', async () => {
-    const request = createMockRequest('POST', '/api/subscriptions/subscribe', INVALID_PAYLOADS.missingCity)
-    mockContext.request = request
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      INVALID_PAYLOADS.missingCity
+    );
+    mockContext.request = request;
 
-    const response = await onRequestPost(mockContext)
+    const response = await onRequestPost(mockContext);
 
-    expect(response.status).toBe(400)
-    const data = await response.json()
-    expect(data.error).toBe('Missing required fields')
-  })
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe('Missing required fields');
+  });
 
   it('should reject duplicate verified subscription', async () => {
     // Pre-populate with verified subscription
@@ -87,19 +114,23 @@ describe('POST /api/subscriptions/subscribe', () => {
       verified: true,
       verification_token: 'existing-token-12345',
       unsubscribe_token: 'existing-unsub-token-67890',
-      created_at: new Date().toISOString()
-    })
+      created_at: new Date().toISOString(),
+    });
 
-    const request = createMockRequest('POST', '/api/subscriptions/subscribe', VALID_SUBSCRIPTION)
-    mockContext.request = request
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      VALID_SUBSCRIPTION
+    );
+    mockContext.request = request;
 
-    const response = await onRequestPost(mockContext)
+    const response = await onRequestPost(mockContext);
 
-    expect(response.status).toBe(400)
-    const data = await response.json()
-    expect(data.error).toContain('already subscribed')
-    expect(mockDB.data.email_subscriptions).toHaveLength(1)
-  })
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain('already subscribed');
+    expect(mockDB.data.email_subscriptions).toHaveLength(1);
+  });
 
   it('should resend verification email for unverified subscription', async () => {
     // Pre-populate with unverified subscription
@@ -112,57 +143,73 @@ describe('POST /api/subscriptions/subscribe', () => {
       verified: false,
       verification_token: 'existing-token-12345',
       unsubscribe_token: 'existing-unsub-token-67890',
-      created_at: new Date().toISOString()
-    })
+      created_at: new Date().toISOString(),
+    });
 
-    const request = createMockRequest('POST', '/api/subscriptions/subscribe', VALID_SUBSCRIPTION)
-    mockContext.request = request
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      VALID_SUBSCRIPTION
+    );
+    mockContext.request = request;
 
-    const response = await onRequestPost(mockContext)
+    const response = await onRequestPost(mockContext);
 
-    expect(response.status).toBe(200)
-    const data = await response.json()
-    expect(data.message).toContain('Verification email sent')
-    expect(mockDB.data.email_subscriptions).toHaveLength(1)
-    // Note: The actual implementation has a bug - it doesn't select verification_token in the query,
-    // so the token will be undefined in the email URL. This test validates current behavior.
-    expect(console.info).toHaveBeenCalled()
-  })
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    // When email is not configured, the response is explicit about it and
+    // includes the verificationUrl instead of falsely claiming email was sent
+    expect(data.message).toContain('not configured');
+    expect(data.verificationUrl).toMatch(
+      /^https:\/\/example\.com\/verify\?token=existing-token-12345$/
+    );
+    expect(mockDB.data.email_subscriptions).toHaveLength(1);
+  });
 
   it('should generate unique verification and unsubscribe tokens', async () => {
-    const request = createMockRequest('POST', '/api/subscriptions/subscribe', VALID_SUBSCRIPTION)
-    mockContext.request = request
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      VALID_SUBSCRIPTION
+    );
+    mockContext.request = request;
 
-    await onRequestPost(mockContext)
+    await onRequestPost(mockContext);
 
-    const subscription = mockDB.data.email_subscriptions[0]
-    expect(subscription.verification_token).toMatch(/^[0-9a-f]{64}$/)
-    expect(subscription.unsubscribe_token).toMatch(/^[0-9a-f]{64}$/)
-    expect(subscription.verification_token).not.toBe(subscription.unsubscribe_token)
-  })
+    const subscription = mockDB.data.email_subscriptions[0];
+    expect(subscription.verification_token).toMatch(/^[0-9a-f]{64}$/);
+    expect(subscription.unsubscribe_token).toMatch(/^[0-9a-f]{64}$/);
+    expect(subscription.verification_token).not.toBe(
+      subscription.unsubscribe_token
+    );
+  });
 
   it('should handle database errors gracefully', async () => {
     // Mock database to throw error
     mockDB.prepare = () => ({
       bind: () => ({
         run: async () => {
-          throw new Error('Database connection failed')
+          throw new Error('Database connection failed');
         },
         all: async () => {
-          throw new Error('Database connection failed')
-        }
-      })
-    })
+          throw new Error('Database connection failed');
+        },
+      }),
+    });
 
-    const request = createMockRequest('POST', '/api/subscriptions/subscribe', VALID_SUBSCRIPTION)
-    mockContext.request = request
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      VALID_SUBSCRIPTION
+    );
+    mockContext.request = request;
 
-    const response = await onRequestPost(mockContext)
+    const response = await onRequestPost(mockContext);
 
-    expect(response.status).toBe(500)
-    const data = await response.json()
-    expect(data.error).toBe('Subscription failed')
-  })
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe('Subscription failed');
+  });
 
   it('should allow same email for different city/genre combinations', async () => {
     // First subscription
@@ -170,49 +217,69 @@ describe('POST /api/subscriptions/subscribe', () => {
       email: 'test@example.com',
       city: 'portland',
       genre: 'punk',
-      frequency: 'weekly'
-    })
-    mockContext.request = request1
+      frequency: 'weekly',
+    });
+    mockContext.request = request1;
 
-    const response1 = await onRequestPost(mockContext)
+    const response1 = await onRequestPost(mockContext);
 
     // Second subscription (different city)
     const request2 = createMockRequest('POST', '/api/subscriptions/subscribe', {
       email: 'test@example.com',
       city: 'seattle',
       genre: 'punk',
-      frequency: 'weekly'
-    })
-    mockContext.request = request2
+      frequency: 'weekly',
+    });
+    mockContext.request = request2;
 
-    const response2 = await onRequestPost(mockContext)
+    const response2 = await onRequestPost(mockContext);
 
-    expect(response1.status).toBe(201)
-    expect(response2.status).toBe(201)
-    expect(mockDB.data.email_subscriptions).toHaveLength(2)
-    expect(mockDB.data.email_subscriptions[0].city).toBe('portland')
-    expect(mockDB.data.email_subscriptions[1].city).toBe('seattle')
-  })
+    expect(response1.status).toBe(201);
+    expect(response2.status).toBe(201);
+    expect(mockDB.data.email_subscriptions).toHaveLength(2);
+    expect(mockDB.data.email_subscriptions[0].city).toBe('portland');
+    expect(mockDB.data.email_subscriptions[1].city).toBe('seattle');
+  });
 
   it('should accept all valid frequency values', async () => {
-    const frequencies = ['daily', 'weekly', 'monthly']
-    
-    for (const frequency of frequencies) {
-      const request = createMockRequest('POST', '/api/subscriptions/subscribe', {
-        email: `test-${frequency}@example.com`,
-        city: 'portland',
-        genre: 'punk',
-        frequency
-      })
-      mockContext.request = request
+    const frequencies = ['daily', 'weekly', 'monthly'];
 
-      const response = await onRequestPost(mockContext)
-      expect(response.status).toBe(201)
+    for (const frequency of frequencies) {
+      const request = createMockRequest(
+        'POST',
+        '/api/subscriptions/subscribe',
+        {
+          email: `test-${frequency}@example.com`,
+          city: 'portland',
+          genre: 'punk',
+          frequency,
+        }
+      );
+      mockContext.request = request;
+
+      const response = await onRequestPost(mockContext);
+      expect(response.status).toBe(201);
     }
 
-    expect(mockDB.data.email_subscriptions).toHaveLength(3)
-    expect(mockDB.data.email_subscriptions[0].frequency).toBe('daily')
-    expect(mockDB.data.email_subscriptions[1].frequency).toBe('weekly')
-    expect(mockDB.data.email_subscriptions[2].frequency).toBe('monthly')
-  })
-})
+    expect(mockDB.data.email_subscriptions).toHaveLength(3);
+    expect(mockDB.data.email_subscriptions[0].frequency).toBe('daily');
+    expect(mockDB.data.email_subscriptions[1].frequency).toBe('weekly');
+    expect(mockDB.data.email_subscriptions[2].frequency).toBe('monthly');
+  });
+
+  it('does not log verification links or subscriber emails when email is not configured', async () => {
+    const request = createMockRequest(
+      'POST',
+      '/api/subscriptions/subscribe',
+      VALID_SUBSCRIPTION
+    );
+    mockContext.request = request;
+
+    await onRequestPost(mockContext);
+
+    expect(console.info).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(
+      '[Subscribe] Email not configured; verification email was not sent.'
+    );
+  });
+});

@@ -32,29 +32,39 @@ export async function onRequestGet(context) {
       return new Response("Email already verified", { status: 200 });
     }
 
-    // Mark as verified
-    await env.DB.prepare(
+    // Mark as verified atomically to prevent token replay races
+    const verifyResult = await env.DB.prepare(
       `
       UPDATE email_subscriptions
       SET verified = 1
-      WHERE id = ?
+      WHERE verification_token = ?
+        AND verified = 0
     `,
     )
-      .bind(subscription.id)
+      .bind(token)
       .run();
 
-    // Log verification
-    await env.DB.prepare(
-      `
-      INSERT INTO subscription_verifications (subscription_id)
-      VALUES (?)
-    `,
-    )
-      .bind(subscription.id)
-      .run();
+    if (!verifyResult?.meta?.changes) {
+      return new Response("Email already verified", { status: 200 });
+    }
+
+    // Log verification (best effort; don't fail successful verifications)
+    try {
+      await env.DB.prepare(
+        `
+        INSERT INTO subscription_verifications (subscription_id)
+        VALUES (?)
+      `,
+      )
+        .bind(subscription.id)
+        .run();
+    } catch (auditError) {
+      console.error("Verification audit log failed:", auditError);
+    }
 
     // Redirect to success page
-    return Response.redirect(`${env.PUBLIC_URL}/subscribe?verified=true`, 302);
+    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    return Response.redirect(`${baseUrl}/subscribe?verified=true`, 302);
   } catch (error) {
     console.error("Verification error:", error);
     return new Response("Verification failed", { status: 500 });

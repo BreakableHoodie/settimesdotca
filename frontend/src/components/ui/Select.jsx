@@ -1,6 +1,5 @@
+import { ChevronDown } from 'lucide-react'
 import PropTypes from 'prop-types'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronDown } from '@fortawesome/free-solid-svg-icons'
 
 /**
  * Select Component - Design System v2.0
@@ -44,7 +43,7 @@ export default function Select({
     bg-white/5 border rounded-lg
     text-text-primary
     transition-colors duration-base
-    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
+    focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
     disabled:opacity-50 disabled:cursor-not-allowed
     appearance-none cursor-pointer
     ${
@@ -98,7 +97,7 @@ export default function Select({
 
         {/* Custom dropdown arrow */}
         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
-          <FontAwesomeIcon icon={faChevronDown} className="text-sm" />
+          <ChevronDown size={14} />
         </div>
       </div>
 

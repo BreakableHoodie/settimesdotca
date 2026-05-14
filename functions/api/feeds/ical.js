@@ -4,6 +4,14 @@
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 
+function sanitizeFilenamePart(value) {
+  return String(value || "all")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "all";
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const gate = getPublicDataGateResponse(env);
@@ -12,11 +20,10 @@ export async function onRequestGet(context) {
   }
   const url = new URL(request.url);
 
-  // Extract city from subdomain or path
-  const hostname = url.hostname;
-  const pathParts = url.pathname.split("/");
   const city = url.searchParams.get("city") || "all";
   const genre = url.searchParams.get("genre") || "all";
+  const safeCityForFilename = sanitizeFilenamePart(city);
+  const safeGenreForFilename = sanitizeFilenamePart(genre);
 
   try {
     // Get events
@@ -67,7 +74,7 @@ export async function onRequestGet(context) {
     return new Response(ical, {
       headers: {
         "Content-Type": "text/calendar; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${city}-${genre}.ics"`,
+        "Content-Disposition": `attachment; filename="${safeCityForFilename}-${safeGenreForFilename}.ics"`,
         "Cache-Control": "public, max-age=3600", // Cache for 1 hour
       },
     });
@@ -84,7 +91,7 @@ function generateICal(bands, city, genre) {
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Concert Schedule//EN",
-    `X-WR-CALNAME:${city} ${genre} Shows`,
+    `X-WR-CALNAME:${escapeIcal(`${city} ${genre} Shows`)}`,
     "X-WR-TIMEZONE:America/Los_Angeles",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
@@ -144,5 +151,5 @@ function escapeIcal(text) {
     .replace(/\\/g, "\\\\")
     .replace(/;/g, "\\;")
     .replace(/,/g, "\\,")
-    .replace(/\n/g, "\\n");
+    .replace(/\r\n|\r|\n/g, "\\n");
 }

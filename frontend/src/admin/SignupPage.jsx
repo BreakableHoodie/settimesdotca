@@ -3,6 +3,7 @@ import { authApi } from '../utils/adminApi'
 import PasswordStrength from '../components/PasswordStrength'
 import { FIELD_LIMITS, validatePasswordStrength } from '../utils/validation'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { safeExternalHref } from '../utils/urlSafety'
 
 export default function SignupPage() {
   const navigate = useNavigate()
@@ -120,8 +121,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-band-navy flex items-center justify-center p-4">
-      <div className="bg-band-purple rounded-lg shadow-lg p-8 max-w-md w-full">
+    <div className="min-h-screen bg-bg-navy flex items-center justify-center p-4">
+      <div className="bg-bg-purple rounded-lg shadow-lg p-8 max-w-md w-full">
         <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
         <p className="text-gray-400 mb-6">Create your SetTimes account</p>
 
@@ -129,10 +130,10 @@ export default function SignupPage() {
           <div className="bg-white/10 border border-white/20 rounded-lg p-4">
             <h2 className="text-lg font-semibold text-white mb-2">Check your email</h2>
             <p className="text-gray-300 text-sm mb-4">{activationInfo.message}</p>
-            {activationInfo.activationUrl && (
+            {safeExternalHref(activationInfo.activationUrl) !== '#' && (
               <div className="mb-4 text-sm text-gray-300 break-all">
                 Activation link:{' '}
-                <a href={activationInfo.activationUrl} className="text-band-orange hover:underline">
+                <a href={safeExternalHref(activationInfo.activationUrl)} className="text-accent-400 hover:underline">
                   {activationInfo.activationUrl}
                 </a>
               </div>
@@ -142,7 +143,7 @@ export default function SignupPage() {
               type="button"
               onClick={handleResend}
               disabled={resendStatus.loading}
-              className="w-full min-h-[44px] px-4 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors font-semibold"
+              className="w-full min-h-[44px] px-4 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 transition-colors font-semibold"
             >
               {resendStatus.loading ? 'Sending...' : 'Resend activation email'}
             </button>
@@ -173,7 +174,7 @@ export default function SignupPage() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="you@example.com"
                   required
                 />
@@ -191,7 +192,7 @@ export default function SignupPage() {
                   onChange={handleChange}
                   minLength={FIELD_LIMITS.password.min}
                   maxLength={FIELD_LIMITS.password.max}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder={`${FIELD_LIMITS.password.min}+ characters with upper/lower/number/symbol`}
                   required
                 />
@@ -210,7 +211,7 @@ export default function SignupPage() {
                   onChange={handleChange}
                   minLength={FIELD_LIMITS.password.min}
                   maxLength={FIELD_LIMITS.password.max}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   required
                 />
                 {passwordMismatch && <p className="mt-2 text-sm text-red-300">{passwordMismatch}</p>}
@@ -226,7 +227,7 @@ export default function SignupPage() {
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="First"
                   required
                 />
@@ -242,7 +243,7 @@ export default function SignupPage() {
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
-                  className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="Last"
                   required
                 />
@@ -257,7 +258,7 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={loading || !formData.inviteCode || Boolean(passwordMismatch)}
-                className="w-full min-h-[44px] px-4 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 transition-colors font-semibold"
+                className="w-full min-h-[44px] px-4 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 transition-colors font-semibold"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>
@@ -267,7 +268,7 @@ export default function SignupPage() {
 
         <p className="text-gray-400 text-sm mt-4 text-center">
           Already have an account?{' '}
-          <a href="/admin/login" className="text-band-orange hover:underline">
+          <a href="/admin/login" className="text-accent-400 hover:underline">
             Log in
           </a>
         </p>

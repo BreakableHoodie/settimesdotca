@@ -237,6 +237,58 @@ describe("Event API - handler integration", () => {
     expect(data.error).toBe("Validation error");
   });
 
+  it("create archived event requires admin role", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const body = {
+      name: "Historical Event",
+      slug: "historical-event",
+      date: "2025-01-01",
+      status: "archived",
+    };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(403);
+    const data = await res.json();
+    expect(data.error).toBe("Forbidden");
+  });
+
+  it("publish endpoint rejects archived events", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, {
+      name: "ArchivedEvent",
+      slug: "archived-event",
+      status: "archived",
+      is_published: 0,
+    });
+
+    const body = { publish: false };
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}/publish`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-test-role": "editor",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation error");
+  });
+
   it("PATCH cannot change slug", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
@@ -374,6 +426,7 @@ describe("Event API - handler integration", () => {
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+        body: JSON.stringify({ confirmCascade: true }),
       }
     );
 
@@ -398,6 +451,7 @@ describe("Event API - handler integration", () => {
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+        body: JSON.stringify({ confirmCascade: true }),
       }
     );
 
@@ -409,6 +463,30 @@ describe("Event API - handler integration", () => {
     // Check performance was removed by cascade
     const row = rawDb.prepare("SELECT * FROM performances WHERE id = ?").get(b.id);
     expect(row).toBeUndefined();
+  });
+
+  it("delete with attached performances requires explicit confirmation", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+
+    const ev = insertEvent(rawDb, {
+      name: "ConfirmDelete",
+      slug: "confirm-delete",
+    });
+    insertBand(rawDb, { name: "NeedsConfirm", event_id: ev.id });
+
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+      }
+    );
+
+    const res = await eventIdHandler.onRequestDelete({ request, env });
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error).toBe("Confirmation required");
+    expect(data.affectedPerformanceCount).toBe(1);
   });
 
   it("PATCH can update date and status to published", async () => {
@@ -438,4 +516,104 @@ describe("Event API - handler integration", () => {
     expect(data.event.date).toBe("2026-03-03");
     expect(data.event.status).toBe("published");
   });
-});
+
+  it("PATCH rejects archived status changes and requires archive endpoint", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "PatchArchive",
+      slug: "patch-archive",
+      date: "2026-02-02",
+    });
+
+    const body = { status: "archived" };
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-test-role": "editor",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation error");
+  });
+
+  it("publish endpoint rejects non-boolean publish field (string 'yes')", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "TypeCheckEvent", slug: "type-check-event" });
+    insertBand(rawDb, { name: "A Band", event_id: ev.id });
+
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}/publish`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        body: JSON.stringify({ publish: "yes" }),
+      }
+    );
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+  });
+
+  it("publish endpoint rejects non-boolean publish field (number 1)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "TypeCheckEvent2", slug: "type-check-event-2" });
+    insertBand(rawDb, { name: "A Band 2", event_id: ev.id });
+
+    const request = new Request(
+      `https://example.test/api/admin/events/${ev.id}/publish`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        body: JSON.stringify({ publish: 1 }),
+      }
+    );
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+  });
+})
+
+describe('Event duplication atomicity (P0-B2)', () => {
+  it('cleans up newly created event if performance copy fails', async () => {
+    const rawDb = createTestDB()
+    const env = { DB: createDBEnv(rawDb) }
+
+    const original = insertEvent(rawDb, { name: 'SourceEvent', slug: 'source-event' })
+    insertBand(rawDb, { name: 'BandA', event_id: original.id })
+
+    // Make the performances INSERT...SELECT throw after the event INSERT succeeds
+    const originalPrepare = env.DB.prepare.bind(env.DB)
+    env.DB.prepare = sql => {
+      if (sql.includes('INSERT INTO performances') && sql.includes('SELECT')) {
+        return { bind: () => ({ run: () => { throw new Error('simulated performances copy failure') } }) }
+      }
+      return originalPrepare(sql)
+    }
+
+    const request = new Request(
+      `https://example.test/api/admin/events/${original.id}/duplicate`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-test-role': 'editor' },
+        body: JSON.stringify({ name: 'Copy', date: '2027-01-01', slug: 'copy-event' }),
+      }
+    )
+
+    const res = await eventIdHandler.onRequestPost({ request, env })
+    expect(res.status).toBe(500)
+
+    // The new event must have been cleaned up — no orphan
+    const orphan = rawDb.prepare("SELECT id FROM events WHERE slug = 'copy-event'").get()
+    expect(orphan).toBeUndefined()
+  })
+})

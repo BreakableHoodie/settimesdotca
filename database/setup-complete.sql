@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   date TEXT NOT NULL,
+  end_date TEXT,
   slug TEXT NOT NULL UNIQUE,
   is_published INTEGER NOT NULL DEFAULT 0,
   status TEXT DEFAULT 'draft',
@@ -18,19 +19,33 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT,
   city TEXT,
   ticket_url TEXT,
+  venue_info TEXT,
+  social_links TEXT,
+  theme_colors TEXT,
+  reveal_mode INTEGER NOT NULL DEFAULT 0,
   created_by_user_id INTEGER,
   updated_by_user_id INTEGER,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Venues table
 CREATE TABLE IF NOT EXISTS venues (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   address TEXT,
+  address_line1 TEXT,
+  address_line2 TEXT,
   city TEXT,
+  region TEXT,
+  postal_code TEXT,
+  country TEXT,
   capacity INTEGER,
   website TEXT,
+  instagram TEXT,
+  facebook TEXT,
+  phone TEXT,
+  contact_email TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -53,33 +68,53 @@ CREATE TABLE IF NOT EXISTS bands (
   FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE SET NULL
 );
 
--- Performances table (for many-to-many relationships)
+-- Performances table (current schema plus legacy compatibility columns)
 CREATE TABLE IF NOT EXISTS performances (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id INTEGER NOT NULL,
-  band_id INTEGER,
-  band_name TEXT,
+  band_profile_id INTEGER NOT NULL,
   venue_id INTEGER,
   start_time TEXT,
   end_time TEXT,
+  notes TEXT,
+  band_id INTEGER,
+  band_name TEXT,
   stage TEXT,
+  is_announced INTEGER NOT NULL DEFAULT 1,
+  band_follow_notified INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_by_user_id INTEGER,
+  updated_by_user_id INTEGER,
+  updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE RESTRICT,
   FOREIGN KEY (band_id) REFERENCES bands(id) ON DELETE SET NULL,
-  FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE SET NULL
+  FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE SET NULL,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id),
+  FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
 );
 
--- Band profiles (persistent band info across events)
+-- Band profiles (current schema plus legacy compatibility columns)
 CREATE TABLE IF NOT EXISTS band_profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  band_name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  name_normalized TEXT NOT NULL UNIQUE,
+  description TEXT,
+  genre TEXT,
+  origin TEXT,
+  origin_city TEXT,
+  origin_region TEXT,
+  contact_email TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  social_links TEXT,
+  photo_url TEXT,
+  url TEXT,
+  band_name TEXT,
   bio TEXT,
   genres TEXT,
   hometown TEXT,
   formed_year INTEGER,
   website TEXT,
-  social_links TEXT,
-  photo_url TEXT,
   total_views INTEGER DEFAULT 0,
   total_social_clicks INTEGER DEFAULT 0,
   popularity_score REAL DEFAULT 0,
@@ -103,6 +138,17 @@ CREATE TABLE IF NOT EXISTS artist_daily_stats (
 
 CREATE INDEX IF NOT EXISTS idx_artist_stats_date ON artist_daily_stats(date);
 CREATE INDEX IF NOT EXISTS idx_artist_stats_band ON artist_daily_stats(band_profile_id);
+
+-- Page views (aggregated daily by path)
+CREATE TABLE IF NOT EXISTS page_views_daily (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  page TEXT NOT NULL,
+  date TEXT NOT NULL,
+  views INTEGER DEFAULT 0,
+  UNIQUE(page, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views_daily(date);
 
 -- ============================================
 -- AUTH TABLES
@@ -186,18 +232,25 @@ CREATE TABLE IF NOT EXISTS mfa_challenges (
 
 CREATE INDEX IF NOT EXISTS idx_mfa_challenges_token ON mfa_challenges(token);
 CREATE INDEX IF NOT EXISTS idx_mfa_challenges_user_id ON mfa_challenges(user_id);
+CREATE INDEX IF NOT EXISTS idx_mfa_challenges_expires_at ON mfa_challenges(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mfa_challenges_active_user
+  ON mfa_challenges(user_id)
+  WHERE used = 0;
 
 -- Invite codes
 CREATE TABLE IF NOT EXISTS invite_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT UNIQUE NOT NULL,
-  created_by INTEGER,
-  used_by INTEGER,
-  used_at TEXT,
-  expires_at TEXT,
+  code TEXT NOT NULL UNIQUE,
+  email TEXT,
+  role TEXT NOT NULL DEFAULT 'editor',
+  created_by_user_id INTEGER,
+  used_by_user_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (used_by) REFERENCES users(id) ON DELETE SET NULL
+  used_at TEXT,
+  expires_at TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (used_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ============================================
@@ -250,6 +303,7 @@ CREATE TABLE IF NOT EXISTS trusted_devices (
   user_id INTEGER NOT NULL,
   token TEXT UNIQUE NOT NULL,
   device_fingerprint TEXT,           -- Hash of IP + User-Agent for validation
+  ua_hash TEXT,                      -- Hash of User-Agent alone for independent validation
   ip_address TEXT,
   user_agent TEXT,
   expires_at TEXT NOT NULL,
@@ -296,6 +350,19 @@ CREATE TABLE IF NOT EXISTS rate_limit (
   last_attempt TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS band_follows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  band_profile_id INTEGER NOT NULL REFERENCES band_profiles(id) ON DELETE CASCADE,
+  verified INTEGER NOT NULL DEFAULT 0,
+  verification_token TEXT UNIQUE,
+  unsubscribe_token TEXT UNIQUE NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(email, band_profile_id)
+);
+CREATE INDEX IF NOT EXISTS idx_band_follows_band ON band_follows(band_profile_id);
+CREATE INDEX IF NOT EXISTS idx_band_follows_email ON band_follows(email);
+
 -- ============================================
 -- INDEXES
 -- ============================================
@@ -306,7 +373,12 @@ CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 CREATE INDEX IF NOT EXISTS idx_bands_event ON bands(event_id);
 CREATE INDEX IF NOT EXISTS idx_bands_venue ON bands(venue_id);
 CREATE INDEX IF NOT EXISTS idx_performances_event ON performances(event_id);
+CREATE INDEX IF NOT EXISTS idx_performances_band ON performances(band_profile_id);
 CREATE INDEX IF NOT EXISTS idx_performances_venue ON performances(venue_id);
+CREATE INDEX IF NOT EXISTS idx_performances_event_time ON performances(event_id, start_time);
+CREATE INDEX IF NOT EXISTS idx_band_profiles_name ON band_profiles(name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_band_profiles_normalized ON band_profiles(name_normalized);
+CREATE INDEX IF NOT EXISTS idx_band_profiles_genre ON band_profiles(genre);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_activation_token ON users(activation_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
@@ -316,6 +388,29 @@ CREATE INDEX IF NOT EXISTS idx_auth_attempts_ip ON auth_attempts(ip_address);
 CREATE INDEX IF NOT EXISTS idx_auth_audit_timestamp ON auth_audit(timestamp);
 CREATE INDEX IF NOT EXISTS idx_auth_audit_ip ON auth_audit(ip_address);
 CREATE INDEX IF NOT EXISTS idx_rate_limit_ip ON rate_limit(ip_address);
+
+-- Globally-consistent fixed-window rate limit counters (D1-backed, for auth/subscription endpoints)
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 0,
+  window_start INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_updated_at ON rate_limits (updated_at);
+
+-- Schedule share link snapshots (server-side /s/[slug] sharing)
+CREATE TABLE IF NOT EXISTS share_links (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug            TEXT    NOT NULL UNIQUE,
+  event_id        INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  event_slug      TEXT    NOT NULL,
+  performance_ids TEXT    NOT NULL,
+  band_names      TEXT    NOT NULL,
+  created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+  expires_at      TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_share_links_slug ON share_links(slug);
+CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
 
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)

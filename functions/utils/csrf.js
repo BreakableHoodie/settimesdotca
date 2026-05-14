@@ -2,6 +2,7 @@
 // Uses csrf-csrf double-submit cookie strategy
 
 import { doubleCsrf } from "csrf-csrf";
+import { isDevRequest } from "./auth.js";
 function parseCookies(cookieHeader) {
   if (!cookieHeader) return {};
   return cookieHeader.split(";").reduce((acc, cookie) => {
@@ -11,12 +12,6 @@ function parseCookies(cookieHeader) {
     }
     return acc;
   }, {});
-}
-
-function isDevRequest(request) {
-  if (!request) return false;
-  const origin = request.headers.get("Origin") || "";
-  return origin.includes("localhost") || (request.url || "").includes("localhost");
 }
 
 function getHeaderToken(request) {
@@ -33,7 +28,7 @@ function resolveCsrfSecret(env, request) {
   }
 
   // Check if this is local development
-  const isLocal = request && isDevRequest(request);
+  const isLocal = request && isDevRequest(request, env);
   if (isLocal) {
     console.warn("[CSRF] Using fallback secret for local development. Set CSRF_SECRET for production.");
     return LOCAL_DEV_CSRF_SECRET;
@@ -47,16 +42,18 @@ function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
   if (sessionIdentifierOverride) {
     return sessionIdentifierOverride;
   }
+  // Check __Host- prefixed name (production) then plain name (dev).
   return (
+    cookies["__Host-session_token"] ||
     cookies.session_token ||
     request.headers.get("Authorization")?.replace("Bearer ", "") ||
-    request.headers.get("CF-Connecting-IP") ||
-    "anonymous"
+    cookies.csrf_token ||
+    "csrf-missing-session"
   );
 }
 
-export function getCookieConfig(request) {
-  const isDev = isDevRequest(request);
+export function getCookieConfig(request, env = null) {
+  const isDev = isDevRequest(request, env);
   return {
     httpOnly: false,
     secure: !isDev,
@@ -107,7 +104,7 @@ export function generateCSRFToken(request, env, sessionIdentifierOverride = null
     cookie: () => {},
   };
   return csrf.generateCsrfToken(req, res, {
-    cookieOptions: getCookieConfig(request),
+    cookieOptions: getCookieConfig(request, env),
     overwrite: true,
   });
 }
@@ -141,16 +138,16 @@ function serializeCookie(name, value, options) {
   return parts.join("; ");
 }
 
-export function setCSRFCookie(token, request = null) {
-  const options = getCookieConfig(request);
+export function setCSRFCookie(token, request = null, env = null) {
+  const options = getCookieConfig(request, env);
   return serializeCookie("csrf_token", token, {
     ...options,
     httpOnly: false,
   });
 }
 
-export function deleteCSRFCookie(request = null) {
-  const options = getCookieConfig(request);
+export function deleteCSRFCookie(request = null, env = null) {
+  const options = getCookieConfig(request, env);
   const secure = options.secure ? "Secure; " : "";
   const sameSite =
     options.sameSite === "none" ? "None" : options.sameSite === "lax" ? "Lax" : "Strict";
@@ -167,6 +164,12 @@ export function validateCSRFToken(request, env = null) {
   }
 }
 
+function isSameOriginMutation(request) {
+  const originHeader = request.headers.get("Origin");
+  if (!originHeader) return false;
+  return originHeader === new URL(request.url).origin;
+}
+
 export function validateCSRFMiddleware(request, env = null) {
   const method = request.method.toUpperCase();
   if (!["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
@@ -174,7 +177,42 @@ export function validateCSRFMiddleware(request, env = null) {
   }
 
   const url = new URL(request.url);
+
+  // Logout is an authenticated endpoint: the user always has both a session cookie
+  // and a CSRF cookie set, so the full double-submit token check can be enforced.
+  // The frontend sends X-CSRF-Token on every request via getHeaders(), so this
+  // requires no frontend changes.
+  if (url.pathname === "/api/admin/auth/logout") {
+    if (!validateCSRFToken(request, env)) {
+      const csrfToken = generateCSRFToken(request, env);
+      const headers = new Headers({ "Content-Type": "application/json" });
+      headers.append("Set-Cookie", setCSRFCookie(csrfToken, request, env));
+      return new Response(
+        JSON.stringify({
+          error: "CSRF validation failed",
+          message: "Invalid or missing CSRF token",
+        }),
+        { status: 403, headers }
+      );
+    }
+    return null;
+  }
+
+  // Other auth-route mutations (login, signup, MFA verify) have no session yet,
+  // so no CSRF cookie exists to validate against. Enforce same-origin only.
   if (url.pathname.includes("/api/admin/auth/")) {
+    if (!isSameOriginMutation(request)) {
+      return new Response(
+        JSON.stringify({
+          error: "Origin validation failed",
+          message: "Cross-site authentication requests are not allowed",
+        }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
     return null;
   }
 

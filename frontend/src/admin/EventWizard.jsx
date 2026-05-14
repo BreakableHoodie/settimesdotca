@@ -1,8 +1,25 @@
-import { useState } from 'react'
-import { eventsApi, venuesApi, bandsApi } from '../utils/adminApi'
+import { useEffect, useState } from 'react'
+import { eventsApi } from '../utils/adminApi'
 import { formatTimeRange } from '../utils/timeFormat'
 
 const STEPS = ['basics', 'venues', 'bands', 'publish']
+const DEFAULT_EVENT_DATA = {
+  name: '',
+  date: '',
+  slug: '',
+  description: '',
+  venues: [],
+  bands: [],
+}
+
+function normalizeEventData(initialEventData) {
+  return {
+    ...DEFAULT_EVENT_DATA,
+    ...initialEventData,
+    venues: Array.isArray(initialEventData?.venues) ? initialEventData.venues : [],
+    bands: Array.isArray(initialEventData?.bands) ? initialEventData.bands : [],
+  }
+}
 
 // Step 1: Event Basics
 function BasicsStep({ eventData, onChange }) {
@@ -39,7 +56,7 @@ function BasicsStep({ eventData, onChange }) {
           type="text"
           value={eventData.name}
           onChange={e => handleNameChange(e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           placeholder="Long Weekend Band Crawl Vol. 6"
           required
         />
@@ -54,7 +71,7 @@ function BasicsStep({ eventData, onChange }) {
           type="date"
           value={eventData.date}
           onChange={e => handleChange('date', e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           required
         />
       </div>
@@ -68,7 +85,7 @@ function BasicsStep({ eventData, onChange }) {
           type="text"
           value={eventData.slug}
           onChange={e => handleChange('slug', e.target.value)}
-          className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           placeholder="vol-6"
           required
         />
@@ -83,7 +100,7 @@ function BasicsStep({ eventData, onChange }) {
           id="event-description"
           value={eventData.description}
           onChange={e => handleChange('description', e.target.value)}
-          className="w-full min-h-[96px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+          className="w-full min-h-[96px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           rows={3}
           placeholder="Describe your event..."
         />
@@ -93,9 +110,9 @@ function BasicsStep({ eventData, onChange }) {
 }
 
 // Step 2: Venues
-function VenuesStep({ eventData: _eventData, onChange }) {
-  const [venues, setVenues] = useState([])
+function VenuesStep({ eventData, onChange }) {
   const [newVenue, setNewVenue] = useState({ name: '', address: '' })
+  const venues = Array.isArray(eventData?.venues) ? eventData.venues : []
 
   const handleAddVenue = () => {
     if (!newVenue.name.trim()) return
@@ -106,7 +123,6 @@ function VenuesStep({ eventData: _eventData, onChange }) {
       address: newVenue.address.trim(),
     }
 
-    setVenues(prev => [...prev, venue])
     onChange(prev => ({
       ...prev,
       venues: [...prev.venues, venue],
@@ -115,7 +131,6 @@ function VenuesStep({ eventData: _eventData, onChange }) {
   }
 
   const handleRemoveVenue = venueId => {
-    setVenues(prev => prev.filter(v => v.id !== venueId))
     onChange(prev => ({
       ...prev,
       venues: prev.venues.filter(v => v.id !== venueId),
@@ -128,7 +143,7 @@ function VenuesStep({ eventData: _eventData, onChange }) {
 
       <div className="space-y-3">
         {venues.map(venue => (
-          <div key={venue.id} className="bg-band-navy rounded p-3 flex justify-between items-center">
+          <div key={venue.id} className="bg-bg-navy rounded p-3 flex justify-between items-center">
             <div>
               <div className="text-white font-medium">{venue.name}</div>
               {venue.address && <div className="text-gray-400 text-sm">{venue.address}</div>}
@@ -147,20 +162,20 @@ function VenuesStep({ eventData: _eventData, onChange }) {
             type="text"
             value={newVenue.name}
             onChange={e => setNewVenue(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             placeholder="Venue name"
           />
           <input
             type="text"
             value={newVenue.address}
             onChange={e => setNewVenue(prev => ({ ...prev, address: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             placeholder="Address (optional)"
           />
           <button
             type="button"
             onClick={handleAddVenue}
-            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
+            className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600"
           >
             Add Venue
           </button>
@@ -172,7 +187,6 @@ function VenuesStep({ eventData: _eventData, onChange }) {
 
 // Step 3: Bands
 function BandsStep({ eventData, onChange }) {
-  const [bands, setBands] = useState([])
   const [newBand, setNewBand] = useState({
     name: '',
     venueId: '',
@@ -180,6 +194,7 @@ function BandsStep({ eventData, onChange }) {
     endTime: '',
     url: '',
   })
+  const bands = Array.isArray(eventData?.bands) ? eventData.bands : []
 
   const handleAddBand = () => {
     if (!newBand.name.trim() || !newBand.venueId || !newBand.startTime || !newBand.endTime) return
@@ -193,7 +208,6 @@ function BandsStep({ eventData, onChange }) {
       url: newBand.url.trim(),
     }
 
-    setBands(prev => [...prev, band])
     onChange(prev => ({
       ...prev,
       bands: [...prev.bands, band],
@@ -208,7 +222,6 @@ function BandsStep({ eventData, onChange }) {
   }
 
   const handleRemoveBand = bandId => {
-    setBands(prev => prev.filter(b => b.id !== bandId))
     onChange(prev => ({
       ...prev,
       bands: prev.bands.filter(b => b.id !== bandId),
@@ -223,7 +236,7 @@ function BandsStep({ eventData, onChange }) {
         {bands.map(band => {
           const venue = eventData.venues.find(v => v.id === band.venueId)
           return (
-            <div key={band.id} className="bg-band-navy rounded p-3 flex justify-between items-center">
+            <div key={band.id} className="bg-bg-navy rounded p-3 flex justify-between items-center">
               <div>
                 <div className="text-white font-medium">{band.name}</div>
                 <div className="text-gray-400 text-sm">
@@ -245,14 +258,14 @@ function BandsStep({ eventData, onChange }) {
             type="text"
             value={newBand.name}
             onChange={e => setNewBand(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             placeholder="Band name"
           />
 
           <select
             value={newBand.venueId}
             onChange={e => setNewBand(prev => ({ ...prev, venueId: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           >
             <option value="">Select venue</option>
             {eventData.venues.map(venue => (
@@ -267,14 +280,14 @@ function BandsStep({ eventData, onChange }) {
               type="time"
               value={newBand.startTime}
               onChange={e => setNewBand(prev => ({ ...prev, startTime: e.target.value }))}
-              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
               placeholder="Start time"
             />
             <input
               type="time"
               value={newBand.endTime}
               onChange={e => setNewBand(prev => ({ ...prev, endTime: e.target.value }))}
-              className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+              className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
               placeholder="End time"
             />
           </div>
@@ -283,14 +296,14 @@ function BandsStep({ eventData, onChange }) {
             type="url"
             value={newBand.url}
             onChange={e => setNewBand(prev => ({ ...prev, url: e.target.value }))}
-            className="w-full min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+            className="w-full min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
             placeholder="Band website/social media (optional)"
           />
 
           <button
             type="button"
             onClick={handleAddBand}
-            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600"
+            className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600"
           >
             Add Band
           </button>
@@ -306,7 +319,7 @@ function PublishStep({ eventData }) {
     <div className="space-y-4">
       <h3 className="text-xl font-bold text-white mb-4">Review & Publish</h3>
 
-      <div className="bg-band-navy rounded p-4 space-y-3">
+      <div className="bg-bg-navy rounded p-4 space-y-3">
         <div>
           <span className="text-gray-400 text-sm">Event Name:</span>
           <div className="text-white font-medium">{eventData.name}</div>
@@ -342,17 +355,18 @@ function PublishStep({ eventData }) {
   )
 }
 
-export default function EventWizard({ onComplete, onCancel }) {
-  const [currentStep, setCurrentStep] = useState(0)
-  const [eventData, setEventData] = useState({
-    name: '',
-    date: '',
-    slug: '',
-    description: '',
-    venues: [],
-    bands: [],
-  })
+export default function EventWizard({ onComplete, onCancel, initialEventData, initialStep = 0, onDraftChange }) {
+  const [currentStep, setCurrentStep] = useState(() => initialStep)
+  const [eventData, setEventData] = useState(() => normalizeEventData(initialEventData))
   const [loading, setLoading] = useState(false)
+  const [publishError, setPublishError] = useState(null)
+
+  useEffect(() => {
+    onDraftChange?.({
+      currentStep,
+      eventData,
+    })
+  }, [currentStep, eventData, onDraftChange])
 
   const stepComponents = {
     basics: <BasicsStep eventData={eventData} onChange={setEventData} />,
@@ -375,41 +389,43 @@ export default function EventWizard({ onComplete, onCancel }) {
 
   const handlePublish = async () => {
     setLoading(true)
+    setPublishError(null)
+
+    // Map temp local venue IDs to 0-based indices for the wizard endpoint
+    const venueIndexMap = Object.fromEntries(eventData.venues.map((v, i) => [v.id, i]))
+
+    // Pre-flight: detect bands referencing a venue that was removed before publishing
+    const staleBand = eventData.bands.find(b => venueIndexMap[b.venueId] === undefined)
+    if (staleBand) {
+      setPublishError(
+        `Band "${staleBand.name}" references a venue that was removed. Please go back and fix the band's venue assignment.`
+      )
+      setLoading(false)
+      return
+    }
 
     try {
-      // Create event
-      const event = await eventsApi.create({
-        name: eventData.name,
-        date: eventData.date,
-        slug: eventData.slug,
-        description: eventData.description,
+      const { event } = await eventsApi.createWizard({
+        event: {
+          name: eventData.name,
+          date: eventData.date,
+          slug: eventData.slug,
+          description: eventData.description,
+        },
+        venues: eventData.venues.map(v => ({ name: v.name, address: v.address })),
+        bands: eventData.bands.map(b => ({
+          name: b.name,
+          venueIndex: venueIndexMap[b.venueId],
+          startTime: b.startTime,
+          endTime: b.endTime,
+          url: b.url,
+        })),
       })
-
-      // Create venues
-      for (const venue of eventData.venues) {
-        await venuesApi.create({
-          name: venue.name,
-          address: venue.address,
-          event_id: event.id,
-        })
-      }
-
-      // Create bands
-      for (const band of eventData.bands) {
-        await bandsApi.create({
-          name: band.name,
-          venue_id: band.venueId,
-          start_time: band.startTime,
-          end_time: band.endTime,
-          url: band.url,
-          event_id: event.id,
-        })
-      }
 
       onComplete(event)
     } catch (error) {
       console.error('Failed to create event:', error)
-      alert('Failed to create event. Please try again.')
+      setPublishError(error?.message || 'Failed to create event. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -429,18 +445,14 @@ export default function EventWizard({ onComplete, onCancel }) {
   }
 
   return (
-    <div className="bg-band-purple rounded-lg p-6">
+    <div className="bg-bg-purple rounded-lg p-6">
       {/* Progress indicator */}
       <div className="flex justify-between mb-8">
         {STEPS.map((step, idx) => (
           <div
             key={step}
             className={`flex-1 text-center ${
-              idx === currentStep
-                ? 'text-band-orange font-bold'
-                : idx < currentStep
-                  ? 'text-green-400'
-                  : 'text-gray-500'
+              idx === currentStep ? 'text-accent-400 font-bold' : idx < currentStep ? 'text-green-400' : 'text-gray-500'
             }`}
           >
             <div className="text-sm capitalize">{step}</div>
@@ -450,6 +462,12 @@ export default function EventWizard({ onComplete, onCancel }) {
 
       {/* Current step content */}
       <div className="mb-6">{stepComponents[STEPS[currentStep]]}</div>
+
+      {publishError && (
+        <div role="alert" className="mb-4 bg-red-900/50 border border-red-600 text-red-200 p-3 rounded text-sm">
+          {publishError}
+        </div>
+      )}
 
       {/* Navigation buttons */}
       <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
@@ -464,7 +482,7 @@ export default function EventWizard({ onComplete, onCancel }) {
           <button
             onClick={handleNext}
             disabled={!canProceed()}
-            className="min-h-[44px] px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50"
+            className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50"
           >
             Next
           </button>

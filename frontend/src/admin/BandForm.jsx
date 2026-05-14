@@ -2,8 +2,8 @@ import PropTypes from 'prop-types'
 import PhotoUpload from './components/PhotoUpload'
 import RichTextEditor from './components/RichTextEditor'
 import { Input, Button, Tooltip } from '../components/ui'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
+import Combobox from '../components/ui/Combobox'
+import { Info } from 'lucide-react'
 import { FIELD_LIMITS } from '../utils/validation'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 
@@ -122,7 +122,7 @@ export default function BandForm({
             {selectedProfile.photo_url ? (
               <img src={selectedProfile.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-band-orange/20 flex items-center justify-center text-band-orange text-xl font-bold">
+              <div className="w-16 h-16 rounded-full bg-accent-500/20 flex items-center justify-center text-accent-400 text-xl font-bold">
                 {selectedProfile.name.charAt(0)}
               </div>
             )}
@@ -131,7 +131,7 @@ export default function BandForm({
               <div className="text-white/60 text-sm">
                 {[selectedProfile.origin, selectedProfile.genre].filter(Boolean).join(' • ')}
               </div>
-              <div className="text-band-orange text-xs mt-1">Adding to lineup</div>
+              <div className="text-accent-400 text-xs mt-1">Adding to lineup</div>
             </div>
           </div>
         ) : (
@@ -142,7 +142,7 @@ export default function BandForm({
               </label>
 
               <Tooltip content="Full name of the band or artist as it should appear publicly">
-                <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+                <Info size={14} className="text-text-tertiary cursor-help" />
               </Tooltip>
             </div>
             <Input
@@ -171,47 +171,33 @@ export default function BandForm({
                   Origin <span className="text-text-tertiary text-xs">(optional)</span>
                 </legend>
                 <Tooltip content="Where the band/artist is from (city and province/state)">
-                  <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+                  <Info size={14} className="text-text-tertiary cursor-help" />
                 </Tooltip>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Input
+                  <Combobox
                     id="band-origin-city"
-                    type="text"
                     name="origin_city"
                     value={formData.origin_city || ''}
                     onChange={onChange}
+                    options={mergedOriginCitySuggestions}
                     maxLength={FIELD_LIMITS.bandOriginCity.max}
                     placeholder="City"
-                    list="band-origin-city-list"
-                    fullWidth
                   />
                 </div>
                 <div>
-                  <Input
+                  <Combobox
                     id="band-origin-region"
-                    type="text"
                     name="origin_region"
                     value={formData.origin_region || ''}
                     onChange={onChange}
+                    options={mergedOriginRegionSuggestions}
                     maxLength={FIELD_LIMITS.bandOriginRegion.max}
                     placeholder="Province/State"
-                    list="band-origin-region-list"
-                    fullWidth
                   />
                 </div>
               </div>
-              <datalist id="band-origin-city-list">
-                {mergedOriginCitySuggestions.map(city => (
-                  <option key={city} value={city} />
-                ))}
-              </datalist>
-              <datalist id="band-origin-region-list">
-                {mergedOriginRegionSuggestions.map(region => (
-                  <option key={region} value={region} />
-                ))}
-              </datalist>
             </fieldset>
 
             <div className="sm:col-span-2">
@@ -220,25 +206,18 @@ export default function BandForm({
                   Genre <span className="text-text-tertiary text-xs">(optional)</span>
                 </label>
                 <Tooltip content="Musical genres, comma-separated (e.g., 'punk, indie rock')">
-                  <FontAwesomeIcon icon={faCircleInfo} className="text-text-tertiary text-sm cursor-help" />
+                  <Info size={14} className="text-text-tertiary cursor-help" />
                 </Tooltip>
               </div>
-              <Input
+              <Combobox
                 id="band-genre"
-                type="text"
                 name="genre"
                 value={formData.genre || ''}
                 onChange={onChange}
+                options={mergedGenreSuggestions}
                 maxLength={FIELD_LIMITS.bandGenre.max}
                 placeholder="punk, indie rock, etc."
-                list="band-genre-list"
-                fullWidth
               />
-              <datalist id="band-genre-list">
-                {mergedGenreSuggestions.map(genre => (
-                  <option key={genre} value={genre} />
-                ))}
-              </datalist>
             </div>
 
             <div className="sm:col-span-2">
@@ -284,7 +263,7 @@ export default function BandForm({
                 value={formData.contact_email || ''}
                 onChange={onChange}
                 maxLength={FIELD_LIMITS.bandContactEmail.max}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
                 placeholder="contact@artist.com"
               />
             </div>
@@ -297,7 +276,7 @@ export default function BandForm({
                 name="is_active"
                 value={formData.is_active ?? 1}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
               >
                 <option value={1}>Active</option>
                 <option value={0}>Inactive</option>
@@ -317,7 +296,7 @@ export default function BandForm({
                 name="event_id"
                 value={formData.event_id}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
               >
                 <option value="">No event assigned yet</option>
                 {events.map(event => (
@@ -349,7 +328,7 @@ export default function BandForm({
                 name="venue_id"
                 value={formData.venue_id}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
               >
                 <option value="">No venue assigned yet</option>
                 {venues.map(venue => (
@@ -367,6 +346,7 @@ export default function BandForm({
             <div>
               <label htmlFor="band-start-time" className="block text-white mb-2 text-sm">
                 Start Time
+                <span className="text-gray-400 text-xs ml-2">optional — leave blank to announce later</span>
               </label>
               <input
                 id="band-start-time"
@@ -374,8 +354,7 @@ export default function BandForm({
                 name="start_time"
                 value={formData.start_time}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
-                required={requireSchedule}
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
               />
             </div>
 
@@ -390,7 +369,7 @@ export default function BandForm({
                 name="duration"
                 value={formData.duration}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
                 placeholder="45"
                 min="1"
               />
@@ -407,8 +386,7 @@ export default function BandForm({
                 name="end_time"
                 value={formData.end_time}
                 onChange={onChange}
-                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
-                required={requireSchedule}
+                className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
               />
             </div>
           </>
@@ -425,7 +403,7 @@ export default function BandForm({
             value={formData.website || ''}
             onChange={onChange}
             maxLength={FIELD_LIMITS.bandUrl.max}
-            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
             placeholder="https://example.com"
           />
         </div>
@@ -441,7 +419,7 @@ export default function BandForm({
             value={formData.instagram || ''}
             onChange={onChange}
             maxLength={FIELD_LIMITS.socialHandle.max}
-            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
             placeholder="@bandhandle"
           />
         </div>
@@ -457,7 +435,7 @@ export default function BandForm({
             value={formData.bandcamp || ''}
             onChange={onChange}
             maxLength={FIELD_LIMITS.bandUrl.max}
-            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
             placeholder="https://bandcamp.com/bandname"
           />
         </div>
@@ -473,16 +451,86 @@ export default function BandForm({
             value={formData.facebook || ''}
             onChange={onChange}
             maxLength={FIELD_LIMITS.bandUrl.max}
-            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none sm:text-sm"
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
             placeholder="https://facebook.com/bandname"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-youtube" className="block text-white mb-2 text-sm">
+            YouTube <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-youtube"
+            type="url"
+            name="youtube"
+            value={formData.youtube || ''}
+            onChange={onChange}
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            placeholder="https://youtube.com/@bandname"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-spotify" className="block text-white mb-2 text-sm">
+            Spotify <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-spotify"
+            type="url"
+            name="spotify"
+            value={formData.spotify || ''}
+            onChange={onChange}
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            placeholder="https://open.spotify.com/artist/..."
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-apple-music" className="block text-white mb-2 text-sm">
+            Apple Music <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-apple-music"
+            type="url"
+            name="apple_music"
+            value={formData.apple_music || ''}
+            onChange={onChange}
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            placeholder="https://music.apple.com/artist/..."
+          />
+        </div>
+
+        <div>
+          <label htmlFor="band-linktree" className="block text-white mb-2 text-sm">
+            Linktree <span className="text-gray-400 text-xs ml-2">(optional)</span>
+          </label>
+          <input
+            id="band-linktree"
+            type="url"
+            name="linktree"
+            value={formData.linktree || ''}
+            onChange={onChange}
+            maxLength={FIELD_LIMITS.bandUrl.max}
+            className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            placeholder="https://linktr.ee/bandname"
           />
         </div>
       </div>
 
-      {requireSchedule && conflicts.length > 0 && (
+      {requireSchedule && conflicts.conflicts.length > 0 && (
         <div className="bg-red-900/30 border border-red-600 rounded p-3 mb-4">
-          <p className="text-red-200 text-sm font-semibold mb-1">Time Conflict Detected!</p>
-          <p className="text-red-200 text-sm">This time overlaps with: {conflicts.join(', ')}</p>
+          <p className="text-red-200 text-sm font-semibold mb-1">Exact Time Conflict!</p>
+          <p className="text-red-200 text-sm">Same time as: {conflicts.conflicts.join(', ')}</p>
+        </div>
+      )}
+      {requireSchedule && conflicts.overlaps.length > 0 && (
+        <div className="bg-yellow-900/30 border border-yellow-600 rounded p-3 mb-4">
+          <p className="text-yellow-200 text-sm font-semibold mb-1">Time Overlap Detected</p>
+          <p className="text-yellow-200 text-sm">Overlaps with: {conflicts.overlaps.join(', ')}</p>
         </div>
       )}
 
@@ -519,6 +567,10 @@ BandForm.propTypes = {
     instagram: PropTypes.string,
     bandcamp: PropTypes.string,
     facebook: PropTypes.string,
+    youtube: PropTypes.string,
+    spotify: PropTypes.string,
+    apple_music: PropTypes.string,
+    linktree: PropTypes.string,
     contact_email: PropTypes.string,
     is_active: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
   }).isRequired,
@@ -528,7 +580,10 @@ BandForm.propTypes = {
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   onCancel: PropTypes.func.isRequired,
-  conflicts: PropTypes.arrayOf(PropTypes.string),
+  conflicts: PropTypes.shape({
+    overlaps: PropTypes.arrayOf(PropTypes.string),
+    conflicts: PropTypes.arrayOf(PropTypes.string),
+  }),
   globalView: PropTypes.bool,
   selectedProfile: PropTypes.object,
   originCitySuggestions: PropTypes.arrayOf(PropTypes.string),
@@ -538,5 +593,5 @@ BandForm.propTypes = {
 
 BandForm.defaultProps = {
   showEventIntro: false,
-  conflicts: [],
+  conflicts: { overlaps: [], conflicts: [] },
 }

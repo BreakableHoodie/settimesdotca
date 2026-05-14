@@ -10,14 +10,16 @@ permissions:
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
-    # Continue on error - requires Dependency Graph to be enabled in repo settings
-    continue-on-error: true
+    timeout-minutes: 10
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           # Only fail on high/critical severity vulnerabilities
           fail-on-severity: high

@@ -1,4 +1,5 @@
 # SetTimes User Guide
+
 **For Event Organizers**
 
 This guide will help you manage your events, venues, and performers on the SetTimes platform. No technical expertise required!
@@ -39,6 +40,7 @@ After logging in, you'll see three main tabs:
 - **🎸 Performers** - Schedule bands with times and venues
 
 The interface is **mobile-optimized** with:
+
 - Large touch targets (44px minimum)
 - Bottom navigation on mobile
 - Responsive design for all screen sizes
@@ -188,6 +190,7 @@ For each band/performer:
 ### Mobile Swipe Gestures
 
 On mobile devices:
+
 - **Swipe left** on a band to reveal the delete button
 - **Swipe right** to hide the delete button
 
@@ -208,6 +211,7 @@ On mobile devices:
 ### Event Status Badges
 
 Events display color-coded status badges:
+
 - **Draft** (gray) - Not visible to public
 - **Published** (green) - Live and visible
 - **Archived** (orange) - Past event, read-only
@@ -232,6 +236,7 @@ Need to make changes to a published event?
 ### Context Banner
 
 When you select an event, a **context banner** appears at the top showing:
+
 - Event name and date
 - Number of performers and venues
 - Quick action buttons (View Event, Clear Selection)
@@ -241,6 +246,7 @@ When you select an event, a **context banner** appears at the top showing:
 ### Breadcrumbs
 
 Navigation breadcrumbs show your current location:
+
 ```
 All Events > Spring Festival 2025 > Performers
 ```
@@ -252,29 +258,34 @@ Click any breadcrumb to navigate back.
 SetTimes uses a consistent design system throughout:
 
 **Buttons:**
+
 - **Primary** (orange) - Main actions like "Save" or "Create"
 - **Secondary** (outlined) - Less prominent actions like "Cancel"
 - **Danger** (red) - Destructive actions like "Delete"
 - **Ghost** (transparent) - Tertiary actions
 
 **Alerts:**
+
 - **Success** (green) - Operation completed
 - **Error** (red) - Something went wrong
 - **Warning** (yellow) - Important notice
 - **Info** (blue) - Helpful information
 
 **Loading States:**
+
 - Animated spinners show when data is loading
 - Prevents accidental double-clicks
 - Provides visual feedback
 
 **Tooltips:**
+
 - Hover over labels with (?) icon to see helpful tips
 - Works on both hover (desktop) and focus (keyboard)
 
 ### Accessibility Features
 
 SetTimes is WCAG 2.1 AA compliant:
+
 - **Keyboard Navigation** - Use Tab, Enter, Escape to navigate
 - **Screen Reader Support** - All content properly labeled
 - **Focus Indicators** - Clear outlines show where you are
@@ -288,6 +299,7 @@ SetTimes is WCAG 2.1 AA compliant:
 ### What are Band Profiles?
 
 Every band/performer automatically gets a public profile page at:
+
 ```
 settimes.ca/bands/[event-slug]/[band-name]
 ```
@@ -297,6 +309,7 @@ settimes.ca/bands/[event-slug]/[band-name]
 ### Profile Features
 
 **Automatically Generated Content:**
+
 - Band name and description
 - Event association
 - Venue and performance time
@@ -305,12 +318,14 @@ settimes.ca/bands/[event-slug]/[band-name]
 - SEO-optimized metadata
 
 **SEO Optimization:**
+
 - Open Graph tags for social sharing
 - Twitter Cards for previews
 - Proper page titles and descriptions
 - Canonical URLs
 
 **Sharing:**
+
 - Share links automatically include rich previews
 - Facebook, Twitter, LinkedIn show band info
 - QR codes can be generated for posters
@@ -333,6 +348,7 @@ settimes.ca/bands/[event-slug]/[band-name]
 ### What is the Timeline?
 
 The public-facing event schedule at `settimes.ca` shows:
+
 - All published events
 - Real-time performance schedules
 - Venue locations
@@ -341,21 +357,25 @@ The public-facing event schedule at `settimes.ca` shows:
 ### Timeline Features (Sprint 2.1)
 
 **Filtering:**
+
 - Filter by venue (click venue name)
 - Filter by month (click month selector)
 - Clear filters to see all events
 
 **Real-Time Updates:**
+
 - Changes appear within 1-2 minutes
 - No need to refresh manually
 - Cache automatically managed
 
 **Mobile-Optimized:**
+
 - Responsive cards for each performance
 - Swipeable on mobile
 - Bottom sheet navigation
 
 **Accessibility:**
+
 - Keyboard-navigable
 - Screen reader friendly
 - High contrast ratios
@@ -399,24 +419,29 @@ Before announcing:
 ### Best Practices
 
 **Save Often:**
+
 - Don't rely on auto-save
 - Click "Save" after every major change
 
 **Double-Check Times:**
+
 - Incorrect times cause attendee confusion
 - Allow buffer time between bands
 
 **Keep It Simple:**
+
 - Use official band names (as they brand themselves)
 - Don't overcomplicate venue names
 - Write clear, concise descriptions
 
 **Test Before Publishing:**
+
 - Always preview the public schedule
 - Check on both mobile and desktop
 - Verify all links work
 
 **Backup Important Info:**
+
 - Screenshot your final schedule
 - Export event data if available
 - Keep venue contact info handy
@@ -440,6 +465,7 @@ Before announcing:
 ### "My changes aren't showing on the public timeline"
 
 **Solution:**
+
 1. Make sure the event is Published (not Draft)
 2. Wait 1-2 minutes for the cache to update
 3. Refresh the page (Ctrl+R or Cmd+R)
@@ -459,6 +485,7 @@ Before announcing:
 ### "The admin panel isn't loading on my phone"
 
 **Solution:**
+
 1. Pull down to refresh the page
 2. Check your internet connection
 3. Try a different browser (Chrome, Safari, Firefox)
@@ -484,7 +511,8 @@ Before announcing:
 ### "The event wizard won't let me continue"
 
 **Solution:** Check for:
-- Required fields marked with asterisks (*)
+
+- Required fields marked with asterisks (\*)
 - Red error messages under fields
 - Invalid date formats
 - Duplicate event slugs
@@ -496,6 +524,7 @@ Before announcing:
 ### "Band profile links return 404 errors"
 
 **Solution:**
+
 1. Ensure the event is published
 2. Check the event slug is correct (no spaces or special characters)
 3. Verify the band is assigned to that event
@@ -522,6 +551,7 @@ Before announcing:
 ### Touch-Friendly Interface
 
 All buttons and interactive elements are optimized for mobile:
+
 - Minimum 44x44px touch targets (WCAG AAA)
 - Large, easy-to-tap buttons
 - Generous spacing between elements
@@ -530,6 +560,7 @@ All buttons and interactive elements are optimized for mobile:
 ### Bottom Navigation (Mobile)
 
 On mobile devices, use the bottom navigation bar:
+
 - **📅 Events** - Manage events
 - **📍 Venues** - Add/edit venues
 - **🎸 Performers** - Schedule performances
@@ -537,12 +568,14 @@ On mobile devices, use the bottom navigation bar:
 ### Form Tips
 
 **Auto-Optimized Keyboards:**
+
 - Email fields show email keyboard
 - Number fields show number pad
 - URL fields show URL keyboard (with .com shortcut)
 - Time fields show time picker
 
 **Auto-Complete:**
+
 - Venue names auto-suggest from existing venues
 - Band names auto-suggest if they've performed before
 
@@ -551,6 +584,7 @@ On mobile devices, use the bottom navigation bar:
 ## Keyboard Shortcuts (Desktop)
 
 **Global:**
+
 - `Tab` - Navigate through form fields and buttons
 - `Shift + Tab` - Navigate backwards
 - `Enter` - Submit forms or activate buttons
@@ -558,11 +592,13 @@ On mobile devices, use the bottom navigation bar:
 - `Ctrl/Cmd + S` - Save current form (when available)
 
 **Navigation:**
+
 - `Alt + E` - Go to Events tab
 - `Alt + V` - Go to Venues tab
 - `Alt + P` - Go to Performers tab
 
 **Accessibility:**
+
 - `Tab` on page load - Reveals "Skip to main content" link
 - Focus indicators always visible
 
@@ -614,6 +650,7 @@ On mobile devices, use the bottom navigation bar:
 ### Your Data is Protected
 
 SetTimes uses industry-standard security:
+
 - **HTTPS/TLS encryption** for all data transmission
 - **HTTPOnly cookies** prevent XSS attacks
 - **CSRF protection** on all state-changing requests
@@ -624,12 +661,14 @@ SetTimes uses industry-standard security:
 ### Best Practices
 
 **Passwords:**
+
 - Use a strong, unique password (min. 8 characters)
 - Include uppercase, lowercase, and numbers
 - Never share your credentials
 - Change passwords quarterly
 
 **Account Security:**
+
 - Log out when using shared devices
 - Don't save passwords on public computers
 - Enable 2FA if available
@@ -663,6 +702,7 @@ A: Database export tools are available to administrators. Contact support for as
 ---
 
 **Questions?** Refer to the other guides:
+
 - [Admin Handbook](./ADMIN_HANDBOOK.md) - For system administrators
 - [Quick Start Guide](./QUICK_START.md) - 10-minute setup tutorial
 - [API Documentation](./API_DOCUMENTATION.md) - For developers

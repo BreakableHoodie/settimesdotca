@@ -14,11 +14,53 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 // Allowed MIME types
 const ALLOWED_TYPES = [
   "image/jpeg",
-  "image/jpg",
   "image/png",
   "image/webp",
   "image/gif",
 ];
+
+/**
+ * Detect the true MIME type from the file's magic bytes.
+ * Rejects client-supplied Content-Type and validates the actual file header.
+ * @param {File} file
+ * @returns {Promise<string|null>} Detected MIME type or null if unrecognised.
+ */
+async function detectMimeType(file) {
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const length = header.length;
+
+  // JPEG: FF D8 FF
+  if (length >= 3 &&
+      header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF) {
+    return "image/jpeg";
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A (full 8-byte signature)
+  if (length >= 8 &&
+      header[0] === 0x89 && header[1] === 0x50 &&
+      header[2] === 0x4E && header[3] === 0x47 &&
+      header[4] === 0x0D && header[5] === 0x0A &&
+      header[6] === 0x1A && header[7] === 0x0A) {
+    return "image/png";
+  }
+  // GIF87a / GIF89a: 47 49 46 38 37|39 61 (full 6-byte signature)
+  if (length >= 6 &&
+      header[0] === 0x47 && header[1] === 0x49 &&
+      header[2] === 0x46 && header[3] === 0x38 &&
+      (header[4] === 0x37 || header[4] === 0x39) &&
+      header[5] === 0x61) {
+    return "image/gif";
+  }
+  // WebP: RIFF (52 49 46 46) + 4-byte length + WEBP (57 45 42 50)
+  if (length >= 12 &&
+      header[0] === 0x52 && header[1] === 0x49 &&
+      header[2] === 0x46 && header[3] === 0x46 &&
+      header[8] === 0x57 && header[9] === 0x45 &&
+      header[10] === 0x42 && header[11] === 0x50) {
+    return "image/webp";
+  }
+
+  return null;
+}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -54,8 +96,9 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Validate MIME type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    // Validate MIME type via magic bytes — ignores attacker-controlled file.type.
+    const detectedType = await detectMimeType(file);
+    if (!detectedType || !ALLOWED_TYPES.includes(detectedType)) {
       return new Response(
         JSON.stringify({
           error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF",
@@ -71,10 +114,10 @@ export async function onRequestPost(context) {
       .toLowerCase();
     const filename = `band-photos/${timestamp}-${sanitizedName}`;
 
-    // Upload to R2 bucket
+    // Upload to R2 bucket — use the server-verified type, not the client-supplied one.
     await env.BAND_PHOTOS.put(filename, file.stream(), {
       httpMetadata: {
-        contentType: file.type,
+        contentType: detectedType,
       },
       customMetadata: {
         uploadedBy: user.email,
@@ -126,7 +169,7 @@ export async function onRequestPost(context) {
         url: publicUrl,
         filename,
         size: file.size,
-        type: file.type,
+        type: detectedType,
       }),
       {
         status: 200,
@@ -138,7 +181,6 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         error: "Photo upload failed",
-        details: error.message,
       }),
       {
         status: 500,
@@ -192,7 +234,6 @@ export async function onRequestDelete(context) {
     return new Response(
       JSON.stringify({
         error: "Photo deletion failed",
-        details: error.message,
       }),
       {
         status: 500,

@@ -26,9 +26,14 @@ export async function onRequestGet(context) {
 
   const formatVenueAddress = (venue) => {
     if (!venue) return null;
-    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+    const line1 = [venue.address_line1, venue.address_line2]
+      .filter(Boolean)
+      .join(", ");
     const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+    const line3 = [venue.postal_code, venue.country]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
     return [line1, line2, line3].filter(Boolean).join(", ");
   };
 
@@ -38,7 +43,10 @@ export async function onRequestGet(context) {
     const includeUpcoming = url.searchParams.get("upcoming") !== "false"; // default true
     const includePast = url.searchParams.get("past") !== "false"; // default true
     const includeBands = url.searchParams.get("includeBands") !== "false"; // default true
-    const pastLimit = parseInt(url.searchParams.get("pastLimit") || "10");
+    const parsedPastLimit = parseInt(url.searchParams.get("pastLimit") || "10", 10);
+    const pastLimit = Number.isFinite(parsedPastLimit)
+      ? Math.min(Math.max(parsedPastLimit, 1), 100)
+      : 10;
 
     const response = {
       now: [],
@@ -59,6 +67,7 @@ export async function onRequestGet(context) {
             name: row.event_name,
             slug: row.event_slug,
             date: row.event_date,
+            status: row.event_status || null,
             ticket_url: row.ticket_url || null,
             bands: includeBands ? [] : null,
             bandIds: new Set(),
@@ -77,7 +86,8 @@ export async function onRequestGet(context) {
             if (!url && row.social_links) {
               try {
                 const links = JSON.parse(row.social_links);
-                url = links.website || links.bandcamp || links.instagram || null;
+                url =
+                  links.website || links.bandcamp || links.instagram || null;
               } catch (_) {}
             }
 
@@ -113,6 +123,7 @@ export async function onRequestGet(context) {
         name: event.name,
         slug: event.slug,
         date: event.date,
+        status: event.status,
         ticket_url: event.ticket_url,
         band_count: event.bandIds.size,
         venue_count: event.venues.size,
@@ -227,6 +238,7 @@ export async function onRequestGet(context) {
           e.name as event_name,
           e.slug as event_slug,
           e.date as event_date,
+          e.status as event_status,
           e.ticket_url as ticket_url,
           p.band_profile_id as band_id,
           b.name as band_name,
@@ -251,12 +263,13 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON p.event_id = e.id
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
-        WHERE e.is_published = 1
-        AND e.date < ?
+        WHERE (
+          (e.is_published = 1 AND e.date < ?)
+          OR e.status = 'archived'
+        )
         AND e.id IN (
           SELECT id FROM events
-          WHERE is_published = 1
-          AND date < ?
+          WHERE (is_published = 1 AND date < ?) OR status = 'archived'
           ORDER BY date DESC
           LIMIT ?
         )

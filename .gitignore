@@ -1,3 +1,6 @@
+# Playwright MCP dev tool logs
+.playwright-mcp/
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -34,8 +37,8 @@ coverage/
 test-results/
 playwright-report/
 playwright/.cache/
+output/
 e2e/.auth/
-e2e/visual-regression.spec.js-snapshots/
 *.lcov
 .nyc_output/
 
@@ -49,6 +52,8 @@ e2e/visual-regression.spec.js-snapshots/
 # AI assistants (developer-specific)
 .claude/
 .serena/
+.mcp.json
+workers-mcp-server/
 chatmodes/
 claudedocs/
 instructions/
@@ -60,6 +65,36 @@ plugins/
 
 # Session notes and dev archives (developer-specific)
 archive/
+plan/
+
+# Audits, reviews, and reports (keep out of repo)
+CODE_REVIEW*.md
+SECURITY_AUDIT*.md
+
+# Superseded database files (canonical schema is setup-complete.sql)
+database/schema.sql
+database/schema-v2.sql
+database/schema-final.sql
+database/seed.sql
+database/seed-v2.sql
+database/migrate-to-v2.sql
+database/migrate-bands-json.js
+database/demo-data-seed.sql
+database/production-data-sync.sql
+database/production-full-sync.sql
+database/DATABASE_ENTRIES.md
+
+# Stale frontend files
+frontend/src/bands.json
+frontend/src/DESIGN_SYSTEM.md
+
+# Completed implementation docs (historical, not active)
+docs/CLAUDE.md
+docs/SECURITY_PACKAGE_MIGRATION.md
+docs/BAND_PROFILES_IMPLEMENTATION.md
+docs/IMPLEMENTATION_SPEC_IMAGE_UPLOAD.md
+docs/frontend/ADMIN_PANEL_COMPLETE.md
+docs/security/SQL_INJECTION_AUDIT.md
 
 # Temporary files
 *.tmp
@@ -68,7 +103,6 @@ archive/
 cookies.txt
 DEV_CREDENTIALS.txt
 TEST_ACCOUNTS.md
-CODE_REVIEW_REPORT.md
 REVIEW_COMPLETE.md
 PLUGIN_STRATEGY.md
 PR_DESCRIPTION.md
@@ -99,3 +133,7 @@ database/migration-*.sql
 # Confidential local data
 band_crawl_schedule.json
 database/exports/
+/docs/code-review
+.superpowers/
+/docs/superpowers/
+docs/SEO_IMPROVEMENTS.md

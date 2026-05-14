@@ -3,8 +3,11 @@
 // Body: { code: string }
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
+import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP } from "../../../utils/request.js";
+import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
 
 function parseBackupCodes(raw) {
   if (!raw) return [];
@@ -76,9 +79,39 @@ export async function onRequestPost(context) {
     );
   }
 
+  const rateCheck = await checkAuthRateLimit(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
+    ipAddress,
+    scope: "user-and-ip",
+    userId,
+  });
+  if (!rateCheck.allowed) {
+    return new Response(
+      JSON.stringify({
+        error: "Too many attempts",
+        message: `Too many failed attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
+      }),
+      {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   let verified = false;
+  let totpSecretError = null;
+  let totpSecretState = null;
   if (user.totp_secret) {
-    verified = await verifyTotp(user.totp_secret, code);
+    try {
+      totpSecretState = await loadTotpSecret(user.totp_secret, env);
+    } catch (error) {
+      totpSecretError = error;
+      console.error("[MFA Disable] Failed to decrypt TOTP secret:", error?.message || error);
+    }
+  }
+
+  if (totpSecretState?.secret) {
+    verified = await verifyTotp(totpSecretState.secret, code);
   }
 
   if (!verified) {
@@ -87,7 +120,30 @@ export async function onRequestPost(context) {
     verified = result.valid;
   }
 
+  if (!verified && totpSecretError) {
+    return new Response(
+      JSON.stringify({
+        error: "Server error",
+        message: "Failed to verify MFA code",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   if (!verified) {
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
+      email: user.email,
+      failureReason: "invalid_code",
+      ipAddress,
+      success: false,
+      userAgent: request.headers.get("User-Agent") || "unknown",
+      userId,
+    });
+
     return new Response(
       JSON.stringify({
         error: "Authentication failed",
@@ -107,6 +163,17 @@ export async function onRequestPost(context) {
   )
     .bind(userId)
     .run();
+
+  await revokeAllTrustedDevices(DB, userId);
+
+  await writeAuthAttempt(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
+    email: user.email,
+    ipAddress,
+    success: true,
+    userAgent: request.headers.get("User-Agent") || "unknown",
+    userId,
+  });
 
   await auditLog(
     env,

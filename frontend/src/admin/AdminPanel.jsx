@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { authApi, eventsApi } from '../utils/adminApi'
+import { eventsApi } from '../utils/adminApi'
 import EventsTab from './EventsTab'
 import VenuesTab from './VenuesTab'
 import RosterTab from './RosterTab'
@@ -12,7 +12,49 @@ import BottomNav from './BottomNav'
 import ContextBanner from './components/ContextBanner'
 import Breadcrumbs from './components/Breadcrumbs'
 import MfaSettingsModal from './components/MfaSettingsModal'
-import { Button, Loading, Alert, ConfirmDialog } from '../components/ui'
+import { Button, Loading, Alert, ConfirmDialog, Modal } from '../components/ui'
+
+const ADMIN_ACTIVE_TAB_KEY = 'adminActiveTab'
+const ADMIN_SELECTED_EVENT_ID_KEY = 'adminSelectedEventId'
+const ADMIN_EVENT_WIZARD_DRAFT_KEY = 'adminEventWizardDraft'
+
+function getStoredAdminTab() {
+  if (typeof window === 'undefined') return 'events'
+  return window.sessionStorage.getItem(ADMIN_ACTIVE_TAB_KEY) || 'events'
+}
+
+function getStoredSelectedEventId() {
+  if (typeof window === 'undefined') return null
+  const stored = window.sessionStorage.getItem(ADMIN_SELECTED_EVENT_ID_KEY)
+  if (!stored) return null
+  const parsed = Number.parseInt(stored, 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function getStoredWizardDraft() {
+  if (typeof window === 'undefined') return null
+
+  const stored = window.sessionStorage.getItem(ADMIN_EVENT_WIZARD_DRAFT_KEY)
+  if (!stored) return null
+
+  try {
+    const parsed = JSON.parse(stored)
+    if (!parsed || typeof parsed !== 'object') return null
+    return {
+      currentStep: Number.isInteger(parsed.currentStep) ? parsed.currentStep : 0,
+      eventData: parsed.eventData && typeof parsed.eventData === 'object' ? parsed.eventData : undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
+function clearAdminSessionContext() {
+  if (typeof window === 'undefined') return
+  window.sessionStorage.removeItem(ADMIN_ACTIVE_TAB_KEY)
+  window.sessionStorage.removeItem(ADMIN_SELECTED_EVENT_ID_KEY)
+  window.sessionStorage.removeItem(ADMIN_EVENT_WIZARD_DRAFT_KEY)
+}
 
 /**
  * AdminPanel - Main container for admin panel with tab navigation
@@ -24,28 +66,31 @@ import { Button, Loading, Alert, ConfirmDialog } from '../components/ui'
  * - Logout functionality
  * - Responsive mobile-first design
  */
-export default function AdminPanel({ onLogout }) {
-  const [activeTab, setActiveTab] = useState('events')
-  const [selectedEventId, setSelectedEventId] = useState(null)
+export default function AdminPanel({ currentUser, onLogout }) {
+  const [activeTab, setActiveTab] = useState(() => getStoredAdminTab())
+  const [selectedEventId, setSelectedEventId] = useState(() => getStoredSelectedEventId())
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
-  const [showWizard, setShowWizard] = useState(false)
+  const [wizardDraft, setWizardDraft] = useState(() => getStoredWizardDraft())
+  const [showWizard, setShowWizard] = useState(() => Boolean(getStoredWizardDraft()))
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showMfaModal, setShowMfaModal] = useState(false)
-  const [currentUser, setCurrentUser] = useState(() => authApi.getCurrentUser())
+
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 5000)
+  }, [])
 
   const loadEvents = useCallback(async () => {
     try {
       setLoading(true)
       const result = await eventsApi.getAll()
-      setEvents(result.events || [])
-
-      // Default to global view (no event selected)
-      // User can optionally select an event from the dropdown
-      setSelectedEventId(null)
+      const nextEvents = result.events || []
+      setEvents(nextEvents)
+      setSelectedEventId(prev => (prev && nextEvents.some(event => event.id === prev) ? prev : null))
     } catch (err) {
-      console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message)
+      if (import.meta.env.DEV) console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message)
       if (err.status === 401 || err.message?.includes('Valid session required')) {
         onLogout()
         return
@@ -54,26 +99,12 @@ export default function AdminPanel({ onLogout }) {
     } finally {
       setLoading(false)
     }
-  }, [onLogout])
+  }, [onLogout, showToast])
 
   // Load events on mount
   useEffect(() => {
     loadEvents()
   }, [loadEvents])
-
-  useEffect(() => {
-    let isMounted = true
-    const refreshUser = async () => {
-      const sessionData = await authApi.verifySession()
-      if (isMounted && sessionData?.user) {
-        setCurrentUser(sessionData.user)
-      }
-    }
-    refreshUser()
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   const isAdmin = currentUser?.role === 'admin'
   const isViewer = currentUser?.role === 'viewer'
@@ -129,15 +160,28 @@ export default function AdminPanel({ onLogout }) {
     }
   }, [activeTab, canManageUsers])
 
-  /**
-   * Show toast notification
-   * @param {string} message - Message to display
-   * @param {string} type - 'success' or 'error'
-   */
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 5000)
-  }
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.sessionStorage.setItem(ADMIN_ACTIVE_TAB_KEY, activeTab)
+  }, [activeTab])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (selectedEventId) {
+      window.sessionStorage.setItem(ADMIN_SELECTED_EVENT_ID_KEY, String(selectedEventId))
+      return
+    }
+    window.sessionStorage.removeItem(ADMIN_SELECTED_EVENT_ID_KEY)
+  }, [selectedEventId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (wizardDraft) {
+      window.sessionStorage.setItem(ADMIN_EVENT_WIZARD_DRAFT_KEY, JSON.stringify(wizardDraft))
+      return
+    }
+    window.sessionStorage.removeItem(ADMIN_EVENT_WIZARD_DRAFT_KEY)
+  }, [wizardDraft])
 
   const handleLogout = () => {
     setShowLogoutConfirm(true)
@@ -145,16 +189,21 @@ export default function AdminPanel({ onLogout }) {
 
   const confirmLogout = () => {
     setShowLogoutConfirm(false)
+    clearAdminSessionContext()
     onLogout()
   }
 
   const handleWizardComplete = event => {
+    setWizardDraft(null)
     setShowWizard(false)
+    setSelectedEventId(event.id)
+    setActiveTab('lineup')
     showToast(`Event "${event.name}" created successfully!`, 'success')
     loadEvents() // Refresh events list
   }
 
   const handleWizardCancel = () => {
+    setWizardDraft(null)
     setShowWizard(false)
   }
 
@@ -172,12 +221,30 @@ export default function AdminPanel({ onLogout }) {
     ...(isAdmin ? [{ id: 'platform', label: 'Platform' }] : []),
   ]
 
+  useEffect(() => {
+    if (tabs.some(tab => tab.id === activeTab)) {
+      return
+    }
+
+    if (selectedEventId && tabs.some(tab => tab.id === 'lineup')) {
+      setActiveTab('lineup')
+      return
+    }
+
+    if (tabs.some(tab => tab.id === 'settings')) {
+      setActiveTab('settings')
+      return
+    }
+
+    setActiveTab('events')
+  }, [activeTab, selectedEventId, tabs])
+
   return (
     <div className="admin-shell min-h-screen bg-bg-navy">
       {/* Skip Navigation Link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-6 focus:py-3 focus:bg-accent-500 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-bg-navy"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-100 focus:px-6 focus:py-3 focus:bg-accent-500 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-bg-navy"
       >
         Skip to main content
       </a>
@@ -206,7 +273,7 @@ export default function AdminPanel({ onLogout }) {
                       const value = e.target.value
                       setSelectedEventId(value ? Number(value) : null)
                     }}
-                    className="min-h-[44px] px-3 py-1.5 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
+                    className="min-h-[44px] px-3 py-1.5 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden text-sm"
                   >
                     <option value="">All Venues/Bands (Global View)</option>
                     {events.map(event => (
@@ -230,7 +297,13 @@ export default function AdminPanel({ onLogout }) {
 
             <div className="flex flex-wrap gap-2">
               {canEdit && (
-                <Button onClick={() => setShowWizard(true)} variant="primary" size="sm">
+                <Button
+                  onClick={() => {
+                    setShowWizard(true)
+                  }}
+                  variant="primary"
+                  size="sm"
+                >
                   Create Event
                 </Button>
               )}
@@ -244,17 +317,22 @@ export default function AdminPanel({ onLogout }) {
       </header>
 
       {/* Tab Navigation */}
-      <div className="bg-band-purple border-b border-band-orange/20 hidden md:block">
+      <div className="bg-bg-purple border-b border-accent-500/20 hidden md:block">
         <div className="container mx-auto px-4">
-          <div className="flex gap-1 sm:gap-2 overflow-x-auto">
+          <div className="flex gap-1 sm:gap-2 overflow-x-auto" role="tablist">
             {tabs.map(tab => (
               <button
                 key={tab.id}
+                id={`tab-${tab.id}`}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls="main-content"
+                tabIndex={activeTab === tab.id ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap min-h-[48px] flex items-center ${
                   activeTab === tab.id
-                    ? 'text-band-orange border-b-2 border-band-orange'
-                    : 'text-white/70 hover:text-white hover:bg-band-navy/30'
+                    ? 'text-accent-400 border-b-2 border-accent-500'
+                    : 'text-white/70 hover:text-white hover:bg-bg-navy/30'
                 }`}
               >
                 {tab.label}
@@ -265,7 +343,12 @@ export default function AdminPanel({ onLogout }) {
       </div>
 
       {/* Tab Content */}
-      <div id="main-content" className="container mx-auto px-4 py-6 pb-24 md:pb-6">
+      <div
+        id="main-content"
+        role="tabpanel"
+        aria-labelledby={`tab-${activeTab}`}
+        className="container mx-auto px-4 py-6 pb-24 md:pb-6"
+      >
         {/* Context Banner - Shows when event is selected */}
         <ContextBanner event={selectedEvent} onClear={() => setSelectedEventId(null)} />
 
@@ -292,6 +375,7 @@ export default function AdminPanel({ onLogout }) {
                 selectedEvent={selectedEvent}
                 onEventFilterChange={setSelectedEventId}
                 readOnly={!canEdit}
+                canArchiveEvents={isAdmin}
               />
             )}
 
@@ -320,13 +404,15 @@ export default function AdminPanel({ onLogout }) {
       </div>
 
       {/* Event Wizard Modal */}
-      {showWizard && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <EventWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} />
-          </div>
-        </div>
-      )}
+      <Modal isOpen={showWizard} onClose={handleWizardCancel} title="Create Event" size="lg" className="bg-bg-purple">
+        <EventWizard
+          onComplete={handleWizardComplete}
+          onCancel={handleWizardCancel}
+          initialEventData={wizardDraft?.eventData}
+          initialStep={wizardDraft?.currentStep ?? 0}
+          onDraftChange={setWizardDraft}
+        />
+      </Modal>
 
       {/* Toast Notification */}
       {toast && (

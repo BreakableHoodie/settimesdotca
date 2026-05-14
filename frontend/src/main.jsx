@@ -8,6 +8,8 @@ import EmbedPage from './pages/EmbedPage.jsx'
 import SubscribePage from './pages/SubscribePage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import ActivatePage from './pages/ActivatePage.jsx'
+import PrivacyPage from './pages/PrivacyPage.jsx'
+import NotFoundPage from './pages/NotFoundPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
 import './index.css'
@@ -15,6 +17,8 @@ import './index.css'
 // Lazy load admin panel and band profiles (not needed for initial page load)
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
 const BandProfilePage = lazy(() => import('./pages/BandProfilePage.jsx'))
+const EventRecapPage = lazy(() => import('./pages/EventRecapPage.jsx'))
+const SharePreviewPage = lazy(() => import('./pages/SharePreviewPage.jsx'))
 
 const hostname = typeof window !== 'undefined' ? window.location.hostname || '' : ''
 const isPreviewBuild = hostname.startsWith('dev.') || hostname.endsWith('.pages.dev')
@@ -29,43 +33,26 @@ if (robotsMeta) {
 }
 
 const BUILD_ID = '2026-01-30-1605'
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   // Helps confirm which build is running in production.
   window.__SETTIMES_BUILD_ID__ = BUILD_ID
 }
 
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-band-navy to-band-purple">
+    <div
+      className="flex items-center justify-center min-h-screen bg-linear-to-br from-bg-navy to-bg-purple"
+      role="status"
+      aria-live="polite"
+    >
       <div className="text-white text-xl">Loading...</div>
     </div>
   )
 }
 
-// Service worker: TEMPORARILY DISABLED to fix caching issues during development
-// Re-enable for production by uncommenting the registration code below
-// if ('serviceWorker' in navigator) {
-//   window.addEventListener('load', () => {
-//     navigator.serviceWorker
-//       .register('/sw.js')
-//       .then(reg => console.log('SW registered:', reg.scope))
-//       .catch(err => console.error('SW registration failed:', err))
-//   })
-// }
-
-// Unregister any existing service workers to clear stale cache (production and dev)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    if (registrations.length > 0) {
-      console.warn('Unregistering', registrations.length, 'service worker(s)...')
-      registrations.forEach(registration => {
-        registration.unregister().then(() => {
-          console.warn('Service worker unregistered - ensuring fresh content')
-          // Optional: Force reload if we just killed a SW?
-          // window.location.reload()
-        })
-      })
-    }
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW registration failed:', err))
   })
 }
 
@@ -79,6 +66,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <HelmetProvider>
         <BrowserRouter>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-9999 focus:px-4 focus:py-2 focus:bg-white focus:text-black focus:rounded focus:text-sm focus:font-medium"
+          >
+            Skip to main content
+          </a>
           <Routes>
             {/* Fan experience: Load immediately */}
             <Route path="/" element={<EventsPage />} />
@@ -87,6 +80,19 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/subscribe" element={<SubscribePage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/activate" element={<ActivatePage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+
+            {/* Event recap: Lazy loaded */}
+            <Route
+              path="/events/:slug/recap"
+              element={
+                <ErrorBoundary title="Event Recap Error" message="Unable to load event recap. Please try again.">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <EventRecapPage />
+                  </Suspense>
+                </ErrorBoundary>
+              }
+            />
 
             {/* Band profiles: Lazy loaded */}
             <Route
@@ -95,6 +101,18 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
                   <Suspense fallback={<LoadingFallback />}>
                     <BandProfilePage />
+                  </Suspense>
+                </ErrorBoundary>
+              }
+            />
+
+            {/* Share preview: Lazy loaded */}
+            <Route
+              path="/s/:slug"
+              element={
+                <ErrorBoundary title="Share Preview Error" message="Unable to load this shared route.">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SharePreviewPage />
                   </Suspense>
                 </ErrorBoundary>
               }
@@ -114,6 +132,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 </ErrorBoundary>
               }
             />
+            {/* 404 catch-all */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>
       </HelmetProvider>

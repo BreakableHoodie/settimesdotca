@@ -78,18 +78,34 @@ export async function onRequestPost(context) {
       );
     }
 
-    await DB.prepare(
+    const updateResult = await DB.prepare(
       `
       UPDATE users
       SET is_active = 1,
           activated_at = datetime('now'),
           activation_token = NULL,
           activation_token_expires_at = NULL
-      WHERE id = ?
+      WHERE activation_token = ?
+        AND is_active = 0
+        AND (activation_token_expires_at IS NULL OR activation_token_expires_at >= datetime('now'))
     `
     )
-      .bind(user.id)
+      .bind(token)
       .run();
+
+    if (!updateResult?.meta?.changes) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid or expired token",
+          message:
+            "This activation link is invalid, expired, or has already been used.",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
     return new Response(
       JSON.stringify({

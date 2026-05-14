@@ -6,24 +6,39 @@ on:
     pull_request:
         branches: [main]
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
 jobs:
     e2e:
         name: e2e
         runs-on: ubuntu-latest
-        # Continue on error - requires E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD secrets
-        continue-on-error: true
+        timeout-minutes: 35
+        # Fork PRs cannot access repo secrets; credentials.js throws when ADMIN_PASSWORD is unset.
+        # Skip the job for fork PRs — it still runs on push and same-repo PRs.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  fetch-depth: 1
 
             - name: Setup Node
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
               with:
-                  node-version: 20
+                  node-version: 22
                   cache: npm
+                  cache-dependency-path: |
+                      package-lock.json
+                      frontend/package-lock.json
 
             - name: Run affected tests (fast-path)
               id: affected
-              uses: dorny/paths-filter@v3
+              uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
               with:
                   filters: |
                       frontend: 'frontend/**'
@@ -39,6 +54,24 @@ jobs:
               working-directory: frontend
               run: npm ci
 
+            - name: Cache Playwright browsers
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              id: playwright-cache
+              uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+            - name: Install Playwright browsers
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              run: |
+                  if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+                      npx playwright install-deps chromium
+                      npx playwright install chromium
+                  else
+                      npx playwright install chromium --with-deps
+                  fi
+
             - name: Build frontend
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               working-directory: frontend
@@ -50,71 +83,75 @@ jobs:
                   E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
                   E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
               run: |
-                  echo 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"' > .dev.vars
+                  printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\n' > .dev.vars
 
-                  # Use wrangler d1 execute to initialize the database schema BEFORE starting the server
-                  # This creates the local D1 database and sets up tables
                   echo "Initializing D1 database with schema..."
-                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --file=database/setup-complete.sql
+                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/setup-complete.sql
 
-                  # Create E2E admin user if credentials are provided
+                  echo "Seeding test data (venues, events, bands)..."
+                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/seed-test-data.sql
+
                   if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
                       echo "Creating E2E admin user..."
-                      ADMIN_HASH=$(node scripts/hash-password.mjs "$E2E_ADMIN_PASSWORD")
-
-                      # Insert or update the admin user using wrangler d1 execute
-                      ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --command="INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active, activated_at) VALUES (100, '$E2E_ADMIN_EMAIL', 'E2E Admin', '$ADMIN_HASH', 'admin', 1, datetime('now'));"
+                      SEED_SQL=$(node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL" --password "$E2E_ADMIN_PASSWORD")
+                      ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="$SEED_SQL"
                       echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
                   else
                       echo "⚠ E2E credentials not set, using default test accounts"
                   fi
 
-                  # Verify the database setup
                   echo "Database users:"
-                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --command="SELECT id, email, role FROM users;"
+                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="SELECT id, email, role FROM users;"
 
                   echo "✓ Database initialization complete"
 
             - name: Start Pages Functions server
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              timeout-minutes: 5
               run: |
-                  # Start wrangler pages dev (database already initialized via d1 execute)
-                  ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 > /tmp/wrangler.log 2>&1 &
+                  ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state > /tmp/wrangler.log 2>&1 &
                   WRANGLER_PID=$!
                   echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
 
-                  # Wait for server to be ready
                   echo "Waiting for server to start..."
-                  for i in {1..60}; do
-                      if curl -s http://localhost:8788/ > /dev/null 2>&1; then
-                          echo "✓ Server is ready on port 8788!"
-                          exit 0
-                      fi
-                      if [ $i -eq 60 ]; then
-                          echo "✗ Server failed to start after 60 seconds"
+                  i=1
+                  while [ $i -le 90 ]; do
+                      if ! kill -0 $WRANGLER_PID 2>/dev/null; then
+                          echo "✗ Wrangler process exited unexpectedly"
                           echo "Wrangler logs:"
                           cat /tmp/wrangler.log
                           exit 1
                       fi
-                      echo "Waiting for server... ($i/60)"
-                      sleep 1
+                      if curl -s http://localhost:8788/ > /dev/null 2>&1; then
+                          echo "✓ Server is ready on port 8788!"
+                          exit 0
+                      fi
+                      if [ $((i % 20)) -eq 0 ]; then
+                          echo "--- Wrangler log (iteration $i) ---"
+                          tail -20 /tmp/wrangler.log 2>/dev/null
+                          echo "---"
+                      fi
+                      echo "Waiting for server... ($i/90)"
+                      sleep 2
+                      i=$((i + 1))
                   done
-
-            - name: Install Playwright browsers
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
-              run: npx playwright install --with-deps
+                  echo "✗ Server failed to start after 180 seconds"
+                  echo "Wrangler logs:"
+                  cat /tmp/wrangler.log
+                  exit 1
 
             - name: Run Playwright tests
               if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
               env:
                   ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
                   ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
-              run: npx playwright test
+                  PLAYWRIGHT_SKIP_A11Y_VISUAL: 'true'
+              run: npx playwright test --reporter=list,html
 
             - name: Upload Playwright report
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               if: always()
               with:
-                  name: playwright-report
+                  name: playwright-report-e2e
                   path: playwright-report/
                   retention-days: 30

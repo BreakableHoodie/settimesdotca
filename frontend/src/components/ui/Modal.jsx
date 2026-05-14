@@ -1,7 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 import PropTypes from 'prop-types'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faXmark } from '@fortawesome/free-solid-svg-icons'
+import { X } from 'lucide-react'
 
 /**
  * Modal Component - Design System v2.0
@@ -173,7 +172,7 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fade-in"
       onClick={handleBackdropClick}
       role="presentation"
     >
@@ -206,7 +205,7 @@ export default function Modal({
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                 aria-label="Close modal"
               >
-                <FontAwesomeIcon icon={faXmark} className="text-xl text-text-secondary" />
+                <X size={20} className="text-text-secondary" />
               </button>
             )}
           </div>

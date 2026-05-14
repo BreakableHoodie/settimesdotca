@@ -7,9 +7,13 @@ const webServerCommand = useWrangler
   ? 'npx wrangler pages dev frontend/dist --port 8788'
   : 'npm run dev --prefix frontend';
 const storageStatePath = 'e2e/.auth/admin.json';
+const skipA11yVisual = process.env.PLAYWRIGHT_SKIP_A11Y_VISUAL === 'true';
 
 export default defineConfig({
   testDir: './e2e',
+  ...(skipA11yVisual
+    ? { testIgnore: [/accessibility\//, /visual-regression\.spec\.js/] }
+    : {}),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

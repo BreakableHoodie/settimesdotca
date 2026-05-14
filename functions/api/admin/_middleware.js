@@ -30,8 +30,11 @@ function normalizeUser(user) {
 }
 
 async function resolveSession(request, env) {
-  const lucia = initializeLucia(env.DB, request);
-  const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true";
+  const lucia = initializeLucia(env.DB, request, env);
+  // SECURITY: Bearer token auth is for non-production environments only.
+  // In production, only cookie-based sessions are accepted.
+  const allowHeaderAuth =
+    env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
   const sessionId =
     lucia.readSessionCookie(request.headers.get("Cookie") ?? "") ||
     (allowHeaderAuth
@@ -130,12 +133,17 @@ async function enforceSession(request, env) {
 
   const idleRemaining = Math.max(0, idleTimeout - idleElapsed);
   const absoluteRemaining = Math.max(0, absoluteTimeout - absoluteElapsed);
-  const timeRemaining = Math.min(idleRemaining, absoluteRemaining);
+
+  const refreshedTiming = {
+    idleRemaining,
+    absoluteRemaining,
+    timeRemaining: Math.min(idleRemaining, absoluteRemaining),
+  };
 
   return {
     result,
     pendingCookie: session.fresh ? lucia.createSessionCookie(session.id).serialize() : null,
-    timing: { idleRemaining, absoluteRemaining, timeRemaining },
+    timing: refreshedTiming,
   };
 }
 
@@ -233,7 +241,11 @@ export async function onRequest(context) {
   const log = createRequestLogger(context);
 
   // Skip auth check for auth endpoints
-  if (pathname.includes("/api/admin/auth/")) {
+  if (pathname.startsWith("/api/admin/auth/")) {
+    const csrfError = validateCSRFMiddleware(request, env);
+    if (csrfError) {
+      return csrfError;
+    }
     return next();
   }
 
@@ -257,8 +269,6 @@ export async function onRequest(context) {
     const normalizedUser = normalizeUser(user);
 
     const sessionData = {
-      id: session.id,
-      session_token: session.id,
       user_id: normalizedUser.userId,
       expires_at: session.expiresAt?.toISOString?.() || null,
       created_at: sessionMeta?.created_at || null,

@@ -190,12 +190,16 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                 <p className="text-text-secondary text-sm mb-3">
                   Enter the 6-digit code from your authenticator app to finish setup.
                 </p>
+                <label htmlFor="mfa-verify-enable" className="sr-only">
+                  Authenticator code
+                </label>
                 <input
+                  id="mfa-verify-enable"
                   type="text"
                   inputMode="numeric"
                   value={verificationCode}
                   onChange={e => setVerificationCode(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
+                  className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
                   placeholder="123456"
                   disabled={loading}
                 />
@@ -223,12 +227,16 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                 <p className="text-text-secondary text-sm mb-3">
                   Regenerating backup codes will invalidate the previous set.
                 </p>
+                <label htmlFor="mfa-verify-backup" className="sr-only">
+                  Authenticator code
+                </label>
                 <input
+                  id="mfa-verify-backup"
                   type="text"
                   inputMode="numeric"
                   value={verificationCode}
                   onChange={e => setVerificationCode(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
+                  className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
                   placeholder="Authenticator code"
                   disabled={loading}
                 />

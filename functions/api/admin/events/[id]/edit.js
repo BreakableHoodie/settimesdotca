@@ -3,12 +3,21 @@
 // Body: { name, date, slug }
 // Returns: { success: true, event: {...} } or error
 
+import { checkPermission, auditLog } from "../../_middleware.js"
+import { getClientIP } from "../../../../utils/request.js"
+
 export async function onRequestPut(context) {
   const { request, env, params } = context
   const { DB } = env
   const eventId = params.id
+  const ipAddress = getClientIP(request)
 
   try {
+    const auth = await checkPermission(context, "editor")
+    if (auth.error) {
+      return auth.response
+    }
+
     if (!eventId || isNaN(eventId)) {
       return new Response(
         JSON.stringify({
@@ -23,7 +32,7 @@ export async function onRequestPut(context) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const { name, date, slug, ticket_link } = body
+    const { name, date, slug, ticket_url } = body
 
     // Validation
     if (!name || !date || !slug) {
@@ -39,8 +48,8 @@ export async function onRequestPut(context) {
       )
     }
 
-    // Validate ticket_link URL if provided
-    if (ticket_link && !ticket_link.match(/^https?:\/\//)) {
+    // Validate ticket_url URL if provided
+    if (ticket_url && !ticket_url.match(/^https?:\/\//)) {
       return new Response(
         JSON.stringify({
           error: 'Validation error',
@@ -95,13 +104,28 @@ export async function onRequestPut(context) {
     const result = await DB.prepare(
       `
       UPDATE events
-      SET name = ?, date = ?, slug = ?, ticket_link = ?
+      SET name = ?, date = ?, slug = ?, ticket_url = ?
       WHERE id = ?
       RETURNING *
     `
     )
-      .bind(name, date, slug, ticket_link || null, eventId)
+      .bind(name, date, slug, ticket_url || null, eventId)
       .first()
+
+    await auditLog(
+      env,
+      auth.user.userId,
+      "event.updated",
+      "event",
+      eventId,
+      {
+        name,
+        date,
+        slug,
+        ticket_url: ticket_url || null,
+      },
+      ipAddress
+    )
 
     return new Response(
       JSON.stringify({

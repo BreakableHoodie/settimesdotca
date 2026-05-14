@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { performersApi } from '../utils/adminApi'
+import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
 
 export default function PerformersManager() {
   const [performers, setPerformers] = useState([])
@@ -18,11 +19,6 @@ export default function PerformersManager() {
     facebook: '',
   })
 
-  // Load performers on mount
-  useEffect(() => {
-    loadPerformers()
-  }, [])
-
   const loadPerformers = async () => {
     setLoading(true)
     try {
@@ -35,6 +31,11 @@ export default function PerformersManager() {
       setLoading(false)
     }
   }
+
+  // Load performers on mount
+  useEffect(() => {
+    loadPerformers()
+  }, [])
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -122,7 +123,7 @@ export default function PerformersManager() {
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 font-medium"
+            className="px-6 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 font-medium"
           >
             + Add Performer
           </button>
@@ -131,7 +132,7 @@ export default function PerformersManager() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-band-purple rounded-lg p-6">
+        <div className="bg-bg-purple rounded-lg p-6">
           <h3 className="text-xl font-bold text-white mb-4">
             {editingPerformer ? 'Edit Performer' : 'Add New Performer'}
           </h3>
@@ -146,7 +147,7 @@ export default function PerformersManager() {
                 type="text"
                 value={formData.name}
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                 placeholder="Performer name"
                 required
               />
@@ -162,7 +163,7 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.genre}
                   onChange={e => setFormData(prev => ({ ...prev, genre: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="Rock, Jazz, etc."
                 />
               </div>
@@ -175,7 +176,7 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.origin}
                   onChange={e => setFormData(prev => ({ ...prev, origin: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="Montreal, Toronto, etc."
                 />
               </div>
@@ -189,7 +190,7 @@ export default function PerformersManager() {
                 id="performer-description"
                 value={formData.description}
                 onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                 rows={3}
                 placeholder="Brief description of the performer..."
               />
@@ -204,7 +205,7 @@ export default function PerformersManager() {
                 type="url"
                 value={formData.url}
                 onChange={e => setFormData(prev => ({ ...prev, url: e.target.value }))}
-                className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                 placeholder="https://example.com"
               />
             </div>
@@ -218,7 +219,7 @@ export default function PerformersManager() {
                 type="url"
                 value={formData.photo_url}
                 onChange={e => setFormData(prev => ({ ...prev, photo_url: e.target.value }))}
-                className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                 placeholder="https://example.com/photo.jpg"
               />
             </div>
@@ -233,7 +234,7 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.instagram}
                   onChange={e => setFormData(prev => ({ ...prev, instagram: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
                   placeholder="@username"
                 />
               </div>
@@ -246,8 +247,8 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.bandcamp}
                   onChange={e => setFormData(prev => ({ ...prev, bandcamp: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  placeholder="username.bandcamp.com"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
+                  placeholder="https://username.bandcamp.com"
                 />
               </div>
               <div>
@@ -259,8 +260,8 @@ export default function PerformersManager() {
                   type="text"
                   value={formData.facebook}
                   onChange={e => setFormData(prev => ({ ...prev, facebook: e.target.value }))}
-                  className="w-full px-4 py-3 rounded bg-band-navy text-white border border-gray-600 focus:border-band-orange focus:outline-none"
-                  placeholder="facebook.com/page"
+                  className="w-full px-4 py-3 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
+                  placeholder="https://facebook.com/page"
                 />
               </div>
             </div>
@@ -269,7 +270,7 @@ export default function PerformersManager() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-band-orange text-white rounded hover:bg-orange-600 disabled:opacity-50 font-medium"
+                className="flex-1 px-6 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 font-medium"
               >
                 {loading ? 'Saving...' : editingPerformer ? 'Update Performer' : 'Add Performer'}
               </button>
@@ -296,7 +297,7 @@ export default function PerformersManager() {
           </div>
         ) : (
           performers.map(performer => (
-            <div key={performer.id} className="bg-band-purple rounded-lg p-4">
+            <div key={performer.id} className="bg-bg-purple rounded-lg p-4">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <h3 className="text-white font-bold text-lg">{performer.name}</h3>
@@ -309,32 +310,32 @@ export default function PerformersManager() {
                   </div>
                   {performer.description && <p className="text-gray-300 text-sm mt-2">{performer.description}</p>}
                   <div className="flex gap-3 mt-2">
-                    {performer.url && (
+                    {safeExternalHref(performer.url) !== '#' && (
                       <a
-                        href={performer.url}
+                        href={safeExternalHref(performer.url)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-band-orange text-sm hover:underline"
+                        className="text-accent-400 text-sm hover:underline"
                       >
                         Website
                       </a>
                     )}
-                    {performer.instagram && (
+                    {safeInstagramHref(performer.instagram) !== '#' && (
                       <a
-                        href={`https://instagram.com/${performer.instagram.replace('@', '')}`}
+                        href={safeInstagramHref(performer.instagram)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-band-orange text-sm hover:underline"
+                        className="text-accent-400 text-sm hover:underline"
                       >
                         Instagram
                       </a>
                     )}
-                    {performer.bandcamp && (
+                    {safeHttpsFallbackHref(performer.bandcamp) !== '#' && (
                       <a
-                        href={`https://${performer.bandcamp}`}
+                        href={safeHttpsFallbackHref(performer.bandcamp)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-band-orange text-sm hover:underline"
+                        className="text-accent-400 text-sm hover:underline"
                       >
                         Bandcamp
                       </a>

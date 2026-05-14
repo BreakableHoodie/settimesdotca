@@ -73,7 +73,7 @@ export default function AdminLogin({ onLoginSuccess }) {
       }
 
       if (result.success) {
-        onLoginSuccess()
+        await onLoginSuccess()
       }
     } catch (err) {
       handleError(err)
@@ -90,7 +90,7 @@ export default function AdminLogin({ onLoginSuccess }) {
     try {
       const result = await authApi.verifyMfa(mfaToken, mfaCode, rememberDevice)
       if (result.success) {
-        onLoginSuccess()
+        await onLoginSuccess()
       }
     } catch (err) {
       handleError(err)
@@ -125,7 +125,7 @@ export default function AdminLogin({ onLoginSuccess }) {
 
   return (
     <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
-      <div className="bg-gradient-card backdrop-blur-sm p-8 rounded-xl shadow-xl max-w-md w-full border border-white/10">
+      <div className="bg-gradient-card backdrop-blur-xs p-8 rounded-xl shadow-xl max-w-md w-full border border-white/10">
         <h1 className="text-2xl font-bold font-display mb-6 text-center">
           <span className="text-accent-500">Set</span>
           <span className="text-white">Times</span>
@@ -144,7 +144,7 @@ export default function AdminLogin({ onLoginSuccess }) {
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all"
                 required
                 disabled={loading}
               />
@@ -160,18 +160,20 @@ export default function AdminLogin({ onLoginSuccess }) {
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all"
                 required
                 disabled={loading}
               />
             </div>
 
             {idleMessage && (
-              <div className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">{idleMessage}</div>
+              <div role="status" className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">
+                {idleMessage}
+              </div>
             )}
 
             {activationInfo && (
-              <div className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">
+              <div role="status" className="bg-blue-900/50 border border-blue-600 text-blue-200 p-3 rounded mb-4">
                 <p className="font-semibold mb-1">Activate your account</p>
                 <p className="text-sm">{activationInfo.message}</p>
                 {resendStatus.message && <p className="text-sm mt-2">{resendStatus.message}</p>}
@@ -186,10 +188,14 @@ export default function AdminLogin({ onLoginSuccess }) {
               </div>
             )}
 
-            {error && <div className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}
+            {error && (
+              <div role="alert" className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">
+                {error}
+              </div>
+            )}
 
             {lockoutInfo && lockoutInfo.locked && (
-              <div className="bg-yellow-900/50 border border-yellow-600 text-yellow-200 p-3 rounded mb-4">
+              <div role="alert" className="bg-yellow-900/50 border border-yellow-600 text-yellow-200 p-3 rounded mb-4">
                 <p className="font-bold mb-1">Account Locked</p>
                 <p className="text-sm">
                   Too many failed login attempts. Please try again in {lockoutInfo.minutesRemaining} minutes.
@@ -224,7 +230,7 @@ export default function AdminLogin({ onLoginSuccess }) {
                 title="Enter your 6-digit code or backup code"
                 value={mfaCode}
                 onChange={e => setMfaCode(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 transition-all"
+                className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all"
                 required
                 disabled={loading}
                 autoComplete="one-time-code"

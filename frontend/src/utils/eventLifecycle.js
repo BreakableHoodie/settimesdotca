@@ -19,12 +19,13 @@ const GRACE_PERIOD_MS = 48 * 60 * 60 * 1000
  * Calculate event lifecycle state
  *
  * @param {string} eventDate - Event date in YYYY-MM-DD format
+ * @param {Date|string|number} referenceTime - Optional time to evaluate against
  * @returns {string} One of: 'upcoming', 'recently_completed', 'archived'
  */
-export function getEventState(eventDate) {
+export function getEventState(eventDate, referenceTime = new Date()) {
   if (!eventDate) return 'upcoming' // No date = treat as upcoming
 
-  const now = new Date()
+  const now = referenceTime instanceof Date ? referenceTime : new Date(referenceTime)
   // Event ends at 23:59:59 on the event date
   const eventEnd = new Date(eventDate + 'T23:59:59')
   const gracePeriodEnd = new Date(eventEnd.getTime() + GRACE_PERIOD_MS)

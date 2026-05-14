@@ -5,7 +5,14 @@
 // DELETE /api/admin/events/{id} - Delete event
 
 import { checkPermission, auditLog } from "../_middleware.js";
-import { FIELD_LIMITS, isValidURL, sanitizeString } from "../../../utils/validation.js";
+import {
+  FIELD_LIMITS,
+  isValidURL,
+  sanitizeEventSocialLinks,
+  sanitizeString,
+  sanitizeVenueInfo,
+  validateDate,
+} from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 
 // Helper to extract event ID from path
@@ -99,6 +106,7 @@ export async function onRequestPatch(context) {
     const {
       name,
       date,
+      end_date,
       status,
       description,
       city,
@@ -143,21 +151,37 @@ export async function onRequestPatch(context) {
     }
 
     if (date !== undefined) {
-      // Validate date format
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const dateResult = validateDate(date);
+      if (!dateResult.valid) {
         return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: "Date must be in YYYY-MM-DD format",
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
+          JSON.stringify({ error: "Validation error", message: dateResult.error }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
       updates.push("date = ?");
       params.push(date);
+    }
+
+    if (end_date !== undefined) {
+      const normalizedEndDate = end_date || null;
+      if (normalizedEndDate !== null) {
+        const endDateResult = validateDate(normalizedEndDate);
+        if (!endDateResult.valid) {
+          return new Response(
+            JSON.stringify({ error: "Validation error", message: endDateResult.error }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const effectiveStartDate = date ?? event.date;
+        if (normalizedEndDate < effectiveStartDate) {
+          return new Response(
+            JSON.stringify({ error: "Validation error", message: "End date must be on or after the event start date" }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+      }
+      updates.push("end_date = ?");
+      params.push(normalizedEndDate);
     }
 
     if (status !== undefined) {
@@ -167,6 +191,18 @@ export async function onRequestPatch(context) {
           JSON.stringify({
             error: "Validation error",
             message: "Status must be: draft, published, or archived",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      if (status === "archived") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Use the dedicated archive action to archive events",
           }),
           {
             status: 400,
@@ -262,51 +298,53 @@ export async function onRequestPatch(context) {
     }
 
     if (venue_info !== undefined) {
-      const parsed = parseJsonField(venue_info, "Venue info");
-      if (parsed.error) {
+      try {
+        const sanitizedVenueInfo = sanitizeVenueInfo(venue_info);
+        if (sanitizedVenueInfo && sanitizedVenueInfo.length > FIELD_LIMITS.eventVenueInfo.max) {
+          return new Response(
+            JSON.stringify({
+              error: "Validation error",
+              message: `Venue info must be no more than ${FIELD_LIMITS.eventVenueInfo.max} characters`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        updates.push("venue_info = ?");
+        params.push(sanitizedVenueInfo ?? null);
+      } catch (error) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
-            message: parsed.error,
+            message: error.message,
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
-      if (typeof parsed.value === "string" && parsed.value.length > FIELD_LIMITS.eventVenueInfo.max) {
-        return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: `Venue info must be no more than ${FIELD_LIMITS.eventVenueInfo.max} characters`,
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      updates.push("venue_info = ?");
-      params.push(parsed.value ?? null);
     }
 
     if (social_links !== undefined) {
-      const parsed = parseJsonField(social_links, "Social links");
-      if (parsed.error) {
+      try {
+        const sanitizedSocialLinks = sanitizeEventSocialLinks(social_links);
+        if (sanitizedSocialLinks && sanitizedSocialLinks.length > FIELD_LIMITS.eventSocialLinks.max) {
+          return new Response(
+            JSON.stringify({
+              error: "Validation error",
+              message: `Social links must be no more than ${FIELD_LIMITS.eventSocialLinks.max} characters`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        updates.push("social_links = ?");
+        params.push(sanitizedSocialLinks ?? null);
+      } catch (error) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
-            message: parsed.error,
+            message: error.message,
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
-      if (typeof parsed.value === "string" && parsed.value.length > FIELD_LIMITS.eventSocialLinks.max) {
-        return new Response(
-          JSON.stringify({
-            error: "Validation error",
-            message: `Social links must be no more than ${FIELD_LIMITS.eventSocialLinks.max} characters`,
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      updates.push("social_links = ?");
-      params.push(parsed.value ?? null);
     }
 
     if (theme_colors !== undefined) {
@@ -651,17 +689,26 @@ export async function onRequestPost(context) {
         )
         .first();
 
-      // Copy all bands from original event
-      await DB.prepare(
-        `
-        INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes)
-        SELECT ?, venue_id, band_profile_id, start_time, end_time, notes
-        FROM performances
-        WHERE event_id = ?
-      `,
-      )
-        .bind(newEvent.id, eventId)
-        .run();
+      if (!newEvent) {
+        throw new Error("events INSERT returned null");
+      }
+
+      // Copy all bands from original event (compensating delete if this fails)
+      try {
+        await DB.prepare(
+          `
+          INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes)
+          SELECT ?, venue_id, band_profile_id, start_time, end_time, notes
+          FROM performances
+          WHERE event_id = ?
+        `,
+        )
+          .bind(newEvent.id, eventId)
+          .run();
+      } catch (copyError) {
+        await DB.prepare("DELETE FROM events WHERE id = ?").bind(newEvent.id).run();
+        throw copyError;
+      }
 
       // Get band count
       const bandCount = await DB.prepare(
@@ -770,7 +817,28 @@ export async function onRequestDelete(context) {
       .bind(eventIdNum)
       .first();
 
-    // Delete the event (database will automatically set event_id to NULL for bands due to ON DELETE SET NULL)
+    const body = await request.json().catch(() => ({}));
+    const url = new URL(request.url);
+    const confirmCascade =
+      body?.confirmCascade === true ||
+      url.searchParams.get("confirmCascade") === "true";
+
+    if (bandCount.count > 0 && !confirmCascade) {
+      return new Response(
+        JSON.stringify({
+          error: "Confirmation required",
+          message:
+            "Deleting this event will permanently remove associated performance records. Repeat the request with confirmCascade=true to continue.",
+          affectedPerformanceCount: bandCount.count,
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Delete the event (performance records are removed automatically via ON DELETE CASCADE)
     await DB.prepare("DELETE FROM events WHERE id = ?").bind(eventIdNum).run();
 
     // Audit log
@@ -790,7 +858,7 @@ export async function onRequestDelete(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} band(s) are now unassigned and can be moved to other events)` : ""}`,
+        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} performance record(s) were permanently deleted with this event)` : ""}`,
       }),
       {
         headers: { "Content-Type": "application/json" },

@@ -2,6 +2,7 @@ import { act, render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { axe, toHaveNoViolations } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
+import { HelmetProvider } from 'react-helmet-async'
 import App from '../App'
 
 expect.extend(toHaveNoViolations)
@@ -37,9 +38,11 @@ const waitForAppToSettle = async () => {
 describe('Accessibility Tests', () => {
   it('App should have no accessibility violations', async () => {
     const { container } = render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>
+      <HelmetProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </HelmetProvider>
     )
 
     // Wait for data to load
@@ -51,9 +54,11 @@ describe('Accessibility Tests', () => {
 
   it('should have proper heading hierarchy', async () => {
     const { container } = render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>
+      <HelmetProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </HelmetProvider>
     )
     await waitForAppToSettle()
 
@@ -63,9 +68,11 @@ describe('Accessibility Tests', () => {
 
   it('should have alt text for images', async () => {
     const { container } = render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>
+      <HelmetProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </HelmetProvider>
     )
     await waitForAppToSettle()
 
@@ -77,9 +84,11 @@ describe('Accessibility Tests', () => {
 
   it('should have accessible buttons', async () => {
     const { container } = render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>
+      <HelmetProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </HelmetProvider>
     )
     await waitForAppToSettle()
 

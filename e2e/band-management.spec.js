@@ -3,11 +3,13 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from './credentials';
 
 const loginAsAdmin = async (page) => {
   await page.goto('/admin');
-  if (page.url().includes('/admin/login')) {
+  // Wait for either admin tab buttons (valid session) or login form (session expired/invalidated)
+  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: 'visible', timeout: 15000 });
+  if (await page.locator('input[type="email"]').isVisible()) {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/admin$/);
+    await page.waitForSelector('button[role="tab"]', { state: 'visible', timeout: 15000 });
   }
 };
 
@@ -30,7 +32,7 @@ test.describe('Band Management', () => {
 
     await page.fill('input[name="name"]', bandName);
     await page.fill('input[name="genre"]', 'Rock');
-    await page.locator('.ql-editor').first().fill('A test band with great music');
+    await page.locator('.ProseMirror').first().fill('A test band with great music');
     await page.fill('input[name="website"]', 'https://testband.com');
     await page.fill('input[name="instagram"]', '@testband');
     await page.fill('input[name="bandcamp"]', 'https://bandcamp.com/testband');
@@ -61,14 +63,14 @@ test.describe('Band Management', () => {
     await page.click('button:has-text("New Artist")');
     await page.fill('input[name="name"]', originalName);
     await page.fill('input[name="genre"]', 'Jazz');
-    await page.locator('.ql-editor').first().fill('Original bio');
+    await page.locator('.ProseMirror').first().fill('Original bio');
     await page.click('button[type="submit"]:has-text("Add Artist")');
 
     await page.locator('tr', { hasText: originalName }).getByRole('button', { name: 'Edit' }).click();
     await expect(page.getByRole('heading', { name: 'Edit Artist' })).toBeVisible();
 
     await page.fill('input[name="name"]', updatedName);
-    await page.locator('.ql-editor').first().fill('Updated bio with new information');
+    await page.locator('.ProseMirror').first().fill('Updated bio with new information');
 
     await page.click('button[type="submit"]:has-text("Update Artist")');
 
@@ -85,7 +87,7 @@ test.describe('Band Management', () => {
     await page.click('button:has-text("New Artist")');
     await page.fill('input[name="name"]', bandName);
     await page.fill('input[name="genre"]', 'Pop');
-    await page.locator('.ql-editor').first().fill('This band will be deleted');
+    await page.locator('.ProseMirror').first().fill('This band will be deleted');
     await page.click('button[type="submit"]:has-text("Add Artist")');
 
     page.once('dialog', dialog => dialog.accept());

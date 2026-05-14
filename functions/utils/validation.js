@@ -38,6 +38,7 @@ const VALID_ROLES = ["admin", "editor", "viewer"];
  * Valid event statuses
  */
 const VALID_EVENT_STATUSES = ["draft", "published", "archived"];
+const ALLOWED_EXTERNAL_PROTOCOLS = new Set(["http:", "https:"]);
 
 /**
  * Control characters to remove during sanitization
@@ -243,22 +244,193 @@ export function sanitizeString(input) {
   return input.replace(CONTROL_CHARS_REGEX, "").trim();
 }
 
+function sanitizeOptionalText(value, maxLength, label) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const text = sanitizeString(String(value));
+  if (!text) {
+    return null;
+  }
+
+  if (maxLength !== undefined && text.length > maxLength) {
+    throw new Error(`${label} must be no more than ${maxLength} characters`);
+  }
+
+  return text;
+}
+
+function sanitizeOptionalHandle(value, maxLength, label) {
+  const text = sanitizeOptionalText(value, maxLength, label);
+  if (!text) {
+    return null;
+  }
+
+  if (/\s/.test(text)) {
+    throw new Error(`${label} must not contain spaces`);
+  }
+
+  return text;
+}
+
+function parseJsonInput(value, label) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      throw new Error(`${label} must be valid JSON`);
+    }
+  }
+
+  if (typeof value === "object") {
+    return value;
+  }
+
+  throw new Error(`${label} must be valid JSON`);
+}
+
+function sanitizeOptionalHandleOrUrl(value, maxLength, label) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const text = sanitizeString(String(value));
+  if (!text) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(text)) {
+    return sanitizeOptionalHttpUrl(text, maxLength, label);
+  }
+
+  return sanitizeOptionalHandle(text, maxLength, label);
+}
+
+export function normalizeHttpUrl(url) {
+  if (!url || typeof url !== "string") {
+    return null;
+  }
+
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(trimmedUrl);
+    if (!ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function sanitizeOptionalHttpUrl(value, maxLength = FIELD_LIMITS.url.max, label = "URL") {
+  const text = sanitizeOptionalText(value, maxLength, label);
+  if (!text) {
+    return null;
+  }
+
+  const normalized = normalizeHttpUrl(text);
+  if (!normalized) {
+    throw new Error(`${label} must start with http:// or https://`);
+  }
+
+  return normalized;
+}
+
+export function sanitizeBandSocialLinks(value) {
+  const parsed = parseJsonInput(value, "Social links");
+  if (!parsed) {
+    return null;
+  }
+
+  if (Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("Social links must be a JSON object");
+  }
+
+  const sanitized = {
+    website: sanitizeOptionalHttpUrl(parsed.website, FIELD_LIMITS.bandUrl.max, "Website URL"),
+    instagram: sanitizeOptionalHandleOrUrl(parsed.instagram, FIELD_LIMITS.socialHandle.max, "Instagram"),
+    bandcamp: sanitizeOptionalHttpUrl(parsed.bandcamp, FIELD_LIMITS.bandUrl.max, "Bandcamp URL"),
+    facebook: sanitizeOptionalHttpUrl(parsed.facebook, FIELD_LIMITS.bandUrl.max, "Facebook URL"),
+    youtube: sanitizeOptionalHttpUrl(parsed.youtube, FIELD_LIMITS.bandUrl.max, "YouTube URL"),
+    spotify: sanitizeOptionalHttpUrl(parsed.spotify, FIELD_LIMITS.bandUrl.max, "Spotify URL"),
+    apple_music: sanitizeOptionalHttpUrl(parsed.apple_music, FIELD_LIMITS.bandUrl.max, "Apple Music URL"),
+    linktree: sanitizeOptionalHttpUrl(parsed.linktree, FIELD_LIMITS.bandUrl.max, "Linktree URL"),
+  };
+
+  return Object.values(sanitized).some(Boolean) ? JSON.stringify(sanitized) : null;
+}
+
+export function sanitizeEventSocialLinks(value) {
+  const parsed = parseJsonInput(value, "Social links");
+  if (!parsed) {
+    return null;
+  }
+
+  if (Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("Social links must be a JSON object");
+  }
+
+  const sanitized = {
+    website: sanitizeOptionalHttpUrl(parsed.website, FIELD_LIMITS.ticketLink.max, "Website URL"),
+    instagram: sanitizeOptionalHandleOrUrl(parsed.instagram, FIELD_LIMITS.ticketLink.max, "Instagram"),
+    facebook: sanitizeOptionalHttpUrl(parsed.facebook, FIELD_LIMITS.ticketLink.max, "Facebook URL"),
+    x: sanitizeOptionalHandleOrUrl(parsed.x, FIELD_LIMITS.ticketLink.max, "X / Twitter"),
+    tiktok: sanitizeOptionalHandleOrUrl(parsed.tiktok, FIELD_LIMITS.ticketLink.max, "TikTok"),
+    youtube: sanitizeOptionalHttpUrl(parsed.youtube, FIELD_LIMITS.ticketLink.max, "YouTube URL"),
+    bandcamp: sanitizeOptionalHttpUrl(parsed.bandcamp, FIELD_LIMITS.ticketLink.max, "Bandcamp URL"),
+  };
+
+  return Object.values(sanitized).some(Boolean) ? JSON.stringify(sanitized) : null;
+}
+
+export function sanitizeVenueInfo(value) {
+  const parsed = parseJsonInput(value, "Venue info");
+  if (!parsed) {
+    return null;
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Venue info must be a JSON array");
+  }
+
+  const sanitizedVenues = parsed.map((venue, index) => {
+    if (!venue || typeof venue !== "object" || Array.isArray(venue)) {
+      throw new Error(`Venue ${index + 1} must be a JSON object`);
+    }
+
+    const name = sanitizeOptionalText(venue.name, FIELD_LIMITS.venueName.max, `Venue ${index + 1} name`);
+    if (!name) {
+      throw new Error(`Venue ${index + 1} name is required`);
+    }
+
+    return {
+      name,
+      address: sanitizeOptionalText(venue.address, FIELD_LIMITS.venueAddress.max, `Venue ${index + 1} address`),
+      note: sanitizeOptionalText(venue.note, FIELD_LIMITS.shortText.max, `Venue ${index + 1} note`),
+      googleMaps: sanitizeOptionalHttpUrl(venue.googleMaps, FIELD_LIMITS.url.max, `Venue ${index + 1} map link`),
+    };
+  });
+
+  return sanitizedVenues.length > 0 ? JSON.stringify(sanitizedVenues) : null;
+}
+
 /**
  * Validate URL format
  * @param {string} url - URL to validate
  * @returns {boolean} True if valid URL
  */
 export function isValidURL(url) {
-  if (!url || typeof url !== "string") {
-    return false;
-  }
-
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
+  return Boolean(normalizeHttpUrl(url));
 }
 
 /**
@@ -861,6 +1033,12 @@ export const VALIDATION_SCHEMAS = {
       type: "date",
       required: true,
       label: "Date",
+    },
+    end_date: {
+      type: "date",
+      required: false,
+      label: "End date",
+      default: null,
     },
     status: {
       type: "enum",

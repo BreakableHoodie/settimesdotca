@@ -1,9 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faKey, faUserSlash, faUserCheck, faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { Key, Pencil, Plus, Trash, UserCheck, UserX } from 'lucide-react'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import { usersApi } from '../utils/adminApi'
+
+function SortIcon({ col, sortConfig }) {
+  return (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
+}
 
 export default function UserManagement() {
   const [users, setUsers] = useState([])
@@ -18,10 +25,6 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-
-  useEffect(() => {
-    fetchUsers()
-  }, [])
 
   const resolveDisplayName = user => {
     if (user?.firstName || user?.lastName) {
@@ -87,12 +90,6 @@ export default function UserManagement() {
     }))
   }
 
-  const SortIcon = ({ col }) => (
-    <span className="ml-1 inline-block w-4">
-      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-    </span>
-  )
-
   const fetchUsers = async () => {
     try {
       const data = await usersApi.getAll()
@@ -104,6 +101,10 @@ export default function UserManagement() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
 
   const handleCreateUser = async userData => {
     setActionLoading(true)
@@ -239,12 +240,12 @@ export default function UserManagement() {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name or email"
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-56"
           />
           <select
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
           >
             <option value="all">All roles</option>
             <option value="admin">Admin</option>
@@ -254,7 +255,7 @@ export default function UserManagement() {
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -265,9 +266,9 @@ export default function UserManagement() {
               setEditingUser(null)
               setShowUserModal(true)
             }}
-            className="bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
+            className="bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
           >
-            <FontAwesomeIcon icon={faPlus} />
+            <Plus size={14} />
             Invite User
           </button>
         </div>
@@ -282,25 +283,25 @@ export default function UserManagement() {
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('name')}
                 >
-                  User <SortIcon col="name" />
+                  User <SortIcon col="name" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('role')}
                 >
-                  Role <SortIcon col="role" />
+                  Role <SortIcon col="role" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('status')}
                 >
-                  Status <SortIcon col="status" />
+                  Status <SortIcon col="status" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('last_login')}
                 >
-                  Last Login <SortIcon col="last_login" />
+                  Last Login <SortIcon col="last_login" sortConfig={sortConfig} />
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Actions
@@ -351,18 +352,18 @@ export default function UserManagement() {
                           title="Edit User"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faEdit} />
+                          <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => {
                             setSelectedUser(user)
                             setShowResetModal(true)
                           }}
-                          className="text-band-orange hover:text-band-orange/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          className="text-accent-400 hover:text-accent-400/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="Reset Password"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faKey} />
+                          <Key size={14} />
                         </button>
                         <button
                           onClick={() => handleToggleUserStatus(user)}
@@ -374,7 +375,7 @@ export default function UserManagement() {
                           title={user.isActive ? 'Deactivate User' : 'Activate User'}
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={user.isActive ? faUserSlash : faUserCheck} />
+                          {user.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
                         </button>
                         <button
                           onClick={() => handleDeleteUser(user)}
@@ -382,7 +383,7 @@ export default function UserManagement() {
                           title="Delete User"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faTrash} />
+                          <Trash size={14} />
                         </button>
                       </div>
                     </td>
@@ -429,7 +430,7 @@ export default function UserManagement() {
                       setSelectedUser(user)
                       setShowResetModal(true)
                     }}
-                    className="px-4 py-2 min-h-[44px] bg-band-orange/80 hover:bg-band-orange text-white rounded text-sm"
+                    className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-white rounded text-sm"
                     disabled={actionLoading}
                   >
                     Reset Password
@@ -489,7 +490,7 @@ export default function UserManagement() {
                 id="resetReason"
                 value={resetReason}
                 onChange={e => setResetReason(e.target.value)}
-                className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-white/10 text-white border border-white/20 focus:border-band-orange focus:outline-none placeholder-gray-400"
+                className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-hidden placeholder-gray-400"
                 placeholder="Reason for password reset..."
                 rows={3}
               />
@@ -499,7 +500,7 @@ export default function UserManagement() {
               <button
                 onClick={handleResetPassword}
                 disabled={actionLoading}
-                className="flex-1 min-h-[44px] bg-band-orange hover:bg-band-orange/90 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+                className="flex-1 min-h-[44px] bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
               >
                 {actionLoading ? 'Sending...' : 'Send Reset Link'}
               </button>

@@ -1,5 +1,4 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronRight } from '@fortawesome/free-solid-svg-icons'
+import { ChevronRight } from 'lucide-react'
 
 /**
  * Breadcrumbs - Navigation hierarchy indicator
@@ -23,7 +22,7 @@ export default function Breadcrumbs({ selectedEvent, onClearEvent, activeTab, ta
       {/* Root: All Events */}
       <button
         onClick={onClearEvent}
-        className="text-text-secondary hover:text-accent-500 transition-colors focus:outline-none focus:text-accent-500 focus:ring-2 focus:ring-accent-500/50 rounded px-2 py-1"
+        className="text-text-secondary hover:text-accent-500 transition-colors focus:outline-hidden focus:text-accent-500 focus:ring-2 focus:ring-accent-500/50 rounded px-2 py-1"
         aria-label="Return to all events view"
       >
         All Events
@@ -32,7 +31,7 @@ export default function Breadcrumbs({ selectedEvent, onClearEvent, activeTab, ta
       {/* Event Name (if selected) */}
       {selectedEvent && (
         <>
-          <FontAwesomeIcon icon={faChevronRight} className="text-text-tertiary text-xs" aria-hidden="true" />
+          <ChevronRight size={12} className="text-text-tertiary" aria-hidden="true" />
           <span className="text-accent-500 font-semibold">{selectedEvent.name}</span>
         </>
       )}
@@ -40,7 +39,7 @@ export default function Breadcrumbs({ selectedEvent, onClearEvent, activeTab, ta
       {/* Tab Name (if not on Events tab) */}
       {activeTab !== 'events' && currentTab && (
         <>
-          <FontAwesomeIcon icon={faChevronRight} className="text-text-tertiary text-xs" aria-hidden="true" />
+          <ChevronRight size={12} className="text-text-tertiary" aria-hidden="true" />
           <span className="text-text-primary">{currentTab.label}</span>
         </>
       )}

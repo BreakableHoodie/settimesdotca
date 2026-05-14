@@ -2,13 +2,13 @@ import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { eventsApi, bandsApi } from '../utils/adminApi'
 import { useEventContext } from '../contexts/EventContext'
 import EventFormModal from './EventFormModal'
+import HistoricalImportModal from './HistoricalImportModal'
 import EventStatusBadge from './components/EventStatusBadge'
 import EmbedCodeGenerator from './EmbedCodeGenerator'
 import MetricsDashboard from './MetricsDashboard'
 import ArchivedEventBanner from './components/ArchivedEventBanner'
 import HelpPanel from './components/HelpPanel'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCopy, faLink, faTicketSimple } from '@fortawesome/free-solid-svg-icons'
+import { Copy, Link, Ticket } from 'lucide-react'
 import { formatTimeRange } from '../utils/timeFormat'
 import {
   getEventState,
@@ -16,6 +16,16 @@ import {
   confirmArchivedEventEdit,
   confirmArchivedEventDelete,
 } from '../utils/eventLifecycle'
+import { safeExternalHref } from '../utils/urlSafety'
+
+const isEventLockedAsArchived = event => event?.status === 'archived' || isEventArchived(event?.date)
+const getAdminEventState = event => (event?.status === 'archived' ? 'archived' : getEventState(event?.date))
+const buttonFocusClass =
+  'border border-transparent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
+const linkFocusClass =
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
+const inputFocusClass =
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
 
 const MINUTES_IN_DAY = 24 * 60
 const EARLY_MORNING_CUTOFF_HOUR = 6
@@ -181,28 +191,39 @@ const areEventPropsEqual = (prevProps, nextProps) => {
 const EventRow = memo(function EventRow({
   event,
   onFilter,
+  onViewMetrics,
   onEdit,
   onTogglePublish,
   onArchive,
   onDelete,
   showToast,
   readOnly,
+  canArchiveEvents,
 }) {
   const ticketLink = event.ticket_url || event.ticket_link
 
   return (
-    <tr className="hover:bg-band-navy/30 transition-colors">
+    <tr className="hover:bg-bg-navy/30 transition-colors">
       <td className="px-4 py-3">
-        <button
-          onClick={() => onFilter?.(event.id)}
-          className="text-white font-medium hover:text-band-orange transition-colors text-left"
-          title="Filter to this event"
-        >
-          {event.name}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => onFilter?.(event.id)}
+            className={`text-white font-medium hover:text-accent-400 transition-colors text-left rounded-xs ${buttonFocusClass}`}
+            title="Filter to this event"
+          >
+            {event.name}
+          </button>
+          <button
+            onClick={() => onViewMetrics?.(event)}
+            className={`px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
+            title="View event metrics"
+          >
+            Metrics
+          </button>
+        </div>
       </td>
       <td className="px-4 py-3 text-white/70">{formatEventDate(event.date)}</td>
-      <td className="px-4 py-3 text-band-orange font-mono text-sm">{event.slug}</td>
+      <td className="px-4 py-3 text-accent-400 font-mono text-sm">{event.slug}</td>
       <td className="px-4 py-3 text-center">
         <div className="inline-flex justify-center w-full">
           <EventStatusBadge status={event.status} />
@@ -210,14 +231,14 @@ const EventRow = memo(function EventRow({
       </td>
       <td className="px-4 py-3 text-center text-white/70">{event.band_count || 0}</td>
       <td className="px-4 py-3 text-center">
-        {ticketLink ? (
+        {safeExternalHref(ticketLink) !== '#' ? (
           <div className="flex justify-center gap-2">
             <button
-              onClick={() => window.open(ticketLink, '_blank')}
-              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+              onClick={() => window.open(safeExternalHref(ticketLink), '_blank', 'noopener,noreferrer')}
+              className={`px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Visit ticket link"
             >
-              <FontAwesomeIcon icon={faLink} className="mr-1" aria-hidden="true" />
+              <Link size={14} className="mr-1" aria-hidden="true" />
               Visit
             </button>
             <button
@@ -225,15 +246,15 @@ const EventRow = memo(function EventRow({
                 await navigator.clipboard.writeText(ticketLink)
                 showToast('Ticket link copied!', 'success')
               }}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+              className={`px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Copy ticket link"
             >
-              <FontAwesomeIcon icon={faCopy} className="mr-1" aria-hidden="true" />
+              <Copy size={14} className="mr-1" aria-hidden="true" />
               Copy
             </button>
           </div>
         ) : (
-          <span className="text-white/30 text-sm">-</span>
+          <span className="text-white/30 text-sm">No ticket link</span>
         )}
       </td>
       {!readOnly && (
@@ -241,13 +262,13 @@ const EventRow = memo(function EventRow({
           <div className="flex justify-end gap-2 flex-wrap">
             <button
               onClick={() => onEdit(event)}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+              className={`px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
               Edit
             </button>
             <button
               onClick={() => onTogglePublish(event)}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${buttonFocusClass} ${
                 event.status === 'published'
                   ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                   : 'bg-green-600 hover:bg-green-700 text-white'
@@ -256,10 +277,10 @@ const EventRow = memo(function EventRow({
             >
               {event.status === 'published' ? 'Unpublish' : 'Publish'}
             </button>
-            {event.status !== 'archived' && (
+            {canArchiveEvents && event.status !== 'archived' && (
               <button
                 onClick={() => onArchive(event)}
-                className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+                className={`px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
                 title="Archive event (admin only)"
               >
                 Archive
@@ -267,7 +288,7 @@ const EventRow = memo(function EventRow({
             )}
             <button
               onClick={() => onDelete(event)}
-              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+              className={`px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
               Delete
             </button>
@@ -278,7 +299,16 @@ const EventRow = memo(function EventRow({
   )
 }, areEventPropsEqual)
 
-const EventCard = memo(function EventCard({ event, onEdit, onTogglePublish, onArchive, onDelete, readOnly }) {
+const EventCard = memo(function EventCard({
+  event,
+  onViewMetrics,
+  onEdit,
+  onTogglePublish,
+  onArchive,
+  onDelete,
+  readOnly,
+  canArchiveEvents,
+}) {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-start justify-between">
@@ -291,48 +321,56 @@ const EventCard = memo(function EventCard({ event, onEdit, onTogglePublish, onAr
 
       <div className="text-sm">
         <span className="text-white/50">Slug: </span>
-        <span className="text-band-orange font-mono">{event.slug}</span>
+        <span className="text-accent-400 font-mono">{event.slug}</span>
       </div>
 
       <div className="text-sm text-white/70">
         Bands: <span className="text-white">{event.band_count || 0}</span>
       </div>
 
-      {!readOnly && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => onEdit(event)}
-            className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => onTogglePublish(event)}
-            className={`px-4 py-2 min-h-[44px] rounded text-sm font-medium transition-colors ${
-              event.status === 'published'
-                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                : 'bg-green-600 hover:bg-green-700 text-white'
-            }`}
-            disabled={event.status === 'archived'}
-          >
-            {event.status === 'published' ? 'Unpublish' : 'Publish'}
-          </button>
-          {event.status !== 'archived' && (
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => onViewMetrics?.(event)}
+          className={`px-4 py-2 min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
+        >
+          Metrics
+        </button>
+        {!readOnly && (
+          <>
             <button
-              onClick={() => onArchive(event)}
-              className="px-4 py-2 min-h-[44px] bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
+              onClick={() => onEdit(event)}
+              className={`px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
-              Archive
+              Edit
             </button>
-          )}
-          <button
-            onClick={() => onDelete(event)}
-            className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
-          >
-            Delete
-          </button>
-        </div>
-      )}
+            <button
+              onClick={() => onTogglePublish(event)}
+              className={`px-4 py-2 min-h-[44px] rounded text-sm font-medium transition-colors ${buttonFocusClass} ${
+                event.status === 'published'
+                  ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+              disabled={event.status === 'archived'}
+            >
+              {event.status === 'published' ? 'Unpublish' : 'Publish'}
+            </button>
+            {canArchiveEvents && event.status !== 'archived' && (
+              <button
+                onClick={() => onArchive(event)}
+                className={`px-4 py-2 min-h-[44px] bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
+              >
+                Archive
+              </button>
+            )}
+            <button
+              onClick={() => onDelete(event)}
+              className={`px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
     </div>
   )
 }, areEventPropsEqual)
@@ -355,9 +393,11 @@ export default function EventsTab({
   selectedEvent,
   onEventFilterChange,
   readOnly = false,
+  canArchiveEvents = false,
 }) {
   const { refreshEvents } = useEventContext()
   const [showModal, setShowModal] = useState(false)
+  const [showHistoricalImport, setShowHistoricalImport] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
   // duplication flow simplified: startDuplicate will perform duplication directly
   const [showEmbedCode, setShowEmbedCode] = useState(null)
@@ -393,8 +433,8 @@ export default function EventsTab({
     if (selectedEventId) {
       const loadEventData = async () => {
         try {
-          const bandsData = await bandsApi.getAll()
-          const eventBandsData = bandsData.bands.filter(b => b.event_id === selectedEventId)
+          const bandsData = await bandsApi.getByEvent(selectedEventId)
+          const eventBandsData = bandsData.bands
 
           // Get venue names from the bands
           const uniqueVenues = {}
@@ -511,7 +551,7 @@ export default function EventsTab({
       return
     }
     // Check if event is archived
-    if (isEventArchived(event.date)) {
+    if (isEventLockedAsArchived(event)) {
       // Show two-confirmation gate
       if (!confirmArchivedEventEdit(event)) {
         showToast('Edit cancelled. Use "Copy as Template" to create a new event instead.', 'error')
@@ -550,8 +590,8 @@ export default function EventsTab({
   }
 
   const handleArchive = async event => {
-    if (readOnly) {
-      showToast('Read-only access: archiving is disabled for your role.', 'error')
+    if (readOnly || !canArchiveEvents) {
+      showToast('Archiving is disabled for your role.', 'error')
       return
     }
     if (!window.confirm(`Archive "${event.name}"? It will be hidden from the default view and unpublished.`)) {
@@ -574,10 +614,10 @@ export default function EventsTab({
       showToast('Read-only access: deleting is disabled for your role.', 'error')
       return
     }
-    const { id: eventId, name: eventName, date: eventDate, band_count: bandCount } = event
+    const { id: eventId, name: eventName, band_count: bandCount } = event
 
     // Check if event is archived
-    if (isEventArchived(eventDate)) {
+    if (isEventLockedAsArchived(event)) {
       // Use special confirmation for archived events
       if (!confirmArchivedEventDelete(event)) {
         showToast('Delete cancelled for archived event.', 'error')
@@ -587,7 +627,7 @@ export default function EventsTab({
       // Regular confirmation for non-archived events
       const confirmMessage =
         bandCount > 0
-          ? `Are you sure you want to delete "${eventName}"? This will remove the event but keep all ${bandCount} band(s) (they will become unassigned and can be moved to other events). This action cannot be undone.`
+          ? `Are you sure you want to delete "${eventName}"? This will permanently delete ${bandCount} scheduled performance record(s) for this event. This action cannot be undone.`
           : `Are you sure you want to delete "${eventName}"? This action cannot be undone.`
 
       if (!window.confirm(confirmMessage)) {
@@ -596,7 +636,7 @@ export default function EventsTab({
     }
 
     try {
-      const result = await eventsApi.delete(eventId)
+      const result = await eventsApi.delete(eventId, { confirmCascade: bandCount > 0 })
       showToast(result.message || `Event "${eventName}" deleted successfully!`, 'success')
       onEventsChange()
     } catch (err) {
@@ -621,7 +661,7 @@ export default function EventsTab({
 
   // If event is selected, show event detail view
   if (selectedEvent && selectedEventId) {
-    const eventState = getEventState(selectedEvent.date)
+    const eventState = getAdminEventState(selectedEvent)
 
     return (
       <div className="space-y-6">
@@ -637,10 +677,10 @@ export default function EventsTab({
         />
 
         {/* Event Details Card */}
-        <div className="bg-band-purple rounded-lg border border-band-orange/20 p-6">
+        <div className="bg-bg-purple rounded-lg border border-accent-500/20 p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-band-orange mb-2">{selectedEvent.name}</h2>
+              <h2 className="text-2xl font-bold text-accent-400 mb-2">{selectedEvent.name}</h2>
               <div className="space-y-1 text-white/70">
                 <p>
                   <span className="font-semibold">Date:</span>{' '}
@@ -653,7 +693,7 @@ export default function EventsTab({
                 </p>
                 <p>
                   <span className="font-semibold">Slug:</span>{' '}
-                  <span className="font-mono text-band-orange">{selectedEvent.slug}</span>
+                  <span className="font-mono text-accent-400">{selectedEvent.slug}</span>
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold">Public URL:</span>
@@ -663,21 +703,22 @@ export default function EventsTab({
                         href={getPublicEventUrl(selectedEvent)}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-band-orange underline break-all"
+                        className={`text-accent-400 underline break-all rounded-xs ${linkFocusClass}`}
                       >
-                        {getPublicEventUrl(selectedEvent)}
+                        Open the public event page for {selectedEvent.name}
                       </a>
+                      <code className="text-white/50 text-xs sm:text-sm">{getPublicEventUrl(selectedEvent)}</code>
                       <button
                         type="button"
                         onClick={() => handleCopyPublicUrl(selectedEvent)}
-                        className="px-2 py-1 text-xs bg-band-navy/50 text-white rounded hover:bg-band-navy/70"
+                        className={`px-2 py-1 text-xs bg-bg-navy/50 text-white rounded hover:bg-bg-navy/70 ${buttonFocusClass}`}
                       >
                         Copy
                       </button>
                       <button
                         type="button"
                         onClick={() => window.open(getPublicEventUrl(selectedEvent), '_blank')}
-                        className="px-2 py-1 text-xs bg-band-navy/50 text-white rounded hover:bg-band-navy/70"
+                        className={`px-2 py-1 text-xs bg-bg-navy/50 text-white rounded hover:bg-bg-navy/70 ${buttonFocusClass}`}
                       >
                         Open
                       </button>
@@ -696,30 +737,32 @@ export default function EventsTab({
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setShowEmbedCode(selectedEvent)}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                className={`px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
               >
                 Embed
               </button>
               <button
                 onClick={() => setShowMetrics(selectedEvent)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                className={`px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
               >
                 Metrics
               </button>
               {!readOnly && (
                 <button
                   onClick={() => startEdit(selectedEvent)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                  className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
                   Edit
                 </button>
               )}
-              {selectedEvent.ticket_link && (
+              {safeExternalHref(selectedEvent.ticket_link) !== '#' && (
                 <button
-                  onClick={() => window.open(selectedEvent.ticket_link, '_blank')}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors min-h-[44px]"
+                  onClick={() =>
+                    window.open(safeExternalHref(selectedEvent.ticket_link), '_blank', 'noopener,noreferrer')
+                  }
+                  className={`px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
-                  <FontAwesomeIcon icon={faTicketSimple} className="mr-2" aria-hidden="true" />
+                  <Ticket size={14} className="mr-2" aria-hidden="true" />
                   Tickets
                 </button>
               )}
@@ -728,16 +771,16 @@ export default function EventsTab({
 
           {/* Statistics */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 mb-6">
-            <div className="bg-band-navy/50 rounded-lg p-4">
-              <div className="text-3xl font-bold text-band-orange mb-1">{selectedEvent.band_count || 0}</div>
+            <div className="bg-bg-navy/50 rounded-lg p-4">
+              <div className="text-3xl font-bold text-accent-400 mb-1">{selectedEvent.band_count || 0}</div>
               <div className="text-white/70 text-sm">Performers</div>
             </div>
-            <div className="bg-band-navy/50 rounded-lg p-4">
-              <div className="text-3xl font-bold text-band-orange mb-1">{eventVenues.length}</div>
+            <div className="bg-bg-navy/50 rounded-lg p-4">
+              <div className="text-3xl font-bold text-accent-400 mb-1">{eventVenues.length}</div>
               <div className="text-white/70 text-sm">Venues</div>
             </div>
-            <div className="bg-band-navy/50 rounded-lg p-4">
-              <div className="text-3xl font-bold text-band-orange mb-1 capitalize">
+            <div className="bg-bg-navy/50 rounded-lg p-4">
+              <div className="text-3xl font-bold text-accent-400 mb-1 capitalize">
                 {selectedEvent.status || 'Draft'}
               </div>
               <div className="text-white/70 text-sm">Status</div>
@@ -748,25 +791,24 @@ export default function EventsTab({
           {eventVenues.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold text-white mb-3">Venues</h3>
-              <div className="flex flex-wrap gap-2">
+              <ul className="flex flex-wrap gap-2" aria-label="Event venues">
                 {eventVenues.map(venue => (
-                  <button
-                    key={venue.id}
-                    onClick={() => {
-                      // Navigate to venues tab with this venue filtered
-                      window.location.href = '#venues'
-                      setTimeout(() => {
-                        // Trigger a custom event to filter this venue
-                        window.dispatchEvent(new CustomEvent('filterVenue', { detail: { venueId: venue.id } }))
-                      }, 100)
-                    }}
-                    className="inline-block bg-band-orange/20 hover:bg-band-orange/30 text-band-orange px-3 py-1.5 rounded text-sm transition-colors cursor-pointer"
-                    title={`View ${venue.name} profile`}
-                  >
-                    {venue.name || `Venue ${venue.id}`}
-                  </button>
+                  <li key={venue.id}>
+                    <button
+                      onClick={() => {
+                        window.location.href = '#venues'
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('filterVenue', { detail: { venueId: venue.id } }))
+                        }, 100)
+                      }}
+                      className={`inline-block bg-accent-500/20 hover:bg-accent-500/30 text-accent-400 px-3 py-1.5 rounded text-sm transition-colors cursor-pointer ${buttonFocusClass}`}
+                      title={`View ${venue.name} profile`}
+                    >
+                      {venue.name || `Venue ${venue.id}`}
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
@@ -774,16 +816,16 @@ export default function EventsTab({
           {eventBands.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold text-white mb-3">Performers</h3>
-              <div className="flex flex-wrap gap-2">
+              <ul className="flex flex-wrap gap-2" aria-label="Event performers">
                 {Array.from(new Set(eventBands.map(b => b.name))).map(bandName => (
-                  <span
+                  <li
                     key={bandName}
-                    className="inline-block bg-blue-900/20 text-blue-300 px-3 py-1.5 rounded text-sm"
+                    className="inline-block bg-blue-900/20 text-blue-300 px-3 py-1.5 rounded text-sm border border-transparent"
                   >
                     {bandName}
-                  </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
@@ -798,10 +840,10 @@ export default function EventsTab({
                   const venueId = scheduleSummary.venueIdByName[venueName]
 
                   return (
-                    <div key={venueName} className="bg-band-navy/30 rounded-lg border border-band-orange/10">
+                    <div key={venueName} className="bg-bg-navy/30 rounded-lg border border-accent-500/10">
                       <button
                         type="button"
-                        className="w-full px-4 py-3 text-base font-semibold text-band-orange border-b border-band-orange/20 cursor-pointer hover:bg-band-navy/20 transition-colors text-left"
+                        className={`w-full px-4 py-3 text-base font-semibold text-accent-400 border-b border-accent-500/20 cursor-pointer hover:bg-bg-navy/20 transition-colors text-left ${buttonFocusClass}`}
                         onClick={() => handleFilterVenue(venueId)}
                         title="View venue profile"
                       >
@@ -809,26 +851,33 @@ export default function EventsTab({
                       </button>
                       <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
-                          <thead className="bg-band-navy/20">
+                          <caption className="sr-only">Schedule for {venueName}</caption>
+                          <thead className="bg-bg-navy/20">
                             <tr>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Time</th>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Performer</th>
-                              <th className="px-4 py-2 text-left text-white/70 text-xs font-semibold">Duration</th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">
+                                Time
+                              </th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">
+                                Performer
+                              </th>
+                              <th scope="col" className="px-4 py-2 text-left text-white/70 text-xs font-semibold">
+                                Duration
+                              </th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-band-orange/10">
+                          <tbody className="divide-y divide-accent-500/10">
                             {venueBands.map(band => {
                               const duration = getDurationMinutes(band.start_time, band.end_time)
 
                               return (
-                                <tr key={band.id} className="hover:bg-band-navy/20 transition-colors">
+                                <tr key={band.id} className="hover:bg-bg-navy/20 transition-colors">
                                   <td className="px-4 py-2 text-white/90 font-mono text-sm">
                                     {formatTimeRange(band.start_time, band.end_time, { fallback: '-' })}
                                   </td>
                                   <td className="px-4 py-2">
                                     <button
                                       onClick={() => handleFilterBand(band.name)}
-                                      className="text-white hover:text-band-orange transition-colors cursor-pointer"
+                                      className={`text-white hover:text-accent-400 transition-colors cursor-pointer rounded-xs ${buttonFocusClass}`}
                                       title="View performer profile"
                                     >
                                       {band.name}
@@ -840,16 +889,16 @@ export default function EventsTab({
                                 </tr>
                               )
                             })}
-                            <tr className="bg-band-orange/20 border-t-2 border-band-orange">
-                              <td className="px-4 py-2 text-band-orange font-semibold" colSpan="2">
+                            <tr className="bg-accent-500/20 border-t-2 border-accent-500">
+                              <td className="px-4 py-2 text-accent-400 font-semibold" colSpan="2">
                                 {venueName} Total
                               </td>
-                              <td className="px-4 py-2 text-band-orange font-semibold">{formatMinutes(venueTotal)}</td>
+                              <td className="px-4 py-2 text-accent-400 font-semibold">{formatMinutes(venueTotal)}</td>
                             </tr>
                           </tbody>
                         </table>
                       </div>
-                      <div className="md:hidden divide-y divide-band-orange/10">
+                      <div className="md:hidden divide-y divide-accent-500/10">
                         {venueBands.map(band => {
                           const duration = getDurationMinutes(band.start_time, band.end_time)
                           return (
@@ -859,7 +908,7 @@ export default function EventsTab({
                               </div>
                               <button
                                 onClick={() => handleFilterBand(band.name)}
-                                className="text-white hover:text-band-orange transition-colors text-left"
+                                className={`text-white hover:text-accent-400 transition-colors text-left rounded-xs ${buttonFocusClass}`}
                                 title="View performer profile"
                               >
                                 {band.name}
@@ -870,8 +919,8 @@ export default function EventsTab({
                             </div>
                           )
                         })}
-                        <div className="px-4 py-3 bg-band-orange/20 border-t border-band-orange/40">
-                          <div className="flex items-center justify-between text-band-orange font-semibold">
+                        <div className="px-4 py-3 bg-accent-500/20 border-t border-accent-500/40">
+                          <div className="flex items-center justify-between text-accent-400 font-semibold">
                             <span>{venueName} Total</span>
                             <span>{formatMinutes(venueTotal)}</span>
                           </div>
@@ -881,11 +930,11 @@ export default function EventsTab({
                   )
                 })}
 
-                <div className="mt-4 bg-band-orange/20 rounded-lg p-4 border-2 border-band-orange">
+                <div className="mt-4 bg-accent-500/20 rounded-lg p-4 border-2 border-accent-500">
                   <div className="flex flex-col gap-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-band-orange font-semibold text-lg">Total Scheduled Time</span>
-                      <span className="text-band-orange font-bold text-lg">
+                      <span className="text-accent-400 font-semibold text-lg">Total Scheduled Time</span>
+                      <span className="text-accent-400 font-bold text-lg">
                         {formatMinutes(scheduleSummary.eventTotal)}
                       </span>
                     </div>
@@ -910,16 +959,20 @@ export default function EventsTab({
             }}
             event={editingEvent}
             onSave={handleEventSaved}
+            canCreateArchived={canArchiveEvents}
           />
         )}
         {/* Metrics Dashboard Modal */}
         {showMetrics && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-bg-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-white">Metrics for &quot;{showMetrics.name}&quot;</h3>
-                  <button onClick={() => setShowMetrics(null)} className="text-gray-400 hover:text-white text-2xl">
+                  <button
+                    onClick={() => setShowMetrics(null)}
+                    className={`text-gray-400 hover:text-white text-2xl rounded ${buttonFocusClass}`}
+                  >
                     ×
                   </button>
                 </div>
@@ -931,11 +984,14 @@ export default function EventsTab({
         {/* Embed Code Generator Modal */}
         {showEmbedCode && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-bg-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-white">Embed Code for &quot;{showEmbedCode.name}&quot;</h3>
-                  <button onClick={() => setShowEmbedCode(null)} className="text-gray-400 hover:text-white text-2xl">
+                  <button
+                    onClick={() => setShowEmbedCode(null)}
+                    className={`text-gray-400 hover:text-white text-2xl rounded ${buttonFocusClass}`}
+                  >
                     ×
                   </button>
                 </div>
@@ -958,17 +1014,21 @@ export default function EventsTab({
           <p className="text-sm text-white/70 mt-1">Create, edit, and publish event schedules.</p>
         </div>
         <div className="flex flex-col items-start sm:flex-row sm:items-center gap-3">
+          <label htmlFor="events-search" className="sr-only">
+            Search events by name or slug
+          </label>
           <input
+            id="events-search"
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name or slug"
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none w-56"
+            className={`min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 w-56 ${inputFocusClass}`}
           />
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="min-h-[44px] px-3 py-2 rounded bg-band-navy text-white border border-white/10 focus:border-band-orange focus:outline-none"
+            className={`min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 ${inputFocusClass}`}
           >
             <option value="all">All statuses</option>
             <option value="published">Published</option>
@@ -977,7 +1037,7 @@ export default function EventsTab({
           </select>
           <button
             onClick={() => setShowHelp(!showHelp)}
-            className="px-4 py-2 text-band-orange underline text-sm hover:text-orange-500 transition-colors min-h-[44px]"
+            className={`px-4 py-2 text-accent-400 underline text-sm hover:text-accent-300 transition-colors min-h-[44px] rounded ${buttonFocusClass}`}
             aria-label="Toggle help"
           >
             {showHelp ? 'Hide Help' : 'Show Help'}
@@ -987,17 +1047,25 @@ export default function EventsTab({
               type="checkbox"
               checked={showArchived}
               onChange={e => setShowArchived(e.target.checked)}
-              className="h-5 w-5 rounded border-gray-600 text-band-orange focus:ring-band-orange"
+              className={`h-5 w-5 rounded border border-gray-600 text-accent-500 ${inputFocusClass}`}
             />
             <span>Show Archived</span>
           </label>
+          {!readOnly && canArchiveEvents && (
+            <button
+              onClick={() => setShowHistoricalImport(true)}
+              className={`px-3 py-2 text-sm text-gray-300 hover:text-white border border-white/20 hover:border-white/40 rounded transition-colors min-h-[44px] ${buttonFocusClass}`}
+            >
+              Import historical event
+            </button>
+          )}
           {!readOnly && (
             <button
               onClick={() => {
                 setEditingEvent(null)
                 setShowModal(true)
               }}
-              className="px-4 py-2 bg-band-orange text-white rounded hover:bg-orange-600 transition-colors min-h-[44px]"
+              className={`px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors min-h-[44px] ${buttonFocusClass}`}
             >
               + Create New Event
             </button>
@@ -1007,6 +1075,20 @@ export default function EventsTab({
 
       {/* Help Panel */}
       {showHelp && <HelpPanel topic="events" isOpen={showHelp} onClose={() => setShowHelp(false)} />}
+
+      {/* Historical Import Modal */}
+      {showHistoricalImport && (
+        <HistoricalImportModal
+          onClose={() => {
+            setShowHistoricalImport(false)
+            refreshEvents()
+          }}
+          onImported={() => {
+            setShowHistoricalImport(false)
+            refreshEvents()
+          }}
+        />
+      )}
 
       {/* Event Form Modal */}
       {!readOnly && (
@@ -1018,11 +1100,12 @@ export default function EventsTab({
           }}
           event={editingEvent}
           onSave={handleEventSaved}
+          canCreateArchived={canArchiveEvents}
         />
       )}
 
       {/* Events List */}
-      <div className="bg-band-purple rounded-lg border border-band-orange/20 overflow-hidden">
+      <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
         {filteredEvents.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {events.length === 0
@@ -1034,59 +1117,72 @@ export default function EventsTab({
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-band-navy/50 border-b border-band-orange/20">
+                <caption className="sr-only">Events list</caption>
+                <thead className="bg-bg-navy/50 border-b border-accent-500/20">
                   <tr>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      scope="col"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('name')}
                     >
                       Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      scope="col"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('date')}
                     >
                       Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      scope="col"
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('slug')}
                     >
                       Slug {sortConfig.key === 'slug' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      scope="col"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('status')}
                     >
                       Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      scope="col"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('band_count')}
                     >
                       Bands {sortConfig.key === 'band_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-band-orange/10"
+                      scope="col"
+                      className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:bg-accent-500/10"
                       onClick={() => handleSort('ticket_url')}
                     >
                       Tickets {sortConfig.key === 'ticket_url' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
+                    {!readOnly && (
+                      <th scope="col" className="px-4 py-3 text-right text-white font-semibold">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-band-orange/10">
+                <tbody className="divide-y divide-accent-500/10">
                   {sortedEvents.map(event => (
                     <EventRow
                       key={event.id}
                       event={event}
                       onFilter={onEventFilterChange}
+                      onViewMetrics={setShowMetrics}
                       onEdit={startEdit}
                       onTogglePublish={handleTogglePublish}
                       onArchive={handleArchive}
                       onDelete={handleDelete}
                       showToast={showToast}
                       readOnly={readOnly}
+                      canArchiveEvents={canArchiveEvents}
                     />
                   ))}
                 </tbody>
@@ -1094,16 +1190,18 @@ export default function EventsTab({
             </div>
 
             {/* Mobile Cards */}
-            <div className="md:hidden divide-y divide-band-orange/10">
+            <div className="md:hidden divide-y divide-accent-500/10">
               {sortedEvents.map(event => (
                 <EventCard
                   key={event.id}
                   event={event}
+                  onViewMetrics={setShowMetrics}
                   onEdit={startEdit}
                   onTogglePublish={handleTogglePublish}
                   onArchive={handleArchive}
                   onDelete={handleDelete}
                   readOnly={readOnly}
+                  canArchiveEvents={canArchiveEvents}
                 />
               ))}
             </div>
@@ -1114,11 +1212,14 @@ export default function EventsTab({
       {/* Metrics Dashboard Modal */}
       {showMetrics && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-band-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-purple rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">Metrics for &quot;{showMetrics.name}&quot;</h3>
-                <button onClick={() => setShowMetrics(null)} className="text-gray-400 hover:text-white text-2xl">
+                <button
+                  onClick={() => setShowMetrics(null)}
+                  className={`text-gray-400 hover:text-white text-2xl rounded ${buttonFocusClass}`}
+                >
                   ×
                 </button>
               </div>
@@ -1131,11 +1232,14 @@ export default function EventsTab({
       {/* Embed Code Generator Modal */}
       {showEmbedCode && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-band-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-purple rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">Embed Code for &quot;{showEmbedCode.name}&quot;</h3>
-                <button onClick={() => setShowEmbedCode(null)} className="text-gray-400 hover:text-white text-2xl">
+                <button
+                  onClick={() => setShowEmbedCode(null)}
+                  className={`text-gray-400 hover:text-white text-2xl rounded ${buttonFocusClass}`}
+                >
                   ×
                 </button>
               </div>

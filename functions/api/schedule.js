@@ -15,15 +15,24 @@ export async function onRequestGet(context) {
 
   try {
     const { DB } = env;
+    const configuredTtl = Number.parseInt(
+      env.SCHEDULE_CACHE_TTL_SECONDS || "60",
+      10,
+    );
+    const cacheTtl = Number.isFinite(configuredTtl) && configuredTtl >= 0
+      ? configuredTtl
+      : 60;
 
     let event;
 
     if (eventParam === "current") {
       // Get the current or next upcoming published event
-      // Note: Using UTC date, adjust with timezone offset if needed
+      // The -6 hour buffer keeps the event visible during late-night/overnight
+      // sets that span past midnight (e.g. 11:30pm-12:30am)
       event = await DB.prepare(
         `
-        SELECT * FROM events
+        SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
+        FROM events
         WHERE is_published = 1
           AND date >= date('now', '-6 hours')
         ORDER BY date ASC
@@ -31,11 +40,12 @@ export async function onRequestGet(context) {
       `,
       ).first();
     } else {
-      // Get event by slug
+      // Get event by slug — includes archived events for read-only history browsing
       event = await DB.prepare(
         `
-        SELECT * FROM events
-        WHERE slug = ? AND is_published = 1
+        SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
+        FROM events
+        WHERE slug = ? AND (is_published = 1 OR status = 'archived')
       `,
       )
         .bind(eventParam)
@@ -72,12 +82,13 @@ export async function onRequestGet(context) {
         v.name as venue
       FROM performances p
       INNER JOIN band_profiles b ON p.band_profile_id = b.id
-      INNER JOIN venues v ON p.venue_id = v.id
+      LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
+        AND (? = 0 OR p.is_announced = 1)
       ORDER BY p.start_time, v.name
     `,
     )
-      .bind(event.id)
+      .bind(event.id, event.reveal_mode ?? 0)
       .all();
 
     const bands = bandsResult.results || [];
@@ -114,7 +125,7 @@ export async function onRequestGet(context) {
         performance_id: band.performance_id,
         band_profile_id: band.band_id,
         name: band.name,
-        venue: band.venue,
+        venue: band.venue ?? null,
         date: event.date,
         startTime: extractTime(band.startTime),
         endTime: extractTime(band.endTime),
@@ -127,11 +138,15 @@ export async function onRequestGet(context) {
       id: event.id,
       name: event.name,
       date: event.date,
+      end_date: event.end_date ?? null,
+      city: event.city ?? null,
       slug: event.slug,
       ticket_url: event.ticket_url,
+      is_archived: event.status === "archived",
       theme_colors: event.theme_colors,
       venue_info: event.venue_info,
       social_links: event.social_links,
+      reveal_mode: event.reveal_mode ?? 0,
     };
 
     return new Response(
@@ -143,7 +158,7 @@ export async function onRequestGet(context) {
         status: 200,
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+          "Cache-Control": `public, max-age=${cacheTtl}`,
         },
       },
     );

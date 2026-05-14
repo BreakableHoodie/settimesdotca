@@ -6,6 +6,7 @@
 import { hashPassword, verifyPassword } from "../../utils/crypto.js";
 import { validatePassword, FIELD_LIMITS } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
+import { revokeAllTrustedDevices } from "../../utils/trustedDevice.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -13,7 +14,7 @@ export async function onRequestPost(context) {
   const debugId = crypto.randomUUID();
 
   const withDebug = (payload) => {
-    if (env?.RESET_DEBUG === "true") {
+    if (env?.ENVIRONMENT !== "production") {
       return { ...payload, debugId };
     }
     return payload;
@@ -111,7 +112,7 @@ export async function onRequestPost(context) {
     }
 
     // Check if token is expired
-    if (new Date(resetToken.expires_at) < new Date()) {
+    if (new Date(resetToken.expires_at.includes('T') ? resetToken.expires_at : resetToken.expires_at.replace(' ', 'T') + 'Z') < new Date()) {
       logDebug("token_expired", { expiresAt: resetToken.expires_at });
       await logFailure("TOKEN_EXPIRED", { expiresAt: resetToken.expires_at });
       return new Response(
@@ -164,6 +165,31 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Atomically consume reset token before expensive work to prevent replay races
+    const consumeResult = await DB.prepare(
+      `
+      UPDATE password_reset_tokens
+      SET used = 1, used_at = datetime('now')
+      WHERE id = ? AND used = 0
+    `
+    )
+      .bind(resetToken.id)
+      .run();
+
+    if (!consumeResult?.meta?.changes) {
+      logDebug("token_already_used", { tokenId: resetToken.id });
+      await logFailure("TOKEN_ALREADY_USED", { tokenId: resetToken.id });
+      return new Response(
+        JSON.stringify(
+          withDebug({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" })
+        ),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     // Hash new password
     logDebug("hash_start", { userId: resetToken.user_id });
     const passwordHash = await hashPassword(newPassword);
@@ -180,17 +206,6 @@ export async function onRequestPost(context) {
       .bind(passwordHash, resetToken.user_id)
       .run();
 
-    // Mark reset token as used
-    await DB.prepare(
-      `
-      UPDATE password_reset_tokens
-      SET used = 1, used_at = datetime('now')
-      WHERE id = ?
-    `,
-    )
-      .bind(resetToken.id)
-      .run();
-
     // Invalidate all existing sessions for this user
     await DB.prepare(
       `
@@ -200,6 +215,8 @@ export async function onRequestPost(context) {
     )
       .bind(resetToken.user_id)
       .run();
+
+    await revokeAllTrustedDevices(DB, resetToken.user_id);
 
     // Log the password reset completion
     await DB.prepare(
@@ -213,7 +230,6 @@ export async function onRequestPost(context) {
         request.headers.get("User-Agent") || "unknown",
         JSON.stringify({
           user_id: resetToken.user_id,
-          user_email: resetToken.email,
           reset_token_id: resetToken.id,
         }),
       )

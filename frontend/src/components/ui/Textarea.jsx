@@ -52,7 +52,7 @@ export default function Textarea({
     bg-white/5 border rounded-lg
     text-text-primary placeholder-text-tertiary
     transition-colors duration-base
-    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
+    focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
     disabled:opacity-50 disabled:cursor-not-allowed
     ${resizeClasses[resize] || resizeClasses.vertical}
     ${
@@ -111,7 +111,7 @@ export default function Textarea({
 
         {showCount && maxLength && (
           <span
-            className={`text-xs flex-shrink-0 ${
+            className={`text-xs shrink-0 ${
               characterCount > maxLength * 0.9 ? 'text-warning-400' : 'text-text-tertiary'
             } ${characterCount >= maxLength ? 'text-error-400' : ''}`}
           >

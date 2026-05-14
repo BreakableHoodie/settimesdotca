@@ -3,8 +3,11 @@
 // Body: { code: string }
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { verifyTotp, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
+import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP } from "../../../utils/request.js";
+import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -78,8 +81,54 @@ export async function onRequestPost(context) {
     );
   }
 
-  const valid = await verifyTotp(user.totp_secret, code);
+  const rateCheck = await checkAuthRateLimit(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+    ipAddress,
+    scope: "user-and-ip",
+    userId,
+  });
+  if (!rateCheck.allowed) {
+    return new Response(
+      JSON.stringify({
+        error: "Too many attempts",
+        message: `Too many failed MFA enable attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
+      }),
+      {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  let totpSecretState;
+  try {
+    totpSecretState = await loadTotpSecret(user.totp_secret, env);
+  } catch (error) {
+    console.error("[MFA Enable] Failed to decrypt TOTP secret:", error?.message || error);
+    return new Response(
+      JSON.stringify({
+        error: "Server error",
+        message: "Failed to verify MFA setup",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  const valid = await verifyTotp(totpSecretState?.secret, code);
   if (!valid) {
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+      email: user.email,
+      failureReason: "invalid_code",
+      ipAddress,
+      success: false,
+      userAgent: request.headers.get("User-Agent") || "unknown",
+      userId,
+    });
+
     return new Response(
       JSON.stringify({
         error: "Authentication failed",
@@ -99,11 +148,28 @@ export async function onRequestPost(context) {
 
   await DB.prepare(
     `UPDATE users
-     SET totp_enabled = 1, backup_codes = ?
+     SET totp_enabled = 1, backup_codes = ?, totp_secret = ?
      WHERE id = ?`
   )
-    .bind(JSON.stringify(hashedCodes), userId)
+    .bind(
+      JSON.stringify(hashedCodes),
+      totpSecretState?.shouldPersist
+        ? totpSecretState.encryptedSecret
+        : user.totp_secret,
+      userId
+    )
     .run();
+
+  await revokeAllTrustedDevices(DB, userId);
+
+  await writeAuthAttempt(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+    email: user.email,
+    ipAddress,
+    success: true,
+    userAgent: request.headers.get("User-Agent") || "unknown",
+    userId,
+  });
 
   await auditLog(
     env,

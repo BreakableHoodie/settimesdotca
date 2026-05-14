@@ -16,22 +16,20 @@ export const SESSION_CONFIG = {
   adminAbsoluteTimeout: 8 * 60 * 60 * 1000,
 };
 
-export function isDevRequest(request) {
+export function isDevRequest(request, env = null) {
+  // SECURITY: Trust env.ENVIRONMENT over request headers — the Origin header
+  // is attacker-controlled and must not influence security-sensitive decisions.
+  if (env?.ENVIRONMENT === "production") return false;
+  if (env?.ENVIRONMENT && env.ENVIRONMENT !== "production") return true;
+  // Fallback for local dev without ENVIRONMENT set: check server-controlled headers only.
   if (!request) return false;
-  const origin = request.headers.get("Origin") || "";
   const host = request.headers.get("Host") || "";
   const url = request.url || "";
-  return (
-    origin.includes("localhost") ||
-    host.includes("localhost") ||
-    url.includes("localhost") ||
-    host.endsWith(".pages.dev") ||
-    origin.includes(".pages.dev")
-  );
+  return host.includes("localhost") || url.includes("localhost");
 }
 
-export function initializeLucia(DB, request = null) {
-  const isDev = request ? isDevRequest(request) : false;
+export function initializeLucia(DB, request = null, env = null) {
+  const isDev = request ? isDevRequest(request, env) : false;
   const adapter = new D1Adapter(DB, {
     user: "users",
     session: "lucia_sessions",
@@ -39,13 +37,19 @@ export function initializeLucia(DB, request = null) {
 
   return new Lucia(adapter, {
     sessionCookie: {
-      name: "session_token",
+      // __Host- prefix enforces Secure + Path=/ + no Domain at the browser level,
+      // preventing subdomain cookie injection. Not valid for HTTP (dev).
+      name: isDev ? "session_token" : "__Host-session_token",
       expires: false,
       attributes: {
         secure: !isDev,
         sameSite: isDev ? "Lax" : "Strict",
         path: "/",
         httpOnly: true,
+        // Explicit Max-Age keeps the cookie aligned with the DB session lifetime
+        // so browsers don't discard it on close while the server-side session
+        // remains valid, which would leave orphaned rows in lucia_sessions.
+        maxAge: 30 * 24 * 60 * 60, // 30 days, matches sessionExpiresIn below
       },
     },
     sessionExpiresIn: new TimeSpan(30, "d"),

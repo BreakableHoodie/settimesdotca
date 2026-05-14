@@ -19,7 +19,7 @@ const EventContext = createContext()
 export function EventProvider({ children }) {
   const [currentEventId, setCurrentEventId] = useState(() => {
     const stored = localStorage.getItem('currentEventId')
-    return stored ? parseInt(stored) : null
+    return stored ? parseInt(stored, 10) : null
   })
 
   const [currentEvent, setCurrentEvent] = useState(null)
@@ -60,7 +60,7 @@ export function EventProvider({ children }) {
 
   // Switch to a different event
   const switchEvent = eventId => {
-    const id = eventId ? parseInt(eventId) : null
+    const id = eventId ? parseInt(eventId, 10) : null
     setCurrentEventId(id)
 
     if (id) {
@@ -74,9 +74,9 @@ export function EventProvider({ children }) {
   }
 
   // Refresh events list (useful after creating/updating/deleting events)
-  const refreshEvents = () => {
+  const refreshEvents = useCallback(() => {
     fetchEvents()
-  }
+  }, [fetchEvents])
 
   return (
     <EventContext.Provider

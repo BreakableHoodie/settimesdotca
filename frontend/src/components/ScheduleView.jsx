@@ -1,9 +1,30 @@
-import { faCheck, faCopy, faMusic } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { useState } from 'react'
+import { Check, Copy, Music } from 'lucide-react'
+import { memo, useMemo, useState } from 'react'
+import { copyToClipboard } from '../utils/clipboard'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
 import BandCard from './BandCard'
+
+const UNSCHEDULED = Symbol('unscheduled')
+const UNSCHEDULED_FILTER_VALUE = '__unscheduled__'
+
+function groupByTime(bands) {
+  const timeGroups = new Map()
+  const grouped = []
+  bands.forEach(band => {
+    const slot = !band.startTime || band.startTime === 'TBD' ? 'TBD' : band.startTime
+    if (!timeGroups.has(slot)) {
+      const group = { time: slot, bands: [] }
+      timeGroups.set(slot, group)
+      grouped.push(group)
+    }
+    timeGroups.get(slot).bands.push(band)
+  })
+  grouped.forEach(group => {
+    group.bands.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
+  })
+  return grouped
+}
 
 function ScheduleView({
   bands,
@@ -13,163 +34,162 @@ function ScheduleView({
   currentTime,
   showPast,
   onToggleShowPast,
-  timeFilter,
+  timeFilter = 'all',
+  venueFilter: controlledVenueFilter,
+  onVenueFilterChange,
+  showVenueFilter = true,
+  eventSlug,
 }) {
-  const [copyAllLabel, setCopyAllLabel] = useState('Copy Full Schedule')
+  const [copyAllLabel, setCopyAllLabel] = useState('Copy Visible Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
-  const nowDate = currentTime instanceof Date ? currentTime : new Date(currentTime)
-  const nowMs = nowDate.getTime()
+  const [localVenueFilter, setLocalVenueFilter] = useState(null)
+  const [genreFilter, setGenreFilter] = useState(null)
+  const venueFilter = controlledVenueFilter === undefined ? localVenueFilter : controlledVenueFilter
+  const nowMs = useMemo(() => {
+    const d = currentTime instanceof Date ? currentTime : new Date(currentTime)
+    return d.getTime()
+  }, [currentTime])
 
-  const finishedCount = bands.reduce((count, band) => {
-    const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-    return bandEndMs <= nowMs ? count + 1 : count
-  }, 0)
+  const uniqueVenues = useMemo(() => [...new Set(bands.map(b => b.venue).filter(Boolean))].sort(), [bands])
+  const hasUnscheduled = useMemo(() => bands.some(b => !b.venue), [bands])
+  const uniqueGenres = useMemo(() => [...new Set(bands.filter(b => b.genre).map(b => b.genre))].sort(), [bands])
 
-  // First apply time filter, then apply showPast filter
-  const timeFilteredBands = filterPerformancesByTime(bands, timeFilter)
+  // Apply time filter first, then venue/genre filter (before showPast so finishedCount is accurate)
+  const timeFilteredBands = useMemo(() => filterPerformancesByTime(bands, timeFilter), [bands, timeFilter])
 
-  const visibleBands = showPast
-    ? timeFilteredBands
-    : timeFilteredBands.filter(band => {
-        // If no endTime (TBD), always show the band
-        if (!band.endTime || band.endTime === 'TBD') {
-          return true
-        }
-        const bandEndMs = typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-        return bandEndMs > nowMs
-      })
+  const venueGenreFilteredBands = useMemo(
+    () =>
+      timeFilteredBands.filter(b => {
+        if (venueFilter === UNSCHEDULED) return !b.venue
+        if (venueFilter && b.venue !== venueFilter) return false
+        if (genreFilter && b.genre !== genreFilter) return false
+        return true
+      }),
+    [timeFilteredBands, venueFilter, genreFilter]
+  )
 
-  const sortedBands = [...visibleBands].sort((a, b) => {
-    // TBD bands go to the end
-    const aTBD = !a.startTime || a.startTime === 'TBD'
-    const bTBD = !b.startTime || b.startTime === 'TBD'
+  // Count finished sets within the active venue/genre filter (not affected by showPast toggle)
+  const finishedCount = useMemo(
+    () =>
+      venueGenreFilteredBands.reduce((count, band) => {
+        if (!band.endTime || band.endTime === 'TBD') return count
+        const bandEndMs = band.endMs > 0 ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+        return Number.isFinite(bandEndMs) && bandEndMs <= nowMs ? count + 1 : count
+      }, 0),
+    [venueGenreFilteredBands, nowMs]
+  )
 
-    if (aTBD && !bTBD) return 1
-    if (!aTBD && bTBD) return -1
-    if (aTBD && bTBD) return a.name.localeCompare(b.name)
+  const visibleBands = useMemo(
+    () =>
+      showPast
+        ? venueGenreFilteredBands
+        : venueGenreFilteredBands.filter(band => {
+            if (!band.endTime || band.endTime === 'TBD') return true
+            const bandEndMs =
+              typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
+            return bandEndMs > nowMs
+          }),
+    [venueGenreFilteredBands, showPast, nowMs]
+  )
 
-    // Normal time-based sorting
-    const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
-    const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
-    if (aTime === bTime) {
-      return a.venue.localeCompare(b.venue)
-    }
-    return aTime - bTime
-  })
+  const sortedBands = useMemo(
+    () =>
+      [...visibleBands].sort((a, b) => {
+        const aTBD = !a.startTime || a.startTime === 'TBD'
+        const bTBD = !b.startTime || b.startTime === 'TBD'
+        if (aTBD && !bTBD) return 1
+        if (!aTBD && bTBD) return -1
+        if (aTBD && bTBD) return a.name.localeCompare(b.name)
+        const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
+        const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
+        return aTime === bTime ? (a.venue ?? '').localeCompare(b.venue ?? '') : aTime - bTime
+      }),
+    [visibleBands]
+  )
 
-  // Helper function to group bands by time slot
-  const groupByTime = bands => {
-    const timeGroups = new Map()
-    const grouped = []
-
-    bands.forEach(band => {
-      const slot = !band.startTime || band.startTime === 'TBD' ? 'TBD' : band.startTime
-      if (!timeGroups.has(slot)) {
-        const group = { time: slot, bands: [] }
-        timeGroups.set(slot, group)
-        grouped.push(group)
+  const { nowPlaying, upcomingBands, pastBands } = useMemo(() => {
+    const nowPlaying = []
+    const upcomingBands = []
+    const pastBands = []
+    sortedBands.forEach(band => {
+      if (!band.startTime || band.startTime === 'TBD' || !band.startMs || !band.endMs) {
+        upcomingBands.push(band)
+        return
       }
-      timeGroups.get(slot).bands.push(band)
+      if (band.startMs <= nowMs && band.endMs > nowMs) {
+        nowPlaying.push(band)
+      } else if (band.startMs > nowMs) {
+        upcomingBands.push(band)
+      } else {
+        pastBands.push(band)
+      }
     })
+    nowPlaying.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
+    return { nowPlaying, upcomingBands, pastBands }
+  }, [sortedBands, nowMs])
 
-    grouped.forEach(group => {
-      group.bands.sort((a, b) => a.venue.localeCompare(b.venue))
-    })
+  const upcomingByTime = useMemo(() => groupByTime(upcomingBands), [upcomingBands])
+  const pastByTime = useMemo(() => groupByTime(pastBands).reverse(), [pastBands])
 
-    return grouped
-  }
+  const selectedBandsSet = useMemo(() => new Set(selectedBands), [selectedBands])
+  const visibleBandIds = useMemo(() => visibleBands.map(band => band.id), [visibleBands])
+  const canToggleBands = typeof onToggleBand === 'function'
+  const canTogglePast = typeof onToggleShowPast === 'function'
+  const canSelectAll = typeof onSelectAll === 'function' && visibleBands.length > 0
 
-  // Categorize bands into Now Playing, Upcoming, and Past
-  const nowPlaying = []
-  const upcomingBands = []
-  const pastBands = []
-
-  sortedBands.forEach(band => {
-    // TBD or missing times go to upcoming
-    if (!band.startTime || band.startTime === 'TBD' || !band.startMs || !band.endMs) {
-      upcomingBands.push(band)
-      return
-    }
-
-    const startMs = band.startMs
-    const endMs = band.endMs
-
-    // Currently performing: started but not finished
-    if (startMs <= nowMs && endMs > nowMs) {
-      nowPlaying.push(band)
-    }
-    // Future performances
-    else if (startMs > nowMs) {
-      upcomingBands.push(band)
-    }
-    // Past performances
-    else if (endMs <= nowMs) {
-      pastBands.push(band)
-    }
-  })
-
-  // Sort Now Playing by venue only (no time grouping)
-  nowPlaying.sort((a, b) => a.venue.localeCompare(b.venue))
-
-  // Group upcoming and past bands by time
-  const upcomingByTime = groupByTime(upcomingBands)
-  const pastByTime = groupByTime(pastBands).reverse() // Reverse chronological for past events
-
-  const allSelected = bands.length > 0 && selectedBands.length === bands.length
+  const allSelected = visibleBandIds.length > 0 && visibleBandIds.every(id => selectedBandsSet.has(id))
+  const canCopyVisible = sortedBands.length > 0
   const hiddenFinished = !showPast ? finishedCount : 0
   const noVisibleBands = sortedBands.length === 0
 
   const copyBands = async bandsToCopy => {
     if (bandsToCopy.length === 0) return false
     const text = bandsToCopy
-      .map(band => `${band.name} — ${formatTimeRange(band.startTime, band.endTime)} @ ${band.venue}`)
+      .map(band => {
+        const venuePart = band.venue ? ` @ ${band.venue}` : ''
+        return `${band.name} — ${formatTimeRange(band.startTime, band.endTime)}${venuePart}`
+      })
       .join('\n')
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text)
-        return true
-      }
-    } catch (error) {
-      console.error('Clipboard API failed, using fallback:', error)
-      /* fallback below */
-    }
-
-    try {
-      const textarea = document.createElement('textarea')
-      textarea.value = text
-      textarea.setAttribute('readonly', '')
-      textarea.style.position = 'absolute'
-      textarea.style.left = '-9999px'
-      document.body.appendChild(textarea)
-      const selection = document.getSelection()
-      const originalRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
-      textarea.select()
-      const successful = document.execCommand('copy')
-      document.body.removeChild(textarea)
-      if (originalRange && selection) {
-        selection.removeAllRanges()
-        selection.addRange(originalRange)
-      }
-      return successful
-    } catch (error) {
-      console.error('Fallback copy method failed:', error)
-      return false
-    }
+    return copyToClipboard(text)
   }
 
   const handleCopyAll = async () => {
-    if (isCopyingAll) return
+    if (isCopyingAll || !canCopyVisible) return
     setIsCopyingAll(true)
-    const success = await copyBands(bands)
+    const success = await copyBands(sortedBands)
     if (success) {
       setCopyAllLabel('Copied!')
       setTimeout(() => {
-        setCopyAllLabel('Copy Full Schedule')
+        setCopyAllLabel('Copy Visible Schedule')
         setIsCopyingAll(false)
       }, 2000)
     } else {
       setIsCopyingAll(false)
     }
+  }
+
+  const handleSelectAll = () => {
+    if (!canSelectAll) return
+    onSelectAll(visibleBands)
+  }
+
+  const handleVenueFilterToggle = nextVenue => {
+    const nextValue = venueFilter === nextVenue ? null : nextVenue
+    if (typeof onVenueFilterChange === 'function') {
+      onVenueFilterChange(nextValue)
+      return
+    }
+    setLocalVenueFilter(nextValue)
+  }
+
+  const handleVenueSelectChange = event => {
+    const nextValue = event.target.value
+    if (nextValue === '') {
+      handleVenueFilterToggle(venueFilter)
+      return
+    }
+
+    handleVenueFilterToggle(nextValue === UNSCHEDULED_FILTER_VALUE ? UNSCHEDULED : nextValue)
   }
 
   return (
@@ -178,19 +198,19 @@ function ScheduleView({
         <div className="flex-1 text-center sm:text-left">
           <h2 className="text-2xl font-bold text-white text-center">Full Lineup</h2>
           {!showPast && hiddenFinished > 0 && (
-            <p className="text-xs text-band-orange/80 mt-1 text-center sm:text-left">
+            <p className="text-xs text-accent-400/80 mt-1 text-center sm:text-left">
               {hiddenFinished} finished {hiddenFinished === 1 ? 'set hidden' : 'sets hidden'}
             </p>
           )}
         </div>
         <div className="flex justify-center sm:justify-end gap-3 flex-wrap">
-          {finishedCount > 0 && (
+          {finishedCount > 0 && canTogglePast && (
             <button
               onClick={onToggleShowPast}
-              className={`text-xs px-3 py-1.5 rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
+              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 showPast
-                  ? 'bg-band-orange/20 border-band-orange/50 text-band-orange hover:bg-band-orange/30'
-                  : 'bg-band-purple/50 border-band-orange/50 text-band-orange hover:bg-band-purple'
+                  ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
+                  : 'bg-bg-purple/50 border-accent-500/50 text-accent-400 hover:bg-bg-purple'
               }`}
               title={showPast ? 'Hide finished sets' : 'Show finished sets'}
               aria-label={showPast ? 'Hide finished sets' : 'Show finished sets'}
@@ -200,28 +220,151 @@ function ScheduleView({
           )}
           <button
             onClick={handleCopyAll}
-            className="text-xs px-3 py-1.5 min-h-[44px] rounded bg-band-purple/60 border border-band-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-band-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange"
-            title={copyAllLabel === 'Copied!' ? 'Full schedule copied to clipboard' : 'Copy the full schedule'}
-            aria-label="Copy the full schedule"
-            disabled={isCopyingAll}
+            className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-white flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+              canCopyVisible
+                ? 'bg-bg-purple/60 border-bg-purple/40 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95'
+                : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
+            }`}
+            title={
+              !canCopyVisible
+                ? 'No visible bands to copy'
+                : copyAllLabel === 'Copied!'
+                  ? 'Visible schedule copied to clipboard'
+                  : 'Copy the visible schedule'
+            }
+            aria-label="Copy the visible schedule"
+            disabled={isCopyingAll || !canCopyVisible}
           >
-            <FontAwesomeIcon icon={copyAllLabel === 'Copied!' ? faCheck : faCopy} aria-hidden="true" />
+            {copyAllLabel === 'Copied!' ? (
+              <Check size={14} aria-hidden="true" />
+            ) : (
+              <Copy size={14} aria-hidden="true" />
+            )}
             <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
           </button>
-          <button
-            onClick={onSelectAll}
-            disabled={allSelected}
-            className={`text-xs px-3 py-1.5 rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-band-orange ${
-              allSelected
-                ? 'bg-gray-500/20 border border-gray-500/50 text-gray-400 cursor-not-allowed'
-                : 'bg-band-orange/20 border border-band-orange/50 text-band-orange hover:bg-band-orange/30'
-            }`}
-            title={allSelected ? 'All bands already selected' : 'Select all bands'}
-          >
-            {allSelected ? 'All Selected' : 'Select All'}
-          </button>
+          {canSelectAll && (
+            <button
+              onClick={handleSelectAll}
+              disabled={allSelected}
+              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+                allSelected
+                  ? 'bg-gray-500/20 border border-gray-500/50 text-gray-400 cursor-not-allowed'
+                  : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
+              }`}
+              title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}
+            >
+              {allSelected ? 'All Selected' : 'Select All'}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Filter pills */}
+      {(showVenueFilter || uniqueGenres.length > 0) &&
+        (uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
+          <div className="space-y-3">
+            <div className="grid gap-2 sm:hidden">
+              {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
+                <div className="space-y-1.5">
+                  <label htmlFor="schedule-venue-filter" className="sr-only">
+                    Venue filter
+                  </label>
+                  <select
+                    id="schedule-venue-filter"
+                    value={venueFilter === UNSCHEDULED ? UNSCHEDULED_FILTER_VALUE : venueFilter || ''}
+                    onChange={handleVenueSelectChange}
+                    className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+                  >
+                    <option value="">All Venues</option>
+                    {uniqueVenues.map(venue => (
+                      <option key={venue} value={venue}>
+                        {venue}
+                      </option>
+                    ))}
+                    {hasUnscheduled && <option value={UNSCHEDULED_FILTER_VALUE}>Unscheduled</option>}
+                  </select>
+                </div>
+              )}
+
+              {uniqueGenres.length > 0 && (
+                <div className="space-y-1.5">
+                  <label htmlFor="schedule-genre-filter" className="sr-only">
+                    Genre filter
+                  </label>
+                  <select
+                    id="schedule-genre-filter"
+                    value={genreFilter || ''}
+                    onChange={event => setGenreFilter(event.target.value || null)}
+                    className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+                  >
+                    <option value="">All Genres</option>
+                    {uniqueGenres.map(genre => (
+                      <option key={genre} value={genre}>
+                        {genre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
+              <div className="hidden items-center gap-2 sm:flex">
+                <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
+                <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
+                  {uniqueVenues.map(venue => (
+                    <button
+                      key={venue}
+                      onClick={() => handleVenueFilterToggle(venue)}
+                      aria-pressed={venueFilter === venue}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        venueFilter === venue
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      {venue}
+                    </button>
+                  ))}
+                  {hasUnscheduled && (
+                    <button
+                      onClick={() => handleVenueFilterToggle(UNSCHEDULED)}
+                      aria-pressed={venueFilter === UNSCHEDULED}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        venueFilter === UNSCHEDULED
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      Unscheduled
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {uniqueGenres.length > 0 && (
+              <div className="hidden items-center gap-2 sm:flex">
+                <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Genre</span>
+                <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
+                  {uniqueGenres.map(genre => (
+                    <button
+                      key={genre}
+                      onClick={() => setGenreFilter(prev => (prev === genre ? null : genre))}
+                      aria-pressed={genreFilter === genre}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                        genreFilter === genre
+                          ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      {genre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       {noVisibleBands ? (
         <div className="text-center text-white/70 py-12">
@@ -237,20 +380,28 @@ function ScheduleView({
           {nowPlaying.length > 0 && (
             <div className="relative">
               <div className="flex items-center mb-4">
-                <div className="bg-band-orange text-band-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg animate-pulse">
-                  <FontAwesomeIcon icon={faMusic} className="mr-2" aria-hidden="true" />
+                <div className="bg-accent-500 text-bg-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-bg-navy/60"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-bg-navy"></span>
+                  </span>
+                  <Music size={16} aria-hidden="true" />
                   NOW PLAYING
                 </div>
-                <div className="flex-1 h-1 bg-band-orange ml-4"></div>
+                <div className="flex-1 h-1 bg-accent-500 ml-4"></div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
                 {nowPlaying.map(band => (
                   <BandCard
                     key={band.id}
                     band={band}
-                    isSelected={selectedBands.includes(band.id)}
+                    isSelected={selectedBandsSet.has(band.id)}
                     onToggle={onToggleBand}
+                    clickable={canToggleBands}
+                    showToggleButton={canToggleBands}
+                    eventSlug={eventSlug}
                     showVenue={true}
+                    currentTime={currentTime}
                   />
                 ))}
               </div>
@@ -261,27 +412,31 @@ function ScheduleView({
           {upcomingByTime.length > 0 && (
             <div className="space-y-8">
               <div className="flex items-center mb-4">
-                <div className="bg-band-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                <div className="bg-bg-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   UPCOMING
                 </div>
-                <div className="flex-1 h-0.5 bg-band-purple/30 ml-4"></div>
+                <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
               </div>
               {upcomingByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4">
                   <div className="flex items-center mb-4">
-                    <div className="bg-band-navy text-white font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <div className="bg-bg-navy text-white font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                     </div>
-                    <div className="flex-1 h-0.5 bg-band-navy/20 ml-4"></div>
+                    <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
                     {timeBands.map(band => (
                       <BandCard
                         key={band.id}
                         band={band}
-                        isSelected={selectedBands.includes(band.id)}
+                        isSelected={selectedBandsSet.has(band.id)}
                         onToggle={onToggleBand}
+                        clickable={canToggleBands}
+                        showToggleButton={canToggleBands}
+                        eventSlug={eventSlug}
                         showVenue={true}
+                        currentTime={currentTime}
                       />
                     ))}
                   </div>
@@ -294,27 +449,31 @@ function ScheduleView({
           {pastByTime.length > 0 && showPast && (
             <div className="space-y-8">
               <div className="flex items-center mb-4">
-                <div className="bg-gray-400 text-gray-700 font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg opacity-75">
+                <div className="bg-white/10 text-white/40 font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   PAST EVENTS
                 </div>
-                <div className="flex-1 h-0.5 bg-gray-300 ml-4"></div>
+                <div className="flex-1 h-0.5 bg-white/10 ml-4"></div>
               </div>
               {pastByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4 opacity-60">
                   <div className="flex items-center mb-4">
-                    <div className="bg-gray-300 text-gray-600 font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <div className="bg-white/5 text-white/30 font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                     </div>
-                    <div className="flex-1 h-0.5 bg-gray-200 ml-4"></div>
+                    <div className="flex-1 h-0.5 bg-white/5 ml-4"></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
                     {timeBands.map(band => (
                       <BandCard
                         key={band.id}
                         band={band}
-                        isSelected={selectedBands.includes(band.id)}
+                        isSelected={selectedBandsSet.has(band.id)}
                         onToggle={onToggleBand}
+                        clickable={canToggleBands}
+                        showToggleButton={canToggleBands}
+                        eventSlug={eventSlug}
                         showVenue={true}
+                        currentTime={currentTime}
                       />
                     ))}
                   </div>
@@ -328,4 +487,4 @@ function ScheduleView({
   )
 }
 
-export default ScheduleView
+export default memo(ScheduleView)

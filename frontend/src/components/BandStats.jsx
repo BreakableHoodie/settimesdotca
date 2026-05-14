@@ -1,7 +1,6 @@
+import { TrendingUp } from 'lucide-react'
 import PropTypes from 'prop-types'
 import { Card } from './ui'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChartLine } from '@fortawesome/free-solid-svg-icons'
 
 const LABELS = {
   total_performances: 'Shows listed',
@@ -76,7 +75,7 @@ export default function BandStats({ stats }) {
   return (
     <Card variant="elevated">
       <h3 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
-        <FontAwesomeIcon icon={faChartLine} className="text-accent-500" />
+        <TrendingUp size={18} className="text-accent-500" />
         Performance Snapshot
       </h3>
       <div className="grid grid-cols-2 gap-3">

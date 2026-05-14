@@ -6,8 +6,7 @@ import Footer from '../components/Footer'
 import PrivacyBanner from '../components/PrivacyBanner'
 import { trackPageView } from '../utils/metrics'
 import { hasAnySchedule, getScheduleEventSlug, SELECTED_BANDS_KEY } from '../utils/scheduleStorage'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCalendarDays, faArrowRight } from '@fortawesome/free-solid-svg-icons'
+import { ArrowRight, CalendarDays } from 'lucide-react'
 
 export default function EventsPage() {
   useEffect(() => {
@@ -38,7 +37,7 @@ export default function EventsPage() {
   }, [refreshBanner])
 
   return (
-    <div id="main-content" className="min-h-screen bg-gradient-dark">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
       <Helmet>
         <title>SetTimes – Live Music Events &amp; Show Schedules</title>
         <meta
@@ -84,12 +83,12 @@ export default function EventsPage() {
             className="flex items-center justify-between gap-3 px-5 py-3 rounded-lg bg-accent-500/15 border border-accent-500/30 hover:bg-accent-500/25 transition-colors group"
           >
             <div className="flex items-center gap-3 text-accent-400">
-              <FontAwesomeIcon icon={faCalendarDays} />
+              <CalendarDays size={16} />
               <span className="text-sm font-medium">You have a schedule in progress</span>
             </div>
             <span className="text-accent-400 text-sm font-medium flex items-center gap-2 group-hover:gap-3 transition-all">
               Continue building
-              <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
+              <ArrowRight size={12} />
             </span>
           </Link>
         </div>
@@ -98,6 +97,6 @@ export default function EventsPage() {
       <EventTimeline />
       <Footer />
       <PrivacyBanner />
-    </div>
+    </main>
   )
 }

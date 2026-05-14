@@ -2,6 +2,7 @@
 // Handles all API calls to the admin endpoints
 
 const API_BASE = '/api/admin'
+const authStateSubscribers = new Set()
 
 // SECURITY: Session token is now stored in HTTPOnly cookie (not accessible to JavaScript)
 // CSRF token is read from cookie (non-HttpOnly) for double-submit pattern
@@ -45,13 +46,88 @@ function refreshCSRFHeader(headers) {
   return nextHeaders
 }
 
+function notifyUnauthorized() {
+  authStateSubscribers.forEach(subscriber => {
+    try {
+      subscriber.onUnauthorized?.()
+    } catch (err) {
+      console.error('[adminApi] onUnauthorized subscriber threw:', err)
+    }
+  })
+}
+
+function parseSessionTiming(response) {
+  const rawTime = response.headers.get('X-Session-Expires-In')
+  const rawIdle = response.headers.get('X-Session-Idle-Expires-In')
+  const rawAbsolute = response.headers.get('X-Session-Absolute-Expires-In')
+
+  if (rawTime === null || rawIdle === null || rawAbsolute === null) return null
+
+  const timeRemainingSeconds = Number(rawTime)
+  const idleRemainingSeconds = Number(rawIdle)
+  const absoluteRemainingSeconds = Number(rawAbsolute)
+
+  if (
+    !Number.isFinite(timeRemainingSeconds) ||
+    !Number.isFinite(idleRemainingSeconds) ||
+    !Number.isFinite(absoluteRemainingSeconds)
+  ) {
+    return null
+  }
+
+  return {
+    timeRemainingSeconds,
+    idleRemainingSeconds,
+    absoluteRemainingSeconds,
+    warning: response.headers.get('X-Session-Warning') === 'true',
+  }
+}
+
+function notifySessionTiming(response) {
+  const timing = parseSessionTiming(response)
+  if (!timing) return
+
+  authStateSubscribers.forEach(subscriber => {
+    try {
+      subscriber.onSessionTiming?.(timing)
+    } catch (err) {
+      console.error('[adminApi] onSessionTiming subscriber threw:', err)
+    }
+  })
+}
+
+function persistUser(user) {
+  if (!user?.email) return
+
+  window.localStorage.setItem('userEmail', user.email)
+  window.localStorage.setItem('userName', resolveFullName(user))
+  window.localStorage.setItem('userFirstName', user.firstName || '')
+  window.localStorage.setItem('userLastName', user.lastName || '')
+  window.localStorage.setItem('userRole', user.role || '')
+}
+
+function clearPersistedUser() {
+  window.localStorage.removeItem('userEmail')
+  window.localStorage.removeItem('userName')
+  window.localStorage.removeItem('userFirstName')
+  window.localStorage.removeItem('userLastName')
+  window.localStorage.removeItem('userRole')
+}
+
+export function subscribeAdminAuthState(subscriber) {
+  authStateSubscribers.add(subscriber)
+  return () => {
+    authStateSubscribers.delete(subscriber)
+  }
+}
+
 async function fetchWithCSRFRetry(url, options = {}, retries = 1) {
   const response = await fetch(url, options)
   if (response.status !== 403 || retries <= 0) {
     return response
   }
 
-  let payload = null
+  let payload
   try {
     payload = await response.clone().json()
   } catch (_error) {
@@ -154,26 +230,15 @@ async function handleResponse(response) {
       console.warn('API Error Response:', response.status, data)
     }
     if (response.status === 401) {
-      if (import.meta.env.DEV) {
-        console.error('Dispatching auth:unauthorized event')
-      }
-      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
-
-      // Fallback: If the app doesn't respond to the event within 1 second, force a redirect
-      setTimeout(() => {
-        if (window.location.pathname !== '/admin/login') {
-          if (import.meta.env.DEV) {
-            console.error('Force redirecting to login...')
-          }
-          window.location.href = '/admin/login'
-        }
-      }, 1000)
+      notifyUnauthorized()
     }
     const error = new Error(data.message || data.error || 'API request failed')
     error.status = response.status
     error.details = data
     throw error
   }
+
+  notifySessionTiming(response)
 
   return data
 }
@@ -200,13 +265,7 @@ export const authApi = {
     // SECURITY: Session token and CSRF token are now in cookies
     // Store user data in localStorage for UI display
     if (data.user && !data.requiresActivation) {
-      window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', resolveFullName(data.user))
-      if (data.user.firstName || data.user.lastName) {
-        window.localStorage.setItem('userFirstName', data.user.firstName || '')
-        window.localStorage.setItem('userLastName', data.user.lastName || '')
-      }
-      window.localStorage.setItem('userRole', data.user.role)
+      persistUser(data.user)
     }
 
     return data
@@ -238,13 +297,7 @@ export const authApi = {
     // SECURITY: Session token and CSRF token are now in cookies
     // Store user data in localStorage for UI display
     if (data.user) {
-      window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', resolveFullName(data.user))
-      if (data.user.firstName || data.user.lastName) {
-        window.localStorage.setItem('userFirstName', data.user.firstName || '')
-        window.localStorage.setItem('userLastName', data.user.lastName || '')
-      }
-      window.localStorage.setItem('userRole', data.user.role)
+      persistUser(data.user)
     }
 
     return data
@@ -260,13 +313,7 @@ export const authApi = {
     const data = await handleResponse(response)
 
     if (data.user) {
-      window.localStorage.setItem('userEmail', data.user.email)
-      window.localStorage.setItem('userName', resolveFullName(data.user))
-      if (data.user.firstName || data.user.lastName) {
-        window.localStorage.setItem('userFirstName', data.user.firstName || '')
-        window.localStorage.setItem('userLastName', data.user.lastName || '')
-      }
-      window.localStorage.setItem('userRole', data.user.role)
+      persistUser(data.user)
     }
 
     return data
@@ -285,11 +332,7 @@ export const authApi = {
     }
 
     // Clear local data (cookies are cleared by server)
-    window.localStorage.removeItem('userEmail')
-    window.localStorage.removeItem('userName')
-    window.localStorage.removeItem('userFirstName')
-    window.localStorage.removeItem('userLastName')
-    window.localStorage.removeItem('userRole')
+    clearPersistedUser()
   },
 
   getCurrentUser() {
@@ -313,23 +356,23 @@ export const authApi = {
         credentials: 'include',
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        // Update local storage with fresh data
-        if (data.user) {
-          window.localStorage.setItem('userEmail', data.user.email)
-          window.localStorage.setItem('userName', resolveFullName(data.user))
-          if (data.user.firstName || data.user.lastName) {
-            window.localStorage.setItem('userFirstName', data.user.firstName || '')
-            window.localStorage.setItem('userLastName', data.user.lastName || '')
-          }
-          window.localStorage.setItem('userRole', data.user.role)
-        }
-        return data
+      if (response.status === 401) {
+        return { status: 'unauthorized' }
       }
-      return null
-    } catch {
-      return null
+
+      const data = await handleResponse(response)
+      if (data.user) {
+        persistUser(data.user)
+      }
+      return {
+        status: 'authenticated',
+        ...data,
+      }
+    } catch (error) {
+      return {
+        status: 'transient',
+        error,
+      }
     }
   },
 }
@@ -415,6 +458,16 @@ export const eventsApi = {
     return handleResponse(response)
   },
 
+  async createWizard(wizardData) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/wizard`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(wizardData),
+    })
+    return handleResponse(response)
+  },
+
   async update(eventId, eventData) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}`, {
       method: 'PATCH',
@@ -469,6 +522,16 @@ export const eventsApi = {
     const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/metrics`, {
       headers: getHeaders(),
       credentials: 'include',
+    })
+    return handleResponse(response)
+  },
+
+  async setRevealMode(eventId, revealMode) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/reveal-mode`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ reveal_mode: revealMode }),
     })
     return handleResponse(response)
   },
@@ -571,6 +634,26 @@ export const bandsApi = {
     return handleResponse(response)
   },
 
+  async bulkPreview(bandIds, action, params = {}) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/bulk-preview`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ band_ids: bandIds, action, ...params }),
+    })
+    return handleResponse(response)
+  },
+
+  async bulkUpdate(bandIds, action, params = {}, ignoreConflicts = false) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/bulk`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ band_ids: bandIds, action, ignore_conflicts: ignoreConflicts, ...params }),
+    })
+    return handleResponse(response)
+  },
+
   async bulkAddToLineup(bandProfileIds, eventId, venueId, startTime, endTime) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/bands/bulk`, {
       method: 'POST',
@@ -583,6 +666,16 @@ export const bandsApi = {
         start_time: startTime || null,
         end_time: endTime || null,
       }),
+    })
+    return handleResponse(response)
+  },
+
+  async patch(bandId, data) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/${bandId}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data),
     })
     return handleResponse(response)
   },

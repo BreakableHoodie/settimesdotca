@@ -1,902 +1,3384 @@
 openapi: 3.0.3
 info:
   title: SetTimes API
-  version: 1.0.0
+  version: "2026-02"
   description: |
-    API for managing and accessing SetTimes event schedules.
+    Live API contract for the current Cloudflare Pages + D1 implementation.
 
-    The API provides:
-    - Public schedule access for attendees
-    - Admin panel for event, venue, and band management
-    - Rate-limited authentication with audit logging
-    - Conflict detection for overlapping performances
-
-    **Base URL:** https://settimes.ca
-
+    Highlights:
+    - Public schedule, discovery, band, feed, subscription, and telemetry endpoints
+    - Invite-based admin signup with session cookies, CSRF protection, and optional TOTP MFA
+    - Role-based admin routes for events, venues, bands, performers, users, invites, analytics, and maintenance
   contact:
     name: SetTimes
   license:
-    name: MIT
+    name: AGPL-3.0-only
 
 servers:
-  - url: https://your-domain.pages.dev
-    description: Production server
-  - url: http://localhost:5173
-    description: Local development server
+  - url: https://settimes.ca
+    description: Production
+  - url: http://localhost:8788
+    description: Local Pages development
 
 tags:
   - name: Public
-    description: Public API endpoints (no authentication required)
+    description: Public schedule, discovery, band, feed, and telemetry endpoints
+  - name: Public - Subscriptions
+    description: Email subscription lifecycle endpoints
+  - name: Public - Auth
+    description: Activation and password-reset endpoints
   - name: Admin - Auth
-    description: Authentication endpoints for admin panel
+    description: Invite-based signup, login, MFA handoff, and logout
+  - name: Admin - Session
+    description: Session, trusted-device, and identity endpoints
+  - name: Admin - MFA
+    description: Authenticated MFA self-service endpoints
   - name: Admin - Events
-    description: Event management (CRUD operations)
-  - name: Admin - Venues
-    description: Venue management (CRUD operations)
+    description: Event management endpoints
   - name: Admin - Bands
-    description: Band/performance management with conflict detection
-
-security:
-  - AdminSession: []
+    description: Performance, roster-assignment, and media endpoints
+  - name: Admin - Venues
+    description: Venue management endpoints
+  - name: Admin - Performers
+    description: Global performer registry endpoints
+  - name: Admin - Users
+    description: User administration endpoints
+  - name: Admin - Invites
+    description: Invite-code management endpoints
+  - name: Admin - Analytics
+    description: Audit and analytics endpoints
+  - name: Admin - Maintenance
+    description: Administrative maintenance endpoints
 
 paths:
   /api/schedule:
     get:
       tags:
         - Public
-      summary: Get event schedule
+      summary: Get the current or named public schedule
       description: |
-        Fetches the schedule for a specific event or the most recent published event.
-
-        **Query Parameters:**
-        - `event=current` (default) - Returns the most recent published event
-        - `event={slug}` - Returns a specific event by slug (e.g., "vol-5")
-
-        **Response Format:** Compatible with existing bands.json structure
-      operationId: getSchedule
-      security: []
+        Returns the public schedule as `{ event, bands }`.
+        This route is gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
       parameters:
         - name: event
           in: query
-          description: Event slug or "current" for most recent published event
           required: false
+          description: Event slug or `current`
           schema:
             type: string
             default: current
-            example: vol-5
       responses:
         "200":
-          description: Schedule successfully retrieved
-          headers:
-            Cache-Control:
+          description: Public schedule response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/events/public:
+    get:
+      tags:
+        - Public
+      summary: List public events
+      description: Public event discovery endpoint gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
+      parameters:
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+            default: all
+        - name: genre
+          in: query
+          required: false
+          schema:
+            type: string
+            default: all
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: upcoming
+          in: query
+          required: false
+          description: When omitted or true, only current and upcoming published events are returned.
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Public events response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicEventsResponse"
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/events/timeline:
+    get:
+      tags:
+        - Public
+      summary: Get grouped event timeline
+      description: Timeline response grouped into `now`, `upcoming`, and `past` buckets.
+      parameters:
+        - name: now
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: upcoming
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: past
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: includeBands
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: pastLimit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        "200":
+          description: Timeline response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimelineResponse"
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/events/{id}/details:
+    get:
+      tags:
+        - Public
+      summary: Get public event details
+      description: Returns one published or archived event with band and venue detail.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event details response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetailsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/bands/{name}:
+    get:
+      tags:
+        - Public
+      summary: Get public band profile
+      description: |
+        Returns a public band profile and published performance history.
+        `{name}` may be a numeric band ID or a normalized band name.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Band profile response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicBandProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/bands/stats/{name}:
+    get:
+      tags:
+        - Public
+      summary: Get public band profile with aggregate stats
+      description: Extended public band endpoint gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Band stats response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicBandStatsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/feeds/ical:
+    get:
+      tags:
+        - Public
+      summary: Download the iCal feed
+      description: Returns a public calendar feed filtered by city and genre.
+      parameters:
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+            default: all
+        - name: genre
+          in: query
+          required: false
+          schema:
+            type: string
+            default: all
+      responses:
+        "200":
+          description: iCal response
+          content:
+            text/calendar:
               schema:
                 type: string
-                example: public, max-age=300
-              description: Response is cached for 5 minutes
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ScheduleBand"
-              example:
-                - id: the-strokes-1
-                  name: The Strokes
-                  venue: Room 47
-                  date: "2025-06-14"
-                  startTime: "20:00"
-                  endTime: "21:00"
-                  url: https://thestrokes.com
-                - id: arctic-monkeys-2
-                  name: Arctic Monkeys
-                  venue: The Basement
-                  date: "2025-06-14"
-                  startTime: "21:30"
-                  endTime: "22:30"
-                  url: null
-        "404":
-          description: Event not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                error: Event not found
-                message: No published events available
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
         "500":
-          description: Database error
+          $ref: "#/components/responses/ServerError"
+
+  /api/metrics:
+    post:
+      tags:
+        - Public
+      summary: Ingest privacy-safe metrics
+      description: Accepts a batch of allow-listed analytics events and responds with `OK` even when the payload is ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetricsBatchRequest"
+      responses:
+        "200":
+          description: Metrics payload accepted or ignored
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /api/schedule/build:
+    post:
+      tags:
+        - Public
+      summary: Record a schedule-build event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleBuildRequest"
+      responses:
+        "200":
+          description: Schedule build recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/subscriptions/subscribe:
+    post:
+      tags:
+        - Public - Subscriptions
+      summary: Create a subscription and send verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionRequest"
+      responses:
+        "201":
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionMessageResponse"
+        "200":
+          description: Existing unverified subscription reused and verification resent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionMessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Bot verification failed
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/subscriptions/verify:
+    get:
+      tags:
+        - Public - Subscriptions
+      summary: Verify a subscription token
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Verification succeeded and the client is redirected to the subscribe page
+        "400":
+          description: Invalid or expired token
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: Token not found
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Verification failed
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/subscriptions/unsubscribe:
+    get:
+      tags:
+        - Public - Subscriptions
+      summary: Unsubscribe from email updates
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML unsubscribe confirmation page
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing token
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: Unknown token
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Unsubscribe failed
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/auth/activate:
+    post:
+      tags:
+        - Public - Auth
+      summary: Activate an invited user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivateRequest"
+      responses:
+        "200":
+          description: Activation succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/auth/resend-activation:
+    post:
+      tags:
+        - Public - Auth
+      summary: Resend an activation email
+      description: Returns a generic success payload even when the email does not belong to an inactive account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendActivationRequest"
+      responses:
+        "200":
+          description: Generic resend response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/auth/reset-password:
+    get:
+      tags:
+        - Public - Auth
+      summary: Unsupported reset-password GET route
+      deprecated: true
+      description: Token validation must use `POST /api/auth/reset-password/validate` so tokens never appear in URLs.
+      responses:
+        "405":
+          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Public - Auth
+      summary: Complete a password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/auth/reset-password/validate:
+    post:
+      tags:
+        - Public - Auth
+      summary: Validate a password-reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetTokenRequest"
+      responses:
+        "200":
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetTokenValidationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/auth/signup:
+    post:
+      tags:
+        - Admin - Auth
+      summary: Create an invite-backed admin account
+      description: Same-origin protected pre-session route. The invite code determines the resulting role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "201":
+          description: Account created and activation email sent or attempted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   /api/admin/auth/login:
     post:
       tags:
         - Admin - Auth
-      summary: Admin login
-      description: |
-        Authenticate admin user with password.
-
-        **Rate Limiting:**
-        - 5 failed attempts in 10 minutes → 1 hour IP lockout
-        - All attempts logged in auth_audit table
-        - Lockout can be manually reset via SQL
-
-        **Security:**
-        - Password stored in environment variable (ADMIN_PASSWORD)
-        - IP-based tracking via CF-Connecting-IP header
-        - Successful login resets rate limit counter
-      operationId: adminLogin
-      security: []
+      summary: Log in with email and password
+      description: Same-origin protected pre-session route. On success, either a session is issued immediately or an MFA challenge is returned.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - password
-              properties:
-                password:
-                  type: string
-                  description: Admin password (stored in env.ADMIN_PASSWORD)
-                  example: your-strong-password-here
+              $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
-          description: Login successful
+          description: Session issued or MFA required
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: Login successful
+                oneOf:
+                  - $ref: "#/components/schemas/LoginSuccess"
+                  - $ref: "#/components/schemas/LoginMfaChallenge"
         "400":
-          description: Bad request (missing password)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Invalid password
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: Unauthorized
-                  message:
-                    type: string
-                    example: Invalid password. 4 attempts remaining before lockout.
-                  remainingAttempts:
-                    type: integer
-                    example: 4
+          $ref: "#/components/responses/Unauthorized"
         "429":
-          description: Rate limited (too many failed attempts)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: Too many failed attempts
-                  message:
-                    type: string
-                    example: Too many failed login attempts. Please try again in 45 minutes.
-                  locked:
-                    type: boolean
-                    example: true
-                  minutesRemaining:
-                    type: integer
-                    example: 45
+          $ref: "#/components/responses/RateLimited"
         "500":
-          description: Server error
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/auth/mfa/verify:
+    post:
+      tags:
+        - Admin - Auth
+      summary: Complete login with MFA
+      description: Same-origin protected pre-session route. May also set a trusted-device cookie when `rememberDevice` is true.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaVerifyRequest"
+      responses:
+        "200":
+          description: MFA verification succeeded and a session was issued
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/LoginSuccess"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/auth/logout:
+    post:
+      tags:
+        - Admin - Auth
+      summary: Log out the current admin session
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      responses:
+        "200":
+          description: Logout response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/me:
+    get:
+      tags:
+        - Admin - Session
+      summary: Get the current authenticated admin user
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: Current user response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/admin/sessions:
+    get:
+      tags:
+        - Admin - Session
+      summary: List active sessions for the current user
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Session
+      summary: Revoke one session belonging to the current user
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteSessionRequest"
+      responses:
+        "200":
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BooleanSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/sessions/revoke-all:
+    post:
+      tags:
+        - Admin - Session
+      summary: Revoke all sessions except the freshly issued current one
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      responses:
+        "200":
+          description: All other sessions revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /api/admin/trusted-devices:
+    get:
+      tags:
+        - Admin - Session
+      summary: List trusted devices for the current user
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: Trusted-device list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrustedDevicesResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Session
+      summary: Revoke one trusted device
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteTrustedDeviceRequest"
+      responses:
+        "200":
+          description: Trusted device revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BooleanSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/mfa/status:
+    get:
+      tags:
+        - Admin - MFA
+      summary: Get MFA status for the current user
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: MFA status response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaStatusResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/mfa/setup:
+    post:
+      tags:
+        - Admin - MFA
+      summary: Start MFA setup for the current user
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      responses:
+        "200":
+          description: TOTP secret generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaSetupResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/mfa/enable:
+    post:
+      tags:
+        - Admin - MFA
+      summary: Enable MFA with a TOTP code
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CodeRequest"
+      responses:
+        "200":
+          description: MFA enabled and backup codes issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupCodesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/mfa/backup-codes:
+    post:
+      tags:
+        - Admin - MFA
+      summary: Regenerate MFA backup codes
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CodeRequest"
+      responses:
+        "200":
+          description: Backup codes regenerated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupCodesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/mfa/disable:
+    post:
+      tags:
+        - Admin - MFA
+      summary: Disable MFA using a TOTP or backup code
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CodeRequest"
+      responses:
+        "200":
+          description: MFA disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BooleanSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   /api/admin/events:
     get:
       tags:
         - Admin - Events
-      summary: List all events
-      description: |
-        Returns all events (published and unpublished) with band counts.
-        Sorted by date descending (newest first).
-      operationId: listEvents
+      summary: List events
+      security:
+        - AdminSessionCookie: []
+      parameters:
+        - name: archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 1000
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         "200":
-          description: Events successfully retrieved
+          description: Event list
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  events:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Event"
-              example:
-                events:
-                  - id: 1
-                    name: Long Weekend Band Crawl Vol. 5
-                    date: "2025-06-14"
-                    slug: vol-5
-                    is_published: 1
-                    created_at: "2025-01-15T10:30:00Z"
-                    band_count: 50
-                  - id: 2
-                    name: Long Weekend Band Crawl Vol. 6
-                    date: "2025-12-20"
-                    slug: vol-6
-                    is_published: 0
-                    created_at: "2025-10-01T14:20:00Z"
-                    band_count: 0
+                $ref: "#/components/schemas/EventListResponse"
         "500":
-          $ref: "#/components/responses/DatabaseError"
-
+          $ref: "#/components/responses/ServerError"
     post:
       tags:
         - Admin - Events
-      summary: Create new event
-      description: |
-        Creates a new event with validation for:
-        - Required fields (name, date, slug)
-        - Date format (YYYY-MM-DD)
-        - Slug format (lowercase, numbers, hyphens only)
-        - Unique slug (no duplicates)
-      operationId: createEvent
+      summary: Create an event
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EventCreate"
-            example:
-              name: Long Weekend Band Crawl Vol. 6
-              date: "2025-12-20"
-              slug: vol-6
-              isPublished: false
+              $ref: "#/components/schemas/EventInput"
       responses:
         "201":
-          description: Event successfully created
+          description: Event created
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  event:
-                    $ref: "#/components/schemas/Event"
+                $ref: "#/components/schemas/EventMutationResponse"
         "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-              examples:
-                missingFields:
-                  value:
-                    error: Validation error
-                    message: Name, date, and slug are required
-                invalidDate:
-                  value:
-                    error: Validation error
-                    message: Date must be in YYYY-MM-DD format
-                invalidSlug:
-                  value:
-                    error: Validation error
-                    message: Slug must contain only lowercase letters, numbers, and hyphens
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
-          description: Slug already exists
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/events/{id}:
+    patch:
+      tags:
+        - Admin - Events
+      summary: Patch an event
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventPatchInput"
+      responses:
+        "200":
+          description: Event updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                error: Conflict
-                message: An event with this slug already exists
+                $ref: "#/components/schemas/EventMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
-          $ref: "#/components/responses/DatabaseError"
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Events
+      summary: Delete an event
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmCascade:
+                  type: boolean
+      responses:
+        "200":
+          description: Event deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/events/{id}/edit:
+    put:
+      tags:
+        - Admin - Events
+      summary: Update core event fields
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventEditInput"
+      responses:
+        "200":
+          description: Event updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/events/{id}/publish:
+    post:
+      tags:
+        - Admin - Events
+      summary: Publish or unpublish an event
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishStateRequest"
+      responses:
+        "200":
+          description: Event publish state updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/events/{id}/archive:
+    post:
+      tags:
+        - Admin - Events
+      summary: Archive an event
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Event archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/events/{id}/metrics:
+    get:
+      tags:
+        - Admin - Events
+      summary: Get schedule-build metrics for one event
+      security:
+        - AdminSessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Event metrics response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventMetricsResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/events/{id}/duplicate:
+    post:
+      tags:
+        - Admin - Events
+      summary: Duplicate an event into a new draft event
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventDuplicateRequest"
+      responses:
+        "201":
+          description: Event duplicated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDuplicateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   /api/admin/venues:
     get:
       tags:
         - Admin - Venues
-      summary: List all venues
-      description: |
-        Returns all venues with band counts.
-        Sorted by name alphabetically.
-      operationId: listVenues
+      summary: List venues
+      security:
+        - AdminSessionCookie: []
       responses:
         "200":
-          description: Venues successfully retrieved
+          description: Venue list
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  venues:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Venue"
-              example:
-                venues:
-                  - id: 1
-                    name: Room 47
-                    address: 123 Main St
-                    band_count: 15
-                  - id: 2
-                    name: The Basement
-                    address: null
-                    band_count: 12
+                $ref: "#/components/schemas/VenueListResponse"
         "500":
-          $ref: "#/components/responses/DatabaseError"
-
+          $ref: "#/components/responses/ServerError"
     post:
       tags:
         - Admin - Venues
-      summary: Create new venue
-      description: |
-        Creates a new venue with validation for:
-        - Required name field
-        - Unique venue name (no duplicates)
-        - Optional address field
-      operationId: createVenue
+      summary: Create a venue
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/VenueCreate"
-            example:
-              name: The Basement
-              address: 456 Underground Ave
+              $ref: "#/components/schemas/VenueInput"
       responses:
         "201":
-          description: Venue successfully created
+          description: Venue created
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  venue:
-                    $ref: "#/components/schemas/Venue"
+                $ref: "#/components/schemas/VenueMutationResponse"
         "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                error: Validation error
-                message: Venue name is required
+          $ref: "#/components/responses/BadRequest"
         "409":
-          description: Venue name already exists
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/venues/{id}:
+    put:
+      tags:
+        - Admin - Venues
+      summary: Update a venue
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VenueInput"
+      responses:
+        "200":
+          description: Venue updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                error: Conflict
-                message: A venue with this name already exists
+                $ref: "#/components/schemas/VenueMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
-          $ref: "#/components/responses/DatabaseError"
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Venues
+      summary: Delete a venue
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      responses:
+        "200":
+          description: Venue deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   /api/admin/bands:
     get:
       tags:
         - Admin - Bands
-      summary: List bands for an event
-      description: |
-        Returns all bands for a specific event with venue and event names.
-        Sorted by start time, then venue name.
-      operationId: listBands
+      summary: List performances or profile-only rows
+      security:
+        - AdminSessionCookie: []
       parameters:
         - name: event_id
           in: query
-          required: true
-          description: ID of the event to fetch bands for
+          required: false
           schema:
             type: integer
-            example: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 200
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         "200":
-          description: Bands successfully retrieved
+          description: Band and performance list
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  bands:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/BandWithDetails"
-              example:
-                bands:
-                  - id: 1
-                    event_id: 1
-                    venue_id: 1
-                    name: The Strokes
-                    start_time: "20:00"
-                    end_time: "21:00"
-                    url: https://thestrokes.com
-                    created_at: "2025-01-15T10:30:00Z"
-                    venue_name: Room 47
-                    event_name: Long Weekend Band Crawl Vol. 5
-        "400":
-          description: Missing event_id parameter
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                error: Bad request
-                message: event_id parameter is required
+                $ref: "#/components/schemas/BandListResponse"
         "500":
-          $ref: "#/components/responses/DatabaseError"
-
+          $ref: "#/components/responses/ServerError"
     post:
       tags:
         - Admin - Bands
-      summary: Create new band
-      description: |
-        Creates a new band with comprehensive validation and conflict detection.
-
-        **Validation:**
-        - Required fields: eventId, venueId, name, startTime, endTime
-        - Time format: HH:MM (24-hour)
-        - End time must be after start time
-        - Event and venue must exist
-
-        **Conflict Detection:**
-        - Checks for overlapping times at the same venue
-        - Returns conflicts as warnings (does not prevent creation)
-        - Frontend highlights conflicts in red for admin review
-      operationId: createBand
+      summary: Create a performance or a profile-only row
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/BandCreate"
-            example:
-              eventId: 1
-              venueId: 1
-              name: The Strokes
-              startTime: "20:00"
-              endTime: "21:00"
-              url: https://thestrokes.com
+              $ref: "#/components/schemas/BandInput"
       responses:
         "201":
-          description: Band successfully created
+          description: Band or performance created
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  band:
-                    $ref: "#/components/schemas/Band"
-                  conflicts:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/BandConflict"
-                    description: Present only if conflicts exist
-                  warning:
-                    type: string
-                    description: Present only if conflicts exist
-                    example: This band overlaps with 2 other band(s) at the same venue
-              examples:
-                noConflicts:
-                  value:
-                    success: true
-                    band:
-                      id: 1
-                      event_id: 1
-                      venue_id: 1
-                      name: The Strokes
-                      start_time: "20:00"
-                      end_time: "21:00"
-                      url: https://thestrokes.com
-                      created_at: "2025-01-15T10:30:00Z"
-                withConflicts:
-                  value:
-                    success: true
-                    band:
-                      id: 2
-                      event_id: 1
-                      venue_id: 1
-                      name: Arctic Monkeys
-                      start_time: "20:30"
-                      end_time: "21:30"
-                      url: null
-                      created_at: "2025-01-15T11:00:00Z"
-                    conflicts:
-                      - id: 1
-                        name: The Strokes
-                        startTime: "20:00"
-                        endTime: "21:00"
-                    warning: This band overlaps with 1 other band(s) at the same venue
+                $ref: "#/components/schemas/BandMutationResponse"
         "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-              examples:
-                missingFields:
-                  value:
-                    error: Validation error
-                    message: eventId, venueId, name, startTime, and endTime are required
-                invalidTime:
-                  value:
-                    error: Validation error
-                    message: Times must be in HH:MM format
-                endBeforeStart:
-                  value:
-                    error: Validation error
-                    message: End time must be after start time
+          $ref: "#/components/responses/BadRequest"
         "404":
-          description: Event or venue not found
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/bands/{id}:
+    put:
+      tags:
+        - Admin - Bands
+      summary: Update a performance or profile-only row
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Performance ID or synthetic `profile_{id}` identifier
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BandUpdateInput"
+      responses:
+        "200":
+          description: Band or performance updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BandMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Bands
+      summary: Delete a performance or profile-only row
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Band or performance deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/bands/bulk-preview:
+    post:
+      tags:
+        - Admin - Bands
+      summary: Preview a bulk band operation
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkPreviewRequest"
+      responses:
+        "200":
+          description: Preview response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkPreviewResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/admin/bands/bulk:
+    post:
+      tags:
+        - Admin - Bands
+      summary: Add existing band profiles to an event lineup
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkAddRequest"
+      responses:
+        "200":
+          description: Bulk add response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Bands
+      summary: Bulk delete performances or profile-only rows
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkDeleteRequest"
+      responses:
+        "200":
+          description: Bulk delete response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/bands/photos:
+    post:
+      tags:
+        - Admin - Bands
+      summary: Upload a band photo
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - photo
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                band_id:
+                  type: string
+                  description: Optional performance ID or profile ID to attach the uploaded image to
+      responses:
+        "200":
+          description: Photo uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoUploadResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/bands/stats/{name}:
+    get:
+      tags:
+        - Admin - Bands
+      summary: Get internal band stats and history
+      security:
+        - AdminSessionCookie: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Band stats response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/performers:
+    get:
+      tags:
+        - Admin - Performers
+      summary: List performers
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: Performer list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformerListResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      tags:
+        - Admin - Performers
+      summary: Create a performer
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PerformerInput"
+      responses:
+        "201":
+          description: Performer created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformerResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/performers/{id}:
+    get:
+      tags:
+        - Admin - Performers
+      summary: Get one performer
+      security:
+        - AdminSessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      responses:
+        "200":
+          description: Performer response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformerResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags:
+        - Admin - Performers
+      summary: Update a performer
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PerformerInput"
+      responses:
+        "200":
+          description: Performer updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformerResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Performers
+      summary: Delete a performer
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      responses:
+        "200":
+          description: Performer deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/users:
+    get:
+      tags:
+        - Admin - Users
+      summary: List users
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      tags:
+        - Admin - Users
+      summary: Create an invite-backed user invitation
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInviteRequest"
+      responses:
+        "201":
+          description: User invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInviteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/users/{id}:
+    patch:
+      tags:
+        - Admin - Users
+      summary: Update a user
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Users
+      summary: Delete a user
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/users/{id}/reset-password:
+    post:
+      tags:
+        - Admin - Users
+      summary: Start an admin-initiated password reset
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminResetPasswordRequest"
+      responses:
+        "200":
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          description: Email delivery failed
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-              examples:
-                eventNotFound:
-                  value:
-                    error: Not found
-                    message: Event not found
-                venueNotFound:
-                  value:
-                    error: Not found
-                    message: Venue not found
         "500":
-          $ref: "#/components/responses/DatabaseError"
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/users/{id}/toggle-status:
+    post:
+      tags:
+        - Admin - Users
+      summary: Activate or deactivate a user
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      responses:
+        "200":
+          description: User status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/invite-codes:
+    get:
+      tags:
+        - Admin - Invites
+      summary: List invite codes
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: Invite-code list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteCodesResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      tags:
+        - Admin - Invites
+      summary: Create an invite code
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteCodeCreateRequest"
+      responses:
+        "201":
+          description: Invite code created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteCodeResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/invite-codes/{code}:
+    delete:
+      tags:
+        - Admin - Invites
+      summary: Revoke an invite code
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invite code revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/audit-log:
+    get:
+      tags:
+        - Admin - Analytics
+      summary: Query the audit log
+      security:
+        - AdminSessionCookie: []
+      parameters:
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Audit-log response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/analytics/subscriptions:
+    get:
+      tags:
+        - Admin - Analytics
+      summary: Get aggregate subscription analytics
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: Subscription analytics response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionAnalyticsResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/maintenance/cleanup-sessions:
+    post:
+      tags:
+        - Admin - Maintenance
+      summary: Run the retention cleanup job
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      responses:
+        "200":
+          description: Cleanup completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupSessionsResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
 components:
   securitySchemes:
-    AdminSession:
+    AdminSessionCookie:
       type: apiKey
       in: cookie
-      name: session_token
-      description: |
-        HTTPOnly session cookie issued by /api/admin/auth/login and /api/admin/auth/signup.
-        Required for all /api/admin/* endpoints (except auth endpoints).
+      name: __Host-session_token
+      description: Deployed admin session cookie. Local Pages development uses `session_token`.
+    CsrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Echo the `csrf_token` cookie for authenticated POST, PUT, PATCH, and DELETE admin requests.
 
-        **CSRF Protection:**
-        - State-changing requests must include `X-CSRF-Token` header.
-        - Token is provided via a non-HttpOnly `csrf_token` cookie.
-
-  schemas:
-    ScheduleBand:
-      type: object
-      description: Band schedule item for public API (compatible with bands.json format)
-      required:
-        - id
-        - name
-        - venue
-        - date
-        - startTime
-        - endTime
-      properties:
-        id:
-          type: string
-          description: Generated ID (band-name-{db_id})
-          example: the-strokes-1
-        name:
-          type: string
-          description: Band name
-          example: The Strokes
-        venue:
-          type: string
-          description: Venue name
-          example: Room 47
-        date:
-          type: string
-          format: date
-          description: Event date (YYYY-MM-DD)
-          example: "2025-06-14"
-        startTime:
-          type: string
-          pattern: '^\d{2}:\d{2}$'
-          description: Start time (HH:MM, 24-hour format)
-          example: "20:00"
-        endTime:
-          type: string
-          pattern: '^\d{2}:\d{2}$'
-          description: End time (HH:MM, 24-hour format)
-          example: "21:00"
-        url:
-          type: string
-          format: uri
-          nullable: true
-          description: Optional URL to band info/social media
-          example: https://thestrokes.com
-
-    Event:
-      type: object
-      required:
-        - id
-        - name
-        - date
-        - slug
-        - is_published
-        - created_at
-      properties:
-        id:
-          type: integer
-          description: Event ID
-          example: 1
-        name:
-          type: string
-          description: Event name
-          example: Long Weekend Band Crawl Vol. 5
-        date:
-          type: string
-          format: date
-          description: Event date (YYYY-MM-DD)
-          example: "2025-06-14"
-        slug:
-          type: string
-          pattern: "^[a-z0-9-]+$"
-          description: URL-friendly identifier (lowercase, numbers, hyphens only)
-          example: vol-5
-        is_published:
-          type: integer
-          enum: [0, 1]
-          description: Publication status (0 = draft, 1 = published)
-          example: 1
-        created_at:
-          type: string
-          format: date-time
-          description: Creation timestamp (ISO 8601)
-          example: "2025-01-15T10:30:00Z"
-        band_count:
-          type: integer
-          description: Number of bands in this event (only in list responses)
-          example: 50
-
-    EventCreate:
-      type: object
-      required:
-        - name
-        - date
-        - slug
-      properties:
-        name:
-          type: string
-          description: Event name
-          example: Long Weekend Band Crawl Vol. 6
-        date:
-          type: string
-          format: date
-          pattern: '^\d{4}-\d{2}-\d{2}$'
-          description: Event date (YYYY-MM-DD)
-          example: "2025-12-20"
-        slug:
-          type: string
-          pattern: "^[a-z0-9-]+$"
-          description: URL-friendly identifier (lowercase, numbers, hyphens only)
-          example: vol-6
-        isPublished:
-          type: boolean
-          description: Whether the event should be published immediately
-          default: false
-          example: false
-
-    Venue:
-      type: object
-      required:
-        - id
-        - name
-      properties:
-        id:
-          type: integer
-          description: Venue ID
-          example: 1
-        name:
-          type: string
-          description: Venue name (must be unique)
-          example: Room 47
-        address:
-          type: string
-          nullable: true
-          description: Optional venue address
-          example: 123 Main St
-        band_count:
-          type: integer
-          description: Number of bands at this venue (only in list responses)
-          example: 15
-
-    VenueCreate:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          description: Venue name (must be unique)
-          example: The Basement
-        address:
-          type: string
-          description: Optional venue address
-          example: 456 Underground Ave
-
-    Band:
-      type: object
-      required:
-        - id
-        - event_id
-        - venue_id
-        - name
-        - start_time
-        - end_time
-        - created_at
-      properties:
-        id:
-          type: integer
-          description: Band ID
-          example: 1
-        event_id:
-          type: integer
-          description: Event ID (foreign key)
-          example: 1
-        venue_id:
-          type: integer
-          description: Venue ID (foreign key)
-          example: 1
-        name:
-          type: string
-          description: Band name
-          example: The Strokes
-        start_time:
-          type: string
-          pattern: '^\d{2}:\d{2}$'
-          description: Start time (HH:MM, 24-hour format)
-          example: "20:00"
-        end_time:
-          type: string
-          pattern: '^\d{2}:\d{2}$'
-          description: End time (HH:MM, 24-hour format)
-          example: "21:00"
-        url:
-          type: string
-          format: uri
-          nullable: true
-          description: Optional URL to band info/social media
-          example: https://thestrokes.com
-        created_at:
-          type: string
-          format: date-time
-          description: Creation timestamp (ISO 8601)
-          example: "2025-01-15T10:30:00Z"
-
-    BandWithDetails:
-      allOf:
-        - $ref: "#/components/schemas/Band"
-        - type: object
-          required:
-            - venue_name
-            - event_name
-          properties:
-            venue_name:
-              type: string
-              description: Venue name (joined from venues table)
-              example: Room 47
-            event_name:
-              type: string
-              description: Event name (joined from events table)
-              example: Long Weekend Band Crawl Vol. 5
-
-    BandCreate:
-      type: object
-      required:
-        - eventId
-        - venueId
-        - name
-        - startTime
-        - endTime
-      properties:
-        eventId:
-          type: integer
-          description: Event ID (must exist)
-          example: 1
-        venueId:
-          type: integer
-          description: Venue ID (must exist)
-          example: 1
-        name:
-          type: string
-          description: Band name
-          example: The Strokes
-        startTime:
-          type: string
-          pattern: '^\d{2}:\d{2}$'
-          description: Start time (HH:MM, 24-hour format)
-          example: "20:00"
-        endTime:
-          type: string
-          pattern: '^\d{2}:\d{2}$'
-          description: End time (HH:MM, 24-hour format, must be after startTime)
-          example: "21:00"
-        url:
-          type: string
-          format: uri
-          description: Optional URL to band info/social media
-          example: https://thestrokes.com
-
-    BandConflict:
-      type: object
-      description: Band that conflicts with the current band (overlapping time at same venue)
-      required:
-        - id
-        - name
-        - startTime
-        - endTime
-      properties:
-        id:
-          type: integer
-          description: Conflicting band's ID
-          example: 1
-        name:
-          type: string
-          description: Conflicting band's name
-          example: The Strokes
-        startTime:
-          type: string
-          pattern: '^\d{2}:\d{2}$'
-          description: Conflicting band's start time
-          example: "20:00"
-        endTime:
-          type: string
-          pattern: '^\d{2}:\d{2}$'
-          description: Conflicting band's end time
-          example: "21:00"
-
-    Error:
-      type: object
-      required:
-        - error
-        - message
-      properties:
-        error:
-          type: string
-          description: Error type/category
-          example: Validation error
-        message:
-          type: string
-          description: Human-readable error message
-          example: Name, date, and slug are required
-        details:
-          type: object
-          description: Optional additional error details
-          additionalProperties: true
+  parameters:
+    NumericId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    EventId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
 
   responses:
-    DatabaseError:
-      description: Database error
+    BadRequest:
+      description: Request validation failed
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
-          example:
-            error: Database error
-            message: Failed to fetch events
+    Unauthorized:
+      description: Authentication failed or no active session exists
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Request was blocked by RBAC, CSRF validation, or same-origin validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Resource state conflicts with the request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PublicDataUnavailable:
+      description: Public publishing is disabled for this route
+      headers:
+        Retry-After:
+          schema:
+            type: string
+            example: "3600"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServerError:
+      description: Unexpected server or database error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    GenericRecord:
+      type: object
+      additionalProperties: true
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+          nullable: true
+        code:
+          type: string
+          nullable: true
+
+    BooleanSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+
+    MessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          nullable: true
+        message:
+          type: string
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum:
+            - viewer
+            - editor
+            - admin
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginSuccess:
+      type: object
+      required:
+        - success
+        - user
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/AuthUser"
+
+    LoginMfaChallenge:
+      type: object
+      required:
+        - mfaRequired
+        - mfaToken
+        - user
+      properties:
+        mfaRequired:
+          type: boolean
+        mfaToken:
+          type: string
+        user:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+              nullable: true
+            firstName:
+              type: string
+              nullable: true
+            lastName:
+              type: string
+              nullable: true
+            role:
+              type: string
+              enum:
+                - viewer
+                - editor
+                - admin
+
+    SignupRequest:
+      type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+        - inviteCode
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        inviteCode:
+          type: string
+
+    SignupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        requiresActivation:
+          type: boolean
+        email:
+          $ref: "#/components/schemas/GenericRecord"
+
+    MfaVerifyRequest:
+      type: object
+      required:
+        - mfaToken
+        - code
+      properties:
+        mfaToken:
+          type: string
+        code:
+          type: string
+        rememberDevice:
+          type: boolean
+          default: false
+
+    CodeRequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+
+    MeResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+        session:
+          type: object
+          nullable: true
+          properties:
+            expires_at:
+              type: string
+              nullable: true
+        authenticated:
+          type: boolean
+
+    SessionInfo:
+      type: object
+      properties:
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          nullable: true
+        last_activity_at:
+          type: string
+          nullable: true
+        expires_at:
+          type: string
+          nullable: true
+        current:
+          type: boolean
+
+    SessionsResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionInfo"
+
+    DeleteSessionRequest:
+      type: object
+      required:
+        - sessionId
+      properties:
+        sessionId:
+          type: string
+
+    TrustedDevice:
+      type: object
+      properties:
+        id:
+          type: integer
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          nullable: true
+        last_used_at:
+          type: string
+          nullable: true
+        expires_at:
+          type: string
+          nullable: true
+
+    TrustedDevicesResponse:
+      type: object
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrustedDevice"
+
+    DeleteTrustedDeviceRequest:
+      type: object
+      required:
+        - deviceId
+      properties:
+        deviceId:
+          type: integer
+
+    MfaStatusResponse:
+      type: object
+      properties:
+        totpEnabled:
+          type: boolean
+        setupPending:
+          type: boolean
+        hasBackupCodes:
+          type: boolean
+
+    MfaSetupResponse:
+      type: object
+      properties:
+        secret:
+          type: string
+        otpauthUrl:
+          type: string
+
+    BackupCodesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        backupCodes:
+          type: array
+          items:
+            type: string
+
+    ScheduleBand:
+      type: object
+      properties:
+        id:
+          type: string
+        performance_id:
+          type: integer
+        band_profile_id:
+          type: integer
+        name:
+          type: string
+        venue:
+          type: string
+        date:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        url:
+          type: string
+          nullable: true
+
+    ScheduleEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        date:
+          type: string
+        slug:
+          type: string
+        ticket_url:
+          type: string
+          nullable: true
+        is_archived:
+          type: boolean
+        theme_colors:
+          type: string
+          nullable: true
+        venue_info:
+          type: string
+          nullable: true
+        social_links:
+          type: string
+          nullable: true
+
+    ScheduleResponse:
+      type: object
+      properties:
+        bands:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleBand"
+        event:
+          $ref: "#/components/schemas/ScheduleEvent"
+
+    PublicEventSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        date:
+          type: string
+        description:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        ticket_url:
+          type: string
+          nullable: true
+        is_upcoming:
+          type: integer
+        band_count:
+          type: integer
+        venue_count:
+          type: integer
+
+    PublicEventsResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicEventSummary"
+        filters:
+          $ref: "#/components/schemas/GenericRecord"
+        count:
+          type: integer
+        generated_at:
+          type: string
+
+    VenueSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        band_count:
+          type: integer
+          nullable: true
+      additionalProperties: true
+
+    TimelineEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        date:
+          type: string
+        status:
+          type: string
+          nullable: true
+        ticket_url:
+          type: string
+          nullable: true
+        band_count:
+          type: integer
+        venue_count:
+          type: integer
+        bands:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        venues:
+          type: array
+          items:
+            $ref: "#/components/schemas/VenueSummary"
+
+    TimelineResponse:
+      type: object
+      properties:
+        now:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEvent"
+        upcoming:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEvent"
+        past:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEvent"
+
+    EventDetailsResponse:
+      type: object
+      properties:
+        event:
+          $ref: "#/components/schemas/GenericRecord"
+        bands:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        venues:
+          type: array
+          items:
+            $ref: "#/components/schemas/VenueSummary"
+        band_count:
+          type: integer
+        venue_count:
+          type: integer
+
+    PublicBandProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        origin:
+          type: string
+          nullable: true
+        social:
+          $ref: "#/components/schemas/GenericRecord"
+        performances:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+
+    PublicBandStatsResponse:
+      type: object
+      additionalProperties: true
+
+    MetricsBatchRequest:
+      type: object
+      properties:
+        events:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            properties:
+              event:
+                type: string
+                enum:
+                  - page_view
+                  - event_view
+                  - artist_profile_view
+                  - social_link_click
+                  - ticket_click
+                  - share_event
+                  - filter_use
+              props:
+                $ref: "#/components/schemas/GenericRecord"
+
+    ScheduleBuildRequest:
+      type: object
+      required:
+        - event_id
+        - user_session
+      properties:
+        event_id:
+          type: integer
+        performance_ids:
+          type: array
+          maxItems: 50
+          items:
+            type: integer
+        band_ids:
+          type: array
+          maxItems: 50
+          items:
+            type: integer
+        user_session:
+          type: string
+
+    SubscriptionRequest:
+      type: object
+      required:
+        - email
+        - city
+        - genre
+        - frequency
+      properties:
+        email:
+          type: string
+          format: email
+        city:
+          type: string
+        genre:
+          type: string
+        frequency:
+          type: string
+          enum:
+            - daily
+            - weekly
+            - monthly
+        turnstileToken:
+          type: string
+          nullable: true
+
+    SubscriptionMessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        error:
+          type: string
+          nullable: true
+
+    ActivateRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+
+    ResendActivationRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetTokenRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+
+    ResetTokenValidationResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        user:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+              nullable: true
+        expiresAt:
+          type: string
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - newPassword
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+
+    EventListResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+
+    EventInput:
+      type: object
+      required:
+        - name
+        - date
+        - slug
+      properties:
+        name:
+          type: string
+        date:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+          enum:
+            - draft
+            - published
+            - archived
+        description:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        ticket_url:
+          type: string
+          nullable: true
+        venue_info:
+          nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
+        social_links:
+          nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
+        theme_colors:
+          nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
+
+    EventPatchInput:
+      type: object
+      additionalProperties: true
+      properties:
+        name:
+          type: string
+        date:
+          type: string
+        status:
+          type: string
+          enum:
+            - draft
+            - published
+        description:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        ticket_url:
+          type: string
+          nullable: true
+        venue_info:
+          nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
+        social_links:
+          nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
+        theme_colors:
+          nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
+
+    EventEditInput:
+      type: object
+      required:
+        - name
+        - date
+        - slug
+      properties:
+        name:
+          type: string
+        date:
+          type: string
+        slug:
+          type: string
+        ticket_url:
+          type: string
+          nullable: true
+
+    PublishStateRequest:
+      type: object
+      required:
+        - publish
+      properties:
+        publish:
+          type: boolean
+
+    EventDuplicateRequest:
+      type: object
+      required:
+        - name
+        - date
+        - slug
+      properties:
+        name:
+          type: string
+        date:
+          type: string
+        slug:
+          type: string
+
+    EventMutationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        event:
+          $ref: "#/components/schemas/GenericRecord"
+        message:
+          type: string
+          nullable: true
+
+    EventDuplicateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        event:
+          $ref: "#/components/schemas/GenericRecord"
+        bandsCopied:
+          type: integer
+        message:
+          type: string
+
+    EventMetricsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        metrics:
+          type: object
+          properties:
+            totalScheduleBuilds:
+              type: integer
+            uniqueVisitors:
+              type: integer
+            lastUpdated:
+              type: string
+              nullable: true
+            popularBands:
+              type: array
+              items:
+                $ref: "#/components/schemas/GenericRecord"
+
+    VenueListResponse:
+      type: object
+      properties:
+        venues:
+          type: array
+          items:
+            $ref: "#/components/schemas/VenueSummary"
+
+    VenueInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        address_line1:
+          type: string
+          nullable: true
+        address_line2:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        region:
+          type: string
+          nullable: true
+        postal_code:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        contact_email:
+          type: string
+          format: email
+          nullable: true
+
+    VenueMutationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        venue:
+          $ref: "#/components/schemas/GenericRecord"
+
+    BandListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        bands:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+
+    BandInput:
+      type: object
+      required:
+        - name
+      properties:
+        eventId:
+          type: integer
+          nullable: true
+        venueId:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        startTime:
+          type: string
+          nullable: true
+        endTime:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        photo_url:
+          type: string
+          nullable: true
+        genre:
+          type: string
+          nullable: true
+        origin:
+          type: string
+          nullable: true
+        origin_city:
+          type: string
+          nullable: true
+        origin_region:
+          type: string
+          nullable: true
+        contact_email:
+          type: string
+          format: email
+          nullable: true
+        is_active:
+          oneOf:
+            - type: integer
+            - type: boolean
+          nullable: true
+        social_links:
+          nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
+
+    BandUpdateInput:
+      type: object
+      additionalProperties: true
+      properties:
+        venueId:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          nullable: true
+        endTime:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        genre:
+          type: string
+          nullable: true
+        origin:
+          type: string
+          nullable: true
+        origin_city:
+          type: string
+          nullable: true
+        origin_region:
+          type: string
+          nullable: true
+        contact_email:
+          type: string
+          format: email
+          nullable: true
+        is_active:
+          oneOf:
+            - type: integer
+            - type: boolean
+          nullable: true
+        photo_url:
+          type: string
+          nullable: true
+        social_links:
+          nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
+
+    BandMutationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        band:
+          $ref: "#/components/schemas/GenericRecord"
+        conflicts:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        warning:
+          type: string
+          nullable: true
+
+    BulkPreviewRequest:
+      type: object
+      required:
+        - band_ids
+        - action
+      properties:
+        band_ids:
+          type: array
+          maxItems: 200
+          items:
+            type: string
+        action:
+          type: string
+          enum:
+            - move_venue
+            - change_time
+            - delete
+        venue_id:
+          type: integer
+          nullable: true
+        start_time:
+          type: string
+          nullable: true
+
+    BulkPreviewResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        conflicts:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+
+    BulkAddRequest:
+      type: object
+      required:
+        - band_profile_ids
+        - event_id
+        - venue_id
+      properties:
+        band_profile_ids:
+          type: array
+          maxItems: 200
+          items:
+            type: integer
+        event_id:
+          type: integer
+        venue_id:
+          type: integer
+        start_time:
+          type: string
+          nullable: true
+        end_time:
+          type: string
+          nullable: true
+
+    BulkDeleteRequest:
+      type: object
+      required:
+        - band_ids
+      properties:
+        band_ids:
+          type: array
+          maxItems: 200
+          items:
+            type: string
+
+    PhotoUploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        url:
+          type: string
+        filename:
+          type: string
+        size:
+          type: integer
+        type:
+          type: string
+
+    PerformerInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        genre:
+          type: string
+          nullable: true
+        origin:
+          type: string
+          nullable: true
+        origin_city:
+          type: string
+          nullable: true
+        origin_region:
+          type: string
+          nullable: true
+        contact_email:
+          type: string
+          format: email
+          nullable: true
+        is_active:
+          oneOf:
+            - type: integer
+            - type: boolean
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        photo_url:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+        instagram:
+          type: string
+          nullable: true
+        bandcamp:
+          type: string
+          nullable: true
+        facebook:
+          type: string
+          nullable: true
+
+    PerformerListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        performers:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+
+    PerformerResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        performer:
+          $ref: "#/components/schemas/GenericRecord"
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        role:
+          type: string
+        isActive:
+          type: boolean
+        created_at:
+          type: string
+          nullable: true
+        last_login:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          nullable: true
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummary"
+
+    UserInviteRequest:
+      type: object
+      required:
+        - email
+        - role
+        - firstName
+        - lastName
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+            - viewer
+            - editor
+            - admin
+        firstName:
+          type: string
+        lastName:
+          type: string
+
+    UserInviteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        invite:
+          $ref: "#/components/schemas/GenericRecord"
+        email:
+          $ref: "#/components/schemas/GenericRecord"
+        inviteUrl:
+          type: string
+          nullable: true
+
+    UserUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        role:
+          type: string
+          enum:
+            - viewer
+            - editor
+            - admin
+        name:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+          nullable: true
+
+    AdminResetPasswordRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          nullable: true
+
+    InviteCodeCreateRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          nullable: true
+        role:
+          type: string
+          enum:
+            - viewer
+            - editor
+            - admin
+          default: editor
+        expiresInDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 7
+
+    InviteCodesResponse:
+      type: object
+      properties:
+        inviteCodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+
+    InviteCodeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        inviteCode:
+          $ref: "#/components/schemas/GenericRecord"
+
+    AuditLogResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    SubscriptionAnalyticsResponse:
+      type: object
+      properties:
+        total_subscribers:
+          type: integer
+        by_city:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        by_genre:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        by_frequency:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        growth_30_days:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenericRecord"
+        total_unsubscribes:
+          type: integer
+        unsubscribe_rate:
+          type: string
+
+    CleanupSessionsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        sessions_deleted:
+          type: integer
+        mfa_challenges_deleted:
+          type: integer
+        email_otp_codes_deleted:
+          type: integer
+        password_reset_tokens_deleted:
+          type: integer
+        trusted_devices_deleted:
+          type: integer
+        auth_attempts_deleted:
+          type: integer
+        auth_audit_deleted:
+          type: integer
+        audit_log_deleted:
+          type: integer
+        rate_limits_deleted:
+          type: integer

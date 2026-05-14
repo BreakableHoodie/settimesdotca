@@ -11,10 +11,6 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newVenue, setNewVenue] = useState({ name: '', address: '' })
 
-  useEffect(() => {
-    loadVenues()
-  }, [])
-
   const loadVenues = async () => {
     setLoading(true)
     try {
@@ -26,6 +22,10 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadVenues()
+  }, [])
 
   const handleAddExisting = venueId => {
     const venue = allVenues.find(v => v.id === parseInt(venueId))

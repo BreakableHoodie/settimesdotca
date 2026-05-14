@@ -3,39 +3,11 @@
 // Body: { code: string }
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
+import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
-
-async function checkRateLimit(DB, userId, ipAddress) {
-  const windowMs = 10 * 60 * 1000;
-  const windowStart = new Date(Date.now() - windowMs).toISOString();
-
-  const attempts = await DB.prepare(
-    `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
-     FROM auth_attempts
-     WHERE user_id = ?
-       AND ip_address = ?
-       AND attempt_type = 'mfa_disable'
-       AND success = 0
-       AND created_at > ?`
-  )
-    .bind(userId, ipAddress, windowStart)
-    .first();
-
-  if (Number(attempts.count) >= 5) {
-    const earliestTs = attempts.earliest_attempt
-      ? new Date(attempts.earliest_attempt).getTime()
-      : Date.now();
-    const elapsed = Date.now() - earliestTs;
-    const remainingMs = Math.max(0, windowMs - elapsed);
-    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-
-    return { allowed: false, remainingMinutes };
-  }
-
-  return { allowed: true };
-}
 
 function parseBackupCodes(raw) {
   if (!raw) return [];
@@ -107,7 +79,12 @@ export async function onRequestPost(context) {
     );
   }
 
-  const rateCheck = await checkRateLimit(DB, userId, ipAddress);
+  const rateCheck = await checkAuthRateLimit(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
+    ipAddress,
+    scope: "user-and-ip",
+    userId,
+  });
   if (!rateCheck.allowed) {
     return new Response(
       JSON.stringify({
@@ -122,8 +99,19 @@ export async function onRequestPost(context) {
   }
 
   let verified = false;
+  let totpSecretError = null;
+  let totpSecretState = null;
   if (user.totp_secret) {
-    verified = await verifyTotp(user.totp_secret, code);
+    try {
+      totpSecretState = await loadTotpSecret(user.totp_secret, env);
+    } catch (error) {
+      totpSecretError = error;
+      console.error("[MFA Disable] Failed to decrypt TOTP secret:", error?.message || error);
+    }
+  }
+
+  if (totpSecretState?.secret) {
+    verified = await verifyTotp(totpSecretState.secret, code);
   }
 
   if (!verified) {
@@ -132,13 +120,29 @@ export async function onRequestPost(context) {
     verified = result.valid;
   }
 
+  if (!verified && totpSecretError) {
+    return new Response(
+      JSON.stringify({
+        error: "Server error",
+        message: "Failed to verify MFA code",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   if (!verified) {
-    await DB.prepare(
-      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-       VALUES (?, ?, ?, ?, 'mfa_disable', 0, 'invalid_code')`
-    )
-      .bind(userId, user.email, ipAddress, request.headers.get("User-Agent") || "unknown")
-      .run();
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
+      email: user.email,
+      failureReason: "invalid_code",
+      ipAddress,
+      success: false,
+      userAgent: request.headers.get("User-Agent") || "unknown",
+      userId,
+    });
 
     return new Response(
       JSON.stringify({
@@ -161,6 +165,15 @@ export async function onRequestPost(context) {
     .run();
 
   await revokeAllTrustedDevices(DB, userId);
+
+  await writeAuthAttempt(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
+    email: user.email,
+    ipAddress,
+    success: true,
+    userAgent: request.headers.get("User-Agent") || "unknown",
+    userId,
+  });
 
   await auditLog(
     env,

@@ -1,6 +1,10 @@
 // Trusted Device utilities for "Remember this device" MFA feature
+import { isDevRequest } from "./auth.js";
 
-const TRUSTED_DEVICE_COOKIE_NAME = "trusted_device";
+// __Host- prefix enforces Secure + Path=/ + no Domain, preventing subdomain injection.
+// Must align with the name used in getTrustedDeviceToken's cookie parsing.
+const TRUSTED_DEVICE_COOKIE_NAME_SECURE = "__Host-trusted_device";
+const TRUSTED_DEVICE_COOKIE_NAME_DEV = "trusted_device";
 const TRUSTED_DEVICE_EXPIRY_DAYS = 30;
 
 /**
@@ -100,7 +104,9 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
 
   if (!device) return null;
 
-  // Validate IP and UA independently using constant-time comparison
+  // Trust policy:
+  //   New rows (ua_hash present): UA must match; IP change is tolerated (DHCP, mobile, VPN).
+  //   Legacy rows (no ua_hash):   full IP+UA fingerprint must match.
   const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
   const currentUaHash = await generateUaHash(userAgent);
 
@@ -109,8 +115,6 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
     currentFingerprint,
   );
 
-  // If stored ua_hash exists, validate UA independently (new schema)
-  // Otherwise fall back to full fingerprint check (pre-migration rows)
   if (device.ua_hash) {
     const uaMatch = timingSafeStringEqual(device.ua_hash, currentUaHash);
     if (!uaMatch) {
@@ -118,19 +122,20 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
       return null;
     }
     if (!fingerprintMatch) {
-      console.log("[TrustedDevice] Fingerprint mismatch, MFA required");
-      return null;
+      // UA matches but IP changed — normal for DHCP, mobile, VPN users.
+      // Fingerprint is refreshed in the update below.
+      console.log("[TrustedDevice] IP changed for known UA, refreshing fingerprint");
     }
   } else if (!fingerprintMatch) {
     console.log("[TrustedDevice] Fingerprint mismatch, device not trusted");
     return null;
   }
 
-  // Update last_used_at and current IP
+  // Always refresh last_used_at; also refresh IP and fingerprint so they stay current
   await DB.prepare(
-    `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ? WHERE id = ?`
+    `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ?, device_fingerprint = ? WHERE id = ?`
   )
-    .bind(ipAddress, device.id)
+    .bind(ipAddress, currentFingerprint, device.id)
     .run();
 
   return device.user_id;
@@ -165,37 +170,38 @@ export async function cleanupExpiredDevices(DB) {
 }
 
 /**
- * Create the trusted device cookie string
+ * Create the trusted device cookie string.
+ * Uses __Host- prefix in production to enforce Secure + Path=/ and prevent subdomain injection.
  */
-export function createTrustedDeviceCookie(token, request) {
-  const isSecure = !request?.url?.includes("localhost");
+export function createTrustedDeviceCookie(token, request, env) {
+  const isDev = isDevRequest(request, env);
+  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
   const maxAge = TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60;
 
   const parts = [
-    `${TRUSTED_DEVICE_COOKIE_NAME}=${token}`,
+    `${cookieName}=${token}`,
     `Path=/`,
     `Max-Age=${maxAge}`,
     `SameSite=Strict`,
+    `HttpOnly`,
   ];
 
-  if (isSecure) {
+  if (!isDev) {
     parts.push("Secure");
   }
-
-  // HTTPOnly so JavaScript can't access it
-  parts.push("HttpOnly");
 
   return parts.join("; ");
 }
 
 /**
- * Create a cookie to delete the trusted device
+ * Create a cookie to clear the trusted device.
  */
-export function deleteTrustedDeviceCookie(request) {
-  const isSecure = !request?.url?.includes("localhost");
-  const secure = isSecure ? "Secure; " : "";
+export function deleteTrustedDeviceCookie(request, env) {
+  const isDev = isDevRequest(request, env);
+  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
+  const secure = isDev ? "" : "Secure; ";
 
-  return `${TRUSTED_DEVICE_COOKIE_NAME}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
+  return `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
 }
 
 /**
@@ -208,7 +214,7 @@ export function getTrustedDeviceToken(request) {
   const cookies = cookieHeader.split(";");
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split("=");
-    if (name === TRUSTED_DEVICE_COOKIE_NAME) {
+    if (name === TRUSTED_DEVICE_COOKIE_NAME_SECURE || name === TRUSTED_DEVICE_COOKIE_NAME_DEV) {
       return value;
     }
   }

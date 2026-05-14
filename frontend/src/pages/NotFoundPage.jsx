@@ -1,7 +1,6 @@
-import { Link } from 'react-router-dom'
+import { Compass } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCompass } from '@fortawesome/free-solid-svg-icons'
+import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
 
 export default function NotFoundPage() {
@@ -12,8 +11,8 @@ export default function NotFoundPage() {
       </Helmet>
       <main className="flex-1 flex items-center justify-center px-4">
         <div className="max-w-md text-center">
-          <div className="text-accent-400 text-6xl mb-4" aria-hidden="true">
-            <FontAwesomeIcon icon={faCompass} />
+          <div className="text-accent-400 mb-4" aria-hidden="true">
+            <Compass size={60} />
           </div>
           <h1 className="text-white text-3xl font-bold mb-2">Page Not Found</h1>
           <p className="text-white/70 mb-8">The page you&apos;re looking for doesn&apos;t exist or may have moved.</p>

@@ -1,8 +1,25 @@
-import { useState } from 'react'
-import { eventsApi, venuesApi, bandsApi } from '../utils/adminApi'
+import { useEffect, useState } from 'react'
+import { eventsApi } from '../utils/adminApi'
 import { formatTimeRange } from '../utils/timeFormat'
 
 const STEPS = ['basics', 'venues', 'bands', 'publish']
+const DEFAULT_EVENT_DATA = {
+  name: '',
+  date: '',
+  slug: '',
+  description: '',
+  venues: [],
+  bands: [],
+}
+
+function normalizeEventData(initialEventData) {
+  return {
+    ...DEFAULT_EVENT_DATA,
+    ...initialEventData,
+    venues: Array.isArray(initialEventData?.venues) ? initialEventData.venues : [],
+    bands: Array.isArray(initialEventData?.bands) ? initialEventData.bands : [],
+  }
+}
 
 // Step 1: Event Basics
 function BasicsStep({ eventData, onChange }) {
@@ -93,9 +110,9 @@ function BasicsStep({ eventData, onChange }) {
 }
 
 // Step 2: Venues
-function VenuesStep({ eventData: _eventData, onChange }) {
-  const [venues, setVenues] = useState([])
+function VenuesStep({ eventData, onChange }) {
   const [newVenue, setNewVenue] = useState({ name: '', address: '' })
+  const venues = Array.isArray(eventData?.venues) ? eventData.venues : []
 
   const handleAddVenue = () => {
     if (!newVenue.name.trim()) return
@@ -106,7 +123,6 @@ function VenuesStep({ eventData: _eventData, onChange }) {
       address: newVenue.address.trim(),
     }
 
-    setVenues(prev => [...prev, venue])
     onChange(prev => ({
       ...prev,
       venues: [...prev.venues, venue],
@@ -115,7 +131,6 @@ function VenuesStep({ eventData: _eventData, onChange }) {
   }
 
   const handleRemoveVenue = venueId => {
-    setVenues(prev => prev.filter(v => v.id !== venueId))
     onChange(prev => ({
       ...prev,
       venues: prev.venues.filter(v => v.id !== venueId),
@@ -172,7 +187,6 @@ function VenuesStep({ eventData: _eventData, onChange }) {
 
 // Step 3: Bands
 function BandsStep({ eventData, onChange }) {
-  const [bands, setBands] = useState([])
   const [newBand, setNewBand] = useState({
     name: '',
     venueId: '',
@@ -180,6 +194,7 @@ function BandsStep({ eventData, onChange }) {
     endTime: '',
     url: '',
   })
+  const bands = Array.isArray(eventData?.bands) ? eventData.bands : []
 
   const handleAddBand = () => {
     if (!newBand.name.trim() || !newBand.venueId || !newBand.startTime || !newBand.endTime) return
@@ -193,7 +208,6 @@ function BandsStep({ eventData, onChange }) {
       url: newBand.url.trim(),
     }
 
-    setBands(prev => [...prev, band])
     onChange(prev => ({
       ...prev,
       bands: [...prev.bands, band],
@@ -208,7 +222,6 @@ function BandsStep({ eventData, onChange }) {
   }
 
   const handleRemoveBand = bandId => {
-    setBands(prev => prev.filter(b => b.id !== bandId))
     onChange(prev => ({
       ...prev,
       bands: prev.bands.filter(b => b.id !== bandId),
@@ -342,17 +355,18 @@ function PublishStep({ eventData }) {
   )
 }
 
-export default function EventWizard({ onComplete, onCancel }) {
-  const [currentStep, setCurrentStep] = useState(0)
-  const [eventData, setEventData] = useState({
-    name: '',
-    date: '',
-    slug: '',
-    description: '',
-    venues: [],
-    bands: [],
-  })
+export default function EventWizard({ onComplete, onCancel, initialEventData, initialStep = 0, onDraftChange }) {
+  const [currentStep, setCurrentStep] = useState(() => initialStep)
+  const [eventData, setEventData] = useState(() => normalizeEventData(initialEventData))
   const [loading, setLoading] = useState(false)
+  const [publishError, setPublishError] = useState(null)
+
+  useEffect(() => {
+    onDraftChange?.({
+      currentStep,
+      eventData,
+    })
+  }, [currentStep, eventData, onDraftChange])
 
   const stepComponents = {
     basics: <BasicsStep eventData={eventData} onChange={setEventData} />,
@@ -375,41 +389,43 @@ export default function EventWizard({ onComplete, onCancel }) {
 
   const handlePublish = async () => {
     setLoading(true)
+    setPublishError(null)
+
+    // Map temp local venue IDs to 0-based indices for the wizard endpoint
+    const venueIndexMap = Object.fromEntries(eventData.venues.map((v, i) => [v.id, i]))
+
+    // Pre-flight: detect bands referencing a venue that was removed before publishing
+    const staleBand = eventData.bands.find(b => venueIndexMap[b.venueId] === undefined)
+    if (staleBand) {
+      setPublishError(
+        `Band "${staleBand.name}" references a venue that was removed. Please go back and fix the band's venue assignment.`
+      )
+      setLoading(false)
+      return
+    }
 
     try {
-      // Create event
-      const event = await eventsApi.create({
-        name: eventData.name,
-        date: eventData.date,
-        slug: eventData.slug,
-        description: eventData.description,
+      const { event } = await eventsApi.createWizard({
+        event: {
+          name: eventData.name,
+          date: eventData.date,
+          slug: eventData.slug,
+          description: eventData.description,
+        },
+        venues: eventData.venues.map(v => ({ name: v.name, address: v.address })),
+        bands: eventData.bands.map(b => ({
+          name: b.name,
+          venueIndex: venueIndexMap[b.venueId],
+          startTime: b.startTime,
+          endTime: b.endTime,
+          url: b.url,
+        })),
       })
-
-      // Create venues
-      for (const venue of eventData.venues) {
-        await venuesApi.create({
-          name: venue.name,
-          address: venue.address,
-          event_id: event.id,
-        })
-      }
-
-      // Create bands
-      for (const band of eventData.bands) {
-        await bandsApi.create({
-          name: band.name,
-          venue_id: band.venueId,
-          start_time: band.startTime,
-          end_time: band.endTime,
-          url: band.url,
-          event_id: event.id,
-        })
-      }
 
       onComplete(event)
     } catch (error) {
       console.error('Failed to create event:', error)
-      alert('Failed to create event. Please try again.')
+      setPublishError(error?.message || 'Failed to create event. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -446,6 +462,12 @@ export default function EventWizard({ onComplete, onCancel }) {
 
       {/* Current step content */}
       <div className="mb-6">{stepComponents[STEPS[currentStep]]}</div>
+
+      {publishError && (
+        <div role="alert" className="mb-4 bg-red-900/50 border border-red-600 text-red-200 p-3 rounded text-sm">
+          {publishError}
+        </div>
+      )}
 
       {/* Navigation buttons */}
       <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">

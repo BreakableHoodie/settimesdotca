@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import { generateTotpCode } from "../../../../utils/totp.js";
+import { AUTH_ATTEMPT_TYPES } from "../../../../utils/authAttempts.js";
+import { isEncryptedTotpSecret } from "../../../../utils/mfaSecrets.js";
 import * as mfaStatusHandler from "../status.js";
 import * as mfaSetupHandler from "../setup.js";
 import * as mfaEnableHandler from "../enable.js";
@@ -45,6 +47,8 @@ describe("admin mfa settings", () => {
 
     const user = rawDb.prepare("SELECT totp_secret, totp_enabled FROM users WHERE id = 1").get();
     expect(user.totp_secret).toBeTruthy();
+    expect(isEncryptedTotpSecret(user.totp_secret)).toBe(true);
+    expect(user.totp_secret).not.toBe(setupPayload.secret);
     expect(user.totp_enabled).toBe(0);
 
     const statusReq2 = new Request("https://example.test/api/admin/mfa/status", {
@@ -139,6 +143,11 @@ describe("admin mfa settings", () => {
       env,
     });
     expect(disableRes.status).toBe(200);
+
+    const disableAttempt = rawDb
+      .prepare("SELECT success FROM auth_attempts WHERE user_id = ? AND attempt_type = ? ORDER BY id DESC LIMIT 1")
+      .get(1, AUTH_ATTEMPT_TYPES.mfaDisable);
+    expect(disableAttempt.success).toBe(1);
 
     const user = rawDb
       .prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = 1")

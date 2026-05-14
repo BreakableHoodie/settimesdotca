@@ -2,13 +2,13 @@ import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { eventsApi, bandsApi } from '../utils/adminApi'
 import { useEventContext } from '../contexts/EventContext'
 import EventFormModal from './EventFormModal'
+import HistoricalImportModal from './HistoricalImportModal'
 import EventStatusBadge from './components/EventStatusBadge'
 import EmbedCodeGenerator from './EmbedCodeGenerator'
 import MetricsDashboard from './MetricsDashboard'
 import ArchivedEventBanner from './components/ArchivedEventBanner'
 import HelpPanel from './components/HelpPanel'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCopy, faLink, faTicketSimple } from '@fortawesome/free-solid-svg-icons'
+import { Copy, Link, Ticket } from 'lucide-react'
 import { formatTimeRange } from '../utils/timeFormat'
 import {
   getEventState,
@@ -238,7 +238,7 @@ const EventRow = memo(function EventRow({
               className={`px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Visit ticket link"
             >
-              <FontAwesomeIcon icon={faLink} className="mr-1" aria-hidden="true" />
+              <Link size={14} className="mr-1" aria-hidden="true" />
               Visit
             </button>
             <button
@@ -249,7 +249,7 @@ const EventRow = memo(function EventRow({
               className={`px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Copy ticket link"
             >
-              <FontAwesomeIcon icon={faCopy} className="mr-1" aria-hidden="true" />
+              <Copy size={14} className="mr-1" aria-hidden="true" />
               Copy
             </button>
           </div>
@@ -397,6 +397,7 @@ export default function EventsTab({
 }) {
   const { refreshEvents } = useEventContext()
   const [showModal, setShowModal] = useState(false)
+  const [showHistoricalImport, setShowHistoricalImport] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
   // duplication flow simplified: startDuplicate will perform duplication directly
   const [showEmbedCode, setShowEmbedCode] = useState(null)
@@ -432,8 +433,8 @@ export default function EventsTab({
     if (selectedEventId) {
       const loadEventData = async () => {
         try {
-          const bandsData = await bandsApi.getAll()
-          const eventBandsData = bandsData.bands.filter(b => b.event_id === selectedEventId)
+          const bandsData = await bandsApi.getByEvent(selectedEventId)
+          const eventBandsData = bandsData.bands
 
           // Get venue names from the bands
           const uniqueVenues = {}
@@ -761,7 +762,7 @@ export default function EventsTab({
                   }
                   className={`px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
-                  <FontAwesomeIcon icon={faTicketSimple} className="mr-2" aria-hidden="true" />
+                  <Ticket size={14} className="mr-2" aria-hidden="true" />
                   Tickets
                 </button>
               )}
@@ -1050,6 +1051,14 @@ export default function EventsTab({
             />
             <span>Show Archived</span>
           </label>
+          {!readOnly && canArchiveEvents && (
+            <button
+              onClick={() => setShowHistoricalImport(true)}
+              className={`px-3 py-2 text-sm text-gray-300 hover:text-white border border-white/20 hover:border-white/40 rounded transition-colors min-h-[44px] ${buttonFocusClass}`}
+            >
+              Import historical event
+            </button>
+          )}
           {!readOnly && (
             <button
               onClick={() => {
@@ -1066,6 +1075,20 @@ export default function EventsTab({
 
       {/* Help Panel */}
       {showHelp && <HelpPanel topic="events" isOpen={showHelp} onClose={() => setShowHelp(false)} />}
+
+      {/* Historical Import Modal */}
+      {showHistoricalImport && (
+        <HistoricalImportModal
+          onClose={() => {
+            setShowHistoricalImport(false)
+            refreshEvents()
+          }}
+          onImported={() => {
+            setShowHistoricalImport(false)
+            refreshEvents()
+          }}
+        />
+      )}
 
       {/* Event Form Modal */}
       {!readOnly && (

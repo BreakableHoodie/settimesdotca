@@ -9,6 +9,7 @@ name = "settimesdotca"
 compatibility_date = "2025-10-08"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "frontend/dist"
+
 # Note: Cloudflare Pages ignores wrangler [build] configs and expects the final
 # artifacts to be present in pages_build_output_dir. The GitHub Actions workflow
 # handles installing dependencies and running `npm run build` before deploying.
@@ -49,22 +50,27 @@ database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b" # binding reference only â€
 # These should be set in Cloudflare Pages dashboard under Settings > Environment Variables
 #
 # Required variables:
-# - ADMIN_PASSWORD: Regular password for organizers (16+ characters)
-# - MASTER_PASSWORD: Recovery password (different from ADMIN_PASSWORD, 20+ characters)
-# - DEVELOPER_CONTACT: Phone number shown on forgot password screen
-# - PUBLIC_DATA_PUBLISH_ENABLED: Set "true" to publish public event data
+# - ENVIRONMENT: production or development
+# - PUBLIC_URL: Base URL used in email links (for example https://settimes.ca)
+# - PUBLIC_DATA_PUBLISH_ENABLED: Set "true" to publish public event data (unset or false keeps public endpoints disabled)
+# - CSRF_SECRET: Required in production
+# - MFA_TOTP_ENCRYPTION_KEY: Required before any TOTP MFA flow; set it in local .dev.vars too when testing MFA locally
 # - CSP_ENFORCE: Set "true" to enforce CSP (report-only when false/omitted)
 # - EMAIL_PROVIDER: "postmark", "mailchannels", or "resend"
 # - EMAIL_FROM: Sender address for transactional email
+# - ADMIN_EMAIL: Optional fallback sender if EMAIL_FROM is not set
 # - POSTMARK_API_TOKEN: Required when EMAIL_PROVIDER="postmark"
 # - RESEND_API_KEY: Required when EMAIL_PROVIDER="resend"
-# - PUBLIC_URL: Base URL used in email links (e.g., https://settimes.ca)
+# - CORS_ALLOWED_ORIGINS: Optional comma-separated extra allowed origins
+# - ALLOW_HEADER_AUTH: Non-production only, for trusted automation
+# - LOG_LEVEL: debug, info, warn, or error
+# - SCHEDULE_CACHE_TTL_SECONDS: Optional cache TTL override for public schedule responses
 #
 # For local development, create a .dev.vars file (NOT committed to git):
 #
-# ADMIN_PASSWORD=your-strong-admin-password-here
-# MASTER_PASSWORD=your-even-stronger-master-password-here
-# DEVELOPER_CONTACT=555-123-4567
+# ENVIRONMENT=development
+# PUBLIC_URL=http://localhost:8788
+# PUBLIC_DATA_PUBLISH_ENABLED=false
 
 # R2 Bucket Binding
 #

@@ -1,51 +1,55 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from "vitest";
-import { createTestEnv } from "../../../test-utils.js";
-import * as resetHandler from "../[id]/reset-password.js";
+import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
+import { createTestEnv } from '../../../test-utils.js';
+import * as resetHandler from '../[id]/reset-password.js';
 
-describe("Admin user password reset API", () => {
+describe('Admin user password reset API', () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      text: async () => "",
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        text: async () => '',
+      }))
+    );
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  test("admin generates reset token and logs action", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
-    env.EMAIL_PROVIDER = "mailchannels";
-    env.EMAIL_FROM = "no-reply@settimes.ca";
+  test('admin generates reset token and logs action', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'admin' });
+    env.EMAIL_PROVIDER = 'mailchannels';
+    env.EMAIL_FROM = 'no-reply@settimes.ca';
     rawDb
       .prepare(
-        "INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, ?)"
+        'INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, ?)'
       )
-      .run("resetme@test.com", "viewer", "Reset Me", "oldhash");
+      .run('resetme@test.com', 'viewer', 'Reset Me', 'oldhash');
     const user = rawDb
-      .prepare("SELECT * FROM users WHERE email = ?")
-      .get("resetme@test.com");
+      .prepare('SELECT * FROM users WHERE email = ?')
+      .get('resetme@test.com');
     const request = new Request(
       `https://example.test/api/admin/users/${user.id}/reset-password`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ reason: "User forgot password" }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ reason: 'User forgot password' }),
       }
     );
     const response = await resetHandler.onRequestPost({
       request,
       env,
-      params: { id: String(user.id) }, data: { user: { userId: 1, role: "admin", email: "admin@test" } },
+      params: { id: String(user.id) },
+      data: { user: { userId: 1, role: 'admin', email: 'admin@test' } },
     });
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload.success).toBe(true);
-    expect(payload.message).toContain("Password reset email sent");
+    expect(payload.message).toContain('Password reset email sent');
     const resetToken = rawDb
       .prepare(
-        "SELECT * FROM password_reset_tokens WHERE user_id = ? ORDER BY created_at DESC"
+        'SELECT * FROM password_reset_tokens WHERE user_id = ? ORDER BY created_at DESC'
       )
       .get(user.id);
     expect(resetToken).toBeTruthy();
@@ -55,54 +59,82 @@ describe("Admin user password reset API", () => {
       )
       .get(user.id);
     expect(audit).toBeTruthy();
+    const details = JSON.parse(audit.details);
+    expect(details).toMatchObject({
+      reason: 'User forgot password',
+      resetTokenGenerated: true,
+    });
+    expect(details).not.toHaveProperty('adminEmail');
+    expect(details).not.toHaveProperty('targetEmail');
   });
 
-  test("non-admin cannot reset password", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+  test('non-admin cannot reset password', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' });
     rawDb
-      .prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
-      .run("noreset@test.com", "viewer", "No Reset");
+      .prepare('INSERT INTO users (email, role, name) VALUES (?, ?, ?)')
+      .run('noreset@test.com', 'viewer', 'No Reset');
     const user = rawDb
-      .prepare("SELECT * FROM users WHERE email = ?")
-      .get("noreset@test.com");
+      .prepare('SELECT * FROM users WHERE email = ?')
+      .get('noreset@test.com');
     const request = new Request(
       `https://example.test/api/admin/users/${user.id}/reset-password`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ reason: "Not authorized" }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ reason: 'Not authorized' }),
       }
     );
     const response = await resetHandler.onRequestPost({
       request,
       env,
-      params: { id: String(user.id) }, data: { user: { userId: 2, role: "editor", email: "editor@test" } },
+      params: { id: String(user.id) },
+      data: { user: { userId: 2, role: 'editor', email: 'editor@test' } },
     });
     expect(response.status).toBe(403);
   });
 
-  test("rejects reset for inactive user", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
-    rawDb
-      .prepare(
-        "INSERT INTO users (email, role, name, is_active) VALUES (?, ?, ?, ?)"
-      )
-      .run("inactive@test.com", "viewer", "Inactive", 0);
-    const user = rawDb
-      .prepare("SELECT * FROM users WHERE email = ?")
-      .get("inactive@test.com");
+  test('rejects non-integer user id with 400', async () => {
+    const { env, headers } = createTestEnv({ role: 'admin' });
     const request = new Request(
-      `https://example.test/api/admin/users/${user.id}/reset-password`,
+      `https://example.test/api/admin/users/1;DROP TABLE users/reset-password`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ reason: "Account inactive" }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({}),
       }
     );
     const response = await resetHandler.onRequestPost({
       request,
       env,
-      params: { id: String(user.id) }, data: { user: { userId: 1, role: "admin", email: "admin@test" } },
+      params: { id: '1;DROP TABLE users' },
+      data: { user: { userId: 1, role: 'admin', email: 'admin@test' } },
+    });
+    expect(response.status).toBe(400);
+  });
+
+  test('rejects reset for inactive user', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'admin' });
+    rawDb
+      .prepare(
+        'INSERT INTO users (email, role, name, is_active) VALUES (?, ?, ?, ?)'
+      )
+      .run('inactive@test.com', 'viewer', 'Inactive', 0);
+    const user = rawDb
+      .prepare('SELECT * FROM users WHERE email = ?')
+      .get('inactive@test.com');
+    const request = new Request(
+      `https://example.test/api/admin/users/${user.id}/reset-password`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ reason: 'Account inactive' }),
+      }
+    );
+    const response = await resetHandler.onRequestPost({
+      request,
+      env,
+      params: { id: String(user.id) },
+      data: { user: { userId: 1, role: 'admin', email: 'admin@test' } },
     });
     expect(response.status).toBe(400);
   });

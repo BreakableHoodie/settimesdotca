@@ -34,21 +34,24 @@ jobs:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
 
       - name: Determine target URL
         id: target
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TARGET_URL: ${{ github.event.inputs.target_url }}
         run: |
           # workflow_dispatch: use provided URL or default to production
           # schedule: scan production
           # workflow_run (after dev deploy): scan dev environment
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            URL="${{ github.event.inputs.target_url }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            URL="${INPUT_TARGET_URL}"
             echo "url=${URL:-https://settimes.ca}" >> $GITHUB_OUTPUT
             echo "Manual scan: ${URL:-https://settimes.ca}"
-          elif [ "${{ github.event_name }}" = "schedule" ]; then
+          elif [ "$EVENT_NAME" = "schedule" ]; then
             echo "url=https://settimes.ca" >> $GITHUB_OUTPUT
             echo "Scheduled scan of production: https://settimes.ca"
           else
@@ -74,7 +77,7 @@ jobs:
           exit 1
 
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.15.0
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: ${{ steps.target.outputs.url }}
           artifact_name: zap-baseline-report
@@ -87,7 +90,7 @@ jobs:
           rules_file_name: ".zap/rules.tsv"
 
       - name: Upload ZAP Report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: zap-report

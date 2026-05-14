@@ -1,7 +1,7 @@
 # Performance Recommendations - SetTimes.ca
 
-**Date:** 2025-11-18  
-**Version:** 1.0.0  
+**Date:** 2025-11-18
+**Version:** 1.0.0
 **Status:** Advisory
 
 ---
@@ -46,23 +46,23 @@ The SetTimes.ca application demonstrates good performance practices with efficie
 **Solution:** Add a cleanup migration to run periodically:
 
 ```sql
--- migrations/legacy/migration-session-cleanup.sql
--- Run this manually or via cron job weekly
+-- Recommended: run this weekly via a scheduled job (or manually for one-off cleanup)
 
-DELETE FROM sessions 
+DELETE FROM sessions
 WHERE expires_at < datetime('now', '-7 days');
 
 -- Optional: Also clean up very old auth attempts
-DELETE FROM auth_attempts 
+DELETE FROM auth_attempts
 WHERE created_at < datetime('now', '-30 days');
 ```
 
 **Implementation:**
+
 - Create Cloudflare Worker with scheduled trigger (cron)
 - Run weekly cleanup
 - Log cleanup statistics
 
-**Effort:** 1-2 hours  
+**Effort:** 1-2 hours
 **Priority:** Medium
 
 ### 2. Add Edge Caching Headers
@@ -84,12 +84,13 @@ headers.set('CDN-Cache-Control', 'max-age=600');
 ```
 
 **Benefits:**
+
 - Reduced database load
 - Faster responses for end users
 - Better resource utilization
 
-**Effort:** 30 minutes  
-**Priority:** High  
+**Effort:** 30 minutes
+**Priority:** High
 **Expected Impact:** 50-70% reduction in database queries for public endpoints
 
 ### 3. Add Database Connection Pooling
@@ -112,8 +113,8 @@ function getPreparedStatement(db, key, sql) {
 }
 ```
 
-**Effort:** 2-3 hours  
-**Priority:** Low  
+**Effort:** 2-3 hours
+**Priority:** Low
 **Expected Impact:** 5-10% reduction in query preparation overhead
 
 ---
@@ -125,6 +126,7 @@ function getPreparedStatement(db, key, sql) {
 **Approach:** Use Cloudflare KV for frequently accessed data.
 
 **Candidates:**
+
 - Band profiles (rarely change)
 - Venue information (rarely change)
 - Published event schedules (change infrequently)
@@ -135,32 +137,34 @@ function getPreparedStatement(db, key, sql) {
 // Cache band profile for 1 hour
 async function getBandProfile(db, kv, bandId) {
   const cacheKey = `band_profile_${bandId}`;
-  
+
   // Check cache first
   const cached = await kv.get(cacheKey, { type: 'json' });
   if (cached) return cached;
-  
+
   // Fetch from database
-  const band = await db.prepare(
-    'SELECT * FROM band_profiles WHERE id = ?'
-  ).bind(bandId).first();
-  
+  const band = await db
+    .prepare('SELECT * FROM band_profiles WHERE id = ?')
+    .bind(bandId)
+    .first();
+
   // Store in cache
   if (band) {
     await kv.put(cacheKey, JSON.stringify(band), { expirationTtl: 3600 });
   }
-  
+
   return band;
 }
 ```
 
 **Considerations:**
+
 - Cache invalidation strategy required
 - KV storage costs (minimal for this use case)
 - Complexity vs. benefit trade-off
 
-**Effort:** 4-6 hours  
-**Priority:** Low (D1 is already fast enough)  
+**Effort:** 4-6 hours
+**Priority:** Low (D1 is already fast enough)
 **Expected Impact:** 20-30% reduction in database queries
 
 ### 5. Optimize Band Photo Storage
@@ -168,6 +172,7 @@ async function getBandProfile(db, kv, bandId) {
 **Current:** Photos stored in R2, referenced in database.
 
 **Recommendations:**
+
 1. **Image Optimization:**
    - Resize images to standard dimensions on upload
    - Generate thumbnails (e.g., 200x200, 400x400)
@@ -181,8 +186,8 @@ async function getBandProfile(db, kv, bandId) {
    - Implement lazy loading for band images in frontend
    - Use loading="lazy" attribute
 
-**Effort:** 6-8 hours  
-**Priority:** Medium  
+**Effort:** 6-8 hours
+**Priority:** Medium
 **Expected Impact:** Faster page loads, reduced bandwidth costs
 
 ### 6. Database Query Optimization
@@ -205,7 +210,7 @@ async function getBandProfile(db, kv, bandId) {
 
 ```sql
 -- Only needed if rate limiting becomes a bottleneck
-CREATE INDEX IF NOT EXISTS idx_auth_attempts_email_created 
+CREATE INDEX IF NOT EXISTS idx_auth_attempts_email_created
 ON auth_attempts(email, created_at DESC);
 ```
 
@@ -220,6 +225,7 @@ ON auth_attempts(email, created_at DESC);
 **Use Case:** Search bands by name, genre, or bio.
 
 **Options:**
+
 1. SQLite FTS5 (Full-Text Search) - Native support in D1
 2. External search service (Algolia, Elasticsearch)
 
@@ -228,8 +234,8 @@ ON auth_attempts(email, created_at DESC);
 ```sql
 -- Create FTS virtual table
 CREATE VIRTUAL TABLE band_profiles_fts USING fts5(
-  name, 
-  genre, 
+  name,
+  genre,
   bio,
   content=band_profiles
 );
@@ -241,44 +247,49 @@ CREATE TRIGGER band_profiles_ai AFTER INSERT ON band_profiles BEGIN
 END;
 ```
 
-**Effort:** 8-12 hours  
+**Effort:** 8-12 hours
 **Priority:** Low (current search is adequate)
 
 ### 8. Analytics and Monitoring
 
 **Implement:**
+
 1. Query performance tracking
 2. Slow query logging (>1000ms)
 3. Request timing metrics
 4. Error rate monitoring
 
 **Tools:**
+
 - Cloudflare Workers Analytics (built-in)
 - Custom logging to Cloudflare Logs
 - Grafana dashboard for visualization
 
-**Effort:** 12-16 hours  
+**Effort:** 12-16 hours
 **Priority:** Medium
 
 ### 9. Load Testing & Benchmarking
 
 **Establish Baselines:**
+
 - Requests per second capacity
 - 95th percentile response times
 - Database query times
 - Memory usage patterns
 
 **Tools:**
+
 - Apache JMeter
 - k6 (modern load testing)
 - Cloudflare Load Balancer (production testing)
 
 **Target Metrics:**
+
 - Public API: <200ms p95
 - Admin API: <500ms p95
 - Database queries: <50ms p95
 
-**Effort:** 8-12 hours  
+**Effort:** 8-12 hours
 **Priority:** Medium (before production launch)
 
 ---
@@ -336,15 +347,15 @@ END;
 
 ## Implementation Priority Matrix
 
-| Priority | Optimization | Effort | Impact | Status |
-|----------|-------------|--------|--------|--------|
-| **High** | Edge caching headers | 30 min | High | Not Started |
-| **Medium** | Session cleanup job | 1-2 hrs | Medium | Not Started |
-| **Medium** | Image optimization | 6-8 hrs | Medium | Not Started |
-| **Medium** | Load testing | 8-12 hrs | High | Not Started |
-| **Low** | Query result caching | 4-6 hrs | Low | Not Started |
-| **Low** | Connection pooling | 2-3 hrs | Low | Not Started |
-| **Low** | Full-text search | 8-12 hrs | Low | Not Started |
+| Priority   | Optimization         | Effort   | Impact | Status      |
+| ---------- | -------------------- | -------- | ------ | ----------- |
+| **High**   | Edge caching headers | 30 min   | High   | Not Started |
+| **Medium** | Session cleanup job  | 1-2 hrs  | Medium | Not Started |
+| **Medium** | Image optimization   | 6-8 hrs  | Medium | Not Started |
+| **Medium** | Load testing         | 8-12 hrs | High   | Not Started |
+| **Low**    | Query result caching | 4-6 hrs  | Low    | Not Started |
+| **Low**    | Connection pooling   | 2-3 hrs  | Low    | Not Started |
+| **Low**    | Full-text search     | 8-12 hrs | Low    | Not Started |
 
 ---
 
@@ -370,6 +381,6 @@ The SetTimes.ca application is already well-optimized for its current scale. The
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2025-11-18  
+**Document Version:** 1.0
+**Last Updated:** 2025-11-18
 **Next Review:** After production launch or at 1000+ daily active users

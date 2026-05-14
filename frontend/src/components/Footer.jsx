@@ -1,6 +1,5 @@
-import { faInstagram } from '@fortawesome/free-brands-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { Link, useLocation } from 'react-router-dom'
+import { InstagramIcon } from './ui/SocialIcons'
 
 function Footer() {
   const { pathname } = useLocation()
@@ -31,7 +30,7 @@ function Footer() {
               rel="noopener noreferrer"
               className="text-accent-400/80 hover:text-accent-400 transition-colors inline-flex items-center gap-1.5"
             >
-              <FontAwesomeIcon icon={faInstagram} aria-hidden="true" />
+              <InstagramIcon size={14} />
               <span>Dre</span>
             </a>
           </p>

@@ -11,17 +11,69 @@ const LOG_LEVELS = {
   error: 3,
 };
 
-// Keys that should be redacted from logs
-const SENSITIVE_KEYS = [
+// Keys that should be redacted from logs (exact case-insensitive match).
+// camelCase keys are normalised to lowercase before lookup, so e.g.
+// 'ipAddress' → 'ipaddress' and 'userAgent' → 'useragent'.
+// Common compound/snake_case variants are listed explicitly so that
+// credential-bearing keys like 'password_hash' and 'totp_secret' are
+// also redacted without falling back to substring matching (which would
+// over-redact unrelated keys such as 'emailDelivered').
+const SENSITIVE_KEYS = new Set([
+  // Password variants
   'password',
+  'password_hash',
+  'passwordhash',       // camelCase 'passwordHash'
+
+  // Token variants
   'token',
+  'access_token',
+  'accesstoken',        // camelCase 'accessToken'
+  'refresh_token',
+  'refreshtoken',       // camelCase 'refreshToken'
+  'verification_token',
+  'verificationtoken',  // camelCase 'verificationToken'
+  'reset_token',
+  'resettoken',         // camelCase 'resetToken'
+  'invite_token',
+  'invitetoken',        // camelCase 'inviteToken'
+  'api_token',
+  'apitoken',           // camelCase 'apiToken'
+
+  // Secret variants
   'secret',
+  'totp_secret',
+  'totpsecret',         // camelCase 'totpSecret'
+  'client_secret',
+  'clientsecret',       // camelCase 'clientSecret'
+
+  // Key variants
+  'key',
+  'api_key',
+  'apikey',             // camelCase 'apiKey'
+  'private_key',
+  'privatekey',         // camelCase 'privateKey'
+  'encryption_key',
+  'encryptionkey',      // camelCase 'encryptionKey'
+
+  // Auth headers / cookies
   'authorization',
   'cookie',
-  'key',
-  'access_token',
-  'refresh_token',
-];
+  'bearer',
+
+  // Email (exact only – avoids over-redacting 'emailDelivered' etc.)
+  'email',
+  'user_email',
+  'useremail',          // camelCase 'userEmail'
+
+  // IP address variants
+  'ip',
+  'ipaddress',          // camelCase 'ipAddress'
+  'ip_address',
+
+  // User-agent variants
+  'useragent',          // camelCase 'userAgent'
+  'user_agent',
+]);
 
 /**
  * Get current log level from environment
@@ -77,7 +129,7 @@ function serializeMetadata(meta) {
     const cleaned = {};
     for (const [key, value] of Object.entries(meta)) {
       // Redact sensitive keys
-      if (SENSITIVE_KEYS.some((k) => key.toLowerCase().includes(k))) {
+      if (SENSITIVE_KEYS.has(key.toLowerCase())) {
         cleaned[key] = '[REDACTED]';
         continue;
       }
@@ -126,11 +178,7 @@ function formatLogEntry(level, message, meta = {}) {
  * Can be scoped to a request or module
  */
 export function createLogger(options = {}) {
-  const {
-    env = {},
-    requestId = generateRequestId(),
-    module = null,
-  } = options;
+  const { env = {}, requestId = generateRequestId(), module = null } = options;
 
   const minLevel = LOG_LEVELS[getLogLevel(env)] || LOG_LEVELS.info;
 
@@ -203,10 +251,12 @@ export function createRequestLogger(context) {
  * Use when you don't have request context
  */
 export const logger = {
-  debug: (message, meta) => console.debug(formatLogEntry('debug', message, meta)),
+  debug: (message, meta) =>
+    console.debug(formatLogEntry('debug', message, meta)),
   info: (message, meta) => console.info(formatLogEntry('info', message, meta)),
   warn: (message, meta) => console.warn(formatLogEntry('warn', message, meta)),
-  error: (message, meta) => console.error(formatLogEntry('error', message, meta)),
+  error: (message, meta) =>
+    console.error(formatLogEntry('error', message, meta)),
 };
 
 /**

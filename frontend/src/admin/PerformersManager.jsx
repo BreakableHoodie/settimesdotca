@@ -19,11 +19,6 @@ export default function PerformersManager() {
     facebook: '',
   })
 
-  // Load performers on mount
-  useEffect(() => {
-    loadPerformers()
-  }, [])
-
   const loadPerformers = async () => {
     setLoading(true)
     try {
@@ -36,6 +31,11 @@ export default function PerformersManager() {
       setLoading(false)
     }
   }
+
+  // Load performers on mount
+  useEffect(() => {
+    loadPerformers()
+  }, [])
 
   const handleSubmit = async e => {
     e.preventDefault()

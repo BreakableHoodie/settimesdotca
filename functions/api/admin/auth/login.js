@@ -7,43 +7,12 @@ import { verifyPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import {
   getTrustedDeviceToken,
   validateTrustedDevice,
 } from "../../../utils/trustedDevice.js";
-
-// Rate limiting: check failed login attempts
-async function checkRateLimit(DB, email, ipAddress) {
-  const windowMs = 10 * 60 * 1000;
-  const windowStart = new Date(Date.now() - windowMs).toISOString();
-
-  const attempts = await DB.prepare(
-    `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
-     FROM auth_attempts
-     WHERE (email = ? OR ip_address = ?)
-     AND attempt_type = 'login'
-     AND success = 0
-     AND created_at > ?`
-  )
-    .bind(email, ipAddress, windowStart)
-    .first();
-
-  if (Number(attempts.count) >= 5) {
-    const earliestTs = attempts.earliest_attempt
-      ? new Date(attempts.earliest_attempt).getTime()
-      : Date.now();
-    const elapsed = Date.now() - earliestTs;
-    const remainingMs = Math.max(0, windowMs - elapsed);
-    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-
-    return {
-      allowed: false,
-      remainingMinutes,
-    };
-  }
-
-  return { allowed: true };
-}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -53,9 +22,9 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { email, password } = body;
+    const { email: rawEmail, password } = body;
 
-    if (!email || !password) {
+    if (!rawEmail || !password) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -68,13 +37,42 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Check rate limit
-    const rateCheck = await checkRateLimit(DB, email, ipAddress);
-    if (!rateCheck.allowed) {
+    const email = rawEmail.trim().toLowerCase();
+
+    // Per-email rate limit: blocks targeted attacks on a known account (5 failures)
+    const emailRateCheck = await checkAuthRateLimit(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.login,
+      email,
+      ipAddress,
+      scope: "email",
+      maxFailures: 5,
+    });
+    if (!emailRateCheck.allowed) {
       return new Response(
         JSON.stringify({
           error: "Too many attempts",
-          message: `Too many failed login attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
+          message: `Too many failed login attempts. Please try again in ${emailRateCheck.remainingMinutes} minutes.`,
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Per-IP rate limit: blocks credential-stuffing across many accounts (20 failures)
+    const ipRateCheck = await checkAuthRateLimit(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.login,
+      email,
+      ipAddress,
+      scope: "ip",
+      maxFailures: 20,
+    });
+    if (!ipRateCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "Too many attempts",
+          message: `Too many failed login attempts. Please try again in ${ipRateCheck.remainingMinutes} minutes.`,
         }),
         {
           status: 429,
@@ -90,7 +88,7 @@ export async function onRequestPost(context) {
              activation_token, activation_token_expires_at, activated_at,
              totp_enabled, totp_secret
       FROM users
-      WHERE email = ?
+      WHERE LOWER(email) = ?
     `
     )
       .bind(email)
@@ -98,12 +96,14 @@ export async function onRequestPost(context) {
 
     if (!user) {
       // Log failed attempt (user not found)
-      await DB.prepare(
-        `INSERT INTO auth_attempts (email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, 'login', 0, 'user_not_found')`
-      )
-        .bind(email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "user_not_found",
+        ipAddress,
+        success: false,
+        userAgent,
+      });
 
       return new Response(
         JSON.stringify({
@@ -119,12 +119,15 @@ export async function onRequestPost(context) {
 
     // Check if account is activated
     if (user.is_active === 0 && !user.activated_at) {
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'login', 0, 'activation_required')`
-      )
-        .bind(user.id, email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "activation_required",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: user.id,
+      });
 
       // Use 401 + generic message to prevent account enumeration.
       // requiresActivation hint is preserved for UX but does not change HTTP status.
@@ -144,12 +147,15 @@ export async function onRequestPost(context) {
     // Check if account is active (deactivated)
     if (user.is_active === 0) {
       // Log failed attempt (account disabled)
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'login', 0, 'account_disabled')`
-      )
-        .bind(user.id, email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "account_disabled",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: user.id,
+      });
 
       // Use 401 + generic message to prevent account enumeration via status codes.
       return new Response(
@@ -169,12 +175,15 @@ export async function onRequestPost(context) {
 
     if (!passwordValid) {
       // Log failed attempt (invalid password)
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-         VALUES (?, ?, ?, ?, 'login', 0, 'invalid_password')`
-      )
-        .bind(user.id, email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "invalid_password",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: user.id,
+      });
 
       return new Response(
         JSON.stringify({
@@ -216,7 +225,37 @@ export async function onRequestPost(context) {
     }
 
     if (Number(user.totp_enabled) === 1 && !skipMfa) {
-      if (!user.totp_secret) {
+      let totpSecretState;
+      try {
+        totpSecretState = await loadTotpSecret(user.totp_secret, env);
+      } catch (error) {
+        console.error("[Login] Failed to decrypt TOTP secret:", error?.message || error);
+        return new Response(
+          JSON.stringify({
+            error: "MFA configuration error",
+            message:
+              "Multi-factor authentication is not configured correctly. Contact an administrator.",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (totpSecretState?.shouldPersist) {
+        await DB.prepare(
+          `UPDATE users
+           SET totp_secret = ?
+           WHERE id = ? AND totp_secret = ?`
+        )
+          .bind(totpSecretState.encryptedSecret, user.id, user.totp_secret)
+          .run();
+      }
+
+      const totpSecret = totpSecretState?.secret;
+
+      if (!totpSecret) {
         console.error("TOTP enabled but missing secret for user:", user.id);
         return new Response(
           JSON.stringify({
@@ -232,31 +271,38 @@ export async function onRequestPost(context) {
       }
 
       const mfaToken = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      // Store in SQLite datetime format (YYYY-MM-DD HH:MM:SS) so TEXT comparisons
+      // against datetime('now') are lexicographically correct. ISO 8601 with 'T'
+      // sorts greater than the space-separated SQLite format at the same instant,
+      // which would allow expired challenges to pass the verify query.
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
+        .toISOString()
+        .replace('T', ' ')
+        .slice(0, 19);
 
       await DB.prepare(
-        `
-        DELETE FROM mfa_challenges
-        WHERE user_id = ?
-          AND (used = 1 OR expires_at <= datetime('now'))
-      `
-      )
-        .bind(user.id)
-        .run();
-
-      await DB.prepare(
-        `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at, used, used_at)
+         VALUES (?, ?, ?, ?, ?, 0, NULL)
+         ON CONFLICT(user_id) WHERE used = 0 DO UPDATE SET
+           token = excluded.token,
+           ip_address = excluded.ip_address,
+           user_agent = excluded.user_agent,
+           expires_at = excluded.expires_at,
+           used = 0,
+           used_at = NULL,
+           created_at = datetime('now')`
       )
         .bind(mfaToken, user.id, ipAddress, userAgent, expiresAt)
         .run();
 
-      await DB.prepare(
-        `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-         VALUES (?, ?, ?, ?, 'login_mfa_challenge', 1)`
-      )
-        .bind(user.id, email, ipAddress, userAgent)
-        .run();
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.loginMfaChallenge,
+        email,
+        ipAddress,
+        success: true,
+        userAgent,
+        userId: user.id,
+      });
 
       return new Response(
         JSON.stringify({
@@ -281,6 +327,7 @@ export async function onRequestPost(context) {
     }
 
     const lucia = initializeLucia(DB, request, env);
+    await lucia.invalidateUserSessions(user.id);
     const session = await lucia.createSession(user.id, {});
 
     await DB.prepare(
@@ -299,12 +346,14 @@ export async function onRequestPost(context) {
       .run();
 
     // Log successful login
-    await DB.prepare(
-      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-       VALUES (?, ?, ?, ?, 'login', 1)`
-    )
-      .bind(user.id, email, ipAddress, userAgent)
-      .run();
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.login,
+      email,
+      ipAddress,
+      success: true,
+      userAgent,
+      userId: user.id,
+    });
 
     // Generate CSRF token
     const csrfToken = generateCSRFToken(request, env, session.id);

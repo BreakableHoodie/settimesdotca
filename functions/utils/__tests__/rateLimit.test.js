@@ -48,7 +48,7 @@ describe('Rate Limiting', () => {
       expect(result.remaining).toBe(59); // 60 - 1
     });
 
-    it('should skip rate limiting for admin routes', async () => {
+    it('non-auth admin routes have a generous rate limit, not completely skipped', async () => {
       const request = new Request('https://example.com/api/admin/users', {
         headers: { 'CF-Connecting-IP': '1.2.3.4' },
       });
@@ -56,7 +56,7 @@ describe('Rate Limiting', () => {
       const result = await checkRateLimit(request);
 
       expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(-1); // -1 indicates skipped
+      expect(result.remaining).toBeGreaterThan(100); // high limit for legitimate CRUD traffic
     });
 
     it('should skip rate limiting for non-API routes', async () => {
@@ -197,6 +197,100 @@ describe('Rate Limiting', () => {
       expect(db.prepare).not.toHaveBeenCalled();
       // Cache API should be used instead
       expect(mockCache.match).toHaveBeenCalled();
+    });
+
+    it('admin auth login route is rate-limited via D1 (fail-closed)', async () => {
+      const db = makeMockDB({ count: 2 });
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/admin/auth/login', {
+        headers: { 'CF-Connecting-IP': '1.2.3.4' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(true);
+      expect(db.prepare).toHaveBeenCalled(); // must use D1, not Cache API
+      expect(mockCache.match).not.toHaveBeenCalled();
+    });
+
+    it('admin auth login fails closed when D1 throws (P1-S1)', async () => {
+      const db = {
+        prepare: vi.fn().mockReturnValue({
+          bind: vi.fn().mockReturnValue({
+            run: vi.fn().mockRejectedValue(new Error('D1 unavailable')),
+            first: vi.fn().mockResolvedValue(null),
+          }),
+        }),
+      };
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/admin/auth/login', {
+        headers: { 'CF-Connecting-IP': '1.2.3.4' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(false); // must fail closed, not open
+    });
+
+    it('admin auth login is blocked when limit is exceeded', async () => {
+      const db = makeMockDB({ count: 100 }); // way over any reasonable limit
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/admin/auth/login', {
+        headers: { 'CF-Connecting-IP': '1.2.3.4' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(false);
+      expect(result.remaining).toBe(0);
+    });
+  });
+
+  describe('IP bypass behaviour', () => {
+    it('loopback 127.0.0.1 skips rate limiting entirely (wrangler dev / CI)', async () => {
+      const db = makeMockDB({ count: 100 });
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/admin/auth/login', {
+        headers: { 'CF-Connecting-IP': '127.0.0.1' },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(-1);
+      expect(db.prepare).not.toHaveBeenCalled();
+    });
+
+    it('loopback ::1 skips rate limiting entirely', async () => {
+      const request = new Request('https://example.com/api/events', {
+        headers: { 'CF-Connecting-IP': '::1' },
+      });
+
+      const result = await checkRateLimit(request);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(-1);
+    });
+
+    it('unknown IP fails closed on fail-closed (auth) endpoints', async () => {
+      const db = makeMockDB({ count: 0 });
+      const env = { DB: db };
+      const request = new Request('https://example.com/api/admin/auth/login', {}); // no IP headers
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(false);
+      expect(result.remaining).toBe(0);
+      expect(db.prepare).not.toHaveBeenCalled(); // blocked before hitting D1
+    });
+
+    it('unknown IP fails open on non-sensitive endpoints', async () => {
+      const request = new Request('https://example.com/api/events', {}); // no IP headers
+
+      const result = await checkRateLimit(request);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(-1);
     });
   });
 

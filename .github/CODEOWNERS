@@ -1,0 +1,11 @@
+# All files require review from the project owner.
+* @BreakableHoodie
+
+# CI/CD and security-sensitive paths require explicit sign-off.
+.github/                   @BreakableHoodie
+functions/utils/auth.js    @BreakableHoodie
+functions/utils/csrf.js    @BreakableHoodie
+functions/utils/totp.js    @BreakableHoodie
+functions/utils/trustedDevice.js @BreakableHoodie
+functions/api/admin/auth/  @BreakableHoodie
+database/                  @BreakableHoodie

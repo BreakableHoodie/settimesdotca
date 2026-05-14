@@ -165,22 +165,9 @@ export function validateCSRFToken(request, env = null) {
 }
 
 function isSameOriginMutation(request) {
-  const requestOrigin = new URL(request.url).origin;
   const originHeader = request.headers.get("Origin");
-  if (originHeader) {
-    return originHeader === requestOrigin;
-  }
-
-  const refererHeader = request.headers.get("Referer");
-  if (refererHeader) {
-    try {
-      return new URL(refererHeader).origin === requestOrigin;
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
+  if (!originHeader) return false;
+  return originHeader === new URL(request.url).origin;
 }
 
 export function validateCSRFMiddleware(request, env = null) {

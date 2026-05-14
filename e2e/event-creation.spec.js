@@ -3,11 +3,13 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from './credentials';
 
 const loginAsAdmin = async (page) => {
   await page.goto('/admin');
-  if (page.url().includes('/admin/login')) {
+  // Wait for either admin tab buttons (valid session) or login form (session expired/invalidated)
+  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: 'visible', timeout: 15000 });
+  if (await page.locator('input[type="email"]').isVisible()) {
     await page.fill('input[type="email"]', ADMIN_EMAIL);
     await page.fill('input[type="password"]', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/admin$/);
+    await page.waitForSelector('button[role="tab"]', { state: 'visible', timeout: 15000 });
   }
 };
 
@@ -121,7 +123,12 @@ test.describe('Event Creation', () => {
 
     await page.click('button[type="submit"]:has-text("Create Event")');
 
-    await expect(page.getByText('Date cannot be in the past')).toBeVisible();
+    // EventFormModal sets min=today on the date input; HTML5 rangeUnderflow blocks
+    // submission before React's validateForm() can run, so the custom error text
+    // never appears. Verify the form was rejected: modal still open, input invalid.
+    await expect(page.getByRole('heading', { name: 'Create New Event' })).toBeVisible();
+    const isInvalid = await page.locator('input[name="date"]').evaluate(input => !input.validity.valid);
+    expect(isInvalid).toBe(true);
   });
 
   test('should allow admin to edit an event', async ({ page }) => {

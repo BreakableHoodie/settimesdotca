@@ -21,16 +21,20 @@ jobs:
         name: e2e-a11y-visual
         runs-on: ubuntu-latest
         timeout-minutes: 35
+        # Fork PRs cannot access repo secrets. Although the a11y/visual tests don't currently
+        # use credentials.js, guard the job defensively so fork PRs don't break if that changes.
+        # Scheduled runs (weekly) are always allowed to proceed.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
 
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
               with:
                   fetch-depth: 1
 
             - name: Setup Node
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
               with:
-                  node-version: 20
+                  node-version: 22
                   cache: npm
                   cache-dependency-path: |
                       package-lock.json
@@ -45,7 +49,7 @@ jobs:
 
             - name: Cache Playwright browsers
               id: playwright-cache
-              uses: actions/cache@v5
+              uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
               with:
                   path: ~/.cache/ms-playwright
                   key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -65,10 +69,10 @@ jobs:
 
             - name: Initialize D1 database with schema
               env:
-                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
+                  E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD  }}
+                  E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL  }}
               run: |
-                  echo 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"' > .dev.vars
+                  printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\n' > .dev.vars
 
                   echo "Initializing D1 database with schema..."
                   ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/setup-complete.sql
@@ -124,14 +128,41 @@ jobs:
                   cat /tmp/wrangler.log
                   exit 1
 
+            - name: Check linux snapshots exist
+              env:
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+              run: |
+                  if [ ! -f "e2e/visual-regression.spec.js-snapshots/admin-login-chromium-linux.png" ]; then
+                      echo "::notice::Linux snapshots missing — generating for artifact download..."
+                      npx playwright test e2e/visual-regression.spec.js --update-snapshots || true
+                      echo "SNAPSHOTS_MISSING=true" >> "$GITHUB_ENV"
+                  fi
+
+            - name: Upload generated linux snapshots
+              if: env.SNAPSHOTS_MISSING == 'true'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: linux-snapshots
+                  path: e2e/visual-regression.spec.js-snapshots/*-linux.png
+                  retention-days: 7
+
+            - name: Fail if linux snapshots were missing
+              if: env.SNAPSHOTS_MISSING == 'true'
+              run: |
+                  echo "::error::Linux snapshots are missing from the repository."
+                  echo "Download the 'linux-snapshots' artifact from this run, place the PNGs in"
+                  echo "e2e/visual-regression.spec.js-snapshots/, commit, and push."
+                  exit 1
+
             - name: Run Playwright tests (A11y + Visual)
               env:
-                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'ci-e2e-fallback-pw' }}
-                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'ci-admin@settimes.ca' }}
-              run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js --update-snapshots --reporter=list,html
+                  ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+                  ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+              run: npx playwright test e2e/accessibility e2e/visual-regression.spec.js --reporter=list,html
 
             - name: Upload Playwright report
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               if: always()
               with:
                   name: playwright-report-a11y-visual

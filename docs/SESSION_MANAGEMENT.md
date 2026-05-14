@@ -1,227 +1,99 @@
 # Session Management and Timeout Policy
 
-This document describes session handling, authentication, and timeout policies for the SetTimes application.
+This document describes the current session model used by the SetTimes admin experience.
 
-## Current Implementation
+## Current Session Architecture
 
-### Session Storage
+SetTimes uses Lucia-backed server-side sessions stored in D1.
 
-**JWT-based authentication** with sessions stored in:
+- Server-side session store: `lucia_sessions`
+- Session cookie: `__Host-session_token` in production, `session_token` in local development
+- CSRF cookie: `csrf_token` for the double-submit CSRF pattern
+- Client-side persistence: localStorage stores display-only user fields such as email, name, and role. It does not store the session secret.
 
-- **Client**: `localStorage` (auth token, user info)
-- **Server**: Stateless JWT validation (no server-side session storage)
+The session identifier remains in an HttpOnly cookie and is not available to JavaScript.
 
-### Session Timeout
+Key implementation references:
 
-**Default timeout: 24 hours**
+- `functions/utils/auth.js`
+- `functions/api/admin/_middleware.js`
+- `functions/api/admin/me.js`
+- `frontend/src/utils/adminApi.js`
+- `frontend/src/admin/hooks/useAdminAuthSession.js`
 
-Sessions automatically expire after 24 hours from login. This is enforced through JWT token expiration.
+## Timeout Policy
 
-```javascript
-// Backend: functions/_middleware.js
-const token = jwt.sign(
-  { userId: user.id },
-  env.JWT_SECRET,
-  { expiresIn: "24h" }, // ← Session timeout
-);
-```
+The timeout model is server-driven.
 
-### Token Refresh
+### Admin sessions
 
-**Current behavior**: No automatic token refresh. Users must re-login after 24 hours.
+- Idle timeout: 15 minutes
+- Absolute maximum lifetime: 8 hours
 
-**Recommended improvement**: Implement sliding session (refresh on activity).
+### Non-admin authenticated sessions
 
-## Security Features
+- Idle timeout: 30 minutes
+- Absolute maximum lifetime: 30 days
 
-### Token Invalidation
+The middleware checks both limits on every authenticated `/api/admin/*` request. If either limit is exceeded, the server invalidates the session and clears the session cookie.
 
-Tokens are invalidated on:
+## Client Behavior
 
-- ✅ Manual logout (client clears localStorage)
-- ✅ Token expiration (24h)
-- ✅ Password reset (server invalidates old tokens)
-- ❌ No server-side token revocation (stateless design)
+The admin frontend checks the current session via `GET /api/admin/me`.
 
-### Session Hijacking Protection
+- A valid response refreshes the local UI state and updates session-timing headers.
+- A `401` response is treated as a real authentication failure and logs the user out.
+- A temporary `5xx`, parse failure, or network problem is treated as a transient verification failure and should not immediately sign out a user who already has valid local admin state.
 
-Current protections:
+This distinction exists to avoid losing in-progress admin work during temporary Cloudflare, D1, or connectivity faults.
 
-- ✅ HTTPS-only in production (Cloudflare Pages enforces TLS)
-- ✅ HttpOnly cookies would be better (future improvement)
-- ✅ JWT signature validation prevents tampering
-- ⚠️ No IP binding (mobile users change IPs frequently)
+## Idle Warning and Logout UX
 
-### Concurrent Sessions
+The admin UI displays a warning dialog shortly before enforced logout.
 
-**Current behavior**: Multiple sessions allowed. Users can log in from multiple devices simultaneously.
+- Warning lead time: 5 minutes before the current server-reported expiry window
+- Warning actions: `Stay signed in` or `Log out`
+- If the user is logged out for inactivity, the login screen shows: `You were signed out due to inactivity. Please sign in again.`
 
-**Security trade-off**: Convenience vs security. No session limit currently enforced.
+`Stay signed in` triggers a fresh session verification. If that verification fails transiently, the UI keeps the existing admin state instead of treating the failure as an immediate logout.
 
-## User Experience
+## Session Security Properties
 
-### Timeout Warning
+- Session cookies are HttpOnly
+- Production cookies use the `__Host-` prefix and `SameSite=Strict`
+- CSRF protection uses a double-submit token cookie plus `X-CSRF-Token`
+- Session expiry enforcement happens server-side, not only in the browser
+- The session metadata returned to the browser excludes raw session identifiers
 
-**Current behavior**: ❌ No warning before session expiration.
+## Session-Related Endpoints
 
-**Recommended**: Add countdown notification at 23:45 (15 minutes before expiry).
+These routes are currently used for authenticated self-service inside the admin portal namespace:
 
-```javascript
-// Recommended implementation
-function checkSessionExpiry() {
-  const token = localStorage.getItem("auth_token");
-  if (!token) return;
+- `GET /api/admin/me`: returns authenticated user info and safe session expiry metadata
+- `GET /api/admin/sessions`: returns safe session metadata for the current user without raw session IDs
+- `DELETE /api/admin/sessions`: revokes a specific session when an opaque `revocationToken` is supplied; raw session IDs are never exposed to the client
+- `POST /api/admin/sessions/revoke-all`: revokes all other sessions and rotates the current session
+- `GET /api/admin/trusted-devices`: lists trusted devices for the current user
+- `DELETE /api/admin/trusted-devices`: revokes a trusted device
 
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    const expiresAt = payload.exp * 1000; // Convert to milliseconds
-    const now = Date.now();
-    const timeLeft = expiresAt - now;
+## Operational Notes
 
-    if (timeLeft < 15 * 60 * 1000 && timeLeft > 0) {
-      // Show warning: "Session expires in 15 minutes"
-      showSessionWarning(timeLeft);
-    }
-  } catch (e) {
-    console.error("Failed to parse token:", e);
-  }
-}
+- Temporary server or network failures should be investigated as availability problems, not assumed to be session expiry.
+- Session cleanup for expired rows is handled by the maintenance cleanup flow against `lucia_sessions`.
+- If an account is deactivated, subsequent authenticated requests fail even if the cookie is still present.
 
-// Check every 5 minutes
-setInterval(checkSessionExpiry, 5 * 60 * 1000);
-```
+## Testing Guidance
 
-### Auto-Logout on Expiry
+Useful checks when changing session behavior:
 
-**Current behavior**: ❌ UI doesn't detect expired sessions automatically.
+1. Verify that `GET /api/admin/me` returns safe session metadata only.
+2. Verify that `GET /api/admin/sessions` does not expose raw `lucia_sessions.id` values.
+3. Verify that transient `5xx` failures during session verification do not immediately sign out an already authenticated admin.
+4. Verify that real `401` responses still clear admin state and redirect to login.
+5. Verify that idle warning timing matches server-provided expiry headers.
 
-Users only discover session expiry when API calls fail with 401.
+## Related Docs
 
-**Recommended**: Add expiry check on app initialization and periodic intervals.
-
-### Remember Me
-
-**Current behavior**: ❌ Not implemented.
-
-**Recommended**: Offer extended session option (7 days) with explicit user consent.
-
-```javascript
-// Recommended implementation
-function login(email, password, rememberMe = false) {
-  const expiresIn = rememberMe ? "7d" : "24h";
-
-  const token = jwt.sign({ userId: user.id }, env.JWT_SECRET, { expiresIn });
-
-  return { token, expiresIn };
-}
-```
-
-## Admin Sessions
-
-### Shorter Timeout for Admins
-
-**Recommended**: Reduce admin session timeout to 4-8 hours for enhanced security.
-
-```javascript
-// Recommended middleware enhancement
-function createSession(user) {
-  const isAdmin = user.role === "admin";
-  const expiresIn = isAdmin ? "4h" : "24h";
-
-  return jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, {
-    expiresIn,
-  });
-}
-```
-
-### Force Re-Authentication for Sensitive Actions
-
-**Current behavior**: ❌ No re-authentication required for destructive actions.
-
-**Recommended**: Require password confirmation for:
-
-- Bulk delete operations
-- User management changes
-- Publishing/unpublishing events
-
-## Session Security Checklist
-
-### Current Status
-
-- [x] JWT-based authentication
-- [x] 24-hour session timeout
-- [x] HTTPS in production
-- [x] Token expiration validation
-- [ ] Session timeout warning UI
-- [ ] Sliding session (refresh on activity)
-- [ ] HttpOnly cookies (more secure than localStorage)
-- [ ] Remember Me option
-- [ ] Admin session timeout (shorter than regular users)
-- [ ] Re-authentication for sensitive actions
-- [ ] Server-side token revocation
-
-### Priority Improvements
-
-**HIGH (Next Sprint)**:
-
-1. Add session timeout warning (15 minutes before expiry)
-2. Auto-logout on token expiry with redirect to login
-3. Sliding session refresh on API activity
-
-**MEDIUM (Future)**: 4. Implement "Remember Me" with 7-day option 5. Reduce admin session timeout to 4 hours 6. Require re-authentication for destructive bulk operations
-
-**LOW (Long-term)**: 7. Migrate from localStorage to HttpOnly cookies 8. Implement server-side token revocation list (Redis/KV) 9. Add session management UI (view/revoke active sessions)
-
-## Testing Session Behavior
-
-### Manual Testing
-
-```bash
-# Test session expiry
-1. Login to admin panel
-2. Wait 24 hours (or modify JWT expiresIn to '1m' for testing)
-3. Attempt API operation
-4. Expected: 401 Unauthorized
-
-# Test logout
-1. Login to admin panel
-2. Check localStorage: auth_token should exist
-3. Click logout
-4. Check localStorage: auth_token should be removed
-5. Attempt to access admin routes
-6. Expected: Redirect to login
-```
-
-### Automated Testing
-
-```javascript
-// Recommended test suite
-describe("Session Management", () => {
-  it("should expire session after 24 hours", async () => {
-    const expiredToken = jwt.sign(
-      { userId: 1 },
-      JWT_SECRET,
-      { expiresIn: "-1h" }, // Already expired
-    );
-
-    const response = await fetch("/api/admin/bands", {
-      headers: { Authorization: `Bearer ${expiredToken}` },
-    });
-
-    expect(response.status).toBe(401);
-  });
-
-  it("should clear token on logout", () => {
-    localStorage.setItem("auth_token", "test_token");
-    logout();
-    expect(localStorage.getItem("auth_token")).toBeNull();
-  });
-});
-```
-
-## References
-
-- JWT specification: https://jwt.io/introduction
-- OWASP Session Management: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
-- Project auth middleware: `functions/_middleware.js`
-- Admin login component: `frontend/src/admin/Login.jsx`
+- `docs/ADMIN_HANDBOOK.md`
+- `docs/TROUBLESHOOTING.md`
+- `SECURITY.md`

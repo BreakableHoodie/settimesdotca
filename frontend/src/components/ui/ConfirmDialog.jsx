@@ -1,29 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import Button from './Button'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTriangleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { TriangleAlert, X } from 'lucide-react'
 
-/**
- * ConfirmDialog - Confirmation dialog for destructive actions
- * Sprint 2.3: Prevents accidental data loss
- *
- * Features:
- * - Modal overlay with backdrop
- * - Clear action/cancel buttons
- * - Keyboard accessible (ESC to cancel)
- * - WCAG 2.1 AA compliant
- * - Focus trap within modal
- *
- * @param {boolean} isOpen - Whether dialog is visible
- * @param {Function} onConfirm - Callback when user confirms
- * @param {Function} onCancel - Callback when user cancels
- * @param {string} title - Dialog title
- * @param {string} message - Confirmation message
- * @param {string} confirmText - Text for confirm button (default: "Confirm")
- * @param {string} cancelText - Text for cancel button (default: "Cancel")
- * @param {string} variant - Button variant: 'danger' | 'primary' (default: 'danger')
- */
+const FOCUSABLE_SELECTORS = [
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'a[href]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ')
+
 export default function ConfirmDialog({
   isOpen,
   onConfirm,
@@ -34,19 +22,57 @@ export default function ConfirmDialog({
   cancelText = 'Cancel',
   variant = 'danger',
 }) {
-  // Handle ESC key press
+  const dialogRef = useRef(null)
+  const previousActiveElement = useRef(null)
+
+  const getFocusableElements = useCallback(() => {
+    if (!dialogRef.current) return []
+    return Array.from(dialogRef.current.querySelectorAll(FOCUSABLE_SELECTORS))
+  }, [])
+
+  // Focus trap + ESC
   useEffect(() => {
     if (!isOpen) return
 
-    const handleEscape = e => {
+    previousActiveElement.current = document.activeElement
+
+    const focusable = getFocusableElements()
+    if (focusable.length > 0) {
+      window.requestAnimationFrame(() => focusable[0].focus())
+    } else if (dialogRef.current) {
+      dialogRef.current.focus()
+    }
+
+    const handleKeyDown = e => {
       if (e.key === 'Escape') {
         onCancel()
+        return
+      }
+      if (e.key !== 'Tab') return
+
+      const elements = getFocusableElements()
+      if (elements.length === 0) return
+
+      const first = elements[0]
+      const last = elements[elements.length - 1]
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
       }
     }
 
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onCancel])
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      if (previousActiveElement.current?.focus) {
+        previousActiveElement.current.focus()
+      }
+    }
+  }, [isOpen, onCancel, getFocusableElements])
 
   if (!isOpen) return null
 
@@ -57,19 +83,18 @@ export default function ConfirmDialog({
 
       {/* Dialog */}
       <div
+        ref={dialogRef}
         className="relative bg-bg-elevated rounded-lg shadow-xl max-w-md w-full border border-white/10 animate-scale-in"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-message"
+        tabIndex={-1}
       >
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <FontAwesomeIcon
-              icon={faTriangleExclamation}
-              className={`text-2xl ${variant === 'danger' ? 'text-error-500' : 'text-accent-500'}`}
-            />
+            <TriangleAlert size={24} className={variant === 'danger' ? 'text-error-500' : 'text-accent-500'} />
             <h2 id="confirm-dialog-title" className="text-xl font-bold text-text-primary">
               {title}
             </h2>
@@ -79,7 +104,7 @@ export default function ConfirmDialog({
             className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded focus:outline-hidden focus:ring-2 focus:ring-accent-500"
             aria-label="Close dialog"
           >
-            <FontAwesomeIcon icon={faXmark} className="text-xl" />
+            <X size={20} />
           </button>
         </div>
 

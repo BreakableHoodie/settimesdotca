@@ -1,6 +1,5 @@
+import { Globe, MapPin, Plus } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faGlobe, faLocationDot, faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useEventContext } from '../contexts/EventContext'
 import EventStatusBadge from './components/EventStatusBadge'
 
@@ -67,7 +66,7 @@ export default function EventSelector({ onCreateEvent }) {
         className="flex items-center gap-2 px-4 py-2 bg-bg-purple hover:bg-bg-navy border border-accent-500/30 rounded-lg text-white transition-colors min-h-[44px]"
         title="Switch event context"
       >
-        <FontAwesomeIcon icon={faLocationDot} className="text-lg" aria-hidden="true" />
+        <MapPin size={18} aria-hidden="true" />
         <div className="text-left">
           <div className="text-xs text-white/50">Event Context:</div>
           <div className="font-medium">{currentEvent ? currentEvent.name : 'All Events'}</div>
@@ -93,7 +92,7 @@ export default function EventSelector({ onCreateEvent }) {
             }`}
           >
             <div className="flex items-center gap-2">
-              <FontAwesomeIcon icon={faGlobe} className="text-lg" aria-hidden="true" />
+              <Globe size={18} aria-hidden="true" />
               <div className="flex-1">
                 <div className="font-medium text-white">All Events</div>
                 <div className="text-xs text-white/50">Global view across all events</div>
@@ -176,7 +175,7 @@ export default function EventSelector({ onCreateEvent }) {
             className="w-full px-4 py-3 text-left hover:bg-bg-navy/50 transition-colors border-t border-accent-500/20 bg-accent-500/10"
           >
             <div className="flex items-center gap-2">
-              <FontAwesomeIcon icon={faPlus} className="text-lg" aria-hidden="true" />
+              <Plus size={18} aria-hidden="true" />
               <div className="font-medium text-accent-400">Create New Event</div>
             </div>
           </button>

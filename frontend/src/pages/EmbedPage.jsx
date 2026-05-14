@@ -2,23 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import ScheduleView from '../components/ScheduleView'
 import { validateBandsData } from '../utils/validation'
-
-function prepareBands(list) {
-  return list.map(band => {
-    const startMs = Date.parse(`${band.date}T${band.startTime}:00`)
-    let endMs = Date.parse(`${band.date}T${band.endTime}:00`)
-
-    if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs < startMs) {
-      endMs += 24 * 60 * 60 * 1000
-    }
-
-    return {
-      ...band,
-      startMs: Number.isNaN(startMs) ? 0 : startMs,
-      endMs: Number.isNaN(endMs) ? 0 : endMs,
-    }
-  })
-}
+import { prepareBands } from '../utils/bandUtils'
 
 export default function EmbedPage() {
   const { slug } = useParams()
@@ -75,6 +59,9 @@ export default function EmbedPage() {
 
     if (slug) {
       loadEventData()
+    } else {
+      setLoading(false)
+      setError('No event slug provided.')
     }
 
     return () => controller.abort()
@@ -104,13 +91,10 @@ export default function EmbedPage() {
       <ScheduleView
         bands={bands}
         selectedBands={[]}
-        onToggleBand={() => {}} // No-op for embed
-        onSelectAll={() => {}} // No-op for embed
         currentTime={currentTime}
         showPast={false}
-        onToggleShowPast={() => {}} // No-op for embed
         timeFilter="all"
-        embedded={true}
+        eventSlug={slug}
       />
     </div>
   )

@@ -147,7 +147,7 @@ describe("POST /api/admin/events/wizard - band validation", () => {
     });
     expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toMatch(/start and end time are required/i);
+    expect(data.message).toMatch(/start and end time are required/i);
   });
 
   it("rejects out-of-range venueIndex with 400", async () => {
@@ -159,7 +159,7 @@ describe("POST /api/admin/events/wizard - band validation", () => {
     });
     expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toMatch(/out of range/i);
+    expect(data.message).toMatch(/out of range/i);
   });
 
   it("rejects equal start and end time with 400", async () => {
@@ -172,7 +172,7 @@ describe("POST /api/admin/events/wizard - band validation", () => {
     });
     expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toMatch(/cannot be the same/i);
+    expect(data.message).toMatch(/cannot be the same/i);
   });
 
   it("rejects midnight crossover exceeding 8 hours with 400", async () => {
@@ -185,7 +185,7 @@ describe("POST /api/admin/events/wizard - band validation", () => {
     });
     expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toMatch(/after start time/i);
+    expect(data.message).toMatch(/after start time/i);
   });
 
   it("accepts a valid midnight crossover within 8 hours", async () => {

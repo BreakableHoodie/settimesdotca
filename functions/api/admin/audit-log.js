@@ -21,8 +21,10 @@ export async function onRequestGet(context) {
     const userIdParam = url.searchParams.get("user_id");
     const action = url.searchParams.get("action");
     const resourceType = url.searchParams.get("resource_type");
-    const limit = parseInt(url.searchParams.get("limit")) || 50;
-    const offset = parseInt(url.searchParams.get("offset")) || 0;
+    const limitRaw = Number.parseInt(url.searchParams.get("limit"), 10);
+    const offsetRaw = Number.parseInt(url.searchParams.get("offset"), 10);
+    const limit = !Number.isNaN(limitRaw) && limitRaw > 0 ? limitRaw : 50;
+    const offset = !Number.isNaN(offsetRaw) && offsetRaw >= 0 ? offsetRaw : 0;
     let userId = null;
 
     // Validate limit (prevent excessive queries)

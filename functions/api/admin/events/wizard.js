@@ -123,10 +123,10 @@ export async function onRequestPost(context) {
       };
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Invalid request", message: err.message }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   // --- Validate bands ---
@@ -197,10 +197,10 @@ export async function onRequestPost(context) {
       };
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Invalid request", message: err.message }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   // Detect time conflicts before touching the DB (new event = no pre-existing performances).

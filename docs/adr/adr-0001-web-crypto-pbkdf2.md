@@ -1,16 +1,16 @@
 ---
 title: "ADR-0001: Use Web Crypto PBKDF2 for Password Hashing"
-status: "Proposed"
+status: "Superseded"
 date: "2026-04-02"
 authors: "Platform Engineering, Application Engineering"
 tags: ["architecture", "security", "authentication", "cloudflare-workers"]
 supersedes: ""
-superseded_by: ""
+superseded_by: "0005-pbkdf2-password-hashing.md"
 ---
 
 ## Status
 
-Proposed
+Superseded by [0005-pbkdf2-password-hashing.md](0005-pbkdf2-password-hashing.md)
 
 ## Context
 

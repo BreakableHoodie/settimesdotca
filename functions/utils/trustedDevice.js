@@ -104,7 +104,9 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
 
   if (!device) return null;
 
-  // Validate IP and UA independently using constant-time comparison
+  // Trust policy:
+  //   New rows (ua_hash present): UA must match; IP change is tolerated (DHCP, mobile, VPN).
+  //   Legacy rows (no ua_hash):   full IP+UA fingerprint must match.
   const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
   const currentUaHash = await generateUaHash(userAgent);
 
@@ -113,8 +115,6 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
     currentFingerprint,
   );
 
-  // If stored ua_hash exists, validate UA independently (new schema)
-  // Otherwise fall back to full fingerprint check (pre-migration rows)
   if (device.ua_hash) {
     const uaMatch = timingSafeStringEqual(device.ua_hash, currentUaHash);
     if (!uaMatch) {
@@ -122,19 +122,20 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
       return null;
     }
     if (!fingerprintMatch) {
-      console.log("[TrustedDevice] Fingerprint mismatch, MFA required");
-      return null;
+      // UA matches but IP changed — normal for DHCP, mobile, VPN users.
+      // Fingerprint is refreshed in the update below.
+      console.log("[TrustedDevice] IP changed for known UA, refreshing fingerprint");
     }
   } else if (!fingerprintMatch) {
     console.log("[TrustedDevice] Fingerprint mismatch, device not trusted");
     return null;
   }
 
-  // Update last_used_at and current IP
+  // Always refresh last_used_at; also refresh IP and fingerprint so they stay current
   await DB.prepare(
-    `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ? WHERE id = ?`
+    `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ?, device_fingerprint = ? WHERE id = ?`
   )
-    .bind(ipAddress, device.id)
+    .bind(ipAddress, currentFingerprint, device.id)
     .run();
 
   return device.user_id;

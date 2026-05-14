@@ -49,7 +49,7 @@ async function captureScreenshot(page, name) {
   return filename;
 }
 
-module.exports = {
+export {
   waitForCondition,
   captureConsoleLogs,
   captureScreenshot

@@ -3,6 +3,13 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from './credentials';
 
 const uniqueSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+// Always 90 days from today — keeps tests valid as time passes
+const futureDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 90);
+  return d.toISOString().slice(0, 10);
+};
+
 const loginAsAdmin = async (page) => {
   await page.goto('/admin');
   await page.waitForSelector('button[role="tab"], input[type="email"]', { state: 'visible', timeout: 15000 });
@@ -47,7 +54,7 @@ test.describe('Event Wizard', () => {
     // Step 1: Event Basics
     await expect(dialog.getByRole('heading', { name: 'Event Basics' })).toBeVisible();
     await dialog.getByRole('textbox', { name: 'Event Name *' }).fill(eventName);
-    await dialog.getByRole('textbox', { name: 'Event Date *' }).fill('2026-09-05');
+    await dialog.getByRole('textbox', { name: 'Event Date *' }).fill(futureDate());
     // Slug auto-populates from name — Next enables once all required fields are set
     await expect(dialog.getByRole('button', { name: 'Next' })).toBeEnabled();
     await dialog.getByRole('button', { name: 'Next' }).click();
@@ -98,7 +105,7 @@ test.describe('Event Wizard', () => {
     await expect(dialog).toBeVisible();
 
     await dialog.getByRole('textbox', { name: 'Event Name *' }).fill(`Wizard Fest ${suffix}`);
-    await dialog.getByRole('textbox', { name: 'Event Date *' }).fill('2026-09-05');
+    await dialog.getByRole('textbox', { name: 'Event Date *' }).fill(futureDate());
     await dialog.getByRole('button', { name: 'Next' }).click();
 
     await expect(dialog.getByRole('heading', { name: 'Venues' })).toBeVisible();
@@ -114,7 +121,7 @@ test.describe('Event Wizard', () => {
 
     // Fill name first (auto-populates slug), then override slug with a known-taken value
     await dialog.getByRole('textbox', { name: 'Event Name *' }).fill(`Duplicate Slug ${suffix}`);
-    await dialog.getByRole('textbox', { name: 'Event Date *' }).fill('2026-09-10');
+    await dialog.getByRole('textbox', { name: 'Event Date *' }).fill(futureDate());
     await dialog.getByRole('textbox', { name: 'URL Slug *' }).fill('smoke-test-fest');
     await dialog.getByRole('button', { name: 'Next' }).click();
 

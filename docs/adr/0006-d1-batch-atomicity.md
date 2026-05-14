@@ -91,4 +91,4 @@ Application-level FK cleanup is required before any `DELETE` that the schema doe
 - **REF-005**: `functions/api/test-utils.js:5` — `PRAGMA foreign_keys = ON` in test helpers (not set in production).
 - **REF-006**: `CLAUDE.md` — "D1 transactions" section documents the `DB.batch()` and compensating delete invariants for AI assistants.
 - **REF-007**: [Cloudflare D1 documentation — Batch statements](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch-statements) — documents atomicity guarantee for `DB.batch()`.
-- **REF-008**: [ADR-0001: Normalize datetime values to space-separated SQLite format](./0001-sqlite-datetime-format.md) — related D1 behavioral constraint.
+- **REF-008**: [ADR-0004: Normalize datetime values to space-separated SQLite format](./0004-sqlite-datetime-format.md) — related D1 behavioral constraint.

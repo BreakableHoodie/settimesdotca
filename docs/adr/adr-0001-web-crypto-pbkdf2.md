@@ -5,12 +5,12 @@ date: "2026-04-02"
 authors: "Platform Engineering, Application Engineering"
 tags: ["architecture", "security", "authentication", "cloudflare-workers"]
 supersedes: ""
-superseded_by: "0002-pbkdf2-password-hashing.md"
+superseded_by: "0005-pbkdf2-password-hashing.md"
 ---
 
 ## Status
 
-Superseded by [0002-pbkdf2-password-hashing.md](0002-pbkdf2-password-hashing.md)
+Superseded by [0005-pbkdf2-password-hashing.md](0005-pbkdf2-password-hashing.md)
 
 ## Context
 

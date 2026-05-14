@@ -27,11 +27,18 @@ describe("validateTrustedDevice", () => {
     const result = await validateTrustedDevice(env.DB, token, IP_B, UA);
     expect(result).toBe(mockUsers.editor.id);
 
-    // Fingerprint in DB should now reflect the new IP
-    const row = rawDb
-      .prepare("SELECT ip_address FROM trusted_devices WHERE user_id = ?")
+    // Both ip_address and device_fingerprint should reflect the new IP
+    const updated = rawDb
+      .prepare("SELECT ip_address, device_fingerprint FROM trusted_devices WHERE user_id = ?")
       .get(mockUsers.editor.id);
-    expect(row.ip_address).toBe(IP_B);
+    expect(updated.ip_address).toBe(IP_B);
+    // Fingerprint is SHA-256(IP_B:UA) — must differ from original SHA-256(IP_A:UA).
+    // Seed a reference device with IP_A to get its fingerprint for comparison.
+    await createTrustedDevice(env.DB, mockUsers.admin.id, IP_A, UA);
+    const ipARow = rawDb
+      .prepare("SELECT device_fingerprint FROM trusted_devices WHERE user_id = ?")
+      .get(mockUsers.admin.id);
+    expect(updated.device_fingerprint).not.toBe(ipARow.device_fingerprint);
   });
 
   it("returns null when UA mismatches even if IP matches", async () => {

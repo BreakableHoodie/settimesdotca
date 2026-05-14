@@ -131,7 +131,7 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
     return null;
   }
 
-  // Update last_used_at, current IP, and fingerprint (no-op if IP unchanged)
+  // Always refresh last_used_at; also refresh IP and fingerprint so they stay current
   await DB.prepare(
     `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ?, device_fingerprint = ? WHERE id = ?`
   )

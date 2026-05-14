@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { createTestEnv } from "../../../test-utils";
-import * as usersHandler from "../../users.js";
+import { describe, expect, it } from 'vitest';
+import { createTestEnv } from '../../../test-utils';
+import * as usersHandler from '../../users.js';
 
-describe("Admin users API", () => {
-  it("allows admins to list users", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+describe('Admin users API', () => {
+  it('allows admins to list users', async () => {
+    const { env, headers } = createTestEnv({ role: 'admin' });
 
-    const request = new Request("https://example.test/api/admin/users", {
+    const request = new Request('https://example.test/api/admin/users', {
       headers,
     });
 
@@ -15,16 +15,16 @@ describe("Admin users API", () => {
 
     const body = await response.json();
     expect(Array.isArray(body.users)).toBe(true);
-    expect(body.users.some((user) => user.email === "admin@test")).toBe(true);
-    expect(body.users.every((user) => typeof user.isActive === "boolean")).toBe(
+    expect(body.users.some((user) => user.email === 'admin@test')).toBe(true);
+    expect(body.users.every((user) => typeof user.isActive === 'boolean')).toBe(
       true
     );
   });
 
-  it("rejects non-admin list requests", async () => {
-    const { env, headers } = createTestEnv({ role: "editor" });
+  it('rejects non-admin list requests', async () => {
+    const { env, headers } = createTestEnv({ role: 'editor' });
 
-    const request = new Request("https://example.test/api/admin/users", {
+    const request = new Request('https://example.test/api/admin/users', {
       headers,
     });
 
@@ -32,17 +32,17 @@ describe("Admin users API", () => {
     expect(response.status).toBe(403);
   });
 
-  it("invites users and logs the action", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+  it('invites users and logs the action', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'admin' });
 
-    const request = new Request("https://example.test/api/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
+    const request = new Request('https://example.test/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({
-        email: "new-user@test.com",
-        role: "editor",
-        firstName: "New",
-        lastName: "User",
+        email: 'new-user@test.com',
+        role: 'editor',
+        firstName: 'New',
+        lastName: 'User',
       }),
     });
 
@@ -50,14 +50,14 @@ describe("Admin users API", () => {
     expect(response.status).toBe(201);
 
     const invite = rawDb
-      .prepare("SELECT * FROM invite_codes WHERE email = ?")
-      .get("new-user@test.com");
+      .prepare('SELECT * FROM invite_codes WHERE email = ?')
+      .get('new-user@test.com');
     expect(invite).toBeDefined();
-    expect(invite.role).toBe("editor");
+    expect(invite.role).toBe('editor');
 
     const created = rawDb
-      .prepare("SELECT * FROM users WHERE email = ?")
-      .get("new-user@test.com");
+      .prepare('SELECT * FROM users WHERE email = ?')
+      .get('new-user@test.com');
     expect(created).toBeUndefined();
 
     const audit = rawDb
@@ -65,19 +65,29 @@ describe("Admin users API", () => {
       .get();
     expect(audit).toBeDefined();
     expect(audit.resource_id).toBe(invite.id);
+    const details = JSON.parse(audit.details);
+    expect(details).toMatchObject({
+      role: 'editor',
+      emailDelivered: false,
+      inviteMode: 'email_restricted',
+      nameProvided: true,
+    });
+    expect(details).not.toHaveProperty('email');
+    expect(details).not.toHaveProperty('firstName');
+    expect(details).not.toHaveProperty('lastName');
   });
 
-  it("prevents non-admins from creating users", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+  it('prevents non-admins from creating users', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' });
 
-    const request = new Request("https://example.test/api/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
+    const request = new Request('https://example.test/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({
-        email: "blocked@test.com",
-        role: "viewer",
-        firstName: "Blocked",
-        lastName: "User",
+        email: 'blocked@test.com',
+        role: 'viewer',
+        firstName: 'Blocked',
+        lastName: 'User',
       }),
     });
 
@@ -85,28 +95,28 @@ describe("Admin users API", () => {
     expect(response.status).toBe(403);
 
     const exists = rawDb
-      .prepare("SELECT * FROM users WHERE email = ?")
-      .get("blocked@test.com");
+      .prepare('SELECT * FROM users WHERE email = ?')
+      .get('blocked@test.com');
     expect(exists).toBeUndefined();
   });
 
-  it("rejects duplicate user emails", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+  it('rejects duplicate user emails', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'admin' });
 
     rawDb
-      .prepare("INSERT INTO users (email, role) VALUES (?, ?)")
-      .run("dup-user@test.com", "viewer");
+      .prepare('INSERT INTO users (email, role) VALUES (?, ?)')
+      .run('dup-user@test.com', 'viewer');
 
     const body = {
-      email: "dup-user@test.com",
-      role: "editor",
-      firstName: "Dup",
-      lastName: "User",
+      email: 'dup-user@test.com',
+      role: 'editor',
+      firstName: 'Dup',
+      lastName: 'User',
     };
 
-    const request = new Request("https://example.test/api/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
+    const request = new Request('https://example.test/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(body),
     });
 

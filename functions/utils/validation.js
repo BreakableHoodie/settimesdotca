@@ -361,6 +361,10 @@ export function sanitizeBandSocialLinks(value) {
     instagram: sanitizeOptionalHandleOrUrl(parsed.instagram, FIELD_LIMITS.socialHandle.max, "Instagram"),
     bandcamp: sanitizeOptionalHttpUrl(parsed.bandcamp, FIELD_LIMITS.bandUrl.max, "Bandcamp URL"),
     facebook: sanitizeOptionalHttpUrl(parsed.facebook, FIELD_LIMITS.bandUrl.max, "Facebook URL"),
+    youtube: sanitizeOptionalHttpUrl(parsed.youtube, FIELD_LIMITS.bandUrl.max, "YouTube URL"),
+    spotify: sanitizeOptionalHttpUrl(parsed.spotify, FIELD_LIMITS.bandUrl.max, "Spotify URL"),
+    apple_music: sanitizeOptionalHttpUrl(parsed.apple_music, FIELD_LIMITS.bandUrl.max, "Apple Music URL"),
+    linktree: sanitizeOptionalHttpUrl(parsed.linktree, FIELD_LIMITS.bandUrl.max, "Linktree URL"),
   };
 
   return Object.values(sanitized).some(Boolean) ? JSON.stringify(sanitized) : null;
@@ -1029,6 +1033,12 @@ export const VALIDATION_SCHEMAS = {
       type: "date",
       required: true,
       label: "Date",
+    },
+    end_date: {
+      type: "date",
+      required: false,
+      label: "End date",
+      default: null,
     },
     status: {
       type: "enum",

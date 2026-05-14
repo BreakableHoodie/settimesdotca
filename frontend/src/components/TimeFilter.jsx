@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
+import { useId } from 'react'
 import { getTimeFilterOptions } from '../utils/timeFilter'
 
 /**
@@ -10,74 +11,37 @@ import { getTimeFilterOptions } from '../utils/timeFilter'
  * - Shows current selection with description
  */
 export default function TimeFilter({ selectedFilter, onFilterChange, className = '' }) {
-  const [isOpen, setIsOpen] = useState(false)
+  const filterId = useId()
   const options = getTimeFilterOptions()
   const selectedOption = options.find(opt => opt.value === selectedFilter) || options[0]
 
-  const handleSelect = option => {
-    onFilterChange(option.value)
-    setIsOpen(false)
-  }
-
   return (
     <div className={`relative ${className}`}>
-      {/* Filter Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`
-          w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-all duration-150 
-          hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 
-          focus-visible:ring-offset-2 focus-visible:ring-accent-400
-          ${
-            selectedFilter === 'all'
-              ? 'bg-bg-purple/50 text-white hover:bg-bg-purple'
-              : 'bg-accent-500 text-bg-navy shadow-lg'
-          }
-        `}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
+      <label htmlFor={filterId} className="sr-only">
+        Time filter
+      </label>
+      <select
+        id={filterId}
+        value={selectedOption.value}
+        onChange={event => onFilterChange?.(event.target.value)}
         title={selectedOption.description}
+        className={`min-h-[44px] w-full appearance-none rounded-full border px-4 py-2 pr-10 text-sm font-medium transition-colors focus:border-accent-500 focus:outline-hidden ${
+          selectedFilter === 'all'
+            ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+            : 'border-accent-500/35 bg-accent-500/10 text-accent-300'
+        }`}
       >
-        <div className="flex items-center justify-center gap-2">
-          <span>{selectedOption.label}</span>
-          <svg
-            className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </button>
-
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} aria-hidden="true" />
-
-          {/* Menu */}
-          <div className="absolute top-full left-0 right-0 sm:right-auto sm:w-64 mt-2 bg-bg-navy border border-accent-500/20 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto">
-            {options.map(option => (
-              <button
-                key={option.value}
-                onClick={() => handleSelect(option)}
-                className={`
-                  w-full px-4 py-3 text-left hover:bg-bg-purple/30 transition-colors
-                  ${selectedFilter === option.value ? 'bg-accent-500/20 text-accent-400' : 'text-white'}
-                  first:rounded-t-lg last:rounded-b-lg
-                `}
-                role="option"
-                aria-selected={selectedFilter === option.value}
-              >
-                <div className="font-medium">{option.label}</div>
-                <div className="text-xs text-white/70 mt-1">{option.description}</div>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+        {options.map(option => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={16}
+        aria-hidden="true"
+        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
+      />
     </div>
   )
 }

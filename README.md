@@ -1,402 +1,207 @@
-# SetTimes.ca - Event Schedule & Performance Management Platform
+# SetTimes.ca
 
-A comprehensive event management platform for organizing multi-venue music events with role-based access control, band profiles, and public discovery features. Built for organizers, venues, and music lovers.
+SetTimes.ca is a Cloudflare Pages application for managing and publishing multi-venue music events. This repository contains the React frontend, Cloudflare Pages Functions API, D1 schema and migrations, admin authentication flows, and deployment automation.
 
-## Overview
+## Stack
 
-SetTimes.ca is designed to streamline the management of multi-venue music events (like music festivals and band crawls) while providing powerful discovery tools for attendees. The platform supports:
+- Frontend: React 19, Vite 8, Tailwind CSS 4, React Router 7
+- Backend: Cloudflare Pages Functions with `nodejs_compat`
+- Data: Cloudflare D1 and optional R2 photo storage
+- Auth: Lucia-backed server-side sessions with HttpOnly cookies and CSRF protection
+- Testing: Vitest for unit/integration coverage and Playwright for end-to-end coverage
 
-- **Multi-user RBAC** with admin, editor, and viewer roles
-- **Band profile management** with photos, bios, and social links
-- **Event scheduling** with automatic conflict detection
-- **Public API** for schedule discovery and integration
-- **Privacy-first analytics** for organizers
+## What The App Supports
 
-## Current Status
-
-**Version:** 1.1.0 (Production)
-**Next Event:** Long Weekend Band Crawl (February 15, 2026)
-
-Core features complete:
-
-- ✅ RBAC Implementation (Admin/Editor/Viewer)
-- ✅ Event Management & Scheduling
-- ✅ Band Profiles with Photos
-- ✅ Public Discovery API
-- ✅ Security Hardening
-- ✅ MFA/2FA with TOTP (authenticator apps)
-- ✅ Trusted Devices & Backup Codes
-- ✅ Navigation with Breadcrumbs & Sticky Headers
-
-## Features
-
-### For Event Organizers (Admin/Editor)
-
-- Password-protected admin interface at `/admin`
-- Multi-event management (create, publish/unpublish)
-- CRUD operations for Events, Venues, and Band Profiles
-- Performance scheduling with conflict detection
-- Bulk operations (move venue, change time, delete multiple)
-- Visual checkbox multi-select with conflict preview
-- User management with role-based permissions (admin only)
-- Comprehensive audit logging for security
-
-### For Attendees (Public)
-
-- Browse all performances across multiple venues
-- Build personalized schedules with localStorage persistence
-- "Coming up in X minutes" countdown notifications
-- Conflict detection for overlapping shows
-- Quick copy buttons for schedules (clipboard-friendly)
-- Mobile-first responsive design with adaptive header
-
-### Security & Compliance
-
-- **Invite-only signup system** - Prevents unauthorized account creation
-- **HTTPOnly session cookies** - Protection against XSS attacks
-- **CSRF token protection** - Prevents cross-site request forgery
-- **Content Security Policy** - Strict CSP headers with HSTS
-- **Strict CORS validation** - Rejects unauthorized origins
-- **MFA/2FA with TOTP** - Authenticator app support (Google Authenticator, Authy)
-- **Trusted Devices** - Remember devices for 30 days to skip MFA
-- **Backup Codes** - 8 single-use recovery codes per user
-- Rate limiting and brute force protection
-- Comprehensive audit logging (GDPR-compliant)
-- Master password recovery system
-- Role-based access control (admin/editor/viewer)
-- IP tracking and user agent logging
-
-For detailed security documentation, see [SECURITY.md](SECURITY.md) and the [SQL Injection Audit Report](docs/security/SQL_INJECTION_AUDIT.md).
-
-### Discovery Features
-
-- **Public Events API** (`/api/events/public`) - no authentication required
-- **Event Timeline API** (`/api/events/timeline`) - full schedule with venues and performances
-- **Band Profile Pages** (`/band/:slug`) - individual artist pages with bios, photos, and social links
-- **Analytics Dashboard** for organizer insights
-
-## Tech Stack
-
-- **Frontend:** React 18, Vite 7, Tailwind CSS 3, React Router 7
-- **Backend:** Cloudflare Pages Functions (serverless edge)
-- **Database:** Cloudflare D1 (distributed SQLite)
-- **Testing:** Vitest with 200+ tests
-- **Build:** GitHub Actions CI/CD
-- **Auth:** Session-based with secure token management
-- **CDN:** Cloudflare global network (190+ cities)
-
-**Current Focus**: Production operations and February 2026 event support.
+- Invite-based admin accounts with role-based access control
+- Event, venue, band profile, and performance management
+- Public event discovery, timeline, details, and calendar-feed endpoints
+- MFA, trusted devices, backup codes, and session self-service flows
+- Email activation, password reset, and subscription workflows
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 20+
-- Cloudflare account (free tier works)
-- Wrangler CLI (`npm install -g wrangler`)
+- npm
+- `sqlite3` CLI for the local database bootstrap scripts
+- A Cloudflare account only if you need remote D1 or Pages deployment
 
-### Local Development
+### 1. Install dependencies
 
 ```bash
-# Clone the repository
-git clone https://github.com/BreakableHoodie/settimesdotca.git
-cd settimesdotca
+./setup.sh
+```
 
-# Install dependencies
-npm install
+Manual equivalent:
 
-# Initialize local database
+```bash
+npm ci
+npm --prefix frontend ci
+```
+
+### 2. Create local runtime variables
+
+Copy the runtime example to `.dev.vars` for Wrangler:
+
+```bash
+cp .env.example .dev.vars
+```
+
+Important defaults for local development:
+
+- `ENVIRONMENT=development`
+- `PUBLIC_URL=http://localhost:8788`
+- `PUBLIC_DATA_PUBLISH_ENABLED=false`
+
+If you need activation, reset, or subscription email flows locally, also configure the email section in `.dev.vars`.
+
+### 3. Build the frontend
+
+```bash
+npm --prefix frontend run build
+```
+
+Wrangler serves `frontend/dist`, so rebuild before restarting Wrangler after frontend changes.
+
+### 4. Start the full local Pages runtime
+
+```bash
+npm run pages:dev
+```
+
+This runs the static app and Pages Functions together at `http://localhost:8788`.
+
+If you need public discovery routes enabled locally without editing `.dev.vars`, use:
+
+```bash
+npm run pages:dev:public
+```
+
+That adds a temporary Wrangler binding for `PUBLIC_DATA_PUBLISH_ENABLED=true` while keeping the default local runtime private.
+
+### 5. Bootstrap the local D1 database
+
+In a second terminal, with Wrangler still running:
+
+```bash
+./scripts/setup-local-db.sh
+```
+
+That script loads `database/setup-complete.sql`, updates the seeded local users with fresh password hashes, and prints the generated credentials for:
+
+- `admin@settimes.ca`
+- `editor@settimes.ca`
+- `viewer@settimes.ca`
+
+### 6. Sign in
+
+Open:
+
+- App: `http://localhost:8788`
+- Admin: `http://localhost:8788/admin`
+
+Use one of the credentials printed by `./scripts/setup-local-db.sh`.
+
+### One-command helper
+
+If you want the repo to build, start Wrangler, and initialize the local database in one step:
+
+```bash
+./init-dev-db.sh
+```
+
+## Daily Commands
+
+```bash
+# Local schema maintenance
 npm run migrate:local
+npm run validate:schema
 
-# Start development server
-npx wrangler pages dev public --binding DB=settimes-db
-
-# Server runs at http://localhost:8788
-```
-
-### Database Setup
-
-```bash
-# Create D1 database
-wrangler d1 create settimes-db
-
-# Update wrangler.toml with database_id from output
-
-# Apply migrations to local database
-npx wrangler d1 execute settimes-db --local --file=database/schema-v2.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-single-org.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-2fa.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-password-reset-reason.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-rbac-sprint-1-1.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-sprint-1-2-event-management.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-subscriptions.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-metrics.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-events-theming.sql
-npx wrangler d1 execute settimes-db --local --file=migrations/legacy/migration-invite-codes.sql
-
-# One-off upgrade (only if schedule_builds has band_id, not performance_id)
-./scripts/run-migrate-schedule-builds-performance-id.sh --local
-
-# Apply to production database
-npx wrangler d1 execute settimes-db --remote --file=database/schema-v2.sql
-# ... repeat for other migrations (include migration-invite-codes.sql)
-
-# One-off upgrade (only if schedule_builds has band_id, not performance_id)
-./scripts/run-migrate-schedule-builds-performance-id.sh --remote
-
-# Create first admin invite code
-node scripts/create-admin-invite.js --local  # For local dev
-node scripts/create-admin-invite.js --prod   # For production
-```
-
-See [docs/D1_SETUP.md](docs/D1_SETUP.md) for complete database setup instructions.
-
-### Environment Configuration
-
-Create `.dev.vars` file (gitignored) for local development:
-
-```bash
-ADMIN_PASSWORD=your-strong-admin-password-here
-MASTER_PASSWORD=your-even-stronger-master-password-here
-DEVELOPER_CONTACT=555-123-4567
-```
-
-For production, set these in Cloudflare Pages dashboard under **Settings → Environment Variables**.
-
-## Project Structure
-
-```sh
-settimes/
-├── frontend/                  # React + Vite + Tailwind
-│   ├── src/
-│   │   ├── components/        # Reusable UI components
-│   │   ├── admin/             # Admin panel components
-│   │   ├── App.jsx            # Main application
-│   │   └── main.jsx           # React entry point
-│   ├── public/                # Static assets
-│   └── package.json
-├── functions/                 # Cloudflare Pages Functions
-│   ├── api/
-│   │   ├── admin/             # Protected admin endpoints
-│   │   │   ├── bands/         # Band management
-│   │   │   ├── venues/        # Venue management
-│   │   │   ├── events/        # Event management
-│   │   │   ├── users/         # User management
-│   │   │   └── analytics/     # Analytics endpoints
-│   │   ├── events/            # Public event APIs
-│   │   ├── feeds/             # iCal feed generation
-│   │   ├── subscriptions/     # Email subscription management
-│   │   └── auth/              # Authentication endpoints
-│   └── _middleware.js         # RBAC & security middleware
-├── database/
-│   └── schema-v2.sql          # Base schema
-├── migrations/                # Numbered schema migrations (0001–0024)
-├── docs/
-│   ├── CLAUDE.md              # Project context for AI assistants
-│   ├── DEPLOYMENT.md          # Deployment guide
-│   ├── DATABASE.md            # Database schema documentation
-│   ├── D1_SETUP.md            # Database setup guide
-│   └── BACKEND_FRAMEWORK.md   # API documentation
-├── wrangler.toml              # Cloudflare configuration
-└── package.json               # Root dependencies
-```
-
-Note: Tests are co-located with their source files in `__tests__/` directories throughout `functions/` and `frontend/src/`.
-
-## Testing
-
-```bash
-# Run all tests
+# Tests
 npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Generate coverage report
 npm run test:coverage
 
-# Current status: 200+ tests passing
-```
+# Frontend build
+npm --prefix frontend run build
 
-## Role-Based Access Control
-
-### Roles & Permissions
-
-| Role       | Level | Permissions                                                                 |
-| ---------- | ----- | --------------------------------------------------------------------------- |
-| **Admin**  | 3     | Full access - user management, venues (structural data), all content        |
-| **Editor** | 2     | Content management - bands, events, publishing (cannot modify venues/users) |
-| **Viewer** | 1     | Read-only - analytics, metrics, event viewing (no modifications)            |
-
-### Test Users (Local Development)
-
-See `.dev.vars.test-users` for credentials. Default users:
-
-- `admin@settimes.ca` - System Administrator (admin)
-- `sarah@settimes.ca` - Second Admin (admin)
-- `editor@settimes.ca` - Content Editor (editor)
-- `viewer@settimes.ca` - Analytics Viewer (viewer)
-- `inactive@settimes.ca` - Inactive User (testing)
-
-**Note:** Use strong passwords in production. See [docs/D1_SETUP.md](docs/D1_SETUP.md) for security best practices.
-
-## Deployment
-
-### Cloudflare Pages (Recommended)
-
-1. **Connect GitHub Repository**
-   - Go to Cloudflare Dashboard → Pages → Create a project
-   - Connect to `BreakableHoodie/settimesdotca`
-   - Set production branch: `main`, preview branches: `dev`
-
-2. **Configure Build Settings**
-   - Build command: `npm run build`
-   - Build output directory: `frontend/dist`
-   - Root directory: `/`
-   - Environment variable: `NODE_VERSION=20`
-
-3. **Configure Environment Variables**
-   - Add `ADMIN_PASSWORD`, `MASTER_PASSWORD`, `DEVELOPER_CONTACT`
-   - Settings → Environment Variables → Production
-
-4. **Deploy**
-   - Every push to `main` triggers production deployment
-   - Every push to `dev` triggers preview deployment
-   - Domain: `settimes.pages.dev` (custom domain: `settimes.ca`)
-
-   **Manual Deployment (from project root):**
-
-   ```bash
-   npm run deploy:prod
-   ```
-
-   This command properly includes static assets from `frontend/dist` and Functions from `functions/`.
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.
-
-## Development Commands
-
-```bash
-# Database
-npm run migrate:local           # Apply migrations to local DB
-npm run validate:schema         # Validate schema consistency
-
-# Testing
-npm test                        # Run all tests
-npm run test:watch              # Watch mode
-npm run test:coverage           # Coverage report
-
-# Deploy (always from repo root so Functions are included)
+# Manual Pages deploys
 npm run deploy:dev
 npm run deploy:prod
 
-# Local Development
-npx wrangler pages dev public --binding DB=settimes-db  # Start dev server
-npx wrangler d1 execute settimes-db --local --command "SELECT * FROM users"  # Query local DB
-
-# Production Database
-npx wrangler d1 execute settimes-db --remote --file=database/migration.sql  # Apply migration
-npx wrangler d1 export settimes-db --output=backup.sql  # Backup database
+# Remote schema verification helper
+npm run verify:schema:remote -- <d1_database_name>
 ```
 
-## API Documentation
+## Testing
 
-### Public Endpoints (No Auth)
+Vitest runs from the repo root:
 
-- `GET /api/events/public` - List all published events
-- `GET /api/events/timeline` - Full schedule with venues and performances
-- `GET /api/events/:id/details` - Event details with full lineup
-- `POST /api/metrics` - Privacy-first analytics beacon
-- `POST /api/auth/activate` - Activate new account
-- `POST /api/auth/reset-password` - Request password reset
-- `POST /api/auth/reset-password-complete` - Complete password reset
-- `POST /api/auth/resend-activation` - Resend activation email
+```bash
+npm test
+```
 
-### Protected Endpoints (Authentication Required)
+Playwright uses Wrangler by default and expects a valid admin user. For local runs, export these shell variables before starting the suite:
 
-All admin endpoints require authentication and appropriate role:
+```bash
+export E2E_ADMIN_EMAIL=admin@settimes.ca
+export E2E_ADMIN_PASSWORD='<password printed by setup-local-db.sh>'
+```
 
-- `POST /api/admin/auth/login` - Login with email/password
-- `POST /api/admin/auth/logout` - End session
-- `POST /api/admin/auth/signup` - Register with invite code
-- `POST /api/admin/auth/mfa/verify` - Verify MFA code
-- `GET /api/admin/events` - List events (viewer+)
-- `POST /api/admin/events` - Create event (editor+)
-- `GET /api/admin/bands` - List bands (viewer+)
-- `POST /api/admin/bands` - Create band (editor+)
-- `GET /api/admin/venues` - List venues (viewer+)
-- `POST /api/admin/venues` - Create venue (admin only)
-- `GET /api/admin/users` - List users (admin only)
-- `POST /api/admin/users` - Invite user (admin only)
-- `GET /api/admin/analytics/*` - Analytics endpoints (viewer+)
-- `GET /api/admin/audit-log` - Audit log (admin only)
+Then run:
 
-See [docs/BACKEND_FRAMEWORK.md](docs/BACKEND_FRAMEWORK.md) for complete API reference.
+```bash
+npx playwright test --project=chromium
+```
 
-## Contributing
+## Deployment Overview
 
-This is a private project for SetTimes.ca. For issues or questions:
+Production and development releases are driven by `.github/workflows/cloudflare-pages.yml`.
 
-- **Technical Issues:** Create a GitHub issue
-- **Security Concerns:** Email <security@settimes.ca>
-- **General Questions:** <hello@settimes.ca>
+The workflow gates deployment in this order:
 
-## Roadmap
+1. CI and validation
+2. Release target resolution (`main` -> production, `dev` -> development)
+3. Remote D1 migrations
+4. Remote schema verification
+5. Pages deploy
+6. Post-deploy smoke checks
 
-**Completed (2025):**
+Required GitHub configuration is documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The key repository secrets and variables are:
 
-- ✅ RBAC with admin/editor/viewer roles
-- ✅ Event management with conflict detection
-- ✅ Band profiles with photos and bios
-- ✅ Public discovery API
-- ✅ Security hardening (HTTPOnly cookies, CSRF, CSP)
-- ✅ Mobile-responsive design
+- `CF_ACCOUNT_ID`
+- `CF_PAGES_API_TOKEN`
+- `CF_PAGES_PROJECT_NAME`
+- `CF_D1_PRODUCTION_DATABASE_NAME`
+- `CF_D1_DEVELOPMENT_DATABASE_NAME` (optional when using a separate dev DB)
+- `CF_PRODUCTION_SMOKE_URL`
+- `CF_DEVELOPMENT_SMOKE_URL`
 
-**Completed (Q1 2026):**
+Public discovery endpoints remain disabled until `PUBLIC_DATA_PUBLISH_ENABLED=true` is set explicitly in the target environment.
 
-- ✅ MFA/2FA with TOTP authenticator support
-- ✅ Trusted Devices (30-day remember)
-- ✅ Backup codes for account recovery
-- ✅ Improved navigation (breadcrumbs, sticky header)
-- ✅ Band profile UX improvements
+For local Pages development, prefer `npm run pages:dev:public` when you want to inspect real public routes without changing the repo-local default in `.dev.vars`.
 
-**Current (2026):**
+## Repository Layout
 
-- Production operations for February 2026 event
+```text
+frontend/      React application and client-side tests
+functions/     Cloudflare Pages Functions routes and shared server utilities
+migrations/    Ordered D1 schema migrations
+database/      Local bootstrap SQL, reference data, and historical exports
+scripts/       Local setup, migration, validation, and maintenance helpers
+docs/          Operator, developer, API, and architecture documentation
+e2e/           Playwright end-to-end coverage
+```
 
-**Upcoming:**
+## More Documentation
 
-- Email subscriptions with city/genre filtering (backend ready, frontend integration pending)
-- iCal feed integration for calendar apps (backend ready, frontend integration pending)
-- Event theming and colour customization from admin backend
-- Performance monitoring and optimization
-
-## Design
-
-Interface inspired by modern event aesthetic:
-
-- Deep navy (#0c0f1a) background
-- Cyan (#0ea5e9) accent colors for actions and branding
-- White text for high contrast and readability
-- Mobile-first responsive layout
-- Desktop: Multi-column grid by venue
-- Mobile: Single column chronological list
-- Sticky navigation header with contextual "My Schedule" link
-- Breadcrumb navigation on band profile pages
-
-## Browser Support
-
-Modern browsers with ES2020+ support:
-
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-
-## Credits
-
-Platform developed for event management needs, inspired by the Long Weekend Band Crawl events presented by Fat Scheid & Pink Lemonade Records.
+- [docs/INDEX.md](docs/INDEX.md) - documentation hub
+- [docs/D1_SETUP.md](docs/D1_SETUP.md) - local and remote D1 workflow
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - release pipeline and operator setup
+- [docs/SESSION_MANAGEMENT.md](docs/SESSION_MANAGEMENT.md) - current session model
+- [docs/DATABASE.md](docs/DATABASE.md) - schema overview and source of truth
+- [SECURITY.md](SECURITY.md) - security posture and operational guidance
 
 ## License
 
-AGPL-3.0 — see [LICENSE](LICENSE)
+AGPL-3.0. See [LICENSE](LICENSE).

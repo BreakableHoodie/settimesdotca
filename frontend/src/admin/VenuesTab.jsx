@@ -2,6 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { venuesApi } from '../utils/adminApi'
 import { FIELD_LIMITS } from '../utils/validation'
 
+function SortIcon({ col, sortConfig }) {
+  return (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
+}
+
 /**
  * VenuesTab - Manage venues (create, edit, delete)
  *
@@ -253,12 +261,6 @@ export default function VenuesTab({ showToast, readOnly = false }) {
     }))
   }
 
-  const SortIcon = ({ col }) => (
-    <span className="ml-1 inline-block w-4">
-      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-    </span>
-  )
-
   if (loading) {
     return (
       <div className="text-center py-12">
@@ -508,31 +510,31 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('name')}
                     >
-                      Name <SortIcon col="name" />
+                      Name <SortIcon col="name" sortConfig={sortConfig} />
                     </th>
                     <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('address')}
                     >
-                      Address <SortIcon col="address" />
+                      Address <SortIcon col="address" sortConfig={sortConfig} />
                     </th>
                     <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('phone')}
                     >
-                      Phone <SortIcon col="phone" />
+                      Phone <SortIcon col="phone" sortConfig={sortConfig} />
                     </th>
                     <th
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('contact_email')}
                     >
-                      Contact <SortIcon col="contact_email" />
+                      Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
                     </th>
                     <th
                       className="px-4 py-3 text-center text-white font-semibold cursor-pointer hover:text-accent-400"
                       onClick={() => handleSort('band_count')}
                     >
-                      Bands <SortIcon col="band_count" />
+                      Bands <SortIcon col="band_count" sortConfig={sortConfig} />
                     </th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>

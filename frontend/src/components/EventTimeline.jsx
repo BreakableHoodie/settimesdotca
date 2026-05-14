@@ -1,20 +1,13 @@
-import {
-  faCalendarDays,
-  faCircle,
-  faClock,
-  faClockRotateLeft,
-  faFilter,
-  faLocationDot,
-  faXmark,
-} from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { Archive, CalendarDays, Clock, Funnel, History, MapPin, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
-import { slugifyBandName } from '../utils/slugify'
+import { fetchPublicJson } from '../utils/publicApi'
+import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
 import { Alert, Badge, Button, Card, Loading } from './ui'
+import EventsPageSkeleton from './EventsPageSkeleton'
 
 /**
  * EventTimeline - Main timeline showing Now, Upcoming, and Past events
@@ -48,18 +41,12 @@ export default function EventTimeline() {
         }
         setError(null)
 
-        const response = await fetch('/api/events/timeline')
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch events timeline')
-        }
-
-        const data = await response.json()
+        const data = await fetchPublicJson('/api/events/timeline', {}, 'Failed to fetch events timeline')
         setTimeline(data)
       } catch (err) {
         console.error('Error fetching timeline:', err)
         if (!isSilent) {
-          setError(err.message)
+          setError(err instanceof Error ? err : new Error('Failed to fetch events timeline'))
         }
       } finally {
         if (!isSilent) {
@@ -143,32 +130,35 @@ export default function EventTimeline() {
   }, [])
 
   // Filter events
-  const filterEvents = events => {
-    if (!events) return []
+  const filterEvents = useCallback(
+    events => {
+      if (!events) return []
 
-    return events.filter(event => {
-      if (filters.venue && !event.venues.some(v => v.id === filters.venue)) {
-        return false
-      }
-      if (filters.month) {
-        const eventMonth = event.date?.slice(0, 7)
-        if (eventMonth !== filters.month) {
+      return events.filter(event => {
+        if (filters.venue && !event.venues.some(v => v.id === filters.venue)) {
           return false
         }
-      }
-      return true
-    })
-  }
+        if (filters.month) {
+          const eventMonth = event.date?.slice(0, 7)
+          if (eventMonth !== filters.month) {
+            return false
+          }
+        }
+        return true
+      })
+    },
+    [filters]
+  )
 
   // Get unique venues and months for filters
   const allVenues = useMemo(() => {
-    return Array.from(
-      new Set(
-        [...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
-          .flatMap(event => event.venues || [])
-          .map(v => JSON.stringify({ id: v.id, name: v.name }))
-      )
-    ).map(v => JSON.parse(v))
+    const seen = new Map()
+    ;[...(timeline.now || []), ...(timeline.upcoming || []), ...(timeline.past || [])]
+      .flatMap(event => event.venues || [])
+      .forEach(v => {
+        if (!seen.has(v.id)) seen.set(v.id, { id: v.id, name: v.name })
+      })
+    return Array.from(seen.values())
   }, [timeline])
 
   const allMonths = useMemo(() => {
@@ -208,26 +198,29 @@ export default function EventTimeline() {
   }, [])
 
   const hasActiveFilters = filters.venue !== null || filters.month !== null
+  const isPublishGateError = error?.status === 503
+
+  // Hooks must be called before any conditional returns (Rules of Hooks)
+  const filteredNow = useMemo(() => filterEvents(timeline.now || []), [filterEvents, timeline.now])
+  const filteredUpcoming = useMemo(() => filterEvents(timeline.upcoming || []), [filterEvents, timeline.upcoming])
+  const filteredPast = useMemo(() => filterEvents(timeline.past || []), [filterEvents, timeline.past])
 
   if (loading) {
-    return <Loading size="lg" text="Loading events..." fullScreen={false} />
+    return <EventsPageSkeleton />
   }
 
   if (error) {
     return (
       <div className="container mx-auto px-4 py-16">
         <Alert variant="error" dismissible onClose={() => setError(null)}>
-          <h4 className="font-bold mb-2">Failed to load events</h4>
-          <p>{error}</p>
+          <h4 className="font-bold mb-2">
+            {isPublishGateError ? 'Events are not published yet' : 'Failed to load events'}
+          </h4>
+          <p>{error.message}</p>
         </Alert>
       </div>
     )
   }
-
-  // Apply filters
-  const filteredNow = filterEvents(timeline.now || [])
-  const filteredUpcoming = filterEvents(timeline.upcoming || [])
-  const filteredPast = filterEvents(timeline.past || [])
 
   const hasNow = filteredNow.length > 0
   const hasUpcoming = filteredUpcoming.length > 0
@@ -245,16 +238,11 @@ export default function EventTimeline() {
 
           <div className="flex items-center gap-3">
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} icon={<FontAwesomeIcon icon={faXmark} />}>
+              <Button variant="ghost" size="sm" onClick={clearFilters} icon={<X size={14} />}>
                 Clear Filters
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleShowFiltersToggle}
-              icon={<FontAwesomeIcon icon={faFilter} />}
-            >
+            <Button variant="secondary" size="sm" onClick={handleShowFiltersToggle} icon={<Funnel size={14} />}>
               {showFilters ? 'Hide' : 'Show'} Filters
             </Button>
           </div>
@@ -324,7 +312,7 @@ export default function EventTimeline() {
         {hasNow && (
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <FontAwesomeIcon icon={faCircle} className="text-error-500 animate-pulse text-sm" />
+              <span className="inline-block w-3 h-3 rounded-full bg-error-500 animate-pulse" aria-hidden="true" />
               <h2 className="text-3xl font-bold text-accent-500">Happening Now</h2>
               <Badge variant="error" size="sm">
                 LIVE
@@ -349,7 +337,7 @@ export default function EventTimeline() {
         {hasUpcoming && (
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <FontAwesomeIcon icon={faCalendarDays} className="text-primary-500 text-xl" />
+              <CalendarDays size={20} className="text-primary-500" />
               <h2 className="text-3xl font-bold text-text-primary">Coming Up</h2>
             </div>
             <div className="space-y-6">
@@ -372,7 +360,7 @@ export default function EventTimeline() {
           <section>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
-                <FontAwesomeIcon icon={faClockRotateLeft} className="text-text-tertiary text-xl" />
+                <History size={20} className="text-text-tertiary" />
                 <h2 className="text-3xl font-bold text-text-secondary">Past Events</h2>
               </div>
               <Button variant="ghost" size="sm" onClick={handleShowPastToggle}>
@@ -445,6 +433,7 @@ function EventCard({
 
   const featuredBands = event.bands || []
   const resolvedDetails = details
+  const isLoadingDetails = expanded && detailsLoading && !resolvedDetails
   const venueList = resolvedDetails?.venues || event.venues || []
   const allBands = resolvedDetails?.bands || []
   const allBandCount = resolvedDetails?.band_count ?? event.band_count
@@ -490,11 +479,17 @@ function EventCard({
                   LIVE NOW
                 </Badge>
               )}
+              {event.status === 'archived' && (
+                <Badge variant="default" size="md">
+                  <Archive size={12} className="mr-1" aria-hidden="true" />
+                  Archived
+                </Badge>
+              )}
               {event.is_published === false && <Badge variant="warning">Draft</Badge>}
             </div>
 
             <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
-              <FontAwesomeIcon icon={faCalendarDays} className="text-xs" />
+              <CalendarDays size={12} />
               {formatDate(event.date)}
             </p>
 
@@ -525,7 +520,7 @@ function EventCard({
                 }
               }}
             >
-              Build Schedule
+              {isPast || event.status === 'archived' ? 'View Lineup' : 'Plan Your Night'}
             </Button>
             {ticketHref !== '#' && (
               <Button
@@ -553,7 +548,7 @@ function EventCard({
                 }
               }}
             >
-              {expanded ? 'Hide Details' : 'View Details'}
+              {isLoadingDetails ? 'Loading Details...' : expanded ? 'Hide Details' : 'View Details'}
             </Button>
           </div>
         </div>
@@ -567,7 +562,7 @@ function EventCard({
                 <Badge
                   key={band.id}
                   as="a"
-                  href={`/band/${slugifyBandName(band.name)}`}
+                  href={buildBandProfileHref(band.name, event.slug)}
                   variant="default"
                   size="md"
                   className="hover:bg-primary-500/20 cursor-pointer transition-colors"
@@ -589,6 +584,12 @@ function EventCard({
       {/* Expanded Details */}
       {expanded && (
         <div className="border-t border-white/10 bg-white/5">
+          {isLoadingDetails && (
+            <div className="border-b border-white/10 px-6 py-5">
+              <Loading size="sm" text="Loading performers and venues..." className="sm:items-start" />
+            </div>
+          )}
+
           {/* Venues */}
           {venueList && venueList.length > 0 && (
             <div className="p-6 border-b border-white/10">
@@ -616,7 +617,7 @@ function EventCard({
                   <Card
                     key={band.id}
                     as={Link}
-                    to={`/band/${slugifyBandName(band.name)}`}
+                    to={buildBandProfileHref(band.name, event.slug)}
                     padding="sm"
                     hoverable
                     className="group"
@@ -639,12 +640,12 @@ function EventCard({
 
                     <div className="space-y-1 text-sm">
                       <div className="text-text-secondary flex items-center gap-2">
-                        <FontAwesomeIcon icon={faLocationDot} aria-hidden="true" />
+                        <MapPin size={12} aria-hidden="true" />
                         <span>{band.venue_name}</span>
                       </div>
 
                       <div className="text-text-tertiary flex items-center gap-2">
-                        <FontAwesomeIcon icon={faClock} aria-hidden="true" />
+                        <Clock size={12} aria-hidden="true" />
                         <span>{formatTimeRange(band.start_time, band.end_time)}</span>
                       </div>
 
@@ -661,8 +662,6 @@ function EventCard({
               </div>
             </div>
           )}
-
-          {detailsLoading && <div className="p-6 text-text-tertiary text-sm">Loading event details...</div>}
         </div>
       )}
     </Card>

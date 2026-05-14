@@ -190,7 +190,11 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                 <p className="text-text-secondary text-sm mb-3">
                   Enter the 6-digit code from your authenticator app to finish setup.
                 </p>
+                <label htmlFor="mfa-verify-enable" className="sr-only">
+                  Authenticator code
+                </label>
                 <input
+                  id="mfa-verify-enable"
                   type="text"
                   inputMode="numeric"
                   value={verificationCode}
@@ -223,7 +227,11 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                 <p className="text-text-secondary text-sm mb-3">
                   Regenerating backup codes will invalidate the previous set.
                 </p>
+                <label htmlFor="mfa-verify-backup" className="sr-only">
+                  Authenticator code
+                </label>
                 <input
+                  id="mfa-verify-backup"
                   type="text"
                   inputMode="numeric"
                   value={verificationCode}

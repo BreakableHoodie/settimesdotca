@@ -1,45 +1,59 @@
-import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Archive, Bell, CircleAlert, X } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
 import Footer from './components/Footer'
 import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
 import PrivacyBanner from './components/PrivacyBanner'
+import LiveContextBar from './components/LiveContextBar'
 import ScheduleView from './components/ScheduleView'
+import ScheduleSkeleton from './components/ScheduleSkeleton'
+import { ConfirmDialog, Modal } from './components/ui'
 import { trackEventView, trackPageView } from './utils/metrics'
+import { getTimeFilterOptions } from './utils/timeFilter'
 import { validateBandsData } from './utils/validation'
+import { prepareBands } from './utils/bandUtils'
+import { saveSelectedBands } from './utils/scheduleStorage'
+
+const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
+const TIME_FILTERS_STORAGE_KEY = 'timeFiltersByEvent'
+const SCHEDULE_TOAST_DURATION_MS = 5000
+const VALID_TIME_FILTERS = new Set(getTimeFilterOptions().map(option => option.value))
 
 const MySchedule = lazy(() => import('./components/MySchedule'))
 const VenueInfo = lazy(() => import('./components/VenueInfo'))
 
 const DEBUG_TIME_STORAGE_KEY = 'debugScheduleTime'
 
-function prepareBands(list) {
-  return list.map(band => {
-    const startMs = Date.parse(`${band.date}T${band.startTime}:00`)
-    let endMs = Date.parse(`${band.date}T${band.endTime}:00`)
-
-    if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs < startMs) {
-      endMs += 24 * 60 * 60 * 1000
-    }
-
-    return {
-      ...band,
-      startMs: Number.isNaN(startMs) ? 0 : startMs,
-      endMs: Number.isNaN(endMs) ? 0 : endMs,
-    }
-  })
-}
-
 const FALLBACK_BANDS = []
 const HAS_FALLBACK = false
 const SCHEDULE_SESSION_KEY = 'scheduleSessionId'
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const LEGACY_SELECTED_BANDS_KEY = 'selectedBands'
+
+const getStoredTimeFilter = slug => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return 'all'
+  }
+
+  try {
+    const stored = window.localStorage.getItem(TIME_FILTERS_STORAGE_KEY)
+    if (!stored) return 'all'
+
+    const parsed = JSON.parse(stored)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return 'all'
+    }
+
+    const nextFilter = parsed[slug || 'default']
+    return VALID_TIME_FILTERS.has(nextFilter) ? nextFilter : 'all'
+  } catch {
+    return 'all'
+  }
+}
 
 const generateSecureSessionId = () => {
   if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
@@ -136,16 +150,28 @@ const formatDebugInputValue = dateValue => {
 
 function App() {
   const { slug } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [bands, setBands] = useState(FALLBACK_BANDS)
   const [eventData, setEventData] = useState(null)
   const [selectedBands, setSelectedBands] = useState(() => getStoredSelection(slug))
   const [view, setView] = useState(() => (getStoredSelection(slug).length > 0 ? 'mine' : 'all'))
-  const [timeFilter] = useState('all')
+  const [showHint, setShowHint] = useState(
+    () => typeof window !== 'undefined' && !localStorage.getItem(HINT_DISMISSED_KEY)
+  )
   const [loading, setLoading] = useState(!HAS_FALLBACK)
   const [error, setError] = useState(null)
   const [showPast, setShowPast] = useState(false)
+  const [timeFilter, setTimeFilter] = useState(() => getStoredTimeFilter(slug))
+  const [venueFilter, setVenueFilter] = useState(null)
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [debugTime, setDebugTime] = useState(() => getInitialDebugTime())
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [sharedScheduleConfirmOpen, setSharedScheduleConfirmOpen] = useState(false)
+  const [pendingSharedBands, setPendingSharedBands] = useState([])
+  const [pendingSharedBandNames, setPendingSharedBandNames] = useState([])
+  const [lastClearedBands, setLastClearedBands] = useState([])
+  const [scheduleToast, setScheduleToast] = useState(null)
+  const scheduleToastTimeoutRef = useRef(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -229,6 +255,8 @@ function App() {
     const stored = getStoredSelection(slug)
     setSelectedBands(stored)
     setView(stored.length > 0 ? 'mine' : 'all')
+    setTimeFilter(getStoredTimeFilter(slug))
+    setVenueFilter(null)
   }, [slug])
 
   useEffect(() => {
@@ -239,7 +267,7 @@ function App() {
     try {
       const key = slug || 'default'
       let nextState = {}
-      const existing = window.localStorage.getItem(SELECTED_BANDS_KEY)
+      const existing = window.localStorage.getItem(TIME_FILTERS_STORAGE_KEY)
       if (existing) {
         const parsed = JSON.parse(existing)
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -247,44 +275,214 @@ function App() {
         }
       }
 
-      nextState[key] = selectedBands
-      window.localStorage.setItem(SELECTED_BANDS_KEY, JSON.stringify(nextState))
+      nextState[key] = VALID_TIME_FILTERS.has(timeFilter) ? timeFilter : 'all'
+      window.localStorage.setItem(TIME_FILTERS_STORAGE_KEY, JSON.stringify(nextState))
     } catch (error) {
-      console.warn('[App] Failed to persist selectedBands', error)
+      console.warn('[App] Failed to persist timeFilter', error)
     }
-  }, [selectedBands, slug])
+  }, [slug, timeFilter])
 
-  const trackScheduleBuilds = async bandsToTrack => {
-    if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {
-      return
+  useEffect(() => {
+    return () => {
+      if (scheduleToastTimeoutRef.current) {
+        window.clearTimeout(scheduleToastTimeoutRef.current)
+      }
     }
+  }, [])
 
-    const performanceIds = bandsToTrack
-      .map(band => band?.performance_id)
-      .filter(id => typeof id === 'number' && Number.isFinite(id))
+  useEffect(() => {
+    saveSelectedBands(slug || 'default', selectedBands, eventData?.date)
+  }, [selectedBands, slug, eventData?.date])
 
-    if (performanceIds.length === 0) {
-      return
+  const clearScheduleToast = useCallback(({ clearUndoState = false } = {}) => {
+    if (scheduleToastTimeoutRef.current) {
+      window.clearTimeout(scheduleToastTimeoutRef.current)
+      scheduleToastTimeoutRef.current = null
     }
-
-    const userSession = getScheduleSessionId()
-    if (!userSession) {
-      return
+    setScheduleToast(null)
+    if (clearUndoState) {
+      setLastClearedBands([])
     }
+  }, [])
 
-    try {
-      await fetch('/api/schedule/build', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: eventData.id,
-          performance_ids: performanceIds,
-          user_session: userSession,
-        }),
+  const showScheduleToast = useCallback(
+    (nextToast, { duration = SCHEDULE_TOAST_DURATION_MS, clearUndoStateOnDismiss = false } = {}) => {
+      clearScheduleToast()
+      setScheduleToast(nextToast)
+
+      if (duration <= 0 || typeof window === 'undefined') {
+        return
+      }
+
+      scheduleToastTimeoutRef.current = window.setTimeout(() => {
+        setScheduleToast(null)
+        if (clearUndoStateOnDismiss) {
+          setLastClearedBands([])
+        }
+        scheduleToastTimeoutRef.current = null
+      }, duration)
+    },
+    [clearScheduleToast]
+  )
+
+  const trackScheduleBuilds = useCallback(
+    async bandsToTrack => {
+      if (!eventData?.id || !Array.isArray(bandsToTrack) || bandsToTrack.length === 0) {
+        return
+      }
+
+      const performanceIds = bandsToTrack
+        .map(band => band?.performance_id)
+        .filter(id => typeof id === 'number' && Number.isFinite(id))
+
+      if (performanceIds.length === 0) {
+        return
+      }
+
+      const userSession = getScheduleSessionId()
+      if (!userSession) {
+        return
+      }
+
+      try {
+        await fetch('/api/schedule/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: eventData.id,
+            performance_ids: performanceIds,
+            user_session: userSession,
+          }),
+        })
+      } catch (error) {
+        console.warn('[App] Failed to record schedule build', error)
+      }
+    },
+    [eventData]
+  )
+
+  useEffect(() => {
+    const sParam = searchParams.get('s')
+    if (!sParam || bands.length === 0) return
+
+    const requestedIds = new Set(
+      sParam
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => /^\d+$/.test(s))
+    )
+
+    const matchedStringIds = bands
+      .filter(band => {
+        const parts = band.id.split('-')
+        const perfId = parts[parts.length - 1]
+        return requestedIds.has(perfId)
       })
-    } catch (error) {
-      console.warn('[App] Failed to record schedule build', error)
+      .map(band => band.id)
+
+    if (matchedStringIds.length === 0) return
+
+    const existing = getStoredSelection(slug)
+
+    const applySelection = () => {
+      const importedBands = bands.filter(band => matchedStringIds.includes(band.id))
+      trackScheduleBuilds(importedBands)
+      setSelectedBands(matchedStringIds)
+      setView('mine')
+      showScheduleToast({
+        type: 'success',
+        message: `Loaded ${matchedStringIds.length} shared ${matchedStringIds.length === 1 ? 'stop' : 'stops'}.`,
+      })
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev)
+          next.delete('s')
+          return next
+        },
+        { replace: true }
+      )
     }
+
+    if (existing.length === 0) {
+      applySelection()
+    } else {
+      setPendingSharedBands(matchedStringIds)
+      setSharedScheduleConfirmOpen(true)
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev)
+          next.delete('s')
+          return next
+        },
+        { replace: true }
+      )
+    }
+  }, [bands, searchParams, setSearchParams, showScheduleToast, slug, trackScheduleBuilds])
+
+  useEffect(() => {
+    const shareSlug = searchParams.get('share')
+    if (!shareSlug || bands.length === 0) return
+
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev)
+        next.delete('share')
+        return next
+      },
+      { replace: true }
+    )
+
+    fetch(`/api/schedule/share/${encodeURIComponent(shareSlug)}`)
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then(data => {
+        const matchedBands = bands.filter(band => {
+          const parts = band.id.split('-')
+          const perfId = Number(parts[parts.length - 1])
+          return data.performance_ids.includes(perfId)
+        })
+        const matchedIds = matchedBands.map(band => band.id)
+        const matchedNames = matchedBands.map(band => band.name || '')
+
+        if (matchedIds.length === 0) return
+
+        setPendingSharedBands(matchedIds)
+        setPendingSharedBandNames(matchedNames)
+        setSharedScheduleConfirmOpen(true)
+      })
+      .catch(err => {
+        console.warn('[App] Failed to load share link', err)
+      })
+  }, [bands, searchParams, setSearchParams])
+
+  const dismissHint = () => {
+    setShowHint(false)
+    localStorage.setItem(HINT_DISMISSED_KEY, '1')
+  }
+
+  const applySharedSchedule = mode => {
+    const selectedBandIds = new Set(selectedBands)
+    const importedBands = bands.filter(
+      band => pendingSharedBands.includes(band.id) && (mode === 'replace' || !selectedBandIds.has(band.id))
+    )
+    const nextSelectedBands =
+      mode === 'merge' ? Array.from(new Set([...selectedBands, ...pendingSharedBands])) : [...pendingSharedBands]
+
+    if (importedBands.length > 0) {
+      trackScheduleBuilds(importedBands)
+    }
+
+    setSharedScheduleConfirmOpen(false)
+    setSelectedBands(nextSelectedBands)
+    setView('mine')
+    setPendingSharedBands([])
+    setPendingSharedBandNames([])
+    showScheduleToast({
+      type: 'success',
+      message:
+        mode === 'merge'
+          ? `Merged ${importedBands.length} new ${importedBands.length === 1 ? 'stop' : 'stops'} into your route.`
+          : `Replaced your route with ${pendingSharedBands.length} shared ${pendingSharedBands.length === 1 ? 'stop' : 'stops'}.`,
+    })
   }
 
   const toggleBand = bandId => {
@@ -296,24 +494,76 @@ function App() {
 
       const band = bands.find(candidate => candidate.id === bandId)
       trackScheduleBuilds(band ? [band] : [])
+      // Auto-dismiss hint on first band selection
+      if (showHint) dismissHint()
       return [...prev, bandId]
     })
   }
 
   const clearSchedule = () => {
-    if (window.confirm('Are you sure you want to clear your entire schedule?')) {
-      setSelectedBands([])
-      setView('all')
+    if (selectedBands.length === 0) {
+      return
     }
+    setClearConfirmOpen(true)
   }
 
-  const selectAll = () => {
-    const allBandIds = bands.map(band => band.id)
-    trackScheduleBuilds(bands)
-    setSelectedBands(allBandIds)
+  const doActualClear = () => {
+    const clearedBands = [...selectedBands]
+    setLastClearedBands(clearedBands)
+    setSelectedBands([])
+    setView('all')
+    setClearConfirmOpen(false)
+    showScheduleToast(
+      {
+        type: 'undo',
+        message: `Cleared ${clearedBands.length} ${clearedBands.length === 1 ? 'stop' : 'stops'} from your route.`,
+      },
+      { clearUndoStateOnDismiss: true }
+    )
   }
 
+  const undoClearSchedule = () => {
+    if (lastClearedBands.length === 0) {
+      return
+    }
+
+    setSelectedBands(lastClearedBands)
+    setView('mine')
+    clearScheduleToast({ clearUndoState: true })
+  }
+
+  const selectAll = (bandsToSelect = bands) => {
+    const normalizedBands = Array.isArray(bandsToSelect)
+      ? bandsToSelect.filter(band => band && typeof band.id === 'string')
+      : []
+
+    if (normalizedBands.length === 0) {
+      return
+    }
+
+    const selectedBandIds = new Set(selectedBands)
+    const newlySelectedBands = normalizedBands.filter(band => !selectedBandIds.has(band.id))
+
+    if (newlySelectedBands.length === 0) {
+      return
+    }
+
+    if (showHint) {
+      dismissHint()
+    }
+
+    trackScheduleBuilds(newlySelectedBands)
+    setSelectedBands(prev => {
+      const nextSelectedBandIds = new Set(prev)
+      normalizedBands.forEach(band => nextSelectedBandIds.add(band.id))
+      return Array.from(nextSelectedBandIds)
+    })
+  }
+
+  const isArchived = Boolean(eventData?.is_archived)
   const myBands = bands.filter(band => selectedBands.includes(band.id))
+  const sharedBandsAlreadySelectedCount = pendingSharedBands.filter(id => selectedBands.includes(id)).length
+  const sharedBandsNewCount = pendingSharedBands.length - sharedBandsAlreadySelectedCount
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
   const effectiveNow = debugTime || currentTime
@@ -326,19 +576,15 @@ function App() {
   })()
 
   if (shouldShowLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-accent-400 text-xl">Loading...</div>
-      </div>
-    )
+    return <ScheduleSkeleton />
   }
 
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md text-center">
-          <div className="text-red-400 text-6xl mb-4" aria-hidden="true">
-            <FontAwesomeIcon icon={faCircleExclamation} />
+          <div className="text-red-400 mb-4" aria-hidden="true">
+            <CircleAlert size={64} />
           </div>
           <h2 className="text-white text-2xl font-bold mb-2">Oops! Something went wrong</h2>
           <p className="text-accent-400 mb-6">{error}</p>
@@ -363,13 +609,29 @@ function App() {
   const eventJsonLd = eventData
     ? JSON.stringify({
         '@context': 'https://schema.org',
-        '@type': 'Event',
+        '@type': 'MusicEvent',
         name: eventData.name,
         startDate: eventData.date,
+        endDate: eventData.end_date || eventData.date,
         url: `https://settimes.ca/event/${slug}`,
         description: `Full set times and schedule for ${eventData.name}.`,
-        ...(eventData.city && { location: { '@type': 'Place', address: eventData.city } }),
+        location: {
+          '@type': 'Place',
+          ...(eventData.city
+            ? { address: { '@type': 'PostalAddress', addressLocality: eventData.city, addressCountry: 'CA' } }
+            : { name: 'Canada', address: { '@type': 'PostalAddress', addressCountry: 'CA' } }),
+        },
         organizer: { '@type': 'Organization', name: 'SetTimes', url: 'https://settimes.ca' },
+        ...(eventData.ticket_url && {
+          offers: {
+            '@type': 'Offer',
+            url: eventData.ticket_url,
+            availability: 'https://schema.org/InStock',
+          },
+        }),
+        ...(bands?.length && {
+          performer: bands.filter(b => b.name).map(b => ({ '@type': 'MusicGroup', name: b.name })),
+        }),
       })
     : null
 
@@ -381,7 +643,7 @@ function App() {
         {slug && <link rel="canonical" href={`https://settimes.ca/event/${slug}`} />}
         {eventData && <meta property="og:title" content={`${eventData.name} | SetTimes`} />}
         {eventDescription && <meta property="og:description" content={eventDescription} />}
-        <meta property="og:type" content="website" />
+        <meta property="og:type" content="event" />
         {slug && <meta property="og:url" content={`https://settimes.ca/event/${slug}`} />}
         <meta property="og:site_name" content="SetTimes" />
         <meta name="twitter:card" content="summary" />
@@ -390,13 +652,85 @@ function App() {
         {eventJsonLd && <script type="application/ld+json">{eventJsonLd}</script>}
       </Helmet>
       <OfflineIndicator />
-      <Header view={view} setView={setView} />
-      <ComingUp bands={myBands} currentTime={effectiveNow} />
+      {isArchived ? (
+        <header className="sticky top-0 z-50 border-b-2 border-white/10 bg-bg-navy/90 backdrop-blur-xs px-4 py-3">
+          <div className="container mx-auto max-w-6xl flex items-center justify-between">
+            <Link to="/" className="font-bold text-white font-display text-2xl hover:opacity-80 transition-opacity">
+              <span className="text-accent-500">Set</span>Times
+            </Link>
+            <Link to="/" className="text-sm text-text-secondary hover:text-white transition-colors">
+              ← All Events
+            </Link>
+          </div>
+        </header>
+      ) : (
+        <Header eventName={eventData?.name} eventDate={eventData?.date} />
+      )}
+      {!isArchived && <ComingUp bands={myBands} currentTime={effectiveNow} />}
+      {!isArchived && (
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={effectiveNow}
+          bands={bands}
+          selectedCount={myBands.length}
+          view={view}
+          onViewChange={setView}
+          venueFilter={venueFilter}
+          onVenueFilterChange={setVenueFilter}
+          timeFilter={timeFilter}
+          onTimeFilterChange={setTimeFilter}
+        />
+      )}
       <main
         id="main-content"
-        className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-4 sm:mt-6 space-y-6 sm:space-y-8"
+        className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-3 sm:mt-6 space-y-6 sm:space-y-8"
       >
-        <Breadcrumbs items={breadcrumbs} />
+        <div className="hidden sm:block">
+          <Breadcrumbs items={breadcrumbs} />
+        </div>
+
+        {/* Archived event banner */}
+        {isArchived && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-text-secondary">
+            <Archive size={16} className="mt-0.5 shrink-0 text-text-tertiary" aria-hidden="true" />
+            <div>
+              <span className="font-semibold text-text-primary">This event has concluded.</span> You&apos;re viewing the
+              archived lineup for reference.
+            </div>
+          </div>
+        )}
+
+        {/* First-time onboarding hint */}
+        {!isArchived && showHint && selectedBands.length === 0 && bands.length > 0 && (
+          <div className="flex items-start justify-between gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
+            <p className="text-accent-300">
+              <span className="font-semibold">How it works:</span> Tap any performer to add them to{' '}
+              <span className="font-semibold">My Schedule</span> — your personal lineup for the night.
+            </p>
+            <button
+              onClick={dismissHint}
+              aria-label="Dismiss tip"
+              className="shrink-0 p-1 text-accent-400 transition-colors hover:text-white sm:p-1.5"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Reveal mode teaser — more bands dropping soon */}
+        {!isArchived && eventData?.reveal_mode === 1 && (
+          <div className="flex items-start gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
+            <Bell size={16} className="shrink-0 text-accent-400" aria-hidden="true" />
+            <p className="text-accent-300">
+              <span className="font-semibold">More bands dropping soon.</span>{' '}
+              <a href="/subscribe" className="underline hover:text-accent-200 transition-colors">
+                Subscribe for updates
+              </a>{' '}
+              or follow individual bands on their profile pages.
+            </p>
+          </div>
+        )}
+
         {debugEnabled && (
           <section className="bg-bg-purple/80 border border-accent-500/30 rounded-lg p-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -443,16 +777,20 @@ function App() {
             </div>
           </section>
         )}
-        {view === 'all' ? (
+        {isArchived || view === 'all' ? (
           <ScheduleView
             bands={bands}
-            selectedBands={selectedBands}
-            onToggleBand={toggleBand}
-            onSelectAll={selectAll}
+            selectedBands={isArchived ? [] : selectedBands}
+            onToggleBand={isArchived ? undefined : toggleBand}
+            onSelectAll={isArchived ? undefined : selectAll}
             currentTime={effectiveNow}
             showPast={showPast}
             onToggleShowPast={toggleShowPast}
             timeFilter={timeFilter}
+            venueFilter={venueFilter}
+            onVenueFilterChange={setVenueFilter}
+            showVenueFilter={false}
+            eventSlug={slug || eventData?.slug}
           />
         ) : (
           <Suspense
@@ -469,6 +807,9 @@ function App() {
               showPast={showPast}
               onToggleShowPast={toggleShowPast}
               nowOverride={debugTime}
+              onBrowseAll={() => setView('all')}
+              eventSlug={slug || eventData?.slug}
+              eventId={eventData?.id}
             />
           </Suspense>
         )}
@@ -484,6 +825,112 @@ function App() {
       </Suspense>
       <Footer />
       <PrivacyBanner />
+      <Modal
+        isOpen={sharedScheduleConfirmOpen}
+        onClose={() => {
+          setSharedScheduleConfirmOpen(false)
+          setPendingSharedBands([])
+          setPendingSharedBandNames([])
+        }}
+        title="Load Shared Route"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setSharedScheduleConfirmOpen(false)
+                setPendingSharedBands([])
+                setPendingSharedBandNames([])
+              }}
+              className="min-h-[44px] rounded-lg border border-white/15 px-4 py-2 text-white/80 transition-colors hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => applySharedSchedule('merge')}
+              className="min-h-[44px] rounded-lg border border-accent-500/30 bg-accent-500/10 px-4 py-2 font-semibold text-accent-400 transition-colors hover:bg-accent-500/20"
+            >
+              Merge
+            </button>
+            <button
+              type="button"
+              onClick={() => applySharedSchedule('replace')}
+              className="min-h-[44px] rounded-lg bg-accent-500 px-4 py-2 font-semibold text-bg-navy transition-colors hover:brightness-110"
+            >
+              Replace
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm text-text-secondary">
+          <p>Choose how to apply this shared route to your current picks.</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="text-xs uppercase tracking-wide text-white/50">Incoming stops</div>
+              <div className="mt-1 text-2xl font-semibold text-white">{pendingSharedBands.length}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="text-xs uppercase tracking-wide text-white/50">Already in your route</div>
+              <div className="mt-1 text-2xl font-semibold text-white">{sharedBandsAlreadySelectedCount}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="text-xs uppercase tracking-wide text-white/50">New to add</div>
+              <div className="mt-1 text-2xl font-semibold text-white">{sharedBandsNewCount}</div>
+            </div>
+          </div>
+          <p className="text-white/70">
+            <span className="font-semibold text-white">Merge</span> keeps your current route and adds only the new
+            shared stops. <span className="font-semibold text-white">Replace</span> swaps your route for the shared one.
+          </p>
+          {pendingSharedBandNames.length > 0 && (
+            <ul className="space-y-1 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/80 list-none">
+              {pendingSharedBandNames.slice(0, 5).map((name, i) => (
+                <li key={i}>{name}</li>
+              ))}
+              {pendingSharedBandNames.length > 5 && (
+                <li className="text-white/50">and {pendingSharedBandNames.length - 5} more…</li>
+              )}
+            </ul>
+          )}
+        </div>
+      </Modal>
+      <ConfirmDialog
+        isOpen={clearConfirmOpen}
+        title="Clear Route"
+        message="Are you sure you want to clear your entire route?"
+        confirmText="Clear"
+        onConfirm={doActualClear}
+        onCancel={() => setClearConfirmOpen(false)}
+      />
+      {scheduleToast && (
+        <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">
+          <div className="rounded-xl border border-white/10 bg-bg-purple/95 px-4 py-3 shadow-xl backdrop-blur-xs">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-white/85">{scheduleToast.message}</p>
+              {scheduleToast.type === 'undo' ? (
+                <button
+                  type="button"
+                  onClick={undoClearSchedule}
+                  className="min-h-[44px] shrink-0 rounded-lg border border-accent-500/30 bg-accent-500/10 px-3 py-2 text-sm font-semibold text-accent-400 transition-colors hover:bg-accent-500/20"
+                >
+                  Undo
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => clearScheduleToast({ clearUndoState: true })}
+                  className="text-white/50 transition-colors hover:text-white"
+                  aria-label="Dismiss message"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

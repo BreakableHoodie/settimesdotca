@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTimes, faCalendar, faMapMarkerAlt, faClock, faMusic } from '@fortawesome/free-solid-svg-icons'
+import { Calendar, Clock, MapPin, Music, X } from 'lucide-react'
 import { bandsApi } from '../../utils/adminApi'
 import { formatTimeRange, parseLocalDate } from '../../utils/timeFormat'
 
@@ -47,7 +46,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div className="bg-bg-navy rounded-lg p-8 max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto">
           <div className="text-center text-white">
-            <FontAwesomeIcon icon={faMusic} spin className="text-4xl mb-4" />
+            <Music size={40} className="animate-spin mb-4" />
             <p>Loading performance history...</p>
           </div>
         </div>
@@ -62,7 +61,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-white">Error</h2>
             <button onClick={onClose} className="text-white hover:text-accent-400 transition" aria-label="Close">
-              <FontAwesomeIcon icon={faTimes} className="text-2xl" />
+              <X size={24} />
             </button>
           </div>
           <div className="bg-red-900/30 border border-red-600 rounded p-4">
@@ -91,11 +90,11 @@ export default function PerformanceHistory({ bandName, onClose }) {
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-white/10">
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <FontAwesomeIcon icon={faMusic} className="text-accent-400" />
+            <Music size={16} className="text-accent-400" />
             Performance History
           </h2>
           <button onClick={onClose} className="text-white hover:text-accent-400 transition" aria-label="Close">
-            <FontAwesomeIcon icon={faTimes} className="text-2xl" />
+            <X size={24} />
           </button>
         </div>
 
@@ -116,7 +115,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
                 <h3 className="text-2xl font-bold text-white mb-2">{profile.name}</h3>
                 {profile.origin && (
                   <p className="text-white/60 mb-2">
-                    <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2" />
+                    <MapPin size={14} className="mr-2" />
                     {profile.origin}
                   </p>
                 )}
@@ -153,7 +152,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
                       {performance.event ? (
                         <>
                           <div className="text-white font-semibold mb-2">
-                            <FontAwesomeIcon icon={faCalendar} className="mr-2 text-accent-400" />
+                            <Calendar size={14} className="mr-2 text-accent-400" />
                             {performance.event.name}
                           </div>
                           <div className="text-white/60 text-sm mb-1">
@@ -168,7 +167,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
                           </div>
                           {performance.event.location && (
                             <div className="text-white/50 text-sm">
-                              <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2" />
+                              <MapPin size={14} className="mr-2" />
                               {performance.event.location}
                             </div>
                           )}
@@ -185,7 +184,7 @@ export default function PerformanceHistory({ bandName, onClose }) {
                     </div>
                     {performance.startTime && performance.endTime && (
                       <div className="text-white/60 text-sm whitespace-nowrap">
-                        <FontAwesomeIcon icon={faClock} className="mr-2" />
+                        <Clock size={14} className="mr-2" />
                         {formatTimeRange(performance.startTime, performance.endTime)}
                       </div>
                     )}

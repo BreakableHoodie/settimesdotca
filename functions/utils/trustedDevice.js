@@ -1,8 +1,11 @@
 // Trusted Device utilities for "Remember this device" MFA feature
+import { isDevRequest } from "./auth.js";
 
-const TRUSTED_DEVICE_COOKIE_NAME = "trusted_device";
+// __Host- prefix enforces Secure + Path=/ + no Domain, preventing subdomain injection.
+// Must align with the name used in getTrustedDeviceToken's cookie parsing.
+const TRUSTED_DEVICE_COOKIE_NAME_SECURE = "__Host-trusted_device";
+const TRUSTED_DEVICE_COOKIE_NAME_DEV = "trusted_device";
 const TRUSTED_DEVICE_EXPIRY_DAYS = 30;
-const SHA256_HEX_REGEX = /^[0-9a-f]{64}$/i;
 
 /**
  * Hash a string using SHA-256, returning hex
@@ -18,10 +21,11 @@ async function sha256Hex(input) {
  * Constant-time string comparison to prevent timing attacks
  */
 function timingSafeStringEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  // Include length inequality in diff to prevent timing oracle on hash length.
+  const maxLen = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < maxLen; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   }
   return diff === 0;
 }
@@ -53,9 +57,6 @@ async function hashTrustedDeviceToken(token) {
   return sha256Hex(token);
 }
 
-function looksLikeStoredTokenHash(token) {
-  return typeof token === "string" && SHA256_HEX_REGEX.test(token);
-}
 
 /**
  * Create a trusted device entry in the database
@@ -65,9 +66,14 @@ export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
   const tokenHash = await hashTrustedDeviceToken(token);
   const fingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
   const uaHash = await generateUaHash(userAgent);
-  const expiresAt = new Date(
-    Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000
-  ).toISOString();
+  // Store in SQLite datetime format (space separator, no T/Z) so that
+  // TEXT comparisons against datetime('now') are lexicographically correct.
+  // ISO 8601 with 'T' compares greater than space-separated format at the
+  // same instant, which would allow expired devices to pass validation.
+  const expiresAt = new Date(Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .replace("T", " ")
+    .slice(0, 19);
 
   await DB.prepare(
     `INSERT INTO trusted_devices (user_id, token, device_fingerprint, ua_hash, ip_address, user_agent, expires_at)
@@ -88,7 +94,7 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
 
   const tokenHash = await hashTrustedDeviceToken(token);
 
-  let device = await DB.prepare(
+  const device = await DB.prepare(
     `SELECT id, user_id, token, device_fingerprint, ua_hash, ip_address, expires_at
      FROM trusted_devices
      WHERE token = ? AND expires_at > datetime('now')`
@@ -96,26 +102,7 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
     .bind(tokenHash)
     .first();
 
-  const canUseLegacyRawTokenFallback = !looksLikeStoredTokenHash(token);
-  if (!device && canUseLegacyRawTokenFallback) {
-    device = await DB.prepare(
-      `SELECT id, user_id, token, device_fingerprint, ua_hash, ip_address, expires_at
-       FROM trusted_devices
-       WHERE token = ? AND expires_at > datetime('now')`
-    )
-      .bind(token)
-      .first();
-  }
-
   if (!device) return null;
-
-  if (canUseLegacyRawTokenFallback && device.token === token) {
-    await DB.prepare(
-      `UPDATE trusted_devices SET token = ? WHERE id = ?`
-    )
-      .bind(tokenHash, device.id)
-      .run();
-  }
 
   // Validate IP and UA independently using constant-time comparison
   const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
@@ -161,12 +148,6 @@ export async function revokeTrustedDevice(DB, token) {
   await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`)
     .bind(tokenHash)
     .run();
-
-  if (!looksLikeStoredTokenHash(token)) {
-    await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`)
-      .bind(token)
-      .run();
-  }
 }
 
 /**
@@ -188,37 +169,38 @@ export async function cleanupExpiredDevices(DB) {
 }
 
 /**
- * Create the trusted device cookie string
+ * Create the trusted device cookie string.
+ * Uses __Host- prefix in production to enforce Secure + Path=/ and prevent subdomain injection.
  */
-export function createTrustedDeviceCookie(token, request) {
-  const isSecure = !request?.url?.includes("localhost");
+export function createTrustedDeviceCookie(token, request, env) {
+  const isDev = isDevRequest(request, env);
+  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
   const maxAge = TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60;
 
   const parts = [
-    `${TRUSTED_DEVICE_COOKIE_NAME}=${token}`,
+    `${cookieName}=${token}`,
     `Path=/`,
     `Max-Age=${maxAge}`,
     `SameSite=Strict`,
+    `HttpOnly`,
   ];
 
-  if (isSecure) {
+  if (!isDev) {
     parts.push("Secure");
   }
-
-  // HTTPOnly so JavaScript can't access it
-  parts.push("HttpOnly");
 
   return parts.join("; ");
 }
 
 /**
- * Create a cookie to delete the trusted device
+ * Create a cookie to clear the trusted device.
  */
-export function deleteTrustedDeviceCookie(request) {
-  const isSecure = !request?.url?.includes("localhost");
-  const secure = isSecure ? "Secure; " : "";
+export function deleteTrustedDeviceCookie(request, env) {
+  const isDev = isDevRequest(request, env);
+  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
+  const secure = isDev ? "" : "Secure; ";
 
-  return `${TRUSTED_DEVICE_COOKIE_NAME}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
+  return `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
 }
 
 /**
@@ -231,7 +213,7 @@ export function getTrustedDeviceToken(request) {
   const cookies = cookieHeader.split(";");
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split("=");
-    if (name === TRUSTED_DEVICE_COOKIE_NAME) {
+    if (name === TRUSTED_DEVICE_COOKIE_NAME_SECURE || name === TRUSTED_DEVICE_COOKIE_NAME_DEV) {
       return value;
     }
   }

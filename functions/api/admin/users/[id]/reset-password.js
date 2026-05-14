@@ -3,20 +3,20 @@
 // Body: { reason?: string }
 // Returns: { success: true, resetUrl: string } or error
 
-import { checkPermission, auditLog } from "../../_middleware.js";
-import { generatePasswordResetToken } from "../../../../utils/tokens.js";
-import { sanitizeString } from "../../../../utils/validation.js";
-import { getClientIP } from "../../../../utils/request.js";
-import { sendEmail, isEmailConfigured } from "../../../../utils/email.js";
-import { buildResetPasswordEmail } from "../../../../utils/emailTemplates.js";
-import { revokeAllTrustedDevices } from "../../../../utils/trustedDevice.js";
+import { checkPermission, auditLog } from '../../_middleware.js';
+import { generatePasswordResetToken } from '../../../../utils/tokens.js';
+import { sanitizeString, validateId } from '../../../../utils/validation.js';
+import { getClientIP } from '../../../../utils/request.js';
+import { sendEmail, isEmailConfigured } from '../../../../utils/email.js';
+import { buildResetPasswordEmail } from '../../../../utils/emailTemplates.js';
+import { revokeAllTrustedDevices } from '../../../../utils/trustedDevice.js';
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
   const { DB } = env;
 
   // RBAC: Require admin role
-  const permCheck = await checkPermission(context, "admin");
+  const permCheck = await checkPermission(context, 'admin');
   if (permCheck.error) {
     return permCheck.response;
   }
@@ -25,9 +25,18 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const userId = params.id;
+    const idValidation = validateId(params.id);
+    if (!idValidation.valid) {
+      return new Response(JSON.stringify({ error: 'Bad request', message: idValidation.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const userId = idValidation.value;
     const { reason } = await request.json().catch(() => ({}));
-    const sanitizedReason = reason ? sanitizeString(reason).slice(0, 500) : null;
+    const sanitizedReason = reason
+      ? sanitizeString(reason).slice(0, 500)
+      : null;
 
     // Get target user
     const targetUser = await DB.prepare(
@@ -35,25 +44,25 @@ export async function onRequestPost(context) {
       SELECT id, email, name, is_active
       FROM users
       WHERE id = ?
-    `,
+    `
     )
       .bind(userId)
       .first();
 
     if (!targetUser) {
-      return new Response(JSON.stringify({ error: "User not found" }), {
+      return new Response(JSON.stringify({ error: 'User not found' }), {
         status: 404,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     if (targetUser.is_active === 0) {
       return new Response(
-        JSON.stringify({ error: "Cannot reset password for inactive user" }),
+        JSON.stringify({ error: 'Cannot reset password for inactive user' }),
         {
           status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
+          headers: { 'Content-Type': 'application/json' },
+        }
       );
     }
 
@@ -71,7 +80,7 @@ export async function onRequestPost(context) {
         user.userId,
         resetToken.expiresAt,
         ipAddress,
-        sanitizedReason,
+        sanitizedReason
       )
       .run();
 
@@ -80,7 +89,7 @@ export async function onRequestPost(context) {
       `
       DELETE FROM lucia_sessions
       WHERE user_id = ?
-    `,
+    `
     )
       .bind(userId)
       .run();
@@ -88,19 +97,22 @@ export async function onRequestPost(context) {
     await revokeAllTrustedDevices(DB, userId);
 
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
-    const resetUrl = `${baseUrl}/reset-password?token=${resetToken.token}`;
+    // Use a hash fragment so the token is never sent to the server, logged by
+    // Cloudflare access logs, stored in browser history, or leaked via Referer.
+    const resetUrl = `${baseUrl}/reset-password#token=${resetToken.token}`;
 
     if (!isEmailConfigured(env)) {
-      console.error("[ResetPassword] Email not configured");
+      console.error('[ResetPassword] Email not configured');
       return new Response(
         JSON.stringify({
-          error: "Email not configured",
-          message: "Email delivery is not configured. Unable to send reset email.",
+          error: 'Email not configured',
+          message:
+            'Email delivery is not configured. Unable to send reset email.',
         }),
         {
           status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
+          headers: { 'Content-Type': 'application/json' },
+        }
       );
     }
     const emailPayload = buildResetPasswordEmail({
@@ -116,17 +128,18 @@ export async function onRequestPost(context) {
     });
 
     if (!emailResult.delivered) {
-      console.error("[ResetPassword] Email delivery failed:", emailResult);
+      console.error('[ResetPassword] Email delivery failed:', emailResult);
       return new Response(
         JSON.stringify({
-          error: "Email delivery failed",
-          message: "Unable to send reset email. Please try again or check email settings.",
-          details: emailResult.reason || "unknown",
+          error: 'Email delivery failed',
+          message:
+            'Unable to send reset email. Please try again or check email settings.',
+          details: emailResult.reason || 'unknown',
         }),
         {
           status: 502,
-          headers: { "Content-Type": "application/json" },
-        },
+          headers: { 'Content-Type': 'application/json' },
+        }
       );
     }
 
@@ -134,36 +147,31 @@ export async function onRequestPost(context) {
     await auditLog(
       env,
       user.userId,
-      "user.password_reset",
-      "user",
+      'user.password_reset',
+      'user',
       userId,
       {
-        adminEmail: user.email,
-        targetEmail: targetUser.email,
         reason: sanitizedReason,
         resetTokenGenerated: true,
       },
-      ipAddress,
+      ipAddress
     );
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Password reset email sent to ${targetUser.email}`,
+        message: 'Password reset email sent.',
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
+        headers: { 'Content-Type': 'application/json' },
+      }
     );
   } catch (error) {
-    console.error("Admin password reset error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to reset password" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    console.error('Admin password reset error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to reset password' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

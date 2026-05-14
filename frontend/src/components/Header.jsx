@@ -1,7 +1,14 @@
 import { memo, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-function Header({ view, setView, selectedCount = 0 }) {
+function Header({ eventName, eventDate }) {
+  const formattedDate = eventDate
+    ? new Date(`${eventDate}T12:00:00`).toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null
   const [scrollProgress, setScrollProgress] = useState(0)
 
   useEffect(() => {
@@ -26,31 +33,33 @@ function Header({ view, setView, selectedCount = 0 }) {
     }
   }, [])
 
-  const headerPadding = Math.round(16 - 8 * scrollProgress)
+  const headerPadding = Math.round(12 - 4 * scrollProgress)
   const headerStyle = {
     paddingTop: `${headerPadding}px`,
     paddingBottom: `${headerPadding}px`,
-    boxShadow: `0 8px 24px rgba(4, 8, 16, ${0.18 * scrollProgress})`,
+    boxShadow: `0 8px 24px rgba(4, 8, 16, ${0.14 * scrollProgress})`,
     backgroundColor: `rgba(8, 16, 32, ${0.65 + 0.25 * scrollProgress})`,
   }
-  const titleScale = 1 - 0.2 * scrollProgress
+  const titleScale = 1 - 0.12 * scrollProgress
+  const fadeProgress = Math.min(1, scrollProgress * 1.75)
   const collapseStyle = {
-    opacity: 1 - scrollProgress,
-    transform: `translateY(${scrollProgress * -8}px)`,
-    maxHeight: `${Math.round(40 * (1 - scrollProgress))}px`,
-    marginTop: `${Math.round(12 * (1 - scrollProgress))}px`,
-    pointerEvents: scrollProgress > 0.85 ? 'none' : 'auto',
+    opacity: 1 - fadeProgress,
+    transform: `translateY(${scrollProgress * -6}px)`,
+    maxHeight: `${Math.round(56 * (1 - scrollProgress))}px`,
+    overflow: 'hidden',
+    marginTop: `${Math.round(8 * (1 - scrollProgress))}px`,
+    pointerEvents: scrollProgress > 0.7 ? 'none' : 'auto',
   }
 
   return (
     <header
-      className="sticky top-0 z-50 border-b-2 border-accent-500/30 transition-all duration-500 ease-out bg-linear-to-b from-bg-navy to-bg-purple backdrop-blur-xs"
+      className="sticky top-0 z-50 border-b border-accent-500/30 transition-[padding,box-shadow,background-color] duration-300 ease-out bg-linear-to-b from-bg-navy to-bg-purple backdrop-blur-xs"
       style={headerStyle}
     >
-      <div className="container mx-auto px-4 max-w-6xl">
-        <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 sm:gap-4 min-h-[44px] transition-all duration-500 ease-out">
+      <div className="container mx-auto max-w-(--breakpoint-2xl) px-4">
+        <div className="flex items-center justify-center sm:justify-between min-h-[40px]">
           <h1
-            className="font-bold text-white font-display tracking-tight text-3xl md:text-4xl text-center sm:text-left leading-tight w-full transition-transform duration-300 ease-out"
+            className="font-bold text-white font-display tracking-tight text-[2rem] sm:text-3xl md:text-4xl text-center sm:text-left leading-tight transition-transform duration-300 ease-out"
             style={{ transform: `scale(${titleScale})` }}
           >
             <Link to="/" className="hover:opacity-80 transition-opacity">
@@ -59,48 +68,16 @@ function Header({ view, setView, selectedCount = 0 }) {
           </h1>
         </div>
 
-        <p
-          className="text-accent-400 text-sm md:text-base font-medium transition-all duration-150 ease-out overflow-hidden text-center"
-          style={collapseStyle}
-        >
-          Discover · Plan · Experience
+        <p className="hidden text-accent-400 text-sm font-medium text-center sm:block" style={collapseStyle}>
+          {eventName ? (
+            <>
+              <span className="font-semibold text-white">{eventName}</span>
+              {formattedDate && <span className="text-accent-400"> · {formattedDate}</span>}
+            </>
+          ) : (
+            'Discover · Plan · Experience'
+          )}
         </p>
-        <div
-          className="flex flex-col sm:flex-row justify-center items-center gap-3 transition-all duration-300 ease-out"
-          style={{ marginTop: `${Math.round(12 * (1 - scrollProgress))}px` }}
-        >
-          <div className="flex gap-2">
-            <button
-              onClick={() => setView('all')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-                view === 'all'
-                  ? 'bg-accent-400 text-bg-navy shadow-lg'
-                  : 'bg-bg-purple/50 text-white hover:bg-bg-purple'
-              }`}
-              title="View all performances"
-              aria-pressed={view === 'all'}
-            >
-              All Performances
-            </button>
-            <button
-              onClick={() => setView('mine')}
-              className={`relative px-6 py-2 rounded-lg font-semibold transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-                view === 'mine'
-                  ? 'bg-accent-400 text-bg-navy shadow-lg'
-                  : 'bg-bg-purple/50 text-white hover:bg-bg-purple'
-              }`}
-              title="View my schedule"
-              aria-pressed={view === 'mine'}
-            >
-              My Schedule
-              {selectedCount > 0 && (
-                <span className="absolute -top-2 -right-2 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-warning-400 text-bg-navy text-xs font-bold leading-none">
-                  {selectedCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
       </div>
     </header>
   )

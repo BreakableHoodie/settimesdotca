@@ -1,9 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faKey, faUserSlash, faUserCheck, faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { Key, Pencil, Plus, Trash, UserCheck, UserX } from 'lucide-react'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import { usersApi } from '../utils/adminApi'
+
+function SortIcon({ col, sortConfig }) {
+  return (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
+}
 
 export default function UserManagement() {
   const [users, setUsers] = useState([])
@@ -18,10 +25,6 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-
-  useEffect(() => {
-    fetchUsers()
-  }, [])
 
   const resolveDisplayName = user => {
     if (user?.firstName || user?.lastName) {
@@ -87,12 +90,6 @@ export default function UserManagement() {
     }))
   }
 
-  const SortIcon = ({ col }) => (
-    <span className="ml-1 inline-block w-4">
-      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-    </span>
-  )
-
   const fetchUsers = async () => {
     try {
       const data = await usersApi.getAll()
@@ -104,6 +101,10 @@ export default function UserManagement() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
 
   const handleCreateUser = async userData => {
     setActionLoading(true)
@@ -267,7 +268,7 @@ export default function UserManagement() {
             }}
             className="bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
           >
-            <FontAwesomeIcon icon={faPlus} />
+            <Plus size={14} />
             Invite User
           </button>
         </div>
@@ -282,25 +283,25 @@ export default function UserManagement() {
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('name')}
                 >
-                  User <SortIcon col="name" />
+                  User <SortIcon col="name" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('role')}
                 >
-                  Role <SortIcon col="role" />
+                  Role <SortIcon col="role" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('status')}
                 >
-                  Status <SortIcon col="status" />
+                  Status <SortIcon col="status" sortConfig={sortConfig} />
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
                   onClick={() => handleSort('last_login')}
                 >
-                  Last Login <SortIcon col="last_login" />
+                  Last Login <SortIcon col="last_login" sortConfig={sortConfig} />
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Actions
@@ -351,7 +352,7 @@ export default function UserManagement() {
                           title="Edit User"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faEdit} />
+                          <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => {
@@ -362,7 +363,7 @@ export default function UserManagement() {
                           title="Reset Password"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faKey} />
+                          <Key size={14} />
                         </button>
                         <button
                           onClick={() => handleToggleUserStatus(user)}
@@ -374,7 +375,7 @@ export default function UserManagement() {
                           title={user.isActive ? 'Deactivate User' : 'Activate User'}
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={user.isActive ? faUserSlash : faUserCheck} />
+                          {user.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
                         </button>
                         <button
                           onClick={() => handleDeleteUser(user)}
@@ -382,7 +383,7 @@ export default function UserManagement() {
                           title="Delete User"
                           disabled={actionLoading}
                         >
-                          <FontAwesomeIcon icon={faTrash} />
+                          <Trash size={14} />
                         </button>
                       </div>
                     </td>

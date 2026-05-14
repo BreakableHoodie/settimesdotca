@@ -1,3 +1,6 @@
+# Playwright MCP dev tool logs
+.playwright-mcp/
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -36,7 +39,6 @@ playwright-report/
 playwright/.cache/
 output/
 e2e/.auth/
-e2e/visual-regression.spec.js-snapshots/
 *.lcov
 .nyc_output/
 
@@ -50,6 +52,8 @@ e2e/visual-regression.spec.js-snapshots/
 # AI assistants (developer-specific)
 .claude/
 .serena/
+.mcp.json
+workers-mcp-server/
 chatmodes/
 claudedocs/
 instructions/
@@ -61,6 +65,7 @@ plugins/
 
 # Session notes and dev archives (developer-specific)
 archive/
+plan/
 
 # Audits, reviews, and reports (keep out of repo)
 CODE_REVIEW*.md
@@ -129,3 +134,6 @@ database/migration-*.sql
 band_crawl_schedule.json
 database/exports/
 /docs/code-review
+.superpowers/
+/docs/superpowers/
+docs/SEO_IMPROVEMENTS.md

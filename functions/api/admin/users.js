@@ -2,15 +2,15 @@
 // GET /api/admin/users - List all users
 // POST /api/admin/users - Create new user
 
-import { checkPermission, auditLog } from "./_middleware.js";
+import { checkPermission, auditLog } from './_middleware.js';
 import {
   validateEntity,
   VALIDATION_SCHEMAS,
   validationErrorResponse,
-} from "../../utils/validation.js";
-import { getClientIP } from "../../utils/request.js";
-import { sendEmail, isEmailConfigured } from "../../utils/email.js";
-import { buildInviteEmail } from "../../utils/emailTemplates.js";
+} from '../../utils/validation.js';
+import { getClientIP } from '../../utils/request.js';
+import { sendEmail, isEmailConfigured } from '../../utils/email.js';
+import { buildInviteEmail } from '../../utils/emailTemplates.js';
 
 // GET - List all users (admin only)
 export async function onRequestGet(context) {
@@ -19,7 +19,7 @@ export async function onRequestGet(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(context, "admin");
+    const permCheck = await checkPermission(context, 'admin');
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -40,7 +40,7 @@ export async function onRequestGet(context) {
         updated_at
       FROM users
       ORDER BY created_at DESC
-    `,
+    `
     ).all();
 
     return new Response(
@@ -51,21 +51,21 @@ export async function onRequestGet(context) {
           lastName: u.last_name || null,
           name:
             u.name ||
-            [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+            [u.first_name, u.last_name].filter(Boolean).join(' ') ||
             null,
           isActive: u.is_active === 1, // Convert to camelCase boolean
         })),
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
+        headers: { 'Content-Type': 'application/json' },
+      }
     );
   } catch (error) {
-    console.error("Get users error:", error);
-    return new Response(JSON.stringify({ error: "Failed to fetch users" }), {
+    console.error('Get users error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch users' }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 }
@@ -78,7 +78,7 @@ export async function onRequestPost(context) {
 
   try {
     // Check permission (admin only)
-    const permCheck = await checkPermission(context, "admin");
+    const permCheck = await checkPermission(context, 'admin');
     if (permCheck.error) {
       return permCheck.response;
     }
@@ -96,13 +96,13 @@ export async function onRequestPost(context) {
     }
 
     const { email, role, firstName, lastName } = validation.sanitized;
-    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
 
     // Check if email already exists
     const existingUser = await DB.prepare(
       `
       SELECT id FROM users WHERE email = ?
-    `,
+    `
     )
       .bind(email)
       .first();
@@ -110,21 +110,21 @@ export async function onRequestPost(context) {
     if (existingUser) {
       return new Response(
         JSON.stringify({
-          error: "Email exists",
-          message: "A user with this email already exists",
+          error: 'Email exists',
+          message: 'A user with this email already exists',
         }),
         {
           status: 409,
-          headers: { "Content-Type": "application/json" },
-        },
+          headers: { 'Content-Type': 'application/json' },
+        }
       );
     }
 
     const inviteCode = crypto.randomUUID();
     const expiresInDays = 7;
     const expiresAt = new Date(
-      Date.now() + expiresInDays * 24 * 60 * 60 * 1000,
-    ).toISOString();
+      Date.now() + expiresInDays * 24 * 60 * 60 * 1000
+    ).toISOString().replace("T", " ").slice(0, 19);
 
     // Create invite code
     const invite = await DB.prepare(
@@ -132,16 +132,16 @@ export async function onRequestPost(context) {
       INSERT INTO invite_codes (code, email, role, created_by_user_id, expires_at)
       VALUES (?, ?, ?, ?, ?)
       RETURNING *
-    `,
+    `
     )
       .bind(inviteCode, email, role, currentUser.userId, expiresAt)
       .first();
 
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
-    const inviteUrl = new URL("/admin/signup", baseUrl);
-    inviteUrl.searchParams.set("code", inviteCode);
+    const inviteUrl = new URL('/admin/signup', baseUrl);
+    inviteUrl.searchParams.set('code', inviteCode);
 
-    let emailResult = { delivered: false, reason: "not_configured" };
+    let emailResult = { delivered: false, reason: 'not_configured' };
     if (isEmailConfigured(env)) {
       const emailPayload = buildInviteEmail({
         inviteUrl: inviteUrl.toString(),
@@ -155,29 +155,23 @@ export async function onRequestPost(context) {
         text: emailPayload.text,
         html: emailPayload.html,
       });
-    } else {
-      if (env?.DEBUG_EMAIL_LINKS === "true") {
-        console.info(`[Email] Invite link for ${email}: ${inviteUrl}`);
-      }
     }
 
     // Audit log
     await auditLog(
       env,
       currentUser.userId,
-      "user.invited",
-      "invite_code",
+      'user.invited',
+      'invite_code',
       invite?.id,
       {
-        email,
         role,
-        name: fullName || null,
-        firstName,
-        lastName,
         expiresAt,
         emailDelivered: emailResult.delivered,
+        inviteMode: email ? 'email_restricted' : 'open',
+        nameProvided: Boolean(fullName),
       },
-      ipAddress,
+      ipAddress
     );
 
     // Return invite details (only expose inviteUrl if email delivery failed)
@@ -191,13 +185,13 @@ export async function onRequestPost(context) {
     }
     return new Response(JSON.stringify(responseBody), {
       status: 201,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error("Create user error:", error);
-    return new Response(JSON.stringify({ error: "Failed to create user" }), {
+    console.error('Create user error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to create user' }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 }

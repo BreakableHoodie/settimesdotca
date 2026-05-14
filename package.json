@@ -4,22 +4,28 @@
   "type": "module",
   "description": "SetTimes.ca - Event Schedule & Performance Management Platform",
   "scripts": {
+    "pages:dev": "./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state",
+    "pages:dev:public": "npm run pages:dev -- --binding PUBLIC_DATA_PUBLISH_ENABLED=true",
     "migrate:local": "bash scripts/migrate-local-db.sh",
     "validate:schema": "node scripts/validate-db-schema.js",
-    "deploy:dev": "npm --prefix frontend run build && npx wrangler pages deploy frontend/dist --project-name settimesdotca --branch dev",
-    "deploy:prod": "npm --prefix frontend run build && npx wrangler pages deploy frontend/dist --project-name settimesdotca --branch main",
+    "validate:openapi": "node scripts/validate-openapi.mjs",
+    "verify:schema:remote": "node scripts/verify-remote-d1-schema.mjs",
+    "deploy:dev": "npm --prefix frontend run build && ./frontend/node_modules/.bin/wrangler pages deploy frontend/dist --project-name settimesdotca --branch dev",
+    "deploy:prod": "npm --prefix frontend run build && ./frontend/node_modules/.bin/wrangler pages deploy frontend/dist --project-name settimesdotca --branch main",
     "prebuild": "npm run validate:schema",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.0",
-    "@playwright/test": "^1.58.2",
-    "@vitest/coverage-v8": "^4.1.1",
-    "baseline-browser-mapping": "^2.10.10",
-    "better-sqlite3": "^11.10.0",
-    "vitest": "^4.0.18"
+    "@apidevtools/swagger-parser": "^12.1.0",
+    "@axe-core/playwright": "^4.11.3",
+    "@playwright/test": "^1.60.0",
+    "@vitest/coverage-v8": "^4.1.6",
+    "baseline-browser-mapping": "^2.10.29",
+    "better-sqlite3": "^12.9.0",
+    "vite": "^8.0.12",
+    "vitest": "^4.1.6"
   },
   "dependencies": {
     "@lucia-auth/adapter-sqlite": "^3.0.2",

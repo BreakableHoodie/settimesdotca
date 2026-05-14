@@ -67,6 +67,7 @@ export async function onRequestGet(context) {
             name: row.event_name,
             slug: row.event_slug,
             date: row.event_date,
+            status: row.event_status || null,
             ticket_url: row.ticket_url || null,
             bands: includeBands ? [] : null,
             bandIds: new Set(),
@@ -122,6 +123,7 @@ export async function onRequestGet(context) {
         name: event.name,
         slug: event.slug,
         date: event.date,
+        status: event.status,
         ticket_url: event.ticket_url,
         band_count: event.bandIds.size,
         venue_count: event.venues.size,
@@ -236,6 +238,7 @@ export async function onRequestGet(context) {
           e.name as event_name,
           e.slug as event_slug,
           e.date as event_date,
+          e.status as event_status,
           e.ticket_url as ticket_url,
           p.band_profile_id as band_id,
           b.name as band_name,
@@ -260,12 +263,13 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON p.event_id = e.id
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
-        WHERE e.is_published = 1
-        AND e.date < ?
+        WHERE (
+          (e.is_published = 1 AND e.date < ?)
+          OR e.status = 'archived'
+        )
         AND e.id IN (
           SELECT id FROM events
-          WHERE is_published = 1
-          AND date < ?
+          WHERE (is_published = 1 AND date < ?) OR status = 'archived'
           ORDER BY date DESC
           LIMIT ?
         )

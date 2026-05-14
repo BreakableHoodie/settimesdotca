@@ -3,42 +3,11 @@
 // Body: { code: string }
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { verifyTotp, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
+import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
-
-async function checkRateLimit(DB, userId, ipAddress) {
-  const windowMs = 10 * 60 * 1000;
-  const windowStart = new Date(Date.now() - windowMs).toISOString();
-
-  const attempts = await DB.prepare(
-    `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
-     FROM auth_attempts
-     WHERE user_id = ?
-       AND ip_address = ?
-       AND attempt_type = 'mfa_enable'
-       AND success = 0
-       AND created_at > ?`
-  )
-    .bind(userId, ipAddress, windowStart)
-    .first();
-
-  if (Number(attempts.count) >= 5) {
-    const earliestTs = attempts.earliest_attempt
-      ? new Date(attempts.earliest_attempt).getTime()
-      : Date.now();
-    const elapsed = Date.now() - earliestTs;
-    const remainingMs = Math.max(0, windowMs - elapsed);
-    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-
-    return {
-      allowed: false,
-      remainingMinutes,
-    };
-  }
-
-  return { allowed: true };
-}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -112,7 +81,12 @@ export async function onRequestPost(context) {
     );
   }
 
-  const rateCheck = await checkRateLimit(DB, userId, ipAddress);
+  const rateCheck = await checkAuthRateLimit(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+    ipAddress,
+    scope: "user-and-ip",
+    userId,
+  });
   if (!rateCheck.allowed) {
     return new Response(
       JSON.stringify({
@@ -126,14 +100,34 @@ export async function onRequestPost(context) {
     );
   }
 
-  const valid = await verifyTotp(user.totp_secret, code);
+  let totpSecretState;
+  try {
+    totpSecretState = await loadTotpSecret(user.totp_secret, env);
+  } catch (error) {
+    console.error("[MFA Enable] Failed to decrypt TOTP secret:", error?.message || error);
+    return new Response(
+      JSON.stringify({
+        error: "Server error",
+        message: "Failed to verify MFA setup",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  const valid = await verifyTotp(totpSecretState?.secret, code);
   if (!valid) {
-    await DB.prepare(
-      `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-       VALUES (?, ?, ?, ?, 'mfa_enable', 0, 'invalid_code')`
-    )
-      .bind(userId, user.email, ipAddress, request.headers.get("User-Agent") || "unknown")
-      .run();
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+      email: user.email,
+      failureReason: "invalid_code",
+      ipAddress,
+      success: false,
+      userAgent: request.headers.get("User-Agent") || "unknown",
+      userId,
+    });
 
     return new Response(
       JSON.stringify({
@@ -154,20 +148,28 @@ export async function onRequestPost(context) {
 
   await DB.prepare(
     `UPDATE users
-     SET totp_enabled = 1, backup_codes = ?
+     SET totp_enabled = 1, backup_codes = ?, totp_secret = ?
      WHERE id = ?`
   )
-    .bind(JSON.stringify(hashedCodes), userId)
+    .bind(
+      JSON.stringify(hashedCodes),
+      totpSecretState?.shouldPersist
+        ? totpSecretState.encryptedSecret
+        : user.totp_secret,
+      userId
+    )
     .run();
 
   await revokeAllTrustedDevices(DB, userId);
 
-  await DB.prepare(
-    `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success)
-     VALUES (?, ?, ?, ?, 'mfa_enable', 1)`
-  )
-    .bind(userId, user.email, ipAddress, request.headers.get("User-Agent") || "unknown")
-    .run();
+  await writeAuthAttempt(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+    email: user.email,
+    ipAddress,
+    success: true,
+    userAgent: request.headers.get("User-Agent") || "unknown",
+    userId,
+  });
 
   await auditLog(
     env,

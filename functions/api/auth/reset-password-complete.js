@@ -14,7 +14,7 @@ export async function onRequestPost(context) {
   const debugId = crypto.randomUUID();
 
   const withDebug = (payload) => {
-    if (env?.RESET_DEBUG === "true") {
+    if (env?.ENVIRONMENT !== "production") {
       return { ...payload, debugId };
     }
     return payload;
@@ -112,7 +112,7 @@ export async function onRequestPost(context) {
     }
 
     // Check if token is expired
-    if (new Date(resetToken.expires_at) < new Date()) {
+    if (new Date(resetToken.expires_at.includes('T') ? resetToken.expires_at : resetToken.expires_at.replace(' ', 'T') + 'Z') < new Date()) {
       logDebug("token_expired", { expiresAt: resetToken.expires_at });
       await logFailure("TOKEN_EXPIRED", { expiresAt: resetToken.expires_at });
       return new Response(
@@ -230,7 +230,6 @@ export async function onRequestPost(context) {
         request.headers.get("User-Agent") || "unknown",
         JSON.stringify({
           user_id: resetToken.user_id,
-          user_email: resetToken.email,
           reset_token_id: resetToken.id,
         }),
       )

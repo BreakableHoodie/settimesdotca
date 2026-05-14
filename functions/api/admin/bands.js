@@ -10,27 +10,18 @@ import {
   sanitizeOptionalHttpUrl,
   sanitizeString,
 } from "../../utils/validation.js";
+import { buildIntervals, intervalsOverlap } from "../../utils/timeConflicts.js";
+import { parseOrigin } from "../../utils/parseOrigin.js";
 
 // Helper to normalize band name
 function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function parseOrigin(origin) {
-  if (!origin) return { city: null, region: null };
-  const [city, region] = origin.split(',').map(part => part.trim());
-  return {
-    city: city || null,
-    region: region || null,
-  };
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 async function getEventStatus(DB, eventId) {
   if (!eventId) return null;
 
-  const event = await DB.prepare(
-    `SELECT id, status FROM events WHERE id = ?`
-  )
+  const event = await DB.prepare(`SELECT id, status FROM events WHERE id = ?`)
     .bind(eventId)
     .first();
 
@@ -42,24 +33,28 @@ function unpackSocialLinks(band) {
   if (!band) return null;
   let social = {};
   try {
-    social = JSON.parse(band.social_links || '{}');
+    social = JSON.parse(band.social_links || "{}");
   } catch (_e) {
     social = {};
   }
-  const origin = [band.origin_city, band.origin_region]
-    .filter(Boolean)
-    .join(', ') || band.origin || '';
+  const origin =
+    [band.origin_city, band.origin_region].filter(Boolean).join(", ") ||
+    band.origin ||
+    "";
   return {
     ...band,
     origin,
-    url: social.website || '',
-    instagram: social.instagram || '',
-    bandcamp: social.bandcamp || '',
-    facebook: social.facebook || ''
+    url: social.website || "",
+    instagram: social.instagram || "",
+    bandcamp: social.bandcamp || "",
+    facebook: social.facebook || "",
+    youtube: social.youtube || "",
+    spotify: social.spotify || "",
+    apple_music: social.apple_music || "",
+    linktree: social.linktree || "",
   };
 }
 
-// Helper to check for time conflicts (supports sets that cross midnight)
 async function checkConflicts(
   DB,
   eventId,
@@ -68,29 +63,6 @@ async function checkConflicts(
   endTime,
   excludePerformanceId = null,
 ) {
-  const conflicts = [];
-
-  // Convert HH:MM to minutes for easier comparison
-  const toMinutes = (time) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
-
-  const normalizeEndMinutes = (startMinutes, endMinutes) => {
-    return endMinutes <= startMinutes ? endMinutes + 24 * 60 : endMinutes;
-  };
-
-  const buildIntervals = (start, end) => {
-    const startMinutes = toMinutes(start);
-    const endMinutes = toMinutes(end);
-    const normalizedEnd = normalizeEndMinutes(startMinutes, endMinutes);
-    return [
-      [startMinutes, normalizedEnd],
-      [startMinutes + 24 * 60, normalizedEnd + 24 * 60],
-    ];
-  };
-
-  // Get all performances at the same venue for the same event
   let query = `
     SELECT p.id, p.start_time, p.end_time, bp.name
     FROM performances p
@@ -98,34 +70,28 @@ async function checkConflicts(
     WHERE p.event_id = ? AND p.venue_id = ?
   `;
   const bindings = [eventId, venueId];
-
   if (excludePerformanceId) {
     query += ` AND p.id != ?`;
     bindings.push(excludePerformanceId);
   }
 
-  const result = await DB.prepare(query)
-    .bind(...bindings)
-    .all();
-  const existingPerformances = result.results || [];
-
-  const intervalsOverlap = (intervalA, intervalB) =>
-    intervalA[0] < intervalB[1] && intervalB[0] < intervalA[1];
-
+  const { results: existingPerformances } = await DB.prepare(query).bind(...bindings).all();
   const newIntervals = buildIntervals(startTime, endTime);
+  const conflicts = [];
 
   for (const perf of existingPerformances) {
+    if (!perf.start_time || !perf.end_time) continue;
     const perfIntervals = buildIntervals(perf.start_time, perf.end_time);
-    const hasOverlap = perfIntervals.some((intervalB) =>
-      newIntervals.some((intervalA) => intervalsOverlap(intervalA, intervalB)),
+    const hasOverlap = perfIntervals.some((b) =>
+      newIntervals.some((a) => intervalsOverlap(a, b)),
     );
-
     if (hasOverlap) {
       conflicts.push({
         id: perf.id,
         name: perf.name,
         startTime: perf.start_time,
         endTime: perf.end_time,
+        type: perf.start_time === startTime && perf.end_time === endTime ? "conflict" : "overlap",
       });
     }
   }
@@ -146,8 +112,14 @@ export async function onRequestGet(context) {
 
   const url = new URL(request.url);
   const eventId = url.searchParams.get("event_id");
-  const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "200", 10);
-  const requestedOffset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+  const requestedLimit = Number.parseInt(
+    url.searchParams.get("limit") || "200",
+    10,
+  );
+  const requestedOffset = Number.parseInt(
+    url.searchParams.get("offset") || "0",
+    10,
+  );
   const limit = Number.isFinite(requestedLimit)
     ? Math.min(Math.max(requestedLimit, 1), 500)
     : 200;
@@ -169,6 +141,7 @@ export async function onRequestGet(context) {
           p.start_time,
           p.end_time,
           p.notes,
+          p.is_announced,
           bp.id as band_profile_id,
           bp.name,
           bp.genre,
@@ -184,10 +157,10 @@ export async function onRequestGet(context) {
           e.name as event_name
         FROM performances p
         JOIN band_profiles bp ON p.band_profile_id = bp.id
-        JOIN venues v ON p.venue_id = v.id
+        LEFT JOIN venues v ON p.venue_id = v.id
         JOIN events e ON p.event_id = e.id
         WHERE p.event_id = ?
-        ORDER BY p.start_time, v.name
+        ORDER BY p.start_time NULLS LAST, bp.name
       `,
       )
         .bind(eventId)
@@ -240,10 +213,10 @@ export async function onRequestGet(context) {
     });
   } catch (error) {
     console.error("Failed to fetch bands:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch bands" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch bands" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
 
@@ -279,14 +252,25 @@ export async function onRequestPost(context) {
     } = body;
 
     const resolvedName = sanitizeString(name || "");
-    const resolvedDescription = description !== undefined ? sanitizeString(description) || null : null;
-    const resolvedGenre = genre !== undefined ? sanitizeString(genre) || null : null;
+    const resolvedVenueId = venueId ? Number(venueId) : null;
+    const resolvedDescription =
+      description !== undefined ? sanitizeString(description) || null : null;
+    const resolvedGenre =
+      genre !== undefined ? sanitizeString(genre) || null : null;
     let resolvedPhotoUrl;
     let resolvedWebsite;
 
     try {
-      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL");
-      resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(
+        photo_url,
+        FIELD_LIMITS.bandUrl.max,
+        "Photo URL",
+      );
+      resolvedWebsite = sanitizeOptionalHttpUrl(
+        url,
+        FIELD_LIMITS.bandUrl.max,
+        "Website URL",
+      );
     } catch (error) {
       return new Response(
         JSON.stringify({ error: "Validation error", message: error.message }),
@@ -310,14 +294,20 @@ export async function onRequestPost(context) {
     if (isGlobalAdd) {
       if (!resolvedName) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields", message: "Band Name is required" }),
+          JSON.stringify({
+            error: "Missing required fields",
+            message: "Band Name is required",
+          }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
     } else {
-      if (!venueId || !resolvedName || !startTime || !endTime) {
+      if (!resolvedName) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields", message: "Event, Venue, Name, Start Time, and End Time are required" }),
+          JSON.stringify({
+            error: "Missing required fields",
+            message: "Band Name is required",
+          }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -330,21 +320,28 @@ export async function onRequestPost(context) {
         );
       }
 
-      if (event.status === 'archived') {
+      if (event.status === "archived") {
         return new Response(
           JSON.stringify({
-            error: 'Validation error',
-            message: 'Cannot add performances to an archived event. Copy it as a template instead.',
+            error: "Validation error",
+            message:
+              "Cannot add performances to an archived event. Copy it as a template instead.",
           }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } },
+          { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
     }
 
     // Validate time format (only if schedule is provided)
-    if ((startTime && !/^\d{2}:\d{2}$/.test(startTime)) || (endTime && !/^\d{2}:\d{2}$/.test(endTime))) {
+    if (
+      (startTime && !/^\d{2}:\d{2}$/.test(startTime)) ||
+      (endTime && !/^\d{2}:\d{2}$/.test(endTime))
+    ) {
       return new Response(
-        JSON.stringify({ error: "Validation error", message: "Time must be in HH:MM format" }),
+        JSON.stringify({
+          error: "Validation error",
+          message: "Time must be in HH:MM format",
+        }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -352,7 +349,10 @@ export async function onRequestPost(context) {
     // Validate time order (only if schedule is provided)
     if (startTime && endTime && startTime === endTime) {
       return new Response(
-        JSON.stringify({ error: "Validation error", message: "Start and end time cannot be the same" }),
+        JSON.stringify({
+          error: "Validation error",
+          message: "Start and end time cannot be the same",
+        }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -368,19 +368,22 @@ export async function onRequestPost(context) {
         const maxDurationMinutes = 8 * 60;
         if (duration > maxDurationMinutes) {
           return new Response(
-            JSON.stringify({ error: "Validation error", message: "End time must be after start time" }),
+            JSON.stringify({
+              error: "Validation error",
+              message: "End time must be after start time",
+            }),
             { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
       }
     }
 
-    // Check for conflicts (only if schedule is provided)
-    if (!isGlobalAdd) {
+    // Check for conflicts (only if times are provided)
+    if (!isGlobalAdd && resolvedVenueId && startTime && endTime) {
       const conflicts = await checkConflicts(
         DB,
         eventId,
-        venueId,
+        resolvedVenueId,
         startTime,
         endTime,
       );
@@ -399,25 +402,35 @@ export async function onRequestPost(context) {
     // 1. Find or Create Band Profile
     const nameNormalized = normalizeName(resolvedName);
     const parsedOrigin = parseOrigin(origin?.trim());
-    const trimmedOriginCity = origin_city ? origin_city.trim() : parsedOrigin.city;
-    const trimmedOriginRegion = origin_region ? origin_region.trim() : parsedOrigin.region;
+    const trimmedOriginCity = origin_city
+      ? origin_city.trim()
+      : parsedOrigin.city;
+    const trimmedOriginRegion = origin_region
+      ? origin_region.trim()
+      : parsedOrigin.region;
     const computedOrigin =
       origin?.trim() ||
       [trimmedOriginCity, trimmedOriginRegion].filter(Boolean).join(", ") ||
       null;
     const resolvedIsActive =
       is_active === undefined ? 1 : Number(is_active) === 1 ? 1 : 0;
-    let bandProfile = await DB.prepare(
-      "SELECT id FROM band_profiles WHERE name_normalized = ?"
+    const existingProfile = await DB.prepare(
+      "SELECT id FROM band_profiles WHERE name_normalized = ?",
     )
       .bind(nameNormalized)
       .first();
+
+    let bandProfile = existingProfile;
+    const createdNewProfile = !existingProfile;
 
     if (!bandProfile) {
       // Create new profile
       let socialLinksJson;
       try {
-        socialLinksJson = sanitizeBandSocialLinks(social_links || (resolvedWebsite ? { website: resolvedWebsite } : null));
+        socialLinksJson = sanitizeBandSocialLinks(
+          social_links ||
+            (resolvedWebsite ? { website: resolvedWebsite } : null),
+        );
       } catch (error) {
         return new Response(
           JSON.stringify({ error: "Validation error", message: error.message }),
@@ -440,7 +453,7 @@ export async function onRequestPost(context) {
           social_links
         )
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         RETURNING id`
+         RETURNING id`,
       )
         .bind(
           resolvedName,
@@ -453,28 +466,60 @@ export async function onRequestPost(context) {
           resolvedIsActive,
           resolvedDescription,
           resolvedPhotoUrl,
-          socialLinksJson || null
+          socialLinksJson || null,
         )
         .first();
+
+      if (!bandProfile) {
+        throw new Error("band_profiles INSERT returned null");
+      }
     }
 
     // 2. Create Performance (only if eventId is provided)
-    let result = { id: `profile_${bandProfile.id}` }; // Default ID if no performance
-    
+    let result = { id: `profile_${bandProfile.id}` };
+
     if (!isGlobalAdd) {
-      result = await DB.prepare(
-        `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
-         VALUES (?, ?, ?, ?, ?)
-         RETURNING id`
-      )
-        .bind(eventId, venueId, bandProfile.id, startTime, endTime)
-        .first();
+      let perfResult;
+      try {
+        perfResult = await DB.prepare(
+          `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
+           VALUES (?, ?, ?, ?, ?)
+           RETURNING id`,
+        )
+          .bind(
+            eventId,
+            resolvedVenueId,
+            bandProfile.id,
+            startTime || null,
+            endTime || null,
+          )
+          .first();
+      } catch (perfError) {
+        // Compensating delete: only undo profiles we just created, not pre-existing ones
+        if (createdNewProfile) {
+          await DB.prepare("DELETE FROM band_profiles WHERE id = ?")
+            .bind(bandProfile.id)
+            .run();
+        }
+        throw perfError;
+      }
+
+      if (!perfResult) {
+        if (createdNewProfile) {
+          await DB.prepare("DELETE FROM band_profiles WHERE id = ?")
+            .bind(bandProfile.id)
+            .run();
+        }
+        throw new Error("performances INSERT returned null");
+      }
+
+      result = perfResult;
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        band: { id: result.id, ...body }, // Return what was sent + new ID
+        band: { id: result.id, ...body },
       }),
       { status: 201, headers: { "Content-Type": "application/json" } },
     );

@@ -22,9 +22,14 @@ function formatOrigin(profile) {
 
 function formatVenueAddress(venue) {
   if (!venue) return null;
-  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+  const line1 = [venue.address_line1, venue.address_line2]
+    .filter(Boolean)
+    .join(", ");
   const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+  const line3 = [venue.postal_code, venue.country]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   return [line1, line2, line3].filter(Boolean).join(", ");
 }
 
@@ -84,10 +89,10 @@ export async function onRequestGet(context) {
     }
 
     if (!bandProfile) {
-      return new Response(
-        JSON.stringify({ error: "Band not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Band not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Get all performances for this band profile
@@ -110,12 +115,12 @@ export async function onRequestGet(context) {
         e.name as event_name,
         e.slug as event_slug,
         e.date as event_date,
-        e.is_published as event_published
+        e.status as event_status
       FROM performances p
       LEFT JOIN venues v ON p.venue_id = v.id
       LEFT JOIN events e ON p.event_id = e.id
       WHERE p.band_profile_id = ?
-        AND e.is_published = 1
+        AND e.status IN ('published', 'archived')
       ORDER BY e.date DESC, p.start_time
     `,
     )
@@ -128,11 +133,12 @@ export async function onRequestGet(context) {
     const today = new Date().toISOString().split("T")[0];
 
     // Separate upcoming and past performances
+    // Archived events always go to past regardless of date
     const upcomingPerformances = allPerformances.filter(
-      (p) => p.event_date >= today,
+      (p) => p.event_date >= today && p.event_status !== "archived",
     );
     const pastPerformances = allPerformances.filter(
-      (p) => p.event_date < today,
+      (p) => p.event_date < today || p.event_status === "archived",
     );
 
     // Get unique venues
@@ -176,9 +182,7 @@ export async function onRequestGet(context) {
 
     const averageSetMinutes =
       setTimes.length > 0
-        ? Math.round(
-            setTimes.reduce((sum, t) => sum + t, 0) / setTimes.length,
-          )
+        ? Math.round(setTimes.reduce((sum, t) => sum + t, 0) / setTimes.length)
         : null;
 
     // Get debut and latest dates
@@ -213,6 +217,10 @@ export async function onRequestGet(context) {
         instagram: socialLinks.instagram || null,
         bandcamp: socialLinks.bandcamp || null,
         facebook: socialLinks.facebook || null,
+        youtube: socialLinks.youtube || null,
+        spotify: socialLinks.spotify || null,
+        apple_music: socialLinks.apple_music || null,
+        linktree: socialLinks.linktree || null,
       },
       stats: {
         total_performances: allPerformances.length,
@@ -235,6 +243,7 @@ export async function onRequestGet(context) {
         event_name: p.event_name,
         event_slug: p.event_slug,
         event_date: p.event_date,
+        event_status: p.event_status,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
         venue_address: p.venue_address || formatVenueAddress(p),
@@ -247,6 +256,7 @@ export async function onRequestGet(context) {
         event_name: p.event_name,
         event_slug: p.event_slug,
         event_date: p.event_date,
+        event_status: p.event_status,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
         venue_address: p.venue_address || formatVenueAddress(p),
@@ -263,7 +273,12 @@ export async function onRequestGet(context) {
       },
     });
   } catch (error) {
-    console.error("Error fetching band stats:", error, error.message, error.stack);
+    console.error(
+      "Error fetching band stats:",
+      error,
+      error.message,
+      error.stack,
+    );
 
     return new Response(
       JSON.stringify({

@@ -1,11 +1,162 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { bandsApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faGlobe } from '@fortawesome/free-solid-svg-icons'
-import { faInstagram, faFacebook, faBandcamp } from '@fortawesome/free-brands-svg-icons'
+import { Globe } from 'lucide-react'
+import { parseOrigin } from '../utils/parseOrigin'
+import {
+  AppleMusicIcon,
+  BandcampIcon,
+  FacebookIcon,
+  InstagramIcon,
+  LinktreeIcon,
+  SpotifyIcon,
+  YouTubeIcon,
+} from '../components/ui/SocialIcons'
+
+function parseSocialLinks(band) {
+  let links = {}
+  try {
+    links = typeof band.social_links === 'string' ? JSON.parse(band.social_links) : band.social_links || {}
+  } catch (_e) {
+    /* ignore */
+  }
+  return links
+}
+
+function SocialLinksIcons({ band }) {
+  const links = parseSocialLinks(band)
+  const websiteHref = safeExternalHref(links.website)
+  const instagramHref = safeInstagramHref(links.instagram)
+  const bandcampHref = safeHttpsFallbackHref(links.bandcamp)
+  const facebookHref = safeExternalHref(links.facebook)
+  const youtubeHref = safeExternalHref(links.youtube)
+  const spotifyHref = safeExternalHref(links.spotify)
+  const appleMusicHref = safeExternalHref(links.apple_music)
+  const linktreeHref = safeExternalHref(links.linktree)
+  const hasAnyLink = [
+    websiteHref,
+    instagramHref,
+    bandcampHref,
+    facebookHref,
+    youtubeHref,
+    spotifyHref,
+    appleMusicHref,
+    linktreeHref,
+  ].some(href => href !== '#')
+
+  if (!hasAnyLink) return <span className="text-white/30">-</span>
+
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {websiteHref !== '#' && (
+        <a
+          href={websiteHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-accent-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
+          title="Website"
+          aria-label={`Open website for ${band.name}`}
+        >
+          <Globe size={14} />
+        </a>
+      )}
+      {instagramHref !== '#' && (
+        <a
+          href={instagramHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-pink-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-400"
+          title="Instagram"
+          aria-label={`Open Instagram for ${band.name}`}
+        >
+          <InstagramIcon size={14} />
+        </a>
+      )}
+      {bandcampHref !== '#' && (
+        <a
+          href={bandcampHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-teal-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
+          title="Bandcamp"
+          aria-label={`Open Bandcamp for ${band.name}`}
+        >
+          <BandcampIcon size={14} />
+        </a>
+      )}
+      {facebookHref !== '#' && (
+        <a
+          href={facebookHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-blue-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+          title="Facebook"
+          aria-label={`Open Facebook for ${band.name}`}
+        >
+          <FacebookIcon size={14} />
+        </a>
+      )}
+      {youtubeHref !== '#' && (
+        <a
+          href={youtubeHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-red-500 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+          title="YouTube"
+          aria-label={`Open YouTube for ${band.name}`}
+        >
+          <YouTubeIcon size={14} />
+        </a>
+      )}
+      {spotifyHref !== '#' && (
+        <a
+          href={spotifyHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-green-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-400"
+          title="Spotify"
+          aria-label={`Open Spotify for ${band.name}`}
+        >
+          <SpotifyIcon size={14} />
+        </a>
+      )}
+      {appleMusicHref !== '#' && (
+        <a
+          href={appleMusicHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-rose-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+          title="Apple Music"
+          aria-label={`Open Apple Music for ${band.name}`}
+        >
+          <AppleMusicIcon size={14} />
+        </a>
+      )}
+      {linktreeHref !== '#' && (
+        <a
+          href={linktreeHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/70 hover:text-lime-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-400"
+          title="Linktree"
+          aria-label={`Open Linktree for ${band.name}`}
+        >
+          <LinktreeIcon size={14} />
+        </a>
+      )}
+    </div>
+  )
+}
+
+function SortIcon({ col, sortConfig }) {
+  return (
+    <span className="ml-1 inline-block w-4">
+      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+    </span>
+  )
+}
 
 /**
  * RosterTab - Manage Global Artist Roster (Band Profiles)
@@ -45,6 +196,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
     instagram: '',
     bandcamp: '',
     facebook: '',
+    youtube: '',
+    spotify: '',
+    apple_music: '',
+    linktree: '',
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -91,12 +246,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
   const formatOrigin = band => {
     if (!band) return ''
     return [band.origin_city, band.origin_region].filter(Boolean).join(', ') || band.origin || ''
-  }
-
-  const splitOrigin = origin => {
-    if (!origin) return { city: '', region: '' }
-    const [city, region] = origin.split(',').map(part => part.trim())
-    return { city: city || '', region: region || '' }
   }
 
   const filteredBands = useMemo(() => {
@@ -157,6 +306,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
         instagram: formData.instagram || '',
         bandcamp: formData.bandcamp || '',
         facebook: formData.facebook || '',
+        youtube: formData.youtube || '',
+        spotify: formData.spotify || '',
+        apple_music: formData.apple_music || '',
+        linktree: formData.linktree || '',
       }
       const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
 
@@ -196,6 +349,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
         instagram: formData.instagram || '',
         bandcamp: formData.bandcamp || '',
         facebook: formData.facebook || '',
+        youtube: formData.youtube || '',
+        spotify: formData.spotify || '',
+        apple_music: formData.apple_music || '',
+        linktree: formData.linktree || '',
       }
       const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
 
@@ -250,7 +407,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
     } catch (_e) {
       /* ignore */
     }
-    const parsedOrigin = splitOrigin(band.origin)
+    const parsedOrigin = parseOrigin(band.origin)
 
     setFormData({
       id: band.id,
@@ -267,6 +424,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
       instagram: socialLinks.instagram || '',
       bandcamp: socialLinks.bandcamp || '',
       facebook: socialLinks.facebook || '',
+      youtube: socialLinks.youtube || '',
+      spotify: socialLinks.spotify || '',
+      apple_music: socialLinks.apple_music || '',
+      linktree: socialLinks.linktree || '',
     })
     setShowAddForm(false)
     // scroll to form
@@ -289,6 +450,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
       instagram: '',
       bandcamp: '',
       facebook: '',
+      youtube: '',
+      spotify: '',
+      apple_music: '',
+      linktree: '',
     })
     setEditingId(null)
     setShowAddForm(false)
@@ -308,7 +473,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
     bands.forEach(band => {
       if (band.origin_city) values.add(band.origin_city)
       if (!band.origin_city && band.origin) {
-        const parsed = splitOrigin(band.origin)
+        const parsed = parseOrigin(band.origin)
         if (parsed.city) values.add(parsed.city)
       }
     })
@@ -320,7 +485,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
     bands.forEach(band => {
       if (band.origin_region) values.add(band.origin_region)
       if (!band.origin_region && band.origin) {
-        const parsed = splitOrigin(band.origin)
+        const parsed = parseOrigin(band.origin)
         if (parsed.region) values.add(parsed.region)
       }
     })
@@ -371,87 +536,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
         showToast(err.message, 'error')
       }
     }
-  }
-
-  const SortIcon = ({ col }) => (
-    <span className="ml-1 inline-block w-4">
-      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-    </span>
-  )
-
-  // Parse social links and render icons
-  const parseSocialLinks = band => {
-    let links = {}
-    try {
-      links = typeof band.social_links === 'string' ? JSON.parse(band.social_links) : band.social_links || {}
-    } catch (_e) {
-      /* ignore */
-    }
-    return links
-  }
-
-  const SocialLinksIcons = ({ band }) => {
-    const links = parseSocialLinks(band)
-    const websiteHref = safeExternalHref(links.website)
-    const instagramHref = safeInstagramHref(links.instagram)
-    const bandcampHref = safeHttpsFallbackHref(links.bandcamp)
-    const facebookHref = safeExternalHref(links.facebook)
-    const hasAnyLink = [websiteHref, instagramHref, bandcampHref, facebookHref].some(href => href !== '#')
-
-    if (!hasAnyLink) return <span className="text-white/30">-</span>
-
-    return (
-      <div className="flex gap-2">
-        {websiteHref !== '#' && (
-          <a
-            href={websiteHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-accent-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
-            title="Website"
-            aria-label={`Open website for ${band.name}`}
-          >
-            <FontAwesomeIcon icon={faGlobe} />
-          </a>
-        )}
-        {instagramHref !== '#' && (
-          <a
-            href={instagramHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-pink-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-400"
-            title="Instagram"
-            aria-label={`Open Instagram for ${band.name}`}
-          >
-            <FontAwesomeIcon icon={faInstagram} />
-          </a>
-        )}
-        {bandcampHref !== '#' && (
-          <a
-            href={bandcampHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-teal-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
-            title="Bandcamp"
-            aria-label={`Open Bandcamp for ${band.name}`}
-          >
-            <FontAwesomeIcon icon={faBandcamp} />
-          </a>
-        )}
-        {facebookHref !== '#' && (
-          <a
-            href={facebookHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-blue-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
-            title="Facebook"
-            aria-label={`Open Facebook for ${band.name}`}
-          >
-            <FontAwesomeIcon icon={faFacebook} />
-          </a>
-        )}
-      </div>
-    )
   }
 
   return (
@@ -518,7 +602,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             onChange={handleInputChange}
             onSubmit={editingId ? handleUpdate : handleAdd}
             onCancel={resetForm}
-            conflicts={[]}
+            conflicts={{ overlaps: [], conflicts: [] }}
             originCitySuggestions={originCitySuggestions}
             originRegionSuggestions={originRegionSuggestions}
             genreSuggestions={genreSuggestions}
@@ -554,32 +638,32 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       onClick={() => handleSort('name')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Name <SortIcon col="name" />
+                      Name <SortIcon col="name" sortConfig={sortConfig} />
                     </th>
                     <th
                       onClick={() => handleSort('origin')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Origin <SortIcon col="origin" />
+                      Origin <SortIcon col="origin" sortConfig={sortConfig} />
                     </th>
                     <th
                       onClick={() => handleSort('genre')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Genre <SortIcon col="genre" />
+                      Genre <SortIcon col="genre" sortConfig={sortConfig} />
                     </th>
                     <th
                       onClick={() => handleSort('is_active')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Status <SortIcon col="is_active" />
+                      Status <SortIcon col="is_active" sortConfig={sortConfig} />
                     </th>
                     <th className="px-4 py-3 text-left text-white font-semibold">Links</th>
                     <th
                       onClick={() => handleSort('contact_email')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
                     >
-                      Contact <SortIcon col="contact_email" />
+                      Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
                     </th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>

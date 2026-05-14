@@ -1,4 +1,6 @@
 const MINUTES_PER_DAY = 24 * 60
+// Bands starting before this hour are treated as after-midnight (same night as the preceding evening)
+export const AFTER_MIDNIGHT_THRESHOLD_MINUTES = 6 * 60
 
 const isNumber = value => typeof value === 'number' && Number.isFinite(value)
 
@@ -15,7 +17,7 @@ const normalizeEndMinutes = (startMinutes, endMinutes) => {
   if (!isNumber(startMinutes) || !isNumber(endMinutes)) {
     return null
   }
-  return endMinutes <= startMinutes ? endMinutes + MINUTES_PER_DAY : endMinutes
+  return endMinutes < startMinutes ? endMinutes + MINUTES_PER_DAY : endMinutes
 }
 
 export const buildTimeIntervals = (startTime, endTime) => {
@@ -26,7 +28,7 @@ export const buildTimeIntervals = (startTime, endTime) => {
   }
 
   const normalizedEnd = normalizeEndMinutes(startMinutes, endMinutes)
-  if (normalizedEnd == null) {
+  if (normalizedEnd == null || normalizedEnd === startMinutes) {
     return []
   }
 
@@ -100,33 +102,38 @@ export const deriveDurationMinutes = (startTime, endTime) => {
 
 const intervalsOverlap = (intervalA, intervalB) => intervalA[0] < intervalB[1] && intervalB[0] < intervalA[1]
 
+// Returns { overlaps: string[], conflicts: string[] }
+// conflicts = exact same start AND end time; overlaps = any other time intersection
 export const detectConflicts = (candidateBand, bands) => {
-  if (!candidateBand || !bands?.length) {
-    return []
-  }
+  const empty = { overlaps: [], conflicts: [] }
+  if (!candidateBand || !bands?.length) return empty
 
   const { event_id: eventId, venue_id: venueId, start_time: startTime, end_time: endTime, id } = candidateBand
-  if (!eventId || !venueId || !startTime || !endTime) {
-    return []
-  }
+  if (!eventId || !venueId || !startTime || !endTime) return empty
 
   const bandIntervals = buildTimeIntervals(startTime, endTime)
-  if (!bandIntervals.length) {
-    return []
+  if (!bandIntervals.length) return empty
+
+  const overlaps = []
+  const conflicts = []
+
+  for (const other of bands) {
+    if (!other) continue
+    if (id != null && other.id === id) continue
+    if (!other.event_id || !other.venue_id) continue
+    if (Number(other.event_id) !== Number(eventId) || Number(other.venue_id) !== Number(venueId)) continue
+
+    const otherIntervals = buildTimeIntervals(other.start_time, other.end_time)
+    if (!otherIntervals.some(b => bandIntervals.some(a => intervalsOverlap(a, b)))) continue
+
+    if (other.start_time === startTime && other.end_time === endTime) {
+      conflicts.push(other.name)
+    } else {
+      overlaps.push(other.name)
+    }
   }
 
-  return bands
-    .filter(other => {
-      if (!other) return false
-      if (id != null && other.id === id) return false
-      if (!other.event_id || !other.venue_id) return false
-      return Number(other.event_id) === Number(eventId) && Number(other.venue_id) === Number(venueId)
-    })
-    .filter(other => {
-      const otherIntervals = buildTimeIntervals(other.start_time, other.end_time)
-      return otherIntervals.some(intervalB => bandIntervals.some(intervalA => intervalsOverlap(intervalA, intervalB)))
-    })
-    .map(other => other.name)
+  return { overlaps, conflicts }
 }
 
 export const formatTimeLabel = time => {
@@ -159,6 +166,9 @@ export const formatDurationLabel = (startTime, endTime) => {
   return `${durationMinutes} min`
 }
 
+export const adjustForMidnight = mins =>
+  mins !== null && mins < AFTER_MIDNIGHT_THRESHOLD_MINUTES ? mins + MINUTES_PER_DAY : mins
+
 export const sortBandsByStart = bands => {
   if (!Array.isArray(bands)) {
     return []
@@ -175,10 +185,13 @@ export const sortBandsByStart = bands => {
     if (aMinutes == null) return 1
     if (bMinutes == null) return -1
 
-    if (aMinutes === bMinutes) {
+    const aAdj = adjustForMidnight(aMinutes)
+    const bAdj = adjustForMidnight(bMinutes)
+
+    if (aAdj === bAdj) {
       return (bandA?.name || '').localeCompare(bandB?.name || '')
     }
 
-    return aMinutes - bMinutes
+    return aAdj - bAdj
   })
 }

@@ -1,7 +1,5 @@
-/* eslint-env browser */
+import { Image, LoaderCircle, Trash, Upload } from 'lucide-react'
 import { useState, useRef } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faUpload, faTrash, faSpinner, faImage } from '@fortawesome/free-solid-svg-icons'
 import { getAdminFormDataHeaders } from '../../utils/adminApi'
 
 /**
@@ -201,7 +199,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
                 disabled={uploading}
                 className="min-h-[44px] bg-accent-500 hover:bg-accent-500/90 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
               >
-                <FontAwesomeIcon icon={faUpload} />
+                <Upload size={14} />
                 Change Photo
               </button>
               <button
@@ -210,7 +208,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
                 disabled={uploading}
                 className="min-h-[44px] bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
               >
-                <FontAwesomeIcon icon={faTrash} />
+                <Trash size={14} />
                 Remove
               </button>
             </div>
@@ -218,7 +216,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
             {/* Loading overlay */}
             {uploading && (
               <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                <FontAwesomeIcon icon={faSpinner} spin className="text-white text-3xl" />
+                <LoaderCircle size={30} className="text-white animate-spin" />
               </div>
             )}
           </div>
@@ -236,10 +234,11 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
             role="button"
             tabIndex={0}
           >
-            <FontAwesomeIcon
-              icon={uploading ? faSpinner : faImage}
-              className={`text-white/50 text-5xl mb-4 ${uploading ? 'animate-spin' : ''}`}
-            />
+            {uploading ? (
+              <LoaderCircle size={48} className="text-white/50 mb-4 animate-spin" />
+            ) : (
+              <Image size={48} className="text-white/50 mb-4" />
+            )}
             <p className="text-white/70 text-center mb-2">
               {uploading ? 'Uploading...' : 'Drop photo here or click to browse'}
             </p>

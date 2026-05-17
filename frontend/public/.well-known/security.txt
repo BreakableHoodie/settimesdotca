@@ -1,0 +1,4 @@
+Contact: mailto:settimes@dredre.net
+Expires: 2027-05-17T00:00:00.000Z
+Preferred-Languages: en, fr
+Canonical: https://settimes.ca/.well-known/security.txt

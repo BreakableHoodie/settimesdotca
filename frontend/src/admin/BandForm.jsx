@@ -590,4 +590,3 @@ BandForm.propTypes = {
   originRegionSuggestions: PropTypes.arrayOf(PropTypes.string),
   genreSuggestions: PropTypes.arrayOf(PropTypes.string),
 }
-

@@ -209,4 +209,3 @@ ArtistPicker.propTypes = {
   venues: PropTypes.array,
   loading: PropTypes.bool,
 }
-

@@ -1,0 +1,11 @@
+# Acknowledged false positives — historical findings in deleted/doc files.
+# Format: commit:file:rule:line
+
+# database/production-full-sync.sql was a one-time DB export used for dev setup.
+# The file was deleted and the reset tokens it contained expired on 2026-01-30.
+1da2e683f40d7aaae16eedfe6e03e8114c271c96:database/production-full-sync.sql:generic-api-key:483
+1da2e683f40d7aaae16eedfe6e03e8114c271c96:database/production-full-sync.sql:generic-api-key:484
+
+# docs/API_DOCUMENTATION.md contains a placeholder curl example with a fictional
+# session_token value — not a real credential.
+05735d9da9763dd7d509dd75605844da7c787e3d:docs/API_DOCUMENTATION.md:curl-auth-header:150

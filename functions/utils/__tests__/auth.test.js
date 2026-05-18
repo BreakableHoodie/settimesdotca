@@ -189,12 +189,8 @@ describe('initializeLucia / session manager', () => {
       expect(cookie).toContain('session_token=test-session-id');
       expect(cookie).toContain('HttpOnly');
       expect(cookie).toContain('Path=/');
-      // Lucia sets expires:false → uses 400-day cookie lifetime (34560000 s)
-      expect(cookie).toContain('Max-Age=34560000');
-      // Lucia's serializeCookie only matches lowercase sameSite values;
-      // auth.js passes "Lax" (titlecase) so no SameSite header is emitted.
-      // The replacement will fix this — update this assertion to .toContain('SameSite=Lax') in Task 2.
-      expect(cookie).not.toContain('SameSite');
+      expect(cookie).toContain('Max-Age=2592000');
+      expect(cookie).toContain('SameSite=Lax');
       expect(cookie.toLowerCase()).not.toContain('secure');
       expect(cookie).not.toContain('__Host-');
     });
@@ -208,12 +204,8 @@ describe('initializeLucia / session manager', () => {
       expect(cookie).toContain('__Host-session_token=prod-session-id');
       expect(cookie).toContain('HttpOnly');
       expect(cookie).toContain('Path=/');
-      // Lucia sets expires:false → uses 400-day cookie lifetime (34560000 s)
-      expect(cookie).toContain('Max-Age=34560000');
-      // Lucia's serializeCookie only matches lowercase sameSite values;
-      // auth.js passes "Strict" (titlecase) so no SameSite header is emitted.
-      // The replacement will fix this — update this assertion to .toContain('SameSite=Strict') in Task 2.
-      expect(cookie).not.toContain('SameSite');
+      expect(cookie).toContain('Max-Age=2592000');
+      expect(cookie).toContain('SameSite=Strict');
       expect(cookie).toContain('Secure');
     });
   });

@@ -277,7 +277,7 @@ function LiveContextBar({
                   onClick={() => onViewChange?.('all')}
                   aria-pressed={view === 'all'}
                   className={`min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
-                    view === 'all' ? 'bg-accent-500 text-bg-navy' : 'text-bg-navy/70 hover:text-bg-navy'
+                    view === 'all' ? 'bg-accent-500 text-bg-navy' : 'text-white/60 hover:text-white'
                   }`}
                 >
                   Live Lineup
@@ -287,7 +287,7 @@ function LiveContextBar({
                   onClick={() => onViewChange?.('mine')}
                   aria-pressed={view === 'mine'}
                   className={`relative min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
-                    view === 'mine' ? 'bg-accent-500 text-bg-navy' : 'text-bg-navy/70 hover:text-bg-navy'
+                    view === 'mine' ? 'bg-accent-500 text-bg-navy' : 'text-white/60 hover:text-white'
                   }`}
                 >
                   My Route

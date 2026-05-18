@@ -22,7 +22,7 @@ function ToolbarButton({ onClick, active, title, children }) {
         onClick()
       }}
       className={`p-1.5 rounded transition-colors ${
-        active ? 'bg-accent-500/30 text-accent-400' : 'text-gray-300 hover:bg-white/10 hover:text-bg-navy'
+        active ? 'bg-accent-500/30 text-accent-400' : 'text-gray-300 hover:bg-white/10 hover:text-white'
       }`}
       title={title}
       aria-pressed={active}

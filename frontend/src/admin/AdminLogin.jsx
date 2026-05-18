@@ -181,7 +181,7 @@ export default function AdminLogin({ onLoginSuccess }) {
                   type="button"
                   onClick={handleResend}
                   disabled={resendStatus.loading || !formData.email}
-                  className="mt-3 w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:brightness-110 disabled:opacity-50 transition-all"
+                  className="mt-3 w-full bg-amber-700 text-white py-2 rounded-lg text-sm font-semibold hover:brightness-110 disabled:opacity-50 transition-all"
                 >
                   {resendStatus.loading ? 'Sending...' : 'Resend activation email'}
                 </button>

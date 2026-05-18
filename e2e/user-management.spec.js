@@ -19,12 +19,10 @@ const openUsersTab = async (page) => {
 };
 
 const uniqueSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-const clickAndAcceptDialog = async (page, selector, matcher) => {
-  const dialogPromise = page.waitForEvent('dialog');
+// Invite/update flows now show a toast instead of a native dialog.
+const clickAndWaitForToast = async (page, selector, matcher) => {
   await page.click(selector);
-  const dialog = await dialogPromise;
-  expect(dialog.message()).toMatch(matcher);
-  await dialog.accept();
+  await expect(page.locator('body')).toContainText(matcher, { timeout: 10000 });
 };
 const waitForCreateUserForm = async (page) => {
   await expect(page.getByRole('heading', { name: 'Create New User' })).toBeVisible();
@@ -59,7 +57,7 @@ test.describe('User Management', () => {
 
     // Invite flow: creates an invite code, not a user row.
     // The user appears in the table only after they complete signup via the invite link.
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
+    await clickAndWaitForToast(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
   });
 
   test('should validate required user fields', async ({ page }) => {
@@ -92,7 +90,7 @@ test.describe('User Management', () => {
     await page.fill('#lastName', `User ${adminSuffix}`);
     await page.fill('#email', adminEmail);
     await page.selectOption('#role', 'admin');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
+    await clickAndWaitForToast(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
 
     // Invite viewer-role user
     await page.click('button:has-text("Invite User")');
@@ -101,7 +99,7 @@ test.describe('User Management', () => {
     await page.fill('#lastName', `User ${viewerSuffix}`);
     await page.fill('#email', viewerEmail);
     await page.selectOption('#role', 'viewer');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
+    await clickAndWaitForToast(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
   });
 
   test('should allow admin to edit user details', async ({ page }) => {
@@ -119,7 +117,7 @@ test.describe('User Management', () => {
 
     await page.fill('#firstName', updatedFirstName);
     await page.fill('#lastName', updatedLastName);
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Update User")', /updated successfully/i);
+    await clickAndWaitForToast(page, 'button[type="submit"]:has-text("Update User")', /updated successfully/i);
 
     const updatedRow = page.locator('table tbody tr', { hasText: email }).first();
     await expect(updatedRow).toContainText(`${updatedFirstName} ${updatedLastName}`);

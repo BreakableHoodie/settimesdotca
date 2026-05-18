@@ -159,7 +159,12 @@ function LiveContextBar({
               className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
               aria-label={`Event status: ${lifecycle.label}`}
               onClick={handleLifecycleTap}
-              onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleLifecycleTap()}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleLifecycleTap()
+                }
+              }}
             >
               {lifecycle.label}
             </span>
@@ -207,7 +212,12 @@ function LiveContextBar({
                 className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
                 aria-label={`Event status: ${lifecycle.label}`}
                 onClick={handleLifecycleTap}
-                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleLifecycleTap()}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleLifecycleTap()
+                  }
+                }}
               >
                 {lifecycle.label}
               </span>

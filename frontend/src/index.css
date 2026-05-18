@@ -288,19 +288,19 @@ body {
 }
 
 .animate-fade-in {
-  animation: fade-in var(--duration-base) var(--ease-out);
+  animation: fade-in var(--default-transition-duration) var(--ease-out);
 }
 .animate-fade-in-up {
-  animation: fade-in-up var(--duration-slow) var(--ease-out);
+  animation: fade-in-up var(--transition-duration-slow) var(--ease-out);
 }
 .animate-fade-in-down {
-  animation: fade-in-down var(--duration-slow) var(--ease-out);
+  animation: fade-in-down var(--transition-duration-slow) var(--ease-out);
 }
 .animate-scale-in {
-  animation: scale-in var(--duration-base) var(--ease-out);
+  animation: scale-in var(--default-transition-duration) var(--ease-out);
 }
 .animate-slide-in-right {
-  animation: slide-in-right var(--duration-slow) var(--ease-out);
+  animation: slide-in-right var(--transition-duration-slow) var(--ease-out);
 }
 
 .animate-shimmer {

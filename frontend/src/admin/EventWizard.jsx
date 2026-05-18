@@ -471,7 +471,10 @@ export default function EventWizard({ onComplete, onCancel, initialEventData, in
       </div>
 
       {/* Current step content */}
-      <div className="mb-6" aria-live="polite" aria-atomic="true">
+      <div className="mb-6">
+        <span className="sr-only" aria-live="polite" aria-atomic="true">
+          Step {currentStep + 1} of {STEPS.length}: {STEPS[currentStep]}
+        </span>
         {stepComponents[STEPS[currentStep]]}
       </div>
 

@@ -157,17 +157,18 @@ export default function UserManagement({ showToast }) {
   const handleDeleteUser = async () => {
     if (!pendingDelete) return
 
+    const target = pendingDelete
+    setPendingDelete(null)
     setActionLoading(true)
     try {
-      await usersApi.remove(pendingDelete.id)
-      showToast(`User ${pendingDelete.email} deleted`, 'success')
+      await usersApi.remove(target.id)
+      showToast(`User ${target.email} deleted`, 'success')
       fetchUsers()
     } catch (error) {
       console.error('Failed to delete user:', error)
       showToast(error.details?.message || error.message || 'Failed to delete user', 'error')
     } finally {
       setActionLoading(false)
-      setPendingDelete(null)
     }
   }
 
@@ -192,16 +193,17 @@ export default function UserManagement({ showToast }) {
   const handleToggleUserStatus = async () => {
     if (!pendingToggle) return
 
+    const target = pendingToggle
+    setPendingToggle(null)
     setActionLoading(true)
     try {
-      await usersApi.update(pendingToggle.id, { isActive: !pendingToggle.isActive })
-      showToast(`User ${pendingToggle.email} ${pendingToggle.isActive ? 'deactivated' : 'activated'}`, 'success')
+      await usersApi.update(target.id, { isActive: !target.isActive })
+      showToast(`User ${target.email} ${target.isActive ? 'deactivated' : 'activated'}`, 'success')
       fetchUsers()
     } catch {
       showToast('Failed to update user status', 'error')
     } finally {
       setActionLoading(false)
-      setPendingToggle(null)
     }
   }
 

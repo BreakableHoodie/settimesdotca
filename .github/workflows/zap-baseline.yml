@@ -55,8 +55,8 @@ jobs:
             echo "url=https://settimes.ca" >> $GITHUB_OUTPUT
             echo "Scheduled scan of production: https://settimes.ca"
           else
-            echo "url=https://dev.settimesdotca.pages.dev" >> $GITHUB_OUTPUT
-            echo "Post-deployment scan of dev: https://dev.settimesdotca.pages.dev"
+            echo "url=https://dev.settimes.ca" >> $GITHUB_OUTPUT
+            echo "Post-deployment scan of dev: https://dev.settimes.ca"
           fi
 
       - name: Bypass Cloudflare bot protection for runner IP

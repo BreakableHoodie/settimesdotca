@@ -233,6 +233,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
             }}
             role="button"
             tabIndex={0}
+            aria-label="Upload photo: drop here or press Enter to browse files"
           >
             {uploading ? (
               <LoaderCircle size={48} className="text-white/50 mb-4 animate-spin" />

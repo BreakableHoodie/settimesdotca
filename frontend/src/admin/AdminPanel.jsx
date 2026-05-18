@@ -319,7 +319,26 @@ export default function AdminPanel({ currentUser, onLogout }) {
       {/* Tab Navigation */}
       <div className="bg-bg-purple border-b border-accent-500/20 hidden md:block">
         <div className="container mx-auto px-4">
-          <div className="flex gap-1 sm:gap-2 overflow-x-auto" role="tablist">
+          <div
+            className="flex gap-1 sm:gap-2 overflow-x-auto"
+            role="tablist"
+            tabIndex={-1}
+            onKeyDown={e => {
+              const ids = tabs.map(t => t.id)
+              const idx = ids.indexOf(activeTab)
+              if (e.key === 'ArrowRight') {
+                e.preventDefault()
+                const next = ids[(idx + 1) % ids.length]
+                setActiveTab(next)
+                document.getElementById(`tab-${next}`)?.focus()
+              } else if (e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const prev = ids[(idx - 1 + ids.length) % ids.length]
+                setActiveTab(prev)
+                document.getElementById(`tab-${prev}`)?.focus()
+              }
+            }}
+          >
             {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -394,7 +413,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
 
             {activeTab === 'roster' && <RosterTab showToast={showToast} readOnly={!canEdit} />}
 
-            {activeTab === 'users' && canManageUsers && <UserManagement />}
+            {activeTab === 'users' && canManageUsers && <UserManagement showToast={showToast} />}
 
             {activeTab === 'settings' && <UserSettings user={currentUser} onOpenMfa={() => setShowMfaModal(true)} />}
 
@@ -416,7 +435,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 md:bottom-4 right-4 z-50 animate-slide-up max-w-md" style={{ bottom: '90px' }}>
+        <div className="fixed right-4 z-50 animate-slide-up max-w-md" style={{ bottom: '90px' }}>
           <Alert variant={toast.type === 'error' ? 'error' : 'success'} className="shadow-xl">
             {toast.message}
           </Alert>

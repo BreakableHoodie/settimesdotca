@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import Button from './Button'
-import { TriangleAlert, X } from 'lucide-react'
+import { TriangleAlert } from 'lucide-react'
 
 const FOCUSABLE_SELECTORS = [
   'button:not([disabled])',
@@ -84,7 +84,7 @@ export default function ConfirmDialog({
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className="relative bg-bg-elevated rounded-lg shadow-xl max-w-md w-full border border-white/10 animate-scale-in"
+        className="relative bg-bg-purple rounded-lg shadow-xl max-w-md w-full border border-white/10 animate-scale-in"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
@@ -92,20 +92,11 @@ export default function ConfirmDialog({
         tabIndex={-1}
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <TriangleAlert size={24} className={variant === 'danger' ? 'text-error-500' : 'text-accent-500'} />
-            <h2 id="confirm-dialog-title" className="text-xl font-bold text-text-primary">
-              {title}
-            </h2>
-          </div>
-          <button
-            onClick={onCancel}
-            className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded focus:outline-hidden focus:ring-2 focus:ring-accent-500"
-            aria-label="Close dialog"
-          >
-            <X size={20} />
-          </button>
+        <div className="flex items-center gap-3 p-6 border-b border-white/10">
+          <TriangleAlert size={24} className={variant === 'danger' ? 'text-error-500' : 'text-accent-500'} />
+          <h2 id="confirm-dialog-title" className="text-xl font-bold text-text-primary">
+            {title}
+          </h2>
         </div>
 
         {/* Message */}
@@ -116,7 +107,7 @@ export default function ConfirmDialog({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10 bg-bg-elevated/50">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10 bg-bg-purple/50">
           <Button variant="secondary" onClick={onCancel}>
             {cancelText}
           </Button>

@@ -29,6 +29,8 @@ export default function BottomNav({
           <button
             key={item.id}
             type="button"
+            role="tab"
+            aria-selected={activeTab === item.id}
             onClick={() => onTabChange(item.id)}
             className={`bottom-nav-button flex flex-col items-center justify-center py-3 text-xs font-medium transition-all min-h-[56px] ${
               activeTab === item.id ? 'text-accent-500 bg-accent-500/10' : 'text-text-tertiary hover:text-white'

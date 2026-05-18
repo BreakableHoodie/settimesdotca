@@ -94,6 +94,7 @@ export default function EventsPage() {
         </div>
       )}
 
+      <h2 className="sr-only">Upcoming Events</h2>
       <EventTimeline />
       <Footer />
       <PrivacyBanner />

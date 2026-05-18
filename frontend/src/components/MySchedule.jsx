@@ -243,17 +243,18 @@ function MySchedule({
     )
   }
 
-  // Get bands with venue travel warnings (Room 47 is across the street from other venues)
+  // "Room 47" is across the street from the main venues at the specific event this app was
+  // originally built for. Warn users when consecutive bands in their schedule require crossing
+  // between Room 47 and any other venue (or vice versa).
+  const CROSS_STREET_VENUE = 'Room 47'
   const travelWarnings = {}
   for (let i = 0; i < visibleBands.length - 1; i++) {
     const current = visibleBands[i]
     const next = visibleBands[i + 1]
-    const currentIsRoom47 = current.venue === 'Room 47'
-    const nextIsRoom47 = next.venue === 'Room 47'
+    const currentIsCrossStreet = current.venue === CROSS_STREET_VENUE
+    const nextIsCrossStreet = next.venue === CROSS_STREET_VENUE
 
-    // Warn if crossing between Room 47 and other venues (either direction)
-    // The warning shows on the band you're going TO
-    if (currentIsRoom47 !== nextIsRoom47) {
+    if (currentIsCrossStreet !== nextIsCrossStreet) {
       travelWarnings[next.id] = `${next.venue} is across the street`
     }
   }

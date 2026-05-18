@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Key, Pencil, Plus, Trash, UserCheck, UserX } from 'lucide-react'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { usersApi } from '../utils/adminApi'
 
 function SortIcon({ col, sortConfig }) {
@@ -12,7 +13,7 @@ function SortIcon({ col, sortConfig }) {
   )
 }
 
-export default function UserManagement() {
+export default function UserManagement({ showToast }) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState(null)
@@ -25,6 +26,8 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [pendingToggle, setPendingToggle] = useState(null)
 
   const resolveDisplayName = user => {
     if (user?.firstName || user?.lastName) {
@@ -96,7 +99,7 @@ export default function UserManagement() {
       setUsers(data.users)
     } catch (error) {
       console.error('Failed to fetch users:', error)
-      alert('Failed to fetch users')
+      showToast('Failed to fetch users', 'error')
     } finally {
       setLoading(false)
     }
@@ -112,22 +115,17 @@ export default function UserManagement() {
       const data = await usersApi.create(userData)
       const inviteUrl = data?.inviteUrl
       const delivered = data?.email?.delivered
-      if (inviteUrl) {
-        if (delivered) {
-          alert(`Invite sent to ${userData.email}`)
-        } else {
-          alert(`Invite created for ${userData.email}.\nShare this link:\n${inviteUrl}`)
-        }
+      if (inviteUrl && !delivered) {
+        showToast(`Invite created for ${userData.email}. Copy the link: ${inviteUrl}`, 'success')
       } else {
-        alert(`Invite created for ${userData.email}`)
+        showToast(`Invite sent to ${userData.email}`, 'success')
       }
       setShowUserModal(false)
       setEditingUser(null)
-      fetchUsers() // Refresh list
+      fetchUsers()
     } catch (error) {
       console.error('Failed to create user:', error)
-      const message = error.details?.message || error.message || 'Failed to send invite'
-      alert(message)
+      showToast(error.details?.message || error.message || 'Failed to send invite', 'error')
     } finally {
       setActionLoading(false)
     }
@@ -144,35 +142,32 @@ export default function UserManagement() {
         lastName: userData.lastName,
         isActive: userData.isActive,
       })
-      alert(`User ${userData.email} updated successfully`)
+      showToast(`User ${userData.email} updated successfully`, 'success')
       setShowUserModal(false)
       setEditingUser(null)
-      fetchUsers() // Refresh list
+      fetchUsers()
     } catch (error) {
       console.error('Failed to update user:', error)
-      const message = error.details?.message || error.message || 'Failed to update user'
-      alert(message)
+      showToast(error.details?.message || error.message || 'Failed to update user', 'error')
     } finally {
       setActionLoading(false)
     }
   }
 
-  const handleDeleteUser = async user => {
-    if (!confirm(`Are you sure you want to delete ${user.email}? This action cannot be undone.`)) {
-      return
-    }
+  const handleDeleteUser = async () => {
+    if (!pendingDelete) return
 
     setActionLoading(true)
     try {
-      await usersApi.remove(user.id)
-      alert(`User ${user.email} deleted successfully`)
-      fetchUsers() // Refresh list
+      await usersApi.remove(pendingDelete.id)
+      showToast(`User ${pendingDelete.email} deleted`, 'success')
+      fetchUsers()
     } catch (error) {
       console.error('Failed to delete user:', error)
-      const message = error.details?.message || error.message || 'Failed to delete user'
-      alert(message)
+      showToast(error.details?.message || error.message || 'Failed to delete user', 'error')
     } finally {
       setActionLoading(false)
+      setPendingDelete(null)
     }
   }
 
@@ -182,32 +177,31 @@ export default function UserManagement() {
     setActionLoading(true)
     try {
       const data = await usersApi.resetPassword(selectedUser.id, { reason: resetReason })
-      alert(data?.message || `Password reset email sent to ${selectedUser.email}`)
+      showToast(data?.message || `Password reset email sent to ${selectedUser.email}`, 'success')
       setShowResetModal(false)
       setResetReason('')
       setSelectedUser(null)
     } catch (error) {
       console.error('Failed to send password reset:', error)
-      const message = error.details?.message || error.message || 'Failed to send password reset email'
-      alert(message)
+      showToast(error.details?.message || error.message || 'Failed to send password reset email', 'error')
     } finally {
       setActionLoading(false)
     }
   }
 
-  const handleToggleUserStatus = async user => {
-    if (!confirm(`Are you sure you want to ${user.isActive ? 'deactivate' : 'activate'} ${user.email}?`)) {
-      return
-    }
+  const handleToggleUserStatus = async () => {
+    if (!pendingToggle) return
 
     setActionLoading(true)
     try {
-      await usersApi.update(user.id, { isActive: !user.isActive })
-      fetchUsers() // Refresh the list
+      await usersApi.update(pendingToggle.id, { isActive: !pendingToggle.isActive })
+      showToast(`User ${pendingToggle.email} ${pendingToggle.isActive ? 'deactivated' : 'activated'}`, 'success')
+      fetchUsers()
     } catch {
-      alert('Failed to update user status')
+      showToast('Failed to update user status', 'error')
     } finally {
       setActionLoading(false)
+      setPendingToggle(null)
     }
   }
 
@@ -235,14 +229,22 @@ export default function UserManagement() {
           <p className="text-sm text-white/70 mt-1">Manage user accounts, roles, and permissions.</p>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <label htmlFor="user-search" className="sr-only">
+            Search users
+          </label>
           <input
+            id="user-search"
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name or email"
             className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-56"
           />
+          <label htmlFor="role-filter" className="sr-only">
+            Filter by role
+          </label>
           <select
+            id="role-filter"
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
             className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
@@ -252,7 +254,11 @@ export default function UserManagement() {
             <option value="editor">Editor</option>
             <option value="viewer">Viewer</option>
           </select>
+          <label htmlFor="status-filter" className="sr-only">
+            Filter by status
+          </label>
           <select
+            id="status-filter"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
             className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
@@ -313,7 +319,7 @@ export default function UserManagement() {
                 <tr>
                   <td colSpan="5" className="px-6 py-8 text-center text-gray-300">
                     {users.length === 0
-                      ? 'No users found. Click “Invite User” to add one.'
+                      ? 'No users found. Click "Invite User" to add one.'
                       : 'No users match your filters.'}
                   </td>
                 </tr>
@@ -344,43 +350,47 @@ export default function UserManagement() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
                       <div className="flex justify-end space-x-2">
                         <button
+                          type="button"
                           onClick={() => {
                             setEditingUser(user)
                             setShowUserModal(true)
                           }}
                           className="text-blue-400 hover:text-blue-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          title="Edit User"
+                          aria-label={`Edit ${user.email}`}
                           disabled={actionLoading}
                         >
                           <Pencil size={14} />
                         </button>
                         <button
+                          type="button"
                           onClick={() => {
                             setSelectedUser(user)
                             setShowResetModal(true)
                           }}
                           className="text-accent-400 hover:text-accent-400/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          title="Reset Password"
+                          aria-label={`Reset password for ${user.email}`}
                           disabled={actionLoading}
                         >
                           <Key size={14} />
                         </button>
                         <button
-                          onClick={() => handleToggleUserStatus(user)}
+                          type="button"
+                          onClick={() => setPendingToggle(user)}
                           className={`transition ${
                             user.isActive
                               ? 'text-yellow-400 hover:text-yellow-300'
                               : 'text-green-400 hover:text-green-300'
                           } min-h-[44px] min-w-[44px] flex items-center justify-center`}
-                          title={user.isActive ? 'Deactivate User' : 'Activate User'}
+                          aria-label={`${user.isActive ? 'Deactivate' : 'Activate'} ${user.email}`}
                           disabled={actionLoading}
                         >
                           {user.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
                         </button>
                         <button
-                          onClick={() => handleDeleteUser(user)}
+                          type="button"
+                          onClick={() => setPendingDelete(user)}
                           className="text-red-400 hover:text-red-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          title="Delete User"
+                          aria-label={`Delete ${user.email}`}
                           disabled={actionLoading}
                         >
                           <Trash size={14} />
@@ -396,7 +406,7 @@ export default function UserManagement() {
         <div className="md:hidden divide-y divide-white/10">
           {filteredUsers.length === 0 ? (
             <div className="px-6 py-8 text-center text-gray-300">
-              {users.length === 0 ? 'No users found. Tap “Invite User” to add one.' : 'No users match your filters.'}
+              {users.length === 0 ? 'No users found. Tap "Invite User" to add one.' : 'No users match your filters.'}
             </div>
           ) : (
             sortedUsers.map(user => (
@@ -416,6 +426,7 @@ export default function UserManagement() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
+                    type="button"
                     onClick={() => {
                       setEditingUser(user)
                       setShowUserModal(true)
@@ -426,6 +437,7 @@ export default function UserManagement() {
                     Edit
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       setSelectedUser(user)
                       setShowResetModal(true)
@@ -436,7 +448,8 @@ export default function UserManagement() {
                     Reset Password
                   </button>
                   <button
-                    onClick={() => handleToggleUserStatus(user)}
+                    type="button"
+                    onClick={() => setPendingToggle(user)}
                     className={`px-4 py-2 min-h-[44px] rounded text-sm ${
                       user.isActive
                         ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
@@ -447,7 +460,8 @@ export default function UserManagement() {
                     {user.isActive ? 'Deactivate' : 'Activate'}
                   </button>
                   <button
-                    onClick={() => handleDeleteUser(user)}
+                    type="button"
+                    onClick={() => setPendingDelete(user)}
                     className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
                     disabled={actionLoading}
                   >
@@ -498,6 +512,7 @@ export default function UserManagement() {
 
             <div className="flex flex-col sm:flex-row gap-3">
               <button
+                type="button"
                 onClick={handleResetPassword}
                 disabled={actionLoading}
                 className="flex-1 min-h-[44px] bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
@@ -505,6 +520,7 @@ export default function UserManagement() {
                 {actionLoading ? 'Sending...' : 'Send Reset Link'}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setShowResetModal(false)
                   setSelectedUser(null)
@@ -519,6 +535,30 @@ export default function UserManagement() {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        isOpen={!!pendingDelete}
+        title="Delete User"
+        message={`Are you sure you want to delete ${pendingDelete?.email}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleDeleteUser}
+        onCancel={() => setPendingDelete(null)}
+      />
+
+      {/* Toggle status confirmation */}
+      <ConfirmDialog
+        isOpen={!!pendingToggle}
+        title={pendingToggle?.isActive ? 'Deactivate User' : 'Activate User'}
+        message={`Are you sure you want to ${pendingToggle?.isActive ? 'deactivate' : 'activate'} ${pendingToggle?.email}?`}
+        confirmText={pendingToggle?.isActive ? 'Deactivate' : 'Activate'}
+        cancelText="Cancel"
+        variant={pendingToggle?.isActive ? 'danger' : 'primary'}
+        onConfirm={handleToggleUserStatus}
+        onCancel={() => setPendingToggle(null)}
+      />
     </div>
   )
 }

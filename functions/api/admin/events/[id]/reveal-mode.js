@@ -5,11 +5,15 @@
 
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP } from "../../../../utils/request.js";
+import { validateId } from "../../../../utils/validation.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
   const { DB } = env;
-  const eventId = params.id;
+  const { valid, value: eventId, error: idError } = validateId(params.id);
+  if (!valid) {
+    return new Response(JSON.stringify({ error: idError }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
   const ipAddress = getClientIP(request);
 
   try {

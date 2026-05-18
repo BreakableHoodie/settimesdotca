@@ -11,7 +11,7 @@ const buildNavItems = ({ showLineup, showUsers, showPlatform }) => [
   ...(showPlatform ? [{ id: 'platform', label: 'Platform', icon: SlidersHorizontal }] : []),
 ]
 
-export default function BottomNav({ activeTab, onTabChange, showLineup, showUsers, showPlatform }) {
+export default function BottomNav({ activeTab, onTabChange, showLineup = false, showUsers = false, showPlatform = false }) {
   const navItems = buildNavItems({ showLineup, showUsers, showPlatform })
   return (
     <nav
@@ -45,8 +45,3 @@ BottomNav.propTypes = {
   showPlatform: PropTypes.bool,
 }
 
-BottomNav.defaultProps = {
-  showLineup: false,
-  showUsers: false,
-  showPlatform: false,
-}

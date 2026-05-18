@@ -13,11 +13,11 @@ export default function BandForm({
   formData,
   submitting,
   mode,
-  showEventIntro,
+  showEventIntro = false,
   onChange,
   onSubmit,
   onCancel,
-  conflicts,
+  conflicts = { overlaps: [], conflicts: [] },
   globalView = false,
   selectedProfile = null, // If provided, we are scheduling this specific existing artist
   originCitySuggestions = [],
@@ -591,7 +591,3 @@ BandForm.propTypes = {
   genreSuggestions: PropTypes.arrayOf(PropTypes.string),
 }
 
-BandForm.defaultProps = {
-  showEventIntro: false,
-  conflicts: { overlaps: [], conflicts: [] },
-}

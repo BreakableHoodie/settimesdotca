@@ -218,6 +218,11 @@ jobs:
     name: Post-deploy smoke checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Serialize across all branches: disable_bot_fight_mode operates at zone
+    # level, so concurrent smoke jobs from main+dev would race to restore it.
+    concurrency:
+      group: cloudflare-zone-smoke
+      cancel-in-progress: false
     needs:
       - deploy
       - resolve-release

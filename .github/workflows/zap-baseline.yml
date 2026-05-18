@@ -30,6 +30,11 @@ jobs:
   zap-baseline:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Serialize with smoke checks: both disable BFM at zone level and must not
+    # run concurrently or one will restore BFM while the other still needs it.
+    concurrency:
+      group: cloudflare-zone-smoke
+      cancel-in-progress: false
     # Only run if deployment succeeded (for workflow_run trigger)
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:

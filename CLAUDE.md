@@ -9,7 +9,7 @@ AI assistant context for this codebase. Captures non-obvious invariants, known g
 - **Frontend**: React 19, Vite 8, Tailwind 4, React Router 7 (`frontend/`)
 - **Backend**: Cloudflare Pages Functions (edge serverless, `functions/`)
 - **Database**: Cloudflare D1 (SQLite-compatible), 38 migrations in `migrations/`
-- **Auth**: Lucia v3, CSRF double-submit, TOTP MFA, trusted devices, RBAC
+- **Auth**: Direct D1 session manager (`functions/utils/auth.js`), CSRF double-submit, TOTP MFA, trusted devices, RBAC
 - **Storage**: Cloudflare R2 (band photos)
 - **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
@@ -43,7 +43,7 @@ Helper: `toSqliteDateTime()` in `functions/utils/authAttempts.js`.
 
 ### `lucia_sessions.expires_at` is INTEGER (Unix epoch), not TEXT
 
-Every other `expires_at` column in the schema is `TEXT` (ISO-8601 / space-separated). Lucia v3 uses `INTEGER` (Unix seconds) for its sessions table. Do not compare it with `datetime('now')` — use `> unixepoch()` instead.
+Every other `expires_at` column in the schema is `TEXT` (ISO-8601 / space-separated). `lucia_sessions` uses `INTEGER` (Unix seconds). Do not compare it with `datetime('now')` — use Unix epoch arithmetic (`expires_at * 1000 < Date.now()`) or `> unixepoch()` in SQL instead.
 
 ### PBKDF2, not bcrypt
 
@@ -129,6 +129,6 @@ cd frontend && npm run lint && npm run format:check
 ## Security Notes
 
 - All admin state-changing endpoints require both a valid session cookie AND a CSRF token (`X-CSRF-Token` header, read from the `csrf_token` cookie).
-- Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `createSession` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts.
+- Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `lucia.createSession()` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts. Both methods live on the object returned by `initializeLucia()` in `functions/utils/auth.js`.
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.

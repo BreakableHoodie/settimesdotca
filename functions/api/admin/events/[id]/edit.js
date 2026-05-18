@@ -22,19 +22,6 @@ export async function onRequestPut(context) {
       return auth.response
     }
 
-    if (!eventId || isNaN(eventId)) {
-      return new Response(
-        JSON.stringify({
-          error: 'Bad request',
-          message: 'Invalid event ID'
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
     const body = await request.json().catch(() => ({}))
     const { name, date, slug, ticket_url } = body
 

@@ -24,13 +24,6 @@ export async function onRequestPost(context) {
 
     const currentUser = auth.user;
 
-    if (!eventId || isNaN(eventId)) {
-      return new Response(
-        JSON.stringify({ error: "Bad request", message: "Invalid event ID" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
     const body = await request.json().catch(() => ({}));
     if (typeof body.reveal_mode !== "boolean") {
       return new Response(

@@ -327,7 +327,7 @@ body {
 }
 
 .btn-primary {
-  @apply px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition;
+  @apply px-4 py-2 bg-amber-700 text-white rounded-lg hover:bg-amber-800 transition;
 }
 
 .btn-danger {

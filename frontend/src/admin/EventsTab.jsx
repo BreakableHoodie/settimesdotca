@@ -246,7 +246,7 @@ const EventRow = memo(function EventRow({
                 await navigator.clipboard.writeText(ticketLink)
                 showToast('Ticket link copied!', 'success')
               }}
-              className={`px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
+              className={`px-3 py-1 bg-amber-700 hover:bg-amber-800 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Copy ticket link"
             >
               <Copy size={14} className="mr-1" aria-hidden="true" />
@@ -262,7 +262,7 @@ const EventRow = memo(function EventRow({
           <div className="flex justify-end gap-2 flex-wrap">
             <button
               onClick={() => onEdit(event)}
-              className={`px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
+              className={`px-3 py-1 bg-amber-700 hover:bg-amber-800 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
               Edit
             </button>
@@ -339,7 +339,7 @@ const EventCard = memo(function EventCard({
           <>
             <button
               onClick={() => onEdit(event)}
-              className={`px-4 py-2 min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
+              className={`px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
             >
               Edit
             </button>
@@ -750,7 +750,7 @@ export default function EventsTab({
               {!readOnly && (
                 <button
                   onClick={() => startEdit(selectedEvent)}
-                  className={`px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
+                  className={`px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded font-medium transition-colors min-h-[44px] ${buttonFocusClass}`}
                 >
                   Edit
                 </button>

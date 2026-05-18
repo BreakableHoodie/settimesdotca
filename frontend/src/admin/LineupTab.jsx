@@ -804,7 +804,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                 )}
                                 <button
                                   onClick={() => startEdit(band)}
-                                  className="px-4 py-2 min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white rounded text-sm"
+                                  className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
                                 >
                                   Edit
                                 </button>
@@ -897,7 +897,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                             )}
                             <button
                               onClick={() => startEdit(band)}
-                              className="px-4 py-2 min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white rounded text-sm"
+                              className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
                             >
                               Edit
                             </button>

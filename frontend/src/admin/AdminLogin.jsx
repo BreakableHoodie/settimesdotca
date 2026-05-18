@@ -206,7 +206,7 @@ export default function AdminLogin({ onLoginSuccess }) {
             <button
               type="submit"
               disabled={loading || (lockoutInfo && lockoutInfo.locked)}
-              className="w-full bg-gradient-accent text-white py-3 rounded-lg font-semibold hover:brightness-110 disabled:opacity-50 mb-4 transition-all active:scale-[0.98] shadow-md"
+              className="w-full bg-gradient-accent text-bg-navy py-3 rounded-lg font-semibold hover:brightness-110 disabled:opacity-50 mb-4 transition-all active:scale-[0.98] shadow-md"
             >
               {loading ? 'Logging in...' : 'Login'}
             </button>
@@ -253,7 +253,7 @@ export default function AdminLogin({ onLoginSuccess }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-accent text-white py-3 rounded-lg font-semibold hover:brightness-110 disabled:opacity-50 mb-3 transition-all active:scale-[0.98] shadow-md"
+              className="w-full bg-gradient-accent text-bg-navy py-3 rounded-lg font-semibold hover:brightness-110 disabled:opacity-50 mb-3 transition-all active:scale-[0.98] shadow-md"
             >
               {loading ? 'Verifying...' : 'Verify Code'}
             </button>

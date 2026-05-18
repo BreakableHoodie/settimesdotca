@@ -44,9 +44,9 @@ function BandCard({
 
   const baseClasses = `w-full p-4 rounded-xl transition-all duration-200 ${
     isSelected
-      ? 'bg-gradient-accent text-white shadow-lg scale-[1.02] ring-2 ring-warning-400 ring-offset-2 ring-offset-bg-navy'
+      ? 'bg-gradient-accent text-bg-navy shadow-lg scale-[1.02] ring-2 ring-warning-400 ring-offset-2 ring-offset-bg-navy'
       : isPlaying
-        ? 'bg-gradient-accent text-white shadow-glow-accent playing-now'
+        ? 'bg-gradient-accent text-bg-navy shadow-glow-accent playing-now'
         : 'bg-gradient-card text-white hover:bg-bg-purple/80 hover:scale-[1.01] shadow-md border border-white/10'
   } relative`
 

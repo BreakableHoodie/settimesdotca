@@ -43,7 +43,10 @@ Helper: `toSqliteDateTime()` in `functions/utils/authAttempts.js`.
 
 ### `lucia_sessions.expires_at` is INTEGER (Unix epoch), not TEXT
 
-Every other `expires_at` column in the schema is `TEXT` (ISO-8601 / space-separated). `lucia_sessions` uses `INTEGER` (Unix seconds). Do not compare it with `datetime('now')` — use Unix epoch arithmetic (`expires_at * 1000 < Date.now()`) or `> unixepoch()` in SQL instead.
+Every other `expires_at` column in the schema is `TEXT` (ISO-8601 / space-separated). `lucia_sessions` uses `INTEGER` (Unix seconds). Do not compare it with `datetime('now')`.
+
+- **JS (check if expired):** `row.expires_at * 1000 < Date.now()`
+- **SQL (select active sessions):** `WHERE expires_at > unixepoch()`
 
 ### PBKDF2, not bcrypt
 
@@ -129,6 +132,6 @@ cd frontend && npm run lint && npm run format:check
 ## Security Notes
 
 - All admin state-changing endpoints require both a valid session cookie AND a CSRF token (`X-CSRF-Token` header, read from the `csrf_token` cookie).
-- Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `lucia.createSession()` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts. Both methods live on the object returned by `initializeLucia()` in `functions/utils/auth.js`.
+- Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `lucia.createSession(user.id, {})` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts. Both methods live on the object returned by `initializeLucia()` in `functions/utils/auth.js`.
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.

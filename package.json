@@ -28,10 +28,8 @@
     "vitest": "^4.1.6"
   },
   "dependencies": {
-    "@lucia-auth/adapter-sqlite": "^3.0.2",
     "csrf-csrf": "^4.0.3",
     "email-validator": "^2.0.4",
-    "lucia": "^3.2.2",
     "otplib": "^13.4.0"
   }
 }

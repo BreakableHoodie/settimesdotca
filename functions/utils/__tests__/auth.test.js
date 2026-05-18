@@ -106,7 +106,7 @@ describe('initializeLucia / session manager', () => {
 
       expect(session).not.toBeNull();
       expect(session.id).toBe(sessionId);
-      expect(session.userId).toBe(1);
+      expect(session.userId).toBe(mockUsers.admin.id);
       expect(session.fresh).toBe(false);
       expect(session.expiresAt).toBeInstanceOf(Date);
       expect(user).not.toBeNull();

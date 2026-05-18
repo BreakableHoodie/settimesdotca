@@ -30,6 +30,11 @@ jobs:
   zap-baseline:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Serialize with smoke checks: both disable BFM at zone level and must not
+    # run concurrently or one will restore BFM while the other still needs it.
+    concurrency:
+      group: cloudflare-zone-smoke
+      cancel-in-progress: false
     # Only run if deployment succeeded (for workflow_run trigger)
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
@@ -55,9 +60,18 @@ jobs:
             echo "url=https://settimes.ca" >> $GITHUB_OUTPUT
             echo "Scheduled scan of production: https://settimes.ca"
           else
-            echo "url=https://dev.settimesdotca.pages.dev" >> $GITHUB_OUTPUT
-            echo "Post-deployment scan of dev: https://dev.settimesdotca.pages.dev"
+            echo "url=https://dev.settimes.ca" >> $GITHUB_OUTPUT
+            echo "Post-deployment scan of dev: https://dev.settimes.ca"
           fi
+
+      - name: Bypass Cloudflare bot protection for runner IP
+        if: contains(steps.target.outputs.url, 'settimes.ca')
+        uses: xiaotianxt/bypass-cloudflare-for-github-action@0c44a8bb3b1c9d370e48be2becf88ef33de8d57e # v2.1.0
+        with:
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          cf_zone_id: ${{ secrets.CF_ZONE_ID }}
+          cf_api_token: ${{ secrets.CF_WAF_API_TOKEN }}
+          disable_bot_fight_mode: true
 
       - name: Wait for deployment to be ready
         run: |

@@ -1,9 +1,13 @@
 import { checkPermission } from "../../_middleware.js";
+import { validateId } from "../../../../utils/validation.js";
 
 export async function onRequestGet(context) {
   const { request, env, params } = context;
   const { DB } = env;
-  const eventId = params.id;
+  const { valid, value: eventId, error: idError } = validateId(params.id);
+  if (!valid) {
+    return new Response(JSON.stringify({ error: idError }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
 
   // RBAC: Require viewer role or higher (read-only metrics)
   const permCheck = await checkPermission(context, "viewer");

@@ -197,7 +197,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
                 type="button"
                 onClick={handleClick}
                 disabled={uploading}
-                className="min-h-[44px] bg-accent-500 hover:bg-accent-500/90 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+                className="min-h-[44px] bg-accent-500 hover:bg-accent-500/90 text-bg-navy px-4 py-2 rounded-lg transition flex items-center gap-2"
               >
                 <Upload size={14} />
                 Change Photo

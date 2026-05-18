@@ -61,7 +61,7 @@ export default function ArchivedEventBanner({ event, onCopyAsTemplate, state }) 
           {onCopyAsTemplate && (
             <button
               onClick={() => onCopyAsTemplate(event)}
-              className="px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded font-medium transition-colors min-h-[48px] flex items-center justify-center gap-2 whitespace-nowrap"
+              className="px-6 py-3 bg-accent-500 hover:bg-accent-600 text-bg-navy rounded font-medium transition-colors min-h-[48px] flex items-center justify-center gap-2 whitespace-nowrap"
               title="Create a new event based on this archived event"
             >
               <Copy size={14} aria-hidden="true" />

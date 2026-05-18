@@ -123,7 +123,7 @@ export default function PerformersManager() {
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="px-6 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 font-medium"
+            className="px-6 py-3 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 font-medium"
           >
             + Add Performer
           </button>
@@ -270,7 +270,7 @@ export default function PerformersManager() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 font-medium"
+                className="flex-1 px-6 py-3 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 disabled:opacity-50 font-medium"
               >
                 {loading ? 'Saving...' : editingPerformer ? 'Update Performer' : 'Add Performer'}
               </button>

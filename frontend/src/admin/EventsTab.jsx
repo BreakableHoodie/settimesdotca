@@ -1065,7 +1065,7 @@ export default function EventsTab({
                 setEditingEvent(null)
                 setShowModal(true)
               }}
-              className={`px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors min-h-[44px] ${buttonFocusClass}`}
+              className={`px-4 py-2 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors min-h-[44px] ${buttonFocusClass}`}
             >
               + Create New Event
             </button>

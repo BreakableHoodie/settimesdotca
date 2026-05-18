@@ -556,7 +556,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
           {!showAddForm && !editingId && !readOnly && (
             <button
               onClick={() => setShowAddForm(true)}
-              className="px-6 py-3 min-h-[44px] bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors font-medium"
+              className="px-6 py-3 min-h-[44px] bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors font-medium"
             >
               + New Artist
             </button>

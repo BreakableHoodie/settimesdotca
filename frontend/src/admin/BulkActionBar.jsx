@@ -98,7 +98,7 @@ function BulkActionBar({
                 className={`flex-1 md:flex-none px-4 py-2 min-h-[44px] rounded-lg font-medium transition-colors ${
                   action === 'delete'
                     ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-accent-500 hover:bg-accent-600 text-white'
+                    : 'bg-accent-500 hover:bg-accent-600 text-bg-navy'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
                 disabled={(action !== 'delete' && !isActionReady()) || isLoading}
               >

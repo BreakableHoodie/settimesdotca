@@ -144,7 +144,7 @@ function BandCard({
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mt-1 ${
               onAmber
                 ? warningType === 'overlap'
-                  ? 'bg-bg-navy/20 text-bg-navy'
+                  ? 'bg-yellow-900/80 text-yellow-100'
                   : 'bg-red-900/70 text-red-100'
                 : warningType === 'overlap'
                   ? 'bg-yellow-500/30 text-yellow-200'

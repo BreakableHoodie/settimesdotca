@@ -128,7 +128,7 @@ export default function VenuePicker({ eventId: _eventId, existingVenueIds, onVen
               <button
                 onClick={handleCreateNew}
                 disabled={!newVenue.name.trim() || loading}
-                className="min-h-[44px] flex-1 px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 text-sm font-medium"
+                className="min-h-[44px] flex-1 px-4 py-2 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 disabled:opacity-50 text-sm font-medium"
               >
                 {loading ? 'Creating...' : 'Create & Add'}
               </button>

@@ -143,7 +143,7 @@ export default function SignupPage() {
               type="button"
               onClick={handleResend}
               disabled={resendStatus.loading}
-              className="w-full min-h-[44px] px-4 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 transition-colors font-semibold"
+              className="w-full min-h-[44px] px-4 py-3 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 disabled:opacity-50 transition-colors font-semibold"
             >
               {resendStatus.loading ? 'Sending...' : 'Resend activation email'}
             </button>
@@ -258,7 +258,7 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={loading || !formData.inviteCode || Boolean(passwordMismatch)}
-                className="w-full min-h-[44px] px-4 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 transition-colors font-semibold"
+                className="w-full min-h-[44px] px-4 py-3 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 disabled:opacity-50 transition-colors font-semibold"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>

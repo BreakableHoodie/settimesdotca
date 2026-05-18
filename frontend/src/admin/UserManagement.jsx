@@ -116,6 +116,8 @@ export default function UserManagement({ showToast }) {
       const inviteUrl = data?.inviteUrl
       const delivered = data?.email?.delivered
       if (inviteUrl && !delivered) {
+        // eslint-disable-next-line no-console
+        console.log('Invite URL (email delivery failed):', inviteUrl)
         showToast(`Invite created for ${userData.email}. Copy the link: ${inviteUrl}`, 'success')
       } else {
         showToast(`Invite sent to ${userData.email}`, 'success')

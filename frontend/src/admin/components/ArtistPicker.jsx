@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 
-export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel, loading, venues }) {
+export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel, loading = false, venues = [] }) {
   const [query, setQuery] = useState('')
   const [checkedIds, setCheckedIds] = useState(new Set())
   const [bulkVenueId, setBulkVenueId] = useState('')
@@ -208,9 +208,4 @@ ArtistPicker.propTypes = {
   onCancel: PropTypes.func.isRequired,
   venues: PropTypes.array,
   loading: PropTypes.bool,
-}
-
-ArtistPicker.defaultProps = {
-  loading: false,
-  venues: [],
 }

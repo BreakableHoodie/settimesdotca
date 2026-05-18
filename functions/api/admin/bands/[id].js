@@ -271,23 +271,7 @@ export async function onRequestPut(context) {
         .first();
 
       if (existingProfile) {
-        // If we are renaming to an existing band, we should probably switch this performance to that band profile
-        // But that's a big change.
-        // Let's stick to the previous behavior: warn about duplicate?
-        // But wait, duplicate names are allowed in performances (same band, different event).
-        // The previous check was:
-        // SELECT id, name FROM bands WHERE LOWER(name) = LOWER(?) AND id != ?
-        // This prevented TWO bands with same name in the `bands` table.
-        // But `bands` table mixed performance and profile.
-        // In new schema, we WANT to reuse profiles.
-        // So if I rename "Band A" to "Band B", and "Band B" exists, I should link to "Band B".
-        // But `onRequestPut` is updating a specific performance.
-        // Let's just update the profile name for now, but warn if it conflicts?
-        // Actually, if we update the profile name, it affects ALL performances of this band.
-        // This might be unintended.
-        // Ideally, we should check if the user intends to rename the BAND (globally) or change the band for this PERFORMANCE.
-        // Given the API is `PUT /bands/{id}`, it implies updating this specific entity.
-        // Let's assume we update the profile name.
+        // Renaming updates the shared profile globally — all performances of this band reflect the change.
       }
     }
 

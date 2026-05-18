@@ -3,6 +3,7 @@ import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { getTimeDescription, isHappeningNow, isStartingSoon } from '../utils/timeFilter'
+import { formatTime } from '../utils/timeFormat'
 
 function BandCard({
   band,
@@ -83,9 +84,9 @@ function BandCard({
         {startingSoon && (
           <span
             className="soon-pill"
-            aria-label={`Starts in ${minutesUntil} ${minutesUntil === 1 ? 'minute' : 'minutes'}`}
+            aria-label={`Starts in ${minutesUntil} ${minutesUntil === 1 ? 'minute' : 'minutes'} at ${formatTime(band.startTime)}`}
           >
-            Starts in {minutesUntil}m
+            Starts in {minutesUntil}m · {formatTime(band.startTime)}
           </span>
         )}
         <div className={`inline-block px-3 py-1.5 rounded-lg mb-1 ${isSelected ? 'bg-white/20' : 'bg-bg-navy/60'}`}>

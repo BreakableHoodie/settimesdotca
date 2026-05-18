@@ -715,7 +715,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                         <td className="px-4 py-3 flex justify-end gap-2">
                           <button
                             onClick={() => startEdit(band)}
-                            className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                            className="px-4 py-2 min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white rounded text-sm"
                           >
                             Edit
                           </button>
@@ -786,7 +786,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => startEdit(band)}
-                        className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                        className="px-4 py-2 min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white rounded text-sm"
                       >
                         Edit
                       </button>

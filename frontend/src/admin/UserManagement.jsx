@@ -420,7 +420,7 @@ export default function UserManagement() {
                       setEditingUser(user)
                       setShowUserModal(true)
                     }}
-                    className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                    className="px-4 py-2 min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white rounded text-sm"
                     disabled={actionLoading}
                   >
                     Edit

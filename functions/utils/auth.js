@@ -1,7 +1,6 @@
 export const SESSION_CONFIG = {
   absoluteTimeout: 30 * 24 * 60 * 60 * 1000,
   idleTimeout: 30 * 60 * 1000,
-  refreshThreshold: 15 * 60 * 1000,
   adminIdleTimeout: 15 * 60 * 1000,
   adminAbsoluteTimeout: 8 * 60 * 60 * 1000,
 };

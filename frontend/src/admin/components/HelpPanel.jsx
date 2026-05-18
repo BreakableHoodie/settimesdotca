@@ -60,7 +60,7 @@ export default function HelpPanel({ topic = 'events', isOpen, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="w-full bg-accent-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-accent-600 transition"
+          className="w-full bg-accent-500 text-bg-navy font-semibold py-2 px-4 rounded-lg hover:bg-accent-600 transition"
         >
           Got it
         </button>

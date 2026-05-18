@@ -245,7 +245,7 @@ export default function HistoricalImportModal({ onClose, onImported }) {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white rounded-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                  className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-bg-navy rounded-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                 >
                   {submitting ? 'Creating…' : 'Next: Add Bands'}
                 </button>
@@ -291,7 +291,7 @@ export default function HistoricalImportModal({ onClose, onImported }) {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white rounded-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                  className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-bg-navy rounded-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                 >
                   {submitting ? `Importing… ${progress?.done ?? 0} / ${progress?.total ?? 0}` : 'Import Bands'}
                 </button>

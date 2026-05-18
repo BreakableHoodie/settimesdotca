@@ -42,11 +42,14 @@ function BandCard({
   const startingSoon = isStartingSoon(band, currentTime)
   const minutesUntil = startingSoon ? Math.ceil((band.startMs - nowMs) / 60000) : 0
 
+  // Both selected and playing states use the amber gradient — dark text required throughout
+  const onAmber = isSelected || isPlaying
+
   const baseClasses = `w-full p-4 rounded-xl transition-all duration-200 ${
     isSelected
-      ? 'bg-gradient-accent text-white shadow-lg scale-[1.02] ring-2 ring-warning-400 ring-offset-2 ring-offset-bg-navy'
+      ? 'bg-gradient-accent text-bg-navy shadow-lg scale-[1.02] ring-2 ring-warning-400 ring-offset-2 ring-offset-bg-navy'
       : isPlaying
-        ? 'bg-gradient-accent text-white shadow-glow-accent playing-now'
+        ? 'bg-gradient-accent text-bg-navy shadow-glow-accent playing-now'
         : 'bg-gradient-card text-white hover:bg-bg-purple/80 hover:scale-[1.01] shadow-md border border-white/10'
   } relative`
 
@@ -69,8 +72,8 @@ function BandCard({
           type="button"
           onClick={handleRemove}
           className={`absolute top-2 right-2 h-11 w-11 flex items-center justify-center text-lg font-bold rounded-full transition-all duration-150 z-10 ${
-            isSelected
-              ? 'bg-white/20 hover:bg-white/30 text-white'
+            onAmber
+              ? 'bg-bg-navy/20 hover:bg-bg-navy/30 text-bg-navy'
               : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white'
           } focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500`}
           aria-label={labelBase}
@@ -83,36 +86,42 @@ function BandCard({
       <div className={`flex flex-col items-center gap-2 ${showToggleButton ? 'pr-10' : ''}`}>
         {startingSoon && (
           <span
-            className="soon-pill"
+            className={`soon-pill${onAmber ? ' soon-pill--dark' : ''}`}
             aria-label={`Starts in ${minutesUntil} ${minutesUntil === 1 ? 'minute' : 'minutes'} at ${formatTime(band.startTime)}`}
           >
             Starts in {minutesUntil}m · {formatTime(band.startTime)}
           </span>
         )}
-        <div className={`inline-block px-3 py-1.5 rounded-lg mb-1 ${isSelected ? 'bg-white/20' : 'bg-bg-navy/60'}`}>
+        <div className={`inline-block px-3 py-1.5 rounded-lg mb-1 ${onAmber ? 'bg-bg-navy/15' : 'bg-bg-navy/60'}`}>
           {band.name ? (
             <Link
               to={bandProfileHref}
               state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
               onClick={e => e.stopPropagation()}
-              className="font-display font-bold text-white text-base md:text-lg leading-snug hover:text-accent-400 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
+              className={`font-display font-bold text-base md:text-lg leading-snug transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
+                onAmber ? 'text-bg-navy' : 'text-white hover:text-accent-400'
+              }`}
             >
               {band.name}
             </Link>
           ) : (
-            <h3 className="font-display font-bold text-white text-base md:text-lg leading-snug">Unnamed Artist</h3>
+            <h3
+              className={`font-display font-bold text-base md:text-lg leading-snug ${onAmber ? 'text-bg-navy' : 'text-white'}`}
+            >
+              Unnamed Artist
+            </h3>
           )}
         </div>
         <p
           className={`text-sm md:text-base font-medium leading-snug ${
-            isPlaying ? 'text-warning-400 font-semibold' : isSelected ? 'text-white/90' : 'text-text-secondary'
+            isPlaying ? 'text-bg-navy font-semibold' : onAmber ? 'text-bg-navy' : 'text-text-secondary'
           }`}
         >
           {getTimeDescription(band)}
           {isPlaying && <span className="ml-2 text-xs uppercase tracking-wide">Live Now</span>}
         </p>
         {showVenue && (
-          <p className={`text-sm font-medium leading-snug ${isSelected ? 'text-white/80' : 'text-text-tertiary'}`}>
+          <p className={`text-sm font-medium leading-snug ${onAmber ? 'text-bg-navy' : 'text-text-tertiary'}`}>
             {band.venue}
           </p>
         )}
@@ -122,7 +131,7 @@ function BandCard({
             state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
             onClick={e => e.stopPropagation()}
             className={`text-xs underline underline-offset-4 ${
-              isSelected ? 'text-white hover:text-white/80' : 'text-accent-400 hover:text-accent-300'
+              onAmber ? 'text-bg-navy' : 'text-accent-400 hover:text-accent-300'
             }`}
           >
             View profile
@@ -133,7 +142,13 @@ function BandCard({
         {warningType && warningText && (
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mt-1 ${
-              warningType === 'overlap' ? 'bg-yellow-500/30 text-yellow-200' : 'bg-red-500/30 text-red-200'
+              onAmber
+                ? warningType === 'overlap'
+                  ? 'bg-yellow-900/80 text-yellow-100'
+                  : 'bg-red-900/70 text-red-100'
+                : warningType === 'overlap'
+                  ? 'bg-yellow-500/30 text-yellow-200'
+                  : 'bg-red-500/30 text-red-200'
             }`}
           >
             {warningType === 'overlap' ? (

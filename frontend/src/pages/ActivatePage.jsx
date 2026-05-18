@@ -59,7 +59,7 @@ export default function ActivatePage() {
           <p className="text-gray-300 mb-6">{message}</p>
           <button
             onClick={() => navigate('/admin/login')}
-            className="bg-accent-500 hover:bg-accent-600 text-white font-bold py-3 px-6 rounded-lg transition"
+            className="bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-3 px-6 rounded-lg transition"
           >
             Back to Login
           </button>
@@ -75,7 +75,7 @@ export default function ActivatePage() {
         <p className="text-gray-300 mb-6">{message}</p>
         <button
           onClick={() => navigate('/admin/login')}
-          className="bg-accent-500 hover:bg-accent-600 text-white font-bold py-3 px-6 rounded-lg transition"
+          className="bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-3 px-6 rounded-lg transition"
         >
           Go to Login
         </button>

@@ -230,7 +230,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
             <button
               type="submit"
               disabled={loading}
-              className="min-h-[44px] flex-1 bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+              className="min-h-[44px] flex-1 bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
             >
               {loading ? 'Saving...' : isEditMode ? 'Update User' : 'Send Invite'}
             </button>

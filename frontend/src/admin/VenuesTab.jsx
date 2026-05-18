@@ -288,7 +288,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
           {!showAddForm && !editingId && !readOnly && (
             <button
               onClick={() => setShowAddForm(true)}
-              className="px-4 py-2 min-h-[44px] bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors"
+              className="px-4 py-2 min-h-[44px] bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors"
             >
               + Add Venue
             </button>
@@ -475,7 +475,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 min-h-[44px] bg-accent-500 text-white rounded hover:bg-accent-600 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 min-h-[44px] bg-accent-500 text-bg-navy rounded hover:bg-accent-600 disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'Saving...' : editingId ? 'Update Venue' : 'Add Venue'}
               </button>
@@ -554,7 +554,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                             <div className="flex justify-end gap-2">
                               <button
                                 onClick={() => startEdit(venue)}
-                                className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                                className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm font-medium transition-colors"
                               >
                                 Edit
                               </button>
@@ -605,7 +605,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                       <div className="flex gap-2 pt-2">
                         <button
                           onClick={() => startEdit(venue)}
-                          className="flex-1 px-3 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                          className="flex-1 px-3 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm font-medium transition-colors"
                         >
                           Edit
                         </button>

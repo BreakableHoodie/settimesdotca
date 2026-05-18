@@ -87,7 +87,7 @@ export default function ArtistPicker({ artists, onSelect, onCancel }) {
             <p className="text-white/50 mb-4">No artist found named &quot;{query}&quot;</p>
             <button
               onClick={() => onSelect(null, query)} // Pass query as name for new artist
-              className="min-h-[44px] px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition"
+              className="min-h-[44px] px-4 py-2 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition"
             >
               + Create &quot;{query}&quot;
             </button>

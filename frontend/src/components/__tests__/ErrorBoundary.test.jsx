@@ -320,7 +320,7 @@ describe('ErrorBoundary', () => {
 
       const refreshButton = screen.getByText('Refresh Page')
       expect(refreshButton).toHaveClass('bg-accent-500')
-      expect(refreshButton).toHaveClass('text-white')
+      expect(refreshButton).toHaveClass('text-bg-navy')
     })
   })
 })

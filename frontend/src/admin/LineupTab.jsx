@@ -559,7 +559,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                 loadRoster()
               }
             }}
-            className="px-6 py-3 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors font-medium min-h-[44px]"
+            className="px-6 py-3 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors font-medium min-h-[44px]"
           >
             + Add to Lineup
           </button>
@@ -804,7 +804,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                 )}
                                 <button
                                   onClick={() => startEdit(band)}
-                                  className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                                  className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
                                 >
                                   Edit
                                 </button>
@@ -897,7 +897,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                             )}
                             <button
                               onClick={() => startEdit(band)}
-                              className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                              className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
                             >
                               Edit
                             </button>

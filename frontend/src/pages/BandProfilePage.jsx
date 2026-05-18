@@ -516,7 +516,7 @@ export default function BandProfilePage() {
                 <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-3">{profile.name}</h1>
                 <div className="flex flex-wrap gap-3">
                   {profile.genre && (
-                    <span className="px-4 py-2 bg-accent-500 text-white rounded-lg font-bold text-sm shadow-lg">
+                    <span className="px-4 py-2 bg-accent-500 text-bg-navy rounded-lg font-bold text-sm shadow-lg">
                       <Guitar size={14} className="mr-2" aria-hidden="true" />
                       {profile.genre}
                     </span>
@@ -535,7 +535,7 @@ export default function BandProfilePage() {
               <h1 className="text-5xl font-bold text-white mb-3">{profile.name}</h1>
               <div className="flex flex-wrap gap-3">
                 {profile.genre && (
-                  <span className="px-4 py-2 bg-accent-500 text-white rounded-lg font-bold text-sm">
+                  <span className="px-4 py-2 bg-accent-500 text-bg-navy rounded-lg font-bold text-sm">
                     <Guitar size={14} className="mr-2 inline" aria-hidden="true" />
                     {profile.genre}
                   </span>
@@ -576,7 +576,7 @@ export default function BandProfilePage() {
                     href={safeExternalHref(profile.social.website)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-accent-500 text-white rounded hover:bg-accent-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                    className="px-4 py-2 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
                     onClick={() => trackSocialClick(profile.id, 'website')}
                   >
                     <Globe size={16} />
@@ -612,7 +612,7 @@ export default function BandProfilePage() {
                     href={safeExternalHref(profile.social.facebook)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                    className="px-4 py-2 bg-amber-700 text-white rounded hover:bg-amber-800 transition-colors text-sm font-medium inline-flex items-center gap-2"
                     onClick={() => trackSocialClick(profile.id, 'facebook')}
                   >
                     <FacebookIcon size={16} />

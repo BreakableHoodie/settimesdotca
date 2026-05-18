@@ -266,7 +266,7 @@ export default function UserManagement() {
               setEditingUser(null)
               setShowUserModal(true)
             }}
-            className="bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
+            className="bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-2 px-4 min-h-[44px] rounded-lg transition flex items-center gap-2"
           >
             <Plus size={14} />
             Invite User
@@ -420,7 +420,7 @@ export default function UserManagement() {
                       setEditingUser(user)
                       setShowUserModal(true)
                     }}
-                    className="px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                    className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
                     disabled={actionLoading}
                   >
                     Edit
@@ -430,7 +430,7 @@ export default function UserManagement() {
                       setSelectedUser(user)
                       setShowResetModal(true)
                     }}
-                    className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-white rounded text-sm"
+                    className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-bg-navy rounded text-sm"
                     disabled={actionLoading}
                   >
                     Reset Password
@@ -500,7 +500,7 @@ export default function UserManagement() {
               <button
                 onClick={handleResetPassword}
                 disabled={actionLoading}
-                className="flex-1 min-h-[44px] bg-accent-500 hover:bg-accent-600 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
+                className="flex-1 min-h-[44px] bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-2 px-4 rounded-lg transition disabled:opacity-50"
               >
                 {actionLoading ? 'Sending...' : 'Send Reset Link'}
               </button>

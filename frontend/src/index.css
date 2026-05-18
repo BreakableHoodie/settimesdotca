@@ -468,6 +468,13 @@ body {
   margin-bottom: 6px;
 }
 
+.soon-pill--dark {
+  background: rgba(12, 15, 26, 0.2);
+  border-color: rgba(12, 15, 26, 0.4);
+  color: #0c0f1a;
+  animation: none;
+}
+
 /* Stagger animation delays */
 .stagger-1 {
   animation-delay: 50ms;

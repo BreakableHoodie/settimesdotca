@@ -86,7 +86,7 @@ function BandCard({
       <div className={`flex flex-col items-center gap-2 ${showToggleButton ? 'pr-10' : ''}`}>
         {startingSoon && (
           <span
-            className="soon-pill"
+            className={`soon-pill${onAmber ? ' soon-pill--dark' : ''}`}
             aria-label={`Starts in ${minutesUntil} ${minutesUntil === 1 ? 'minute' : 'minutes'} at ${formatTime(band.startTime)}`}
           >
             Starts in {minutesUntil}m · {formatTime(band.startTime)}
@@ -99,7 +99,7 @@ function BandCard({
               state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
               onClick={e => e.stopPropagation()}
               className={`font-display font-bold text-base md:text-lg leading-snug transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
-                onAmber ? 'text-bg-navy hover:text-bg-navy/70' : 'text-white hover:text-accent-400'
+                onAmber ? 'text-bg-navy' : 'text-white hover:text-accent-400'
               }`}
             >
               {band.name}
@@ -114,14 +114,14 @@ function BandCard({
         </div>
         <p
           className={`text-sm md:text-base font-medium leading-snug ${
-            isPlaying ? 'text-warning-400 font-semibold' : isSelected ? 'text-bg-navy' : 'text-text-secondary'
+            isPlaying ? 'text-bg-navy font-semibold' : onAmber ? 'text-bg-navy' : 'text-text-secondary'
           }`}
         >
           {getTimeDescription(band)}
           {isPlaying && <span className="ml-2 text-xs uppercase tracking-wide">Live Now</span>}
         </p>
         {showVenue && (
-          <p className={`text-sm font-medium leading-snug ${isSelected ? 'text-bg-navy' : 'text-text-tertiary'}`}>
+          <p className={`text-sm font-medium leading-snug ${onAmber ? 'text-bg-navy' : 'text-text-tertiary'}`}>
             {band.venue}
           </p>
         )}
@@ -131,7 +131,7 @@ function BandCard({
             state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
             onClick={e => e.stopPropagation()}
             className={`text-xs underline underline-offset-4 ${
-              isSelected ? 'text-bg-navy hover:text-bg-navy/70' : 'text-accent-400 hover:text-accent-300'
+              onAmber ? 'text-bg-navy' : 'text-accent-400 hover:text-accent-300'
             }`}
           >
             View profile
@@ -142,7 +142,13 @@ function BandCard({
         {warningType && warningText && (
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mt-1 ${
-              warningType === 'overlap' ? 'bg-yellow-500/30 text-yellow-200' : 'bg-red-500/30 text-red-200'
+              onAmber
+                ? warningType === 'overlap'
+                  ? 'bg-bg-navy/20 text-bg-navy'
+                  : 'bg-red-900/70 text-red-100'
+                : warningType === 'overlap'
+                  ? 'bg-yellow-500/30 text-yellow-200'
+                  : 'bg-red-500/30 text-red-200'
             }`}
           >
             {warningType === 'overlap' ? (

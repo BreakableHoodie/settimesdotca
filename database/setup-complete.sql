@@ -169,7 +169,12 @@ CREATE TABLE IF NOT EXISTS users (
   activated_at TEXT,
   totp_secret TEXT,
   totp_enabled INTEGER DEFAULT 0,
+  webauthn_enabled INTEGER DEFAULT 0,
+  email_otp_enabled INTEGER DEFAULT 0,
   backup_codes TEXT,
+  require_2fa INTEGER DEFAULT 1,
+  deactivated_at TEXT,
+  deactivated_by INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_login TEXT,
   updated_at TEXT DEFAULT (datetime('now'))

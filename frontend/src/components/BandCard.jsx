@@ -125,19 +125,6 @@ function BandCard({
             {band.venue}
           </p>
         )}
-        {band.name && (
-          <Link
-            to={bandProfileHref}
-            state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
-            onClick={e => e.stopPropagation()}
-            className={`text-xs underline underline-offset-4 ${
-              onAmber ? 'text-bg-navy' : 'text-accent-400 hover:text-accent-300'
-            }`}
-          >
-            View profile
-          </Link>
-        )}
-
         {/* Inline warning - always visible, no interaction needed */}
         {warningType && warningText && (
           <div

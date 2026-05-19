@@ -380,14 +380,14 @@ function ScheduleView({
           {nowPlaying.length > 0 && (
             <div className="relative">
               <div className="flex items-center mb-4">
-                <div className="bg-accent-500 text-bg-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
-                  <span className="relative flex h-3 w-3">
+                <h2 className="bg-accent-500 text-bg-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                  <span className="relative flex h-3 w-3" aria-hidden="true">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-bg-navy/60"></span>
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-bg-navy"></span>
                   </span>
                   <Music size={16} aria-hidden="true" />
                   NOW PLAYING
-                </div>
+                </h2>
                 <div className="flex-1 h-1 bg-accent-500 ml-4"></div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
@@ -412,17 +412,17 @@ function ScheduleView({
           {upcomingByTime.length > 0 && (
             <div className="space-y-8">
               <div className="flex items-center mb-4">
-                <div className="bg-bg-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                <h2 className="bg-bg-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   UPCOMING
-                </div>
+                </h2>
                 <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
               </div>
               {upcomingByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4">
                   <div className="flex items-center mb-4">
-                    <div className="bg-bg-navy text-white font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <h3 className="bg-bg-navy text-white font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
-                    </div>
+                    </h3>
                     <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
@@ -449,17 +449,17 @@ function ScheduleView({
           {pastByTime.length > 0 && showPast && (
             <div className="space-y-8">
               <div className="flex items-center mb-4">
-                <div className="bg-white/10 text-white/40 font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                <h2 className="bg-white/10 text-white/40 font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   PAST EVENTS
-                </div>
+                </h2>
                 <div className="flex-1 h-0.5 bg-white/10 ml-4"></div>
               </div>
               {pastByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4 opacity-60">
                   <div className="flex items-center mb-4">
-                    <div className="bg-white/5 text-white/30 font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <h3 className="bg-white/5 text-white/30 font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
-                    </div>
+                    </h3>
                     <div className="flex-1 h-0.5 bg-white/5 ml-4"></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">

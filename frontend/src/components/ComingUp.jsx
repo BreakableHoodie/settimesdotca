@@ -63,6 +63,7 @@ function ComingUp({ bands, currentTime }) {
 
   return (
     <div
+      aria-hidden={!hasNext}
       className={`overflow-hidden transition-all duration-300 ease-out ${
         hasNext ? 'max-h-28 sm:max-h-32 opacity-100' : 'max-h-0 opacity-0'
       }`}

@@ -5,11 +5,13 @@
 // - user: User object (null for create mode)
 // - onSave: function(userData)
 // - loading: boolean
+// - inviteUrl: string|null — when set, switches to invite-link copy view (email delivery failed)
 
 import { useState, useEffect } from 'react'
 import { FIELD_LIMITS } from '../../utils/validation'
+import Modal from '../../components/ui/Modal'
 
-export default function UserFormModal({ isOpen, onClose, user, onSave, loading }) {
+export default function UserFormModal({ isOpen, onClose, user, onSave, loading, inviteUrl }) {
   const isEditMode = Boolean(user)
 
   const [formData, setFormData] = useState({
@@ -102,6 +104,38 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading }
   }
 
   if (!isOpen) return null
+
+  if (inviteUrl) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Invite Created" size="sm" showCloseButton={false}>
+        <p className="text-sm text-yellow-300 mb-4">Email delivery failed. Copy this link and share it manually:</p>
+        <input
+          type="text"
+          readOnly
+          value={inviteUrl}
+          onFocus={e => e.target.select()}
+          aria-label="Invite URL"
+          className="w-full min-h-[44px] px-3 py-2 mb-4 rounded-lg bg-black/30 text-white border border-white/20 text-xs font-mono break-all"
+        />
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(inviteUrl)}
+            className="flex-1 min-h-[44px] bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-2 px-4 rounded-lg transition"
+          >
+            Copy Link
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 min-h-[44px] bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition"
+          >
+            Close
+          </button>
+        </div>
+      </Modal>
+    )
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">

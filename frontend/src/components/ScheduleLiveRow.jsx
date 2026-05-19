@@ -36,7 +36,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                variant === 'now' ? 'bg-accent-500 text-bg-navy' : 'bg-secondary-500/20 text-secondary-500'
+                variant === 'now' ? 'bg-accent-500 text-bg-navy' : 'bg-info-500/20 text-info-400'
               }`}
             >
               {variant === 'now' ? <Music size={14} aria-hidden="true" /> : <Clock size={14} aria-hidden="true" />}

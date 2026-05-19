@@ -612,7 +612,7 @@ export default function BandProfilePage() {
                     href={safeExternalHref(profile.social.facebook)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-amber-700 text-white rounded hover:bg-amber-800 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
                     onClick={() => trackSocialClick(profile.id, 'facebook')}
                   >
                     <FacebookIcon size={16} />
@@ -685,15 +685,18 @@ export default function BandProfilePage() {
             </p>
           ) : (
             <form onSubmit={submitFollow} className="flex flex-col gap-2">
+              <label htmlFor="follow-email" className="text-sm text-white/70">
+                Your email address
+              </label>
               <div className="flex gap-2">
                 <input
+                  id="follow-email"
                   type="email"
                   value={followEmail}
                   onChange={e => setFollowEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
                   className="flex-1 px-3 py-2 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
-                  aria-label={`Email to follow ${profile.name}`}
                 />
                 <Button
                   type="submit"

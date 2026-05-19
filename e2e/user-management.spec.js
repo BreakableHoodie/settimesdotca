@@ -19,12 +19,18 @@ const openUsersTab = async (page) => {
 };
 
 const uniqueSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-const clickAndAcceptDialog = async (page, selector, matcher) => {
-  const dialogPromise = page.waitForEvent('dialog');
+// Invite/update flows show a toast (email delivered) or keep the modal open
+// with a URL-copy view (email delivery failed). Both cases are handled here.
+const clickAndWaitForToast = async (page, selector, matcher) => {
   await page.click(selector);
-  const dialog = await dialogPromise;
-  expect(dialog.message()).toMatch(matcher);
-  await dialog.accept();
+  await expect(page.locator('body')).toContainText(matcher, { timeout: 10000 });
+  // If email delivery failed the modal stays open showing the invite URL.
+  // Close it so subsequent test steps are not blocked by the overlay.
+  const inviteCreatedHeading = page.getByRole('heading', { name: 'Invite Created' });
+  if (await inviteCreatedHeading.isVisible()) {
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(inviteCreatedHeading).not.toBeVisible();
+  }
 };
 const waitForCreateUserForm = async (page) => {
   await expect(page.getByRole('heading', { name: 'Create New User' })).toBeVisible();
@@ -38,6 +44,9 @@ const waitForEditUserForm = async (page, email) => {
 };
 
 test.describe('User Management', () => {
+  // Tests mutate shared seeded accounts — serialize to prevent parallel races
+  test.describe.configure({ mode: 'serial' })
+
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
   });
@@ -59,7 +68,7 @@ test.describe('User Management', () => {
 
     // Invite flow: creates an invite code, not a user row.
     // The user appears in the table only after they complete signup via the invite link.
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
+    await clickAndWaitForToast(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
   });
 
   test('should validate required user fields', async ({ page }) => {
@@ -92,7 +101,7 @@ test.describe('User Management', () => {
     await page.fill('#lastName', `User ${adminSuffix}`);
     await page.fill('#email', adminEmail);
     await page.selectOption('#role', 'admin');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
+    await clickAndWaitForToast(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
 
     // Invite viewer-role user
     await page.click('button:has-text("Invite User")');
@@ -101,7 +110,7 @@ test.describe('User Management', () => {
     await page.fill('#lastName', `User ${viewerSuffix}`);
     await page.fill('#email', viewerEmail);
     await page.selectOption('#role', 'viewer');
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
+    await clickAndWaitForToast(page, 'button[type="submit"]:has-text("Send Invite")', /invite (sent|created)/i);
   });
 
   test('should allow admin to edit user details', async ({ page }) => {
@@ -114,14 +123,60 @@ test.describe('User Management', () => {
 
     const editRow = page.locator('table tbody tr', { hasText: email }).first();
     await expect(editRow).toBeVisible({ timeout: 15000 });
-    await editRow.locator('button[title="Edit User"]').click();
+    await editRow.locator('button[aria-label^="Edit"]').click();
     await waitForEditUserForm(page, email);
 
     await page.fill('#firstName', updatedFirstName);
     await page.fill('#lastName', updatedLastName);
-    await clickAndAcceptDialog(page, 'button[type="submit"]:has-text("Update User")', /updated successfully/i);
+    await clickAndWaitForToast(page, 'button[type="submit"]:has-text("Update User")', /updated successfully/i);
 
     const updatedRow = page.locator('table tbody tr', { hasText: email }).first();
     await expect(updatedRow).toContainText(`${updatedFirstName} ${updatedLastName}`);
+  });
+
+  test('should show delete confirm dialog and allow cancellation', async ({ page }) => {
+    const email = 'viewer@settimes.ca';
+    await openUsersTab(page);
+
+    const row = page.locator('table tbody tr', { hasText: email }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+
+    await row.locator('button[aria-label^="Delete"]').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog')).toContainText('Delete User');
+
+    // Cancel — user should still be in the table
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(row).toBeVisible();
+  });
+
+  test('should show toggle confirm dialog and complete deactivate/reactivate cycle', async ({ page }) => {
+    const email = 'viewer@settimes.ca';
+    await openUsersTab(page);
+
+    const row = page.locator('table tbody tr', { hasText: email }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+
+    // Deactivate
+    await row.locator('button[aria-label^="Deactivate"]').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog')).toContainText('Deactivate User');
+    await page.getByRole('dialog').getByRole('button', { name: 'Deactivate' }).click();
+    await expect(page.locator('body')).toContainText(/deactivated/i, { timeout: 10000 });
+
+    // Full page reload flushes wrangler D1 local write-through and guarantees fresh DB state.
+    // Fast tab navigation (previous approach) races the miniflare SQLite commit.
+    await loginAsAdmin(page);
+    await openUsersTab(page);
+
+    // DB-backed state: user is now inactive — Activate button is deterministically present.
+    const deactivatedRow = page.locator('table tbody tr', { hasText: email }).first();
+    await expect(deactivatedRow).toBeVisible({ timeout: 15000 });
+    await deactivatedRow.locator('button[aria-label^="Activate"]').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog')).toContainText('Activate User');
+    await page.getByRole('dialog').getByRole('button', { name: 'Activate' }).click();
+    await expect(page.locator('body')).toContainText(/activated/i, { timeout: 10000 });
   });
 });

@@ -121,11 +121,39 @@ npx playwright test
 ```
 Requires a running wrangler dev server or uses it automatically via `playwright.config.js`. Run `npm run build --prefix frontend` first.
 
-### Before every commit
+### Before every commit — required checklist
+
+Run all steps that apply. Do not commit if any step fails.
+
+**Frontend changes (`frontend/src/`):**
+```bash
+cd frontend
+npx prettier --write "src/**/*.{js,jsx,json,css}"  # fix formatting first
+npm run lint && npm run format:check                 # ESLint + verify format
+npm test -- --run                                    # unit tests
+npm run build                                        # catch import/compile errors E2E would catch
 ```
-npm run lint
-cd frontend && npm run lint && npm run format:check
+
+**Backend changes (`functions/`):**
+```bash
+npm run validate:openapi    # if openapi.yaml changed
+npm test                    # from repo root (may fail on Apple Silicon — run in CI)
 ```
+
+**Why `--write` before `--check`:** `format:check` (what CI runs) only reports errors — it never fixes them. Always run `--write` first so the commit is already clean.
+
+**Why `npm run build`:** E2E tests run against the built app. A build failure will fail E2E in CI without a clear error. Running `build` locally catches broken imports, missing exports, and Vite errors before they reach CI.
+
+**E2E tests** require a live wrangler dev server and are slow — run them only when changing routes, auth flows, or anything the E2E suite targets. The build check above catches most issues.
+
+### Before every push (including follow-up commits during PR review)
+
+```bash
+git fetch origin
+git rebase origin/main      # keep branch current with main
+```
+
+Do this **every time you push**, not just when opening the PR. Dependabot merges deps bumps to `main` frequently — if you push without rebasing, GitHub will require an "Update branch" click before merging, which adds round-trips. Rebasing before each push eliminates this entirely.
 
 ---
 

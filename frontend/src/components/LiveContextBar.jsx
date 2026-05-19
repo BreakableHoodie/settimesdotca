@@ -40,7 +40,7 @@ function getLifecycleLabel(eventDate, currentTime) {
   }
 
   if (state === 'recently_completed') {
-    return { label: 'Recap', classes: 'bg-secondary-500/15 text-secondary-500 border-secondary-500/30' }
+    return { label: 'Recap', classes: 'bg-info-500/15 text-info-400 border-info-500/30' }
   }
 
   if (isSameLocalDay(eventDate, currentTime)) {
@@ -154,20 +154,24 @@ function LiveContextBar({
         <div className="sm:hidden">
           <div className="flex items-center justify-between gap-3">
             <span
-              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
               role="button"
               tabIndex={0}
+              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+              aria-label={`Event status: ${lifecycle.label}`}
               onClick={handleLifecycleTap}
-              onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleLifecycleTap()}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleLifecycleTap()
+                }
+              }}
             >
               {lifecycle.label}
             </span>
 
             <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85">
               <Clock size={14} aria-hidden="true" className="text-accent-400" />
-              <span aria-live="polite" className="tabular-nums">
-                {formatCurrentTime(currentTime)}
-              </span>
+              <span className="tabular-nums">{formatCurrentTime(currentTime)}</span>
             </div>
           </div>
 
@@ -201,11 +205,17 @@ function LiveContextBar({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
                 role="button"
                 tabIndex={0}
+                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+                aria-label={`Event status: ${lifecycle.label}`}
                 onClick={handleLifecycleTap}
-                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleLifecycleTap()}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleLifecycleTap()
+                  }
+                }}
               >
                 {lifecycle.label}
               </span>

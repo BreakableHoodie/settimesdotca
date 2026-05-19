@@ -122,7 +122,7 @@ test.describe('Event Wizard', () => {
     // Fill name first (auto-populates slug), then override slug with a known-taken value
     await dialog.getByRole('textbox', { name: 'Event Name *' }).fill(`Duplicate Slug ${suffix}`);
     await dialog.getByRole('textbox', { name: 'Event Date *' }).fill(futureDate());
-    await dialog.getByRole('textbox', { name: 'URL Slug *' }).fill('smoke-test-fest');
+    await dialog.getByRole('textbox', { name: 'URL Slug *' }).fill('winter-warm-up-2024');
     await dialog.getByRole('button', { name: 'Next' }).click();
 
     await dialog.getByRole('textbox', { name: 'Venue name' }).fill('Any Venue');
@@ -136,10 +136,17 @@ test.describe('Event Wizard', () => {
     await dialog.getByRole('button', { name: 'Add Band' }).click();
     await dialog.getByRole('button', { name: 'Next' }).click();
 
-    await dialog.getByRole('button', { name: 'Publish Event' }).click();
+    // Wait for the API response before asserting the error alert — on a cold CI runner
+    // the slug-conflict response can be slow, causing a first-attempt flake.
+    await Promise.all([
+      page.waitForResponse(resp =>
+        resp.url().includes('/api/admin/events') && !resp.ok()
+      ),
+      dialog.getByRole('button', { name: 'Publish Event' }).click(),
+    ]);
 
     // Error renders inside the dialog (not the global toast)
-    await expect(dialog.getByRole('alert')).toContainText('slug already exists', { timeout: 10000 });
+    await expect(dialog.getByRole('alert')).toContainText('slug already exists');
     await expect(dialog).toBeVisible();
   });
 });

@@ -148,7 +148,11 @@ function VenuesStep({ eventData, onChange }) {
               <div className="text-white font-medium">{venue.name}</div>
               {venue.address && <div className="text-gray-400 text-sm">{venue.address}</div>}
             </div>
-            <button onClick={() => handleRemoveVenue(venue.id)} className="text-red-400 hover:text-red-300">
+            <button
+              type="button"
+              onClick={() => handleRemoveVenue(venue.id)}
+              className="text-red-400 hover:text-red-300 min-h-[44px] px-2"
+            >
               Remove
             </button>
           </div>
@@ -243,7 +247,11 @@ function BandsStep({ eventData, onChange }) {
                   {venue?.name} • {formatTimeRange(band.startTime, band.endTime)}
                 </div>
               </div>
-              <button onClick={() => handleRemoveBand(band.id)} className="text-red-400 hover:text-red-300">
+              <button
+                type="button"
+                onClick={() => handleRemoveBand(band.id)}
+                className="text-red-400 hover:text-red-300 min-h-[44px] px-2"
+              >
                 Remove
               </button>
             </div>
@@ -447,10 +455,12 @@ export default function EventWizard({ onComplete, onCancel, initialEventData, in
   return (
     <div className="bg-bg-purple rounded-lg p-6">
       {/* Progress indicator */}
-      <div className="flex justify-between mb-8">
+      <div className="flex justify-between mb-8" role="list" aria-label="Wizard steps">
         {STEPS.map((step, idx) => (
           <div
             key={step}
+            role="listitem"
+            aria-current={idx === currentStep ? 'step' : undefined}
             className={`flex-1 text-center ${
               idx === currentStep ? 'text-accent-400 font-bold' : idx < currentStep ? 'text-green-400' : 'text-gray-500'
             }`}
@@ -461,7 +471,12 @@ export default function EventWizard({ onComplete, onCancel, initialEventData, in
       </div>
 
       {/* Current step content */}
-      <div className="mb-6">{stepComponents[STEPS[currentStep]]}</div>
+      <div className="mb-6">
+        <span className="sr-only" aria-live="polite" aria-atomic="true">
+          Step {currentStep + 1} of {STEPS.length}: {STEPS[currentStep]}
+        </span>
+        {stepComponents[STEPS[currentStep]]}
+      </div>
 
       {publishError && (
         <div role="alert" className="mb-4 bg-red-900/50 border border-red-600 text-red-200 p-3 rounded text-sm">

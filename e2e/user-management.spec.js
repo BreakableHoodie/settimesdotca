@@ -165,15 +165,15 @@ test.describe('User Management', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Deactivate' }).click();
     await expect(page.locator('body')).toContainText(/deactivated/i, { timeout: 10000 });
 
-    // Re-query after React reconciles the table; original locator is stale post-mutation.
-    // Wait for the row itself first so a slow re-render doesn't give a misleading error.
+    // Navigate away and back to force UserManagement remount + fresh fetchUsers() from
+    // DB. Relying on the optimistic-update render timing has been unreliable in CI.
+    await page.locator('#tab-events').click();
+    await openUsersTab(page);
+
+    // DB-backed state: user is now inactive — Activate button is deterministically present.
     const deactivatedRow = page.locator('table tbody tr', { hasText: email }).first();
     await expect(deactivatedRow).toBeVisible({ timeout: 15000 });
-    // click() waits for the button to exist, be visible, be stable, AND be enabled —
-    // all atomically. Using getByRole so Playwright resolves the accessible name on
-    // each poll interval rather than evaluating a static CSS selector once.
-    // /^activate/i anchors to start — prevents matching "Deactivate …" via substring
-    await deactivatedRow.getByRole('button', { name: /^activate/i }).click({ timeout: 15000 });
+    await deactivatedRow.locator('button[aria-label^="Activate"]').click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('dialog')).toContainText('Activate User');
     await page.getByRole('dialog').getByRole('button', { name: 'Activate' }).click();

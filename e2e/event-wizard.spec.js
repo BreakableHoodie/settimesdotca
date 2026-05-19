@@ -136,10 +136,17 @@ test.describe('Event Wizard', () => {
     await dialog.getByRole('button', { name: 'Add Band' }).click();
     await dialog.getByRole('button', { name: 'Next' }).click();
 
-    await dialog.getByRole('button', { name: 'Publish Event' }).click();
+    // Wait for the API response before asserting the error alert — on a cold CI runner
+    // the slug-conflict response can be slow, causing a first-attempt flake.
+    await Promise.all([
+      page.waitForResponse(resp =>
+        resp.url().includes('/api/admin/events') && !resp.ok()
+      ),
+      dialog.getByRole('button', { name: 'Publish Event' }).click(),
+    ]);
 
     // Error renders inside the dialog (not the global toast)
-    await expect(dialog.getByRole('alert')).toContainText('slug already exists', { timeout: 15000 });
+    await expect(dialog.getByRole('alert')).toContainText('slug already exists');
     await expect(dialog).toBeVisible();
   });
 });

@@ -121,24 +121,39 @@ npx playwright test
 ```
 Requires a running wrangler dev server or uses it automatically via `playwright.config.js`. Run `npm run build --prefix frontend` first.
 
-### Before every commit
+### Before every commit — required checklist
 
-Run these in order from the repo root. Do not skip any step, and do not commit if any step fails.
+Run all steps that apply. Do not commit if any step fails.
 
-```
-# 1. Format-fix all edited frontend files (use --write, not just --check)
-cd frontend && npx prettier --write "src/**/*.{js,jsx,json,css}"
-
-# 2. Lint
-npm run lint && npm run format:check
-
-# 3. Unit tests
-npm test -- --run
+**Frontend changes (`frontend/src/`):**
+```bash
+cd frontend
+npx prettier --write "src/**/*.{js,jsx,json,css}"  # fix formatting first
+npm run lint && npm run format:check                 # ESLint + verify format
+npm test -- --run                                    # unit tests
+npm run build                                        # catch import/compile errors E2E would catch
 ```
 
-**Why `--write` before `--check`:** `format:check` only reports formatting errors; it doesn't fix them. Running `--write` first ensures the commit is already clean before the check runs. Skipping `--write` and only running `--check` leads to CI format failures that require a follow-up commit.
+**Backend changes (`functions/`):**
+```bash
+npm run validate:openapi    # if openapi.yaml changed
+npm test                    # from repo root (may fail on Apple Silicon — run in CI)
+```
 
-After editing backend (`functions/`) files, also run `npm test` from the repo root (backend unit tests).
+**Why `--write` before `--check`:** `format:check` (what CI runs) only reports errors — it never fixes them. Always run `--write` first so the commit is already clean.
+
+**Why `npm run build`:** E2E tests run against the built app. A build failure will fail E2E in CI without a clear error. Running `build` locally catches broken imports, missing exports, and Vite errors before they reach CI.
+
+**E2E tests** require a live wrangler dev server and are slow — run them only when changing routes, auth flows, or anything the E2E suite targets. The build check above catches most issues.
+
+### Before every push (including follow-up commits during PR review)
+
+```bash
+git fetch origin
+git rebase origin/main      # keep branch current with main
+```
+
+Do this **every time you push**, not just when opening the PR. Dependabot merges deps bumps to `main` frequently — if you push without rebasing, GitHub will require an "Update branch" click before merging, which adds round-trips. Rebasing before each push eliminates this entirely.
 
 ---
 

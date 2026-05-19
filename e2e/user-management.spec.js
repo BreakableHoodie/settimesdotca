@@ -44,6 +44,9 @@ const waitForEditUserForm = async (page, email) => {
 };
 
 test.describe('User Management', () => {
+  // Tests mutate shared seeded accounts — serialize to prevent parallel races
+  test.describe.configure({ mode: 'serial' })
+
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
   });

@@ -5,6 +5,7 @@
 // - user: User object (null for create mode)
 // - onSave: function(userData)
 // - loading: boolean
+// - inviteUrl: string|null — when set, switches to invite-link copy view (email delivery failed)
 
 import { useState, useEffect, useRef } from 'react'
 import { FIELD_LIMITS } from '../../utils/validation'

@@ -171,9 +171,7 @@ function LiveContextBar({
 
             <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85">
               <Clock size={14} aria-hidden="true" className="text-accent-400" />
-              <span className="tabular-nums">
-                {formatCurrentTime(currentTime)}
-              </span>
+              <span className="tabular-nums">{formatCurrentTime(currentTime)}</span>
             </div>
           </div>
 

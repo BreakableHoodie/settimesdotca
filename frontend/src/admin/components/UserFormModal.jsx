@@ -108,9 +108,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-6 max-w-md w-full">
           <h3 className="text-lg font-bold text-white mb-2">Invite Created</h3>
-          <p className="text-sm text-yellow-300 mb-4">
-            Email delivery failed. Copy this link and share it manually:
-          </p>
+          <p className="text-sm text-yellow-300 mb-4">Email delivery failed. Copy this link and share it manually:</p>
           <input
             type="text"
             readOnly

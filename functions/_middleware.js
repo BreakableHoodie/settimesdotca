@@ -19,6 +19,12 @@ export async function onRequest(context) {
 
   const log = createRequestLogger(context);
 
+  // Enable FK enforcement for this D1 session. SQLite disables it by default;
+  // this must be set per-connection so it applies to every handler in this request.
+  if (env.DB) {
+    await env.DB.prepare('PRAGMA foreign_keys = ON').run();
+  }
+
   // Allowed origins for CORS (production and development)
   const baseAllowedOrigins = [
     'https://settimes.ca',

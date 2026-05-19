@@ -60,9 +60,11 @@ The Cloudflare Workers D1 binding does not support explicit `BEGIN`/`COMMIT` tra
 
 For mutations that cannot be expressed as a single batch (e.g., the event-duplication pattern in `functions/api/admin/events/[id].js`), use compensating deletes: if step N fails, manually undo steps 1…N-1.
 
-### PRAGMA `foreign_keys = ON` is NOT set in production
+### PRAGMA `foreign_keys = ON` is enforced in production
 
-SQLite foreign keys are disabled by default. They're enabled in test helpers but not in the production wrangler config (`wrangler.toml`). This is a known open issue (DB-F1). Do not silently assume FK constraints are enforced — application-level checks are required.
+`functions/_middleware.js` runs `PRAGMA foreign_keys = ON` on every D1 session before the request handler fires. Unit test helpers (`functions/api/test-utils.js`) set it the same way via `better-sqlite3`. FK constraints are active in all environments.
+
+When recreating a table in a migration (SQLite has no ALTER COLUMN), surround the table-recreation block with `PRAGMA foreign_keys = OFF` / `PRAGMA foreign_keys = ON` as migration 0032 does — D1 will reject the DROP otherwise.
 
 ### `ALLOW_ADMIN_SIGNUP` is test-only
 

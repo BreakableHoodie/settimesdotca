@@ -164,11 +164,13 @@ export default function UserManagement({ showToast }) {
     setActionLoading(true)
     try {
       await usersApi.remove(target.id)
-      await fetchUsers()
+      setUsers(prev => prev.filter(u => u.id !== target.id))
       showToast(`User ${target.email} deleted`, 'success')
+      fetchUsers()
     } catch (error) {
       console.error('Failed to delete user:', error)
       showToast(error.details?.message || error.message || 'Failed to delete user', 'error')
+      await fetchUsers()
     } finally {
       setActionLoading(false)
     }
@@ -200,10 +202,12 @@ export default function UserManagement({ showToast }) {
     setActionLoading(true)
     try {
       await usersApi.update(target.id, { isActive: !target.isActive })
-      await fetchUsers()
+      setUsers(prev => prev.map(u => (u.id === target.id ? { ...u, isActive: !target.isActive } : u)))
       showToast(`User ${target.email} ${target.isActive ? 'deactivated' : 'activated'}`, 'success')
+      fetchUsers()
     } catch {
       showToast('Failed to update user status', 'error')
+      await fetchUsers()
     } finally {
       setActionLoading(false)
     }

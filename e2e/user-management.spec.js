@@ -165,9 +165,9 @@ test.describe('User Management', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Deactivate' }).click();
     await expect(page.locator('body')).toContainText(/deactivated/i, { timeout: 10000 });
 
-    // Navigate away and back to force UserManagement remount + fresh fetchUsers() from
-    // DB. Relying on the optimistic-update render timing has been unreliable in CI.
-    await page.locator('#tab-events').click();
+    // Full page reload flushes wrangler D1 local write-through and guarantees fresh DB state.
+    // Fast tab navigation (previous approach) races the miniflare SQLite commit.
+    await loginAsAdmin(page);
     await openUsersTab(page);
 
     // DB-backed state: user is now inactive — Activate button is deterministically present.

@@ -122,7 +122,7 @@ test.describe('Event Wizard', () => {
     // Fill name first (auto-populates slug), then override slug with a known-taken value
     await dialog.getByRole('textbox', { name: 'Event Name *' }).fill(`Duplicate Slug ${suffix}`);
     await dialog.getByRole('textbox', { name: 'Event Date *' }).fill(futureDate());
-    await dialog.getByRole('textbox', { name: 'URL Slug *' }).fill('smoke-test-fest');
+    await dialog.getByRole('textbox', { name: 'URL Slug *' }).fill('winter-warm-up-2024');
     await dialog.getByRole('button', { name: 'Next' }).click();
 
     await dialog.getByRole('textbox', { name: 'Venue name' }).fill('Any Venue');

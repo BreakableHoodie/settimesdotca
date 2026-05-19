@@ -112,7 +112,7 @@ test.describe('User Management', () => {
 
     const editRow = page.locator('table tbody tr', { hasText: email }).first();
     await expect(editRow).toBeVisible({ timeout: 15000 });
-    await editRow.locator('button[title="Edit User"]').click();
+    await editRow.locator('button[aria-label^="Edit"]').click();
     await waitForEditUserForm(page, email);
 
     await page.fill('#firstName', updatedFirstName);
@@ -121,5 +121,45 @@ test.describe('User Management', () => {
 
     const updatedRow = page.locator('table tbody tr', { hasText: email }).first();
     await expect(updatedRow).toContainText(`${updatedFirstName} ${updatedLastName}`);
+  });
+
+  test('should show delete confirm dialog and allow cancellation', async ({ page }) => {
+    const email = 'viewer@settimes.ca';
+    await openUsersTab(page);
+
+    const row = page.locator('table tbody tr', { hasText: email }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+
+    await row.locator('button[aria-label^="Delete"]').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog')).toContainText('Delete User');
+
+    // Cancel — user should still be in the table
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(row).toBeVisible();
+  });
+
+  test('should show toggle confirm dialog and complete deactivate/reactivate cycle', async ({ page }) => {
+    const email = 'viewer@settimes.ca';
+    await openUsersTab(page);
+
+    const row = page.locator('table tbody tr', { hasText: email }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+
+    // Deactivate
+    await row.locator('button[aria-label^="Deactivate"]').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog')).toContainText('Deactivate User');
+    await page.getByRole('dialog').getByRole('button', { name: 'Deactivate' }).click();
+    await expect(page.locator('body')).toContainText(/deactivated/i, { timeout: 10000 });
+
+    // Wait for table to reflect deactivated state, then reactivate
+    await expect(row.locator('button[aria-label^="Activate"]')).toBeVisible({ timeout: 10000 });
+    await row.locator('button[aria-label^="Activate"]').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog')).toContainText('Activate User');
+    await page.getByRole('dialog').getByRole('button', { name: 'Activate' }).click();
+    await expect(page.locator('body')).toContainText(/activated/i, { timeout: 10000 });
   });
 });

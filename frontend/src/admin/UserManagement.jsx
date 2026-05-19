@@ -28,6 +28,7 @@ export default function UserManagement({ showToast }) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [pendingDelete, setPendingDelete] = useState(null)
   const [pendingToggle, setPendingToggle] = useState(null)
+  const [pendingInviteUrl, setPendingInviteUrl] = useState(null)
 
   const resolveDisplayName = user => {
     if (user?.firstName || user?.lastName) {
@@ -116,14 +117,13 @@ export default function UserManagement({ showToast }) {
       const inviteUrl = data?.inviteUrl
       const delivered = data?.email?.delivered
       if (inviteUrl && !delivered) {
-        // eslint-disable-next-line no-console
-        console.log('Invite URL (email delivery failed):', inviteUrl)
-        showToast(`Invite created for ${userData.email}. Copy the link: ${inviteUrl}`, 'success')
+        setPendingInviteUrl(inviteUrl)
+        // Keep modal open — UserFormModal switches to URL-copy view
       } else {
         showToast(`Invite sent to ${userData.email}`, 'success')
+        setShowUserModal(false)
+        setEditingUser(null)
       }
-      setShowUserModal(false)
-      setEditingUser(null)
       fetchUsers()
     } catch (error) {
       console.error('Failed to create user:', error)
@@ -484,10 +484,12 @@ export default function UserManagement({ showToast }) {
         onClose={() => {
           setShowUserModal(false)
           setEditingUser(null)
+          setPendingInviteUrl(null)
         }}
         user={editingUser}
         onSave={handleSaveUser}
         loading={actionLoading}
+        inviteUrl={pendingInviteUrl}
       />
 
       {/* Password Reset Modal */}

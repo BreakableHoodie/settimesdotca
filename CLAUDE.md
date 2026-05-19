@@ -122,10 +122,23 @@ npx playwright test
 Requires a running wrangler dev server or uses it automatically via `playwright.config.js`. Run `npm run build --prefix frontend` first.
 
 ### Before every commit
+
+Run these in order from the repo root. Do not skip any step, and do not commit if any step fails.
+
 ```
-npm run lint
-cd frontend && npm run lint && npm run format:check
+# 1. Format-fix all edited frontend files (use --write, not just --check)
+cd frontend && npx prettier --write "src/**/*.{js,jsx,json,css}"
+
+# 2. Lint
+npm run lint && npm run format:check
+
+# 3. Unit tests
+npm test -- --run
 ```
+
+**Why `--write` before `--check`:** `format:check` only reports formatting errors; it doesn't fix them. Running `--write` first ensures the commit is already clean before the check runs. Skipping `--write` and only running `--check` leads to CI format failures that require a follow-up commit.
+
+After editing backend (`functions/`) files, also run `npm test` from the repo root (backend unit tests).
 
 ---
 

@@ -144,10 +144,10 @@ export default function UserManagement({ showToast }) {
         lastName: userData.lastName,
         isActive: userData.isActive,
       })
-      showToast(`User ${userData.email} updated successfully`, 'success')
       setShowUserModal(false)
       setEditingUser(null)
       await fetchUsers()
+      showToast(`User ${userData.email} updated successfully`, 'success')
     } catch (error) {
       console.error('Failed to update user:', error)
       showToast(error.details?.message || error.message || 'Failed to update user', 'error')
@@ -164,8 +164,8 @@ export default function UserManagement({ showToast }) {
     setActionLoading(true)
     try {
       await usersApi.remove(target.id)
-      showToast(`User ${target.email} deleted`, 'success')
       await fetchUsers()
+      showToast(`User ${target.email} deleted`, 'success')
     } catch (error) {
       console.error('Failed to delete user:', error)
       showToast(error.details?.message || error.message || 'Failed to delete user', 'error')
@@ -200,8 +200,8 @@ export default function UserManagement({ showToast }) {
     setActionLoading(true)
     try {
       await usersApi.update(target.id, { isActive: !target.isActive })
-      showToast(`User ${target.email} ${target.isActive ? 'deactivated' : 'activated'}`, 'success')
       await fetchUsers()
+      showToast(`User ${target.email} ${target.isActive ? 'deactivated' : 'activated'}`, 'success')
     } catch {
       showToast('Failed to update user status', 'error')
     } finally {

@@ -19,10 +19,18 @@ const openUsersTab = async (page) => {
 };
 
 const uniqueSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-// Invite/update flows now show a toast instead of a native dialog.
+// Invite/update flows show a toast (email delivered) or keep the modal open
+// with a URL-copy view (email delivery failed). Both cases are handled here.
 const clickAndWaitForToast = async (page, selector, matcher) => {
   await page.click(selector);
   await expect(page.locator('body')).toContainText(matcher, { timeout: 10000 });
+  // If email delivery failed the modal stays open showing the invite URL.
+  // Close it so subsequent test steps are not blocked by the overlay.
+  const inviteCreatedHeading = page.getByRole('heading', { name: 'Invite Created' });
+  if (await inviteCreatedHeading.isVisible()) {
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(inviteCreatedHeading).not.toBeVisible();
+  }
 };
 const waitForCreateUserForm = async (page) => {
   await expect(page.getByRole('heading', { name: 'Create New User' })).toBeVisible();

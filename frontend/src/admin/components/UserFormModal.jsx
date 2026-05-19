@@ -6,7 +6,7 @@
 // - onSave: function(userData)
 // - loading: boolean
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FIELD_LIMITS } from '../../utils/validation'
 
 export default function UserFormModal({ isOpen, onClose, user, onSave, loading, inviteUrl }) {
@@ -91,6 +91,11 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
     return Object.keys(newErrors).length === 0
   }
 
+  const copyButtonRef = useRef(null)
+  useEffect(() => {
+    if (isOpen && inviteUrl) copyButtonRef.current?.focus()
+  }, [isOpen, inviteUrl])
+
   const handleSubmit = e => {
     e.preventDefault()
 
@@ -105,9 +110,16 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
 
   if (inviteUrl) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-6 max-w-md w-full">
-          <h3 className="text-lg font-bold text-white mb-2">Invite Created</h3>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" role="presentation">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="invite-url-title"
+          className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-6 max-w-md w-full"
+        >
+          <h3 id="invite-url-title" className="text-lg font-bold text-white mb-2">
+            Invite Created
+          </h3>
           <p className="text-sm text-yellow-300 mb-4">Email delivery failed. Copy this link and share it manually:</p>
           <input
             type="text"
@@ -119,6 +131,7 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
           />
           <div className="flex gap-3">
             <button
+              ref={copyButtonRef}
               type="button"
               onClick={() => navigator.clipboard.writeText(inviteUrl)}
               className="flex-1 min-h-[44px] bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-2 px-4 rounded-lg transition"

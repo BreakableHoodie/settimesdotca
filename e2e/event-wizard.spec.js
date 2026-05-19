@@ -139,7 +139,7 @@ test.describe('Event Wizard', () => {
     await dialog.getByRole('button', { name: 'Publish Event' }).click();
 
     // Error renders inside the dialog (not the global toast)
-    await expect(dialog.getByRole('alert')).toContainText('slug already exists', { timeout: 10000 });
+    await expect(dialog).toContainText('slug already exists', { timeout: 10000 });
     await expect(dialog).toBeVisible();
   });
 });

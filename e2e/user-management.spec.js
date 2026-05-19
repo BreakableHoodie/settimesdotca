@@ -165,9 +165,10 @@ test.describe('User Management', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Deactivate' }).click();
     await expect(page.locator('body')).toContainText(/deactivated/i, { timeout: 10000 });
 
-    // Wait for table to reflect deactivated state, then reactivate
-    await expect(row.locator('button[aria-label^="Activate"]')).toBeVisible({ timeout: 10000 });
-    await row.locator('button[aria-label^="Activate"]').click();
+    // Re-query after table re-renders — original locator is stale post-mutation
+    const deactivatedRow = page.locator('table tbody tr', { hasText: email }).first();
+    await expect(deactivatedRow.locator('button[aria-label^="Activate"]')).toBeVisible({ timeout: 10000 });
+    await deactivatedRow.locator('button[aria-label^="Activate"]').click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('dialog')).toContainText('Activate User');
     await page.getByRole('dialog').getByRole('button', { name: 'Activate' }).click();

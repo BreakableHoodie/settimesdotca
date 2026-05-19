@@ -172,7 +172,8 @@ test.describe('User Management', () => {
     // click() waits for the button to exist, be visible, be stable, AND be enabled —
     // all atomically. Using getByRole so Playwright resolves the accessible name on
     // each poll interval rather than evaluating a static CSS selector once.
-    await deactivatedRow.getByRole('button', { name: /activate/i }).click({ timeout: 15000 });
+    // /^activate/i anchors to start — prevents matching "Deactivate …" via substring
+    await deactivatedRow.getByRole('button', { name: /^activate/i }).click({ timeout: 15000 });
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('dialog')).toContainText('Activate User');
     await page.getByRole('dialog').getByRole('button', { name: 'Activate' }).click();

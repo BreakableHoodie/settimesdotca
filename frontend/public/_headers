@@ -17,6 +17,7 @@
 
   # Cross-Origin policies
   Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Resource-Policy: same-origin
 
   # Content Security Policy
@@ -27,6 +28,20 @@
 
   # Prevent stale HTML fallback caching (SPA routes like /band/*, /event/*)
   Cache-Control: no-cache, no-store, must-revalidate
+
+# Embed widget pages — intended to be loaded in third-party iframes.
+# Cloudflare Pages merges duplicate headers across matching rules (comma-joining),
+# so headers set by /* must be explicitly unset with ! before re-setting them here.
+# Without the ! unsetting, both CSPs would apply and the browser would take the
+# intersection — leaving frame-ancestors 'none' in effect despite this override.
+/embed/*
+  ! X-Frame-Options
+  ! Cross-Origin-Opener-Policy
+  ! Cross-Origin-Embedder-Policy
+  ! Content-Security-Policy
+  Cross-Origin-Embedder-Policy: unsafe-none
+  Cross-Origin-Opener-Policy: unsafe-none
+  Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://*.settimes.ca https://*.pages.dev https://cloudflareinsights.com https://static.cloudflareinsights.com; frame-ancestors *; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
 
 # Cache control for static assets (versioned JS/CSS bundles)
 /assets/*

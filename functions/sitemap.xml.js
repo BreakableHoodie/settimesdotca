@@ -60,6 +60,9 @@ ${rows.join("\n")}
       headers: {
         "Content-Type": "application/xml; charset=UTF-8",
         "Cache-Control": "public, max-age=3600",
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Resource-Policy": "same-origin",
       },
     });
   } catch (error) {
@@ -75,7 +78,13 @@ ${rows.join("\n")}
 </urlset>`,
       {
         status: 500,
-        headers: { "Content-Type": "application/xml; charset=UTF-8" },
+        headers: {
+          "Content-Type": "application/xml; charset=UTF-8",
+          "Cache-Control": "no-store",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Cross-Origin-Embedder-Policy": "require-corp",
+          "Cross-Origin-Resource-Policy": "same-origin",
+        },
       },
     );
   }

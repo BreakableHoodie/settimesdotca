@@ -20,12 +20,12 @@
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
     "@axe-core/playwright": "^4.11.3",
-    "@playwright/test": "^1.60.0",
-    "@vitest/coverage-v8": "^4.1.8",
-    "baseline-browser-mapping": "^2.10.34",
-    "better-sqlite3": "^12.10.0",
+    "@playwright/test": "^1.61.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "baseline-browser-mapping": "^2.10.37",
+    "better-sqlite3": "^12.10.1",
     "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   },
   "dependencies": {
     "csrf-csrf": "^4.0.3",

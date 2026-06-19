@@ -33,6 +33,18 @@ export async function onRequestGet(context) {
       return json({ error: 'Share link not found or expired' }, 404)
     }
 
+    // Best-effort view counter — a counter failure must never break share
+    // retrieval, but we log (not silently swallow) so write failures stay visible.
+    try {
+      await DB.prepare(
+        'UPDATE share_links SET view_count = view_count + 1 WHERE slug = ?'
+      )
+        .bind(slug)
+        .run()
+    } catch (err) {
+      console.error('Share link view-count increment failed:', slug, err)
+    }
+
     let performance_ids, band_names
     try {
       performance_ids = JSON.parse(row.performance_ids)

@@ -72,4 +72,32 @@ describe('GET /api/schedule/share/[slug]', () => {
     })
     expect(res.status).toBe(400)
   })
+
+  test('increments view_count each time the share link is fetched', async () => {
+    const { env, rawDb } = createTestEnv()
+    const event = insertEvent(rawDb, { name: 'My Fest', slug: 'my-fest' })
+    rawDb.prepare('UPDATE events SET is_published = 1 WHERE id = ?').run(event.id)
+    insertShareLink(rawDb, {
+      slug: 'view1234',
+      event_id: event.id,
+      event_slug: 'my-fest',
+      performance_ids: [10],
+      band_names: ['Band A'],
+    })
+
+    const call = () =>
+      onRequestGet({
+        request: makeRequest('view1234'),
+        params: { slug: 'view1234' },
+        env,
+      })
+
+    await call()
+    await call()
+
+    const row = rawDb
+      .prepare('SELECT view_count FROM share_links WHERE slug = ?')
+      .get('view1234')
+    expect(row.view_count).toBe(2)
+  })
 })

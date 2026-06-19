@@ -92,6 +92,14 @@ All interactions go through `frontend/src/utils/scheduleStorage.js`. Do not writ
 
 ---
 
+## Metrics & Analytics
+
+Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_stats`) via `POST /api/metrics`, plus an optional Cloudflare Analytics Engine sink (`env.ANALYTICS`, configured in `wrangler.toml`). Ingestion is best-effort and fire-and-forget; failures must not surface to users.
+
+**Share metrics come from `share_links`, not telemetry.** A share *create* is a `share_links` row; a *view* increments `share_links.view_count` (best-effort, in the `GET /api/schedule/share/[slug]` handler). The admin event metrics endpoint reads these directly. Do **not** wire the allowlisted-but-unused `share_event` / `filter_use` events into `/api/metrics` for share counts — they would be redundant with `share_links`.
+
+---
+
 ## RBAC Roles
 
 Three roles in ascending order: `viewer` → `editor` → `admin`.

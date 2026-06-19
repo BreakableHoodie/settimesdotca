@@ -1483,6 +1483,67 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/admin/bands/import:
+    post:
+      tags:
+        - Admin - Bands
+      summary: Bulk-import a lineup of bands for an event
+      description: >
+        Import many bands at once for one event. Every row is validated up front;
+        if any row is invalid nothing is written (400 with per-row errors). Valid
+        rows find-or-create band profiles by normalized name and create
+        performances. The whole import is rolled back on any write failure.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event_id
+                - bands
+              properties:
+                event_id:
+                  type: integer
+                  description: Event the bands are imported into
+                bands:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                      start_time:
+                        type: string
+                        description: "Start time in HH:MM format"
+                      end_time:
+                        type: string
+                        description: "End time in HH:MM format"
+                      venue:
+                        type: string
+                        description: Must match an existing venue name
+                      genre:
+                        type: string
+      responses:
+        "201":
+          description: Import succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/admin/bands/photos:
     post:
       tags:

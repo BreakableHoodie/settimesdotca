@@ -58,6 +58,27 @@ export async function onRequestGet(context) {
       popularBands = { results: [] };
     }
 
+    // Share-link analytics: shares created + total views + top routes by views.
+    // Derived directly from share_links (creates are rows; views are view_count),
+    // so no separate share telemetry path is needed.
+    const shareStats = await DB.prepare(
+      `SELECT COUNT(*) AS total_shares,
+              COALESCE(SUM(view_count), 0) AS total_share_views
+       FROM share_links WHERE event_id = ?`,
+    )
+      .bind(eventId)
+      .first();
+
+    const topSharedRoutes = await DB.prepare(
+      `SELECT slug, view_count
+       FROM share_links
+       WHERE event_id = ?
+       ORDER BY view_count DESC, created_at DESC
+       LIMIT 10`,
+    )
+      .bind(eventId)
+      .all();
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -66,6 +87,9 @@ export async function onRequestGet(context) {
           uniqueVisitors: metrics?.unique_visitors || 0,
           lastUpdated: metrics?.last_updated,
           popularBands: popularBands.results || [],
+          totalShares: shareStats?.total_shares || 0,
+          totalShareViews: shareStats?.total_share_views || 0,
+          topSharedRoutes: topSharedRoutes.results || [],
         },
       }),
       {

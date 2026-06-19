@@ -46,6 +46,18 @@ export default function MetricsDashboard({ eventId }) {
             {metrics.lastUpdated ? new Date(metrics.lastUpdated).toLocaleDateString() : 'Never'}
           </div>
         </div>
+
+        {/* Shares Created */}
+        <div className="bg-bg-purple rounded-lg p-4">
+          <div className="text-gray-400 text-sm">Shares Created</div>
+          <div className="text-3xl font-bold text-white mt-2">{metrics.totalShares ?? 0}</div>
+        </div>
+
+        {/* Share Views */}
+        <div className="bg-bg-purple rounded-lg p-4">
+          <div className="text-gray-400 text-sm">Share Views</div>
+          <div className="text-3xl font-bold text-white mt-2">{metrics.totalShareViews ?? 0}</div>
+        </div>
       </div>
 
       {/* Popular Bands */}
@@ -63,6 +75,25 @@ export default function MetricsDashboard({ eventId }) {
             ))
           ) : (
             <p className="text-gray-400 text-sm">No data available yet</p>
+          )}
+        </div>
+      </div>
+
+      {/* Most-Viewed Shared Routes */}
+      <div className="bg-bg-purple rounded-lg p-4">
+        <h4 className="text-white font-semibold mb-3">Most-Viewed Shared Routes</h4>
+        <div className="space-y-2">
+          {(metrics.topSharedRoutes || []).length > 0 ? (
+            (metrics.topSharedRoutes || []).map((route, idx) => (
+              <div key={route.slug} className="flex justify-between text-sm">
+                <span className="text-white">
+                  {idx + 1}. /s/{route.slug}
+                </span>
+                <span className="text-gray-400">{route.view_count} views</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-400 text-sm">No shared routes yet</p>
           )}
         </div>
       </div>

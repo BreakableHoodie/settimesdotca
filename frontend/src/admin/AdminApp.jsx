@@ -37,14 +37,17 @@ export default function AdminApp() {
   // Show loading state while checking session
   if (checking) {
     return (
-      <div className="min-h-screen bg-bg-navy flex items-center justify-center">
+      <div data-theme="midnight-ember" className="min-h-screen bg-bg-navy flex items-center justify-center">
         <div className="text-accent-400 text-lg">Loading...</div>
       </div>
     )
   }
 
   return (
-    <>
+    // Admin is pinned to the dark theme — it should not follow the visitor's
+    // public theme pick (it is a tool, not a vibe). display:contents keeps this
+    // wrapper layout-transparent while providing the data-theme token context.
+    <div data-theme="midnight-ember" className="contents">
       <Routes>
         <Route
           path="login"
@@ -81,6 +84,6 @@ export default function AdminApp() {
         cancelText="Log out"
         variant="primary"
       />
-    </>
+    </div>
   )
 }

@@ -276,6 +276,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
         const bVal = formatOrigin(b).toLowerCase()
         return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
       }
+      if (sortConfig.key === 'follower_count') {
+        const aVal = a.follower_count ?? 0
+        const bVal = b.follower_count ?? 0
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
+      }
       const aVal = (a[sortConfig.key] || '').toLowerCase()
       const bVal = (b[sortConfig.key] || '').toLowerCase()
 
@@ -665,6 +670,12 @@ export default function RosterTab({ showToast, readOnly = false }) {
                     >
                       Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
                     </th>
+                    <th
+  onClick={() => handleSort('follower_count')}
+  className="px-4 py-3 text-right text-white font-semibold cursor-pointer hover:text-accent-400"
+>
+  Followers <SortIcon col="follower_count" sortConfig={sortConfig} />
+</th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>
                 </thead>
@@ -711,6 +722,15 @@ export default function RosterTab({ showToast, readOnly = false }) {
                         <SocialLinksIcons band={band} />
                       </td>
                       <td className="px-4 py-3 text-white/70">{band.contact_email || '-'}</td>
+                      <td className="px-4 py-3 text-right text-white/70">
+                        {band.follower_count > 0 ? (
+                          <span className="inline-flex items-center rounded-full bg-accent-500/15 px-2 py-1 text-xs font-semibold text-accent-300">
+                            {band.follower_count}
+                          </span>
+                        ) : (
+                          <span className="text-white/30">0</span>
+                        )}
+                      </td>
                       {!readOnly && (
                         <td className="px-4 py-3 flex justify-end gap-2">
                           <button
@@ -772,16 +792,18 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       </a>
                     </label>
                   </div>
-                  <div className="text-sm text-text-secondary space-y-1">
-                    <div>Origin: {formatOrigin(band) || '-'}</div>
-                    <div>Genre: {band.genre || '-'}</div>
-                    <div>Status: {band.is_active === 0 || band.is_active === false ? 'Inactive' : 'Active'}</div>
-                    <div className="flex items-center gap-2">
-                      <span>Links:</span>
-                      <SocialLinksIcons band={band} />
+                    <div className="text-sm text-text-secondary space-y-1">
+                      <div>Origin: {formatOrigin(band) || '-'}</div>
+                      <div>Genre: {band.genre || '-'}</div>
+                      <div>Status: {band.is_active === 0 || band.is_active === false ? 'Inactive' : 'Active'}</div>
+                      <div>Followers: {band.follower_count ?? 0}</div>
+                      <div className="flex items-center gap-2">
+                        <span>Links:</span>
+                        <SocialLinksIcons band={band} />
+                      </div>
+                      <div>Contact: {band.contact_email || '-'}</div>
+                    <div>Followers: {band.follower_count > 0 ? band.follower_count : 0}</div>
                     </div>
-                    <div>Contact: {band.contact_email || '-'}</div>
-                  </div>
                   {!readOnly && (
                     <div className="flex flex-wrap gap-2">
                       <button

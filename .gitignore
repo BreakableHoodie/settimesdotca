@@ -52,6 +52,8 @@ e2e/.auth/
 # AI assistants (developer-specific)
 .claude/
 .serena/
+.opencode/
+.agents/
 .mcp.json
 workers-mcp-server/
 chatmodes/

@@ -36,7 +36,7 @@ export async function onRequestPost(context) {
   }
 
   const perf = await DB.prepare(
-    `SELECT p.id, p.band_profile_id, bp.name AS band_name, e.name AS event_name
+    `SELECT p.id, p.is_announced, p.band_profile_id, bp.name AS band_name, e.name AS event_name
      FROM performances p
      JOIN band_profiles bp ON p.band_profile_id = bp.id
      JOIN events e ON p.event_id = e.id
@@ -47,6 +47,13 @@ export async function onRequestPost(context) {
 
   if (!perf) {
     return json({ error: "Not found", message: "Performance not found" }, 404);
+  }
+
+  if (!perf.is_announced) {
+    return json(
+      { error: "Bad request", message: "Performance has not been announced" },
+      400,
+    );
   }
 
   // Verified followers WITHOUT a notification row for this performance.

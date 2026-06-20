@@ -36,7 +36,7 @@ export async function notifyBandFollowers(
       });
 
       // sendEmail returns { delivered: false } on failure rather than throwing.
-      const delivered = result?.delivered !== false;
+      const delivered = result?.delivered === true;
       if (delivered) {
         // Record the success so a future resend skips this follower. A recording
         // failure must NOT flip the email result, so it is caught and logged.

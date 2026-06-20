@@ -634,6 +634,16 @@ export const bandsApi = {
     return handleResponse(response)
   },
 
+  async bulkImport(eventId, bands) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/import`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ event_id: eventId, bands }),
+    })
+    return handleResponse(response)
+  },
+
   async bulkPreview(bandIds, action, params = {}) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/bands/bulk-preview`, {
       method: 'POST',

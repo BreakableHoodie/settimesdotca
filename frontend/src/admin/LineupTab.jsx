@@ -4,6 +4,7 @@ import { bandsApi, venuesApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
 import BulkPreviewModal from './BulkPreviewModal'
+import BulkBandImport from './BulkBandImport'
 import ArtistPicker from './components/ArtistPicker'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
@@ -552,17 +553,25 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
           <p className="text-sm text-white/70 mt-1">Manage performances, times, and venues for the selected event.</p>
         </div>
         {viewMode === 'list' && !readOnly && (
-          <button
-            onClick={() => {
-              setViewMode('picker')
-              if (!allBands.length) {
-                loadRoster()
-              }
-            }}
-            className="px-6 py-3 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors font-medium min-h-[44px]"
-          >
-            + Add to Lineup
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setViewMode('import')}
+              className="px-6 py-3 bg-bg-purple text-white rounded hover:bg-bg-purple/80 transition-colors font-medium min-h-[44px] border border-accent-500/30"
+            >
+              Bulk import
+            </button>
+            <button
+              onClick={() => {
+                setViewMode('picker')
+                if (!allBands.length) {
+                  loadRoster()
+                }
+              }}
+              className="px-6 py-3 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors font-medium min-h-[44px]"
+            >
+              + Add to Lineup
+            </button>
+          </div>
         )}
       </div>
 
@@ -575,6 +584,22 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
           loading={rosterLoading}
           venues={venues}
         />
+      )}
+
+      {viewMode === 'import' && !readOnly && (
+        <div className="space-y-3">
+          <button onClick={() => setViewMode('list')} className="text-sm text-white/70 hover:text-white">
+            ← Back to lineup
+          </button>
+          <BulkBandImport
+            eventId={selectedEventId}
+            onImported={() => {
+              loadData()
+              setViewMode('list')
+              if (showToast) showToast('Bands imported', 'success')
+            }}
+          />
+        </div>
       )}
 
       {viewMode === 'form' && !readOnly && (

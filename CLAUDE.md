@@ -60,6 +60,8 @@ The Cloudflare Workers D1 binding does not support explicit `BEGIN`/`COMMIT` tra
 
 For mutations that cannot be expressed as a single batch (e.g., the event-duplication pattern in `functions/api/admin/events/[id].js`), use compensating deletes: if step N fails, manually undo steps 1…N-1.
 
+The bulk band import (`functions/api/admin/bands/import.js`) follows this pattern and is **all-or-nothing**: it validates every row first (an invalid row aborts the whole import with per-row errors, writing nothing), then find-or-creates profiles and inserts performances, rolling back everything it created if any write fails. A lineup is never left half-imported.
+
 ### PRAGMA `foreign_keys = ON` is enforced in production
 
 `functions/_middleware.js` runs `PRAGMA foreign_keys = ON` on every D1 session before the request handler fires. Unit test helpers (`functions/api/test-utils.js`) set it the same way via `better-sqlite3`. FK constraints are active in all environments.
@@ -89,6 +91,14 @@ Band selections are stored under the `selectedBandsByEvent` key as `{ [eventSlug
 The `__dates__` namespace is used for stale detection. **Always use YYYY-MM-DD lexicographic string comparison** — do NOT use `new Date('YYYY-MM-DD')` which parses as UTC midnight and causes events to appear stale on their own day in UTC-negative timezones.
 
 All interactions go through `frontend/src/utils/scheduleStorage.js`. Do not write to `selectedBandsByEvent` directly.
+
+---
+
+## Metrics & Analytics
+
+Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_stats`) via `POST /api/metrics`, plus an optional Cloudflare Analytics Engine sink (`env.ANALYTICS`, configured in `wrangler.toml`). Ingestion is best-effort and fire-and-forget; failures must not surface to users.
+
+**Share metrics come from `share_links`, not telemetry.** A share *create* is a `share_links` row; a *view* increments `share_links.view_count` (best-effort, in the `GET /api/schedule/share/[slug]` handler). The admin event metrics endpoint reads these directly. Do **not** wire the allowlisted-but-unused `share_event` / `filter_use` events into `/api/metrics` for share counts — they would be redundant with `share_links`.
 
 ---
 

@@ -30,12 +30,18 @@ binding = "DB"
 database_name = "settimes-production-db"
 database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b" # binding reference only — not a credential; D1 access still requires Cloudflare API token auth
 
-# Analytics Engine binding (privacy-first metrics)
-# Requires Analytics Engine to be enabled in Cloudflare dashboard
-# Enable at: https://dash.cloudflare.com/YOUR_ACCOUNT/workers/analytics-engine
-# [[analytics_engine_datasets]]
-# binding = "ANALYTICS"
-# dataset = "settimes_metrics"
+# Analytics Engine binding (privacy-first metrics) — secondary, queryable sink
+# read by functions/api/metrics.js (env.ANALYTICS.writeDataPoint). The D1 daily
+# aggregate tables remain the primary store; this adds fast, queryable analytics
+# for the event-day dashboard. The metrics handler guards on `if (env.ANALYTICS)`,
+# so this is a no-op until the binding resolves.
+#
+# Production (Pages): also add the binding in the Cloudflare dashboard under
+# Settings > Functions > Analytics Engine bindings (Variable name: ANALYTICS),
+# mirroring the R2 binding below. Requires Analytics Engine enabled on the account.
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "settimes_metrics"
 
 # Cron triggers are not supported for Cloudflare Pages
 # Use a separate Worker if scheduled tasks are needed

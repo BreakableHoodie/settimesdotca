@@ -802,6 +802,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                         <SocialLinksIcons band={band} />
                       </div>
                       <div>Contact: {band.contact_email || '-'}</div>
+                    <div>Followers: {band.follower_count > 0 ? band.follower_count : 0}</div>
                     </div>
                   {!readOnly && (
                     <div className="flex flex-wrap gap-2">

@@ -311,7 +311,8 @@ export function createTestDB() {
       performance_ids TEXT    NOT NULL,
       band_names      TEXT    NOT NULL,
       created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-      expires_at      TEXT    NOT NULL
+      expires_at      TEXT    NOT NULL,
+      view_count      INTEGER NOT NULL DEFAULT 0
     );
   `);
 

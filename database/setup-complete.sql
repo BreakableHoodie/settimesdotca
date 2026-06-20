@@ -412,7 +412,8 @@ CREATE TABLE IF NOT EXISTS share_links (
   performance_ids TEXT    NOT NULL,
   band_names      TEXT    NOT NULL,
   created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-  expires_at      TEXT    NOT NULL
+  expires_at      TEXT    NOT NULL,
+  view_count      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_share_links_slug ON share_links(slug);
 CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);

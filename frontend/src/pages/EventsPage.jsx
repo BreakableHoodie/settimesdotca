@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import EventTimeline from '../components/EventTimeline'
 import Footer from '../components/Footer'
 import PrivacyBanner from '../components/PrivacyBanner'
+import ThemeToggle from '../components/ThemeToggle.jsx'
 import { trackPageView } from '../utils/metrics'
 import { hasAnySchedule, getScheduleEventSlug, SELECTED_BANDS_KEY } from '../utils/scheduleStorage'
 import { ArrowRight, CalendarDays } from 'lucide-react'
@@ -69,11 +70,16 @@ export default function EventsPage() {
           })}
         </script>
       </Helmet>
-      <header className="py-8 px-4 text-center border-b border-accent-500/30">
-        <h1 className="text-4xl font-bold text-white font-display mb-2">
-          <span className="text-accent-500">Set</span>Times
-        </h1>
-        <p className="text-accent-400 text-lg">Discover · Plan · Experience</p>
+      <header className="border-b border-accent-500/30 px-4 py-8">
+        <div className="container mx-auto flex max-w-7xl items-start justify-between gap-4">
+          <div>
+            <h1 className="mb-2 text-4xl font-bold text-white font-display">
+              <span className="text-accent-500">Set</span>Times
+            </h1>
+            <p className="text-lg text-accent-400">Discover · Plan · Experience</p>
+          </div>
+          <ThemeToggle />
+        </div>
       </header>
 
       {showBanner && scheduleSlug && (

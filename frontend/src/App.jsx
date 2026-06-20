@@ -710,7 +710,7 @@ function App() {
           <div className="flex items-start justify-between gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
             <p className="text-accent-300">
               <span className="font-semibold">How it works:</span> Tap any performer to add them to{' '}
-              <span className="font-semibold">My Schedule</span> — your personal lineup for the night.
+              <span className="font-semibold">My Route</span> — your personal lineup for the night.
             </p>
             <button
               onClick={dismissHint}

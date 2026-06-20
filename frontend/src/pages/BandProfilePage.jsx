@@ -481,7 +481,7 @@ export default function BandProfilePage() {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-500/20 text-accent-400 hover:bg-accent-500/30 transition-colors text-sm font-medium"
               >
                 <CalendarDays size={14} />
-                {sourceEventSlug ? 'Back to Schedule' : 'My Schedule'}
+                {sourceEventSlug ? 'Back to Schedule' : 'My Route'}
               </Link>
             )}
           </div>

@@ -382,7 +382,7 @@ function MySchedule({
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-white text-center">My Schedule</h2>
+            <h2 className="text-2xl font-bold text-white text-center">My Route</h2>
             <p className="text-center text-accent-400 text-sm">
               {showPast
                 ? `${sortedBands.length} ${sortedBands.length === 1 ? 'band' : 'bands'} selected`

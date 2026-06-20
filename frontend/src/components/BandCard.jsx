@@ -53,7 +53,7 @@ function BandCard({
         : 'bg-gradient-card text-white hover:bg-bg-purple/80 hover:scale-[1.01] shadow-md border border-white/10'
   } relative`
 
-  const labelBase = isSelected ? `Remove ${band.name} from my schedule` : `Add ${band.name} to my schedule`
+  const labelBase = isSelected ? `Remove ${band.name} from my route` : `Add ${band.name} to my route`
   const bandProfileHref = band.name ? buildBandProfileHref(band.name, eventSlug) : null
 
   return (

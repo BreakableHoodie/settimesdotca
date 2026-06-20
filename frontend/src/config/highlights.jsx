@@ -1,6 +1,6 @@
 /**
  * Configuration for highlighted bands
- * These bands will get special treatment in the My Schedule view
+ * These bands will get special treatment in the My Route view
  */
 export const HIGHLIGHTED_BANDS = ['ba-johnston', 'blackout', 'handheld']
 

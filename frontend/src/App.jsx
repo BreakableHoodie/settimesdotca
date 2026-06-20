@@ -657,7 +657,10 @@ function App() {
       {isArchived ? (
         <header className="sticky top-0 z-50 border-b-2 border-white/10 bg-bg-navy/90 backdrop-blur-xs px-4 py-3">
           <div className="container mx-auto max-w-6xl flex items-center justify-between">
-            <Link to="/" className="font-bold text-white font-display text-2xl hover:opacity-80 transition-opacity">
+            <Link
+              to="/"
+              className="font-bold text-text-primary font-display text-2xl hover:opacity-80 transition-opacity"
+            >
               <span className="text-accent-500">Set</span>Times
             </Link>
             <Link to="/" className="text-sm text-text-secondary hover:text-white transition-colors">

@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import ThemeToggle from './ThemeToggle.jsx'
 
 function Header({ eventName, eventDate }) {
   const formattedDate = eventDate
@@ -57,15 +58,16 @@ function Header({ eventName, eventDate }) {
       style={headerStyle}
     >
       <div className="container mx-auto max-w-(--breakpoint-2xl) px-4">
-        <div className="flex items-center justify-center sm:justify-between min-h-[40px]">
+        <div className="flex min-h-[40px] items-center justify-between gap-3">
           <h1
-            className="font-bold text-white font-display tracking-tight text-[2rem] sm:text-3xl md:text-4xl text-center sm:text-left leading-tight transition-transform duration-300 ease-out"
+            className="font-bold text-white font-display tracking-tight text-[2rem] sm:text-3xl md:text-4xl text-left leading-tight transition-transform duration-300 ease-out"
             style={{ transform: `scale(${titleScale})` }}
           >
             <Link to="/" className="hover:opacity-80 transition-opacity">
               <span className="text-accent-500">Set</span>Times
             </Link>
           </h1>
+          <ThemeToggle />
         </div>
 
         <p className="hidden text-accent-400 text-sm font-medium text-center sm:block" style={collapseStyle}>

@@ -19,6 +19,8 @@ settimes.ca is evolving into the best multi-venue/multi-artist event platform fo
 - **Single photo per band** — extends existing `photo_url` / R2 upload flow; no video embeds
 - **Design:** Fresh visual identity for Vol. 17 using Tailwind v4 `@theme`
 
+Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude, OpenCode, and humans.
+
 ---
 
 ## Stack

@@ -61,4 +61,91 @@ describe('notifyBandFollowers', () => {
       .all(perf.id)
     expect(notified.map((r) => r.band_follow_id)).toEqual([f1])
   })
+
+  test('skips followers already claimed by another concurrent request', async () => {
+    const { env, rawDb } = createTestEnv()
+    const event = insertEvent(rawDb, { name: 'Test', slug: 'test' })
+    const venue = insertVenue(rawDb, { name: 'Venue' })
+    const perf = insertBand(rawDb, {
+      name: 'Band',
+      event_id: event.id,
+      venue_id: venue.id,
+    })
+    const bandProfileId = perf.band_profile_id
+
+    const fId = rawDb
+      .prepare(
+        'INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)'
+      )
+      .run('fan@example.com', bandProfileId, 'tok').lastInsertRowid
+
+    // Pre-claim the follower as if another concurrent request already did
+    rawDb
+      .prepare(
+        'INSERT INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)'
+      )
+      .run(perf.id, fId)
+
+    sendEmail.mockReset()
+    sendEmail.mockImplementation(() =>
+      Promise.resolve({ delivered: true })
+    )
+
+    const result = await notifyBandFollowers(env, env.DB, {
+      performanceId: perf.id,
+      bandProfileId,
+      bandName: 'Band',
+      eventName: 'Test',
+      followers: [
+        { id: fId, email: 'fan@example.com', unsubscribe_token: 'tok' },
+      ],
+    })
+
+    expect(result).toEqual({ sent: 0, failed: 1 })
+    // sendEmail should not have been called — the race was won by the other request
+    expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  test('releases claim when email fails so resend can retry', async () => {
+    const { env, rawDb } = createTestEnv()
+    const event = insertEvent(rawDb, { name: 'Test', slug: 'test' })
+    const venue = insertVenue(rawDb, { name: 'Venue' })
+    const perf = insertBand(rawDb, {
+      name: 'Band',
+      event_id: event.id,
+      venue_id: venue.id,
+    })
+    const bandProfileId = perf.band_profile_id
+
+    const fId = rawDb
+      .prepare(
+        'INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)'
+      )
+      .run('fan@example.com', bandProfileId, 'tok').lastInsertRowid
+
+    sendEmail.mockReset()
+    sendEmail.mockImplementation(() =>
+      Promise.resolve({ delivered: false })
+    )
+
+    const result = await notifyBandFollowers(env, env.DB, {
+      performanceId: perf.id,
+      bandProfileId,
+      bandName: 'Band',
+      eventName: 'Test',
+      followers: [
+        { id: fId, email: 'fan@example.com', unsubscribe_token: 'tok' },
+      ],
+    })
+
+    expect(result).toEqual({ sent: 0, failed: 1 })
+
+    // The claim row should have been deleted — resend will pick up this follower
+    const rows = rawDb
+      .prepare(
+        'SELECT id FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?'
+      )
+      .all(perf.id, fId)
+    expect(rows).toHaveLength(0)
+  })
 })

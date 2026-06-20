@@ -27,6 +27,19 @@ export async function notifyBandFollowers(
 
   const results = await Promise.allSettled(
     followers.map(async (follower) => {
+      // Claim the follower atomically before delivery. INSERT OR IGNORE
+      // returns changes=0 if another request already claimed this follower,
+      // preventing concurrent resends from double-sending to the same person.
+      const claim = await DB.prepare(
+        "INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)",
+      )
+        .bind(performanceId, follower.id)
+        .run();
+
+      if (claim.meta.changes === 0) {
+        return false;
+      }
+
       const unsubUrl = `${publicUrl}/api/bands/${bandProfileId}/unfollow?token=${follower.unsubscribe_token}`;
       const result = await sendEmail(env, {
         to: follower.email,
@@ -35,25 +48,14 @@ export async function notifyBandFollowers(
         html: `<p><strong>${escapeHtml(bandName)}</strong> is now on the lineup for <strong>${escapeHtml(eventName)}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
       });
 
-      // sendEmail returns { delivered: false } on failure rather than throwing.
       const delivered = result?.delivered === true;
-      if (delivered) {
-        // Record the success so a future resend skips this follower. A recording
-        // failure must NOT flip the email result, so it is caught and logged.
-        try {
-          await DB.prepare(
-            "INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)",
-          )
-            .bind(performanceId, follower.id)
-            .run();
-        } catch (err) {
-          console.error(
-            "Failed to record band follow notification",
-            performanceId,
-            follower.id,
-            err,
-          );
-        }
+      if (!delivered) {
+        // Email failed — release the claim so a future resend can retry.
+        await DB.prepare(
+          "DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?",
+        )
+          .bind(performanceId, follower.id)
+          .run();
       }
       return delivered;
     }),

@@ -27,8 +27,14 @@ export async function onRequestGet(context) {
     // Parse query parameters
     const url = new URL(request.url);
     const showArchived = url.searchParams.get("archived") === "true";
-    const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "1000", 10);
-    const requestedOffset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+    const requestedLimit = Number.parseInt(
+      url.searchParams.get("limit") || "1000",
+      10,
+    );
+    const requestedOffset = Number.parseInt(
+      url.searchParams.get("offset") || "0",
+      10,
+    );
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(Math.max(requestedLimit, 1), 1000)
       : 1000;
@@ -59,7 +65,9 @@ export async function onRequestGet(context) {
     `;
     queryParams.push(limit, offset);
 
-    const result = await DB.prepare(query).bind(...queryParams).all();
+    const result = await DB.prepare(query)
+      .bind(...queryParams)
+      .all();
 
     return new Response(
       JSON.stringify({
@@ -148,11 +156,15 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Validate date is not in past (unless status is archived for retroactive events)
-    const eventDate = new Date(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (eventDate < today && status !== "archived") {
+    // Validate date is not in past (unless status is archived for retroactive
+    // events). Compare YYYY-MM-DD strings lexicographically rather than via Date
+    // objects: new Date('YYYY-MM-DD') parses as UTC midnight, which reads as
+    // "yesterday" in UTC-negative timezones and would wrongly reject an event
+    // dated today (same bug class as the schedule-storage note in CLAUDE.md).
+    const eventDateStr = String(date).slice(0, 10);
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    if (eventDateStr < todayStr && status !== "archived") {
       return validationErrorResponse(
         currentUser.role === "admin"
           ? "Date cannot be in the past unless you are intentionally creating an archived historical event"
@@ -161,7 +173,9 @@ export async function onRequestPost(context) {
     }
 
     if (end_date && end_date < date) {
-      return validationErrorResponse("End date must be on or after the event start date");
+      return validationErrorResponse(
+        "End date must be on or after the event start date",
+      );
     }
 
     // Check if slug already exists

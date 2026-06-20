@@ -29,7 +29,7 @@ vi.mock("../../_middleware.js", () => ({
         error: true,
         response: new Response(
           JSON.stringify({ error: "Forbidden", message: "Admin required" }),
-          { status: 403, headers: { "Content-Type": "application/json" } }
+          { status: 403, headers: { "Content-Type": "application/json" } },
         ),
       };
     }
@@ -75,11 +75,11 @@ describe("Event API - smoke tests", () => {
   it.todo("POST /api/admin/events - should validate required fields");
   it.todo("PATCH /api/admin/events/:id - should update event fields");
   it.todo(
-    "POST /api/admin/events/:id/publish - should publish when bands >= 1"
+    "POST /api/admin/events/:id/publish - should publish when bands >= 1",
   );
   it.todo("POST /api/admin/events/:id/archive - should archive only for admin");
   it.todo(
-    "DELETE /api/admin/events/:id - should delete event and orphan bands"
+    "DELETE /api/admin/events/:id - should delete event and orphan bands",
   );
 });
 
@@ -88,11 +88,15 @@ describe("Event API - handler integration", () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
 
-    // Build a minimal Request-like object
+    // Use today's local date (computed dynamically) so the test never ages into
+    // a hardcoded "past" date, and so it exercises the timezone-robust past-date
+    // check: an event dated *today* must not be rejected as being in the past.
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const body = {
       name: "Integration Event",
       slug: "integration-event",
-      date: "2026-06-20",
+      date: todayStr,
     };
     const request = new Request("https://example.test/api/admin/events", {
       method: "POST",
@@ -126,7 +130,7 @@ describe("Event API - handler integration", () => {
           "x-test-role": "editor",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestPatch({ request, env });
@@ -153,14 +157,14 @@ describe("Event API - handler integration", () => {
           "x-test-role": "editor",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     const res = await publishHandler.onRequestPost({ request, env });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(
-      data.event.is_published === 1 || data.event.is_published === true
+      data.event.is_published === 1 || data.event.is_published === true,
     ).toBeTruthy();
   });
 
@@ -228,7 +232,7 @@ describe("Event API - handler integration", () => {
           "x-test-role": "editor",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     const res = await publishHandler.onRequestPost({ request, env });
@@ -280,7 +284,7 @@ describe("Event API - handler integration", () => {
           "x-test-role": "editor",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     const res = await publishHandler.onRequestPost({ request, env });
@@ -307,7 +311,7 @@ describe("Event API - handler integration", () => {
           "x-test-role": "editor",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestPatch({ request, env });
@@ -329,7 +333,7 @@ describe("Event API - handler integration", () => {
           "Content-Type": "application/json",
           "x-test-role": "editor",
         },
-      }
+      },
     );
 
     const res = await archiveHandler.onRequestPost({ request, env });
@@ -352,7 +356,7 @@ describe("Event API - handler integration", () => {
           "Content-Type": "application/json",
           "x-test-role": "editor",
         },
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestDelete({ request, env });
@@ -371,7 +375,7 @@ describe("Event API - handler integration", () => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-test-role": "admin" },
-      }
+      },
     );
 
     const res = await archiveHandler.onRequestPost({ request, env });
@@ -403,7 +407,7 @@ describe("Event API - handler integration", () => {
           "x-test-role": "editor",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestPost({ request, env });
@@ -427,7 +431,7 @@ describe("Event API - handler integration", () => {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-test-role": "admin" },
         body: JSON.stringify({ confirmCascade: true }),
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestDelete({ request, env });
@@ -452,7 +456,7 @@ describe("Event API - handler integration", () => {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-test-role": "admin" },
         body: JSON.stringify({ confirmCascade: true }),
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestDelete({ request, env });
@@ -461,7 +465,9 @@ describe("Event API - handler integration", () => {
     expect(data.success).toBeTruthy();
 
     // Check performance was removed by cascade
-    const row = rawDb.prepare("SELECT * FROM performances WHERE id = ?").get(b.id);
+    const row = rawDb
+      .prepare("SELECT * FROM performances WHERE id = ?")
+      .get(b.id);
     expect(row).toBeUndefined();
   });
 
@@ -479,7 +485,7 @@ describe("Event API - handler integration", () => {
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-test-role": "admin" },
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestDelete({ request, env });
@@ -507,7 +513,7 @@ describe("Event API - handler integration", () => {
           "x-test-role": "editor",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestPatch({ request, env });
@@ -535,7 +541,7 @@ describe("Event API - handler integration", () => {
           "x-test-role": "editor",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     const res = await eventIdHandler.onRequestPatch({ request, env });
@@ -547,16 +553,22 @@ describe("Event API - handler integration", () => {
   it("publish endpoint rejects non-boolean publish field (string 'yes')", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
-    const ev = insertEvent(rawDb, { name: "TypeCheckEvent", slug: "type-check-event" });
+    const ev = insertEvent(rawDb, {
+      name: "TypeCheckEvent",
+      slug: "type-check-event",
+    });
     insertBand(rawDb, { name: "A Band", event_id: ev.id });
 
     const request = new Request(
       `https://example.test/api/admin/events/${ev.id}/publish`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-test-role": "editor",
+        },
         body: JSON.stringify({ publish: "yes" }),
-      }
+      },
     );
 
     const res = await publishHandler.onRequestPost({ request, env });
@@ -566,54 +578,78 @@ describe("Event API - handler integration", () => {
   it("publish endpoint rejects non-boolean publish field (number 1)", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
-    const ev = insertEvent(rawDb, { name: "TypeCheckEvent2", slug: "type-check-event-2" });
+    const ev = insertEvent(rawDb, {
+      name: "TypeCheckEvent2",
+      slug: "type-check-event-2",
+    });
     insertBand(rawDb, { name: "A Band 2", event_id: ev.id });
 
     const request = new Request(
       `https://example.test/api/admin/events/${ev.id}/publish`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-test-role": "editor",
+        },
         body: JSON.stringify({ publish: 1 }),
-      }
+      },
     );
 
     const res = await publishHandler.onRequestPost({ request, env });
     expect(res.status).toBe(400);
   });
-})
+});
 
-describe('Event duplication atomicity (P0-B2)', () => {
-  it('cleans up newly created event if performance copy fails', async () => {
-    const rawDb = createTestDB()
-    const env = { DB: createDBEnv(rawDb) }
+describe("Event duplication atomicity (P0-B2)", () => {
+  it("cleans up newly created event if performance copy fails", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
 
-    const original = insertEvent(rawDb, { name: 'SourceEvent', slug: 'source-event' })
-    insertBand(rawDb, { name: 'BandA', event_id: original.id })
+    const original = insertEvent(rawDb, {
+      name: "SourceEvent",
+      slug: "source-event",
+    });
+    insertBand(rawDb, { name: "BandA", event_id: original.id });
 
     // Make the performances INSERT...SELECT throw after the event INSERT succeeds
-    const originalPrepare = env.DB.prepare.bind(env.DB)
-    env.DB.prepare = sql => {
-      if (sql.includes('INSERT INTO performances') && sql.includes('SELECT')) {
-        return { bind: () => ({ run: () => { throw new Error('simulated performances copy failure') } }) }
+    const originalPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("INSERT INTO performances") && sql.includes("SELECT")) {
+        return {
+          bind: () => ({
+            run: () => {
+              throw new Error("simulated performances copy failure");
+            },
+          }),
+        };
       }
-      return originalPrepare(sql)
-    }
+      return originalPrepare(sql);
+    };
 
     const request = new Request(
       `https://example.test/api/admin/events/${original.id}/duplicate`,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-test-role': 'editor' },
-        body: JSON.stringify({ name: 'Copy', date: '2027-01-01', slug: 'copy-event' }),
-      }
-    )
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-test-role": "editor",
+        },
+        body: JSON.stringify({
+          name: "Copy",
+          date: "2027-01-01",
+          slug: "copy-event",
+        }),
+      },
+    );
 
-    const res = await eventIdHandler.onRequestPost({ request, env })
-    expect(res.status).toBe(500)
+    const res = await eventIdHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(500);
 
     // The new event must have been cleaned up — no orphan
-    const orphan = rawDb.prepare("SELECT id FROM events WHERE slug = 'copy-event'").get()
-    expect(orphan).toBeUndefined()
-  })
-})
+    const orphan = rawDb
+      .prepare("SELECT id FROM events WHERE slug = 'copy-event'")
+      .get();
+    expect(orphan).toBeUndefined();
+  });
+});

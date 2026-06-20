@@ -123,6 +123,47 @@
   --spacing-safe-right: env(safe-area-inset-right);
 }
 
+/* midnight-ember — warm dark (default). Declared explicitly so the admin surface
+   can pin to it via <div data-theme="midnight-ember"> and stay readable regardless
+   of the visitor's chosen public theme. Values mirror the @theme defaults. */
+[data-theme='midnight-ember'] {
+  --color-primary-50: #fffbeb;
+  --color-primary-100: #fef3c7;
+  --color-primary-400: #fbbf24;
+  --color-primary-500: #f59e0b;
+  --color-primary-600: #d97706;
+  --color-primary-700: #b45309;
+
+  --color-accent-300: #fdba74;
+  --color-accent-400: #fb923c;
+  --color-accent-500: #f97316;
+  --color-accent-600: #ea580c;
+
+  --color-bg-navy: #0c0f1a;
+  --color-bg-purple: #141927;
+  --color-bg-dark: #0f1219;
+  --color-bg-darker: #080a10;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e5e7eb;
+  --color-text-tertiary: #9ca3af;
+  --color-text-disabled: #6b7280;
+  --color-text-inverse: #111827;
+
+  --color-band-navy: #0c0f1a;
+  --color-band-purple: #141927;
+  --color-band-orange: #f97316;
+
+  --background-image-gradient-primary: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --background-image-gradient-accent: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+  --background-image-gradient-dark: linear-gradient(180deg, #0c0f1a 0%, #141927 100%);
+  --background-image-gradient-card: linear-gradient(145deg, rgba(20, 25, 39, 0.9) 0%, rgba(12, 15, 26, 0.95) 100%);
+  --background-image-gradient-glow: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.15) 0%, transparent 70%);
+
+  --shadow-glow-primary: 0 0 20px rgba(245, 158, 11, 0.5);
+  --shadow-glow-accent: 0 0 20px rgba(249, 115, 22, 0.5);
+}
+
 /* arctic-night — dark cool */
 [data-theme='arctic-night'] {
   --color-primary-50: #eef2ff;

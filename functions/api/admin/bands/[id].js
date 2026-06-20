@@ -11,17 +11,10 @@ import {
   sanitizeString,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
-import { sendEmail, isEmailConfigured } from "../../../utils/email.js";
+import { isEmailConfigured } from "../../../utils/email.js";
+import { notifyBandFollowers } from "../../../utils/bandFollowNotify.js";
 import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
 import { parseOrigin } from "../../../utils/parseOrigin.js";
-
-const escapeHtml = (s) =>
-  String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 
 // Helper to extract band ID from path
 function getBandId(request) {
@@ -767,7 +760,7 @@ export async function onRequestPatch(context) {
 
       if (perf) {
         const { results: followers = [] } = await DB.prepare(
-          "SELECT email, unsubscribe_token FROM band_follows WHERE band_profile_id = ? AND verified = 1",
+          "SELECT id, email, unsubscribe_token FROM band_follows WHERE band_profile_id = ? AND verified = 1",
         )
           .bind(perf.band_profile_id)
           .all();
@@ -783,32 +776,24 @@ export async function onRequestPatch(context) {
             .run();
 
           if (claimed.meta.changes > 0) {
-            const publicUrl = env.PUBLIC_URL || "https://settimes.ca";
-            const emailResults = await Promise.allSettled(
-              followers.map((follower) => {
-                const unsubUrl = `${publicUrl}/api/bands/${perf.band_profile_id}/unfollow?token=${follower.unsubscribe_token}`;
-                return sendEmail(env, {
-                  to: follower.email,
-                  subject: `${perf.band_name} just joined the lineup for ${perf.event_name}!`,
-                  text: `${perf.band_name} is now on the lineup for ${perf.event_name}.\n\nUnfollow: ${unsubUrl}`,
-                  html: `<p><strong>${escapeHtml(perf.band_name)}</strong> is now on the lineup for <strong>${escapeHtml(perf.event_name)}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
-                });
-              }),
-            );
-            // sendEmail returns {delivered:false} on failure rather than throwing — filter both rejection types
-            const failedCount = emailResults.filter(
-              (r) =>
-                r.status === "rejected" ||
-                (r.status === "fulfilled" && !r.value?.delivered),
-            ).length;
-            if (failedCount > 0) {
+            // Send + record each successful delivery (see bandFollowNotify.js).
+            // A failed send leaves no notification row, so it can be recovered
+            // later via the resend-announcement endpoint.
+            const { failed } = await notifyBandFollowers(env, DB, {
+              performanceId: Number(performanceId),
+              bandProfileId: perf.band_profile_id,
+              bandName: perf.band_name,
+              eventName: perf.event_name,
+              followers,
+            });
+            if (failed > 0) {
               await auditLog(
                 env,
                 user.userId,
                 "performance.announced.email_failure",
                 "performance",
                 Number(performanceId),
-                { failed_count: failedCount, band_name: perf.band_name },
+                { failed_count: failed, band_name: perf.band_name },
                 ipAddress,
               ).catch(() => {});
             }

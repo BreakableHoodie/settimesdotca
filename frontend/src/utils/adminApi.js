@@ -690,6 +690,15 @@ export const bandsApi = {
     return handleResponse(response)
   },
 
+  async resendAnnouncement(performanceId) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/bands/${performanceId}/resend-announcement`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+    })
+    return handleResponse(response)
+  },
+
   async getStats(bandName) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/bands/stats/${encodeURIComponent(bandName)}`, {
       headers: getHeaders(),

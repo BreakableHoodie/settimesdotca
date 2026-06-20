@@ -77,6 +77,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   })
   const [submitting, setSubmitting] = useState(false)
   const [togglingId, setTogglingId] = useState(null)
+  const [resendingId, setResendingId] = useState(null)
   const [serverConflicts, setServerConflicts] = useState({ overlaps: [], conflicts: [] })
 
   // Selected IDs for bulk delete within event
@@ -344,6 +345,24 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       showToast(err.message || 'Failed to update announced status', 'error')
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  const handleResendAnnouncement = async (performanceId, bandName) => {
+    setResendingId(performanceId)
+    try {
+      const res = await bandsApi.resendAnnouncement(performanceId)
+      const sent = res.sent ?? 0
+      showToast(
+        sent > 0
+          ? `Resent ${bandName} announcement to ${sent} follower${sent === 1 ? '' : 's'}.`
+          : `All ${bandName} followers were already notified.`,
+        'success'
+      )
+    } catch (err) {
+      showToast(err.message || 'Failed to resend announcement', 'error')
+    } finally {
+      setResendingId(null)
     }
   }
 
@@ -825,6 +844,16 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                     aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
                                   >
                                     {band.is_announced ? <Eye size={14} /> : <EyeOff size={14} />}
+                                  </button>
+                                )}
+                                {selectedEvent?.reveal_mode === 1 && band.is_announced === 1 && (
+                                  <button
+                                    onClick={() => handleResendAnnouncement(band.id, band.name)}
+                                    disabled={resendingId === band.id}
+                                    title="Resend the lineup announcement to followers not yet notified"
+                                    className={`px-3 py-2 min-h-[44px] bg-bg-purple hover:bg-bg-purple/80 text-white/80 rounded text-sm border border-accent-500/30 ${resendingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  >
+                                    {resendingId === band.id ? 'Resending…' : 'Resend'}
                                   </button>
                                 )}
                                 <button

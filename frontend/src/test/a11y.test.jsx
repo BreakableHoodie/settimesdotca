@@ -4,6 +4,7 @@ import { axe, toHaveNoViolations } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
 import { HelmetProvider } from 'react-helmet-async'
 import App from '../App'
+import { ThemeProvider } from '../components/ThemeProvider.jsx'
 
 expect.extend(toHaveNoViolations)
 
@@ -35,15 +36,21 @@ const waitForAppToSettle = async () => {
   })
 }
 
-describe('Accessibility Tests', () => {
-  it('App should have no accessibility violations', async () => {
-    const { container } = render(
+function renderApp() {
+  return render(
+    <ThemeProvider>
       <HelmetProvider>
         <MemoryRouter>
           <App />
         </MemoryRouter>
       </HelmetProvider>
-    )
+    </ThemeProvider>
+  )
+}
+
+describe('Accessibility Tests', () => {
+  it('App should have no accessibility violations', async () => {
+    const { container } = renderApp()
 
     // Wait for data to load
     await waitForAppToSettle()
@@ -53,13 +60,7 @@ describe('Accessibility Tests', () => {
   }, 10000) // Increase timeout for axe
 
   it('should have proper heading hierarchy', async () => {
-    const { container } = render(
-      <HelmetProvider>
-        <MemoryRouter>
-          <App />
-        </MemoryRouter>
-      </HelmetProvider>
-    )
+    const { container } = renderApp()
     await waitForAppToSettle()
 
     const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6')
@@ -67,13 +68,7 @@ describe('Accessibility Tests', () => {
   })
 
   it('should have alt text for images', async () => {
-    const { container } = render(
-      <HelmetProvider>
-        <MemoryRouter>
-          <App />
-        </MemoryRouter>
-      </HelmetProvider>
-    )
+    const { container } = renderApp()
     await waitForAppToSettle()
 
     const images = container.querySelectorAll('img')
@@ -83,13 +78,7 @@ describe('Accessibility Tests', () => {
   })
 
   it('should have accessible buttons', async () => {
-    const { container } = render(
-      <HelmetProvider>
-        <MemoryRouter>
-          <App />
-        </MemoryRouter>
-      </HelmetProvider>
-    )
+    const { container } = renderApp()
     await waitForAppToSettle()
 
     const buttons = container.querySelectorAll('button')

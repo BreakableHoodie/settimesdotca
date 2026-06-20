@@ -216,6 +216,14 @@ export function createTestDB() {
       UNIQUE(email, band_profile_id)
     );
 
+    CREATE TABLE band_follow_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
+      band_follow_id INTEGER NOT NULL REFERENCES band_follows(id) ON DELETE CASCADE,
+      notified_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(performance_id, band_follow_id)
+    );
+
     CREATE TABLE password_reset_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

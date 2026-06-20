@@ -12,12 +12,7 @@ import { checkPermission } from "../_middleware.js";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 // Allowed MIME types
-const ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-];
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /**
  * Detect the true MIME type from the file's magic bytes.
@@ -30,32 +25,52 @@ async function detectMimeType(file) {
   const length = header.length;
 
   // JPEG: FF D8 FF
-  if (length >= 3 &&
-      header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF) {
+  if (
+    length >= 3 &&
+    header[0] === 0xff &&
+    header[1] === 0xd8 &&
+    header[2] === 0xff
+  ) {
     return "image/jpeg";
   }
   // PNG: 89 50 4E 47 0D 0A 1A 0A (full 8-byte signature)
-  if (length >= 8 &&
-      header[0] === 0x89 && header[1] === 0x50 &&
-      header[2] === 0x4E && header[3] === 0x47 &&
-      header[4] === 0x0D && header[5] === 0x0A &&
-      header[6] === 0x1A && header[7] === 0x0A) {
+  if (
+    length >= 8 &&
+    header[0] === 0x89 &&
+    header[1] === 0x50 &&
+    header[2] === 0x4e &&
+    header[3] === 0x47 &&
+    header[4] === 0x0d &&
+    header[5] === 0x0a &&
+    header[6] === 0x1a &&
+    header[7] === 0x0a
+  ) {
     return "image/png";
   }
   // GIF87a / GIF89a: 47 49 46 38 37|39 61 (full 6-byte signature)
-  if (length >= 6 &&
-      header[0] === 0x47 && header[1] === 0x49 &&
-      header[2] === 0x46 && header[3] === 0x38 &&
-      (header[4] === 0x37 || header[4] === 0x39) &&
-      header[5] === 0x61) {
+  if (
+    length >= 6 &&
+    header[0] === 0x47 &&
+    header[1] === 0x49 &&
+    header[2] === 0x46 &&
+    header[3] === 0x38 &&
+    (header[4] === 0x37 || header[4] === 0x39) &&
+    header[5] === 0x61
+  ) {
     return "image/gif";
   }
   // WebP: RIFF (52 49 46 46) + 4-byte length + WEBP (57 45 42 50)
-  if (length >= 12 &&
-      header[0] === 0x52 && header[1] === 0x49 &&
-      header[2] === 0x46 && header[3] === 0x46 &&
-      header[8] === 0x57 && header[9] === 0x45 &&
-      header[10] === 0x42 && header[11] === 0x50) {
+  if (
+    length >= 12 &&
+    header[0] === 0x52 &&
+    header[1] === 0x49 &&
+    header[2] === 0x46 &&
+    header[3] === 0x46 &&
+    header[8] === 0x57 &&
+    header[9] === 0x45 &&
+    header[10] === 0x42 &&
+    header[11] === 0x50
+  ) {
     return "image/webp";
   }
 
@@ -92,7 +107,7 @@ export async function onRequestPost(context) {
             MAX_FILE_SIZE / 1024 / 1024
           }MB`,
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -103,7 +118,7 @@ export async function onRequestPost(context) {
         JSON.stringify({
           error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF",
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -127,9 +142,12 @@ export async function onRequestPost(context) {
       },
     });
 
-    // Generate public URL (assumes R2 bucket has public access configured)
-    // In production, you'll configure a custom domain or use R2 public URL
-    const publicUrl = `https://band-photos.settimes.ca/${filename}`;
+    // Generate the public URL for the stored object. The base is configurable via
+    // BAND_PHOTOS_PUBLIC_URL so dev/staging/prod can point at different R2 public
+    // buckets / custom domains; falls back to the production custom domain.
+    const photoBaseUrl =
+      env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca";
+    const publicUrl = `${photoBaseUrl}/${filename}`;
 
     // If band_id provided, update the band profile record
     if (bandId) {
@@ -140,7 +158,7 @@ export async function onRequestPost(context) {
         bandProfileId = Number(bandIdValue.replace("profile_", ""));
       } else if (!Number.isNaN(Number(bandIdValue))) {
         const performance = await env.DB.prepare(
-          "SELECT band_profile_id FROM performances WHERE id = ?"
+          "SELECT band_profile_id FROM performances WHERE id = ?",
         )
           .bind(Number(bandIdValue))
           .first();
@@ -148,7 +166,7 @@ export async function onRequestPost(context) {
         bandProfileId = performance?.band_profile_id ?? null;
         if (!bandProfileId) {
           const profile = await env.DB.prepare(
-            "SELECT id FROM band_profiles WHERE id = ?"
+            "SELECT id FROM band_profiles WHERE id = ?",
           )
             .bind(Number(bandIdValue))
             .first();
@@ -157,7 +175,9 @@ export async function onRequestPost(context) {
       }
 
       if (bandProfileId) {
-        await env.DB.prepare("UPDATE band_profiles SET photo_url = ? WHERE id = ?")
+        await env.DB.prepare(
+          "UPDATE band_profiles SET photo_url = ? WHERE id = ?",
+        )
           .bind(publicUrl, bandProfileId)
           .run();
       }
@@ -174,7 +194,7 @@ export async function onRequestPost(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Photo upload error:", error);
@@ -185,7 +205,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -238,7 +258,7 @@ export async function onRequestDelete(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

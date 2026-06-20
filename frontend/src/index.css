@@ -162,22 +162,22 @@
 
 /* golden-hour — light warm */
 [data-theme='golden-hour'] {
-  --color-primary-50: #fff1f2;
-  --color-primary-100: #ffe4e6;
+  --color-primary-50: #fff7ed;
+  --color-primary-100: #ffedd5;
   --color-primary-400: #fb7185;
-  --color-primary-500: #f43f5e;
-  --color-primary-600: #e11d48;
-  --color-primary-700: #be123c;
+  --color-primary-500: #e11d48;
+  --color-primary-600: #be123c;
+  --color-primary-700: #9f1239;
 
-  --color-accent-300: #fed7aa;
-  --color-accent-400: #fb923c;
-  --color-accent-500: #d97706;
-  --color-accent-600: #b45309;
+  --color-accent-300: #fdba74;
+  --color-accent-400: #f97316;
+  --color-accent-500: #c2410c;
+  --color-accent-600: #9a3412;
 
-  --color-bg-navy: #fffbeb;
-  --color-bg-purple: #fef3c7;
-  --color-bg-dark: #fef3c7;
-  --color-bg-darker: #fde68a;
+  --color-bg-navy: #fff8f1;
+  --color-bg-purple: #f3dfca;
+  --color-bg-dark: #f7eadc;
+  --color-bg-darker: #e7c6a5;
 
   --color-text-primary: #1c1917;
   --color-text-secondary: #44403c;
@@ -185,19 +185,19 @@
   --color-text-disabled: #a8a29e;
   --color-text-inverse: #fafaf9;
 
-  --color-band-navy: #fffbeb;
-  --color-band-purple: #fef3c7;
-  --color-band-orange: #d97706;
+  --color-band-navy: #fff8f1;
+  --color-band-purple: #f3dfca;
+  --color-band-orange: #c2410c;
 
-  --background-image-gradient-primary: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
-  --background-image-gradient-accent: linear-gradient(135deg, #fb923c 0%, #d97706 100%);
-  --background-image-gradient-dark: linear-gradient(180deg, #fef3c7 0%, #fffbeb 100%);
+  --background-image-gradient-primary: linear-gradient(135deg, #fb7185 0%, #be123c 100%);
+  --background-image-gradient-accent: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+  --background-image-gradient-dark: linear-gradient(180deg, #f3dfca 0%, #fff8f1 100%);
   --background-image-gradient-card: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(254, 243, 199, 0.9) 100%
+    rgba(255, 248, 241, 0.96) 0%,
+    rgba(247, 234, 220, 0.92) 100%
   );
-  --background-image-gradient-glow: radial-gradient(ellipse at center, rgba(244, 63, 94, 0.08) 0%, transparent 70%);
+  --background-image-gradient-glow: radial-gradient(ellipse at center, rgba(190, 18, 60, 0.08) 0%, transparent 70%);
 
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.06);
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
@@ -205,8 +205,8 @@
   --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
   --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.05);
   --shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.15);
-  --shadow-glow-primary: 0 0 20px rgba(244, 63, 94, 0.25);
-  --shadow-glow-accent: 0 0 20px rgba(217, 119, 6, 0.25);
+  --shadow-glow-primary: 0 0 20px rgba(190, 18, 60, 0.22);
+  --shadow-glow-accent: 0 0 20px rgba(194, 65, 12, 0.24);
 }
 
 /* silver-lining — light cool */

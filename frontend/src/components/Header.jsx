@@ -60,7 +60,7 @@ function Header({ eventName, eventDate }) {
       <div className="container mx-auto max-w-(--breakpoint-2xl) px-4">
         <div className="flex min-h-[40px] items-center justify-between gap-3">
           <h1
-            className="font-bold text-white font-display tracking-tight text-[2rem] sm:text-3xl md:text-4xl text-left leading-tight transition-transform duration-300 ease-out"
+            className="font-bold text-text-primary font-display tracking-tight text-[2rem] sm:text-3xl md:text-4xl text-left leading-tight transition-transform duration-300 ease-out"
             style={{ transform: `scale(${titleScale})` }}
           >
             <Link to="/" className="hover:opacity-80 transition-opacity">
@@ -73,7 +73,7 @@ function Header({ eventName, eventDate }) {
         <p className="hidden text-accent-400 text-sm font-medium text-center sm:block" style={collapseStyle}>
           {eventName ? (
             <>
-              <span className="font-semibold text-white">{eventName}</span>
+              <span className="font-semibold text-text-primary">{eventName}</span>
               {formattedDate && <span className="text-accent-400"> · {formattedDate}</span>}
             </>
           ) : (

@@ -73,7 +73,7 @@ export default function EventsPage() {
       <header className="border-b border-accent-500/30 px-4 py-8">
         <div className="container mx-auto flex max-w-7xl items-start justify-between gap-4">
           <div>
-            <h1 className="mb-2 text-4xl font-bold text-white font-display">
+            <h1 className="mb-2 text-4xl font-bold text-text-primary font-display">
               <span className="text-accent-500">Set</span>Times
             </h1>
             <p className="text-lg text-accent-400">Discover · Plan · Experience</p>

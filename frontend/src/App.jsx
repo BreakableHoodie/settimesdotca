@@ -432,7 +432,9 @@ function App() {
       { replace: true }
     )
 
-    fetch(`/api/schedule/share/${encodeURIComponent(shareSlug)}`)
+    // ?import=1 — this is the apply-the-route refetch after the preview already
+    // counted the view, so it must not inflate share view_count (see share/[slug].js).
+    fetch(`/api/schedule/share/${encodeURIComponent(shareSlug)}?import=1`)
       .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then(data => {
         const matchedBands = bands.filter(band => {

@@ -9,7 +9,7 @@ function json(body, status = 200) {
 }
 
 export async function onRequestGet(context) {
-  const { params, env } = context
+  const { params, env, request } = context
   const { DB } = env
   const { slug } = params
 
@@ -35,14 +35,21 @@ export async function onRequestGet(context) {
 
     // Best-effort view counter — a counter failure must never break share
     // retrieval, but we log (not silently swallow) so write failures stay visible.
-    try {
-      await DB.prepare(
-        'UPDATE share_links SET view_count = view_count + 1 WHERE slug = ?'
-      )
-        .bind(slug)
-        .run()
-    } catch (err) {
-      console.error('Share link view-count increment failed:', slug, err)
+    // The import refetch (App.jsx adds ?import=1) re-fetches the same snapshot to
+    // apply it after the preview already counted, so it must NOT count again —
+    // only genuine preview views (SharePreviewPage, no flag) increment.
+    const isImportRefetch =
+      new URL(request.url).searchParams.get('import') === '1'
+    if (!isImportRefetch) {
+      try {
+        await DB.prepare(
+          'UPDATE share_links SET view_count = view_count + 1 WHERE slug = ?'
+        )
+          .bind(slug)
+          .run()
+      } catch (err) {
+        console.error('Share link view-count increment failed:', slug, err)
+      }
     }
 
     let performance_ids, band_names

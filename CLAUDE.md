@@ -60,6 +60,8 @@ The Cloudflare Workers D1 binding does not support explicit `BEGIN`/`COMMIT` tra
 
 For mutations that cannot be expressed as a single batch (e.g., the event-duplication pattern in `functions/api/admin/events/[id].js`), use compensating deletes: if step N fails, manually undo steps 1…N-1.
 
+The bulk band import (`functions/api/admin/bands/import.js`) follows this pattern and is **all-or-nothing**: it validates every row first (an invalid row aborts the whole import with per-row errors, writing nothing), then find-or-creates profiles and inserts performances, rolling back everything it created if any write fails. A lineup is never left half-imported.
+
 ### PRAGMA `foreign_keys = ON` is enforced in production
 
 `functions/_middleware.js` runs `PRAGMA foreign_keys = ON` on every D1 session before the request handler fires. Unit test helpers (`functions/api/test-utils.js`) set it the same way via `better-sqlite3`. FK constraints are active in all environments.

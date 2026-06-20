@@ -162,14 +162,14 @@ export async function onRequestDelete(context) {
             continue;
           }
 
-          await auditLog(env, user.userId, "band_profile.deleted", "band_profile", profileId, { deletedBy: user.email, bulk: true }, ipAddress);
           await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(profileId).run();
+          await auditLog(env, user.userId, "band_profile.deleted", "band_profile", profileId, { deletedBy: user.email, bulk: true }, ipAddress);
           deletedCount++;
         } else {
           const performance = performanceMap.get(Number(id));
           if (performance) {
-            await auditLog(env, user.userId, "band.deleted", "band", id, { bandName: performance.name, bulk: true }, ipAddress);
             await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
+            await auditLog(env, user.userId, "band.deleted", "band", id, { bandName: performance.name, bulk: true }, ipAddress);
             deletedCount++;
           }
         }
@@ -181,7 +181,7 @@ export async function onRequestDelete(context) {
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: errors.length === 0,
         message: `Deleted ${deletedCount} bands`,
         deletedCount,
         errors: errors.length > 0 ? errors : undefined,

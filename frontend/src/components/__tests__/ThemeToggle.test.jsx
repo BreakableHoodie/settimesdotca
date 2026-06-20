@@ -11,35 +11,28 @@ function renderThemeToggle() {
   )
 }
 
+function openPicker() {
+  fireEvent.click(screen.getByRole('button', { name: /activate to change/i }))
+}
+
 describe('ThemeToggle', () => {
-  it('cycles the theme and persists the selected value', () => {
+  it('applies and persists the selected theme', () => {
     renderThemeToggle()
+    openPicker()
 
-    const button = screen.getByRole('button', {
-      name: /current theme: midnight ember/i,
-    })
-
-    fireEvent.click(button)
+    fireEvent.click(screen.getByRole('button', { name: /cool dark theme/i }))
 
     expect(document.documentElement.dataset.theme).toBe('arctic-night')
     expect(window.localStorage.getItem(THEME_KEY)).toBe('arctic-night')
-    expect(
-      screen.getByRole('button', {
-        name: /current theme: arctic night/i,
-      })
-    ).toBeInTheDocument()
   })
 
-  it('uses a stored valid theme on first render', () => {
-    window.localStorage.setItem(THEME_KEY, 'golden-hour')
-
+  it('marks the stored theme as active on first render', () => {
+    window.localStorage.setItem(THEME_KEY, 'daybreak')
     renderThemeToggle()
 
-    expect(document.documentElement.dataset.theme).toBe('golden-hour')
-    expect(
-      screen.getByRole('button', {
-        name: /current theme: golden hour/i,
-      })
-    ).toBeInTheDocument()
+    expect(document.documentElement.dataset.theme).toBe('daybreak')
+
+    openPicker()
+    expect(screen.getByRole('button', { name: /warm light theme/i })).toHaveAttribute('aria-pressed', 'true')
   })
 })

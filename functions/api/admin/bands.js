@@ -153,6 +153,7 @@ export async function onRequestGet(context) {
           bp.description,
           bp.photo_url,
           bp.social_links,
+          (SELECT COUNT(*) FROM band_follows bf WHERE bf.band_profile_id = bp.id AND bf.verified = 1) AS follower_count,
           v.name as venue_name,
           e.name as event_name
         FROM performances p
@@ -190,6 +191,7 @@ export async function onRequestGet(context) {
           bp.description,
           bp.photo_url,
           bp.social_links,
+          (SELECT COUNT(*) FROM band_follows bf WHERE bf.band_profile_id = bp.id AND bf.verified = 1) AS follower_count,
           v.name as venue_name,
           e.name as event_name,
           e.date as event_date

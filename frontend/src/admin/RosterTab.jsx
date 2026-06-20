@@ -665,6 +665,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                     >
                       Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
                     </th>
+                    <th className="px-4 py-3 text-right text-white font-semibold">Followers</th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>
                 </thead>
@@ -711,6 +712,15 @@ export default function RosterTab({ showToast, readOnly = false }) {
                         <SocialLinksIcons band={band} />
                       </td>
                       <td className="px-4 py-3 text-white/70">{band.contact_email || '-'}</td>
+                      <td className="px-4 py-3 text-right text-white/70">
+                        {band.follower_count > 0 ? (
+                          <span className="inline-flex items-center rounded-full bg-accent-500/15 px-2 py-1 text-xs font-semibold text-accent-300">
+                            {band.follower_count}
+                          </span>
+                        ) : (
+                          <span className="text-white/30">0</span>
+                        )}
+                      </td>
                       {!readOnly && (
                         <td className="px-4 py-3 flex justify-end gap-2">
                           <button

@@ -160,8 +160,8 @@
   --shadow-glow-accent: 0 0 20px rgba(14, 165, 233, 0.4);
 }
 
-/* golden-hour — light warm */
-[data-theme='golden-hour'] {
+/* daybreak — light warm (slug renamed from golden-hour; not surfaced in the UI) */
+[data-theme='daybreak'] {
   --color-primary-50: #fff7ed;
   --color-primary-100: #ffedd5;
   --color-primary-400: #fb7185;

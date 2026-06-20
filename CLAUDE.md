@@ -4,6 +4,23 @@ AI assistant context for this codebase. Captures non-obvious invariants, known g
 
 ---
 
+## Mission & Scope
+
+settimes.ca is evolving into the best multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON), starting with **Long Weekend Band Crawl Vol. 17** on **August 2, 2026**.
+
+- **Focus:** Waterloo Region only (not Ottawa — do not reference Ottawa in new code/docs)
+- **Brand:** settimes.ca — no rebranding
+- **Target event:** Vol. 17, ~6 weeks out (Aug 2, 2026). Urgency applies to all work.
+- **Venues (6, King St N, Waterloo):** Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost
+- **Bands:** 22, doors 6:30PM / show 6:45PM, ages 19+
+- **Both fan-facing and admin tooling are equal priority**
+- **SEO is a priority** (band pages, event pages, local discovery, structured data)
+- **Colour themes:** 4 user-selectable (dark + light presets) via Tailwind v4 CSS custom properties + `data-theme` on `<html>`, persisted in localStorage
+- **Single photo per band** — extends existing `photo_url` / R2 upload flow; no video embeds
+- **Design:** Fresh visual identity for Vol. 17 using Tailwind v4 `@theme`
+
+---
+
 ## Stack
 
 - **Frontend**: React 19, Vite 8, Tailwind 4, React Router 7 (`frontend/`)

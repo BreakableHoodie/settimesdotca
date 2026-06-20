@@ -147,6 +147,9 @@ export async function onRequest(context) {
       "font-src 'self' data:",
       "connect-src 'self'",
       "object-src 'none'",
+      "frame-src 'none'",
+      "child-src 'none'",
+      "worker-src 'none'",
       "base-uri 'self'",
       "frame-ancestors 'none'",
     ].join('; ');
@@ -186,11 +189,11 @@ export async function onRequest(context) {
           ...(cspEnforce
             ? {
                 'Content-Security-Policy':
-                  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+                  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; base-uri 'self'; frame-ancestors 'none'",
               }
             : {
                 'Content-Security-Policy-Report-Only':
-                  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+                  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; base-uri 'self'; frame-ancestors 'none'",
               }),
         },
       }

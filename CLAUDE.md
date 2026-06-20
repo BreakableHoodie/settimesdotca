@@ -114,6 +114,12 @@ Enforced via `checkPermission(context, "viewer"|"editor"|"admin")` in `functions
 
 ---
 
+## Band Announcements
+
+When a performance is announced (`is_announced` 0→1), verified followers of that band are emailed once. Delivery is tracked **per-follower** in `band_follow_notifications (performance_id, band_follow_id)`: the announce records each *successful* send. Failed sends leave no row, so `POST /api/admin/bands/:id/resend-announcement` recovers them by emailing only followers without a notification row (never double-sending). Shared send+record logic lives in `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking** — it silently drops fans whose first send failed (the bug this replaced).
+
+---
+
 ## Testing
 
 ### Backend unit tests

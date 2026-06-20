@@ -1407,6 +1407,40 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/admin/bands/{id}/resend-announcement:
+    post:
+      tags:
+        - Admin - Bands
+      summary: Resend a lineup announcement to un-notified followers
+      description: >
+        Re-sends the "band joined the lineup" email to verified followers who
+        were not yet notified for this performance (recovers partial send
+        failures from the initial announce). Never double-sends. `id` is a
+        performance id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Performance id
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      responses:
+        "200":
+          description: "Resend result: { success, sent, failed }"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/admin/bands/bulk-preview:
     post:
       tags:

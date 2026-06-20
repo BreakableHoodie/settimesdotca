@@ -1,6 +1,6 @@
-import { isValidEmail } from '../../utils/validation.js';
-import { isEmailConfigured, sendEmail } from '../../utils/email.js';
-import { buildActivationEmail } from '../../utils/emailTemplates.js';
+import { isValidEmail } from "../../utils/validation.js";
+import { isEmailConfigured, sendEmail } from "../../utils/email.js";
+import { buildActivationEmail } from "../../utils/emailTemplates.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -14,29 +14,29 @@ export async function onRequestPost(context) {
     email = null;
   }
 
-  if (!email || typeof email !== 'string') {
+  if (!email || typeof email !== "string") {
     return new Response(
       JSON.stringify({
-        error: 'Validation error',
-        message: 'Email is required',
+        error: "Validation error",
+        message: "Email is required",
       }),
       {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      }
+        headers: { "Content-Type": "application/json" },
+      },
     );
   }
 
   if (!isValidEmail(email)) {
     return new Response(
       JSON.stringify({
-        error: 'Validation error',
-        message: 'Invalid email format',
+        error: "Validation error",
+        message: "Invalid email format",
       }),
       {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      }
+        headers: { "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -44,12 +44,12 @@ export async function onRequestPost(context) {
     JSON.stringify({
       success: true,
       message:
-        'If an inactive account exists with this email, an activation link has been sent.',
+        "If an inactive account exists with this email, an activation link has been sent.",
     }),
     {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }
+      headers: { "Content-Type": "application/json" },
+    },
   );
 
   try {
@@ -58,7 +58,7 @@ export async function onRequestPost(context) {
       SELECT id, first_name, last_name, is_active, activated_at
       FROM users
       WHERE email = ?
-    `
+    `,
     )
       .bind(email)
       .first();
@@ -72,30 +72,42 @@ export async function onRequestPost(context) {
     }
 
     const activationToken =
-      crypto.randomUUID() + crypto.randomUUID().replace(/-/g, '');
+      crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
     const activationExpires = new Date(
-      Date.now() + 24 * 60 * 60 * 1000
+      Date.now() + 24 * 60 * 60 * 1000,
     ).toISOString();
 
-    await DB.prepare(
-      `
+    try {
+      await DB.prepare(
+        `
       UPDATE users
       SET activation_token = ?,
           activation_token_expires_at = ?
       WHERE id = ?
-    `
-    )
-      .bind(activationToken, activationExpires, user.id)
-      .run();
+    `,
+      )
+        .bind(activationToken, activationExpires, user.id)
+        .run();
+    } catch (writeErr) {
+      // The generic response is intentionally returned for all paths (user
+      // enumeration resistance), but a failed token write is infrastructural,
+      // not a benign not-found/already-active branch — log it distinctly so it
+      // is alertable rather than hidden behind the generic 200.
+      console.error(
+        "[ResendActivation] activation token write failed:",
+        writeErr,
+      );
+      return genericResponse;
+    }
 
     const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
-    const activationUrl = new URL('/activate', baseUrl);
-    activationUrl.searchParams.set('token', activationToken);
+    const activationUrl = new URL("/activate", baseUrl);
+    activationUrl.searchParams.set("token", activationToken);
 
     if (isEmailConfigured(env)) {
       const fullName = [user.first_name, user.last_name]
         .filter(Boolean)
-        .join(' ')
+        .join(" ")
         .trim();
       const emailPayload = buildActivationEmail({
         activationUrl: activationUrl.toString(),
@@ -109,18 +121,18 @@ export async function onRequestPost(context) {
         html: emailPayload.html,
       });
       console.log(
-        '[ResendActivation] Activation email delivery attempted:',
-        emailResult.reason || 'delivered'
+        "[ResendActivation] Activation email delivery attempted:",
+        emailResult.reason || "delivered",
       );
     } else {
       console.warn(
-        '[ResendActivation] Email not configured; activation email was not sent.'
+        "[ResendActivation] Email not configured; activation email was not sent.",
       );
     }
 
     return genericResponse;
   } catch (error) {
-    console.error('Resend activation error:', error);
+    console.error("Resend activation error:", error);
     return genericResponse;
   }
 }

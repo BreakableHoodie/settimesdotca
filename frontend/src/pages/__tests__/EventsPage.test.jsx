@@ -30,11 +30,9 @@ describe('EventsPage', () => {
   it('shows the theme toggle on the homepage', () => {
     renderEventsPage()
 
-    const toggle = screen.getByRole('button', {
-      name: /current theme: midnight ember/i,
-    })
-
-    fireEvent.click(toggle)
+    // Open the minimal swatch picker, then pick the cool-dark (arctic-night) theme.
+    fireEvent.click(screen.getByRole('button', { name: /colour theme/i }))
+    fireEvent.click(screen.getByRole('button', { name: /cool dark theme/i }))
 
     expect(document.documentElement.dataset.theme).toBe('arctic-night')
     expect(window.localStorage.getItem(THEME_KEY)).toBe('arctic-night')

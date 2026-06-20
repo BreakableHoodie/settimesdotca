@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
 export const THEME_KEY = 'settimes-theme'
-export const VALID_THEMES = ['midnight-ember', 'arctic-night', 'golden-hour', 'silver-lining']
+export const VALID_THEMES = ['midnight-ember', 'arctic-night', 'daybreak', 'silver-lining']
 export const DEFAULT_THEME = 'midnight-ember'
 
 const ThemeContext = createContext(null)
@@ -58,5 +58,5 @@ export function useTheme() {
 }
 
 export function getThemeInitScript() {
-  return `(function(){var t;try{t=localStorage.getItem('${THEME_KEY}')}catch{}if(!t||!['midnight-ember','arctic-night','golden-hour','silver-lining'].includes(t))t='${DEFAULT_THEME}';document.documentElement.dataset.theme=t})()`
+  return `(function(){var t;try{t=localStorage.getItem('${THEME_KEY}')}catch{}if(!t||!['midnight-ember','arctic-night','daybreak','silver-lining'].includes(t))t='${DEFAULT_THEME}';document.documentElement.dataset.theme=t})()`
 }

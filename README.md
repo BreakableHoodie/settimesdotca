@@ -7,7 +7,7 @@ SetTimes.ca is a Cloudflare Pages application for managing and publishing multi-
 - Frontend: React 19, Vite 8, Tailwind CSS 4, React Router 7
 - Backend: Cloudflare Pages Functions with `nodejs_compat`
 - Data: Cloudflare D1 and optional R2 photo storage
-- Auth: Lucia-backed server-side sessions with HttpOnly cookies and CSRF protection
+- Auth: Direct D1 server-side session manager with HttpOnly cookies and CSRF protection
 - Testing: Vitest for unit/integration coverage and Playwright for end-to-end coverage
 
 ## What The App Supports

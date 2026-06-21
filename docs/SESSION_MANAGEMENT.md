@@ -4,7 +4,7 @@ This document describes the current session model used by the SetTimes admin exp
 
 ## Current Session Architecture
 
-SetTimes uses Lucia-backed server-side sessions stored in D1.
+SetTimes uses server-side sessions stored in D1, managed by a direct session manager in `functions/utils/auth.js`. (The Lucia dependency was removed in PR #290; the table is still named `lucia_sessions` for historical/compatibility reasons.)
 
 - Server-side session store: `lucia_sessions`
 - Session cookie: `__Host-session_token` in production, `session_token` in local development

@@ -60,6 +60,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     url: '',
     description: '',
     photo_url: '',
+    photo_alt_text: '',
     genre: '',
     origin: '',
     origin_city: '',
@@ -283,6 +284,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         is_active: Number(formData.is_active) === 1,
         description: formData.description,
         photo_url: formData.photo_url,
+        photo_alt_text: formData.photo_alt_text,
         social_links: JSON.stringify(socialLinks),
         url: formData.url,
       }
@@ -392,6 +394,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       url: band.url || '',
       description: band.description || '',
       photo_url: band.photo_url || '',
+      photo_alt_text: band.photo_alt_text || '',
       genre: band.genre || '',
       origin: band.origin || '',
       origin_city: band.origin_city || parsedOrigin.city,

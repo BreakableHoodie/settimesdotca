@@ -209,6 +209,7 @@ export async function onRequestGet(context) {
       id: bandProfile.id,
       name: bandProfile.name,
       photo_url: bandProfile.photo_url,
+      photo_alt_text: bandProfile.photo_alt_text,
       description: bandProfile.description,
       genre: bandProfile.genre,
       origin: formatOrigin(bandProfile),

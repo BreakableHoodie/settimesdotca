@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS band_profiles (
   is_active INTEGER NOT NULL DEFAULT 1,
   social_links TEXT,
   photo_url TEXT,
+  photo_alt_text TEXT,
   url TEXT,
   band_name TEXT,
   bio TEXT,

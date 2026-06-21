@@ -32,6 +32,11 @@ export async function onRequestGet(context) {
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>`,
+      `  <url>
+    <loc>https://settimes.ca/artists</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`,
     ];
 
     for (const event of events) {

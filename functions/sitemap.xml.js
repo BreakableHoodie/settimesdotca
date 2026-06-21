@@ -13,18 +13,26 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const [{ results: events }, { results: bands }] = await Promise.all([
-      env.DB.prepare(
-        `SELECT slug, date FROM events WHERE is_published = 1 ORDER BY date DESC`,
-      ).all(),
-      env.DB.prepare(
-        `SELECT DISTINCT bp.id
+    const [{ results: events }, { results: bands }, { results: venues }] =
+      await Promise.all([
+        env.DB.prepare(
+          `SELECT slug, date FROM events WHERE is_published = 1 ORDER BY date DESC`,
+        ).all(),
+        env.DB.prepare(
+          `SELECT DISTINCT bp.id
          FROM band_profiles bp
          INNER JOIN performances p ON p.band_profile_id = bp.id
          INNER JOIN events e ON e.id = p.event_id
          WHERE e.is_published = 1`,
-      ).all(),
-    ]);
+        ).all(),
+        env.DB.prepare(
+          `SELECT DISTINCT v.id
+         FROM venues v
+         INNER JOIN performances p ON p.venue_id = v.id
+         INNER JOIN events e ON e.id = p.event_id
+         WHERE e.is_published = 1`,
+        ).all(),
+      ]);
 
     const rows = [
       `  <url>
@@ -34,6 +42,11 @@ export async function onRequestGet(context) {
   </url>`,
       `  <url>
     <loc>https://settimes.ca/artists</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`,
+      `  <url>
+    <loc>https://settimes.ca/venues</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>`,
@@ -53,6 +66,14 @@ export async function onRequestGet(context) {
     <loc>https://settimes.ca/band/${band.id}</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+  </url>`);
+    }
+
+    for (const venue of venues) {
+      rows.push(`  <url>
+    <loc>https://settimes.ca/venue/${venue.id}</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url>`);
     }
 

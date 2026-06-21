@@ -84,6 +84,14 @@ function BandCard({
       )}
 
       <div className={`flex flex-col items-center gap-2 ${showToggleButton ? 'pr-10' : ''}`}>
+        {band.photo_url && (
+          <img
+            src={band.photo_url}
+            alt=""
+            loading="lazy"
+            className={`h-16 w-16 rounded-full object-cover ring-2 ${onAmber ? 'ring-bg-navy/20' : 'ring-white/15'}`}
+          />
+        )}
         {startingSoon && (
           <span
             className={`soon-pill${onAmber ? ' soon-pill--dark' : ''}`}

@@ -46,6 +46,37 @@ const renderView = props =>
     </MemoryRouter>
   )
 
+describe('ScheduleView — venue-lane view', () => {
+  it('groups the lineup by venue when "By venue" is selected', () => {
+    const bands = [
+      makeBand({
+        id: '1',
+        name: 'Alpha',
+        venue: 'Roost',
+        startTime: '21:00',
+        startMs: Date.parse('2024-06-01T21:00:00'),
+        endMs: Date.parse('2024-06-01T22:00:00'),
+      }),
+      makeBand({
+        id: '2',
+        name: 'Beta',
+        venue: 'Blue Room',
+        startTime: '21:30',
+        startMs: Date.parse('2024-06-01T21:30:00'),
+        endMs: Date.parse('2024-06-01T22:30:00'),
+      }),
+    ]
+    renderView({ bands })
+
+    fireEvent.click(screen.getByRole('button', { name: /by venue/i }))
+
+    expect(screen.getByRole('heading', { name: 'Roost' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Blue Room' })).toBeInTheDocument()
+    expect(screen.getByText('Alpha')).toBeInTheDocument()
+    expect(screen.getByText('Beta')).toBeInTheDocument()
+  })
+})
+
 describe('ScheduleView — Bug 4: finished sets hidden count', () => {
   it('does not count bands with no endTime as finished', () => {
     // Bands without endTime have endMs = 0; previously 0 <= NOW_MS always counted them as finished.

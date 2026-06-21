@@ -44,6 +44,7 @@ function ScheduleView({
   const [isCopyingAll, setIsCopyingAll] = useState(false)
   const [localVenueFilter, setLocalVenueFilter] = useState(null)
   const [genreFilter, setGenreFilter] = useState(null)
+  const [groupBy, setGroupBy] = useState('time')
   const venueFilter = controlledVenueFilter === undefined ? localVenueFilter : controlledVenueFilter
   const nowMs = useMemo(() => {
     const d = currentTime instanceof Date ? currentTime : new Date(currentTime)
@@ -131,6 +132,18 @@ function ScheduleView({
   const upcomingByTime = useMemo(() => groupByTime(upcomingBands), [upcomingBands])
   const pastByTime = useMemo(() => groupByTime(pastBands).reverse(), [pastBands])
 
+  // Venue-lane view: group the visible (already time-sorted) bands by venue, so
+  // each venue's sets stay in chronological order within its section.
+  const bandsByVenue = useMemo(() => {
+    const map = new Map()
+    sortedBands.forEach(band => {
+      const venue = band.venue || 'Unscheduled'
+      if (!map.has(venue)) map.set(venue, [])
+      map.get(venue).push(band)
+    })
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [sortedBands])
+
   const selectedBandsSet = useMemo(() => new Set(selectedBands), [selectedBands])
   const visibleBandIds = useMemo(() => visibleBands.map(band => band.id), [visibleBands])
   const canToggleBands = typeof onToggleBand === 'function'
@@ -204,6 +217,25 @@ function ScheduleView({
           )}
         </div>
         <div className="flex justify-center sm:justify-end gap-3 flex-wrap">
+          <div
+            className="inline-flex items-center rounded-full border border-white/10 bg-white/5 p-0.5"
+            role="group"
+            aria-label="Group lineup by"
+          >
+            {['time', 'venue'].map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setGroupBy(mode)}
+                aria-pressed={groupBy === mode}
+                className={`min-h-[44px] rounded-full px-3 py-1.5 text-xs font-medium capitalize transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
+                  groupBy === mode ? 'bg-accent-500/20 text-accent-400' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                By {mode}
+              </button>
+            ))}
+          </div>
           {finishedCount > 0 && canTogglePast && (
             <button
               onClick={onToggleShowPast}
@@ -373,6 +405,37 @@ function ScheduleView({
             : finishedCount > 0
               ? 'All finished sets are hidden. Show them to revisit earlier performances.'
               : 'No upcoming bands at the moment.'}
+        </div>
+      ) : groupBy === 'venue' ? (
+        <div className="space-y-12">
+          {bandsByVenue.map(([venue, venueBands]) => (
+            <div key={venue}>
+              <div className="flex items-center mb-4">
+                <h2 className="bg-bg-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                  {venue}
+                </h2>
+                <span className="ml-3 text-xs text-white/40 shrink-0">
+                  {venueBands.length} {venueBands.length === 1 ? 'set' : 'sets'}
+                </span>
+                <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
+                {venueBands.map(band => (
+                  <BandCard
+                    key={band.id}
+                    band={band}
+                    isSelected={selectedBandsSet.has(band.id)}
+                    onToggle={onToggleBand}
+                    clickable={canToggleBands}
+                    showToggleButton={canToggleBands}
+                    eventSlug={eventSlug}
+                    showVenue={false}
+                    currentTime={currentTime}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-12">

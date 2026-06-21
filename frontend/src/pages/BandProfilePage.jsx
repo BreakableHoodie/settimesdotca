@@ -507,7 +507,7 @@ export default function BandProfilePage() {
             <div className="relative h-80 bg-linear-to-b from-bg-navy via-bg-purple to-bg-navy overflow-hidden">
               <img
                 src={profile.photo_url}
-                alt={profile.name}
+                alt={profile.photo_alt_text || profile.name}
                 loading="lazy"
                 className="w-full h-full object-cover opacity-60"
               />

@@ -77,6 +77,7 @@ dataset = "settimes_metrics"
 # ENVIRONMENT=development
 # PUBLIC_URL=http://localhost:8788
 # PUBLIC_DATA_PUBLISH_ENABLED=false
+# BAND_PHOTOS_PUBLIC_URL=https://band-photos.settimes.ca  # public base URL serving uploaded band photos (R2 public bucket / custom domain); falls back to the prod domain if unset
 
 # R2 Bucket Binding
 #
@@ -89,9 +90,9 @@ dataset = "settimes_metrics"
 #    Variable name: BAND_PHOTOS
 #    R2 bucket: settimes-band-photos
 
-# [[r2_buckets]]
-# binding = "BAND_PHOTOS"
-# bucket_name = "settimes-band-photos"
+[[r2_buckets]]
+binding = "BAND_PHOTOS"
+bucket_name = "settimes-band-photos"
 
 # Custom routes (optional - Pages handles this automatically)
 # Uncomment if you need custom routing behavior

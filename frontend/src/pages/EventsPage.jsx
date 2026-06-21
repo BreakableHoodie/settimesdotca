@@ -7,7 +7,7 @@ import PrivacyBanner from '../components/PrivacyBanner'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import { trackPageView } from '../utils/metrics'
 import { hasAnySchedule, getScheduleEventSlug, SELECTED_BANDS_KEY } from '../utils/scheduleStorage'
-import { ArrowRight, CalendarDays } from 'lucide-react'
+import { ArrowRight, CalendarDays, Users } from 'lucide-react'
 
 export default function EventsPage() {
   useEffect(() => {
@@ -77,6 +77,13 @@ export default function EventsPage() {
               <span className="text-accent-500">Set</span>Times
             </h1>
             <p className="text-lg text-accent-400">Discover · Plan · Experience</p>
+            <Link
+              to="/artists"
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent-400 transition-colors hover:text-accent-300"
+            >
+              <Users size={15} aria-hidden="true" /> Browse all artists
+              <ArrowRight size={12} aria-hidden="true" />
+            </Link>
           </div>
           <ThemeToggle />
         </div>

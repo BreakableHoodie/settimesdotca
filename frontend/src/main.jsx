@@ -20,6 +20,7 @@ const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
 const BandProfilePage = lazy(() => import('./pages/BandProfilePage.jsx'))
 const EventRecapPage = lazy(() => import('./pages/EventRecapPage.jsx'))
 const SharePreviewPage = lazy(() => import('./pages/SharePreviewPage.jsx'))
+const ArtistsPage = lazy(() => import('./pages/ArtistsPage.jsx'))
 
 const hostname = typeof window !== 'undefined' ? window.location.hostname || '' : ''
 const isPreviewBuild = hostname.startsWith('dev.') || hostname.endsWith('.pages.dev')
@@ -103,6 +104,18 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                   <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
                     <Suspense fallback={<LoadingFallback />}>
                       <BandProfilePage />
+                    </Suspense>
+                  </ErrorBoundary>
+                }
+              />
+
+              {/* Artist directory: Lazy loaded */}
+              <Route
+                path="/artists"
+                element={
+                  <ErrorBoundary title="Artists Error" message="Unable to load the artist directory. Please try again.">
+                    <Suspense fallback={<LoadingFallback />}>
+                      <ArtistsPage />
                     </Suspense>
                   </ErrorBoundary>
                 }

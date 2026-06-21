@@ -122,6 +122,110 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/venues:
+    get:
+      tags:
+        - Public
+      summary: List/search the public venue directory
+      description: |
+        Venues that have hosted one or more performances at a published or
+        archived event, as `{ venues, hasMore }`. Searchable by name/city and
+        paginated. Gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against venue name and city
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 24
+            minimum: 1
+            maximum: 60
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: Venue directory page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        location:
+                          type: string
+                          nullable: true
+                        performance_count:
+                          type: integer
+                        event_count:
+                          type: integer
+                  hasMore:
+                    type: boolean
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/venues/{id}:
+    get:
+      tags:
+        - Public
+      summary: Get a venue with its lineup
+      description: |
+        Returns a venue plus its upcoming and past performances at published or
+        archived events. Gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Venue id
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Venue detail with lineup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    type: object
+                  upcoming:
+                    type: array
+                    items:
+                      type: object
+                  past:
+                    type: array
+                    items:
+                      type: object
+        "400":
+          description: Invalid venue id
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/schedule:
     get:
       tags:

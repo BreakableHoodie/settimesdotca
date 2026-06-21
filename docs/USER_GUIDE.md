@@ -335,11 +335,22 @@ settimes.ca/bands/[event-slug]/[band-name]
 1. Go to **🎸 Performers** tab
 2. Find the band and click "Edit"
 3. Update the **Description** field (supports markdown)
-4. Add or update social media links
-5. Upload a photo (if photo support is enabled)
-6. Click "Save"
+4. Upload a photo — drag-and-drop or click to browse (JPG/PNG/WebP, up to 5 MB). It is stored in Cloudflare R2 and appears on the public profile, the schedule-card thumbnail, and link previews.
+5. (Recommended) Fill in **Photo alt text** — a short description of the image for screen readers and for when the image fails to load. Defaults to the band name if left blank.
+6. Add or update social media links
+7. Click "Save"
 
 **Tip:** Write compelling descriptions that fans will want to read and share!
+
+---
+
+## Public-Facing Features
+
+Beyond the schedule itself, fans get a few experience features worth knowing about:
+
+- **Themes** — four selectable colour themes (two dark, two light) via the swatch picker in the public header; the choice persists per browser. The admin panel always stays on the dark theme regardless of the visitor's pick.
+- **My Route** — a fan's personal lineup (formerly "My Schedule"). Fans tap performers to add them; the route is saved in their browser and can be shared as a `/s/<code>` link with rich social previews.
+- **Artist Directory** — a public, searchable index of every artist who has performed at a SetTimes event, at `/artists` (linked from the homepage). Each card links to that artist's profile.
 
 ---
 

@@ -591,7 +591,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 
 ```sql
 -- Remove old sessions
-DELETE FROM sessions WHERE expires_at < datetime('now', '-7 days');
+DELETE FROM lucia_sessions WHERE expires_at < unixepoch('now', '-7 days');
 
 -- Archive old audit logs
 INSERT INTO audit_logs_archive SELECT * FROM audit_logs

@@ -44,10 +44,10 @@ This handbook is for system administrators managing the SetTimes platform. It co
 
 **Frontend:**
 
-- React 18 with Vite 5
+- React 19 with Vite 8
 - React Router v7
-- Tailwind CSS 3
-- Font Awesome icons
+- Tailwind CSS 4
+- lucide-react icons
 - Cloudflare Pages (hosting)
 
 **Backend:**
@@ -196,7 +196,7 @@ POST /api/admin/users
 
 - Minimum 8 characters
 - Must include: uppercase, lowercase, number
-- Hashed using bcrypt (cost factor: 10)
+- Hashed using PBKDF2-SHA256 via the Web Crypto API (not bcrypt — Workers cannot run native bcrypt)
 
 ---
 
@@ -207,14 +207,15 @@ POST /api/admin/users
 **Tables:**
 
 - `users` - User accounts
-- `sessions` - Active user sessions
+- `lucia_sessions` - Active server-side sessions
 - `events` - Event definitions
 - `venues` - Performance venues
-- `bands` - Band profiles
+- `band_profiles` - Artist/band profiles
+- `performances` - Links a band profile to an event, venue, and set time
 - `audit_logs` - Security audit trail
 - `invite_codes` - User invite system
 
-**Schema Location:** `migrations/schema.sql`
+**Schema Location:** numbered migrations in `migrations/` (with `database/setup-complete.sql` as the consolidated reference)
 
 ### Accessing the Database
 
@@ -225,16 +226,16 @@ POST /api/admin/users
 wrangler d1 list
 
 # Execute query
-wrangler d1 execute settimes-db --command="SELECT * FROM users LIMIT 10"
+wrangler d1 execute settimes-production-db --command="SELECT * FROM users LIMIT 10"
 
 # Run migration
-wrangler d1 execute settimes-db --file=./migrations/001_initial_schema.sql
+wrangler d1 execute settimes-production-db --file=./migrations/001_initial_schema.sql
 ```
 
 **Via Cloudflare Dashboard:**
 
 1. Workers & Pages → D1
-2. Select database: `settimes-db`
+2. Select database: `settimes-production-db`
 3. Console tab → Run queries
 
 ### Common Database Queries
@@ -242,11 +243,11 @@ wrangler d1 execute settimes-db --file=./migrations/001_initial_schema.sql
 **Check User Sessions:**
 
 ```sql
-SELECT u.email, s.created_at, s.last_activity_at, s.ip_address
-FROM sessions s
+SELECT u.email, s.expires_at
+FROM lucia_sessions s
 JOIN users u ON s.user_id = u.id
-WHERE s.expires_at > datetime('now')
-ORDER BY s.last_activity_at DESC;
+WHERE s.expires_at > unixepoch()
+ORDER BY s.expires_at DESC;
 ```
 
 **Event Statistics:**
@@ -255,11 +256,10 @@ ORDER BY s.last_activity_at DESC;
 SELECT
   e.name,
   e.date,
-  COUNT(DISTINCT b.id) as band_count,
-  COUNT(DISTINCT v.id) as venue_count
+  COUNT(DISTINCT p.band_profile_id) as band_count,
+  COUNT(DISTINCT p.venue_id) as venue_count
 FROM events e
-LEFT JOIN bands b ON e.id = b.event_id
-LEFT JOIN venues v ON b.venue_id = v.id
+LEFT JOIN performances p ON e.id = p.event_id
 GROUP BY e.id
 ORDER BY e.date DESC;
 ```
@@ -291,14 +291,14 @@ LIMIT 100;
 
 ```bash
 # Export entire database
-wrangler d1 export settimes-db --output=backup-$(date +%Y%m%d).sql
+wrangler d1 export settimes-production-db --output=backup-$(date +%Y%m%d).sql
 ```
 
 **Restore from Backup:**
 
 ```bash
 # Restore database
-wrangler d1 execute settimes-db --file=backup-20251119.sql
+wrangler d1 execute settimes-production-db --file=backup-20251119.sql
 ```
 
 **Backup Schedule:**
@@ -314,17 +314,26 @@ wrangler d1 execute settimes-db --file=backup-20251119.sql
 ### Authentication Flow
 
 1. User submits email + password to `/api/admin/auth/login`
-2. Backend verifies credentials (bcrypt)
-3. Session created in `sessions` table
+2. Backend verifies credentials (PBKDF2-SHA256 via Web Crypto)
+3. Session created in `lucia_sessions` table
 4. Session token returned in HTTPOnly cookie
 5. All subsequent requests include cookie
 6. Middleware validates session + checks RBAC
+
+### Multi-Factor Authentication (MFA)
+
+Admins can enable TOTP-based two-factor authentication on their accounts:
+
+- **Setup:** In account settings, scan the QR code (or enter the secret) into an authenticator app (Google Authenticator, Authy, 1Password, etc.) and confirm with a 6-digit code. TOTP is HMAC-SHA1 over a 30-second window, computed via the Web Crypto API (`functions/utils/totp.js`) — no third-party crypto library.
+- **Backup codes:** Enabling MFA reveals one-time backup codes — store them securely. Each works once if the authenticator is unavailable.
+- **Trusted devices:** A device can be marked trusted to skip the MFA prompt there for a limited period; trusted devices can be revoked at any time.
+- **Enforcement:** With MFA enabled, login requires the password **and** a valid TOTP (or backup) code before a session is issued. On any successful re-authentication, the user's prior sessions are invalidated.
 
 ### Session Management
 
 **Session Configuration:**
 
-- Storage: Lucia-backed `lucia_sessions` rows in D1
+- Storage: `lucia_sessions` rows in D1 (direct D1 session manager; `expires_at` is INTEGER Unix-epoch seconds)
 - Admin idle timeout: 15 minutes
 - Admin absolute lifetime: 8 hours
 - Cookie transport: HttpOnly session cookie (`__Host-session_token` in production)
@@ -491,7 +500,7 @@ wrangler tail --status error
 
 ```bash
 # Create backup
-wrangler d1 export settimes-db --output=backups/settimes-$(date +%Y%m%d-%H%M%S).sql
+wrangler d1 export settimes-production-db --output=backups/settimes-$(date +%Y%m%d-%H%M%S).sql
 
 # Compress backup
 gzip backups/settimes-*.sql
@@ -502,7 +511,7 @@ gzip backups/settimes-*.sql
 ```bash
 # Restore from backup
 gunzip backups/settimes-20251119.sql.gz
-wrangler d1 execute settimes-db --file=backups/settimes-20251119.sql
+wrangler d1 execute settimes-production-db --file=backups/settimes-20251119.sql
 ```
 
 ### Disaster Recovery Plan
@@ -582,7 +591,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 
 ```sql
 -- Remove old sessions
-DELETE FROM sessions WHERE expires_at < datetime('now', '-7 days');
+DELETE FROM lucia_sessions WHERE expires_at < unixepoch('now', '-7 days');
 
 -- Archive old audit logs
 INSERT INTO audit_logs_archive SELECT * FROM audit_logs
@@ -653,7 +662,7 @@ SELECT COUNT(*) FROM bands WHERE event_id = <event_id>;
 wrangler tail --status slow
 
 # Check query performance
-wrangler d1 execute settimes-db --command="EXPLAIN QUERY PLAN <your_query>"
+wrangler d1 execute settimes-production-db --command="EXPLAIN QUERY PLAN <your_query>"
 ```
 
 **Solutions:**
@@ -742,16 +751,16 @@ cd frontend && npm run deploy:prod
 cd frontend && npm run deploy:dev
 
 # Run migrations
-wrangler d1 migrations apply settimes-db
+wrangler d1 migrations apply settimes-production-db
 
 # Check database size
-wrangler d1 info settimes-db
+wrangler d1 info settimes-production-db
 
 # List all users
-wrangler d1 execute settimes-db --command="SELECT email, role FROM users"
+wrangler d1 execute settimes-production-db --command="SELECT email, role FROM users"
 
 # Force logout all users
-wrangler d1 execute settimes-db --command="DELETE FROM sessions"
+wrangler d1 execute settimes-production-db --command="DELETE FROM lucia_sessions"
 ```
 
 ### Environment Variables

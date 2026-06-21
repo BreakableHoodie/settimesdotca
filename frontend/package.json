@@ -36,7 +36,6 @@
     "dompurify": "^3.4.11",
     "isomorphic-dompurify": "^3.17.0",
     "lucide-react": "^1.21.0",
-    "otplib": "^13.4.1",
     "prop-types": "^15.8.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",

@@ -15,6 +15,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import BandFacts from '../components/BandFacts'
 import BandStats from '../components/BandStats'
 import Breadcrumbs from '../components/Breadcrumbs'
+import ShareButton from '../components/ShareButton'
 import PrivacyBanner from '../components/PrivacyBanner'
 import { Alert, Badge, Button, Card, BandProfileSkeleton } from '../components/ui'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
@@ -549,6 +550,15 @@ export default function BandProfilePage() {
               </div>
             </div>
           )}
+
+          {/* Share */}
+          <div className="flex justify-end bg-bg-purple/50 px-6 pt-4">
+            <ShareButton
+              url={typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined}
+              title={profile.name}
+              text={`${profile.name} on SetTimes`}
+            />
+          </div>
 
           {/* Bio and Social Links */}
           <div className="p-6 bg-bg-purple/50 border-t border-white/10">

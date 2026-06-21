@@ -27,7 +27,7 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 
 - **Frontend**: React 19, Vite 8, Tailwind 4, React Router 7 (`frontend/`)
 - **Backend**: Cloudflare Pages Functions (edge serverless, `functions/`)
-- **Database**: Cloudflare D1 (SQLite-compatible), 38 migrations in `migrations/`
+- **Database**: Cloudflare D1 (SQLite-compatible), numbered migrations in `migrations/`
 - **Auth**: Direct D1 session manager (`functions/utils/auth.js`), CSRF double-submit, TOTP MFA, trusted devices, RBAC
 - **Storage**: Cloudflare R2 (band photos)
 - **Email**: Postmark/Resend/MailChannels

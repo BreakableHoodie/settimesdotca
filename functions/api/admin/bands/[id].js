@@ -138,6 +138,7 @@ export async function onRequestPut(context) {
       contact_email,
       is_active,
       photo_url,
+      photo_alt_text,
       social_links,
     } = body;
     let resolvedPhotoUrl;
@@ -411,6 +412,7 @@ export async function onRequestPut(context) {
       contact_email !== undefined ||
       is_active !== undefined ||
       photo_url !== undefined ||
+      photo_alt_text !== undefined ||
       social_links !== undefined
     ) {
       const profileUpdates = [];
@@ -471,6 +473,11 @@ export async function onRequestPut(context) {
       if (photo_url !== undefined) {
         profileUpdates.push("photo_url = ?");
         profileParams.push(resolvedPhotoUrl || null);
+      }
+      if (photo_alt_text !== undefined) {
+        profileUpdates.push("photo_alt_text = ?");
+        const cleanedAlt = sanitizeString(photo_alt_text);
+        profileParams.push(cleanedAlt ? cleanedAlt.slice(0, 250) : null);
       }
 
       // Handle Social Links (merge or overwrite?)

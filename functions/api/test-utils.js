@@ -129,6 +129,7 @@ export function createTestDB() {
       popularity_score REAL DEFAULT 0,
       description TEXT,
       photo_url TEXT,
+      photo_alt_text TEXT,
       social_links TEXT,
       created_by_user_id INTEGER REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),

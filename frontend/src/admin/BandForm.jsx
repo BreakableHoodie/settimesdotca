@@ -231,6 +231,27 @@ export default function BandForm({
               />
             </div>
 
+            {formData.photo_url && (
+              <div className="sm:col-span-2">
+                <label htmlFor="band-photo-alt" className="block text-white mb-2 text-sm">
+                  Photo alt text <span className="text-gray-400 text-xs ml-2">(optional)</span>
+                </label>
+                <input
+                  id="band-photo-alt"
+                  type="text"
+                  name="photo_alt_text"
+                  value={formData.photo_alt_text || ''}
+                  onChange={onChange}
+                  maxLength={250}
+                  className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+                  placeholder={`Describe the photo (defaults to "${formData.name || 'band name'}")`}
+                />
+                <p className="text-gray-400 text-xs mt-1">
+                  Read by screen readers and shown if the image fails to load.
+                </p>
+              </div>
+            )}
+
             <div className="sm:col-span-2">
               <label htmlFor="band-description" className="block text-white mb-2 text-sm">
                 Description <span className="text-gray-400 text-xs">(optional)</span>

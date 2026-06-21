@@ -75,6 +75,31 @@ describe('Admin bands API - CRUD operations', () => {
     const data = await res.json()
     expect(data.success).toBeTruthy()
   })
+
+  it('PUT /api/admin/bands/{id} persists photo_alt_text and GET returns it', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'AltEvent', slug: 'alt-event' })
+    const venue = insertVenue(rawDb, { name: 'Alt Venue' })
+    const band = insertBand(rawDb, { name: 'Alt Band', event_id: ev.id, venue_id: venue.id })
+
+    const body = {
+      photo_url: 'https://band-photos.settimes.ca/band-photos/x.jpg',
+      photo_alt_text: 'Alt Band performing under red stage lights',
+    }
+    const putReq = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    })
+    const putRes = await bandIdHandler.onRequestPut({ request: putReq, env, data: { user: { role: 'editor' } } })
+    expect(putRes.status).toBe(200)
+
+    const getReq = new Request(`https://example.test/api/admin/bands?event_id=${ev.id}`, { headers })
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: 'editor' } } })
+    const list = await getRes.json()
+    const updated = list.bands.find(b => b.name === 'Alt Band')
+    expect(updated.photo_alt_text).toBe('Alt Band performing under red stage lights')
+  })
 })
 
 describe('Admin bands API - Validation', () => {

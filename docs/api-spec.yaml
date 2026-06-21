@@ -3025,6 +3025,10 @@ components:
         photo_url:
           type: string
           nullable: true
+        photo_alt_text:
+          type: string
+          nullable: true
+          description: Accessible alt text for the band photo; falls back to the band name when empty.
         genre:
           type: string
           nullable: true
@@ -3098,6 +3102,10 @@ components:
         photo_url:
           type: string
           nullable: true
+        photo_alt_text:
+          type: string
+          nullable: true
+          description: Accessible alt text for the band photo; falls back to the band name when empty.
         social_links:
           nullable: true
           oneOf:
@@ -3239,6 +3247,10 @@ components:
         photo_url:
           type: string
           nullable: true
+        photo_alt_text:
+          type: string
+          nullable: true
+          description: Accessible alt text for the band photo; falls back to the band name when empty.
         url:
           type: string
           nullable: true

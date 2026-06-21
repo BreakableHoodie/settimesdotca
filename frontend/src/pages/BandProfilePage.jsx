@@ -766,7 +766,16 @@ export default function BandProfilePage() {
                             {performance.venue_name && (
                               <span className="flex items-center gap-2">
                                 <MapPin size={14} className="text-accent-500" />
-                                {performance.venue_name}
+                                {performance.venue_id ? (
+                                  <Link
+                                    to={`/venue/${performance.venue_id}`}
+                                    className="transition-colors hover:text-accent-400 hover:underline"
+                                  >
+                                    {performance.venue_name}
+                                  </Link>
+                                ) : (
+                                  performance.venue_name
+                                )}
                               </span>
                             )}
                             {performance.start_time && performance.end_time && (
@@ -841,7 +850,16 @@ export default function BandProfilePage() {
                             {performance.venue_name && (
                               <span className="flex items-center gap-2">
                                 <MapPin size={14} className="text-text-tertiary" />
-                                {performance.venue_name}
+                                {performance.venue_id ? (
+                                  <Link
+                                    to={`/venue/${performance.venue_id}`}
+                                    className="transition-colors hover:text-accent-400 hover:underline"
+                                  >
+                                    {performance.venue_name}
+                                  </Link>
+                                ) : (
+                                  performance.venue_name
+                                )}
                               </span>
                             )}
                             {performance.start_time && performance.end_time && (

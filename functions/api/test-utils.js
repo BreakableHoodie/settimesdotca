@@ -186,6 +186,8 @@ export function createTestDB() {
       phone TEXT,
       contact_email TEXT,
       address TEXT,
+      latitude REAL,
+      longitude REAL,
       created_by_user_id INTEGER REFERENCES users(id),
       updated_by_user_id INTEGER REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),

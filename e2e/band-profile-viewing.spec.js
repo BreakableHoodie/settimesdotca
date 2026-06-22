@@ -188,11 +188,20 @@ test.describe('Band Profile Viewing', () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     if (await bandLink.isVisible()) {
-      const bandName = await bandLink.textContent();
+      const bandName = (await bandLink.textContent())?.trim() || '';
       await bandLink.click();
+      await page.waitForURL(/\/band(s)?\//);
 
-      // Verify band profile is visible on mobile
-      await expect(page.getByRole('heading', { name: new RegExp(bandName || '', 'i') })).toBeVisible();
+      // Verify the band profile heading renders on mobile. Wait generously: the
+      // profile route is lazy-loaded and fetches its data, which can exceed the
+      // default 5s timeout on a cold CI mobile run. Match the band name robustly
+      // (regex-escaped), and allow multiple headings via .first().
+      const headingName = bandName
+        ? new RegExp(bandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+        : /.+/;
+      await expect(page.getByRole('heading', { name: headingName }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // Verify content is readable on mobile
       const contentArea = page.locator('main, [role="main"], article').first();

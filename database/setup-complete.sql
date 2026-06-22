@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS venues (
   facebook TEXT,
   phone TEXT,
   contact_email TEXT,
+  latitude REAL,
+  longitude REAL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

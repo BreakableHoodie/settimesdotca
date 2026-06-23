@@ -557,7 +557,7 @@ export default function BandProfilePage() {
 
           {/* Bio, Social Links, and Share */}
           <div className="p-6 bg-bg-purple/50 border-t border-text-primary/10">
-            <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="mb-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className="flex-1 min-w-0">
                 {profile.description ? (
                   <div
@@ -579,7 +579,7 @@ export default function BandProfilePage() {
                   )
                 )}
               </div>
-              <div className="shrink-0">
+              <div className="shrink-0 self-end sm:self-auto">
                 <ShareButton
                   url={
                     typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
@@ -696,7 +696,7 @@ export default function BandProfilePage() {
 
         {/* Follow band */}
         <div className="mt-6 p-4 rounded-lg bg-text-primary/5 border border-text-primary/10">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="sm:flex-1">
               <h3 className="text-sm font-semibold text-text-primary mb-1">Follow {profile.name}</h3>
               <p className="text-xs text-text-secondary">Get notified when they join a new lineup.</p>

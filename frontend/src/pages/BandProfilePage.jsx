@@ -696,39 +696,43 @@ export default function BandProfilePage() {
 
         {/* Follow band */}
         <div className="mt-6 p-4 rounded-lg bg-text-primary/5 border border-text-primary/10">
-          <h3 className="text-sm font-semibold text-text-primary mb-1">Follow {profile.name}</h3>
-          <p className="text-xs text-text-secondary mb-3">Get notified when they join a new lineup.</p>
-          {followStatus === 'success' ? (
-            <p className="text-sm text-green-400">
-              <Check size={14} className="mr-1.5" />
-              You&apos;re following {profile.name}! We&apos;ll email you when they join a lineup.
-            </p>
-          ) : (
-            <form onSubmit={submitFollow} className="flex flex-col gap-2">
-              <label htmlFor="follow-email" className="text-sm text-text-secondary">
-                Your email address
-              </label>
-              <div className="flex gap-2 max-w-md">
-                <input
-                  id="follow-email"
-                  type="email"
-                  value={followEmail}
-                  onChange={e => setFollowEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  required
-                  className="flex-1 min-w-0 px-3 py-2 rounded bg-bg-navy text-text-primary border border-text-primary/20 focus:border-accent-500 focus:outline-none text-sm"
-                />
-                <Button
-                  type="submit"
-                  disabled={followStatus === 'loading' || (turnstileEnabled && !turnstileToken)}
-                  size="sm"
-                >
-                  {followStatus === 'loading' ? 'Saving…' : 'Follow'}
-                </Button>
-              </div>
-              {turnstileEnabled && <div ref={turnstileContainerRef} className="mt-2" />}
-            </form>
-          )}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="sm:flex-1">
+              <h3 className="text-sm font-semibold text-text-primary mb-1">Follow {profile.name}</h3>
+              <p className="text-xs text-text-secondary">Get notified when they join a new lineup.</p>
+            </div>
+            {followStatus === 'success' ? (
+              <p className="text-sm text-green-400 sm:max-w-sm">
+                <Check size={14} className="mr-1.5" />
+                You&apos;re following {profile.name}! We&apos;ll email you when they join a lineup.
+              </p>
+            ) : (
+              <form onSubmit={submitFollow} className="w-full sm:w-auto">
+                <label htmlFor="follow-email" className="sr-only">
+                  Your email address
+                </label>
+                <div className="flex gap-2 sm:w-80">
+                  <input
+                    id="follow-email"
+                    type="email"
+                    value={followEmail}
+                    onChange={e => setFollowEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    required
+                    className="flex-1 min-w-0 px-3 py-2 rounded bg-bg-navy text-text-primary border border-text-primary/20 focus:border-accent-500 focus:outline-none text-sm"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={followStatus === 'loading' || (turnstileEnabled && !turnstileToken)}
+                    size="sm"
+                  >
+                    {followStatus === 'loading' ? 'Saving…' : 'Follow'}
+                  </Button>
+                </div>
+                {turnstileEnabled && <div ref={turnstileContainerRef} className="mt-2" />}
+              </form>
+            )}
+          </div>
           {followStatus === 'error' && <p className="text-xs text-red-400 mt-1">{followError}</p>}
         </div>
 

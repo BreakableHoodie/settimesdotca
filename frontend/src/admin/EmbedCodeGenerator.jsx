@@ -1,7 +1,7 @@
 export default function EmbedCodeGenerator({ event }) {
   const embedCode = `
 <iframe
-  src="https://setplan.app/embed/${event.slug}"
+  src="https://settimes.ca/embed/${event.slug}"
   width="100%"
   height="600"
   frameborder="0"

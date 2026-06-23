@@ -179,7 +179,7 @@ export default function Modal({
       <div
         ref={modalRef}
         className={`
-          w-full bg-bg-darker border border-white/10 rounded-xl shadow-xl
+          w-full bg-bg-darker border border-border rounded-xl shadow-xl
           max-h-[90vh] overflow-y-auto animate-scale-in
           ${sizeClasses[size] || sizeClasses.md}
           ${className}
@@ -193,7 +193,7 @@ export default function Modal({
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center justify-between p-6 border-b border-border">
             {title && (
               <h2 id="modal-title" className="text-2xl font-bold text-text-primary">
                 {title}
@@ -202,7 +202,7 @@ export default function Modal({
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                className="p-2 hover:bg-surface rounded-lg transition-colors"
                 aria-label="Close modal"
               >
                 <X size={20} className="text-text-secondary" />
@@ -216,7 +216,7 @@ export default function Modal({
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10 bg-white/5">{footer}</div>
+          <div className="flex items-center justify-end gap-3 p-6 border-t border-border bg-surface">{footer}</div>
         )}
       </div>
     </div>

@@ -261,7 +261,7 @@ export default function EventTimeline() {
                   id="timeline-venue-filter"
                   value={filters.venue || ''}
                   onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-hidden transition-colors"
+                  className="w-full px-4 py-2 bg-surface border border-border rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-hidden transition-colors"
                 >
                   <option value="">All Venues</option>
                   {allVenues.map(venue => (
@@ -281,7 +281,7 @@ export default function EventTimeline() {
                   id="timeline-month-filter"
                   value={filters.month || ''}
                   onChange={e => handleFilterChange('month', e.target.value || null)}
-                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-hidden transition-colors"
+                  className="w-full px-4 py-2 bg-surface border border-border rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-hidden transition-colors"
                 >
                   <option value="">All Months</option>
                   {allMonths.map(month => (
@@ -297,7 +297,7 @@ export default function EventTimeline() {
             </div>
 
             {hasActiveFilters && (
-              <div className="mt-4 pt-4 border-t border-white/10">
+              <div className="mt-4 pt-4 border-t border-border">
                 <p className="text-sm text-text-tertiary">
                   Showing {filteredNow.length + filteredUpcoming.length + filteredPast.length} filtered event(s)
                 </p>
@@ -555,7 +555,7 @@ function EventCard({
 
         {/* Featured Bands Preview (when collapsed) */}
         {!expanded && featuredBands.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/10">
+          <div className="mt-4 pt-4 border-t border-border">
             <p className="text-text-tertiary text-sm mb-3">Performers:</p>
             <div className="flex flex-wrap gap-2">
               {featuredBands.map(band => (
@@ -575,7 +575,7 @@ function EventCard({
         )}
 
         {!expanded && featuredBands.length === 0 && (
-          <div className="mt-4 pt-4 border-t border-white/10">
+          <div className="mt-4 pt-4 border-t border-border">
             <p className="text-text-tertiary text-sm">Expand to load performers and venues.</p>
           </div>
         )}
@@ -583,16 +583,16 @@ function EventCard({
 
       {/* Expanded Details */}
       {expanded && (
-        <div className="border-t border-white/10 bg-white/5">
+        <div className="border-t border-border bg-surface">
           {isLoadingDetails && (
-            <div className="border-b border-white/10 px-6 py-5">
+            <div className="border-b border-border px-6 py-5">
               <Loading size="sm" text="Loading performers and venues..." className="sm:items-start" />
             </div>
           )}
 
           {/* Venues */}
           {venueList && venueList.length > 0 && (
-            <div className="p-6 border-b border-white/10">
+            <div className="p-6 border-b border-border">
               <h4 className="text-lg font-bold text-text-primary mb-4">Venues</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {venueList.map(venue => (
@@ -627,7 +627,7 @@ function EventCard({
                         {band.name}
                       </div>
                       {band.photo_url && (
-                        <div className="w-12 h-12 rounded-full bg-bg-darker overflow-hidden shrink-0 ring-2 ring-white/10">
+                        <div className="w-12 h-12 rounded-full bg-bg-darker overflow-hidden shrink-0 ring-2 ring-border">
                           <img
                             src={band.photo_url}
                             alt={band.name}

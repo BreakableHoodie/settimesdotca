@@ -15,7 +15,7 @@ export default function ShareButton({
   title,
   text,
   label = 'Share',
-  className = 'inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-white/15 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400',
+  className = 'inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-surface focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400',
 }) {
   const [copied, setCopied] = useState(false)
 

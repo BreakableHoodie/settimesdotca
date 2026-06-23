@@ -41,6 +41,14 @@
   --color-text-tertiary: #9ca3af;
   --color-text-disabled: #6b7280;
   --color-text-inverse: #111827;
+
+  /* Theme-aware surface + border: faint white on dark themes, faint ink on
+     light themes, so cards / inputs / dividers stay visible under every theme.
+     Defined here so Tailwind generates bg-surface / border-border utilities;
+     each [data-theme] block below overrides the values. */
+  --color-surface: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(255, 255, 255, 0.1);
+
   --color-band-navy: #0c0f1a;
   --color-band-purple: #141927;
   --color-band-orange: #f97316;
@@ -150,6 +158,9 @@
   --color-text-disabled: #6b7280;
   --color-text-inverse: #111827;
 
+  --color-surface: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(255, 255, 255, 0.1);
+
   --color-band-navy: #0c0f1a;
   --color-band-purple: #141927;
   --color-band-orange: #f97316;
@@ -189,6 +200,9 @@
   --color-text-disabled: #64748b;
   --color-text-inverse: #0f172a;
 
+  --color-surface: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(255, 255, 255, 0.1);
+
   --color-band-navy: #0f172a;
   --color-band-purple: #1e293b;
   --color-band-orange: #0ea5e9;
@@ -225,6 +239,9 @@
   --color-text-tertiary: #78716c;
   --color-text-disabled: #a8a29e;
   --color-text-inverse: #fafaf9;
+
+  --color-surface: rgba(28, 25, 23, 0.04);
+  --color-border: rgba(28, 25, 23, 0.12);
 
   --color-band-navy: #fff8f1;
   --color-band-purple: #f3dfca;
@@ -274,6 +291,9 @@
   --color-text-tertiary: #64748b;
   --color-text-disabled: #94a3b8;
   --color-text-inverse: #f8fafc;
+
+  --color-surface: rgba(15, 23, 42, 0.04);
+  --color-border: rgba(15, 23, 42, 0.12);
 
   --color-band-navy: #f8fafc;
   --color-band-purple: #f1f5f9;

@@ -209,10 +209,10 @@ function MySchedule({
   if (sortedBands.length === 0) {
     return (
       <div className="py-16 text-center space-y-4">
-        <div className="text-white/20 mb-2">
+        <div className="text-text-disabled mb-2">
           <CalendarPlus size={60} aria-hidden="true" />
         </div>
-        <p className="text-white text-xl font-semibold">No bands selected yet</p>
+        <p className="text-text-primary text-xl font-semibold">No bands selected yet</p>
         <p className="text-accent-400 text-sm">Tap a band to start building your schedule</p>
         {onBrowseAll && (
           <button
@@ -229,7 +229,7 @@ function MySchedule({
   if (!showPast && visibleBands.length === 0 && hiddenFinishedCount > 0) {
     return (
       <div className="py-12 text-center">
-        <p className="text-white text-xl mb-2">All your selected bands have wrapped up</p>
+        <p className="text-text-primary text-xl mb-2">All your selected bands have wrapped up</p>
         <p className="text-accent-400">Tap &ldquo;Show finished sets&rdquo; to revisit what you already caught.</p>
         <div className="mt-4">
           <button
@@ -382,7 +382,7 @@ function MySchedule({
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-white text-center">My Route</h2>
+            <h2 className="text-2xl font-bold text-text-primary text-center">My Route</h2>
             <p className="text-center text-accent-400 text-sm">
               {showPast
                 ? `${sortedBands.length} ${sortedBands.length === 1 ? 'band' : 'bands'} selected`
@@ -426,7 +426,7 @@ function MySchedule({
                     setIsCopyingSchedule(false)
                   }
                 }}
-                className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
+                className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-text-primary flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
                 title={copyButtonLabel === 'Copied!' ? 'Schedule copied to clipboard' : 'Copy your schedule'}
                 disabled={isCopyingSchedule}
               >
@@ -440,7 +440,7 @@ function MySchedule({
               {bands.length > 0 && (
                 <button
                   onClick={handleShareSchedule}
-                  className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-white flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
+                  className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-text-primary flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
                   title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Share your schedule'}
                   aria-label="Copy shareable link to your schedule"
                 >
@@ -534,9 +534,9 @@ function MySchedule({
           return (
             <div key={band.id} className="relative mb-6">
               {/* Time gap indicator */}
-              {timeGap && <div className="text-center text-white/50 text-xs italic py-3">{timeGap}</div>}
+              {timeGap && <div className="text-center text-text-tertiary text-xs italic py-3">{timeGap}</div>}
               {showDreReminder && (
-                <div className="text-center text-white/80 text-xs italic pb-2 flex items-center justify-center gap-2">
+                <div className="text-center text-text-secondary text-xs italic pb-2 flex items-center justify-center gap-2">
                   <Smile size={14} className="text-yellow-300" aria-hidden="true" />
                   <span>{getHighlightMessage()}</span>
                 </div>
@@ -605,7 +605,7 @@ function MySchedule({
         })}
       </div>
 
-      <div className="max-w-5xl mx-auto mt-8 text-center text-xs text-white/60">
+      <div className="max-w-5xl mx-auto mt-8 text-center text-xs text-text-tertiary">
         <Car size={14} aria-hidden="true" className="mr-2 inline" />
         Home safe plan: grab a rideshare, call a friend, or line up a sober ride—no drinking and driving.
       </div>

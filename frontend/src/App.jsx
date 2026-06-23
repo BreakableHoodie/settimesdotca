@@ -588,7 +588,7 @@ function App() {
           <div className="text-red-400 mb-4" aria-hidden="true">
             <CircleAlert size={64} />
           </div>
-          <h2 className="text-white text-2xl font-bold mb-2">Oops! Something went wrong</h2>
+          <h2 className="text-text-primary text-2xl font-bold mb-2">Oops! Something went wrong</h2>
           <p className="text-accent-400 mb-6">{error}</p>
           <button
             onClick={() => window.location.reload()}
@@ -655,7 +655,7 @@ function App() {
       </Helmet>
       <OfflineIndicator />
       {isArchived ? (
-        <header className="sticky top-0 z-50 border-b-2 border-white/10 bg-bg-navy/90 backdrop-blur-xs px-4 py-3">
+        <header className="sticky top-0 z-50 border-b-2 border-border bg-bg-navy/90 backdrop-blur-xs px-4 py-3">
           <div className="container mx-auto max-w-6xl flex items-center justify-between">
             <Link
               to="/"
@@ -663,7 +663,7 @@ function App() {
             >
               <span className="text-accent-500">Set</span>Times
             </Link>
-            <Link to="/" className="text-sm text-text-secondary hover:text-white transition-colors">
+            <Link to="/" className="text-sm text-text-secondary hover:text-text-primary transition-colors">
               ← All Events
             </Link>
           </div>
@@ -696,7 +696,7 @@ function App() {
 
         {/* Archived event banner */}
         {isArchived && (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-text-secondary">
+          <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-surface border border-border text-text-secondary">
             <Archive size={16} className="mt-0.5 shrink-0 text-text-tertiary" aria-hidden="true" />
             <div>
               <span className="font-semibold text-text-primary">This event has concluded.</span> You&apos;re viewing the
@@ -715,7 +715,7 @@ function App() {
             <button
               onClick={dismissHint}
               aria-label="Dismiss tip"
-              className="shrink-0 p-1 text-accent-400 transition-colors hover:text-white sm:p-1.5"
+              className="shrink-0 p-1 text-accent-400 transition-colors hover:text-text-primary sm:p-1.5"
             >
               <X size={16} />
             </button>
@@ -740,13 +740,13 @@ function App() {
           <section className="bg-bg-purple/80 border border-accent-500/30 rounded-lg p-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <h2 className="text-white font-semibold text-lg">Realtime Test Time</h2>
-                <p className="text-white/60 text-sm">
+                <h2 className="text-text-primary font-semibold text-lg">Realtime Test Time</h2>
+                <p className="text-text-tertiary text-sm">
                   Use this to simulate &ldquo;Now Playing&rdquo; and upcoming sets before event day.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <label className="text-white/80 text-sm" htmlFor="debug-time">
+                <label className="text-text-secondary text-sm" htmlFor="debug-time">
                   Time override
                 </label>
                 <input
@@ -762,7 +762,7 @@ function App() {
                     const parsed = parseDebugTime(value)
                     setDebugTime(parsed)
                   }}
-                  className="px-3 py-2 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden text-sm"
+                  className="px-3 py-2 rounded bg-bg-navy text-text-primary border border-border focus:border-accent-500 focus:outline-hidden text-sm"
                 />
                 <button
                   type="button"
@@ -774,7 +774,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => setDebugTime(null)}
-                  className="px-3 py-2 rounded bg-white/10 border border-white/20 text-white/80 text-sm hover:bg-white/20"
+                  className="px-3 py-2 rounded bg-surface border border-border text-text-secondary text-sm hover:bg-surface"
                 >
                   Clear override
                 </button>
@@ -800,7 +800,7 @@ function App() {
         ) : (
           <Suspense
             fallback={
-              <div className="py-16 text-center text-white/70" role="status" aria-live="polite">
+              <div className="py-16 text-center text-text-secondary" role="status" aria-live="polite">
                 Loading your schedule...
               </div>
             }
@@ -821,7 +821,7 @@ function App() {
       </main>
       <Suspense
         fallback={
-          <div className="py-12 text-center text-white/60" role="status" aria-live="polite">
+          <div className="py-12 text-center text-text-tertiary" role="status" aria-live="polite">
             Loading venue tips...
           </div>
         }
@@ -848,7 +848,7 @@ function App() {
                 setPendingSharedBands([])
                 setPendingSharedBandNames([])
               }}
-              className="min-h-[44px] rounded-lg border border-white/15 px-4 py-2 text-white/80 transition-colors hover:bg-white/10"
+              className="min-h-[44px] rounded-lg border border-border px-4 py-2 text-text-secondary transition-colors hover:bg-surface"
             >
               Cancel
             </button>
@@ -872,30 +872,31 @@ function App() {
         <div className="space-y-4 text-sm text-text-secondary">
           <p>Choose how to apply this shared route to your current picks.</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-xs uppercase tracking-wide text-white/50">Incoming stops</div>
-              <div className="mt-1 text-2xl font-semibold text-white">{pendingSharedBands.length}</div>
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <div className="text-xs uppercase tracking-wide text-text-tertiary">Incoming stops</div>
+              <div className="mt-1 text-2xl font-semibold text-text-primary">{pendingSharedBands.length}</div>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-xs uppercase tracking-wide text-white/50">Already in your route</div>
-              <div className="mt-1 text-2xl font-semibold text-white">{sharedBandsAlreadySelectedCount}</div>
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <div className="text-xs uppercase tracking-wide text-text-tertiary">Already in your route</div>
+              <div className="mt-1 text-2xl font-semibold text-text-primary">{sharedBandsAlreadySelectedCount}</div>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-xs uppercase tracking-wide text-white/50">New to add</div>
-              <div className="mt-1 text-2xl font-semibold text-white">{sharedBandsNewCount}</div>
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <div className="text-xs uppercase tracking-wide text-text-tertiary">New to add</div>
+              <div className="mt-1 text-2xl font-semibold text-text-primary">{sharedBandsNewCount}</div>
             </div>
           </div>
-          <p className="text-white/70">
-            <span className="font-semibold text-white">Merge</span> keeps your current route and adds only the new
-            shared stops. <span className="font-semibold text-white">Replace</span> swaps your route for the shared one.
+          <p className="text-text-secondary">
+            <span className="font-semibold text-text-primary">Merge</span> keeps your current route and adds only the
+            new shared stops. <span className="font-semibold text-text-primary">Replace</span> swaps your route for the
+            shared one.
           </p>
           {pendingSharedBandNames.length > 0 && (
-            <ul className="space-y-1 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/80 list-none">
+            <ul className="space-y-1 rounded-lg border border-border bg-surface p-3 text-sm text-text-secondary list-none">
               {pendingSharedBandNames.slice(0, 5).map((name, i) => (
                 <li key={i}>{name}</li>
               ))}
               {pendingSharedBandNames.length > 5 && (
-                <li className="text-white/50">and {pendingSharedBandNames.length - 5} more…</li>
+                <li className="text-text-tertiary">and {pendingSharedBandNames.length - 5} more…</li>
               )}
             </ul>
           )}
@@ -911,9 +912,9 @@ function App() {
       />
       {scheduleToast && (
         <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">
-          <div className="rounded-xl border border-white/10 bg-bg-purple/95 px-4 py-3 shadow-xl backdrop-blur-xs">
+          <div className="rounded-xl border border-border bg-bg-purple/95 px-4 py-3 shadow-xl backdrop-blur-xs">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-white/85">{scheduleToast.message}</p>
+              <p className="text-sm text-text-secondary">{scheduleToast.message}</p>
               {scheduleToast.type === 'undo' ? (
                 <button
                   type="button"
@@ -926,7 +927,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => clearScheduleToast({ clearUndoState: true })}
-                  className="text-white/50 transition-colors hover:text-white"
+                  className="text-text-tertiary transition-colors hover:text-text-primary"
                   aria-label="Dismiss message"
                 >
                   <X size={16} />

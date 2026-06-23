@@ -59,7 +59,7 @@ export default function Alert({
       {dismissible && onClose && (
         <button
           onClick={onClose}
-          className="shrink-0 p-1 hover:bg-white/10 rounded transition-colors"
+          className="shrink-0 p-1 hover:bg-surface rounded transition-colors"
           aria-label="Dismiss alert"
         >
           <X size={18} />

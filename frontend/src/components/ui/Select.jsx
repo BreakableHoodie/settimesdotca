@@ -40,7 +40,7 @@ export default function Select({
 
   const selectClasses = `
     w-full px-4 py-2.5 pr-10 min-h-[44px]
-    bg-white/5 border rounded-lg
+    bg-surface border rounded-lg
     text-text-primary
     transition-colors duration-base
     focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
@@ -49,7 +49,7 @@ export default function Select({
     ${
       hasError
         ? 'border-error-500 focus:border-error-500 focus:ring-error-500'
-        : 'border-white/10 focus:border-primary-500 focus:ring-primary-500/50'
+        : 'border-border focus:border-primary-500 focus:ring-primary-500/50'
     }
     ${!value ? 'text-text-tertiary' : ''}
     ${className}

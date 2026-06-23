@@ -22,7 +22,7 @@ export default function Card({
   ...props
 }) {
   // Base classes
-  const baseClasses = 'bg-bg-dark border border-white/10 rounded-xl shadow-base transition-all duration-base'
+  const baseClasses = 'bg-bg-dark border border-border rounded-xl shadow-base transition-all duration-base'
 
   // Variant styles
   const variantClasses = {

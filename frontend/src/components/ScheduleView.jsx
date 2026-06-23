@@ -209,7 +209,7 @@ function ScheduleView({
     <div className="py-6 space-y-6 sm:space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex-1 text-center sm:text-left">
-          <h2 className="text-2xl font-bold text-white text-center">Full Lineup</h2>
+          <h2 className="text-2xl font-bold text-text-primary text-center">Full Lineup</h2>
           {!showPast && hiddenFinished > 0 && (
             <p className="text-xs text-accent-400/80 mt-1 text-center sm:text-left">
               {hiddenFinished} finished {hiddenFinished === 1 ? 'set hidden' : 'sets hidden'}
@@ -218,7 +218,7 @@ function ScheduleView({
         </div>
         <div className="flex justify-center sm:justify-end gap-3 flex-wrap">
           <div
-            className="inline-flex items-center rounded-full border border-white/10 bg-white/5 p-0.5"
+            className="inline-flex items-center rounded-full border border-border bg-surface p-0.5"
             role="group"
             aria-label="Group lineup by"
           >
@@ -229,7 +229,7 @@ function ScheduleView({
                 onClick={() => setGroupBy(mode)}
                 aria-pressed={groupBy === mode}
                 className={`min-h-[44px] rounded-full px-3 py-1.5 text-xs font-medium capitalize transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
-                  groupBy === mode ? 'bg-accent-500/20 text-accent-400' : 'text-white/60 hover:text-white'
+                  groupBy === mode ? 'bg-accent-500/20 text-accent-400' : 'text-text-tertiary hover:text-text-primary'
                 }`}
               >
                 By {mode}
@@ -252,10 +252,10 @@ function ScheduleView({
           )}
           <button
             onClick={handleCopyAll}
-            className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-white flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+            className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-text-primary flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
               canCopyVisible
                 ? 'bg-bg-purple/60 border-bg-purple/40 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95'
-                : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
+                : 'bg-surface border-border text-text-tertiary cursor-not-allowed'
             }`}
             title={
               !canCopyVisible
@@ -305,7 +305,7 @@ function ScheduleView({
                     id="schedule-venue-filter"
                     value={venueFilter === UNSCHEDULED ? UNSCHEDULED_FILTER_VALUE : venueFilter || ''}
                     onChange={handleVenueSelectChange}
-                    className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+                    className="min-h-[44px] w-full rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
                   >
                     <option value="">All Venues</option>
                     {uniqueVenues.map(venue => (
@@ -327,7 +327,7 @@ function ScheduleView({
                     id="schedule-genre-filter"
                     value={genreFilter || ''}
                     onChange={event => setGenreFilter(event.target.value || null)}
-                    className="min-h-[44px] w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+                    className="min-h-[44px] w-full rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
                   >
                     <option value="">All Genres</option>
                     {uniqueGenres.map(genre => (
@@ -342,7 +342,7 @@ function ScheduleView({
 
             {showVenueFilter && (uniqueVenues.length > 1 || hasUnscheduled) && (
               <div className="hidden items-center gap-2 sm:flex">
-                <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Venue</span>
+                <span className="text-xs text-text-tertiary uppercase tracking-wide shrink-0">Venue</span>
                 <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
                   {uniqueVenues.map(venue => (
                     <button
@@ -352,7 +352,7 @@ function ScheduleView({
                       className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                         venueFilter === venue
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                          : 'bg-surface border-border text-text-tertiary hover:bg-surface'
                       }`}
                     >
                       {venue}
@@ -365,7 +365,7 @@ function ScheduleView({
                       className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                         venueFilter === UNSCHEDULED
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                          : 'bg-surface border-border text-text-tertiary hover:bg-surface'
                       }`}
                     >
                       Unscheduled
@@ -376,7 +376,7 @@ function ScheduleView({
             )}
             {uniqueGenres.length > 0 && (
               <div className="hidden items-center gap-2 sm:flex">
-                <span className="text-xs text-white/40 uppercase tracking-wide shrink-0">Genre</span>
+                <span className="text-xs text-text-tertiary uppercase tracking-wide shrink-0">Genre</span>
                 <div className="overflow-x-auto flex gap-2 pb-1 -mb-1">
                   {uniqueGenres.map(genre => (
                     <button
@@ -386,7 +386,7 @@ function ScheduleView({
                       className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                         genreFilter === genre
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                          : 'bg-surface border-border text-text-tertiary hover:bg-surface'
                       }`}
                     >
                       {genre}
@@ -399,7 +399,7 @@ function ScheduleView({
         )}
 
       {noVisibleBands ? (
-        <div className="text-center text-white/70 py-12">
+        <div className="text-center text-text-secondary py-12">
           {showPast
             ? 'No bands in this lineup right now.'
             : finishedCount > 0
@@ -411,10 +411,10 @@ function ScheduleView({
           {bandsByVenue.map(([venue, venueBands]) => (
             <div key={venue}>
               <div className="flex items-center mb-4">
-                <h2 className="bg-bg-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                <h2 className="bg-bg-purple text-text-primary font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   {venue}
                 </h2>
-                <span className="ml-3 text-xs text-white/40 shrink-0">
+                <span className="ml-3 text-xs text-text-tertiary shrink-0">
                   {venueBands.length} {venueBands.length === 1 ? 'set' : 'sets'}
                 </span>
                 <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
@@ -475,7 +475,7 @@ function ScheduleView({
           {upcomingByTime.length > 0 && (
             <div className="space-y-8">
               <div className="flex items-center mb-4">
-                <h2 className="bg-bg-purple text-white font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                <h2 className="bg-bg-purple text-text-primary font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   UPCOMING
                 </h2>
                 <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
@@ -483,7 +483,7 @@ function ScheduleView({
               {upcomingByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4">
                   <div className="flex items-center mb-4">
-                    <h3 className="bg-bg-navy text-white font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <h3 className="bg-bg-navy text-text-primary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                     </h3>
                     <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
@@ -512,18 +512,18 @@ function ScheduleView({
           {pastByTime.length > 0 && showPast && (
             <div className="space-y-8">
               <div className="flex items-center mb-4">
-                <h2 className="bg-white/10 text-white/40 font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+                <h2 className="bg-surface text-text-tertiary font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   PAST EVENTS
                 </h2>
-                <div className="flex-1 h-0.5 bg-white/10 ml-4"></div>
+                <div className="flex-1 h-0.5 bg-surface ml-4"></div>
               </div>
               {pastByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4 opacity-60">
                   <div className="flex items-center mb-4">
-                    <h3 className="bg-white/5 text-white/30 font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <h3 className="bg-surface text-text-disabled font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                     </h3>
-                    <div className="flex-1 h-0.5 bg-white/5 ml-4"></div>
+                    <div className="flex-1 h-0.5 bg-surface ml-4"></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
                     {timeBands.map(band => (

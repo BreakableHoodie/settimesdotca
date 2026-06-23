@@ -50,7 +50,7 @@ function BandCard({
       ? 'bg-gradient-accent text-bg-navy shadow-lg scale-[1.02] ring-2 ring-warning-400 ring-offset-2 ring-offset-bg-navy'
       : isPlaying
         ? 'bg-gradient-accent text-bg-navy shadow-glow-accent playing-now'
-        : 'bg-gradient-card text-white hover:bg-bg-purple/80 hover:scale-[1.01] shadow-md border border-white/10'
+        : 'bg-gradient-card text-text-primary hover:bg-bg-purple/80 hover:scale-[1.01] shadow-md border border-border'
   } relative`
 
   const labelBase = isSelected ? `Remove ${band.name} from my route` : `Add ${band.name} to my route`
@@ -74,7 +74,7 @@ function BandCard({
           className={`absolute top-2 right-2 h-11 w-11 flex items-center justify-center text-lg font-bold rounded-full transition-all duration-150 z-10 ${
             onAmber
               ? 'bg-bg-navy/20 hover:bg-bg-navy/30 text-bg-navy'
-              : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white'
+              : 'bg-surface hover:bg-surface text-text-secondary hover:text-text-primary'
           } focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500`}
           aria-label={labelBase}
           title={labelBase}
@@ -89,7 +89,7 @@ function BandCard({
             src={band.photo_url}
             alt=""
             loading="lazy"
-            className={`h-16 w-16 rounded-full object-cover ring-2 ${onAmber ? 'ring-bg-navy/20' : 'ring-white/15'}`}
+            className={`h-16 w-16 rounded-full object-cover ring-2 ${onAmber ? 'ring-bg-navy/20' : 'ring-border'}`}
           />
         )}
         {startingSoon && (
@@ -107,14 +107,14 @@ function BandCard({
               state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
               onClick={e => e.stopPropagation()}
               className={`font-display font-bold text-base md:text-lg leading-snug transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
-                onAmber ? 'text-bg-navy' : 'text-white hover:text-accent-400'
+                onAmber ? 'text-bg-navy' : 'text-text-primary hover:text-accent-400'
               }`}
             >
               {band.name}
             </Link>
           ) : (
             <h3
-              className={`font-display font-bold text-base md:text-lg leading-snug ${onAmber ? 'text-bg-navy' : 'text-white'}`}
+              className={`font-display font-bold text-base md:text-lg leading-snug ${onAmber ? 'text-bg-navy' : 'text-text-primary'}`}
             >
               Unnamed Artist
             </h3>

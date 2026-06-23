@@ -18,7 +18,7 @@ function VenueInfo({ eventData }) {
   return (
     <section className="py-8 sm:py-10 mt-8 border-t border-accent-500/20 bg-bg-purple/30">
       <div className="container mx-auto px-4 max-w-6xl">
-        <h3 className="text-xl font-bold text-white mb-4 text-center">Venue Locations</h3>
+        <h3 className="text-xl font-bold text-text-primary mb-4 text-center">Venue Locations</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-5xl mx-auto">
           {venues.map(venue => {
             const mapHref = safeExternalHref(venue.googleMaps)
@@ -28,7 +28,7 @@ function VenueInfo({ eventData }) {
             if (mapHref === '#') {
               return (
                 <div key={venue.name} className={cardClassName}>
-                  <h4 className="font-bold text-white text-sm mb-2">{venue.name}</h4>
+                  <h4 className="font-bold text-text-primary text-sm mb-2">{venue.name}</h4>
                   <p className="text-accent-400 text-xs mb-1 flex items-center justify-center gap-2">
                     <MapPin size={12} aria-hidden="true" />
                     <span>{venue.address}</span>
@@ -48,7 +48,7 @@ function VenueInfo({ eventData }) {
                 title={`Open directions to ${venue.name}`}
                 aria-label={`Open directions to ${venue.name}`}
               >
-                <h4 className="font-bold text-white text-sm mb-2">{venue.name}</h4>
+                <h4 className="font-bold text-text-primary text-sm mb-2">{venue.name}</h4>
                 <p className="text-accent-400 text-xs mb-1 flex items-center justify-center gap-2">
                   <MapPin size={14} aria-hidden="true" />
                   <span>{venue.address}</span>

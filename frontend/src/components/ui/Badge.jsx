@@ -26,7 +26,7 @@ const Badge = memo(function Badge({
 
   // Variant styles
   const variantClasses = {
-    default: 'bg-white/10 text-text-secondary',
+    default: 'bg-surface text-text-secondary',
     primary: 'bg-primary-500/20 text-primary-100',
     success: 'bg-success-500/20 text-success-400',
     warning: 'bg-warning-500/20 text-warning-400',

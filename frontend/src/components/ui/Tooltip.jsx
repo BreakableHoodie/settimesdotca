@@ -46,7 +46,7 @@ export default function Tooltip({ children, content, position = 'top' }) {
 
       {isVisible && content && (
         <div role="tooltip" className={`absolute z-50 ${positionClasses[position]} animate-fade-in`}>
-          <div className="bg-bg-dark text-text-primary text-sm px-3 py-2 rounded-lg shadow-lg border border-white/10 max-w-xs whitespace-normal">
+          <div className="bg-bg-dark text-text-primary text-sm px-3 py-2 rounded-lg shadow-lg border border-border max-w-xs whitespace-normal">
             {content}
           </div>
           {/* Arrow */}

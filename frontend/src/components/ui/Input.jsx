@@ -39,7 +39,7 @@ export default function Input({
 
   const inputClasses = `
     w-full px-4 py-2.5 min-h-[44px]
-    bg-white/5 border rounded-lg
+    bg-surface border rounded-lg
     text-text-primary placeholder-text-tertiary
     transition-colors duration-base
     focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy
@@ -47,7 +47,7 @@ export default function Input({
     ${
       hasError
         ? 'border-error-500 focus:border-error-500 focus:ring-error-500'
-        : 'border-white/10 focus:border-primary-500 focus:ring-primary-500/50'
+        : 'border-border focus:border-primary-500 focus:ring-primary-500/50'
     }
     ${icon && iconPosition === 'left' ? 'pl-10' : ''}
     ${icon && iconPosition === 'right' ? 'pr-10' : ''}

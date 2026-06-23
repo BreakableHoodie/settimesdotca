@@ -14,8 +14,10 @@ export default function NotFoundPage() {
           <div className="text-accent-400 mb-4" aria-hidden="true">
             <Compass size={60} />
           </div>
-          <h1 className="text-white text-3xl font-bold mb-2">Page Not Found</h1>
-          <p className="text-white/70 mb-8">The page you&apos;re looking for doesn&apos;t exist or may have moved.</p>
+          <h1 className="text-text-primary text-3xl font-bold mb-2">Page Not Found</h1>
+          <p className="text-text-secondary mb-8">
+            The page you&apos;re looking for doesn&apos;t exist or may have moved.
+          </p>
           <Link
             to="/"
             className="inline-block px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-all"

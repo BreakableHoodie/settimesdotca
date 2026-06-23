@@ -46,7 +46,7 @@ export default function ActivatePage() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center">
-        <div className="text-white text-xl">Activating your account...</div>
+        <div className="text-text-primary text-xl">Activating your account...</div>
       </div>
     )
   }
@@ -54,8 +54,8 @@ export default function ActivatePage() {
   if (status === 'error') {
     return (
       <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">Activation Failed</h1>
+        <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border text-center">
+          <h1 className="text-2xl font-bold text-text-primary mb-4">Activation Failed</h1>
           <p className="text-gray-300 mb-6">{message}</p>
           <button
             onClick={() => navigate('/admin/login')}
@@ -70,8 +70,8 @@ export default function ActivatePage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 text-center">
-        <h1 className="text-2xl font-bold text-white mb-4">Account Activated</h1>
+      <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border text-center">
+        <h1 className="text-2xl font-bold text-text-primary mb-4">Account Activated</h1>
         <p className="text-gray-300 mb-6">{message}</p>
         <button
           onClick={() => navigate('/admin/login')}

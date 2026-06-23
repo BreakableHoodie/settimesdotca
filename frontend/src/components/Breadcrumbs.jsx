@@ -17,7 +17,10 @@ function Breadcrumbs({ items }) {
                 {item.label}
               </Link>
             ) : (
-              <span className="text-white font-medium" aria-current={index === items.length - 1 ? 'page' : undefined}>
+              <span
+                className="text-text-primary font-medium"
+                aria-current={index === items.length - 1 ? 'page' : undefined}
+              >
                 {item.label}
               </span>
             )}

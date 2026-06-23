@@ -30,7 +30,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
   const toggleLabel = isSelected ? `Remove ${band.name} from my route` : `Add ${band.name} to my route`
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-lg backdrop-blur-xs">
+    <div className="rounded-2xl border border-border bg-surface px-4 py-4 shadow-lg backdrop-blur-xs">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -42,7 +42,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
               {variant === 'now' ? <Music size={14} aria-hidden="true" /> : <Clock size={14} aria-hidden="true" />}
               {status.label}
             </span>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-bg-navy/60 px-2.5 py-1 text-xs font-medium text-white/80">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-bg-navy/60 px-2.5 py-1 text-xs font-medium text-text-secondary">
               <MapPin size={12} aria-hidden="true" className="text-accent-400" />
               {band.venue}
             </span>
@@ -52,11 +52,11 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
             <div className="min-w-0">
               <Link
                 to={`/band/${slugifyBandName(band.name)}`}
-                className="block truncate text-lg font-bold text-white transition-colors hover:text-accent-400 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy"
+                className="block truncate text-lg font-bold text-text-primary transition-colors hover:text-accent-400 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy"
               >
                 {band.name}
               </Link>
-              <p className="mt-1 text-sm text-white/70">{formatTimeRange(band.startTime, band.endTime)}</p>
+              <p className="mt-1 text-sm text-text-secondary">{formatTimeRange(band.startTime, band.endTime)}</p>
               <p className="mt-1 text-sm font-medium text-accent-300">{status.detail}</p>
             </div>
 
@@ -66,7 +66,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
               className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy ${
                 isSelected
                   ? 'border-accent-500/50 bg-accent-500/20 text-accent-400 hover:bg-accent-500/30'
-                  : 'border-white/15 bg-white/5 text-white/80 hover:bg-white/10'
+                  : 'border-border bg-surface text-text-secondary hover:bg-surface'
               }`}
               aria-label={toggleLabel}
               title={toggleLabel}

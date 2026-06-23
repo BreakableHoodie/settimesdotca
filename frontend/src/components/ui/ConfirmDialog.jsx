@@ -84,7 +84,7 @@ export default function ConfirmDialog({
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className="relative bg-bg-purple rounded-lg shadow-xl max-w-md w-full border border-white/10 animate-scale-in"
+        className="relative bg-bg-purple rounded-lg shadow-xl max-w-md w-full border border-border animate-scale-in"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
@@ -92,7 +92,7 @@ export default function ConfirmDialog({
         tabIndex={-1}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 p-6 border-b border-white/10">
+        <div className="flex items-center gap-3 p-6 border-b border-border">
           <TriangleAlert size={24} className={variant === 'danger' ? 'text-error-500' : 'text-accent-500'} />
           <h2 id="confirm-dialog-title" className="text-xl font-bold text-text-primary">
             {title}
@@ -107,7 +107,7 @@ export default function ConfirmDialog({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10 bg-bg-purple/50">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-border bg-bg-purple/50">
           <Button variant="secondary" onClick={onCancel}>
             {cancelText}
           </Button>

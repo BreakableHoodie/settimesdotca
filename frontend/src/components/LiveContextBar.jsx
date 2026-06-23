@@ -36,7 +36,7 @@ function getLifecycleLabel(eventDate, currentTime) {
   const state = getEventState(eventDate, currentTime)
 
   if (state === 'archived') {
-    return { label: 'Archive', classes: 'bg-white/10 text-white/80 border-white/15' }
+    return { label: 'Archive', classes: 'bg-surface text-text-secondary border-border' }
   }
 
   if (state === 'recently_completed') {
@@ -149,7 +149,7 @@ function LiveContextBar({
   }
 
   return (
-    <section className="sticky top-[57px] z-40 border-b border-white/10 bg-bg-navy/92 backdrop-blur-xs">
+    <section className="sticky top-[57px] z-40 border-b border-border bg-bg-navy/92 backdrop-blur-xs">
       <div className="container mx-auto px-4 max-w-(--breakpoint-2xl) py-2.5 sm:py-3">
         <div className="sm:hidden">
           <div className="flex items-center justify-between gap-3">
@@ -169,28 +169,28 @@ function LiveContextBar({
               {lifecycle.label}
             </span>
 
-            <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85">
+            <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary">
               <Clock size={14} aria-hidden="true" className="text-accent-400" />
               <span className="tabular-nums">{formatCurrentTime(currentTime)}</span>
             </div>
           </div>
 
           <h2
-            className="mt-2 overflow-hidden text-base font-semibold leading-snug text-white"
+            className="mt-2 overflow-hidden text-base font-semibold leading-snug text-text-primary"
             style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
           >
             {eventData.name}
           </h2>
 
           <div className="mt-1 flex items-center justify-between gap-2">
-            <p className="truncate text-xs text-white/60">{mobileSummary}</p>
+            <p className="truncate text-xs text-text-tertiary">{mobileSummary}</p>
             <button
               type="button"
               onClick={() => setIsFiltersOpen(v => !v)}
               aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
               aria-expanded={isFiltersOpen}
               aria-controls="live-filter-panel"
-              className="shrink-0 flex min-h-[36px] items-center gap-1 px-2 text-xs text-white/50 hover:text-white/80 transition-colors"
+              className="shrink-0 flex min-h-[36px] items-center gap-1 px-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
             >
               <ChevronDown
                 size={14}
@@ -219,15 +219,17 @@ function LiveContextBar({
               >
                 {lifecycle.label}
               </span>
-              <h2 className="min-w-0 truncate text-base font-semibold text-white md:text-lg">{eventData.name}</h2>
+              <h2 className="min-w-0 truncate text-base font-semibold text-text-primary md:text-lg">
+                {eventData.name}
+              </h2>
             </div>
-            <p className="mt-1 truncate text-xs text-white/60 sm:hidden">{mobileSummary}</p>
-            <p className="mt-1 hidden text-sm text-white/60 md:block">
+            <p className="mt-1 truncate text-xs text-text-tertiary sm:hidden">{mobileSummary}</p>
+            <p className="mt-1 hidden text-sm text-text-tertiary md:block">
               Fast lookup for what&apos;s on now, what&apos;s next, and where to go after that.
             </p>
           </div>
 
-          <div className="inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white/85">
+          <div className="inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-sm font-medium text-text-secondary">
             <Clock size={14} aria-hidden="true" className="text-accent-400" />
             <span aria-live="polite" className="tabular-nums">
               {formatCurrentTime(currentTime)}
@@ -236,13 +238,13 @@ function LiveContextBar({
         </div>
 
         <div className="mt-3 hidden flex-wrap items-center gap-2 text-xs sm:flex sm:text-sm">
-          <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white/80">
+          <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-text-secondary">
             <Warehouse size={14} aria-hidden="true" className="text-accent-400" />
             <span>
               {uniqueVenues} {uniqueVenues === 1 ? 'venue' : 'venues'}
             </span>
           </div>
-          <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white/80">
+          <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-text-secondary">
             <CalendarDays size={14} aria-hidden="true" className="text-accent-400" />
             <span>
               {bands.length} {bands.length === 1 ? 'set' : 'sets'}
@@ -267,7 +269,7 @@ function LiveContextBar({
             aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
             aria-expanded={isFiltersOpen}
             aria-controls="live-filter-panel"
-            className="ml-auto inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 hover:text-white/80 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/30"
+            className="ml-auto inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-border"
           >
             <span>Filters</span>
             <ChevronDown
@@ -279,15 +281,15 @@ function LiveContextBar({
         </div>
 
         {isFiltersOpen && (
-          <div id="live-filter-panel" className="mt-3 border-t border-white/10 pt-3">
+          <div id="live-filter-panel" className="mt-3 border-t border-border pt-3">
             <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
-              <div className="grid grid-cols-2 items-center rounded-full border border-white/10 bg-white/5 p-1">
+              <div className="grid grid-cols-2 items-center rounded-full border border-border bg-surface p-1">
                 <button
                   type="button"
                   onClick={() => onViewChange?.('all')}
                   aria-pressed={view === 'all'}
                   className={`min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
-                    view === 'all' ? 'bg-accent-500 text-bg-navy' : 'text-white/60 hover:text-white'
+                    view === 'all' ? 'bg-accent-500 text-bg-navy' : 'text-text-tertiary hover:text-text-primary'
                   }`}
                 >
                   Live Lineup
@@ -297,12 +299,12 @@ function LiveContextBar({
                   onClick={() => onViewChange?.('mine')}
                   aria-pressed={view === 'mine'}
                   className={`relative min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
-                    view === 'mine' ? 'bg-accent-500 text-bg-navy' : 'text-white/60 hover:text-white'
+                    view === 'mine' ? 'bg-accent-500 text-bg-navy' : 'text-text-tertiary hover:text-text-primary'
                   }`}
                 >
                   My Route
                   {selectedCount > 0 && (
-                    <span className="ml-2 inline-flex min-w-[20px] items-center justify-center rounded-full bg-bg-navy/80 px-1.5 py-0.5 text-xs font-bold text-white">
+                    <span className="ml-2 inline-flex min-w-[20px] items-center justify-center rounded-full bg-bg-navy/80 px-1.5 py-0.5 text-xs font-bold text-text-primary">
                       {selectedCount}
                     </span>
                   )}
@@ -321,7 +323,7 @@ function LiveContextBar({
                       id="live-venue-switcher"
                       value={venueFilter || ''}
                       onChange={event => onVenueFilterChange?.(event.target.value || null)}
-                      className="min-h-[44px] w-full appearance-none rounded-full border border-white/10 bg-white/5 px-4 py-2 pr-10 text-sm font-medium text-white focus:border-accent-500 focus:outline-hidden"
+                      className="min-h-[44px] w-full appearance-none rounded-full border border-border bg-surface px-4 py-2 pr-10 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
                     >
                       <option value="">All Venues</option>
                       {venueOptions.map(venue => (
@@ -333,7 +335,7 @@ function LiveContextBar({
                     <ChevronDown
                       size={16}
                       aria-hidden="true"
-                      className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
+                      className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary"
                     />
                   </div>
                 )}

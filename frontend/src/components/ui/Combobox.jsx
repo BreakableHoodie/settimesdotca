@@ -84,7 +84,7 @@ export default function Combobox({
     }
   }
 
-  const baseClass = `w-full px-4 py-2.5 min-h-[44px] bg-white/5 border rounded-lg text-text-primary placeholder-text-tertiary transition-colors duration-base focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy border-white/10 focus:border-primary-500 focus:ring-primary-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${className}`
+  const baseClass = `w-full px-4 py-2.5 min-h-[44px] bg-surface border rounded-lg text-text-primary placeholder-text-tertiary transition-colors duration-base focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy border-border focus:border-primary-500 focus:ring-primary-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${className}`
 
   return (
     <div ref={containerRef} className="relative">
@@ -127,7 +127,7 @@ export default function Combobox({
           ref={listRef}
           id={`${id}-listbox`}
           role="listbox"
-          className="absolute z-50 mt-1 w-full rounded-lg border border-white/10 bg-bg-navy shadow-lg max-h-52 overflow-y-auto"
+          className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-bg-navy shadow-lg max-h-52 overflow-y-auto"
         >
           {filtered.map((opt, i) => (
             <li
@@ -138,7 +138,7 @@ export default function Combobox({
               onMouseDown={() => pick(opt)}
               onMouseEnter={() => setActiveIndex(i)}
               className={`px-4 py-2 text-sm cursor-pointer select-none ${
-                i === activeIndex ? 'bg-accent-500/20 text-accent-300' : 'text-text-primary hover:bg-white/5'
+                i === activeIndex ? 'bg-accent-500/20 text-accent-300' : 'text-text-primary hover:bg-surface'
               }`}
             >
               {opt}

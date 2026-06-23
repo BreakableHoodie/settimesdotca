@@ -16,6 +16,7 @@ import BandFacts from '../components/BandFacts'
 import BandStats from '../components/BandStats'
 import Breadcrumbs from '../components/Breadcrumbs'
 import ShareButton from '../components/ShareButton'
+import ThemeToggle from '../components/ThemeToggle'
 import PrivacyBanner from '../components/PrivacyBanner'
 import { Alert, Badge, Button, Card, BandProfileSkeleton } from '../components/ui'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
@@ -469,22 +470,25 @@ export default function BandProfilePage() {
       </Helmet>
 
       {/* Sticky Navigation Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-bg-navy/95 backdrop-blur-xs">
+      <header className="sticky top-0 z-50 border-b border-text-primary/10 bg-bg-navy/95 backdrop-blur-xs">
         <div className="container mx-auto px-4 max-w-6xl">
           <div className="flex items-center justify-between h-14">
             <Link to="/" className="text-xl font-bold font-display hover:opacity-80 transition-opacity">
               <span className="text-accent-500">Set</span>
-              <span className="text-white">Times</span>
+              <span className="text-text-primary">Times</span>
             </Link>
-            {(returnEventSlug || userHasSchedule) && (
-              <Link
-                to={returnEventPath}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-500/20 text-accent-400 hover:bg-accent-500/30 transition-colors text-sm font-medium"
-              >
-                <CalendarDays size={14} />
-                {sourceEventSlug ? 'Back to Schedule' : 'My Route'}
-              </Link>
-            )}
+            <div className="flex items-center gap-3">
+              {(returnEventSlug || userHasSchedule) && (
+                <Link
+                  to={returnEventPath}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-500/20 text-accent-400 hover:bg-accent-500/30 transition-colors text-sm font-medium"
+                >
+                  <CalendarDays size={14} />
+                  {sourceEventSlug ? 'Back to Schedule' : 'My Route'}
+                </Link>
+              )}
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </header>
@@ -512,7 +516,7 @@ export default function BandProfilePage() {
                 loading="lazy"
                 className="w-full h-full object-cover opacity-60"
               />
-              <div className="absolute inset-0 bg-linear-to-t from-bg-purple via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/30 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-6">
                 <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-3">{profile.name}</h1>
                 <div className="flex flex-wrap gap-3">
@@ -523,7 +527,7 @@ export default function BandProfilePage() {
                     </span>
                   )}
                   {profile.origin && (
-                    <span className="px-4 py-2 bg-bg-purple border-2 border-white/30 text-white rounded-lg font-bold text-sm shadow-lg">
+                    <span className="px-4 py-2 bg-black/40 border-2 border-white/40 text-white rounded-lg font-bold text-sm shadow-lg">
                       <MapPin size={14} className="mr-2" aria-hidden="true" />
                       {profile.origin}
                     </span>
@@ -533,7 +537,7 @@ export default function BandProfilePage() {
             </div>
           ) : (
             <div className="p-8 bg-linear-to-br from-bg-purple to-bg-navy">
-              <h1 className="text-5xl font-bold text-white mb-3">{profile.name}</h1>
+              <h1 className="text-5xl font-bold text-text-primary mb-3">{profile.name}</h1>
               <div className="flex flex-wrap gap-3">
                 {profile.genre && (
                   <span className="px-4 py-2 bg-accent-500 text-bg-navy rounded-lg font-bold text-sm">
@@ -542,7 +546,7 @@ export default function BandProfilePage() {
                   </span>
                 )}
                 {profile.origin && (
-                  <span className="px-4 py-2 bg-bg-navy border-2 border-white/30 text-white rounded-lg font-bold text-sm">
+                  <span className="px-4 py-2 bg-bg-navy border-2 border-text-primary/30 text-text-primary rounded-lg font-bold text-sm">
                     <MapPin size={14} className="mr-2 inline" aria-hidden="true" />
                     {profile.origin}
                   </span>
@@ -551,34 +555,40 @@ export default function BandProfilePage() {
             </div>
           )}
 
-          {/* Share */}
-          <div className="flex justify-end bg-bg-purple/50 px-6 pt-4">
-            <ShareButton
-              url={typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined}
-              title={profile.name}
-              text={`${profile.name} on SetTimes`}
-            />
-          </div>
-
-          {/* Bio and Social Links */}
-          <div className="p-6 bg-bg-purple/50 border-t border-white/10">
-            {profile.description ? (
-              <div
-                className="mb-4 text-white/90 text-sm leading-relaxed [&_p]:my-2 [&_a]:text-accent-500 [&_a:hover]:underline"
-                style={{
-                  wordBreak: 'normal',
-                  overflowWrap: 'break-word',
-                  whiteSpace: 'normal',
-                  hyphens: 'none',
-                  WebkitHyphens: 'none',
-                  MozHyphens: 'none',
-                  msHyphens: 'none',
-                }}
-                dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
-              />
-            ) : (
-              !hasAnySocial(profile.social) && <p className="text-white/30 text-sm italic mb-4">No bio added yet.</p>
-            )}
+          {/* Bio, Social Links, and Share */}
+          <div className="p-6 bg-bg-purple/50 border-t border-text-primary/10">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                {profile.description ? (
+                  <div
+                    className="text-text-secondary text-sm leading-relaxed [&_p]:my-2 [&_a]:text-accent-500 [&_a:hover]:underline"
+                    style={{
+                      wordBreak: 'normal',
+                      overflowWrap: 'break-word',
+                      whiteSpace: 'normal',
+                      hyphens: 'none',
+                      WebkitHyphens: 'none',
+                      MozHyphens: 'none',
+                      msHyphens: 'none',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
+                  />
+                ) : (
+                  !hasAnySocial(profile.social) && (
+                    <p className="text-text-tertiary text-sm italic">No bio added yet.</p>
+                  )
+                )}
+              </div>
+              <div className="shrink-0">
+                <ShareButton
+                  url={
+                    typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
+                  }
+                  title={profile.name}
+                  text={`${profile.name} on SetTimes`}
+                />
+              </div>
+            </div>
             {hasAnySocial(profile.social) ? (
               <div className="flex flex-wrap gap-3">
                 {safeExternalHref(profile.social.website) !== '#' && (
@@ -679,13 +689,13 @@ export default function BandProfilePage() {
                 )}
               </div>
             ) : (
-              !profile.description && <p className="text-white/30 text-sm italic">No links added yet.</p>
+              !profile.description && <p className="text-text-tertiary text-sm italic">No links added yet.</p>
             )}
           </div>
         </div>
 
         {/* Follow band */}
-        <div className="mt-6 p-4 rounded-lg bg-white/5 border border-white/10">
+        <div className="mt-6 p-4 rounded-lg bg-text-primary/5 border border-text-primary/10">
           <h3 className="text-sm font-semibold text-text-primary mb-1">Follow {profile.name}</h3>
           <p className="text-xs text-text-secondary mb-3">Get notified when they join a new lineup.</p>
           {followStatus === 'success' ? (
@@ -695,10 +705,10 @@ export default function BandProfilePage() {
             </p>
           ) : (
             <form onSubmit={submitFollow} className="flex flex-col gap-2">
-              <label htmlFor="follow-email" className="text-sm text-white/70">
+              <label htmlFor="follow-email" className="text-sm text-text-secondary">
                 Your email address
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-w-md">
                 <input
                   id="follow-email"
                   type="email"
@@ -706,7 +716,7 @@ export default function BandProfilePage() {
                   onChange={e => setFollowEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
-                  className="flex-1 px-3 py-2 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-none text-sm"
+                  className="flex-1 min-w-0 px-3 py-2 rounded bg-bg-navy text-text-primary border border-text-primary/20 focus:border-accent-500 focus:outline-none text-sm"
                 />
                 <Button
                   type="submit"
@@ -722,20 +732,23 @@ export default function BandProfilePage() {
           {followStatus === 'error' && <p className="text-xs text-red-400 mt-1">{followError}</p>}
         </div>
 
-        {/* Two Column Layout: Stats/Facts + Shows */}
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Stats/Facts (left) + Shows (right). When a band has no stats, the shows
+            column spans full width so the empty state stays aligned with the page. */}
+        <div className={`mt-6 mb-6 ${profile.stats ? 'grid grid-cols-1 gap-6 lg:grid-cols-3' : ''}`}>
           {/* Left Column - Stats & Facts */}
-          <div className="lg:col-span-1 space-y-6">
-            {profile.stats && <BandStats stats={profile.stats} />}
-            {profile.stats && <BandFacts band={profile} stats={profile.stats} />}
-          </div>
+          {profile.stats && (
+            <div className="lg:col-span-1 space-y-6">
+              <BandStats stats={profile.stats} />
+              <BandFacts band={profile} stats={profile.stats} />
+            </div>
+          )}
 
           {/* Right Column - Upcoming & Past Shows */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className={profile.stats ? 'lg:col-span-2 space-y-6' : 'space-y-6'}>
             {/* Upcoming Shows */}
             {profile.upcoming && profile.upcoming.length > 0 && (
               <Card variant="elevated" className="border-2 border-accent-500/30">
-                <div className="pb-4 mb-4 border-b border-white/10">
+                <div className="pb-4 mb-4 border-b border-text-primary/10">
                   <h2 className="text-2xl font-bold text-accent-500 flex items-center gap-2">
                     <CalendarDays size={14} />
                     <span>Upcoming Shows</span>
@@ -811,7 +824,7 @@ export default function BandProfilePage() {
             {/* Past Performance History */}
             {profile.past && profile.past.length > 0 && (
               <Card variant="elevated">
-                <div className="pb-4 mb-4 border-b border-white/10">
+                <div className="pb-4 mb-4 border-b border-text-primary/10">
                   <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
                     <TrendingUp size={14} />
                     <span>Performance History</span>
@@ -828,7 +841,7 @@ export default function BandProfilePage() {
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <h3 className="text-xl font-semibold text-accent-500">{performance.event_name}</h3>
                             {performance.event_status === 'archived' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-white/10 text-white/50 border border-white/10">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-text-primary/10 text-text-tertiary border border-text-primary/10">
                                 <Archive size={12} aria-hidden="true" />
                                 Archived
                               </span>
@@ -886,8 +899,8 @@ export default function BandProfilePage() {
             {(!profile.upcoming || profile.upcoming.length === 0) && (!profile.past || profile.past.length === 0) && (
               <Card variant="elevated" className="flex items-center justify-center py-12 text-center">
                 <div>
-                  <p className="text-white/40 text-lg mb-1">No performances on record yet.</p>
-                  <p className="text-white/25 text-sm">Check back after the next event is announced.</p>
+                  <p className="text-text-tertiary text-lg mb-1">No performances on record yet.</p>
+                  <p className="text-text-disabled text-sm">Check back after the next event is announced.</p>
                 </div>
               </Card>
             )}

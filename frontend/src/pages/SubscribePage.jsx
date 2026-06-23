@@ -124,18 +124,18 @@ export default function SubscribePage() {
       <div className="max-w-2xl mx-auto pt-20">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4">Never Miss a Show</h1>
+          <h1 className="text-4xl font-bold text-text-primary mb-4">Never Miss a Show</h1>
           <p className="text-xl text-gray-300">
             Get weekly emails about concerts in your city. No algorithm, no ads, just shows.
           </p>
         </div>
 
         {/* Form */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
+        <div className="bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-white font-medium mb-2">
+              <label htmlFor="email" className="block text-text-primary font-medium mb-2">
                 Email Address
               </label>
               <input
@@ -144,21 +144,21 @@ export default function SubscribePage() {
                 required
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-hidden placeholder-gray-400"
+                className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden placeholder-text-tertiary"
                 placeholder="you@example.com"
               />
             </div>
 
             {/* City */}
             <div>
-              <label htmlFor="city" className="block text-white font-medium mb-2">
+              <label htmlFor="city" className="block text-text-primary font-medium mb-2">
                 City
               </label>
               <select
                 id="city"
                 value={formData.city}
                 onChange={e => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-hidden"
+                className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden"
               >
                 <option value="kitchener">Kitchener</option>
                 <option value="waterloo">Waterloo</option>
@@ -170,14 +170,14 @@ export default function SubscribePage() {
 
             {/* Genre */}
             <div>
-              <label htmlFor="genre" className="block text-white font-medium mb-2">
+              <label htmlFor="genre" className="block text-text-primary font-medium mb-2">
                 Genre Preference
               </label>
               <select
                 id="genre"
                 value={formData.genre}
                 onChange={e => setFormData({ ...formData, genre: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-hidden"
+                className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden"
               >
                 <option value="all">All Genres</option>
                 <option value="punk">Punk</option>
@@ -190,14 +190,14 @@ export default function SubscribePage() {
 
             {/* Frequency */}
             <div>
-              <label htmlFor="frequency" className="block text-white font-medium mb-2">
+              <label htmlFor="frequency" className="block text-text-primary font-medium mb-2">
                 Email Frequency
               </label>
               <select
                 id="frequency"
                 value={formData.frequency}
                 onChange={e => setFormData({ ...formData, frequency: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-hidden"
+                className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden"
               >
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -227,7 +227,7 @@ export default function SubscribePage() {
           </form>
 
           {/* Privacy note */}
-          <div className="mt-8 pt-6 border-t border-white/10">
+          <div className="mt-8 pt-6 border-t border-border">
             <p className="text-sm text-gray-400 text-center">
               We respect your privacy. No tracking, no ads, no selling your data.
               <br />
@@ -238,18 +238,18 @@ export default function SubscribePage() {
 
         {/* Alternative feeds */}
         <div className="mt-12 text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Prefer RSS or Calendar Sync?</h2>
+          <h2 className="text-2xl font-bold text-text-primary mb-4">Prefer RSS or Calendar Sync?</h2>
           <div className="flex flex-wrap justify-center gap-4">
             <a
               href="/api/feeds/ical?city=portland&genre=all"
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition"
+              className="px-6 py-3 bg-surface hover:bg-surface text-text-primary rounded-lg border border-border transition"
             >
               <CalendarDays size={16} className="mr-2 inline" aria-hidden="true" />
               Subscribe to Calendar
             </a>
             <a
               href="/api/events/public?city=portland&genre=all"
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition"
+              className="px-6 py-3 bg-surface hover:bg-surface text-text-primary rounded-lg border border-border transition"
             >
               <Rss size={16} className="mr-2 inline" aria-hidden="true" />
               JSON Feed

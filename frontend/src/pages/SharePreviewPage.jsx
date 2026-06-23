@@ -47,7 +47,7 @@ export default function SharePreviewPage() {
         <div className="mx-auto max-w-2xl">
           <Link
             to="/"
-            className="mb-6 inline-flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+            className="mb-6 inline-flex items-center gap-2 text-sm text-text-tertiary hover:text-text-primary transition-colors"
           >
             <ArrowLeft size={16} aria-hidden="true" />
             Back to events
@@ -68,7 +68,7 @@ export default function SharePreviewPage() {
         <Helmet>
           <title>Shared Route Not Found | SetTimes</title>
         </Helmet>
-        <p className="text-2xl font-semibold text-white">This route has expired or doesn&apos;t exist.</p>
+        <p className="text-2xl font-semibold text-text-primary">This route has expired or doesn&apos;t exist.</p>
         <p className="mt-2 text-text-secondary">Share links are valid for 30 days.</p>
         <Link to="/" className="mt-6 text-accent-400 hover:underline">
           Browse events
@@ -97,21 +97,21 @@ export default function SharePreviewPage() {
       <div className="mx-auto max-w-2xl px-4 py-8">
         <Link
           to={`/event/${shareData.event_slug}`}
-          className="mb-6 inline-flex items-center gap-1 text-sm text-text-secondary hover:text-white"
+          className="mb-6 inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
         >
           <ArrowLeft size={14} />
           Back to {shareData.event_name}
         </Link>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white">{shareData.band_names.length}-stop route</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{shareData.band_names.length}-stop route</h1>
           <p className="mt-1 text-text-secondary">{shareData.event_name}</p>
         </div>
 
         <ul aria-label="Bands in this route" className="mb-8 list-none space-y-3 p-0">
           {shareData.band_names.map((name, i) => (
-            <li key={i} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-              <p className="font-semibold text-white">{name}</p>
+            <li key={i} className="rounded-xl border border-border bg-surface px-4 py-3">
+              <p className="font-semibold text-text-primary">{name}</p>
             </li>
           ))}
         </ul>

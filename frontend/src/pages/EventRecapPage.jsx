@@ -70,14 +70,14 @@ function groupBandsByVenue(bands) {
 
 function StatCard({ label, value }) {
   return (
-    <div className="bg-white/5 rounded-lg p-4 text-center">
+    <div className="bg-surface rounded-lg p-4 text-center">
       <div className="sr-only">
         {label}: {value ?? '—'}
       </div>
-      <div className="text-3xl font-bold text-white" aria-hidden="true">
+      <div className="text-3xl font-bold text-text-primary" aria-hidden="true">
         {value ?? '—'}
       </div>
-      <div className="text-sm text-white/60 mt-1" aria-hidden="true">
+      <div className="text-sm text-text-tertiary mt-1" aria-hidden="true">
         {label}
       </div>
     </div>
@@ -159,7 +159,7 @@ export default function EventRecapPage() {
 
       <main id="main-content" className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple px-4 py-10">
         <div className="mx-auto max-w-5xl">
-          <header className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-xs">
+          <header className="mb-8 rounded-2xl border border-border bg-surface p-6 shadow-xl backdrop-blur-xs">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-accent-400">
               <span className="inline-flex items-center gap-2 rounded-full border border-accent-400/20 bg-accent-400/10 px-3 py-1">
                 <Archive size={14} aria-hidden="true" />
@@ -167,8 +167,8 @@ export default function EventRecapPage() {
               </span>
               <span>Recap</span>
             </div>
-            <h1 className="mt-4 text-4xl font-bold text-white">{event.name}</h1>
-            <p className="mt-2 text-lg text-white/60">{formattedDate}</p>
+            <h1 className="mt-4 text-4xl font-bold text-text-primary">{event.name}</h1>
+            <p className="mt-2 text-lg text-text-tertiary">{formattedDate}</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 to={`/event/${event.slug}`}
@@ -179,7 +179,7 @@ export default function EventRecapPage() {
               </Link>
               <Link
                 to="/"
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-white/15 px-5 py-3 font-semibold text-white/80 transition-colors hover:bg-white/10"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-5 py-3 font-semibold text-text-secondary transition-colors hover:bg-surface"
               >
                 <ArrowLeft size={16} aria-hidden="true" />
                 Browse All Events
@@ -195,29 +195,29 @@ export default function EventRecapPage() {
             <StatCard label="Saved Route" value={savedBands.length || '—'} />
           </section>
 
-          <section aria-label="Your route recap" className="mb-10 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <section aria-label="Your route recap" className="mb-10 rounded-2xl border border-border bg-surface p-6">
             <div className="mb-5 flex items-center gap-2">
               <Route size={18} className="text-accent-400" aria-hidden="true" />
-              <h2 className="text-2xl font-semibold text-white">Your Route Recap</h2>
+              <h2 className="text-2xl font-semibold text-text-primary">Your Route Recap</h2>
             </div>
 
             {savedBands.length > 0 ? (
               <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-bg-navy/40 p-4">
-                  <h3 className="mb-3 text-lg font-semibold text-white">Saved in your route</h3>
-                  <p className="mb-4 text-sm text-white/60">
+                <div className="rounded-xl border border-border bg-bg-navy/40 p-4">
+                  <h3 className="mb-3 text-lg font-semibold text-text-primary">Saved in your route</h3>
+                  <p className="mb-4 text-sm text-text-tertiary">
                     You saved {savedBands.length} {savedBands.length === 1 ? 'set' : 'sets'} for this event.
                   </p>
                   <ul className="space-y-3">
                     {savedBands.map(band => (
-                      <li key={band.performance_id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <li key={band.performance_id} className="rounded-lg border border-border bg-surface p-3">
                         <Link
                           to={buildBandProfileHref(band.name, event.slug)}
                           className="font-medium text-accent-400 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
                         >
                           {band.name}
                         </Link>
-                        <div className="mt-1 text-sm text-white/60">
+                        <div className="mt-1 text-sm text-text-tertiary">
                           {band.venue_name || 'Unscheduled'}
                           {(band.start_time || band.end_time) &&
                             ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
@@ -227,21 +227,21 @@ export default function EventRecapPage() {
                   </ul>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-bg-navy/40 p-4">
-                  <h3 className="mb-3 text-lg font-semibold text-white">Bands you missed</h3>
-                  <p className="mb-4 text-sm text-white/60">
+                <div className="rounded-xl border border-border bg-bg-navy/40 p-4">
+                  <h3 className="mb-3 text-lg font-semibold text-text-primary">Bands you missed</h3>
+                  <p className="mb-4 text-sm text-text-tertiary">
                     {missedBands.length} {missedBands.length === 1 ? 'set was' : 'sets were'} outside your saved route.
                   </p>
                   <ul className="space-y-3">
                     {missedBands.slice(0, 6).map(band => (
-                      <li key={band.performance_id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <li key={band.performance_id} className="rounded-lg border border-border bg-surface p-3">
                         <Link
                           to={buildBandProfileHref(band.name, event.slug)}
                           className="font-medium text-accent-400 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
                         >
                           {band.name}
                         </Link>
-                        <div className="mt-1 text-sm text-white/60">
+                        <div className="mt-1 text-sm text-text-tertiary">
                           {band.venue_name || 'Unscheduled'}
                           {(band.start_time || band.end_time) &&
                             ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
@@ -252,25 +252,25 @@ export default function EventRecapPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-white/15 bg-bg-navy/30 p-4 text-sm text-white/70">
+              <div className="rounded-xl border border-dashed border-border bg-bg-navy/30 p-4 text-sm text-text-secondary">
                 No saved route was found for this event. The archive still preserves the full lineup, venue recap, and
                 band history.
               </div>
             )}
           </section>
 
-          <section aria-label="Venue recap" className="mb-10 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <section aria-label="Venue recap" className="mb-10 rounded-2xl border border-border bg-surface p-6">
             <div className="mb-5 flex items-center gap-2">
               <MapPin size={18} className="text-accent-400" aria-hidden="true" />
-              <h2 className="text-2xl font-semibold text-white">Venue Recap</h2>
+              <h2 className="text-2xl font-semibold text-text-primary">Venue Recap</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {venueRecap.map(venue => (
-                <article key={venue.id} className="rounded-xl border border-white/10 bg-bg-navy/40 p-4">
+                <article key={venue.id} className="rounded-xl border border-border bg-bg-navy/40 p-4">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-white">{venue.name}</h3>
-                      <p className="text-sm text-white/60">
+                      <h3 className="text-lg font-semibold text-text-primary">{venue.name}</h3>
+                      <p className="text-sm text-text-tertiary">
                         {venue.bands.length} {venue.bands.length === 1 ? 'set' : 'sets'} on the night
                       </p>
                     </div>
@@ -281,11 +281,11 @@ export default function EventRecapPage() {
                       View schedule →
                     </Link>
                   </div>
-                  <ul className="space-y-2 text-sm text-white/70">
+                  <ul className="space-y-2 text-sm text-text-secondary">
                     {venue.bands.map(band => (
                       <li
                         key={band.performance_id}
-                        className="flex items-start justify-between gap-3 rounded-lg bg-white/5 px-3 py-2"
+                        className="flex items-start justify-between gap-3 rounded-lg bg-surface px-3 py-2"
                       >
                         <Link
                           to={buildBandProfileHref(band.name, event.slug)}
@@ -293,7 +293,7 @@ export default function EventRecapPage() {
                         >
                           {band.name}
                         </Link>
-                        <span className="shrink-0 text-white/50">
+                        <span className="shrink-0 text-text-tertiary">
                           {band.start_time || 'TBD'}–{band.end_time || 'TBD'}
                         </span>
                       </li>
@@ -305,13 +305,13 @@ export default function EventRecapPage() {
           </section>
 
           <section aria-label="Archived lineup">
-            <h2 className="mb-4 text-xl font-semibold text-white">Archived Lineup</h2>
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">Archived Lineup</h2>
             <ul className="space-y-3">
               {bands.length === 0 ? (
-                <li className="text-white/50 text-sm py-4 text-center">No performers recorded for this event.</li>
+                <li className="text-text-tertiary text-sm py-4 text-center">No performers recorded for this event.</li>
               ) : (
                 bands.map(band => (
-                  <li key={band.id} className="bg-white/5 rounded-lg p-4 flex items-center justify-between gap-4">
+                  <li key={band.id} className="bg-surface rounded-lg p-4 flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <Link
                         to={buildBandProfileHref(band.name, event.slug)}
@@ -319,8 +319,8 @@ export default function EventRecapPage() {
                       >
                         {band.name}
                       </Link>
-                      {band.genre && <span className="ml-2 text-white/50 text-sm">{band.genre}</span>}
-                      <div className="mt-0.5 text-white/50 text-sm">
+                      {band.genre && <span className="ml-2 text-text-tertiary text-sm">{band.genre}</span>}
+                      <div className="mt-0.5 text-text-tertiary text-sm">
                         {band.venue_name || 'Unscheduled'}
                         {(band.start_time || band.end_time) &&
                           ` • ${band.start_time || 'TBD'}–${band.end_time || 'TBD'}`}
@@ -339,15 +339,15 @@ export default function EventRecapPage() {
             </ul>
           </section>
 
-          <section aria-label="Archive next steps" className="mt-12 rounded-2xl bg-white/5 p-6 text-center">
-            <h2 className="mb-2 text-xl font-semibold text-white">Keep exploring the archive</h2>
-            <p className="mb-4 text-white/60">
+          <section aria-label="Archive next steps" className="mt-12 rounded-2xl bg-surface p-6 text-center">
+            <h2 className="mb-2 text-xl font-semibold text-text-primary">Keep exploring the archive</h2>
+            <p className="mb-4 text-text-tertiary">
               Revisit the archived schedule, jump into band histories, or get notified when the next lineup drops.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Link
                 to={`/event/${event.slug}`}
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-white/15 px-5 py-3 font-semibold text-white/80 transition-colors hover:bg-white/10"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-5 py-3 font-semibold text-text-secondary transition-colors hover:bg-surface"
               >
                 <CalendarDays size={16} aria-hidden="true" />
                 Archived Schedule

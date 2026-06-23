@@ -79,7 +79,7 @@ export default function EmbedPage() {
     return (
       <div className="min-h-screen bg-bg-navy flex items-center justify-center p-4">
         <div className="text-center">
-          <h2 className="text-white text-xl font-bold mb-2">Event Not Found</h2>
+          <h2 className="text-text-primary text-xl font-bold mb-2">Event Not Found</h2>
           <p className="text-gray-400">{error}</p>
         </div>
       </div>

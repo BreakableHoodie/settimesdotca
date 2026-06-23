@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center">
-        <div className="text-white text-xl">Verifying reset token...</div>
+        <div className="text-text-primary text-xl">Verifying reset token...</div>
       </div>
     )
   }
@@ -107,8 +107,8 @@ export default function ResetPasswordPage() {
   if (status === 'error') {
     return (
       <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">Reset Failed</h1>
+        <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border text-center">
+          <h1 className="text-2xl font-bold text-text-primary mb-4">Reset Failed</h1>
           <p className="text-gray-300 mb-6">{message}</p>
           <button
             onClick={() => navigate('/admin/login')}
@@ -124,8 +124,8 @@ export default function ResetPasswordPage() {
   if (status === 'success') {
     return (
       <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">✓ Password Reset</h1>
+        <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border text-center">
+          <h1 className="text-2xl font-bold text-text-primary mb-4">✓ Password Reset</h1>
           <p className="text-gray-300 mb-6">{message}</p>
           <button
             onClick={() => navigate('/admin/login')}
@@ -140,9 +140,9 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
+      <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Reset Password</h1>
+          <h1 className="text-3xl font-bold text-text-primary mb-2">Reset Password</h1>
           <p className="text-gray-300">
             Set a new password for <span className="font-medium">{user?.email}</span>
           </p>
@@ -150,7 +150,7 @@ export default function ResetPasswordPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="newPassword" className="block text-white font-medium mb-2">
+            <label htmlFor="newPassword" className="block text-text-primary font-medium mb-2">
               New Password
             </label>
             <input
@@ -161,14 +161,14 @@ export default function ResetPasswordPage() {
               maxLength={FIELD_LIMITS.password.max}
               value={formData.newPassword}
               onChange={e => setFormData({ ...formData, newPassword: e.target.value })}
-              className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-hidden placeholder-gray-400"
+              className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden placeholder-text-tertiary"
               placeholder="Enter new password"
             />
             <PasswordStrength password={formData.newPassword} />
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-white font-medium mb-2">
+            <label htmlFor="confirmPassword" className="block text-text-primary font-medium mb-2">
               Confirm Password
             </label>
             <input
@@ -179,7 +179,7 @@ export default function ResetPasswordPage() {
               maxLength={FIELD_LIMITS.password.max}
               value={formData.confirmPassword}
               onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-              className="w-full px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 focus:border-accent-500 focus:outline-hidden placeholder-gray-400"
+              className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden placeholder-text-tertiary"
               placeholder="Confirm new password"
             />
           </div>

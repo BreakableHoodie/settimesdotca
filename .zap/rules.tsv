@@ -41,3 +41,54 @@
 
 # Session ID in URL - we use cookies, not URL params
 3	IGNORE	.*
+
+# ===========================================================================
+# Issue #346 disposition (2026-06-22) — accepted/unfixable baseline findings.
+# Sub-alert IDs (e.g. 10055-4) target one specific check so the rest of the
+# plugin keeps detecting genuine regressions. See PR for full rationale.
+# ===========================================================================
+
+# CSP: Wildcard Directive — fires on `img-src 'self' data: https: blob:`.
+# The `https:` source is intentional: band photos may be served from arbitrary
+# HTTPS hosts (admin-supplied photo_url + the R2 custom domain). img-src is
+# low risk (images can't execute script); script-src/connect-src stay 'self'.
+10055-4	IGNORE	.*
+
+# CSP: Failure to Define Directive with No Fallback (frame-ancestors).
+# Fires only on /embed/, which sets `frame-ancestors *` so third-party sites
+# can iframe the schedule widget. Required by the embed feature; embedder
+# origins are open-ended and can't be enumerated.
+10055-13	IGNORE	.*
+
+# Cross-Domain Misconfiguration (Access-Control-Allow-Origin: *).
+# Cloudflare auto-injects ACAO:* on STATIC assets (HTML/favicon/robots).
+# Our API (functions/_middleware.js) echoes a strict origin allowlist, never
+# '*'. The flagged resources are public and non-credentialed — no real exposure.
+10098	IGNORE	.*
+
+# Cross-Origin-Resource-Policy missing — only on the Cloudflare-injected
+# /cdn-cgi/ Rocket Loader script, which _headers cannot control. Our own pages
+# set CORP via the /* rule, so scope the ignore to /cdn-cgi/.
+90004-1	IGNORE	.*cdn-cgi.*
+
+# Cross-Origin-Embedder-Policy 'unsafe-none' on /embed/ — deliberate: the
+# embedded iframe must interact with its third-party parent. Normal pages set
+# require-corp via /*, so scope the ignore to /embed/.
+90004-2	IGNORE	.*embed.*
+
+# Cross-Origin-Opener-Policy 'unsafe-none' on /embed/ — deliberate (same reason
+# as COEP). Normal pages set same-origin via /*, so scope the ignore to /embed/.
+90004-3	IGNORE	.*embed.*
+
+# Permissions-Policy missing — only on the Cloudflare /cdn-cgi/ Rocket Loader
+# script. Our pages set Permissions-Policy via /* and middleware.
+10063	IGNORE	.*cdn-cgi.*
+
+# Non-Storable Content — informational. SPA HTML sets `no-store` deliberately
+# (Safari stale-HTML fix); favicon/robots inherit it via _headers merge. Not a
+# security issue.
+10049	IGNORE	.*
+
+# Re-examine Cache-control Directives — informational. Fires on sitemap.xml
+# (`public, max-age=3600`), which is the correct, intended cache policy.
+10015	IGNORE	.*

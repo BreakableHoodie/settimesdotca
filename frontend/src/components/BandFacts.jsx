@@ -47,15 +47,15 @@ export default function BandFacts({ band, stats }) {
 
   return (
     <Card variant="elevated">
-      <h3 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
-        <Lightbulb size={18} className="text-accent-500" />
+      <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-text-primary">
+        <Lightbulb size={18} className="text-accent-500" aria-hidden="true" />
         Fast Facts
       </h3>
-      <ul className="space-y-2">
+      <ul className="space-y-2.5">
         {facts.map((fact, index) => (
-          <li key={index} className="text-text-secondary text-sm leading-relaxed flex items-center gap-2">
-            <span className="text-accent-500">•</span>
-            <span>{fact}</span>
+          <li key={index} className="flex items-start gap-2.5 text-sm leading-relaxed text-text-secondary">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500" aria-hidden="true" />
+            <span className="break-words">{fact}</span>
           </li>
         ))}
       </ul>

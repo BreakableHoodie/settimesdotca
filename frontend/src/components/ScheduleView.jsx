@@ -352,7 +352,7 @@ function ScheduleView({
                       className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                         venueFilter === venue
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                          : 'bg-surface border-border text-text-tertiary hover:bg-surface'
+                          : 'bg-surface border-border text-text-tertiary hover:bg-surface-hover'
                       }`}
                     >
                       {venue}
@@ -365,7 +365,7 @@ function ScheduleView({
                       className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                         venueFilter === UNSCHEDULED
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                          : 'bg-surface border-border text-text-tertiary hover:bg-surface'
+                          : 'bg-surface border-border text-text-tertiary hover:bg-surface-hover'
                       }`}
                     >
                       Unscheduled
@@ -386,7 +386,7 @@ function ScheduleView({
                       className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                         genreFilter === genre
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
-                          : 'bg-surface border-border text-text-tertiary hover:bg-surface'
+                          : 'bg-surface border-border text-text-tertiary hover:bg-surface-hover'
                       }`}
                     >
                       {genre}

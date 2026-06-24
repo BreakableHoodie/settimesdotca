@@ -66,7 +66,7 @@ function ScheduleLiveRow({ band, variant, isSelected, onToggle, currentTime }) {
               className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-navy ${
                 isSelected
                   ? 'border-accent-500/50 bg-accent-500/20 text-accent-400 hover:bg-accent-500/30'
-                  : 'border-border bg-surface text-text-secondary hover:bg-surface'
+                  : 'border-border bg-surface text-text-secondary hover:bg-surface-hover'
               }`}
               aria-label={toggleLabel}
               title={toggleLabel}

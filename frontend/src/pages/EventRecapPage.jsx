@@ -179,7 +179,7 @@ export default function EventRecapPage() {
               </Link>
               <Link
                 to="/"
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-5 py-3 font-semibold text-text-secondary transition-colors hover:bg-surface"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-5 py-3 font-semibold text-text-secondary transition-colors hover:bg-surface-hover"
               >
                 <ArrowLeft size={16} aria-hidden="true" />
                 Browse All Events
@@ -347,7 +347,7 @@ export default function EventRecapPage() {
             <div className="flex flex-wrap justify-center gap-3">
               <Link
                 to={`/event/${event.slug}`}
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-5 py-3 font-semibold text-text-secondary transition-colors hover:bg-surface"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-5 py-3 font-semibold text-text-secondary transition-colors hover:bg-surface-hover"
               >
                 <CalendarDays size={16} aria-hidden="true" />
                 Archived Schedule

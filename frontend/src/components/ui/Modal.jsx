@@ -202,7 +202,7 @@ export default function Modal({
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-surface rounded-lg transition-colors"
+                className="p-2 hover:bg-surface-hover rounded-lg transition-colors"
                 aria-label="Close modal"
               >
                 <X size={20} className="text-text-secondary" />

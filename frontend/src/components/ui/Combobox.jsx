@@ -138,7 +138,7 @@ export default function Combobox({
               onMouseDown={() => pick(opt)}
               onMouseEnter={() => setActiveIndex(i)}
               className={`px-4 py-2 text-sm cursor-pointer select-none ${
-                i === activeIndex ? 'bg-accent-500/20 text-accent-300' : 'text-text-primary hover:bg-surface'
+                i === activeIndex ? 'bg-accent-500/20 text-accent-300' : 'text-text-primary hover:bg-surface-hover'
               }`}
             >
               {opt}

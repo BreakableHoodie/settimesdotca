@@ -119,7 +119,7 @@ function MySchedule({
         status: 'now',
         icon: Guitar,
         text: `Playing now - ${minutesLeft} min left`,
-        color: 'bg-green-500/20 border-green-500/50 text-green-200',
+        color: 'bg-success-500/20 border-success-500/50 text-text-primary',
       }
     }
 
@@ -129,7 +129,7 @@ function MySchedule({
         status: 'past',
         icon: Check,
         text: 'Finished',
-        color: 'bg-gray-500/20 border-gray-500/50 text-gray-400',
+        color: 'bg-surface border-border text-text-tertiary',
       }
     }
 
@@ -140,14 +140,14 @@ function MySchedule({
         status: 'soon',
         icon: Bell,
         text: 'Starting soon!',
-        color: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-200',
+        color: 'bg-warning-500/20 border-warning-500/50 text-text-primary',
       }
     } else if (minutesUntil <= 60) {
       return {
         status: 'upcoming',
         icon: Clock,
         text: `In ${minutesUntil} min`,
-        color: 'bg-blue-500/20 border-blue-500/50 text-blue-200',
+        color: 'bg-info-500/20 border-info-500/50 text-text-primary',
       }
     } else if (minutesUntil >= 1440) {
       const days = Math.floor(minutesUntil / 1440)
@@ -161,7 +161,7 @@ function MySchedule({
         status: 'later',
         icon: Hourglass,
         text: `In ${parts.join(' ')}`,
-        color: 'bg-blue-500/20 border-blue-500/50 text-blue-200',
+        color: 'bg-info-500/20 border-info-500/50 text-text-primary',
       }
     } else {
       const hours = Math.floor(minutesUntil / 60)
@@ -171,7 +171,7 @@ function MySchedule({
         status: 'later',
         icon: Hourglass,
         text: `In ${timeLabel}`,
-        color: 'bg-blue-500/20 border-blue-500/50 text-blue-200',
+        color: 'bg-info-500/20 border-info-500/50 text-text-primary',
       }
     }
   }
@@ -457,7 +457,7 @@ function MySchedule({
               )}
               <button
                 onClick={onClearSchedule}
-                className="text-xs px-3 py-1.5 rounded bg-red-500/20 border border-red-500/50 text-red-200 flex items-center gap-2 transition-transform duration-150 hover:bg-red-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300"
+                className="text-xs px-3 py-1.5 rounded bg-error-500/20 border border-error-500/50 text-text-primary flex items-center gap-2 transition-transform duration-150 hover:bg-error-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-error-400"
                 title="Clear all selected bands"
               >
                 <Trash2 size={14} aria-hidden="true" />
@@ -484,9 +484,9 @@ function MySchedule({
       {(conflicts.length > 0 || overlaps.length > 0) && (
         <div className="space-y-4 max-w-5xl mx-auto">
           {conflicts.length > 0 && (
-            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 leading-normal">
-              <div className="flex items-center gap-3 text-red-200 font-semibold">
-                <TriangleAlert size={20} className="text-red-300 shrink-0" aria-hidden="true" />
+            <div className="bg-error-500/20 border border-error-500/50 rounded-lg p-4 leading-normal">
+              <div className="flex items-center gap-3 text-text-primary font-semibold">
+                <TriangleAlert size={20} className="text-error-400 shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
                   {conflictCount} band{conflictCount !== 1 ? 's' : ''} happening at the same time — you&apos;ll need to
                   choose!
@@ -495,9 +495,9 @@ function MySchedule({
             </div>
           )}
           {overlaps.length > 0 && (
-            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 leading-normal">
-              <div className="flex items-center gap-3 text-yellow-200 font-semibold">
-                <Zap size={20} className="text-yellow-300 shrink-0" aria-hidden="true" />
+            <div className="bg-warning-500/20 border border-warning-500/50 rounded-lg p-4 leading-normal">
+              <div className="flex items-center gap-3 text-text-primary font-semibold">
+                <Zap size={20} className="text-warning-400 shrink-0" aria-hidden="true" />
                 <p className="text-sm sm:text-base leading-normal">
                   {overlapCount} band{overlapCount !== 1 ? 's' : ''} with overlapping set{overlapCount !== 1 ? 's' : ''}{' '}
                   — you may not catch every full set.

@@ -509,26 +509,28 @@ export default function BandProfilePage() {
         <div className="bg-bg-purple rounded-xl border-2 border-accent-500/30 overflow-hidden mb-6 shadow-xl">
           {/* Band Photo with Overlay */}
           {profile.photo_url ? (
-            <div className="relative h-80 bg-linear-to-b from-bg-navy via-bg-purple to-bg-navy overflow-hidden">
+            <div className="relative h-72 overflow-hidden bg-linear-to-b from-bg-navy via-bg-purple to-bg-navy sm:h-80">
               <img
                 src={profile.photo_url}
                 alt={profile.photo_alt_text || profile.name}
                 loading="lazy"
-                className="w-full h-full object-cover opacity-60"
+                className="h-full w-full object-cover opacity-60"
               />
-              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/30 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-3">{profile.name}</h1>
-                <div className="flex flex-wrap gap-3">
+              <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 p-6">
+                <h1 className="mb-3 text-4xl font-bold leading-tight text-white drop-shadow-lg sm:text-5xl">
+                  {profile.name}
+                </h1>
+                <div className="flex flex-wrap gap-2.5">
                   {profile.genre && (
-                    <span className="px-4 py-2 bg-accent-500 text-bg-navy rounded-lg font-bold text-sm shadow-lg">
-                      <Guitar size={14} className="mr-2" aria-hidden="true" />
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-bold text-bg-navy shadow-lg">
+                      <Guitar size={14} className="shrink-0" aria-hidden="true" />
                       {profile.genre}
                     </span>
                   )}
                   {profile.origin && (
-                    <span className="px-4 py-2 bg-black/40 border-2 border-white/40 text-white rounded-lg font-bold text-sm shadow-lg">
-                      <MapPin size={14} className="mr-2" aria-hidden="true" />
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border-2 border-white/40 bg-black/40 px-3.5 py-2 text-sm font-bold text-white shadow-lg backdrop-blur-xs">
+                      <MapPin size={14} className="shrink-0" aria-hidden="true" />
                       {profile.origin}
                     </span>
                   )}
@@ -536,18 +538,18 @@ export default function BandProfilePage() {
               </div>
             </div>
           ) : (
-            <div className="p-8 bg-linear-to-br from-bg-purple to-bg-navy">
-              <h1 className="text-5xl font-bold text-text-primary mb-3">{profile.name}</h1>
-              <div className="flex flex-wrap gap-3">
+            <div className="bg-linear-to-br from-bg-purple to-bg-navy p-6 sm:p-8">
+              <h1 className="mb-3 text-4xl font-bold leading-tight text-text-primary sm:text-5xl">{profile.name}</h1>
+              <div className="flex flex-wrap gap-2.5">
                 {profile.genre && (
-                  <span className="px-4 py-2 bg-accent-500 text-bg-navy rounded-lg font-bold text-sm">
-                    <Guitar size={14} className="mr-2 inline" aria-hidden="true" />
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-bold text-bg-navy">
+                    <Guitar size={14} className="shrink-0" aria-hidden="true" />
                     {profile.genre}
                   </span>
                 )}
                 {profile.origin && (
-                  <span className="px-4 py-2 bg-bg-navy border-2 border-text-primary/30 text-text-primary rounded-lg font-bold text-sm">
-                    <MapPin size={14} className="mr-2 inline" aria-hidden="true" />
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border-2 border-text-primary/30 bg-bg-navy px-3.5 py-2 text-sm font-bold text-text-primary">
+                    <MapPin size={14} className="shrink-0" aria-hidden="true" />
                     {profile.origin}
                   </span>
                 )}
@@ -556,26 +558,17 @@ export default function BandProfilePage() {
           )}
 
           {/* Bio, Social Links, and Share */}
-          <div className="p-6 bg-bg-purple/50 border-t border-text-primary/10">
-            <div className="mb-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <div className="flex-1 min-w-0">
+          <div className="border-t border-text-primary/10 bg-bg-purple/50 p-6">
+            <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
                 {profile.description ? (
                   <div
-                    className="text-text-secondary text-sm leading-relaxed [&_p]:my-2 [&_a]:text-accent-500 [&_a:hover]:underline"
-                    style={{
-                      wordBreak: 'normal',
-                      overflowWrap: 'break-word',
-                      whiteSpace: 'normal',
-                      hyphens: 'none',
-                      WebkitHyphens: 'none',
-                      MozHyphens: 'none',
-                      msHyphens: 'none',
-                    }}
+                    className="band-bio max-w-prose text-sm leading-relaxed text-text-secondary [&_a:hover]:underline [&_a]:text-accent-500 [&_p]:my-2"
                     dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
                   />
                 ) : (
                   !hasAnySocial(profile.social) && (
-                    <p className="text-text-tertiary text-sm italic">No bio added yet.</p>
+                    <p className="text-sm italic text-text-tertiary">No bio added yet.</p>
                   )
                 )}
               </div>
@@ -590,120 +583,125 @@ export default function BandProfilePage() {
               </div>
             </div>
             {hasAnySocial(profile.social) ? (
-              <div className="flex flex-wrap gap-3">
-                {safeExternalHref(profile.social.website) !== '#' && (
-                  <a
-                    href={safeExternalHref(profile.social.website)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                    onClick={() => trackSocialClick(profile.id, 'website')}
-                  >
-                    <Globe size={16} />
-                    Website
-                  </a>
-                )}
-                {safeInstagramHref(profile.social.instagram) !== '#' && (
-                  <a
-                    href={safeInstagramHref(profile.social.instagram)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-linear-to-br from-purple-500 to-pink-500 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                    onClick={() => trackSocialClick(profile.id, 'instagram')}
-                  >
-                    <InstagramIcon size={16} />
-                    Instagram
-                  </a>
-                )}
-                {safeExternalHref(profile.social.bandcamp) !== '#' && (
-                  <a
-                    href={safeExternalHref(profile.social.bandcamp)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                    onClick={() => trackSocialClick(profile.id, 'bandcamp')}
-                  >
-                    <BandcampIcon size={16} />
-                    Bandcamp
-                  </a>
-                )}
-                {safeExternalHref(profile.social.facebook) !== '#' && (
-                  <a
-                    href={safeExternalHref(profile.social.facebook)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                    onClick={() => trackSocialClick(profile.id, 'facebook')}
-                  >
-                    <FacebookIcon size={16} />
-                    Facebook
-                  </a>
-                )}
-                {safeExternalHref(profile.social.youtube) !== '#' && (
-                  <a
-                    href={safeExternalHref(profile.social.youtube)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                    onClick={() => trackSocialClick(profile.id, 'youtube')}
-                  >
-                    <YouTubeIcon size={16} />
-                    YouTube
-                  </a>
-                )}
-                {safeExternalHref(profile.social.spotify) !== '#' && (
-                  <a
-                    href={safeExternalHref(profile.social.spotify)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                    onClick={() => trackSocialClick(profile.id, 'spotify')}
-                  >
-                    <SpotifyIcon size={16} />
-                    Spotify
-                  </a>
-                )}
-                {safeExternalHref(profile.social.apple_music) !== '#' && (
-                  <a
-                    href={safeExternalHref(profile.social.apple_music)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-linear-to-br from-pink-500 to-red-600 text-white rounded hover:opacity-90 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                    onClick={() => trackSocialClick(profile.id, 'apple_music')}
-                  >
-                    <AppleMusicIcon size={16} />
-                    Apple Music
-                  </a>
-                )}
-                {safeExternalHref(profile.social.linktree) !== '#' && (
-                  <a
-                    href={safeExternalHref(profile.social.linktree)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-lime-500 text-white rounded hover:bg-lime-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                    onClick={() => trackSocialClick(profile.id, 'linktree')}
-                  >
-                    <LinktreeIcon size={16} />
-                    Linktree
-                  </a>
-                )}
+              <div className="mt-5 border-t border-text-primary/10 pt-5">
+                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                  Listen &amp; follow
+                </h2>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-2.5">
+                  {safeExternalHref(profile.social.website) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.website)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-bg-navy transition-colors hover:bg-accent-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      onClick={() => trackSocialClick(profile.id, 'website')}
+                    >
+                      <Globe size={16} className="shrink-0" />
+                      Website
+                    </a>
+                  )}
+                  {safeInstagramHref(profile.social.instagram) !== '#' && (
+                    <a
+                      href={safeInstagramHref(profile.social.instagram)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-linear-to-br from-purple-500 to-pink-500 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      onClick={() => trackSocialClick(profile.id, 'instagram')}
+                    >
+                      <InstagramIcon size={16} className="shrink-0" />
+                      Instagram
+                    </a>
+                  )}
+                  {safeExternalHref(profile.social.bandcamp) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.bandcamp)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      onClick={() => trackSocialClick(profile.id, 'bandcamp')}
+                    >
+                      <BandcampIcon size={16} className="shrink-0" />
+                      Bandcamp
+                    </a>
+                  )}
+                  {safeExternalHref(profile.social.facebook) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.facebook)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      onClick={() => trackSocialClick(profile.id, 'facebook')}
+                    >
+                      <FacebookIcon size={16} className="shrink-0" />
+                      Facebook
+                    </a>
+                  )}
+                  {safeExternalHref(profile.social.youtube) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.youtube)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      onClick={() => trackSocialClick(profile.id, 'youtube')}
+                    >
+                      <YouTubeIcon size={16} className="shrink-0" />
+                      YouTube
+                    </a>
+                  )}
+                  {safeExternalHref(profile.social.spotify) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.spotify)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      onClick={() => trackSocialClick(profile.id, 'spotify')}
+                    >
+                      <SpotifyIcon size={16} className="shrink-0" />
+                      Spotify
+                    </a>
+                  )}
+                  {safeExternalHref(profile.social.apple_music) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.apple_music)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-linear-to-br from-pink-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      onClick={() => trackSocialClick(profile.id, 'apple_music')}
+                    >
+                      <AppleMusicIcon size={16} className="shrink-0" />
+                      Apple Music
+                    </a>
+                  )}
+                  {safeExternalHref(profile.social.linktree) !== '#' && (
+                    <a
+                      href={safeExternalHref(profile.social.linktree)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-lime-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-lime-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      onClick={() => trackSocialClick(profile.id, 'linktree')}
+                    >
+                      <LinktreeIcon size={16} className="shrink-0" />
+                      Linktree
+                    </a>
+                  )}
+                </div>
               </div>
             ) : (
-              !profile.description && <p className="text-text-tertiary text-sm italic">No links added yet.</p>
+              !profile.description && <p className="mt-5 text-sm italic text-text-tertiary">No links added yet.</p>
             )}
           </div>
         </div>
 
         {/* Follow band */}
-        <div className="mt-6 p-4 rounded-lg bg-text-primary/5 border border-text-primary/10">
+        <div className="mb-6 rounded-xl border border-text-primary/10 bg-text-primary/5 p-5">
           <div className="mx-auto flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="sm:flex-1">
-              <h3 className="text-sm font-semibold text-text-primary mb-1">Follow {profile.name}</h3>
+              <h2 className="mb-1 text-sm font-semibold text-text-primary">Follow {profile.name}</h2>
               <p className="text-xs text-text-secondary">Get notified when they join a new lineup.</p>
             </div>
             {followStatus === 'success' ? (
-              <p className="text-sm text-green-400 sm:max-w-sm">
-                <Check size={14} className="mr-1.5" />
+              <p className="inline-flex items-start gap-1.5 text-sm text-green-400 sm:max-w-sm">
+                <Check size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 You&apos;re following {profile.name}! We&apos;ll email you when they join a lineup.
               </p>
             ) : (
@@ -733,12 +731,12 @@ export default function BandProfilePage() {
               </form>
             )}
           </div>
-          {followStatus === 'error' && <p className="text-xs text-red-400 mt-1">{followError}</p>}
+          {followStatus === 'error' && <p className="mt-2 text-xs text-red-400">{followError}</p>}
         </div>
 
         {/* Stats/Facts (left) + Shows (right). When a band has no stats, the shows
             column spans full width so the empty state stays aligned with the page. */}
-        <div className={`mt-6 mb-6 ${profile.stats ? 'grid grid-cols-1 gap-6 lg:grid-cols-3' : ''}`}>
+        <div className={`mb-6 ${profile.stats ? 'grid grid-cols-1 gap-6 lg:grid-cols-3' : ''}`}>
           {/* Left Column - Stats & Facts */}
           {profile.stats && (
             <div className="lg:col-span-1 space-y-6">
@@ -752,11 +750,13 @@ export default function BandProfilePage() {
             {/* Upcoming Shows */}
             {profile.upcoming && profile.upcoming.length > 0 && (
               <Card variant="elevated" className="border-2 border-accent-500/30">
-                <div className="pb-4 mb-4 border-b border-text-primary/10">
-                  <h2 className="text-2xl font-bold text-accent-500 flex items-center gap-2">
-                    <CalendarDays size={14} />
-                    <span>Upcoming Shows</span>
-                    <Badge variant="primary" className="ml-2">
+                <div className="mb-5 flex items-center gap-3 border-b border-text-primary/10 pb-4">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-500/15 text-accent-500">
+                    <CalendarDays size={18} aria-hidden="true" />
+                  </span>
+                  <h2 className="flex flex-1 items-center gap-2 text-xl font-bold text-accent-500 sm:text-2xl">
+                    Upcoming Shows
+                    <Badge variant="primary" className="ml-1">
                       {profile.upcoming.length}
                     </Badge>
                   </h2>
@@ -828,11 +828,13 @@ export default function BandProfilePage() {
             {/* Past Performance History */}
             {profile.past && profile.past.length > 0 && (
               <Card variant="elevated">
-                <div className="pb-4 mb-4 border-b border-text-primary/10">
-                  <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-                    <TrendingUp size={14} />
-                    <span>Performance History</span>
-                    <Badge variant="secondary" className="ml-2">
+                <div className="mb-5 flex items-center gap-3 border-b border-text-primary/10 pb-4">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-text-primary/10 text-text-tertiary">
+                    <TrendingUp size={18} aria-hidden="true" />
+                  </span>
+                  <h2 className="flex flex-1 items-center gap-2 text-xl font-bold text-text-primary sm:text-2xl">
+                    Performance History
+                    <Badge variant="secondary" className="ml-1">
                       {profile.past.length}
                     </Badge>
                   </h2>
@@ -912,7 +914,7 @@ export default function BandProfilePage() {
         </div>
 
         {/* Back to Events */}
-        <div className="mt-6 text-center">
+        <div className="pt-2 text-center">
           <Button as={Link} to={returnEventPath} variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
             {returnEventSlug ? 'Back to Schedule' : 'Back to Events'}
           </Button>

@@ -27,7 +27,7 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
         title={selectedOption.description}
         className={`min-h-[44px] w-full appearance-none rounded-full border px-4 py-2 pr-10 text-sm font-medium transition-colors focus:border-accent-500 focus:outline-hidden ${
           selectedFilter === 'all'
-            ? 'border-border bg-surface text-text-primary hover:bg-surface'
+            ? 'border-border bg-surface text-text-primary hover:bg-surface-hover'
             : 'border-accent-500/35 bg-accent-500/10 text-accent-300'
         }`}
       >

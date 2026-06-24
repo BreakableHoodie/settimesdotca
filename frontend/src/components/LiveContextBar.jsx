@@ -269,7 +269,7 @@ function LiveContextBar({
             aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
             aria-expanded={isFiltersOpen}
             aria-controls="live-filter-panel"
-            className="ml-auto inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-border"
+            className="ml-auto inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
           >
             <span>Filters</span>
             <ChevronDown

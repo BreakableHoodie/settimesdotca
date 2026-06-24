@@ -87,7 +87,7 @@ The bulk band import (`functions/api/admin/bands/import.js`) follows this patter
 
 ### PRAGMA `foreign_keys = ON` is enforced in production
 
-`functions/_middleware.js` runs `PRAGMA foreign_keys = ON` on every D1 session before the request handler fires. Unit test helpers (`functions/api/test-utils.js`) set it the same way via `better-sqlite3`. FK constraints are active in all environments.
+`functions/_middleware.js` runs `PRAGMA foreign_keys = ON` before the request handler fires for every **mutating** request. Read-only methods (`GET`/`HEAD`) skip it — they can't violate FK constraints, and skipping saves a D1 round-trip on hot read paths. The guard is a strict read-only allowlist, so any other method (including unknown ones) still gets FK enforcement; never widen it to skip writes. Unit test helpers (`functions/api/test-utils.js`) set the PRAGMA unconditionally via `better-sqlite3`, so FK constraints are always active under test.
 
 When recreating a table in a migration (SQLite has no ALTER COLUMN), surround the table-recreation block with `PRAGMA foreign_keys = OFF` / `PRAGMA foreign_keys = ON` as migration 0032 does — D1 will reject the DROP otherwise.
 

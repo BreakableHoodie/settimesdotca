@@ -7,87 +7,96 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock D1 Database
-const createMockDB = () => {
-  const mockPrepare = (query) => {
+// Returns the mock result set for a query string, keyed off the distinctive
+// WHERE clause for each period (now / upcoming / past).
+const resultForQuery = (query) => {
+  if (query.includes('e.date = ?')) {
+    // "Now" events query
     return {
-      bind: (...args) => ({
-        all: async () => {
-          // Mock data for different query types
-          if (query.includes('e.date = ?')) {
-            // "Now" events query
-            return {
-              results: [
-                {
-                  event_id: 1,
-                  event_name: 'Test Event Today',
-                  event_slug: 'test-event-today',
-                  event_date: '2025-11-05',
-                  band_id: 1,
-                  band_name: 'Test Band 1',
-                  start_time: '20:00',
-                  end_time: '21:00',
-                  url: 'https://testband1.com',
-                  genre: 'Rock',
-                  origin: 'Toronto',
-                  photo_url: 'https://example.com/band1.jpg',
-                  venue_id: 1,
-                  venue_name: 'Test Venue 1',
-                  venue_address: '123 Test St',
-                },
-                {
-                  event_id: 1,
-                  event_name: 'Test Event Today',
-                  event_slug: 'test-event-today',
-                  event_date: '2025-11-05',
-                  band_id: 2,
-                  band_name: 'Test Band 2',
-                  start_time: '21:00',
-                  end_time: '22:00',
-                  url: 'https://testband2.com',
-                  genre: 'Jazz',
-                  origin: 'Montreal',
-                  photo_url: 'https://example.com/band2.jpg',
-                  venue_id: 2,
-                  venue_name: 'Test Venue 2',
-                  venue_address: '456 Test Ave',
-                },
-              ],
-            };
-          } else if (query.includes('e.date > ?')) {
-            // "Upcoming" events query
-            return { results: [] };
-          } else if (query.includes('e.date < ?')) {
-            // "Past" events query
-            return {
-              results: [
-                {
-                  event_id: 2,
-                  event_name: 'Past Event',
-                  event_slug: 'past-event',
-                  event_date: '2025-11-01',
-                  band_id: 3,
-                  band_name: 'Past Band',
-                  start_time: '19:00',
-                  end_time: '20:00',
-                  url: 'https://pastband.com',
-                  genre: 'Blues',
-                  origin: 'Ottawa',
-                  photo_url: 'https://example.com/band3.jpg',
-                  venue_id: 3,
-                  venue_name: 'Past Venue',
-                  venue_address: '789 Past Rd',
-                },
-              ],
-            };
-          }
-          return { results: [] };
+      results: [
+        {
+          event_id: 1,
+          event_name: 'Test Event Today',
+          event_slug: 'test-event-today',
+          event_date: '2025-11-05',
+          band_id: 1,
+          band_name: 'Test Band 1',
+          start_time: '20:00',
+          end_time: '21:00',
+          url: 'https://testband1.com',
+          genre: 'Rock',
+          origin: 'Toronto',
+          photo_url: 'https://example.com/band1.jpg',
+          venue_id: 1,
+          venue_name: 'Test Venue 1',
+          venue_address: '123 Test St',
         },
-      }),
+        {
+          event_id: 1,
+          event_name: 'Test Event Today',
+          event_slug: 'test-event-today',
+          event_date: '2025-11-05',
+          band_id: 2,
+          band_name: 'Test Band 2',
+          start_time: '21:00',
+          end_time: '22:00',
+          url: 'https://testband2.com',
+          genre: 'Jazz',
+          origin: 'Montreal',
+          photo_url: 'https://example.com/band2.jpg',
+          venue_id: 2,
+          venue_name: 'Test Venue 2',
+          venue_address: '456 Test Ave',
+        },
+      ],
     };
-  };
+  } else if (query.includes('e.date > ?')) {
+    // "Upcoming" events query
+    return { results: [] };
+  } else if (query.includes('e.date < ?')) {
+    // "Past" events query
+    return {
+      results: [
+        {
+          event_id: 2,
+          event_name: 'Past Event',
+          event_slug: 'past-event',
+          event_date: '2025-11-01',
+          band_id: 3,
+          band_name: 'Past Band',
+          start_time: '19:00',
+          end_time: '20:00',
+          url: 'https://pastband.com',
+          genre: 'Blues',
+          origin: 'Ottawa',
+          photo_url: 'https://example.com/band3.jpg',
+          venue_id: 3,
+          venue_name: 'Past Venue',
+          venue_address: '789 Past Rd',
+        },
+      ],
+    };
+  }
+  return { results: [] };
+};
 
-  return { prepare: mockPrepare };
+// Mock D1 Database. The endpoint now batches the three period queries into a
+// single DB.batch([...]) round-trip, so the mock exposes both prepare/bind
+// (each bound statement carries its `query`) and a batch() that returns results
+// in input order.
+const createMockDB = () => {
+  const mockPrepare = (query) => ({
+    bind: () => ({
+      query,
+      all: async () => resultForQuery(query),
+    }),
+  });
+
+  return {
+    prepare: mockPrepare,
+    batch: async (statements) =>
+      statements.map((statement) => resultForQuery(statement.query)),
+  };
 };
 
 describe('Timeline API - Optimized JOIN Queries', () => {
@@ -251,10 +260,9 @@ describe('Timeline API - Optimized JOIN Queries', () => {
     it('should handle empty results', async () => {
       mockContext.env.DB = {
         prepare: () => ({
-          bind: () => ({
-            all: async () => ({ results: [] }),
-          }),
+          bind: () => ({ all: async () => ({ results: [] }) }),
         }),
+        batch: async (statements) => statements.map(() => ({ results: [] })),
       };
 
       const response = await onRequestGet(mockContext);
@@ -268,10 +276,9 @@ describe('Timeline API - Optimized JOIN Queries', () => {
     it('should handle null results', async () => {
       mockContext.env.DB = {
         prepare: () => ({
-          bind: () => ({
-            all: async () => ({ results: null }),
-          }),
+          bind: () => ({ all: async () => ({ results: null }) }),
         }),
+        batch: async (statements) => statements.map(() => ({ results: null })),
       };
 
       const response = await onRequestGet(mockContext);
@@ -300,6 +307,22 @@ describe('Timeline API - Optimized JOIN Queries', () => {
       expect(prepareCallCount.count).toBe(3);
     });
 
+    it('should run all period queries in a single batched round-trip', async () => {
+      const batchCallCount = { count: 0 };
+      const originalBatch = mockContext.env.DB.batch;
+
+      mockContext.env.DB.batch = (statements) => {
+        batchCallCount.count++;
+        return originalBatch(statements);
+      };
+
+      await onRequestGet(mockContext);
+
+      // The three period queries (now/upcoming/past) are collapsed into one
+      // DB.batch([...]) call rather than three serial awaits.
+      expect(batchCallCount.count).toBe(1);
+    });
+
     it('should group multiple bands per event without additional queries', async () => {
       // This validates that groupEventData works in-memory
       // without triggering additional database calls
@@ -314,32 +337,28 @@ describe('Timeline API - Optimized JOIN Queries', () => {
 
   describe('Edge Cases', () => {
     it('should handle events with no bands', async () => {
+      const results = [
+        {
+          event_id: 99,
+          event_name: 'Empty Event',
+          event_slug: 'empty-event',
+          event_date: '2025-11-05',
+          band_id: null,
+          band_name: null,
+          start_time: null,
+          end_time: null,
+          url: null,
+          genre: null,
+          origin: null,
+          photo_url: null,
+          venue_id: null,
+          venue_name: null,
+          venue_address: null,
+        },
+      ];
       mockContext.env.DB = {
-        prepare: () => ({
-          bind: () => ({
-            all: async () => ({
-              results: [
-                {
-                  event_id: 99,
-                  event_name: 'Empty Event',
-                  event_slug: 'empty-event',
-                  event_date: '2025-11-05',
-                  band_id: null,
-                  band_name: null,
-                  start_time: null,
-                  end_time: null,
-                  url: null,
-                  genre: null,
-                  origin: null,
-                  photo_url: null,
-                  venue_id: null,
-                  venue_name: null,
-                  venue_address: null,
-                },
-              ],
-            }),
-          }),
-        }),
+        prepare: () => ({ bind: () => ({ all: async () => ({ results }) }) }),
+        batch: async (statements) => statements.map(() => ({ results })),
       };
 
       const response = await onRequestGet(mockContext);
@@ -352,49 +371,45 @@ describe('Timeline API - Optimized JOIN Queries', () => {
     });
 
     it('should handle same venue with multiple bands', async () => {
+      const results = [
+        {
+          event_id: 1,
+          event_name: 'Multi-Band Event',
+          event_slug: 'multi-band',
+          event_date: '2025-11-05',
+          band_id: 1,
+          band_name: 'Band 1',
+          start_time: '20:00',
+          end_time: '21:00',
+          url: null,
+          genre: null,
+          origin: null,
+          photo_url: null,
+          venue_id: 1,
+          venue_name: 'Same Venue',
+          venue_address: '123 St',
+        },
+        {
+          event_id: 1,
+          event_name: 'Multi-Band Event',
+          event_slug: 'multi-band',
+          event_date: '2025-11-05',
+          band_id: 2,
+          band_name: 'Band 2',
+          start_time: '21:00',
+          end_time: '22:00',
+          url: null,
+          genre: null,
+          origin: null,
+          photo_url: null,
+          venue_id: 1,
+          venue_name: 'Same Venue',
+          venue_address: '123 St',
+        },
+      ];
       mockContext.env.DB = {
-        prepare: () => ({
-          bind: () => ({
-            all: async () => ({
-              results: [
-                {
-                  event_id: 1,
-                  event_name: 'Multi-Band Event',
-                  event_slug: 'multi-band',
-                  event_date: '2025-11-05',
-                  band_id: 1,
-                  band_name: 'Band 1',
-                  start_time: '20:00',
-                  end_time: '21:00',
-                  url: null,
-                  genre: null,
-                  origin: null,
-                  photo_url: null,
-                  venue_id: 1,
-                  venue_name: 'Same Venue',
-                  venue_address: '123 St',
-                },
-                {
-                  event_id: 1,
-                  event_name: 'Multi-Band Event',
-                  event_slug: 'multi-band',
-                  event_date: '2025-11-05',
-                  band_id: 2,
-                  band_name: 'Band 2',
-                  start_time: '21:00',
-                  end_time: '22:00',
-                  url: null,
-                  genre: null,
-                  origin: null,
-                  photo_url: null,
-                  venue_id: 1,
-                  venue_name: 'Same Venue',
-                  venue_address: '123 St',
-                },
-              ],
-            }),
-          }),
-        }),
+        prepare: () => ({ bind: () => ({ all: async () => ({ results }) }) }),
+        batch: async (statements) => statements.map(() => ({ results })),
       };
 
       const response = await onRequestGet(mockContext);

@@ -564,6 +564,19 @@ body {
   animation-delay: 250ms;
 }
 
+/* Band-profile bio: long URLs / unbroken slugs (e.g. "have-you-lost-your-mind")
+   must wrap at any point rather than overflow or hyphenate mid-word. */
+.band-bio {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: none;
+}
+
+.band-bio a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .rich-text-content p {
   margin-bottom: 0.75rem;
 }

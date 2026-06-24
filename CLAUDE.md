@@ -21,6 +21,8 @@ settimes.ca is evolving into the best multi-venue/multi-artist event platform fo
 
 Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude, OpenCode, and humans.
 
+**Track remaining/deferred work as GitHub issues** (`gh issue create`) — not just chat threads or ad-hoc lists — so nothing is lost across sessions and contributors. Reference issues from PRs (`Closes #N`).
+
 ---
 
 ## Stack

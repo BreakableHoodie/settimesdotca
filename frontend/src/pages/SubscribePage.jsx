@@ -241,14 +241,14 @@ export default function SubscribePage() {
           <h2 className="text-2xl font-bold text-text-primary mb-4">Prefer RSS or Calendar Sync?</h2>
           <div className="flex flex-wrap justify-center gap-4">
             <a
-              href="/api/feeds/ical?city=portland&genre=all"
+              href="/api/feeds/ical?city=waterloo&genre=all"
               className="px-6 py-3 bg-surface hover:bg-surface text-text-primary rounded-lg border border-border transition"
             >
               <CalendarDays size={16} className="mr-2 inline" aria-hidden="true" />
               Subscribe to Calendar
             </a>
             <a
-              href="/api/events/public?city=portland&genre=all"
+              href="/api/events/public?city=waterloo&genre=all"
               className="px-6 py-3 bg-surface hover:bg-surface text-text-primary rounded-lg border border-border transition"
             >
               <Rss size={16} className="mr-2 inline" aria-hidden="true" />

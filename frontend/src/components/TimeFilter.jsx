@@ -27,7 +27,7 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
         title={selectedOption.description}
         className={`min-h-[44px] w-full appearance-none rounded-full border px-4 py-2 pr-10 text-sm font-medium transition-colors focus:border-accent-500 focus:outline-hidden ${
           selectedFilter === 'all'
-            ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+            ? 'border-border bg-surface text-text-primary hover:bg-surface'
             : 'border-accent-500/35 bg-accent-500/10 text-accent-300'
         }`}
       >
@@ -40,7 +40,7 @@ export default function TimeFilter({ selectedFilter, onFilterChange, className =
       <ChevronDown
         size={16}
         aria-hidden="true"
-        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
+        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary"
       />
     </div>
   )

@@ -904,7 +904,7 @@ export default function BandProfilePage() {
               <Card variant="elevated" className="flex items-center justify-center py-12 text-center">
                 <div>
                   <p className="text-text-tertiary text-lg mb-1">No performances on record yet.</p>
-                  <p className="text-text-disabled text-sm">Check back after the next event is announced.</p>
+                  <p className="text-text-tertiary text-sm">Check back after the next event is announced.</p>
                 </div>
               </Card>
             )}

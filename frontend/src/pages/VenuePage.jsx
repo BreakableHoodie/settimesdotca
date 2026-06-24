@@ -11,7 +11,7 @@ import { safeExternalHref } from '../utils/urlSafety'
 
 function PerformanceRow({ perf }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-bg-purple/40 p-4">
+    <div className="rounded-lg border border-border bg-bg-purple/40 p-4">
       {perf.band_name && (
         <Link
           to={buildBandProfileHref(perf.band_name)}

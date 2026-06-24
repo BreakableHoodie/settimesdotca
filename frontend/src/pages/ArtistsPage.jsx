@@ -18,14 +18,14 @@ function ArtistCard({ artist }) {
   return (
     <Link
       to={buildBandProfileHref(artist.name)}
-      className="flex items-center gap-4 rounded-xl border border-white/10 bg-gradient-card p-4 transition hover:scale-[1.01] hover:border-accent-400/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+      className="flex items-center gap-4 rounded-xl border border-border bg-gradient-card p-4 transition hover:scale-[1.01] hover:border-accent-400/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
     >
       {artist.photo_url ? (
         <img
           src={artist.photo_url}
           alt=""
           loading="lazy"
-          className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-white/15"
+          className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-border"
         />
       ) : (
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent-500/20 text-2xl font-bold text-accent-400">
@@ -143,7 +143,7 @@ export default function ArtistsPage() {
             onChange={e => setQuery(e.target.value)}
             placeholder="Search artists by name or genre…"
             aria-label="Search artists by name or genre"
-            className="min-h-[44px] w-full rounded-full border border-white/15 bg-bg-purple/60 py-3 pl-10 pr-4 text-text-primary placeholder:text-text-tertiary focus:border-accent-400 focus:outline-hidden"
+            className="min-h-[44px] w-full rounded-full border border-border bg-bg-purple/60 py-3 pl-10 pr-4 text-text-primary placeholder:text-text-tertiary focus:border-accent-400 focus:outline-hidden"
           />
         </div>
 

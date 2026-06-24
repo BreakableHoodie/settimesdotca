@@ -19,9 +19,8 @@ export async function onRequestGet(context) {
       env.SCHEDULE_CACHE_TTL_SECONDS || "60",
       10,
     );
-    const cacheTtl = Number.isFinite(configuredTtl) && configuredTtl >= 0
-      ? configuredTtl
-      : 60;
+    const cacheTtl =
+      Number.isFinite(configuredTtl) && configuredTtl >= 0 ? configuredTtl : 60;
 
     let event;
 
@@ -80,7 +79,9 @@ export async function onRequestGet(context) {
         p.end_time as endTime,
         b.social_links,
         b.photo_url,
-        v.name as venue
+        v.name as venue,
+        v.latitude as venue_lat,
+        v.longitude as venue_lng
       FROM performances p
       INNER JOIN band_profiles b ON p.band_profile_id = b.id
       LEFT JOIN venues v ON p.venue_id = v.id
@@ -99,11 +100,11 @@ export async function onRequestGet(context) {
       // Extract time from datetime string or time-only format
       // Handles: "2026-01-17 20:00" -> "20:00" OR "20:00" -> "20:00"
       const extractTime = (datetime) => {
-        if (!datetime || datetime === 'TBD') return 'TBD';
+        if (!datetime || datetime === "TBD") return "TBD";
         // If it contains a space, it's a full datetime - extract time part
-        if (datetime.includes(' ')) {
-          const timePart = datetime.split(' ')[1];
-          return timePart ? timePart.substring(0, 5) : 'TBD'; // Get HH:MM
+        if (datetime.includes(" ")) {
+          const timePart = datetime.split(" ")[1];
+          return timePart ? timePart.substring(0, 5) : "TBD"; // Get HH:MM
         }
         // Otherwise, it's already in time format (HH:MM or HH:MM:SS)
         return datetime.substring(0, 5); // Get HH:MM
@@ -115,7 +116,13 @@ export async function onRequestGet(context) {
         if (band.social_links) {
           const links = JSON.parse(band.social_links);
           // Prioritize website, then bandcamp, then instagram, etc.
-          primaryUrl = links.website || links.bandcamp || links.instagram || links.facebook || links.spotify || null;
+          primaryUrl =
+            links.website ||
+            links.bandcamp ||
+            links.instagram ||
+            links.facebook ||
+            links.spotify ||
+            null;
         }
       } catch (_) {
         // Ignore JSON parse errors
@@ -128,6 +135,8 @@ export async function onRequestGet(context) {
         name: band.name,
         photo_url: band.photo_url ?? null,
         venue: band.venue ?? null,
+        venue_lat: typeof band.venue_lat === "number" ? band.venue_lat : null,
+        venue_lng: typeof band.venue_lng === "number" ? band.venue_lng : null,
         date: event.date,
         startTime: extractTime(band.startTime),
         endTime: extractTime(band.endTime),

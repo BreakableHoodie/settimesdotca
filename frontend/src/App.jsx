@@ -1,9 +1,10 @@
 import { Archive, Bell, CircleAlert, X } from 'lucide-react'
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
+import NextMove from './components/NextMove'
 import Footer from './components/Footer'
 import Header from './components/Header'
 import OfflineIndicator from './components/OfflineIndicator'
@@ -14,6 +15,7 @@ import ScheduleSkeleton from './components/ScheduleSkeleton'
 import { ConfirmDialog, Modal } from './components/ui'
 import { trackEventView, trackPageView } from './utils/metrics'
 import { getTimeFilterOptions } from './utils/timeFilter'
+import { computeNextMove } from './utils/nextMove'
 import { validateBandsData } from './utils/validation'
 import { prepareBands } from './utils/bandUtils'
 import { saveSelectedBands } from './utils/scheduleStorage'
@@ -575,6 +577,10 @@ function App() {
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
   const effectiveNow = debugTime || currentTime
+  // "Next Move" live companion: the single glanceable action for right now,
+  // derived from the user's route + current time (see utils/nextMove.js). When
+  // active (event is live/near), it supersedes the simpler ComingUp banner.
+  const nextMoveState = useMemo(() => computeNextMove(myBands, effectiveNow), [myBands, effectiveNow])
   const debugEnabled = (() => {
     if (typeof window === 'undefined') return false
     const hostname = window.location.hostname || ''
@@ -677,7 +683,12 @@ function App() {
       ) : (
         <Header eventName={eventData?.name} eventDate={eventData?.date} />
       )}
-      {!isArchived && <ComingUp bands={myBands} currentTime={effectiveNow} />}
+      {!isArchived &&
+        (nextMoveState.kind ? (
+          <NextMove state={nextMoveState} onDecide={() => setView('mine')} />
+        ) : (
+          <ComingUp bands={myBands} currentTime={effectiveNow} />
+        ))}
       {!isArchived && (
         <LiveContextBar
           eventData={eventData}

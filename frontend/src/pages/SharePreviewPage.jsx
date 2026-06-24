@@ -36,6 +36,20 @@ export default function SharePreviewPage() {
     }
   }, [slug])
 
+  const pageTitle = notFound
+    ? 'Shared Route Not Found | SetTimes'
+    : error
+      ? 'Error | SetTimes'
+      : shareData
+        ? `Shared Route — ${shareData.event_name} | SetTimes`
+        : 'Shared Route | SetTimes'
+
+  // react-helmet-async does not reliably set document.title in React 19 — set it
+  // directly to match the <Helmet> titles below. See BandProfilePage.jsx.
+  useEffect(() => {
+    document.title = pageTitle
+  }, [pageTitle])
+
   const handleImport = () => {
     if (!shareData) return
     navigate(`/event/${shareData.event_slug}?share=${slug}`)

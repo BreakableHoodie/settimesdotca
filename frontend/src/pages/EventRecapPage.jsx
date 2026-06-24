@@ -118,6 +118,12 @@ export default function EventRecapPage() {
     }
   }, [slug])
 
+  // react-helmet-async does not reliably set document.title in React 19 — set it
+  // directly to match the <Helmet> title below. See BandProfilePage.jsx.
+  useEffect(() => {
+    document.title = event ? `${event.name} — Event Recap | SetTimes.ca` : 'Event Recap | SetTimes.ca'
+  }, [event])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">

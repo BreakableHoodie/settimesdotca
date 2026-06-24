@@ -41,7 +41,7 @@ export default function EventTimeline() {
         }
         setError(null)
 
-        const data = await fetchPublicJson('/api/events/timeline', {}, 'Failed to fetch events timeline')
+        const data = await fetchPublicJson('/api/events/timeline?pastLimit=50', {}, 'Failed to fetch events timeline')
         setTimeline(data)
       } catch (err) {
         console.error('Error fetching timeline:', err)

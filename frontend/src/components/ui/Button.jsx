@@ -35,9 +35,9 @@ export default function Button({
       'bg-accent-500 text-bg-navy font-semibold hover:bg-accent-400 focus:ring-accent-500 shadow-xs hover:shadow-md active:scale-95',
     'primary-gradient':
       'bg-gradient-accent text-bg-navy font-semibold hover:brightness-110 focus:ring-accent-500 shadow-xs hover:shadow-md active:scale-95',
-    secondary: 'border-2 border-text-secondary text-text-primary hover:bg-surface focus:ring-primary-500',
+    secondary: 'border-2 border-text-secondary text-text-primary hover:bg-surface-hover focus:ring-primary-500',
     danger: 'bg-error-500 text-white hover:bg-error-600 focus:ring-error-500 shadow-xs hover:shadow-md active:scale-95',
-    ghost: 'text-text-primary hover:bg-surface focus:ring-primary-500',
+    ghost: 'text-text-primary hover:bg-surface-hover focus:ring-primary-500',
     success: 'bg-success-500 text-white hover:bg-success-600 focus:ring-success-500 shadow-xs hover:shadow-md',
     warning: 'bg-warning-500 text-white hover:bg-warning-600 focus:ring-warning-500 shadow-xs hover:shadow-md',
     link: 'text-accent-500 hover:text-accent-400 underline-offset-4 hover:underline focus:ring-accent-500 p-0',

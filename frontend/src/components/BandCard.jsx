@@ -74,7 +74,7 @@ function BandCard({
           className={`absolute top-2 right-2 h-11 w-11 flex items-center justify-center text-lg font-bold rounded-full transition-all duration-150 z-10 ${
             onAmber
               ? 'bg-bg-navy/20 hover:bg-bg-navy/30 text-bg-navy'
-              : 'bg-surface hover:bg-surface text-text-secondary hover:text-text-primary'
+              : 'bg-surface hover:bg-surface-hover text-text-secondary hover:text-text-primary'
           } focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500`}
           aria-label={labelBase}
           title={labelBase}

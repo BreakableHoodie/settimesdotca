@@ -242,14 +242,14 @@ export default function SubscribePage() {
           <div className="flex flex-wrap justify-center gap-4">
             <a
               href="/api/feeds/ical?city=waterloo&genre=all"
-              className="px-6 py-3 bg-surface hover:bg-surface text-text-primary rounded-lg border border-border transition"
+              className="px-6 py-3 bg-surface hover:bg-surface-hover text-text-primary rounded-lg border border-border transition"
             >
               <CalendarDays size={16} className="mr-2 inline" aria-hidden="true" />
               Subscribe to Calendar
             </a>
             <a
               href="/api/events/public?city=waterloo&genre=all"
-              className="px-6 py-3 bg-surface hover:bg-surface text-text-primary rounded-lg border border-border transition"
+              className="px-6 py-3 bg-surface hover:bg-surface-hover text-text-primary rounded-lg border border-border transition"
             >
               <Rss size={16} className="mr-2 inline" aria-hidden="true" />
               JSON Feed

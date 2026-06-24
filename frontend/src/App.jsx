@@ -774,7 +774,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => setDebugTime(null)}
-                  className="px-3 py-2 rounded bg-surface border border-border text-text-secondary text-sm hover:bg-surface"
+                  className="px-3 py-2 rounded bg-surface border border-border text-text-secondary text-sm hover:bg-surface-hover"
                 >
                   Clear override
                 </button>
@@ -848,7 +848,7 @@ function App() {
                 setPendingSharedBands([])
                 setPendingSharedBandNames([])
               }}
-              className="min-h-[44px] rounded-lg border border-border px-4 py-2 text-text-secondary transition-colors hover:bg-surface"
+              className="min-h-[44px] rounded-lg border border-border px-4 py-2 text-text-secondary transition-colors hover:bg-surface-hover"
             >
               Cancel
             </button>

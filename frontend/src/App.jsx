@@ -294,6 +294,12 @@ function App() {
     saveSelectedBands(slug || 'default', selectedBands, eventData?.date)
   }, [selectedBands, slug, eventData?.date])
 
+  // react-helmet-async does not reliably set document.title in React 19 — set it
+  // directly. Mirrors the <Helmet> <title> below. See BandProfilePage.jsx.
+  useEffect(() => {
+    document.title = eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'
+  }, [eventData?.name])
+
   const clearScheduleToast = useCallback(({ clearUndoState = false } = {}) => {
     if (scheduleToastTimeoutRef.current) {
       window.clearTimeout(scheduleToastTimeoutRef.current)
@@ -690,6 +696,10 @@ function App() {
         id="main-content"
         className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-3 sm:mt-6 space-y-6 sm:space-y-8"
       >
+        {/* Primary page heading for SEO/a11y. The event name is shown visually in
+            the LiveContextBar (as h2); this gives the <main> landmark a correct h1
+            naming the page topic without duplicating it on screen. */}
+        <h1 className="sr-only">{eventData?.name ? `${eventData.name} — set times & schedule` : 'Event schedule'}</h1>
         <div className="hidden sm:block">
           <Breadcrumbs items={breadcrumbs} />
         </div>

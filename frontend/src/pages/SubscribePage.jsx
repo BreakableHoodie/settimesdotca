@@ -1,7 +1,12 @@
 import { CalendarDays, Rss } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 
 const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+
+const PAGE_TITLE = 'Subscribe — Never Miss a Show | SetTimes'
+const PAGE_DESCRIPTION =
+  'Get notified about new live music events and lineup announcements in Waterloo Region. Subscribe for show alerts from SetTimes.'
 
 export default function SubscribePage() {
   const turnstileContainerRef = useRef(null)
@@ -18,6 +23,12 @@ export default function SubscribePage() {
   const [turnstileToken, setTurnstileToken] = useState('')
   const [status, setStatus] = useState('idle') // idle, submitting, success, error
   const [message, setMessage] = useState('')
+
+  // react-helmet-async does not reliably set document.title in React 19 — set it
+  // directly to match the <Helmet> title below. See BandProfilePage.jsx.
+  useEffect(() => {
+    document.title = PAGE_TITLE
+  }, [])
 
   useEffect(() => {
     if (!turnstileEnabled) {
@@ -121,6 +132,19 @@ export default function SubscribePage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple p-4">
+      <Helmet>
+        <title>{PAGE_TITLE}</title>
+        <meta name="description" content={PAGE_DESCRIPTION} />
+        <link rel="canonical" href="https://settimes.ca/subscribe" />
+        <meta property="og:title" content={PAGE_TITLE} />
+        <meta property="og:description" content={PAGE_DESCRIPTION} />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://settimes.ca/subscribe" />
+        <meta property="og:site_name" content="SetTimes" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={PAGE_TITLE} />
+        <meta name="twitter:description" content={PAGE_DESCRIPTION} />
+      </Helmet>
       <div className="max-w-2xl mx-auto pt-20">
         {/* Header */}
         <div className="text-center mb-12">

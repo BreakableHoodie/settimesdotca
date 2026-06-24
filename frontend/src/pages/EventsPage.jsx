@@ -11,6 +11,9 @@ import { ArrowRight, CalendarDays, MapPin, Users } from 'lucide-react'
 
 export default function EventsPage() {
   useEffect(() => {
+    // react-helmet-async does not reliably set document.title in React 19 — set it
+    // directly to match the <Helmet> title below. See BandProfilePage.jsx.
+    document.title = 'SetTimes – Live Music Events & Show Schedules'
     trackPageView('/')
   }, [])
 

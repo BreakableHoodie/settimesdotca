@@ -107,6 +107,21 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
   // Trust policy:
   //   New rows (ua_hash present): UA must match; IP change is tolerated (DHCP, mobile, VPN).
   //   Legacy rows (no ua_hash):   full IP+UA fingerprint must match.
+  //
+  // ACCEPTED RISK (conscious tradeoff): tolerating IP changes means a stolen
+  // trusted-device token replayed from a different network still validates, as
+  // long as the attacker also presents the same User-Agent string. We accept
+  // this because:
+  //   1. The token is the primary factor — a 256-bit secret, hashed at rest
+  //      (hashTrustedDeviceToken), delivered over a Secure/HttpOnly cookie and
+  //      expiring after a bounded window. IP/UA are only weak secondary signals.
+  //   2. Pinning to IP would reject a large fraction of legitimate logins
+  //      (mobile handoff, CGNAT/DHCP churn, corporate VPNs), pushing users back
+  //      through full MFA constantly and eroding the feature's value.
+  //   3. Trusted-device only skips the MFA *second factor* on an already
+  //      password-authenticated login — it is not a standalone credential.
+  // If the threat model tightens (e.g. admin-only high-value accounts), revisit
+  // by adding IP-range/ASN checks rather than exact-IP pinning.
   const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
   const currentUaHash = await generateUaHash(userAgent);
 

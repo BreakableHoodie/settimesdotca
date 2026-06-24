@@ -24,7 +24,10 @@ describe('POST /api/bands/:name/follow', () => {
     const row = rawDb.prepare('SELECT * FROM band_follows WHERE email=? AND band_profile_id=?')
       .get('fan@example.com', band.band_profile_id)
     expect(row).toBeTruthy()
-    expect(row.verified).toBe(1)
+    // Double opt-in: a new follow is created UNVERIFIED with a pending
+    // verification token; it only becomes verified=1 after confirm-follow.
+    expect(row.verified).toBe(0)
+    expect(row.verification_token).toBeTruthy()
     expect(row.unsubscribe_token).toBeTruthy()
   })
 

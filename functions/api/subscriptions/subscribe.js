@@ -4,6 +4,7 @@
 import { generateToken } from '../../utils/tokens.js';
 import { sendEmail, isEmailConfigured } from '../../utils/email.js';
 import { isValidEmail } from '../../utils/validation.js';
+import { verifyTurnstile } from '../../utils/turnstile.js';
 
 const FREQUENCY_OPTIONS = new Set(['daily', 'weekly', 'monthly']);
 const MAX_EMAIL_LENGTH = 320;
@@ -18,41 +19,6 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/\"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-async function verifyTurnstile(request, env, token) {
-  const secret = env?.TURNSTILE_SECRET_KEY;
-  if (!secret) {
-    return true;
-  }
-
-  if (!token || typeof token !== 'string') {
-    return false;
-  }
-
-  const ip = request.headers.get('CF-Connecting-IP') || '';
-  const formData = new URLSearchParams();
-  formData.set('secret', secret);
-  formData.set('response', token);
-  if (ip) {
-    formData.set('remoteip', ip);
-  }
-
-  try {
-    const response = await fetch(
-      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData,
-      }
-    );
-
-    const result = await response.json().catch(() => ({}));
-    return Boolean(result?.success);
-  } catch (_error) {
-    return false;
-  }
 }
 
 // Build a JSON Response, merging an optional verificationUrl when email

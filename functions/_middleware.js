@@ -101,7 +101,16 @@ export async function onRequest(context) {
   // this must be set per-connection so it applies to every handler in this request.
   // Placed after all early returns so preflights and rejected origins don't pay
   // a D1 round-trip.
-  if (env.DB) {
+  //
+  // SECURITY: FK constraints only matter for writes (INSERT/UPDATE/DELETE). GET
+  // and HEAD are read-only by HTTP semantics and cannot violate them, so skip
+  // the PRAGMA round-trip for those to speed up read paths (e.g. the landing
+  // page). The guard is a strict allowlist of read-only methods — anything else
+  // (POST/PUT/PATCH/DELETE or an unknown method) still gets FK enforcement, so
+  // the invariant holds for every mutation. Do NOT widen this to skip writes.
+  const isReadOnlyMethod =
+    request.method === 'GET' || request.method === 'HEAD';
+  if (env.DB && !isReadOnlyMethod) {
     await env.DB.prepare('PRAGMA foreign_keys = ON').run();
   }
 

@@ -132,10 +132,18 @@ export async function onRequestGet(context) {
       }));
     }
 
-    // Get "Now" events (events happening today) - OPTIMIZED: Single query with JOIN
+    // Batch all timeline queries into a single D1 round-trip instead of one
+    // round-trip per period. Statements are pushed conditionally; `slots` maps
+    // each period to its index in the batch results.
+    const statements = [];
+    const slots = {};
+
+    // "Now" events (happening today) - single JOIN query
     if (includeNow) {
-      const nowResult = await DB.prepare(
-        `
+      slots.now = statements.length;
+      statements.push(
+        DB.prepare(
+          `
         SELECT
           e.id as event_id,
           e.name as event_name,
@@ -169,17 +177,16 @@ export async function onRequestGet(context) {
         AND e.date = ?
         ORDER BY e.date DESC, p.start_time, v.name
       `,
-      )
-        .bind(today)
-        .all();
-
-      response.now = groupEventData(nowResult.results || []);
+        ).bind(today),
+      );
     }
 
-    // Get "Upcoming" events (future events, next 30 days) - OPTIMIZED: Single query with JOIN
+    // "Upcoming" events (future events, next 30 days) - single JOIN query
     if (includeUpcoming) {
-      const upcomingResult = await DB.prepare(
-        `
+      slots.upcoming = statements.length;
+      statements.push(
+        DB.prepare(
+          `
         SELECT
           e.id as event_id,
           e.name as event_name,
@@ -222,17 +229,16 @@ export async function onRequestGet(context) {
         )
         ORDER BY e.date ASC, p.start_time, v.name
       `,
-      )
-        .bind(today, today, today, today)
-        .all();
-
-      response.upcoming = groupEventData(upcomingResult.results || []);
+        ).bind(today, today, today, today),
+      );
     }
 
-    // Get "Past" events (historical events) - OPTIMIZED: Single query with JOIN
+    // "Past" events (historical) - single JOIN query
     if (includePast) {
-      const pastResult = await DB.prepare(
-        `
+      slots.past = statements.length;
+      statements.push(
+        DB.prepare(
+          `
         SELECT
           e.id as event_id,
           e.name as event_name,
@@ -275,11 +281,25 @@ export async function onRequestGet(context) {
         )
         ORDER BY e.date DESC, p.start_time, v.name
       `,
-      )
-        .bind(today, today, pastLimit)
-        .all();
+        ).bind(today, today, pastLimit),
+      );
+    }
 
-      response.past = groupEventData(pastResult.results || []);
+    // Execute all timeline queries in a single batched round-trip. Results are
+    // returned in the same order statements were pushed (tracked by `slots`).
+    if (statements.length > 0) {
+      const batchResults = await DB.batch(statements);
+      if (slots.now !== undefined) {
+        response.now = groupEventData(batchResults[slots.now].results || []);
+      }
+      if (slots.upcoming !== undefined) {
+        response.upcoming = groupEventData(
+          batchResults[slots.upcoming].results || [],
+        );
+      }
+      if (slots.past !== undefined) {
+        response.past = groupEventData(batchResults[slots.past].results || []);
+      }
     }
 
     return new Response(JSON.stringify(response), {

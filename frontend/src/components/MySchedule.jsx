@@ -24,6 +24,25 @@ import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx
 import { copyToClipboard } from '../utils/clipboard'
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
+import { walkMinutesBetween } from '../utils/walkTime'
+
+// Label a break between two sets at the same venue.
+function formatBreakLabel(mins) {
+  if (mins >= 60) {
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return m > 0 ? `${h}h ${m}m break` : `${h}h break`
+  }
+  return `${mins} min break`
+}
+
+// "Buffer" = minutes of slack after walking to the next venue (gap − walk) — the
+// crawl's core decision value: can I watch this set and still make the next one?
+function bufferLabel(buffer) {
+  if (buffer < 0) return `overlaps by ${Math.abs(buffer)} min`
+  if (buffer < 3) return 'leave right after'
+  return `${buffer} min to spare`
+}
 
 function MySchedule({
   bands,
@@ -241,22 +260,6 @@ function MySchedule({
         </div>
       </div>
     )
-  }
-
-  // "Room 47" is across the street from the main venues at the specific event this app was
-  // originally built for. Warn users when consecutive bands in their schedule require crossing
-  // between Room 47 and any other venue (or vice versa).
-  const CROSS_STREET_VENUE = 'Room 47'
-  const travelWarnings = {}
-  for (let i = 0; i < visibleBands.length - 1; i++) {
-    const current = visibleBands[i]
-    const next = visibleBands[i + 1]
-    const currentIsCrossStreet = current.venue === CROSS_STREET_VENUE
-    const nextIsCrossStreet = next.venue === CROSS_STREET_VENUE
-
-    if (currentIsCrossStreet !== nextIsCrossStreet) {
-      travelWarnings[next.id] = `${next.venue} is across the street`
-    }
   }
 
   // Get contextual reminders based on schedule and time
@@ -509,32 +512,49 @@ function MySchedule({
         {visibleBands.map((band, idx) => {
           const hasConflict = conflicts.some(c => c.band1 === band.id || c.band2 === band.id)
           const hasOverlap = overlaps.some(c => c.band1 === band.id || c.band2 === band.id)
-          const travelWarning = travelWarnings[band.id]
           const showDreReminder = band.id === firstHighlightedBandId
 
-          // Calculate gap from previous band
-          let timeGap = null
+          // Walk + buffer from the previous set — the crawl's "can I make it?" math.
+          let transition = null
           if (idx > 0) {
             const prevBand = visibleBands[idx - 1]
-            const gapMs = band.startMs - prevBand.endMs
-            const gapMinutes = Math.floor(gapMs / 1000 / 60)
-
-            // Only show breaks 15+ minutes (venues are close, don't need tight warnings)
-            if (gapMinutes >= 15) {
-              if (gapMinutes >= 60) {
-                const hours = Math.floor(gapMinutes / 60)
-                const mins = gapMinutes % 60
-                timeGap = mins > 0 ? `${hours}h ${mins}m break` : `${hours}h break`
-              } else {
-                timeGap = `${gapMinutes} min break`
-              }
+            const gapMinutes = Math.floor((band.startMs - prevBand.endMs) / 1000 / 60)
+            const venueChanged = Boolean(band.venue && prevBand.venue && band.venue !== prevBand.venue)
+            const walkMin = venueChanged
+              ? walkMinutesBetween(
+                  { latitude: prevBand.venue_lat, longitude: prevBand.venue_lng },
+                  { latitude: band.venue_lat, longitude: band.venue_lng }
+                )
+              : null
+            const buffer = walkMin != null ? gapMinutes - walkMin : null
+            // Show a transition when there's a walk to make, or a notable (15+ min) break.
+            if (walkMin != null || gapMinutes >= 15) {
+              transition = { gapMinutes, walkMin, buffer, venue: band.venue }
             }
           }
 
           return (
             <div key={band.id} className="relative mb-6">
-              {/* Time gap indicator */}
-              {timeGap && <div className="text-center text-text-tertiary text-xs italic py-3">{timeGap}</div>}
+              {/* Walk / break transition from the previous set */}
+              {transition && (
+                <div className="flex flex-wrap items-center justify-center gap-1.5 py-3 text-xs">
+                  {transition.walkMin != null ? (
+                    <span className="inline-flex flex-wrap items-center justify-center gap-1.5 text-text-tertiary">
+                      <Footprints size={14} aria-hidden="true" />
+                      <span>
+                        ~{transition.walkMin} min walk to {transition.venue}
+                      </span>
+                      {transition.buffer != null && (
+                        <span className={transition.buffer < 3 ? 'font-semibold text-error-600' : 'text-text-tertiary'}>
+                          · {bufferLabel(transition.buffer)}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="italic text-text-tertiary">{formatBreakLabel(transition.gapMinutes)}</span>
+                  )}
+                </div>
+              )}
               {showDreReminder && (
                 <div className="text-center text-text-secondary text-xs italic pb-2 flex items-center justify-center gap-2">
                   <Smile size={14} className="text-yellow-300" aria-hidden="true" />
@@ -542,14 +562,6 @@ function MySchedule({
                 </div>
               )}
               <div className="space-y-2">
-                {/* Travel warning - appears ABOVE the band card */}
-                {travelWarning && (
-                  <div className="text-xs text-blue-300 bg-blue-900/30 px-3 py-1.5 rounded border border-blue-500/30 flex items-center gap-2">
-                    <Footprints size={14} aria-hidden="true" title="Travel time alert" />
-                    <span>Heads up, the next show at {travelWarning}</span>
-                  </div>
-                )}
-
                 <div className={getTimeStatus(band).status === 'now' ? 'playing-now rounded-xl' : ''}>
                   <BandCard
                     band={band}

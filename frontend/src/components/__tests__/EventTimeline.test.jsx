@@ -44,7 +44,7 @@ describe('EventTimeline', () => {
     })
 
     global.fetch = vi.fn(url => {
-      if (url === '/api/events/timeline') {
+      if (url.startsWith('/api/events/timeline')) {
         return Promise.resolve(jsonResponse(timelineData))
       }
 

@@ -257,14 +257,28 @@ jobs:
         env:
           SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
         run: |
-          curl --fail --silent --show-error --location "$SMOKE_URL" > /tmp/settimes-homepage.html
+          # Retry transient fetch failures: the GitHub-runner datacenter IP is
+          # intermittently 403'd at Cloudflare's edge despite the bot-fight-mode bypass.
+          ok=0
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --location "$SMOKE_URL" > /tmp/settimes-homepage.html; then ok=1; break; fi
+            echo "Attempt $attempt: transient fetch failure, retrying in 6s..."
+            sleep 6
+          done
+          [ "$ok" = "1" ] || { echo "::error::Homepage unreachable after 5 attempts"; exit 1; }
           grep -Eiq '<!doctype html|<html' /tmp/settimes-homepage.html
 
       - name: Verify admin shell HTML
         env:
           SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
         run: |
-          curl --fail --silent --show-error --location "$SMOKE_URL/admin" > /tmp/settimes-admin.html
+          ok=0
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --location "$SMOKE_URL/admin" > /tmp/settimes-admin.html; then ok=1; break; fi
+            echo "Attempt $attempt: transient fetch failure, retrying in 6s..."
+            sleep 6
+          done
+          [ "$ok" = "1" ] || { echo "::error::Admin shell unreachable after 5 attempts"; exit 1; }
           grep -Eiq '<!doctype html|<html' /tmp/settimes-admin.html
 
       - name: Verify public timeline JSON
@@ -272,7 +286,15 @@ jobs:
           SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
           DEPLOY_ENV: ${{ needs.resolve-release.outputs.environment_name }}
         run: |
-          STATUS=$(curl --silent --show-error --location --write-out '%{http_code}' --output /tmp/settimes-timeline.json "$SMOKE_URL/api/events/timeline")
+          # Retry only transient statuses (Cloudflare edge block on the runner IP);
+          # valid responses (200/404/503) break out immediately.
+          for attempt in 1 2 3 4 5; do
+            STATUS=$(curl --silent --show-error --location --write-out '%{http_code}' --output /tmp/settimes-timeline.json "$SMOKE_URL/api/events/timeline")
+            case "$STATUS" in
+              403 | 408 | 425 | 429 | 500 | 502 | 504 | 000) echo "Attempt $attempt: transient HTTP $STATUS, retrying in 6s..."; sleep 6 ;;
+              *) break ;;
+            esac
+          done
 
           if [ "$DEPLOY_ENV" = "production" ]; then
             if [ "$STATUS" != "200" ]; then
@@ -307,7 +329,15 @@ jobs:
           SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
           DEPLOY_ENV: ${{ needs.resolve-release.outputs.environment_name }}
         run: |
-          STATUS=$(curl --silent --show-error --location --write-out '%{http_code}' --output /tmp/settimes-schedule.json "$SMOKE_URL/api/schedule?event=current")
+          # Retry only transient statuses (Cloudflare edge block on the runner IP);
+          # valid responses (200/404/503) break out immediately.
+          for attempt in 1 2 3 4 5; do
+            STATUS=$(curl --silent --show-error --location --write-out '%{http_code}' --output /tmp/settimes-schedule.json "$SMOKE_URL/api/schedule?event=current")
+            case "$STATUS" in
+              403 | 408 | 425 | 429 | 500 | 502 | 504 | 000) echo "Attempt $attempt: transient HTTP $STATUS, retrying in 6s..."; sleep 6 ;;
+              *) break ;;
+            esac
+          done
 
           if [ "$DEPLOY_ENV" = "production" ]; then
             if [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ] && [ "$STATUS" != "503" ]; then

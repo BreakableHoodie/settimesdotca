@@ -708,7 +708,7 @@ function App() {
         {/* First-time onboarding hint */}
         {!isArchived && showHint && selectedBands.length === 0 && bands.length > 0 && (
           <div className="flex items-start justify-between gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
-            <p className="text-accent-300">
+            <p className="text-text-secondary">
               <span className="font-semibold">How it works:</span> Tap any performer to add them to{' '}
               <span className="font-semibold">My Route</span> — your personal lineup for the night.
             </p>
@@ -726,7 +726,7 @@ function App() {
         {!isArchived && eventData?.reveal_mode === 1 && (
           <div className="flex items-start gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
             <Bell size={16} className="shrink-0 text-accent-400" aria-hidden="true" />
-            <p className="text-accent-300">
+            <p className="text-text-secondary">
               <span className="font-semibold">More bands dropping soon.</span>{' '}
               <a href="/subscribe" className="underline hover:text-accent-200 transition-colors">
                 Subscribe for updates

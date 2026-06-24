@@ -520,7 +520,7 @@ function ScheduleView({
               {pastByTime.map(({ time, bands: timeBands }) => (
                 <div key={time} className="relative ml-0 sm:ml-4 opacity-60">
                   <div className="flex items-center mb-4">
-                    <h3 className="bg-surface text-text-disabled font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                    <h3 className="bg-surface text-text-tertiary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                     </h3>
                     <div className="flex-1 h-0.5 bg-surface ml-4"></div>

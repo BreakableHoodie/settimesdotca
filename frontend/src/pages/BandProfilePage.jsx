@@ -702,7 +702,7 @@ export default function BandProfilePage() {
             {followStatus === 'success' ? (
               <p className="inline-flex items-start gap-1.5 text-sm text-green-400 sm:max-w-sm">
                 <Check size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-                You&apos;re following {profile.name}! We&apos;ll email you when they join a lineup.
+                Almost there — check your email to confirm your follow of {profile.name}.
               </p>
             ) : (
               <form onSubmit={submitFollow} className="w-full sm:w-auto">

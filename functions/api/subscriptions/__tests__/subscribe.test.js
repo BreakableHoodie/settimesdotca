@@ -54,7 +54,10 @@ describe('POST /api/subscriptions/subscribe', () => {
       genre: 'punk',
       frequency: 'weekly',
       verified: false,
+      consent_method: 'web_form',
     });
+    // CF-Connecting-IP is not present in test requests, so consent_ip is null
+    expect(mockDB.data.email_subscriptions[0].consent_ip).toBeNull();
   });
 
   it('should reject request with missing email', async () => {

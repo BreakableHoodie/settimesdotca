@@ -366,6 +366,8 @@ CREATE TABLE IF NOT EXISTS band_follows (
   verification_token TEXT UNIQUE,
   unsubscribe_token TEXT UNIQUE NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  consent_ip TEXT,
+  consent_method TEXT NOT NULL DEFAULT 'web_form',
   UNIQUE(email, band_profile_id)
 );
 CREATE INDEX IF NOT EXISTS idx_band_follows_band ON band_follows(band_profile_id);

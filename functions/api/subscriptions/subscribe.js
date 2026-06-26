@@ -160,14 +160,15 @@ export async function onRequestPost(context) {
     }
 
     // Create subscription
+    const consentIp = request.headers.get('CF-Connecting-IP') ?? null;
     try {
       await env.DB.prepare(
         `
-        INSERT INTO email_subscriptions (email, city, genre, frequency, verification_token, unsubscribe_token)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO email_subscriptions (email, city, genre, frequency, verification_token, unsubscribe_token, consent_ip, consent_method)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'web_form')
       `
       )
-        .bind(email, city, genre, frequency, verificationToken, unsubscribeToken)
+        .bind(email, city, genre, frequency, verificationToken, unsubscribeToken, consentIp)
         .run();
     } catch (insertError) {
       if (insertError?.message?.includes('UNIQUE constraint failed')) {

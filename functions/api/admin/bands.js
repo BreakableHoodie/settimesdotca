@@ -201,6 +201,7 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON bp.id = p.band_profile_id
         LEFT JOIN venues v ON p.venue_id = v.id
         LEFT JOIN events e ON p.event_id = e.id
+        WHERE bp.is_active = 1
         ORDER BY e.date DESC, p.start_time, bp.name
         LIMIT ?
         OFFSET ?

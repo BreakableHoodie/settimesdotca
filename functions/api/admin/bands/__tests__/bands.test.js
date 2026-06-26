@@ -119,6 +119,22 @@ describe('Admin bands API - CRUD operations', () => {
     expect(row.is_active).toBe(0)
   })
 
+  it('GET without event_id excludes inactive bands from the lineup-builder picker', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+
+    rawDb.prepare('INSERT INTO band_profiles (name, name_normalized, is_active) VALUES (?, ?, ?)').run('Active Band', 'activeband', 1)
+    rawDb.prepare('INSERT INTO band_profiles (name, name_normalized, is_active) VALUES (?, ?, ?)').run('Inactive Band', 'inactiveband', 0)
+
+    const getReq = new Request('https://example.test/api/admin/bands', { headers })
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: 'editor' } } })
+    expect(getRes.status).toBe(200)
+    const data = await getRes.json()
+
+    const names = data.bands.map((b) => b.name)
+    expect(names).toContain('Active Band')
+    expect(names).not.toContain('Inactive Band')
+  })
+
   it('PUT /api/admin/bands/{id} still rejects set-time edits for a performance in an archived event', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
     const ev = insertEvent(rawDb, { name: 'ArchivedTime', slug: 'archived-time', status: 'archived', is_published: 0 })

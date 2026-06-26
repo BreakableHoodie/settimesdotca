@@ -14,9 +14,9 @@ import {
   Music,
   Pizza,
   Smile,
+  Split,
   Star,
   Trash2,
-  TriangleAlert,
   Zap,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -42,6 +42,44 @@ function bufferLabel(buffer) {
   if (buffer < 0) return `overlaps by ${Math.abs(buffer)} min`
   if (buffer < 3) return 'leave right after'
   return `${buffer} min to spare`
+}
+
+// Conflict resolution card — shows two same-start bands side by side so the fan can pick one.
+// "Keep this one" removes the OTHER band from the schedule via onToggleBand.
+function ForkCard({ band1, band2, onToggleBand }) {
+  const sides = [
+    { band: band1, removeId: band2.id },
+    { band: band2, removeId: band1.id },
+  ]
+
+  return (
+    <div className="rounded-xl border border-error-500/50 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-error-500/20 border-b border-error-500/30">
+        <Split size={15} className="text-error-400 shrink-0" aria-hidden="true" />
+        <span className="text-sm font-semibold text-text-primary">Fork in the road — same start time</span>
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-error-500/30 bg-error-500/10">
+        {sides.map(({ band, removeId }) => (
+          <div key={band.id} className="px-3 py-3 flex flex-col gap-1.5">
+            <p className="font-bold text-text-primary text-sm leading-snug">{band.name}</p>
+            {band.genre && (
+              <span className="self-start text-xs px-2 py-0.5 rounded-full bg-surface border border-border text-text-secondary leading-normal">
+                {band.genre}
+              </span>
+            )}
+            {band.venue && <p className="text-xs text-text-secondary">{band.venue}</p>}
+            <p className="text-xs text-text-tertiary">{formatTimeRange(band.startTime, band.endTime)}</p>
+            <button
+              onClick={() => onToggleBand(removeId)}
+              className="mt-2 w-full py-2 text-xs font-semibold rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30 active:scale-95 transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[36px]"
+            >
+              Keep this one
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function MySchedule({
@@ -188,10 +226,11 @@ function MySchedule({
     return visibleBands.find(band => highlightedBandIds.has(band.id))?.id || null
   }, [visibleBands, highlightedBandIds])
 
+  const bandById = useMemo(() => new Map(visibleBands.map(b => [b.id, b])), [visibleBands])
   const bandNameById = useMemo(() => new Map(visibleBands.map(b => [b.id, b.name])), [visibleBands])
 
   // Detect overlaps and conflicts
-  const { conflicts, overlaps, conflictCount, overlapCount } = useMemo(() => {
+  const { conflicts, overlaps, overlapCount } = useMemo(() => {
     const conflicts = []
     const overlaps = []
 
@@ -219,10 +258,9 @@ function MySchedule({
       }
     }
 
-    const conflictCount = new Set(conflicts.flatMap(c => [c.band1, c.band2])).size
     const overlapCount = new Set(overlaps.flatMap(c => [c.band1, c.band2])).size
 
-    return { conflicts, overlaps, conflictCount, overlapCount }
+    return { conflicts, overlaps, overlapCount }
   }, [visibleBands])
 
   if (sortedBands.length === 0) {
@@ -483,17 +521,13 @@ function MySchedule({
 
       {(conflicts.length > 0 || overlaps.length > 0) && (
         <div className="space-y-4 max-w-5xl mx-auto">
-          {conflicts.length > 0 && (
-            <div className="bg-error-500/20 border border-error-500/50 rounded-lg p-4 leading-normal">
-              <div className="flex items-center gap-3 text-text-primary font-semibold">
-                <TriangleAlert size={20} className="text-error-400 shrink-0" aria-hidden="true" />
-                <p className="text-sm sm:text-base leading-normal">
-                  {conflictCount} band{conflictCount !== 1 ? 's' : ''} happening at the same time — you&apos;ll need to
-                  choose!
-                </p>
-              </div>
-            </div>
-          )}
+          {conflicts.length > 0 &&
+            conflicts.map(({ band1: b1id, band2: b2id }) => {
+              const b1 = bandById.get(b1id)
+              const b2 = bandById.get(b2id)
+              if (!b1 || !b2) return null
+              return <ForkCard key={`${b1id}-${b2id}`} band1={b1} band2={b2} onToggleBand={onToggleBand} />
+            })}
           {overlaps.length > 0 && (
             <div className="bg-warning-500/20 border border-warning-500/50 rounded-lg p-4 leading-normal">
               <div className="flex items-center gap-3 text-text-primary font-semibold">

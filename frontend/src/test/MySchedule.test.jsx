@@ -81,13 +81,17 @@ describe('MySchedule — conflict vs overlap severity', () => {
       </MemoryRouter>
     )
 
-    // Alpha is in both buckets — its pill must be red (conflict = more severe)
-    const alphaCard = screen.getByText('Band Alpha').closest('[class*="rounded-xl"]')
-    const pill = alphaCard?.querySelector('[class*="bg-red"]')
-    expect(pill).not.toBeNull()
+    // Alpha is in both buckets — its BandCard pill must be red (conflict = more severe).
+    // Note: Band Alpha also appears in the ForkCard, so we use getAllByText and check
+    // each ancestor rounded-xl for a red pill.
+    const alphaElements = screen.getAllByText('Band Alpha')
+    const hasRedPill = alphaElements.some(
+      el => el.closest('[class*="rounded-xl"]')?.querySelector('[class*="bg-red"]') != null
+    )
+    expect(hasRedPill).toBe(true)
   })
 
-  it('red summary banner appears for same-start bands', () => {
+  it('fork card replaces the summary banner for same-start bands', () => {
     const bands = [
       makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30'),
       makeBand(2, 'Band Beta', 'Stage B', '20:00', '20:30'),
@@ -98,9 +102,14 @@ describe('MySchedule — conflict vs overlap severity', () => {
       </MemoryRouter>
     )
 
-    // The red summary banner must mention "same time"
-    expect(screen.getByText(/happening at the same time/i)).toBeInTheDocument()
-    // And must NOT say "overlapping set" in a red context
+    // The fork card header must appear
+    expect(screen.getByText(/fork in the road/i)).toBeInTheDocument()
+    // Both band names must appear (in the fork card)
+    expect(screen.getAllByText('Band Alpha').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Band Beta').length).toBeGreaterThan(0)
+    // Two "Keep this one" buttons must exist — one per side
+    expect(screen.getAllByRole('button', { name: /keep this one/i }).length).toBe(2)
+    // These bands conflict (same start), so no partial-overlap banner
     expect(screen.queryByText(/overlapping set/i)).not.toBeInTheDocument()
   })
 

@@ -97,6 +97,32 @@ export async function onRequest(context) {
       ? env?.CSP_ENFORCE === 'true'
       : env?.ENVIRONMENT === 'production';
 
+  // Single source of truth for the Content-Security-Policy (reused on both the
+  // success and error responses below).
+  //   - script-src/frame-src/connect-src allow https://challenges.cloudflare.com
+  //     for Cloudflare Turnstile (per its CSP docs); no 'unsafe-inline' needed.
+  //   - the inline theme-flash bootstrap in frontend/index.html is permitted by
+  //     its sha256 hash — REGENERATE this hash if that <script> ever changes
+  //     (openssl/Node sha256 over the exact script body, base64).
+  //   - worker-src 'self' permits the /sw.js service worker (main.jsx registers it).
+  // NOTE: this strict policy (no 'unsafe-inline') is incompatible with Cloudflare
+  // Rocket Loader, which rewrites/inline-executes scripts. Rocket Loader must stay
+  // DISABLED for this zone or it will trip "Refused to execute inline script".
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' https://challenges.cloudflare.com 'sha256-AthfpLUxHMTHKKJhjnay6WvKZb8lWKmb3ca+GM+ZrkI='",
+    "style-src 'self'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://challenges.cloudflare.com",
+    "object-src 'none'",
+    "frame-src 'self' https://challenges.cloudflare.com",
+    "child-src 'self' https://challenges.cloudflare.com",
+    "worker-src 'self'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+
   // Enable FK enforcement for this D1 session. SQLite disables it by default;
   // this must be set per-connection so it applies to every handler in this request.
   // Placed after all early returns so preflights and rejected origins don't pay
@@ -148,20 +174,6 @@ export async function onRequest(context) {
       'Permissions-Policy',
       'geolocation=(), microphone=(), camera=()'
     );
-    const csp = [
-      "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self'",
-      "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      "connect-src 'self'",
-      "object-src 'none'",
-      "frame-src 'none'",
-      "child-src 'none'",
-      "worker-src 'none'",
-      "base-uri 'self'",
-      "frame-ancestors 'none'",
-    ].join('; ');
     if (cspEnforce) {
       newHeaders.set('Content-Security-Policy', csp);
     } else {
@@ -196,14 +208,8 @@ export async function onRequest(context) {
           'Referrer-Policy': 'no-referrer',
           'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
           ...(cspEnforce
-            ? {
-                'Content-Security-Policy':
-                  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; base-uri 'self'; frame-ancestors 'none'",
-              }
-            : {
-                'Content-Security-Policy-Report-Only':
-                  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; base-uri 'self'; frame-ancestors 'none'",
-              }),
+            ? { 'Content-Security-Policy': csp }
+            : { 'Content-Security-Policy-Report-Only': csp }),
         },
       }
     );

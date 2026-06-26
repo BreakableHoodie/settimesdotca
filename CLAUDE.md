@@ -227,10 +227,15 @@ Do this **every time you push**, not just when opening the PR. Dependabot merges
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.
 
-### Content-Security-Policy (strict, no `unsafe-inline`)
+### Content-Security-Policy (strict, no `unsafe-inline`) — TWO sources
 
-The CSP is built once in `functions/_middleware.js` (enforced when `ENVIRONMENT=production` unless `CSP_ENFORCE` overrides) and applied to every response. It is deliberately strict.
+There are **two** CSPs, and the one the browser enforces on a page is **not** the middleware:
 
-- **Turnstile** requires `https://challenges.cloudflare.com` in `script-src` and `frame-src` (Cloudflare's [CSP docs](https://developers.cloudflare.com/turnstile/reference/content-security-policy/)). It does **not** need `'unsafe-inline'`.
-- **The inline theme-flash `<script>` in `frontend/index.html`** is allowed by a `'sha256-…'` hash in `script-src`. **If you edit that script, regenerate the hash** (sha256 of the exact built script body, base64) or it silently stops running and a theme flash returns. There is no test for this — verify by building and hashing `dist/index.html`.
+- **`frontend/public/_headers`** sets the CSP (and COOP/COEP/CORP) on **static/document responses** — i.e. the HTML the browser loads. **This is the browser-enforced CSP for pages and the one that governs Turnstile, the service worker, and inline scripts.** Edit this for anything affecting what the page can load.
+- **`functions/_middleware.js`** sets a CSP on **Pages Functions / API responses** (JSON), enforced when `ENVIRONMENT=production` unless `CSP_ENFORCE` overrides. It does not govern the document.
+
+For the `_headers` document CSP:
+- **Turnstile** needs `https://challenges.cloudflare.com` in `script-src`/`frame-src` ([CSP docs](https://developers.cloudflare.com/turnstile/reference/content-security-policy/)); no `'unsafe-inline'`.
+- **`Cross-Origin-Embedder-Policy: require-corp` must NOT be set** — it blocks the Turnstile iframe (which doesn't send COEP; `credentialless` isn't supported in Safari). The app needs no cross-origin isolation.
+- **The inline theme-flash `<script>` in `frontend/index.html`** is allowed by a `'sha256-…'` hash in `script-src`. **If you edit that script, regenerate the hash** (sha256 of the exact built script body, base64) or it silently stops running and a theme flash returns. No test covers this — verify by building and hashing `dist/index.html`.
 - **Cloudflare Rocket Loader must stay DISABLED** for the zone. It rewrites/inline-executes `<script>` tags, which strict CSP blocks ("Refused to execute inline script"). A modern code-split Vite SPA gains nothing from it.

@@ -83,7 +83,8 @@ describe('EventTimeline', () => {
       })
     )
 
-    expect(await screen.findByText('Band One')).toBeInTheDocument()
+    // Band One now appears in both the genre discovery wall and the All Performers grid
+    expect((await screen.findAllByText('Band One'))[0]).toBeInTheDocument()
     expect(await screen.findByText('Stage A')).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()

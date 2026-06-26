@@ -382,6 +382,21 @@ CREATE TABLE IF NOT EXISTS band_follow_notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_band_follow_notifications_performance ON band_follow_notifications(performance_id);
 
+CREATE TABLE IF NOT EXISTS band_announce_queue (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  band_follow_id INTEGER NOT NULL REFERENCES band_follows(id) ON DELETE CASCADE,
+  performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
+  event_id INTEGER NOT NULL,
+  band_name TEXT NOT NULL,
+  event_name TEXT NOT NULL,
+  event_slug TEXT NOT NULL,
+  band_profile_id INTEGER NOT NULL,
+  queued_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(band_follow_id, performance_id)
+);
+CREATE INDEX IF NOT EXISTS idx_band_announce_queue_event ON band_announce_queue(event_id);
+CREATE INDEX IF NOT EXISTS idx_band_announce_queue_follow ON band_announce_queue(band_follow_id);
+
 -- ============================================
 -- INDEXES
 -- ============================================

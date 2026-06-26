@@ -231,6 +231,19 @@ export function createTestDB() {
       UNIQUE(performance_id, band_follow_id)
     );
 
+    CREATE TABLE band_announce_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      band_follow_id INTEGER NOT NULL REFERENCES band_follows(id) ON DELETE CASCADE,
+      performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
+      event_id INTEGER NOT NULL,
+      band_name TEXT NOT NULL,
+      event_name TEXT NOT NULL,
+      event_slug TEXT NOT NULL,
+      band_profile_id INTEGER NOT NULL,
+      queued_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(band_follow_id, performance_id)
+    );
+
     CREATE TABLE password_reset_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

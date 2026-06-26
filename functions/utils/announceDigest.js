@@ -1,0 +1,131 @@
+// Digest flush for band-lineup announcements.
+//
+// Groups pending band_announce_queue entries by (email, event_id) and sends
+// one email per fan per event. Fans following a single announced band on the
+// event get the standard per-band email; fans following multiple get a digest.
+//
+// band_follow_notifications remains the idempotency ledger: each entry is
+// claimed (INSERT OR IGNORE) immediately before sending. A send failure
+// releases the claim so resend-announcement can retry. A concurrent flush or
+// resend that already claimed a slot simply skips that entry.
+
+import { sendEmail } from "./email.js";
+
+const escapeHtml = (s) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+export async function flushAnnounceDigest(env, DB) {
+  const publicUrl = env.PUBLIC_URL || "https://settimes.ca";
+
+  // Fetch every pending entry, joining band_follows for email + unsubscribe_token.
+  const { results: queue } = await DB.prepare(
+    `SELECT q.id, q.band_follow_id, q.performance_id, q.event_id,
+            q.band_name, q.event_name, q.event_slug, q.band_profile_id,
+            bf.email, bf.unsubscribe_token
+     FROM band_announce_queue q
+     JOIN band_follows bf ON bf.id = q.band_follow_id
+     ORDER BY q.event_id, bf.email, q.queued_at`,
+  ).all();
+
+  if (!queue.length) return { sent: 0, failed: 0, skipped: 0 };
+
+  // Group by (email, event_id) — one digest per fan per event.
+  const groups = new Map();
+  for (const item of queue) {
+    const key = `${item.email}::${item.event_id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const items of groups.values()) {
+    const { email, event_name, event_slug } = items[0];
+    const eventUrl = `${publicUrl}/events/${event_slug}`;
+
+    // Claim each (performance_id, band_follow_id) atomically before sending.
+    // INSERT OR IGNORE: changes=0 means already claimed by a concurrent flush
+    // or by the resend-announcement endpoint — skip those items.
+    const claimed = [];
+    for (const item of items) {
+      const result = await DB.prepare(
+        "INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)",
+      )
+        .bind(item.performance_id, item.band_follow_id)
+        .run();
+      if (result.meta.changes > 0) claimed.push(item);
+    }
+
+    // Delete every queue entry for this group — whether claimed now or
+    // already handled by a concurrent path.
+    await DB.batch(
+      items.map((item) =>
+        DB.prepare("DELETE FROM band_announce_queue WHERE id = ?").bind(item.id),
+      ),
+    );
+
+    if (!claimed.length) {
+      skipped += items.length;
+      continue;
+    }
+
+    // Build the email.
+    const bands = claimed.map((item) => item.band_name);
+    const subject =
+      bands.length === 1
+        ? `${bands[0]} just joined the lineup for ${event_name}!`
+        : `${bands.length} bands you follow are playing ${event_name}!`;
+
+    const bandListText = bands.map((b) => `• ${b}`).join("\n");
+    const bandListHtml = bands
+      .map((b) => `<li>${escapeHtml(b)}</li>`)
+      .join("");
+    const unsubText = claimed
+      .map(
+        (item) =>
+          `Unfollow ${item.band_name}: ${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${item.unsubscribe_token}`,
+      )
+      .join("\n");
+    const unsubHtml = claimed
+      .map(
+        (item) =>
+          `<a href="${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${item.unsubscribe_token}">Unfollow ${escapeHtml(item.band_name)}</a>`,
+      )
+      .join(" · ");
+
+    const text =
+      bands.length === 1
+        ? `${bands[0]} is now on the lineup for ${event_name}.\n\nView the schedule: ${eventUrl}\n\n${unsubText}`
+        : `${bands.length} bands you follow just joined the lineup for ${event_name}:\n\n${bandListText}\n\nView the schedule: ${eventUrl}\n\n${unsubText}`;
+
+    const html =
+      bands.length === 1
+        ? `<p><strong>${escapeHtml(bands[0])}</strong> is now on the lineup for <strong>${escapeHtml(event_name)}</strong>.</p><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`
+        : `<p><strong>${bands.length} bands you follow</strong> just joined the lineup for <strong>${escapeHtml(event_name)}</strong>:</p><ul>${bandListHtml}</ul><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`;
+
+    const result = await sendEmail(env, { to: email, subject, text, html });
+
+    if (result?.delivered) {
+      sent++;
+    } else {
+      // Release claims so resend-announcement can recover this fan.
+      await DB.batch(
+        claimed.map((item) =>
+          DB.prepare(
+            "DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?",
+          ).bind(item.performance_id, item.band_follow_id),
+        ),
+      );
+      failed++;
+    }
+  }
+
+  return { sent, failed, skipped };
+}

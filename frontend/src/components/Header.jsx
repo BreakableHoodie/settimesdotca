@@ -1,8 +1,9 @@
 import { memo, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ThemeToggle from './ThemeToggle.jsx'
+import VenueStrip from './VenueStrip.jsx'
 
-function Header({ eventName, eventDate }) {
+function Header({ eventName, eventDate, selectedVenues }) {
   const formattedDate = eventDate
     ? new Date(`${eventDate}T12:00:00`).toLocaleDateString('en-US', {
         weekday: 'long',
@@ -70,16 +71,19 @@ function Header({ eventName, eventDate }) {
           <ThemeToggle />
         </div>
 
-        <p className="hidden text-accent-400 text-sm font-medium text-center sm:block" style={collapseStyle}>
-          {eventName ? (
-            <>
-              <span className="font-semibold text-text-primary">{eventName}</span>
-              {formattedDate && <span className="text-accent-400"> · {formattedDate}</span>}
-            </>
-          ) : (
-            'Discover · Plan · Experience'
-          )}
-        </p>
+        <div className="hidden sm:block" style={collapseStyle}>
+          <p className="text-accent-400 text-sm font-medium text-center">
+            {eventName ? (
+              <>
+                <span className="font-semibold text-text-primary">{eventName}</span>
+                {formattedDate && <span className="text-accent-400"> · {formattedDate}</span>}
+              </>
+            ) : (
+              'Discover · Plan · Experience'
+            )}
+          </p>
+          {eventName && <VenueStrip activeVenues={selectedVenues} />}
+        </div>
       </div>
     </header>
   )

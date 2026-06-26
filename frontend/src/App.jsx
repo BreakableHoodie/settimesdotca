@@ -572,6 +572,7 @@ function App() {
 
   const isArchived = Boolean(eventData?.is_archived)
   const myBands = bands.filter(band => selectedBands.includes(band.id))
+  const selectedVenues = useMemo(() => [...new Set(myBands.map(b => b.venue).filter(Boolean))], [myBands])
   const sharedBandsAlreadySelectedCount = pendingSharedBands.filter(id => selectedBands.includes(id)).length
   const sharedBandsNewCount = pendingSharedBands.length - sharedBandsAlreadySelectedCount
   const toggleShowPast = () => setShowPast(prev => !prev)
@@ -681,7 +682,7 @@ function App() {
           </div>
         </header>
       ) : (
-        <Header eventName={eventData?.name} eventDate={eventData?.date} />
+        <Header eventName={eventData?.name} eventDate={eventData?.date} selectedVenues={selectedVenues} />
       )}
       {!isArchived &&
         (nextMoveState.kind ? (

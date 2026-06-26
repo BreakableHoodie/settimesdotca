@@ -1,4 +1,4 @@
-import { Archive, CalendarDays, Clock, Funnel, History, MapPin, X } from 'lucide-react'
+import { Archive, CalendarDays, Check, Clock, Funnel, History, MapPin, Music, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
@@ -6,6 +6,7 @@ import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
+import { getSelectedBands, saveSelectedBands } from '../utils/scheduleStorage'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
 
@@ -406,6 +407,136 @@ export default function EventTimeline() {
 }
 
 /**
+ * GenreDiscovery - Genre-clustered band wall for upcoming events.
+ * Lets fans tap photos to add bands to their schedule before the event.
+ */
+function GenreDiscovery({ bands, eventSlug, eventDate }) {
+  const [selectedIds, setSelectedIds] = useState(() => new Set(getSelectedBands(eventSlug)))
+
+  const toggleBand = useCallback(
+    bandId => {
+      if (!eventSlug) return
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        if (next.has(bandId)) {
+          next.delete(bandId)
+        } else {
+          next.add(bandId)
+        }
+        saveSelectedBands(eventSlug, Array.from(next), eventDate)
+        return next
+      })
+    },
+    [eventSlug, eventDate]
+  )
+
+  // Group bands by genre, case-insensitive. Bands without a genre go to "Other".
+  const genreGroups = useMemo(() => {
+    const groups = new Map()
+    for (const band of bands) {
+      const raw = (band.genre || '').trim()
+      const genre = raw || 'Other'
+      const key = genre.toLowerCase()
+      if (!groups.has(key)) {
+        groups.set(key, { label: genre, bands: [] })
+      }
+      groups.get(key).bands.push(band)
+    }
+    // Alphabetical, with "Other" always last
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.label.toLowerCase() === 'other') return 1
+      if (b.label.toLowerCase() === 'other') return -1
+      return a.label.localeCompare(b.label)
+    })
+  }, [bands])
+
+  if (genreGroups.length === 0) return null
+
+  return (
+    <div className="p-6 border-b border-border">
+      <div className="flex items-center justify-between mb-5">
+        <h4 className="text-lg font-bold text-text-primary">Discover Bands</h4>
+        {selectedIds.size > 0 && (
+          <span className="text-xs font-semibold text-accent-500">
+            {selectedIds.size} {selectedIds.size === 1 ? 'band' : 'bands'} added to your schedule
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-6">
+        {genreGroups.map(({ label, bands: groupBands }) => (
+          <div key={label.toLowerCase()}>
+            {/* Genre header pill */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary-500/15 border border-primary-500/30 text-primary-500">
+                {label}
+              </span>
+              <span className="text-xs text-text-tertiary">
+                {groupBands.length} {groupBands.length === 1 ? 'band' : 'bands'}
+              </span>
+            </div>
+
+            {/* Band photo wall */}
+            <div className="flex flex-wrap gap-3">
+              {groupBands.map(band => {
+                const isSelected = selectedIds.has(band.id)
+                return (
+                  <button
+                    key={band.id}
+                    type="button"
+                    onClick={() => toggleBand(band.id)}
+                    aria-pressed={isSelected}
+                    aria-label={`${isSelected ? 'Remove' : 'Add'} ${band.name} ${isSelected ? 'from' : 'to'} my schedule`}
+                    className={`w-24 flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-1 ${
+                      isSelected
+                        ? 'bg-accent-500/10 ring-2 ring-accent-500'
+                        : 'bg-surface ring-1 ring-border hover:bg-surface-hover hover:ring-primary-500/40'
+                    }`}
+                  >
+                    {/* Photo or placeholder */}
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                      {band.photo_url ? (
+                        <img
+                          src={band.photo_url}
+                          alt={band.name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-bg-darker flex items-center justify-center">
+                          <Music size={24} className="text-text-tertiary" aria-hidden="true" />
+                        </div>
+                      )}
+                      {/* Selected checkmark overlay */}
+                      {isSelected && (
+                        <div className="absolute inset-0 bg-accent-500/20 flex items-end justify-end p-1">
+                          <div className="bg-accent-500 rounded-full p-0.5">
+                            <Check size={10} className="text-bg-navy" aria-hidden="true" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Band name */}
+                    <span
+                      className={`text-xs font-medium text-center leading-tight line-clamp-2 min-h-[2rem] ${
+                        isSelected ? 'text-accent-500' : 'text-text-primary'
+                      }`}
+                    >
+                      {band.name}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
  * EventCard - Displays event info with bands and venues
  * Sprint 2.1: Updated with design system components
  */
@@ -588,6 +719,11 @@ function EventCard({
             <div className="border-b border-border px-6 py-5">
               <Loading size="sm" text="Loading performers and venues..." className="sm:items-start" />
             </div>
+          )}
+
+          {/* Genre Discovery Wall — upcoming events only */}
+          {isUpcoming && allBands && allBands.length > 0 && (
+            <GenreDiscovery bands={allBands} eventSlug={event.slug} eventDate={event.date} />
           )}
 
           {/* Venues */}

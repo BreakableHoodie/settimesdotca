@@ -272,7 +272,15 @@ export default function BandProfilePage() {
   )
 
   useEffect(() => {
-    if (!turnstileEnabled) {
+    // The Turnstile container lives inside the follow form, which is NOT mounted
+    // while the page shows its loading skeleton (`if (loading) return <Skeleton>`).
+    // Gate on the loaded state AND depend on it so the effect re-runs once the
+    // form (and the container ref) actually exists. Without this, when
+    // window.turnstile becomes ready before the profile fetch resolves — always
+    // the case on SPA client-nav with a cached script — render() is attempted
+    // against a null container, bails, and never retries, leaving the Follow
+    // button permanently disabled.
+    if (!turnstileEnabled || loading || error || !profile) {
       return undefined
     }
 
@@ -328,7 +336,7 @@ export default function BandProfilePage() {
         turnstileWidgetIdRef.current = null
       }
     }
-  }, [turnstileEnabled, turnstileSiteKey])
+  }, [turnstileEnabled, turnstileSiteKey, loading, error, profile])
 
   useEffect(() => {
     document.title = pageTitle

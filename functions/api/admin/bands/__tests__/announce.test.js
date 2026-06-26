@@ -89,22 +89,17 @@ describe('PATCH /api/admin/bands/:id - announce toggle', () => {
     expect(res.status).toBe(403)
   })
 
-  it('sets band_follow_notified=1 when band is announced and followers exist', async () => {
+  it('queues followers in band_announce_queue when band is announced', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
-    env.EMAIL_PROVIDER = 'mailchannels'
-    env.EMAIL_FROM = 'noreply@settimes.ca'
-    // Stub fetch so sendEmail resolves without a real network call.
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 202 }))
-
     const ev = insertEvent(rawDb, { name: 'Vol6', slug: 'vol6-notify' })
     rawDb.prepare('UPDATE events SET reveal_mode=1 WHERE id=?').run(ev.id)
     const venue = insertVenue(rawDb, { name: 'Venue N' })
     const band = insertBand(rawDb, { name: 'Notify Band', event_id: ev.id, venue_id: venue.id })
     rawDb.prepare('UPDATE performances SET is_announced=0 WHERE id=?').run(band.id)
 
-    rawDb.prepare(
+    const followId = rawDb.prepare(
       'INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)'
-    ).run('follower@example.com', band.band_profile_id, 'unsub-token-1')
+    ).run('follower@example.com', band.band_profile_id, 'unsub-token-1').lastInsertRowid
 
     const req = new Request(`https://example.test/api/admin/bands/${band.id}`, {
       method: 'PATCH',
@@ -117,10 +112,16 @@ describe('PATCH /api/admin/bands/:id - announce toggle', () => {
       data: { user: { role: 'editor', id: 2 } },
     })
 
-    vi.unstubAllGlobals()
+    // Latch is set so a repeat announce does not re-queue.
+    const perfRow = rawDb.prepare('SELECT band_follow_notified FROM performances WHERE id=?').get(band.id)
+    expect(perfRow.band_follow_notified).toBe(1)
 
-    const row = rawDb.prepare('SELECT band_follow_notified FROM performances WHERE id=?').get(band.id)
-    expect(row.band_follow_notified).toBe(1)
+    // Follower is queued for digest delivery, not emailed immediately.
+    const queued = rawDb.prepare('SELECT * FROM band_announce_queue WHERE band_follow_id=?').all(followId)
+    expect(queued).toHaveLength(1)
+    expect(queued[0].band_name).toBe('Notify Band')
+    expect(queued[0].event_name).toBe('Vol6')
+    expect(queued[0].performance_id).toBe(band.id)
   })
 
   it('does not set band_follow_notified when no followers exist', async () => {

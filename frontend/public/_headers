@@ -17,11 +17,19 @@
 
   # Cross-Origin policies
   Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
+  # No Cross-Origin-Embedder-Policy: require-corp blocks the Cloudflare Turnstile
+  # iframe (it does not send COEP, and COEP:credentialless is unsupported in Safari).
+  # This app needs no cross-origin isolation (no SharedArrayBuffer/crossOriginIsolated),
+  # so COEP buys nothing here. Do NOT re-add it without exempting Turnstile's iframe.
   Cross-Origin-Resource-Policy: same-origin
 
   # Content Security Policy
-  Content-Security-Policy: default-src 'self'; style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://*.settimes.ca https://*.pages.dev https://cloudflareinsights.com https://static.cloudflareinsights.com; frame-ancestors 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+  # Turnstile: challenges.cloudflare.com in script-src/frame-src/connect-src.
+  # The sha256 hash allows the inline theme-flash <script> in index.html — REGENERATE
+  # it (sha256 of the exact built script body, base64) if that script changes.
+  # worker-src 'self' permits /sw.js. NOTE: Cloudflare Rocket Loader must stay OFF
+  # for the zone (it inline-executes scripts, which this no-'unsafe-inline' CSP blocks).
+  Content-Security-Policy: default-src 'self'; style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com 'sha256-AthfpLUxHMTHKKJhjnay6WvKZb8lWKmb3ca+GM+ZrkI='; connect-src 'self' https://*.settimes.ca https://*.pages.dev https://cloudflareinsights.com https://static.cloudflareinsights.com https://challenges.cloudflare.com; frame-ancestors 'none'; frame-src 'self' https://challenges.cloudflare.com; child-src 'self' https://challenges.cloudflare.com; worker-src 'self'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
 
   # Permissions policy (disable unnecessary features)
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()

@@ -226,3 +226,11 @@ Do this **every time you push**, not just when opening the PR. Dependabot merges
 - Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `lucia.createSession(user.id, {})` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts. Both methods live on the object returned by `initializeLucia()` in `functions/utils/auth.js`.
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.
+
+### Content-Security-Policy (strict, no `unsafe-inline`)
+
+The CSP is built once in `functions/_middleware.js` (enforced when `ENVIRONMENT=production` unless `CSP_ENFORCE` overrides) and applied to every response. It is deliberately strict.
+
+- **Turnstile** requires `https://challenges.cloudflare.com` in `script-src` and `frame-src` (Cloudflare's [CSP docs](https://developers.cloudflare.com/turnstile/reference/content-security-policy/)). It does **not** need `'unsafe-inline'`.
+- **The inline theme-flash `<script>` in `frontend/index.html`** is allowed by a `'sha256-…'` hash in `script-src`. **If you edit that script, regenerate the hash** (sha256 of the exact built script body, base64) or it silently stops running and a theme flash returns. There is no test for this — verify by building and hashing `dist/index.html`.
+- **Cloudflare Rocket Loader must stay DISABLED** for the zone. It rewrites/inline-executes `<script>` tags, which strict CSP blocks ("Refused to execute inline script"). A modern code-split Vite SPA gains nothing from it.

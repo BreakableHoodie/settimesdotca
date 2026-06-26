@@ -205,6 +205,8 @@ export function createTestDB() {
       unsubscribe_token TEXT UNIQUE NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       last_email_sent TEXT,
+      consent_ip TEXT,
+      consent_method TEXT NOT NULL DEFAULT 'web_form',
       UNIQUE(email, city, genre)
     );
 
@@ -216,6 +218,8 @@ export function createTestDB() {
       verification_token TEXT UNIQUE,
       unsubscribe_token TEXT UNIQUE NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      consent_ip TEXT,
+      consent_method TEXT NOT NULL DEFAULT 'web_form',
       UNIQUE(email, band_profile_id)
     );
 

@@ -29,6 +29,28 @@ describe('POST /api/bands/:name/follow', () => {
     expect(row.verified).toBe(0)
     expect(row.verification_token).toBeTruthy()
     expect(row.unsubscribe_token).toBeTruthy()
+    // CASL/CAN-SPAM: consent fields are always recorded
+    expect(row.consent_method).toBe('web_form')
+    // CF-Connecting-IP is absent in test requests, so consent_ip is null
+    expect(row.consent_ip).toBeNull()
+  })
+
+  it('records CF-Connecting-IP as consent_ip when the header is present', async () => {
+    const { env, rawDb } = createTestEnv()
+    const ev = insertEvent(rawDb, { name: 'Vol6', slug: 'vol6-consent-ip' })
+    const band = insertBand(rawDb, { name: 'IP Band', event_id: ev.id })
+
+    const req = new Request(`https://example.test/api/bands/${band.band_profile_id}/follow`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.42' },
+      body: JSON.stringify({ email: 'fan2@example.com' }),
+    })
+    await followHandler.onRequestPost({ request: req, env, params: { name: String(band.band_profile_id) }, waitUntil })
+
+    const row = rawDb.prepare('SELECT consent_ip, consent_method FROM band_follows WHERE email=?')
+      .get('fan2@example.com')
+    expect(row.consent_ip).toBe('203.0.113.42')
+    expect(row.consent_method).toBe('web_form')
   })
 
   it('returns 400 for an invalid email', async () => {

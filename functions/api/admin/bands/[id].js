@@ -11,8 +11,6 @@ import {
   sanitizeString,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
-import { isEmailConfigured } from "../../../utils/email.js";
-import { notifyBandFollowers } from "../../../utils/bandFollowNotify.js";
 import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
 import { parseOrigin } from "../../../utils/parseOrigin.js";
 
@@ -758,14 +756,17 @@ export async function onRequestPatch(context) {
       .bind(newValue, performanceId)
       .run();
 
-    // Notify band followers on first 0 → 1 transition only
+    // Queue band-follower notifications on first 0 → 1 transition.
+    // Followers are batched into band_announce_queue; POST /api/admin/flush-announce-digest
+    // groups them by (email, event) and sends one digest per fan per event.
     if (
       newValue === 1 &&
       performance.is_announced === 0 &&
       !performance.band_follow_notified
     ) {
       const perf = await DB.prepare(
-        `SELECT p.band_profile_id, bp.name as band_name, e.name as event_name
+        `SELECT p.band_profile_id, bp.name as band_name,
+                e.id as event_id, e.name as event_name, e.slug as event_slug
          FROM performances p
          JOIN band_profiles bp ON p.band_profile_id = bp.id
          JOIN events e ON p.event_id = e.id
@@ -776,15 +777,13 @@ export async function onRequestPatch(context) {
 
       if (perf) {
         const { results: followers = [] } = await DB.prepare(
-          "SELECT id, email, unsubscribe_token FROM band_follows WHERE band_profile_id = ? AND verified = 1",
+          "SELECT id FROM band_follows WHERE band_profile_id = ? AND verified = 1",
         )
           .bind(perf.band_profile_id)
           .all();
 
-        if (followers.length > 0 && isEmailConfigured(env)) {
-          // Atomic claim: only the first concurrent request sees changes > 0.
-          // Latch is only set when email is actually configured — if email is temporarily
-          // misconfigured, band_follow_notified stays 0 so notifications can fire later.
+        if (followers.length > 0) {
+          // Atomic latch: only the first concurrent announce-toggle queues followers.
           const claimed = await DB.prepare(
             "UPDATE performances SET band_follow_notified = 1 WHERE id = ? AND band_follow_notified = 0",
           )
@@ -792,27 +791,25 @@ export async function onRequestPatch(context) {
             .run();
 
           if (claimed.meta.changes > 0) {
-            // Send + record each successful delivery (see bandFollowNotify.js).
-            // A failed send leaves no notification row, so it can be recovered
-            // later via the resend-announcement endpoint.
-            const { failed } = await notifyBandFollowers(env, DB, {
-              performanceId: Number(performanceId),
-              bandProfileId: perf.band_profile_id,
-              bandName: perf.band_name,
-              eventName: perf.event_name,
-              followers,
-            });
-            if (failed > 0) {
-              await auditLog(
-                env,
-                user.userId,
-                "performance.announced.email_failure",
-                "performance",
-                Number(performanceId),
-                { failed_count: failed, band_name: perf.band_name },
-                ipAddress,
-              ).catch(() => {});
-            }
+            // Queue one row per follower. INSERT OR IGNORE on UNIQUE(band_follow_id,
+            // performance_id) prevents double-queuing from a retry.
+            await DB.batch(
+              followers.map((f) =>
+                DB.prepare(
+                  `INSERT OR IGNORE INTO band_announce_queue
+                   (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                ).bind(
+                  f.id,
+                  Number(performanceId),
+                  perf.event_id,
+                  perf.band_name,
+                  perf.event_name,
+                  perf.event_slug,
+                  perf.band_profile_id,
+                ),
+              ),
+            );
           }
         }
       }

@@ -115,8 +115,8 @@ export class MockD1Database {
     
     // INSERT INTO email_subscriptions
     if (queryLower.includes('insert into email_subscriptions')) {
-      const [email, city, genre, frequency, verificationToken, unsubscribeToken] = params
-      
+      const [email, city, genre, frequency, verificationToken, unsubscribeToken, consentIp] = params
+
       const newSub = {
         id: this.idCounter++,
         email,
@@ -127,9 +127,11 @@ export class MockD1Database {
         unsubscribe_token: unsubscribeToken,
         verified: false,
         created_at: new Date().toISOString(),
-        last_email_sent: null
+        last_email_sent: null,
+        consent_ip: consentIp ?? null,
+        consent_method: 'web_form',
       }
-      
+
       this.data.email_subscriptions.push(newSub)
       return { success: true, meta: { changes: 1 } }
     }

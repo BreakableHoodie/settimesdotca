@@ -4,6 +4,23 @@ AI assistant context for this codebase. Captures non-obvious invariants, known g
 
 ---
 
+## Proactive Quality Gates
+
+Invoke these without being asked — don't wait for the user to request them:
+
+| Trigger | Action |
+|---------|--------|
+| After editing `functions/utils/auth.js`, session endpoints (`sessions/`), or follow/unfollow/confirm-follow flows | Invoke `cloudflare-security-reviewer` agent |
+| After writing or modifying error handling (`catch` blocks, `.catch()`, `try/finally`) in `functions/` | Invoke `pr-review-toolkit:silent-failure-hunter` agent |
+| Before declaring any multi-file feature complete | Invoke `pr-review-toolkit:code-reviewer` agent |
+| After editing `frontend/src/` public pages (outside `admin/`) | Scan for `text-white`/`bg-white` theme violations before finishing |
+| After editing `migrations/` or `setup-complete.sql` | Verify `setup-complete.sql` stays in sync (it seeds CI; drift causes 500s) |
+| When SEO-relevant pages change (band pages, event pages, venue pages) | Check structured data and `document.title` assignments |
+
+The `hooks` in `.claude/settings.local.json` automate the mechanical parts (prettier, ESLint, pre-PR gate). The triggers above require judgment — apply them proactively.
+
+---
+
 ## Mission & Scope
 
 settimes.ca is evolving into the best multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON), starting with **Long Weekend Band Crawl Vol. 17** on **August 2, 2026**.

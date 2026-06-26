@@ -205,6 +205,8 @@ export function createTestDB() {
       unsubscribe_token TEXT UNIQUE NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       last_email_sent TEXT,
+      consent_ip TEXT,
+      consent_method TEXT NOT NULL DEFAULT 'web_form',
       UNIQUE(email, city, genre)
     );
 
@@ -216,6 +218,8 @@ export function createTestDB() {
       verification_token TEXT UNIQUE,
       unsubscribe_token TEXT UNIQUE NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      consent_ip TEXT,
+      consent_method TEXT NOT NULL DEFAULT 'web_form',
       UNIQUE(email, band_profile_id)
     );
 
@@ -225,6 +229,19 @@ export function createTestDB() {
       band_follow_id INTEGER NOT NULL REFERENCES band_follows(id) ON DELETE CASCADE,
       notified_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(performance_id, band_follow_id)
+    );
+
+    CREATE TABLE band_announce_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      band_follow_id INTEGER NOT NULL REFERENCES band_follows(id) ON DELETE CASCADE,
+      performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
+      event_id INTEGER NOT NULL,
+      band_name TEXT NOT NULL,
+      event_name TEXT NOT NULL,
+      event_slug TEXT NOT NULL,
+      band_profile_id INTEGER NOT NULL,
+      queued_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(band_follow_id, performance_id)
     );
 
     CREATE TABLE password_reset_tokens (

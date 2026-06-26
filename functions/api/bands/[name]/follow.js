@@ -71,11 +71,12 @@ export async function onRequestPost(context) {
     // — it receives at most this single confirmation email it can ignore.
     const unsubscribeToken = generateToken();
     const verificationToken = generateToken();
+    const consentIp = request.headers.get("CF-Connecting-IP") ?? null;
     const result = await DB.prepare(
-      `INSERT OR IGNORE INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token)
-       VALUES (?, ?, 0, ?, ?)`,
+      `INSERT OR IGNORE INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, consent_ip, consent_method)
+       VALUES (?, ?, 0, ?, ?, ?, 'web_form')`,
     )
-      .bind(email, band.id, verificationToken, unsubscribeToken)
+      .bind(email, band.id, verificationToken, unsubscribeToken, consentIp)
       .run();
 
     // changes=0 → this email already follows the band (verified or pending). Say

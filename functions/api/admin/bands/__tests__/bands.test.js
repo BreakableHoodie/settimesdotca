@@ -100,6 +100,39 @@ describe('Admin bands API - CRUD operations', () => {
     const updated = list.bands.find(b => b.name === 'Alt Band')
     expect(updated.photo_alt_text).toBe('Alt Band performing under red stage lights')
   })
+
+  it('PUT /api/admin/bands/{id} allows band-profile edits (is_active) for a performance in an archived event', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'ArchivedEdit', slug: 'archived-edit', status: 'archived', is_published: 0 })
+    const venue = insertVenue(rawDb, { name: 'Archived Edit Venue' })
+    const band = insertBand(rawDb, { name: 'Filthy Kitty', event_id: ev.id, venue_id: venue.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ is_active: 0 }),
+    })
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
+    // Band status is band-wide, not event-specific — must not be blocked by archive.
+    expect(res.status).toBe(200)
+    const row = rawDb.prepare('SELECT is_active FROM band_profiles WHERE id = ?').get(band.band_profile_id)
+    expect(row.is_active).toBe(0)
+  })
+
+  it('PUT /api/admin/bands/{id} still rejects set-time edits for a performance in an archived event', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'ArchivedTime', slug: 'archived-time', status: 'archived', is_published: 0 })
+    const venue = insertVenue(rawDb, { name: 'Archived Time Venue' })
+    const band = insertBand(rawDb, { name: 'Frozen Set', event_id: ev.id, venue_id: venue.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ startTime: '20:00', endTime: '21:00' }),
+    })
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(400)
+  })
 })
 
 describe('Admin bands API - Validation', () => {
@@ -273,7 +306,7 @@ describe('Admin bands API - Validation', () => {
     expect(res.status).toBe(404)
   })
 
-  it('update rejects performances for archived events', async () => {
+  it('update allows band-profile fields (name) for a performance in an archived event', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
     const ev = insertEvent(rawDb, { name: 'ArchivedUpdate', slug: 'archived-update', status: 'archived', is_published: 0 })
     const venue = insertVenue(rawDb, { name: 'Archive Update Venue' })
@@ -285,10 +318,12 @@ describe('Admin bands API - Validation', () => {
       body: JSON.stringify({ name: 'Renamed Frozen Band' }),
     })
 
+    // Band name is band-wide profile data (one shared band_profiles row) — editable
+    // regardless of event archive state. Only event-specific set times are frozen.
     const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
-    expect(res.status).toBe(400)
-    const data = await res.json()
-    expect(data.error).toBe('Validation error')
+    expect(res.status).toBe(200)
+    const row = rawDb.prepare('SELECT name FROM band_profiles WHERE id = ?').get(band.band_profile_id)
+    expect(row.name).toBe('Renamed Frozen Band')
   })
 
   it('delete returns 404 for non-existent band', async () => {

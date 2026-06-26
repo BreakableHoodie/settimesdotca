@@ -3,10 +3,10 @@ import { createTestEnv, insertBand, insertEvent } from '../../test-utils'
 import { onRequestGet } from '../[name]/unfollow.js'
 
 describe('GET /api/bands/:name/unfollow', () => {
-  it('deletes the follow row for a valid token and returns 200 HTML', async () => {
+  it('deletes the follow row for a valid token and names the band in the response', async () => {
     const { env, rawDb } = createTestEnv()
     const ev = insertEvent(rawDb, { name: 'Vol6', slug: 'vol6-unfollow' })
-    const band = insertBand(rawDb, { name: 'Band', event_id: ev.id })
+    const band = insertBand(rawDb, { name: 'Witchrot', event_id: ev.id })
     rawDb.prepare(
       'INSERT INTO band_follows (email, band_profile_id, unsubscribe_token) VALUES (?, ?, ?)'
     ).run('fan@example.com', band.band_profile_id, 'valid-token-abc')
@@ -19,6 +19,8 @@ describe('GET /api/bands/:name/unfollow', () => {
     expect(res.status).toBe(200)
     const body = await res.text()
     expect(body).toContain('Unfollowed')
+    // Should name the specific band the fan unsubscribed from, not "this band".
+    expect(body).toContain('Witchrot')
     expect(res.headers.get('Cache-Control')).toBe('no-store')
 
     const row = rawDb.prepare('SELECT * FROM band_follows WHERE unsubscribe_token=?').get('valid-token-abc')

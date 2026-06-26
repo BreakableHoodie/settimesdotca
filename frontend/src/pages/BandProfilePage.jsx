@@ -297,6 +297,9 @@ export default function BandProfilePage() {
 
       turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
         sitekey: turnstileSiteKey,
+        // Invisible unless Turnstile actually needs a human challenge — keeps the
+        // form uncluttered for legit visitors while preserving bot protection.
+        appearance: 'interaction-only',
         callback: token => {
           setTurnstileToken(token)
         },

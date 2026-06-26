@@ -65,6 +65,15 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
+        env:
+          # Public Turnstile site key — Vite inlines VITE_* into the client bundle
+          # at build time (import.meta.env.VITE_TURNSTILE_SITE_KEY). The deployed
+          # bundle is built HERE in CI (the deploy job only redeploys this artifact,
+          # it never rebuilds), so the site key must be present in this step or the
+          # public forms render no widget and the backend rejects with "Bot
+          # verification failed". Pairs with the runtime TURNSTILE_SECRET_KEY secret.
+          # Non-secret (it ships to browsers), so it lives in repo Variables, not Secrets.
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
         run: npm run build
 
       - name: Upload frontend build artifact

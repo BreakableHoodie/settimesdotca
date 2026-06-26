@@ -200,12 +200,21 @@ export async function onRequestPut(context) {
       bandProfileId = performance.band_profile_id;
       linkedEvent = await getEventForPerformance(DB, realPerformanceId);
 
-      if (linkedEvent?.status === "archived") {
+      // An archived event freezes its lineup's event-specific fields (set times,
+      // venue) — but band-profile fields (is_active, name, genre, origin, photo,
+      // social links, bio) are band-WIDE and must stay editable regardless of the
+      // events the band has played. Only block when a performance field is the
+      // thing actually being changed.
+      const editsPerformanceFields =
+        venueId !== undefined ||
+        startTime !== undefined ||
+        endTime !== undefined;
+      if (linkedEvent?.status === "archived" && editsPerformanceFields) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
             message:
-              "Archived event performances cannot be edited. Copy the event as a template instead.",
+              "Archived event set times cannot be edited. Copy the event as a template instead.",
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );

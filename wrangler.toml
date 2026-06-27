@@ -43,10 +43,12 @@ database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b" # binding reference only �
 binding = "ANALYTICS"
 dataset = "settimes_metrics"
 
-# Cron triggers are not supported for Cloudflare Pages
-# Use a separate Worker if scheduled tasks are needed
-# [triggers]
-# crons = ["0 * * * *"]
+# Cron triggers are not supported for Cloudflare Pages.
+# Scheduled tasks (popularity aggregation, PII retention cleanup, share-link
+# expiry) run via .github/workflows/scheduled-jobs.yml, which POSTs daily to
+# /api/internal/run-scheduled. That endpoint is gated by the CRON_SECRET env
+# var — configure it in Cloudflare Pages Settings → Environment Variables and
+# as a GitHub Actions repository secret with the same value.
 
 # For local development, Wrangler will create a local SQLite database
 # Local DB path: .wrangler/state/v3/d1/miniflare-D1DatabaseObject/

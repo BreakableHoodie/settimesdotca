@@ -7,7 +7,7 @@ const LEGACY_ITERATIONS = 100000;
 const DEFAULT_ITERATIONS = 100000;
 const KEY_LENGTH = 32;
 
-function timingSafeEqual(a, b) {
+export function timingSafeEqual(a, b) {
   if (a.length !== b.length) {
     return false;
   }
@@ -32,7 +32,7 @@ async function deriveKey(password, salt, iterations) {
     encoder.encode(password),
     "PBKDF2",
     false,
-    ["deriveBits"]
+    ["deriveBits"],
   );
 
   const derived = await crypto.subtle.deriveBits(
@@ -43,7 +43,7 @@ async function deriveKey(password, salt, iterations) {
       hash: "SHA-256",
     },
     keyMaterial,
-    KEY_LENGTH * 8
+    KEY_LENGTH * 8,
   );
 
   return new Uint8Array(derived);
@@ -102,7 +102,7 @@ export async function verifyPassword(password, storedHash) {
 
     const hashArray = await deriveKey(password, salt, iterations);
     const storedHashArray = Uint8Array.from(atob(hashBase64), (c) =>
-      c.charCodeAt(0)
+      c.charCodeAt(0),
     );
 
     return timingSafeEqual(hashArray, storedHashArray);

@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         <h1 className="text-text-primary text-3xl font-bold mb-2">Privacy Policy</h1>
         <p className="text-text-tertiary text-sm mb-10">Last updated: April 2026</p>
 
-        <div className="space-y-8 text-gray-300 leading-relaxed">
+        <div className="space-y-8 text-text-secondary leading-relaxed">
           <section>
             <h2 className="text-text-primary text-lg font-semibold mb-3">What SetTimes is</h2>
             <p>

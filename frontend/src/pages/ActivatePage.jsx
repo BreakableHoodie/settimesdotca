@@ -56,7 +56,7 @@ export default function ActivatePage() {
       <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border text-center">
           <h1 className="text-2xl font-bold text-text-primary mb-4">Activation Failed</h1>
-          <p className="text-gray-300 mb-6">{message}</p>
+          <p className="text-text-secondary mb-6">{message}</p>
           <button
             onClick={() => navigate('/admin/login')}
             className="bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-3 px-6 rounded-lg transition"
@@ -72,7 +72,7 @@ export default function ActivatePage() {
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border text-center">
         <h1 className="text-2xl font-bold text-text-primary mb-4">Account Activated</h1>
-        <p className="text-gray-300 mb-6">{message}</p>
+        <p className="text-text-secondary mb-6">{message}</p>
         <button
           onClick={() => navigate('/admin/login')}
           className="bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-3 px-6 rounded-lg transition"

@@ -16,9 +16,14 @@ export async function onRequestGet(context) {
 
   const formatVenueAddress = (venue) => {
     if (!venue) return null;
-    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+    const line1 = [venue.address_line1, venue.address_line2]
+      .filter(Boolean)
+      .join(", ");
     const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+    const line3 = [venue.postal_code, venue.country]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
     return [line1, line2, line3].filter(Boolean).join(", ");
   };
 
@@ -33,7 +38,7 @@ export async function onRequestGet(context) {
   try {
     const event = await DB.prepare(
       `
-      SELECT id, name, slug, date, ticket_url, status
+      SELECT id, name, slug, date, ticket_url, status, reveal_mode
       FROM events
       WHERE id = ? AND (is_published = 1 OR status = 'archived')
       LIMIT 1
@@ -72,10 +77,11 @@ export async function onRequestGet(context) {
       LEFT JOIN band_profiles b ON p.band_profile_id = b.id
       LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
+        AND (? = 0 OR p.is_announced = 1)
       ORDER BY p.start_time, v.name
     `,
     )
-      .bind(eventId)
+      .bind(eventId, event.reveal_mode ?? 0)
       .all();
 
     const rows = bandsResult.results || [];

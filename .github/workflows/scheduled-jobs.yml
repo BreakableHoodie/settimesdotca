@@ -1,0 +1,35 @@
+name: Scheduled Jobs
+
+# Cloudflare Pages does not support cron triggers, so scheduled tasks
+# (popularity aggregation, PII retention cleanup, share-link expiry) are
+# triggered by this workflow POSTing to the secret-protected endpoint
+# /api/internal/run-scheduled. Mirrors the pattern used by zap-baseline.yml.
+#
+# Required secrets:
+#   CRON_SECRET — must match the CRON_SECRET env var in the Cloudflare Pages
+#                 project (Settings → Environment Variables → Production).
+
+on:
+  schedule:
+    # Daily at 07:17 UTC (off-peak; intentionally non-round to avoid thundering herd)
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-scheduled:
+    name: Run scheduled handler
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Invoke /api/internal/run-scheduled
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "Triggering scheduled handler..."
+          curl -fsS -X POST "https://settimes.ca/api/internal/run-scheduled" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json"
+          echo "Scheduled handler completed successfully."

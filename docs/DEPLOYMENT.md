@@ -533,6 +533,7 @@ The checked-in release workflow expects these repository secrets:
 
 - `CF_ACCOUNT_ID`
 - `CF_PAGES_API_TOKEN`
+- `CRON_SECRET` — required by `.github/workflows/scheduled-jobs.yml` (daily scheduled tasks). Generate a strong random value (e.g. `openssl rand -base64 32`) and set it **both** here as a GitHub Actions repository secret **and** in Cloudflare Pages → Settings → Environment Variables (Production) with the same value. The `/api/internal/run-scheduled` endpoint fails closed (503) if this variable is missing from the Pages environment.
 
 The workflow also supports these repository variables:
 

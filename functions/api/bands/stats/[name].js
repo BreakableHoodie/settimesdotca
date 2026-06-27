@@ -121,6 +121,7 @@ export async function onRequestGet(context) {
       LEFT JOIN events e ON p.event_id = e.id
       WHERE p.band_profile_id = ?
         AND e.status IN ('published', 'archived')
+        AND (e.reveal_mode = 0 OR p.is_announced = 1)
       ORDER BY e.date DESC, p.start_time
     `,
     )

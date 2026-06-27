@@ -43,7 +43,10 @@ export async function onRequestGet(context) {
     const includeUpcoming = url.searchParams.get("upcoming") !== "false"; // default true
     const includePast = url.searchParams.get("past") !== "false"; // default true
     const includeBands = url.searchParams.get("includeBands") !== "false"; // default true
-    const parsedPastLimit = parseInt(url.searchParams.get("pastLimit") || "10", 10);
+    const parsedPastLimit = parseInt(
+      url.searchParams.get("pastLimit") || "10",
+      10,
+    );
     const pastLimit = Number.isFinite(parsedPastLimit)
       ? Math.min(Math.max(parsedPastLimit, 1), 100)
       : 10;
@@ -170,7 +173,7 @@ export async function onRequestGet(context) {
           v.postal_code,
           v.country
         FROM events e
-        LEFT JOIN performances p ON p.event_id = e.id
+        LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1
@@ -213,7 +216,7 @@ export async function onRequestGet(context) {
           v.postal_code,
           v.country
         FROM events e
-        LEFT JOIN performances p ON p.event_id = e.id
+        LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1
@@ -266,7 +269,7 @@ export async function onRequestGet(context) {
           v.postal_code,
           v.country
         FROM events e
-        LEFT JOIN performances p ON p.event_id = e.id
+        LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
         WHERE (

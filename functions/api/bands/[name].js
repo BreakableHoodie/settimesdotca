@@ -21,9 +21,14 @@ function formatOrigin(profile) {
 
 function formatVenueAddress(venue) {
   if (!venue) return null;
-  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
+  const line1 = [venue.address_line1, venue.address_line2]
+    .filter(Boolean)
+    .join(", ");
   const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
+  const line3 = [venue.postal_code, venue.country]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   return [line1, line2, line3].filter(Boolean).join(", ");
 }
 
@@ -83,10 +88,10 @@ export async function onRequestGet(context) {
     }
 
     if (!bandProfile) {
-      return new Response(
-        JSON.stringify({ error: "Band not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Band not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Get all performances for this band profile
@@ -113,6 +118,7 @@ export async function onRequestGet(context) {
       LEFT JOIN events e ON p.event_id = e.id
       WHERE p.band_profile_id = ?
         AND e.is_published = 1
+        AND (e.reveal_mode = 0 OR p.is_announced = 1)
       ORDER BY e.date DESC, p.start_time
     `,
     )
@@ -121,10 +127,10 @@ export async function onRequestGet(context) {
 
     const history = performances.results || [];
     if (history.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Band not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Band not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     let socialLinks = {};

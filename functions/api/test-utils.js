@@ -1,8 +1,8 @@
-import Database from 'better-sqlite3';
+import Database from "better-sqlite3";
 
 export function createTestDB() {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
+  const db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
 
   db.exec(`
     CREATE TABLE users (
@@ -345,97 +345,97 @@ export function createTestDB() {
   `);
 
   const insertUser = db.prepare(
-    "INSERT INTO users (email, role, activated_at) VALUES (?, ?, datetime('now'))"
+    "INSERT INTO users (email, role, activated_at) VALUES (?, ?, datetime('now'))",
   );
-  insertUser.run('admin@test', 'admin');
-  insertUser.run('editor@test', 'editor');
-  insertUser.run('viewer@test', 'viewer');
+  insertUser.run("admin@test", "admin");
+  insertUser.run("editor@test", "editor");
+  insertUser.run("viewer@test", "viewer");
 
   return db;
 }
 
 export const mockUsers = {
-  admin: { id: 1, email: 'admin@test', role: 'admin' },
-  editor: { id: 2, email: 'editor@test', role: 'editor' },
-  viewer: { id: 3, email: 'viewer@test', role: 'viewer' },
+  admin: { id: 1, email: "admin@test", role: "admin" },
+  editor: { id: 2, email: "editor@test", role: "editor" },
+  viewer: { id: 3, email: "viewer@test", role: "viewer" },
 };
 
 export function insertEvent(
   db,
   {
-    name = 'Test Event',
-    slug = 'test-event',
-    date = '2025-12-15',
-    status = 'draft',
+    name = "Test Event",
+    slug = "test-event",
+    date = "2025-12-15",
+    status = "draft",
     created_by = 1,
-  } = {}
+  } = {},
 ) {
   const stmt = db.prepare(
-    'INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)'
+    "INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)",
   );
   const info = stmt.run(name, slug, date, status, created_by);
   return db
-    .prepare('SELECT * FROM events WHERE id = ?')
+    .prepare("SELECT * FROM events WHERE id = ?")
     .get(info.lastInsertRowid);
 }
 
 export function insertBand(
   db,
   {
-    name = 'Test Band',
+    name = "Test Band",
     event_id = null,
     venue_id = null,
-    start_time = '18:00',
-    end_time = '19:00',
+    start_time = "18:00",
+    end_time = "19:00",
     url = null,
     genre = null,
     origin = null,
     description = null,
     photo_url = null,
     social_links = null,
-  } = {}
+  } = {},
 ) {
   // Insert into band_profiles + performances (v2 schema)
-  const nameNormalized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const nameNormalized = name.toLowerCase().replace(/[^a-z0-9]/g, "");
   let profileId;
   const resolvedSocialLinks =
     social_links ?? (url ? JSON.stringify({ website: url }) : null);
   const existingProfile = db
-    .prepare('SELECT * FROM band_profiles WHERE name_normalized = ?')
+    .prepare("SELECT * FROM band_profiles WHERE name_normalized = ?")
     .get(nameNormalized);
   if (existingProfile) {
     profileId = existingProfile.id;
     const updates = [];
     const values = [];
     if (genre !== null) {
-      updates.push('genre = ?');
+      updates.push("genre = ?");
       values.push(genre);
     }
     if (origin !== null) {
-      updates.push('origin = ?');
+      updates.push("origin = ?");
       values.push(origin);
     }
     if (description !== null) {
-      updates.push('description = ?');
+      updates.push("description = ?");
       values.push(description);
     }
     if (photo_url !== null) {
-      updates.push('photo_url = ?');
+      updates.push("photo_url = ?");
       values.push(photo_url);
     }
     if (resolvedSocialLinks !== null) {
-      updates.push('social_links = ?');
+      updates.push("social_links = ?");
       values.push(resolvedSocialLinks);
     }
     if (updates.length > 0) {
       db.prepare(
-        `UPDATE band_profiles SET ${updates.join(', ')} WHERE id = ?`
+        `UPDATE band_profiles SET ${updates.join(", ")} WHERE id = ?`,
       ).run(...values, profileId);
     }
   } else {
     const profileInfo = db
       .prepare(
-        'INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        "INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
       .run(
         name,
@@ -444,14 +444,14 @@ export function insertBand(
         origin,
         description,
         photo_url,
-        resolvedSocialLinks
+        resolvedSocialLinks,
       );
     profileId = profileInfo.lastInsertRowid;
   }
 
   const perfInfo = db
     .prepare(
-      'INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time) VALUES (?, ?, ?, ?, ?)'
+      "INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time) VALUES (?, ?, ?, ?, ?)",
     )
     .run(event_id, venue_id, profileId, start_time, end_time);
 
@@ -462,7 +462,7 @@ export function insertBand(
     FROM performances p
     JOIN band_profiles bp ON p.band_profile_id = bp.id
     WHERE p.id = ?
-  `
+  `,
     )
     .get(perfInfo.lastInsertRowid);
 }
@@ -470,8 +470,8 @@ export function insertBand(
 export function insertVenue(
   db,
   {
-    name = 'Test Venue',
-    city = 'Portland',
+    name = "Test Venue",
+    city = "Portland",
     region = null,
     address_line1 = null,
     address_line2 = null,
@@ -480,7 +480,7 @@ export function insertVenue(
     phone = null,
     contact_email = null,
     address = null,
-  } = {}
+  } = {},
 ) {
   const stmt = db.prepare(
     `INSERT INTO venues (
@@ -494,7 +494,7 @@ export function insertVenue(
       phone,
       contact_email,
       address
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const info = stmt.run(
     name,
@@ -506,10 +506,10 @@ export function insertVenue(
     country,
     phone,
     contact_email,
-    address
+    address,
   );
   return db
-    .prepare('SELECT * FROM venues WHERE id = ?')
+    .prepare("SELECT * FROM venues WHERE id = ?")
     .get(info.lastInsertRowid);
 }
 
@@ -579,43 +579,50 @@ export function createDBEnv(db) {
 
       return wrapper;
     },
-    // Cloudflare D1 batch() method
+    // Cloudflare D1 batch() method.
+    // For SELECT statements the bound wrapper's all() returns { results: [...] };
+    // for mutations (INSERT/UPDATE/DELETE) all() throws so we fall back to
+    // run() which returns { success, meta }.  This mirrors how D1.batch() works.
     async batch(statements) {
       const results = [];
       for (const stmt of statements) {
-        results.push(await stmt.run());
+        try {
+          results.push(stmt.all());
+        } catch {
+          results.push(stmt.run());
+        }
       }
       return results;
     },
   };
 }
 
-export function createTestEnv({ role = 'editor' } = {}) {
+export function createTestEnv({ role = "editor" } = {}) {
   const rawDb = createTestDB();
 
   // Create a valid session for the test user
-  const userId = role === 'admin' ? 1 : role === 'editor' ? 2 : 3;
+  const userId = role === "admin" ? 1 : role === "editor" ? 2 : 3;
   const sessionId = crypto.randomUUID();
   const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
 
   rawDb
     .prepare(
-      'INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)'
+      "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
     )
-    .run(sessionId, userId, expiresAt, '127.0.0.1', 'test-agent');
+    .run(sessionId, userId, expiresAt, "127.0.0.1", "test-agent");
 
   return {
     env: {
       DB: createDBEnv(rawDb),
-      ALLOW_HEADER_AUTH: 'true',
-      ENVIRONMENT: 'test',
-      CSRF_SECRET: 'test-csrf-secret-for-unit-tests',
-      MFA_TOTP_ENCRYPTION_KEY: 'test-mfa-totp-encryption-key',
+      ALLOW_HEADER_AUTH: "true",
+      ENVIRONMENT: "test",
+      CSRF_SECRET: "test-csrf-secret-for-unit-tests",
+      MFA_TOTP_ENCRYPTION_KEY: "test-mfa-totp-encryption-key",
     },
     rawDb,
     role,
     headers: {
-      'x-test-role': role,
+      "x-test-role": role,
       Authorization: `Bearer ${sessionId}`,
     },
   };
@@ -624,32 +631,34 @@ export function createTestEnv({ role = 'editor' } = {}) {
 export function insertShareLink(
   db,
   {
-    slug = 'testslug',
+    slug = "testslug",
     event_id,
-    event_slug = 'test-event',
+    event_slug = "test-event",
     performance_ids = [1],
-    band_names = ['Test Band'],
+    band_names = ["Test Band"],
     expires_at = null,
-  } = {}
+  } = {},
 ) {
   const expiresAt =
     expires_at ??
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
-      .replace('T', ' ')
-      .replace(/\.\d+Z$/, '')
+      .replace("T", " ")
+      .replace(/\.\d+Z$/, "");
 
   const stmt = db.prepare(
     `INSERT INTO share_links (slug, event_id, event_slug, performance_ids, band_names, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  )
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  );
   const info = stmt.run(
     slug,
     event_id,
     event_slug,
     JSON.stringify(performance_ids),
     JSON.stringify(band_names),
-    expiresAt
-  )
-  return db.prepare('SELECT * FROM share_links WHERE id = ?').get(info.lastInsertRowid)
+    expiresAt,
+  );
+  return db
+    .prepare("SELECT * FROM share_links WHERE id = ?")
+    .get(info.lastInsertRowid);
 }

@@ -1,7 +1,9 @@
-const PROVIDERS = new Set(['postmark', 'mailchannels', 'resend']);
+import { logger } from "./logger.js";
+
+const PROVIDERS = new Set(["postmark", "mailchannels", "resend"]);
 
 function getProvider(env) {
-  const provider = (env?.EMAIL_PROVIDER || '').toLowerCase();
+  const provider = (env?.EMAIL_PROVIDER || "").toLowerCase();
   return PROVIDERS.has(provider) ? provider : null;
 }
 
@@ -17,11 +19,11 @@ export function isEmailConfigured(env) {
     return false;
   }
 
-  if (provider === 'postmark') {
+  if (provider === "postmark") {
     return Boolean(env?.POSTMARK_API_TOKEN);
   }
 
-  if (provider === 'resend') {
+  if (provider === "resend") {
     return Boolean(env?.RESEND_API_KEY);
   }
 
@@ -33,20 +35,31 @@ export async function sendEmail(env, { to, subject, html, text }) {
   const from = getFrom(env);
 
   if (!provider || !from) {
-    return { delivered: false, reason: 'not_configured' };
+    logger.warn("email delivery failed", {
+      provider: provider ?? "none",
+      reason: "not_configured",
+    });
+    return { delivered: false, reason: "not_configured" };
   }
 
   if (!to || !subject) {
-    return { delivered: false, reason: 'missing_fields' };
+    logger.warn("email delivery failed", {
+      provider,
+      reason: "missing_fields",
+    });
+    return { delivered: false, reason: "missing_fields" };
   }
 
-  if (provider === 'postmark') {
+  if (provider === "postmark") {
     const token = env?.POSTMARK_API_TOKEN;
-    console.log('[Email] Using Postmark provider');
+    logger.info("email provider selected", { provider: "postmark" });
 
     if (!token) {
-      console.error('[Email] Postmark token missing');
-      return { delivered: false, reason: 'missing_postmark_token' };
+      logger.warn("email delivery failed", {
+        provider: "postmark",
+        reason: "missing_postmark_token",
+      });
+      return { delivered: false, reason: "missing_postmark_token" };
     }
 
     const payload = {
@@ -59,76 +72,98 @@ export async function sendEmail(env, { to, subject, html, text }) {
 
     let response;
     try {
-      response = await fetch('https://api.postmarkapp.com/email', {
-        method: 'POST',
+      response = await fetch("https://api.postmarkapp.com/email", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'X-Postmark-Server-Token': token,
+          "Content-Type": "application/json",
+          "X-Postmark-Server-Token": token,
         },
         body: JSON.stringify(payload),
       });
     } catch (error) {
-      console.error('[Email] Postmark fetch error:', error?.message || error);
-      return { delivered: false, reason: 'postmark_fetch_error' };
+      logger.warn("email delivery failed", {
+        provider: "postmark",
+        reason: "postmark_fetch_error",
+        error,
+      });
+      return { delivered: false, reason: "postmark_fetch_error" };
     }
 
-    console.log('[Email] Postmark response status:', response.status);
+    logger.info("email provider response received", {
+      provider: "postmark",
+      status: response.status,
+    });
 
     if (!response.ok) {
-      console.error('[Email] Postmark delivery failed:', response.status);
-      return { delivered: false, reason: 'postmark_error' };
+      logger.warn("email delivery failed", {
+        provider: "postmark",
+        status: response.status,
+        reason: "postmark_error",
+      });
+      return { delivered: false, reason: "postmark_error" };
     }
 
-    console.log('[Email] Postmark delivery successful');
+    logger.info("email delivered", { provider: "postmark" });
     return { delivered: true };
   }
 
-  if (provider === 'mailchannels') {
-    console.log('[Email] Using MailChannels provider');
+  if (provider === "mailchannels") {
+    logger.info("email provider selected", { provider: "mailchannels" });
 
     const payload = {
       personalizations: [{ to: [{ email: to }] }],
       from: { email: from },
       subject,
       content: [
-        ...(html ? [{ type: 'text/html', value: html }] : []),
-        ...(text ? [{ type: 'text/plain', value: text }] : []),
+        ...(html ? [{ type: "text/html", value: html }] : []),
+        ...(text ? [{ type: "text/plain", value: text }] : []),
       ],
     };
 
     let response;
     try {
-      response = await fetch('https://api.mailchannels.net/tx/v1/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      response = await fetch("https://api.mailchannels.net/tx/v1/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     } catch (error) {
-      console.error(
-        '[Email] MailChannels fetch error:',
-        error?.message || error
-      );
-      return { delivered: false, reason: 'mailchannels_fetch_error' };
+      logger.warn("email delivery failed", {
+        provider: "mailchannels",
+        reason: "mailchannels_fetch_error",
+        error,
+      });
+      return { delivered: false, reason: "mailchannels_fetch_error" };
     }
 
-    console.log('[Email] MailChannels response status:', response.status);
+    logger.info("email provider response received", {
+      provider: "mailchannels",
+      status: response.status,
+    });
 
     if (!response.ok) {
-      console.error('[Email] MailChannels delivery failed:', response.status);
-      return { delivered: false, reason: 'mailchannels_error' };
+      logger.warn("email delivery failed", {
+        provider: "mailchannels",
+        status: response.status,
+        reason: "mailchannels_error",
+      });
+      return { delivered: false, reason: "mailchannels_error" };
     }
 
-    console.log('[Email] MailChannels delivery successful');
+    logger.info("email delivered", { provider: "mailchannels" });
     return { delivered: true };
   }
 
-  if (provider === 'resend') {
+  if (provider === "resend") {
     const token = env?.RESEND_API_KEY;
-    console.log('[Email] Using Resend provider');
+    logger.info("email provider selected", { provider: "resend" });
 
     if (!token) {
-      console.error('[Email] Resend API key missing');
-      return { delivered: false, reason: 'missing_resend_token' };
+      logger.warn("email delivery failed", {
+        provider: "resend",
+        reason: "missing_resend_token",
+      });
+      return { delivered: false, reason: "missing_resend_token" };
     }
 
     const payload = {
@@ -141,30 +176,44 @@ export async function sendEmail(env, { to, subject, html, text }) {
 
     let response;
     try {
-      response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
+      response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
     } catch (error) {
-      console.error('[Email] Resend fetch error:', error?.message || error);
-      return { delivered: false, reason: 'resend_fetch_error' };
+      logger.warn("email delivery failed", {
+        provider: "resend",
+        reason: "resend_fetch_error",
+        error,
+      });
+      return { delivered: false, reason: "resend_fetch_error" };
     }
 
-    console.log('[Email] Resend response status:', response.status);
+    logger.info("email provider response received", {
+      provider: "resend",
+      status: response.status,
+    });
 
     if (!response.ok) {
-      console.error('[Email] Resend delivery failed:', response.status);
-      return { delivered: false, reason: 'resend_error' };
+      logger.warn("email delivery failed", {
+        provider: "resend",
+        status: response.status,
+        reason: "resend_error",
+      });
+      return { delivered: false, reason: "resend_error" };
     }
 
-    console.log('[Email] Resend delivery successful');
+    logger.info("email delivered", { provider: "resend" });
     return { delivered: true };
   }
 
-  console.error('[Email] Unsupported provider:', provider);
-  return { delivered: false, reason: 'unsupported_provider' };
+  logger.warn("email delivery failed", {
+    provider,
+    reason: "unsupported_provider",
+  });
+  return { delivered: false, reason: "unsupported_provider" };
 }

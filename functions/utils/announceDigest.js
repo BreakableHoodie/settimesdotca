@@ -10,6 +10,7 @@
 // resend that already claimed a slot simply skips that entry.
 
 import { sendEmail } from "./email.js";
+import { logger } from "./logger.js";
 
 const escapeHtml = (s) =>
   String(s ?? "")
@@ -67,7 +68,9 @@ export async function flushAnnounceDigest(env, DB) {
     // already handled by a concurrent path.
     await DB.batch(
       items.map((item) =>
-        DB.prepare("DELETE FROM band_announce_queue WHERE id = ?").bind(item.id),
+        DB.prepare("DELETE FROM band_announce_queue WHERE id = ?").bind(
+          item.id,
+        ),
       ),
     );
 
@@ -84,9 +87,7 @@ export async function flushAnnounceDigest(env, DB) {
         : `${bands.length} bands you follow are playing ${event_name}!`;
 
     const bandListText = bands.map((b) => `• ${b}`).join("\n");
-    const bandListHtml = bands
-      .map((b) => `<li>${escapeHtml(b)}</li>`)
-      .join("");
+    const bandListHtml = bands.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
     const unsubText = claimed
       .map(
         (item) =>
@@ -127,5 +128,8 @@ export async function flushAnnounceDigest(env, DB) {
     }
   }
 
+  if (failed > 0) {
+    logger.warn("announce digest partially failed", { sent, failed, skipped });
+  }
   return { sent, failed, skipped };
 }

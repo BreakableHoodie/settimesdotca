@@ -280,7 +280,7 @@ function ScheduleView({
               disabled={allSelected}
               className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
                 allSelected
-                  ? 'bg-gray-500/20 border border-gray-500/50 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gray-500/20 border border-gray-500/50 text-text-disabled cursor-not-allowed'
                   : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
               }`}
               title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}

@@ -152,7 +152,7 @@ export default function SubscribePage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-text-primary mb-4">Never Miss a Show</h1>
-          <p className="text-xl text-gray-300">
+          <p className="text-xl text-text-secondary">
             Get weekly emails about concerts in your city. No algorithm, no ads, just shows.
           </p>
         </div>
@@ -255,7 +255,7 @@ export default function SubscribePage() {
 
           {/* Privacy note */}
           <div className="mt-8 pt-6 border-t border-border">
-            <p className="text-sm text-gray-400 text-center">
+            <p className="text-sm text-text-tertiary text-center">
               We respect your privacy. No tracking, no ads, no selling your data.
               <br />
               Unsubscribe anytime with one click.

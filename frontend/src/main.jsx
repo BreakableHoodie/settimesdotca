@@ -49,7 +49,7 @@ function LoadingFallback() {
       role="status"
       aria-live="polite"
     >
-      <div className="text-white text-xl">Loading...</div>
+      <div className="text-text-primary text-xl">Loading...</div>
     </div>
   )
 }

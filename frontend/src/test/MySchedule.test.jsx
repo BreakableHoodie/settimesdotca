@@ -107,8 +107,8 @@ describe('MySchedule — conflict vs overlap severity', () => {
     // Both band names must appear (in the fork card)
     expect(screen.getAllByText('Band Alpha').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Band Beta').length).toBeGreaterThan(0)
-    // Two "Keep this one" buttons must exist — one per side
-    expect(screen.getAllByRole('button', { name: /keep this one/i }).length).toBe(2)
+    // Two "Keep …" buttons must exist — one per side (accessible name is the aria-label, e.g. "Keep Band Alpha, remove Band Beta")
+    expect(screen.getAllByRole('button', { name: /^keep /i }).length).toBe(2)
     // These bands conflict (same start), so no partial-overlap banner
     expect(screen.queryByText(/overlapping set/i)).not.toBeInTheDocument()
   })

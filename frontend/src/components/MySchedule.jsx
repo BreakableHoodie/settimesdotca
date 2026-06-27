@@ -71,7 +71,8 @@ function ForkCard({ band1, band2, onToggleBand }) {
             <p className="text-xs text-text-tertiary">{formatTimeRange(band.startTime, band.endTime)}</p>
             <button
               onClick={() => onToggleBand(removeId)}
-              className="mt-2 w-full py-2 text-xs font-semibold rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30 active:scale-95 transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[36px]"
+              aria-label={`Keep ${band.name}, remove ${removeId === band2.id ? band2.name : band1.name}`}
+              className="mt-2 w-full py-2 text-xs font-semibold rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30 active:scale-95 transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
             >
               Keep this one
             </button>

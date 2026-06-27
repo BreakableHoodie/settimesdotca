@@ -5,11 +5,13 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 
 function sanitizeFilenamePart(value) {
-  return String(value || "all")
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "") || "all";
+  return (
+    String(value || "all")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "all"
+  );
 }
 
 export async function onRequestGet(context) {
@@ -43,7 +45,7 @@ export async function onRequestGet(context) {
         v.name as venue_name,
         v.address
       FROM events e
-      LEFT JOIN performances p ON p.event_id = e.id
+      LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
       LEFT JOIN band_profiles bp ON p.band_profile_id = bp.id
       LEFT JOIN venues v ON v.id = p.venue_id
       WHERE e.is_published = 1

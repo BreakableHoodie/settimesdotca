@@ -70,6 +70,7 @@ export async function onRequestGet(context) {
       JOIN band_profiles bp ON bp.id = p.band_profile_id
       WHERE p.venue_id = ?
         AND (e.is_published = 1 OR e.status = 'archived')
+        AND (e.reveal_mode = 0 OR p.is_announced = 1)
       ORDER BY e.date DESC, p.start_time
     `,
     )

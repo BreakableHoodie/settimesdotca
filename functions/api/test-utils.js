@@ -149,6 +149,16 @@ export function createTestDB() {
       FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE page_views_daily (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      page TEXT NOT NULL,
+      date TEXT NOT NULL,
+      views INTEGER DEFAULT 0,
+      UNIQUE(page, date)
+    );
+
+    CREATE INDEX idx_page_views_date ON page_views_daily(date);
+
     CREATE TABLE performances (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,

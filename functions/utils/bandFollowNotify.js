@@ -7,6 +7,7 @@
 // double-sending. Used by the announce flow (bands/[id].js) and the resend
 // endpoint (bands/[id]/resend-announcement.js).
 import { sendEmail } from "./email.js";
+import { logger } from "./logger.js";
 
 // Escape plain-text band/event names for safe interpolation into the email HTML.
 // Mirrors the escaper in bands/[id].js (regex .replace, the codebase convention).
@@ -66,6 +67,13 @@ export async function notifyBandFollowers(
   for (const r of results) {
     if (r.status === "fulfilled" && r.value === true) sent++;
     else failed++;
+  }
+  if (failed > 0) {
+    logger.warn("band follow notifications partially failed", {
+      performanceId,
+      sent,
+      failed,
+    });
   }
   return { sent, failed };
 }

@@ -2,6 +2,8 @@
 // POST /api/metrics
 // Privacy-first: no PII, aggregated only
 
+import { logger } from "../utils/logger.js";
+
 const MAX_BATCH_STATEMENTS = 20;
 
 const ALLOWED_EVENTS = new Set([
@@ -41,7 +43,11 @@ function parseInteger(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-async function executeInChunks(db, statements, chunkSize = MAX_BATCH_STATEMENTS) {
+async function executeInChunks(
+  db,
+  statements,
+  chunkSize = MAX_BATCH_STATEMENTS,
+) {
   for (let i = 0; i < statements.length; i += chunkSize) {
     await db.batch(statements.slice(i, i + chunkSize));
   }
@@ -163,7 +169,6 @@ export async function onRequestPost(context) {
       }
 
       for (const [key, count] of eventViewCounts) {
-        if (pvStmts.length >= MAX_BATCH_STATEMENTS) break;
         pvStmts.push(
           env.DB.prepare(
             `INSERT INTO page_views_daily (page, date, views)
@@ -177,15 +182,18 @@ export async function onRequestPost(context) {
       if (pvStmts.length > 0) {
         try {
           await executeInChunks(env.DB, pvStmts);
-        } catch (_) {
-          // Table may not exist yet if migration hasn't run
+        } catch (err) {
+          logger.warn(
+            "page_views_daily upsert failed (table may be missing or write error)",
+            { error: err, statementCount: pvStmts.length },
+          );
         }
       }
     }
 
     return new Response("OK", { status: 200 });
   } catch (error) {
-    console.error("[Metrics] Ingestion error:", error);
+    logger.error("Metrics ingestion error", { error });
     return new Response("OK", { status: 200 });
   }
 }

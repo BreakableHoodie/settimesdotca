@@ -60,17 +60,6 @@ export const FIELD_LIMITS = {
 }
 
 /**
- * Validate and sanitize email
- * @param {string} email - Email string
- * @returns {boolean}
- */
-export function validateEmail(email) {
-  if (!email) return false
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
-/**
  * Validate password strength with enterprise-grade policy.
  * @param {string} password
  * @returns {string|null} Error message or null if valid
@@ -93,38 +82,6 @@ export function validatePasswordStrength(password) {
     return 'Password must contain at least one special character'
   }
   return null
-}
-
-/**
- * Validate and sanitize phone number
- * @param {string} phone - Phone number string
- * @returns {boolean}
- */
-export function validatePhone(phone) {
-  if (!phone) return true // Optional field
-  const phoneRegex = /^[+]?[\d\s().-]+$/
-  return phoneRegex.test(phone)
-}
-
-/**
- * Validate date format
- * @param {string} date - Date string
- * @returns {boolean}
- */
-export function validateDate(date) {
-  if (!date) return false
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-  return dateRegex.test(date)
-}
-
-/**
- * Validate slug format
- * @param {string} slug - URL slug
- * @returns {boolean}
- */
-export function validateSlug(slug) {
-  if (!slug) return false
-  return /^[a-z0-9-]+$/.test(slug)
 }
 
 /**

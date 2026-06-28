@@ -1592,6 +1592,43 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/admin/events/{id}/duplicate:
+    post:
+      tags:
+        - Admin - Events
+      summary: Duplicate an event into a new draft
+      description: |
+        Copies the source event's performances into a new **unpublished draft**
+        identified by the supplied `{ name, date, slug }`. Carries over the
+        source's descriptive fields but not its publish state. Requires the
+        `editor` role.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventDuplicateRequest"
+      responses:
+        "201":
+          description: Event duplicated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDuplicateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/admin/events/wizard:
     post:
       tags:
@@ -3466,6 +3503,34 @@ components:
         message:
           type: string
           nullable: true
+
+    EventDuplicateRequest:
+      type: object
+      required:
+        - name
+        - date
+        - slug
+      properties:
+        name:
+          type: string
+        date:
+          type: string
+          description: ISO date (YYYY-MM-DD) for the new draft
+        slug:
+          type: string
+          description: Unique slug for the new draft
+
+    EventDuplicateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        event:
+          $ref: "#/components/schemas/GenericRecord"
+        bandsCopied:
+          type: integer
+        message:
+          type: string
 
     BandFollowRequest:
       type: object

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: SetTimes API
-  version: "2026-02"
+  version: "2026-06"
   description: |
     Live API contract for the current Cloudflare Pages + D1 implementation.
 
@@ -381,6 +381,42 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/events/{id}/recap:
+    get:
+      tags:
+        - Public
+      summary: Get recap stats and lineup for an archived event
+      description: |
+        Returns `{ event, stats, bands }` for a single **archived** event.
+        `{id}` may be a numeric event ID or a slug. `stats` aggregates
+        `total_sets`, `venue_count`, `first_timers`, and `returning_acts`;
+        each band carries an `is_returning` flag. Gated by
+        `PUBLIC_DATA_PUBLISH_ENABLED`. Cacheable (`max-age=3600`).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric event ID or slug
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event recap response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventRecapResponse"
+        "404":
+          description: Event not found or not archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/bands/{name}:
     get:
       tags:
@@ -438,6 +474,136 @@ paths:
           $ref: "#/components/responses/PublicDataUnavailable"
         "500":
           $ref: "#/components/responses/ServerError"
+
+  /api/bands/{name}/follow:
+    post:
+      tags:
+        - Public
+      summary: Follow a band (double opt-in)
+      description: |
+        Registers an email to be notified when the band joins a lineup. The
+        follow is created **unverified** and only a confirmation email is sent;
+        announcement emails reach verified followers only. Bot-protected by
+        Turnstile (`turnstileToken` in the body). `{name}` may be a numeric band
+        ID or a normalized band name. Always responds `200` for a valid request
+        regardless of whether the email already follows (no enumeration).
+        `confirmUrl` is returned only when email delivery is not configured
+        (local/dev) so the follow can still be confirmed.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Numeric band ID or normalized band name
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BandFollowRequest"
+      responses:
+        "200":
+          description: Follow accepted (confirmation email sent if new)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BandFollowResponse"
+        "400":
+          description: Invalid email or failed bot verification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/bands/{name}/confirm-follow:
+    get:
+      tags:
+        - Public
+      summary: Confirm a pending band follow
+      description: |
+        Verifies a double opt-in band follow via its one-time `token` and
+        renders a friendly HTML page. Idempotent: a second click changes
+        nothing. Messaging is generic so the response never reveals whether a
+        given token was valid.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Numeric band ID or normalized band name
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: true
+          description: One-time verification token from the confirmation email
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML confirmation page (valid, already-used, or expired)
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing or malformed token
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Server error
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/bands/{name}/unfollow:
+    get:
+      tags:
+        - Public
+      summary: Unsubscribe from a band's emails
+      description: |
+        Deletes the band follow tied to the `token` (the unsubscribe token from
+        an email footer) and renders an HTML confirmation page. Returns `200`
+        whether or not the token existed (no enumeration).
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Numeric band ID or normalized band name
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: true
+          description: Unsubscribe token
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML unsubscribe confirmation page
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing or malformed token
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Server error
+          content:
+            text/plain:
+              schema:
+                type: string
 
   /api/feeds/ical:
     get:
@@ -511,6 +677,80 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/schedule/share:
+    post:
+      tags:
+        - Public
+      summary: Create a shareable schedule snapshot
+      description: |
+        Persists a selected lineup for a published or archived event and returns
+        a short `slug` reachable at `/s/{slug}`. Snapshots expire after 30 days.
+        `band_names` must be the same length as `performance_ids` (up to 50).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleShareRequest"
+      responses:
+        "200":
+          description: Share link created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleShareCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/schedule/share/{slug}:
+    get:
+      tags:
+        - Public
+      summary: Fetch a shared schedule snapshot
+      description: |
+        Returns the stored snapshot for a share `slug` if the link is unexpired
+        and its event is still published or archived. Increments a best-effort
+        view counter unless `?import=1` (the re-fetch used when applying the
+        snapshot, so it is not double-counted).
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: 1–16 alphanumeric share slug
+          schema:
+            type: string
+        - name: import
+          in: query
+          required: false
+          description: Set to `1` on the apply re-fetch to skip the view increment
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Share snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleShareResponse"
+        "400":
+          description: Invalid slug
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Share link not found or expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -718,6 +958,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ResetTokenValidationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/auth/reset-password-complete:
+    post:
+      tags:
+        - Public - Auth
+      summary: Complete a password reset (canonical handler)
+      description: |
+        Consumes a one-time reset token and sets a new password, then
+        invalidates all of the user's sessions and trusted devices. This is the
+        canonical handler; `POST /api/auth/reset-password` re-exports it, so both
+        URLs accept the same request and behave identically.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
@@ -1324,11 +1592,49 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /api/admin/events/{id}/duplicate:
+  /api/admin/events/wizard:
     post:
       tags:
         - Admin - Events
-      summary: Duplicate an event into a new draft event
+      summary: Create an event, venues, and lineup in one request
+      description: |
+        Single-request event creation. Accepts `{ event, venues, bands }` and
+        creates a **draft** event, find-or-creates each venue by name, upserts
+        band profiles, and batch-inserts performances atomically. Each
+        `bands[].venueIndex` is a 0-based index into the submitted `venues`
+        array. **Requires the `admin` role** (venue creation is admin-only).
+        Rejects intra-submission time conflicts (`409`) and past draft dates.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventWizardRequest"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/events/{id}/reveal-mode:
+    post:
+      tags:
+        - Admin - Events
+      summary: Toggle an event's reveal mode
+      description: |
+        Sets the event's `reveal_mode` flag. When on, the lineup stays embargoed
+        from public surfaces until reveal. Requires the `editor` role.
       security:
         - AdminSessionCookie: []
           CsrfToken: []
@@ -1339,20 +1645,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EventDuplicateRequest"
+              $ref: "#/components/schemas/RevealModeRequest"
       responses:
-        "201":
-          description: Event duplicated
+        "200":
+          description: Reveal mode updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EventDuplicateResponse"
+                $ref: "#/components/schemas/RevealModeResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -1858,79 +2162,6 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /api/admin/performers/{id}:
-    get:
-      tags:
-        - Admin - Performers
-      summary: Get one performer
-      security:
-        - AdminSessionCookie: []
-      parameters:
-        - $ref: "#/components/parameters/NumericId"
-      responses:
-        "200":
-          description: Performer response
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PerformerResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-    put:
-      tags:
-        - Admin - Performers
-      summary: Update a performer
-      security:
-        - AdminSessionCookie: []
-          CsrfToken: []
-      parameters:
-        - $ref: "#/components/parameters/NumericId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PerformerInput"
-      responses:
-        "200":
-          description: Performer updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PerformerResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "500":
-          $ref: "#/components/responses/ServerError"
-    delete:
-      tags:
-        - Admin - Performers
-      summary: Delete a performer
-      security:
-        - AdminSessionCookie: []
-          CsrfToken: []
-      parameters:
-        - $ref: "#/components/parameters/NumericId"
-      responses:
-        "200":
-          description: Performer deleted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
   /api/admin/users:
     get:
       tags:
@@ -2219,6 +2450,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SubscriptionAnalyticsResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/flush-announce-digest:
+    post:
+      tags:
+        - Admin - Maintenance
+      summary: Flush the pending band-announcement digest queue
+      description: |
+        Groups pending `band_announce_queue` entries by `(email, event)` and
+        sends one digest email per fan per event, recording each successful send
+        in the per-follower idempotency ledger so resend never double-sends.
+        Call after a batch of announce toggles. Requires the `editor` role and a
+        configured email provider (otherwise `400`).
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      responses:
+        "200":
+          description: Digest flushed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlushAnnounceDigestResponse"
+        "400":
+          description: Email provider not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -3053,19 +3314,147 @@ components:
         publish:
           type: boolean
 
-    EventDuplicateRequest:
+    EventRecapResponse:
+      type: object
+      properties:
+        event:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            slug:
+              type: string
+            date:
+              type: string
+        stats:
+          type: object
+          properties:
+            total_sets:
+              type: integer
+            venue_count:
+              type: integer
+            first_timers:
+              type: integer
+            returning_acts:
+              type: integer
+        bands:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              performance_id:
+                type: integer
+              name:
+                type: string
+              genre:
+                type: string
+                nullable: true
+              photo_url:
+                type: string
+                nullable: true
+              start_time:
+                type: string
+                nullable: true
+              end_time:
+                type: string
+                nullable: true
+              venue_id:
+                type: integer
+                nullable: true
+              venue_name:
+                type: string
+                nullable: true
+              is_returning:
+                type: boolean
+
+    EventWizardRequest:
       type: object
       required:
-        - name
-        - date
-        - slug
+        - event
+        - venues
+        - bands
       properties:
-        name:
-          type: string
-        date:
-          type: string
-        slug:
-          type: string
+        event:
+          type: object
+          required:
+            - name
+            - date
+            - slug
+          properties:
+            name:
+              type: string
+            date:
+              type: string
+              description: ISO date (YYYY-MM-DD); must not be in the past
+            slug:
+              type: string
+            description:
+              type: string
+              nullable: true
+        venues:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            required:
+              - name
+            properties:
+              name:
+                type: string
+              address:
+                type: string
+                nullable: true
+        bands:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required:
+              - name
+              - venueIndex
+              - startTime
+              - endTime
+            properties:
+              name:
+                type: string
+              venueIndex:
+                type: integer
+                description: 0-based index into the `venues` array
+              startTime:
+                type: string
+                description: HH:MM
+              endTime:
+                type: string
+                description: HH:MM
+              url:
+                type: string
+                nullable: true
+
+    RevealModeRequest:
+      type: object
+      required:
+        - reveal_mode
+      properties:
+        reveal_mode:
+          type: boolean
+
+    RevealModeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        event:
+          type: object
+          properties:
+            id:
+              type: integer
+            reveal_mode:
+              type: integer
+              enum: [0, 1]
 
     EventMutationResponse:
       type: object
@@ -3078,17 +3467,86 @@ components:
           type: string
           nullable: true
 
-    EventDuplicateResponse:
+    BandFollowRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        turnstileToken:
+          type: string
+          description: Cloudflare Turnstile token; required in production
+
+    BandFollowResponse:
       type: object
       properties:
         success:
           type: boolean
-        event:
-          $ref: "#/components/schemas/GenericRecord"
-        bandsCopied:
-          type: integer
-        message:
+        confirmUrl:
           type: string
+          description: Returned only when email delivery is unconfigured (local/dev)
+
+    ScheduleShareRequest:
+      type: object
+      required:
+        - event_id
+        - event_slug
+        - performance_ids
+        - band_names
+      properties:
+        event_id:
+          type: integer
+        event_slug:
+          type: string
+        performance_ids:
+          type: array
+          maxItems: 50
+          items:
+            type: integer
+        band_names:
+          type: array
+          description: Must be the same length as `performance_ids`
+          items:
+            type: string
+
+    ScheduleShareCreateResponse:
+      type: object
+      properties:
+        slug:
+          type: string
+
+    ScheduleShareResponse:
+      type: object
+      properties:
+        slug:
+          type: string
+        event_slug:
+          type: string
+        event_name:
+          type: string
+        performance_ids:
+          type: array
+          items:
+            type: integer
+        band_names:
+          type: array
+          items:
+            type: string
+
+    FlushAnnounceDigestResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        sent:
+          type: integer
+        failed:
+          type: integer
+        skipped:
+          type: integer
 
     EventMetricsResponse:
       type: object

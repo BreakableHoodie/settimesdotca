@@ -1,7 +1,14 @@
+import { useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
 
 export default function PrivacyPage() {
+  // react-helmet-async does not reliably set document.title in React 19 — set it
+  // directly to match the <Helmet> title below. See BandProfilePage.jsx.
+  useEffect(() => {
+    document.title = 'Privacy Policy | SetTimes'
+  }, [])
+
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
       <Helmet>

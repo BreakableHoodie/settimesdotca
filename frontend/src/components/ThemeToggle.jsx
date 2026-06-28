@@ -52,13 +52,13 @@ export default function ThemeToggle() {
         title="Colour theme"
         className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
       >
-        <span aria-hidden="true" className={`h-5 w-5 rounded-full ${SWATCH_CLASSES[theme]} ring-1 ring-white/40`} />
+        <span aria-hidden="true" className={`h-5 w-5 rounded-full ${SWATCH_CLASSES[theme]} ring-1 ring-border`} />
       </button>
       {open && (
         <div
           role="group"
           aria-label="Colour theme"
-          className="absolute right-0 top-full z-50 mt-1 flex items-center gap-1 rounded-full border border-white/10 bg-bg-purple/95 px-1.5 py-1 shadow-lg backdrop-blur-xs"
+          className="absolute right-0 top-full z-50 mt-1 flex items-center gap-1 rounded-full border border-border bg-bg-purple/95 px-1.5 py-1 shadow-lg backdrop-blur-xs"
         >
           {VALID_THEMES.map(name => {
             const isActive = name === theme
@@ -79,7 +79,7 @@ export default function ThemeToggle() {
                 <span
                   aria-hidden="true"
                   className={`h-5 w-5 rounded-full ${SWATCH_CLASSES[name]} ${
-                    isActive ? 'ring-2 ring-white ring-offset-1 ring-offset-bg-purple' : 'opacity-60'
+                    isActive ? 'ring-2 ring-accent-500 ring-offset-1 ring-offset-bg-purple' : 'opacity-60'
                   }`}
                 />
               </button>

@@ -8,16 +8,7 @@
 // endpoint (bands/[id]/resend-announcement.js).
 import { sendEmail } from "./email.js";
 import { logger } from "./logger.js";
-
-// Escape plain-text band/event names for safe interpolation into the email HTML.
-// Mirrors the escaper in bands/[id].js (regex .replace, the codebase convention).
-const escapeHtml = (s) =>
-  String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+import { escapeHtml } from "./html.js";
 
 export async function notifyBandFollowers(
   env,

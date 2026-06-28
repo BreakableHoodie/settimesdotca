@@ -12,11 +12,7 @@ import {
 } from "../../utils/validation.js";
 import { buildIntervals, intervalsOverlap } from "../../utils/timeConflicts.js";
 import { parseOrigin } from "../../utils/parseOrigin.js";
-
-// Helper to normalize band name
-function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
+import { normalizeBandName } from "../../utils/bandName.js";
 
 async function getEventStatus(DB, eventId) {
   if (!eventId) return null;
@@ -75,7 +71,9 @@ async function checkConflicts(
     bindings.push(excludePerformanceId);
   }
 
-  const { results: existingPerformances } = await DB.prepare(query).bind(...bindings).all();
+  const { results: existingPerformances } = await DB.prepare(query)
+    .bind(...bindings)
+    .all();
   const newIntervals = buildIntervals(startTime, endTime);
   const conflicts = [];
 
@@ -91,7 +89,10 @@ async function checkConflicts(
         name: perf.name,
         startTime: perf.start_time,
         endTime: perf.end_time,
-        type: perf.start_time === startTime && perf.end_time === endTime ? "conflict" : "overlap",
+        type:
+          perf.start_time === startTime && perf.end_time === endTime
+            ? "conflict"
+            : "overlap",
       });
     }
   }
@@ -405,7 +406,7 @@ export async function onRequestPost(context) {
     }
 
     // 1. Find or Create Band Profile
-    const nameNormalized = normalizeName(resolvedName);
+    const nameNormalized = normalizeBandName(resolvedName);
     const parsedOrigin = parseOrigin(origin?.trim());
     const trimmedOriginCity = origin_city
       ? origin_city.trim()

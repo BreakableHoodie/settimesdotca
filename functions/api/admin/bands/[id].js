@@ -11,8 +11,12 @@ import {
   sanitizeString,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
-import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
+import {
+  buildIntervals,
+  intervalsOverlap,
+} from "../../../utils/timeConflicts.js";
 import { parseOrigin } from "../../../utils/parseOrigin.js";
+import { normalizeBandName } from "../../../utils/bandName.js";
 
 // Helper to extract band ID from path
 function getBandId(request) {
@@ -20,11 +24,6 @@ function getBandId(request) {
   const parts = url.pathname.split("/");
   const idIndex = parts.indexOf("bands") + 1;
   return parts[idIndex];
-}
-
-// Helper to normalize band name
-function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 async function getEventForPerformance(DB, performanceId) {
@@ -64,7 +63,9 @@ async function checkConflicts(
     ? [eventId, venueId, excludePerformanceId]
     : [eventId, venueId];
 
-  const { results: existingBands } = await DB.prepare(query).bind(...bindings).all();
+  const { results: existingBands } = await DB.prepare(query)
+    .bind(...bindings)
+    .all();
   const newIntervals = buildIntervals(startTime, endTime);
   const conflicts = [];
 
@@ -80,7 +81,10 @@ async function checkConflicts(
         name: band.name,
         startTime: band.start_time,
         endTime: band.end_time,
-        type: band.start_time === startTime && band.end_time === endTime ? "conflict" : "overlap",
+        type:
+          band.start_time === startTime && band.end_time === endTime
+            ? "conflict"
+            : "overlap",
       });
     }
   }
@@ -162,7 +166,10 @@ export async function onRequestPut(context) {
       const parsed = Number(performanceId.toString().split("_")[1]);
       if (!Number.isInteger(parsed) || parsed <= 0) {
         return new Response(
-          JSON.stringify({ error: "Bad request", message: "Invalid profile ID" }),
+          JSON.stringify({
+            error: "Bad request",
+            message: "Invalid profile ID",
+          }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -264,7 +271,7 @@ export async function onRequestPut(context) {
       // Or maybe we just switch profile?
       // For now, let's just update the profile name if it's unique, or switch if it exists.
 
-      const nameNormalized = normalizeName(name);
+      const nameNormalized = normalizeBandName(name);
       const existingProfile = await DB.prepare(
         `SELECT id FROM band_profiles WHERE name_normalized = ? AND id != ?`,
       )
@@ -430,7 +437,7 @@ export async function onRequestPut(context) {
         profileUpdates.push("name_normalized = ?");
         const sanitizedName = sanitizeString(name);
         profileParams.push(sanitizedName);
-        profileParams.push(normalizeName(sanitizedName));
+        profileParams.push(normalizeBandName(sanitizedName));
       }
 
       // Update other profile fields
@@ -891,7 +898,10 @@ export async function onRequestDelete(context) {
       const bandProfileId = Number(performanceId.toString().split("_")[1]);
       if (!Number.isInteger(bandProfileId) || bandProfileId <= 0) {
         return new Response(
-          JSON.stringify({ error: "Bad request", message: "Invalid profile ID" }),
+          JSON.stringify({
+            error: "Bad request",
+            message: "Invalid profile ID",
+          }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }

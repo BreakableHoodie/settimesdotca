@@ -1,4 +1,5 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
+import { normalizeBandName } from "../../../utils/bandName.js";
 
 /**
  * Public API: Get band profile with rich stats
@@ -8,11 +9,6 @@ import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
  * Returns band profile with performance statistics, upcoming shows, and history
  * Supports both numeric IDs and band names (URL-encoded)
  */
-
-// Normalize band name for lookup against name_normalized
-function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
 
 function formatOrigin(profile) {
   if (!profile) return null;
@@ -75,7 +71,7 @@ export async function onRequestGet(context) {
         .bind(bandId)
         .first();
     } else {
-      const normalized = normalizeName(searchName);
+      const normalized = normalizeBandName(searchName);
       bandProfile = await DB.prepare(
         `
         SELECT * FROM band_profiles

@@ -18,11 +18,11 @@ import {
   FIELD_LIMITS,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
-import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
-
-function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
+import {
+  buildIntervals,
+  intervalsOverlap,
+} from "../../../utils/timeConflicts.js";
+import { normalizeBandName } from "../../../utils/bandName.js";
 
 // Detect scheduling conflicts within the submitted band list (all for a new event).
 function findConflict(bands) {
@@ -162,8 +162,7 @@ export async function onRequestPost(context) {
       if (!startCheck.valid)
         throw new Error(`Band ${i + 1}: ${startCheck.error}`);
       const endCheck = isValidTime(b.endTime);
-      if (!endCheck.valid)
-        throw new Error(`Band ${i + 1}: ${endCheck.error}`);
+      if (!endCheck.valid) throw new Error(`Band ${i + 1}: ${endCheck.error}`);
       if (b.startTime && b.endTime) {
         if (b.startTime === b.endTime) {
           throw new Error(
@@ -253,7 +252,7 @@ export async function onRequestPost(context) {
       // Resolve each band profile (find or create) sequentially — dedup by normalized name
       const profileIds = [];
       for (const band of sanitizedBands) {
-        const normalized = normalizeName(band.name);
+        const normalized = normalizeBandName(band.name);
         let profile = await DB.prepare(
           "SELECT id FROM band_profiles WHERE name_normalized = ?",
         )
@@ -317,7 +316,9 @@ export async function onRequestPost(context) {
     // so we don't leave an empty draft behind.
     if (event?.id) {
       try {
-        await DB.prepare("DELETE FROM events WHERE id = ?").bind(event.id).run();
+        await DB.prepare("DELETE FROM events WHERE id = ?")
+          .bind(event.id)
+          .run();
       } catch (e) {
         console.error("Wizard cleanup failed:", e);
       }

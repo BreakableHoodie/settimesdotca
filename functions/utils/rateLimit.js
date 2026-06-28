@@ -11,51 +11,60 @@
 //    feeds). PoP-local is acceptable here; the goal is DoS protection, not security
 //    enforcement, and fail-open behaviour avoids availability impact.
 
-import { logger } from './logger.js';
+import { logger } from "./logger.js";
 
-const RATE_LIMIT_PREFIX = 'rate-limit:';
+const RATE_LIMIT_PREFIX = "rate-limit:";
+
+// Band action endpoints that send email and must be fail-closed with a tight limit.
+// Scoped to the /follow|unfollow|confirm-follow suffix so that public GET reads
+// (e.g. /api/bands/<name>) are not affected.
+const BAND_ACTION_RE =
+  /^\/api\/bands\/[^/]+\/(follow|unfollow|confirm-follow)$/;
 
 // Rate limit configurations by endpoint pattern.
 // Order matters: more-specific prefixes must appear before less-specific ones.
 const RATE_LIMITS = {
   // Admin auth endpoints — tight limits, fail-closed via D1
-  '/api/admin/auth/login':  { requests: 5,   window: 60  }, // 5 per minute
-  '/api/admin/auth/signup': { requests: 3,   window: 300 }, // 3 per 5 min
-  '/api/admin/auth/':       { requests: 10,  window: 60  }, // logout, MFA, etc.
+  "/api/admin/auth/login": { requests: 5, window: 60 }, // 5 per minute
+  "/api/admin/auth/signup": { requests: 3, window: 300 }, // 3 per 5 min
+  "/api/admin/auth/": { requests: 10, window: 60 }, // logout, MFA, etc.
 
   // Other admin CRUD — generous limit for legitimate editor activity
-  '/api/admin/': { requests: 300, window: 60 },
+  "/api/admin/": { requests: 300, window: 60 },
 
   // Public API endpoints
-  '/api/events': { requests: 60, window: 60 },
-  '/api/schedule/share/': { requests: 60, window: 60 }, // GET /api/schedule/share/[slug]
-  '/api/schedule/share':  { requests: 10, window: 60 }, // POST /api/schedule/share
-  '/api/schedule': { requests: 30, window: 60 },
-  '/api/feeds': { requests: 20, window: 60 },
-  '/api/subscriptions': { requests: 10, window: 60 },
-  '/api/metrics': { requests: 40, window: 60 },
-  '/api/auth/activate': { requests: 10, window: 60 },
-  '/api/auth/resend': { requests: 3, window: 300 },
+  "/api/events": { requests: 60, window: 60 },
+  "/api/schedule/share/": { requests: 60, window: 60 }, // GET /api/schedule/share/[slug]
+  "/api/schedule/share": { requests: 10, window: 60 }, // POST /api/schedule/share
+  "/api/schedule": { requests: 30, window: 60 },
+  "/api/feeds": { requests: 20, window: 60 },
+  "/api/subscriptions": { requests: 10, window: 60 },
+  "/api/metrics": { requests: 40, window: 60 },
+  "/api/auth/activate": { requests: 10, window: 60 },
+  "/api/auth/resend": { requests: 3, window: 300 },
 
   // Default for unmatched public APIs
-  'default': { requests: 30, window: 60 },
+  default: { requests: 30, window: 60 },
 };
 
 // Endpoints to skip rate limiting
 const SKIP_PATTERNS = [
-  '/_',           // Cloudflare internal
+  "/_", // Cloudflare internal
 ];
 
 // Endpoints where a rate-limit failure blocks the request (fail closed).
 // These use D1 for globally-consistent counters.
 const FAIL_CLOSED_PATTERNS = [
-  '/api/admin/auth/',
-  '/api/auth/',
-  '/api/subscriptions',
+  "/api/admin/auth/",
+  "/api/auth/",
+  "/api/subscriptions",
 ];
 
 function shouldFailClosed(pathname) {
-  return FAIL_CLOSED_PATTERNS.some((pattern) => pathname.startsWith(pattern));
+  return (
+    BAND_ACTION_RE.test(pathname) ||
+    FAIL_CLOSED_PATTERNS.some((pattern) => pathname.startsWith(pattern))
+  );
 }
 
 /**
@@ -70,13 +79,17 @@ function getRateLimitConfig(pathname) {
   }
 
   // Only rate limit /api/ routes
-  if (!pathname.startsWith('/api/')) {
+  if (!pathname.startsWith("/api/")) {
     return null;
   }
 
+  // Band action endpoints (follow/unfollow/confirm-follow) — checked before the
+  // prefix loop so that the tight fail-closed limit takes precedence over 'default'.
+  if (BAND_ACTION_RE.test(pathname)) return { requests: 5, window: 300 };
+
   // Find matching config
   for (const [pattern, config] of Object.entries(RATE_LIMITS)) {
-    if (pattern !== 'default' && pathname.startsWith(pattern)) {
+    if (pattern !== "default" && pathname.startsWith(pattern)) {
       return config;
     }
   }
@@ -86,14 +99,17 @@ function getRateLimitConfig(pathname) {
 
 /**
  * Generate a stable key for rate limiting (IP + endpoint base path).
- * Auth sub-routes use 5 segments so login and signup get distinct D1 keys.
+ * Auth sub-routes and band action endpoints use 5 segments so each action
+ * (login, signup, follow, confirm-follow, etc.) gets a distinct D1 key.
  */
 function getRateLimitKey(ip, pathname) {
   const depth =
-    pathname.startsWith('/api/admin/auth/') || pathname.startsWith('/api/auth/')
+    pathname.startsWith("/api/admin/auth/") ||
+    pathname.startsWith("/api/auth/") ||
+    BAND_ACTION_RE.test(pathname)
       ? 5
       : 4;
-  const basePath = pathname.split('/').slice(0, depth).join('/');
+  const basePath = pathname.split("/").slice(0, depth).join("/");
   return `${ip}:${basePath}`;
 }
 
@@ -108,18 +124,24 @@ async function checkRateLimitD1(DB, ip, pathname, config) {
   try {
     // Atomically upsert: insert on first request, or increment/reset on subsequent ones.
     // The CASE expression resets the window when it has expired.
-    await DB.prepare(`
+    await DB.prepare(
+      `
       INSERT INTO rate_limits (key, count, window_start, updated_at)
       VALUES (?1, 1, ?2, ?2)
       ON CONFLICT(key) DO UPDATE SET
         count = CASE WHEN (?2 - window_start) >= ?3 THEN 1 ELSE count + 1 END,
         window_start = CASE WHEN (?2 - window_start) >= ?3 THEN ?2 ELSE window_start END,
         updated_at = ?2
-    `).bind(key, now, config.window).run();
+    `,
+    )
+      .bind(key, now, config.window)
+      .run();
 
     const row = await DB.prepare(
-      'SELECT count, window_start FROM rate_limits WHERE key = ?'
-    ).bind(key).first();
+      "SELECT count, window_start FROM rate_limits WHERE key = ?",
+    )
+      .bind(key)
+      .first();
 
     const count = row?.count ?? 1;
     const windowStart = row?.window_start ?? now;
@@ -133,7 +155,11 @@ async function checkRateLimitD1(DB, ip, pathname, config) {
       limit: config.requests,
     };
   } catch (error) {
-    logger.error('D1 rate limit check failed on sensitive endpoint', { error, ip, pathname });
+    logger.error("D1 rate limit check failed on sensitive endpoint", {
+      error,
+      ip,
+      pathname,
+    });
     // Fail closed: block the request when the counter is unavailable.
     return {
       allowed: false,
@@ -149,7 +175,7 @@ async function checkRateLimitD1(DB, ip, pathname, config) {
  */
 function getCacheKey(ip, pathname) {
   // Normalize path to endpoint base
-  const basePath = pathname.split('/').slice(0, 4).join('/');
+  const basePath = pathname.split("/").slice(0, 4).join("/");
   return `https://rate-limit.internal/${RATE_LIMIT_PREFIX}${ip}:${basePath}`;
 }
 
@@ -171,21 +197,27 @@ export async function checkRateLimit(request, env = null) {
   }
 
   // Get client IP (Cloudflare provides this)
-  const ip = request.headers.get('CF-Connecting-IP') ||
-             request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
-             'unknown';
+  const ip =
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
+    "unknown";
 
   // Loopback IPs (127.0.0.1/::1) only appear in wrangler dev / CI, where miniflare
   // injects the socket's local address. Skip rate limiting entirely — no real IP is available.
-  if (ip === '127.0.0.1' || ip === '::1') {
+  if (ip === "127.0.0.1" || ip === "::1") {
     return { allowed: true, remaining: -1, resetAt: 0 };
   }
 
   // In production, CF-Connecting-IP is always present. If both IP headers are absent,
   // fail closed on auth endpoints (misconfiguration safety) and fail open elsewhere.
-  if (ip === 'unknown') {
+  if (ip === "unknown") {
     if (shouldFailClosed(pathname)) {
-      return { allowed: false, remaining: 0, resetAt: Math.floor(Date.now() / 1000) + 60, limit: config.requests };
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt: Math.floor(Date.now() / 1000) + 60,
+        limit: config.requests,
+      };
     }
     return { allowed: true, remaining: -1, resetAt: 0 };
   }
@@ -226,8 +258,8 @@ export async function checkRateLimit(request, env = null) {
     // Store updated data
     const response = new Response(JSON.stringify(data), {
       headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': `max-age=${config.window}`,
+        "Content-Type": "application/json",
+        "Cache-Control": `max-age=${config.window}`,
       },
     });
 
@@ -241,7 +273,7 @@ export async function checkRateLimit(request, env = null) {
     };
   } catch (error) {
     // Fail open for non-sensitive endpoints to avoid availability impact.
-    logger.warn('Rate limit check failed', { error, ip });
+    logger.warn("Rate limit check failed", { error, ip });
     return { allowed: true, remaining: -1, resetAt: 0 };
   }
 }
@@ -255,9 +287,9 @@ export function rateLimitHeaders(result) {
   }
 
   return {
-    'X-RateLimit-Limit': String(result.limit || 30),
-    'X-RateLimit-Remaining': String(result.remaining),
-    'X-RateLimit-Reset': String(result.resetAt),
+    "X-RateLimit-Limit": String(result.limit || 30),
+    "X-RateLimit-Remaining": String(result.remaining),
+    "X-RateLimit-Reset": String(result.resetAt),
   };
 }
 
@@ -265,22 +297,25 @@ export function rateLimitHeaders(result) {
  * Create 429 Too Many Requests response
  */
 export function rateLimitResponse(result, corsHeaders = {}) {
-  const retryAfter = Math.max(1, result.resetAt - Math.floor(Date.now() / 1000));
+  const retryAfter = Math.max(
+    1,
+    result.resetAt - Math.floor(Date.now() / 1000),
+  );
 
   return new Response(
     JSON.stringify({
-      error: 'Too many requests',
-      message: 'Rate limit exceeded. Please try again later.',
+      error: "Too many requests",
+      message: "Rate limit exceeded. Please try again later.",
       retryAfter,
     }),
     {
       status: 429,
       headers: {
-        'Content-Type': 'application/json',
-        'Retry-After': String(retryAfter),
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfter),
         ...rateLimitHeaders(result),
         ...corsHeaders,
       },
-    }
+    },
   );
 }

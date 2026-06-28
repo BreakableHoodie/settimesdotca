@@ -8,10 +8,15 @@
 // claimed (INSERT OR IGNORE) immediately before sending. A send failure
 // releases the claim so resend-announcement can retry. A concurrent flush or
 // resend that already claimed a slot simply skips that entry.
+//
+// Sends are dispatched in bounded-concurrency chunks (SEND_CONCURRENCY) so
+// a large queue does not exhaust the Worker subrequest cap or wall-clock limit.
 
 import { sendEmail } from "./email.js";
 import { logger } from "./logger.js";
 import { escapeHtml } from "./html.js";
+
+const SEND_CONCURRENCY = 8;
 
 export async function flushAnnounceDigest(env, DB) {
   const publicUrl = env.PUBLIC_URL || "https://settimes.ca";
@@ -36,9 +41,12 @@ export async function flushAnnounceDigest(env, DB) {
     groups.get(key).push(item);
   }
 
-  let sent = 0;
-  let failed = 0;
   let skipped = 0;
+
+  // ── Phase A (sequential) ─────────────────────────────────────────────────
+  // For each group: claim slots, delete queue rows, build the email payload.
+  // Ordering is preserved: claim-before-send is the idempotency contract.
+  const sendTasks = [];
 
   for (const items of groups.values()) {
     const { email, event_name, event_slug } = items[0];
@@ -72,7 +80,7 @@ export async function flushAnnounceDigest(env, DB) {
       continue;
     }
 
-    // Build the email.
+    // Build the email payload.
     const bands = claimed.map((item) => item.band_name);
     const subject =
       bands.length === 1
@@ -104,14 +112,28 @@ export async function flushAnnounceDigest(env, DB) {
         ? `<p><strong>${escapeHtml(bands[0])}</strong> is now on the lineup for <strong>${escapeHtml(event_name)}</strong>.</p><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`
         : `<p><strong>${bands.length} bands you follow</strong> just joined the lineup for <strong>${escapeHtml(event_name)}</strong>:</p><ul>${bandListHtml}</ul><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`;
 
-    const result = await sendEmail(env, { to: email, subject, text, html });
+    sendTasks.push({ email, subject, text, html, claimed });
+  }
 
+  // ── Phase B (bounded concurrency) ────────────────────────────────────────
+  // Send the collected tasks in chunks of SEND_CONCURRENCY. On send failure,
+  // release that task's claims so resend-announcement can recover.
+  let sent = 0;
+  let failed = 0;
+
+  async function sendOne(task) {
+    const result = await sendEmail(env, {
+      to: task.email,
+      subject: task.subject,
+      text: task.text,
+      html: task.html,
+    });
     if (result?.delivered) {
       sent++;
     } else {
       // Release claims so resend-announcement can recover this fan.
       await DB.batch(
-        claimed.map((item) =>
+        task.claimed.map((item) =>
           DB.prepare(
             "DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?",
           ).bind(item.performance_id, item.band_follow_id),
@@ -119,6 +141,11 @@ export async function flushAnnounceDigest(env, DB) {
       );
       failed++;
     }
+  }
+
+  for (let i = 0; i < sendTasks.length; i += SEND_CONCURRENCY) {
+    const chunk = sendTasks.slice(i, i + SEND_CONCURRENCY);
+    await Promise.allSettled(chunk.map(sendOne));
   }
 
   if (failed > 0) {

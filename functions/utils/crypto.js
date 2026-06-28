@@ -4,7 +4,7 @@
 
 const SALT_LENGTH = 16;
 const LEGACY_ITERATIONS = 100000;
-const DEFAULT_ITERATIONS = 100000;
+const DEFAULT_ITERATIONS = 600000;
 const KEY_LENGTH = 32;
 
 export function timingSafeEqual(a, b) {

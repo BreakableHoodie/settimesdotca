@@ -1,9 +1,18 @@
 import { hashPassword } from "../../../utils/crypto.js";
-import { isValidEmail, validatePassword, FIELD_LIMITS } from "../../../utils/validation.js";
+import {
+  isValidEmail,
+  validatePassword,
+  FIELD_LIMITS,
+} from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 import { isEmailConfigured, sendEmail } from "../../../utils/email.js";
 import { buildActivationEmail } from "../../../utils/emailTemplates.js";
-import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import {
+  AUTH_ATTEMPT_TYPES,
+  checkAuthRateLimit,
+  writeAuthAttempt,
+} from "../../../utils/authAttempts.js";
+import { logger } from "../../../utils/logger.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -24,7 +33,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -38,7 +47,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -52,7 +61,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -72,7 +81,7 @@ export async function onRequestPost(context) {
         {
           status: 429,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -93,7 +102,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -105,7 +114,7 @@ export async function onRequestPost(context) {
       AND is_active = 1
       AND expires_at > datetime('now')
       AND used_by_user_id IS NULL
-    `
+    `,
     )
       .bind(inviteCode)
       .first();
@@ -130,7 +139,7 @@ export async function onRequestPost(context) {
         {
           status: 403,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -154,7 +163,7 @@ export async function onRequestPost(context) {
         {
           status: 403,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -165,13 +174,13 @@ export async function onRequestPost(context) {
     // Ignore any role parameter passed by client to prevent privilege escalation
     if (role === "admin") {
       console.warn(
-        `Signup attempt with admin role blocked for email: ${email}`
+        `Signup attempt with admin role blocked for email: ${email}`,
       );
     }
 
     // Check if user already exists
     const existingUser = await DB.prepare(
-      "SELECT id FROM users WHERE email = ?"
+      "SELECT id FROM users WHERE email = ?",
     )
       .bind(email)
       .first();
@@ -185,7 +194,7 @@ export async function onRequestPost(context) {
         {
           status: 409,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -196,7 +205,9 @@ export async function onRequestPost(context) {
         ? String(firstName).trim()
         : "";
     let resolvedLastName =
-      lastName !== undefined && lastName !== null ? String(lastName).trim() : "";
+      lastName !== undefined && lastName !== null
+        ? String(lastName).trim()
+        : "";
 
     if ((!resolvedFirstName || !resolvedLastName) && fallbackName) {
       const parts = fallbackName.split(/\s+/).filter(Boolean);
@@ -217,7 +228,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -229,12 +240,12 @@ export async function onRequestPost(context) {
     const activationToken =
       crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
     const activationExpires = new Date(
-      Date.now() + 24 * 60 * 60 * 1000
+      Date.now() + 24 * 60 * 60 * 1000,
     ).toISOString();
 
     // Create user (inactive until activation)
     const user = await DB.prepare(
-      "INSERT INTO users (email, password_hash, name, first_name, last_name, role, is_active, activation_token, activation_token_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, email, name, first_name, last_name, role"
+      "INSERT INTO users (email, password_hash, name, first_name, last_name, role, is_active, activation_token, activation_token_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, email, name, first_name, last_name, role",
     )
       .bind(
         email,
@@ -245,13 +256,13 @@ export async function onRequestPost(context) {
         userRole,
         0,
         activationToken,
-        activationExpires
+        activationExpires,
       )
       .first();
 
     // Mark invite code as used
     await DB.prepare(
-      "UPDATE invite_codes SET used_by_user_id = ?, used_at = datetime('now') WHERE code = ?"
+      "UPDATE invite_codes SET used_by_user_id = ?, used_at = datetime('now') WHERE code = ?",
     )
       .bind(user.id, inviteCode)
       .run();
@@ -271,10 +282,14 @@ export async function onRequestPost(context) {
     activationUrl.searchParams.set("token", activationToken);
 
     let emailResult = { delivered: false, reason: "not_configured" };
-    console.log("[Signup] Checking email configuration for activation email...");
+    logger.debug("checking email configuration for activation email", {
+      userId: user.id,
+    });
 
     if (isEmailConfigured(env)) {
-      console.log("[Signup] Email is configured, building activation email...");
+      logger.debug("email configured, sending activation email", {
+        userId: user.id,
+      });
       const emailPayload = buildActivationEmail({
         activationUrl: activationUrl.toString(),
         recipientName: resolvedName || null,
@@ -286,9 +301,11 @@ export async function onRequestPost(context) {
         text: emailPayload.text,
         html: emailPayload.html,
       });
-      console.log("[Signup] Activation email delivery attempted.");
+      logger.debug("activation email delivery attempted", { userId: user.id });
     } else {
-      console.warn("[Signup] Email not configured; activation email was not sent.");
+      console.warn(
+        "[Signup] Email not configured; activation email was not sent.",
+      );
     }
 
     return new Response(
@@ -302,7 +319,7 @@ export async function onRequestPost(context) {
       {
         status: 201,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Signup error:", error);
@@ -314,7 +331,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

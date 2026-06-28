@@ -1,5 +1,6 @@
 // Trusted Device utilities for "Remember this device" MFA feature
 import { isDevRequest } from "./auth.js";
+import { logger } from "./logger.js";
 
 // __Host- prefix enforces Secure + Path=/ + no Domain, preventing subdomain injection.
 // Must align with the name used in getTrustedDeviceToken's cookie parsing.
@@ -12,7 +13,10 @@ const TRUSTED_DEVICE_EXPIRY_DAYS = 30;
  */
 async function sha256Hex(input) {
   const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(input));
+  const hashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    encoder.encode(input),
+  );
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -57,7 +61,6 @@ async function hashTrustedDeviceToken(token) {
   return sha256Hex(token);
 }
 
-
 /**
  * Create a trusted device entry in the database
  */
@@ -70,16 +73,26 @@ export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
   // TEXT comparisons against datetime('now') are lexicographically correct.
   // ISO 8601 with 'T' compares greater than space-separated format at the
   // same instant, which would allow expired devices to pass validation.
-  const expiresAt = new Date(Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+  const expiresAt = new Date(
+    Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+  )
     .toISOString()
     .replace("T", " ")
     .slice(0, 19);
 
   await DB.prepare(
     `INSERT INTO trusted_devices (user_id, token, device_fingerprint, ua_hash, ip_address, user_agent, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
-    .bind(userId, tokenHash, fingerprint, uaHash, ipAddress, userAgent, expiresAt)
+    .bind(
+      userId,
+      tokenHash,
+      fingerprint,
+      uaHash,
+      ipAddress,
+      userAgent,
+      expiresAt,
+    )
     .run();
 
   return { token, expiresAt };
@@ -97,7 +110,7 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
   const device = await DB.prepare(
     `SELECT id, user_id, token, device_fingerprint, ua_hash, ip_address, expires_at
      FROM trusted_devices
-     WHERE token = ? AND expires_at > datetime('now')`
+     WHERE token = ? AND expires_at > datetime('now')`,
   )
     .bind(tokenHash)
     .first();
@@ -122,7 +135,10 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
   //      password-authenticated login — it is not a standalone credential.
   // If the threat model tightens (e.g. admin-only high-value accounts), revisit
   // by adding IP-range/ASN checks rather than exact-IP pinning.
-  const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
+  const currentFingerprint = await generateDeviceFingerprint(
+    ipAddress,
+    userAgent,
+  );
   const currentUaHash = await generateUaHash(userAgent);
 
   const fingerprintMatch = timingSafeStringEqual(
@@ -133,22 +149,29 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
   if (device.ua_hash) {
     const uaMatch = timingSafeStringEqual(device.ua_hash, currentUaHash);
     if (!uaMatch) {
-      console.log("[TrustedDevice] UA mismatch, device not trusted");
+      logger.debug("trusted device UA mismatch, device not trusted", {
+        userId: device.user_id,
+      });
       return null;
     }
     if (!fingerprintMatch) {
       // UA matches but IP changed — normal for DHCP, mobile, VPN users.
       // Fingerprint is refreshed in the update below.
-      console.log("[TrustedDevice] IP changed for known UA, refreshing fingerprint");
+      logger.debug(
+        "trusted device IP changed for known UA, refreshing fingerprint",
+        { userId: device.user_id },
+      );
     }
   } else if (!fingerprintMatch) {
-    console.log("[TrustedDevice] Fingerprint mismatch, device not trusted");
+    logger.debug("trusted device fingerprint mismatch, device not trusted", {
+      userId: device.user_id,
+    });
     return null;
   }
 
   // Always refresh last_used_at; also refresh IP and fingerprint so they stay current
   await DB.prepare(
-    `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ?, device_fingerprint = ? WHERE id = ?`
+    `UPDATE trusted_devices SET last_used_at = datetime('now'), ip_address = ?, device_fingerprint = ? WHERE id = ?`,
   )
     .bind(ipAddress, currentFingerprint, device.id)
     .run();
@@ -180,7 +203,7 @@ export async function revokeAllTrustedDevices(DB, userId) {
  */
 export async function cleanupExpiredDevices(DB) {
   await DB.prepare(
-    `DELETE FROM trusted_devices WHERE expires_at <= datetime('now')`
+    `DELETE FROM trusted_devices WHERE expires_at <= datetime('now')`,
   ).run();
 }
 
@@ -190,7 +213,9 @@ export async function cleanupExpiredDevices(DB) {
  */
 export function createTrustedDeviceCookie(token, request, env) {
   const isDev = isDevRequest(request, env);
-  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
+  const cookieName = isDev
+    ? TRUSTED_DEVICE_COOKIE_NAME_DEV
+    : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
   const maxAge = TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60;
 
   const parts = [
@@ -213,7 +238,9 @@ export function createTrustedDeviceCookie(token, request, env) {
  */
 export function deleteTrustedDeviceCookie(request, env) {
   const isDev = isDevRequest(request, env);
-  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
+  const cookieName = isDev
+    ? TRUSTED_DEVICE_COOKIE_NAME_DEV
+    : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
   const secure = isDev ? "" : "Secure; ";
 
   return `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
@@ -229,7 +256,10 @@ export function getTrustedDeviceToken(request) {
   const cookies = cookieHeader.split(";");
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split("=");
-    if (name === TRUSTED_DEVICE_COOKIE_NAME_SECURE || name === TRUSTED_DEVICE_COOKIE_NAME_DEV) {
+    if (
+      name === TRUSTED_DEVICE_COOKIE_NAME_SECURE ||
+      name === TRUSTED_DEVICE_COOKIE_NAME_DEV
+    ) {
       return value;
     }
   }

@@ -3,16 +3,21 @@
 // Body: { email: string, password: string }
 // Returns: { success: true, user: object } or error
 
-import { verifyPassword } from "../../../utils/crypto.js";
+import { verifyPassword, hashPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
-import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import {
+  AUTH_ATTEMPT_TYPES,
+  checkAuthRateLimit,
+  writeAuthAttempt,
+} from "../../../utils/authAttempts.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import {
   getTrustedDeviceToken,
   validateTrustedDevice,
 } from "../../../utils/trustedDevice.js";
+import { logger } from "../../../utils/logger.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -33,7 +38,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -56,7 +61,7 @@ export async function onRequestPost(context) {
         {
           status: 429,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -77,7 +82,7 @@ export async function onRequestPost(context) {
         {
           status: 429,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -89,7 +94,7 @@ export async function onRequestPost(context) {
              totp_enabled, totp_secret
       FROM users
       WHERE LOWER(email) = ?
-    `
+    `,
     )
       .bind(email)
       .first();
@@ -113,64 +118,13 @@ export async function onRequestPost(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
-    // Check if account is activated
-    if (user.is_active === 0 && !user.activated_at) {
-      await writeAuthAttempt(DB, {
-        attemptType: AUTH_ATTEMPT_TYPES.login,
-        email,
-        failureReason: "activation_required",
-        ipAddress,
-        success: false,
-        userAgent,
-        userId: user.id,
-      });
-
-      // Use 401 + generic message to prevent account enumeration.
-      // requiresActivation hint is preserved for UX but does not change HTTP status.
-      return new Response(
-        JSON.stringify({
-          error: "Authentication failed",
-          message: "Invalid email or password",
-          requiresActivation: true,
-        }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Check if account is active (deactivated)
-    if (user.is_active === 0) {
-      // Log failed attempt (account disabled)
-      await writeAuthAttempt(DB, {
-        attemptType: AUTH_ATTEMPT_TYPES.login,
-        email,
-        failureReason: "account_disabled",
-        ipAddress,
-        success: false,
-        userAgent,
-        userId: user.id,
-      });
-
-      // Use 401 + generic message to prevent account enumeration via status codes.
-      return new Response(
-        JSON.stringify({
-          error: "Authentication failed",
-          message: "Invalid email or password",
-        }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Verify password
+    // Verify password FIRST to prevent account-enumeration via account-state branches.
+    // An attacker submitting any password to an existing email must not learn whether
+    // the account exists or what state it is in until they prove knowledge of the password.
     const passwordValid = await verifyPassword(password, user.password_hash);
 
     if (!passwordValid) {
@@ -193,7 +147,77 @@ export async function onRequestPost(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
+      );
+    }
+
+    // Password is valid — opportunistically upgrade the hash if it was created with
+    // fewer than 600 000 iterations. Best-effort: a write failure must not block login.
+    try {
+      const storedIterations = Number(user.password_hash.split("$")[1]);
+      if (storedIterations && storedIterations < 600000) {
+        const newHash = await hashPassword(password);
+        await DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
+          .bind(newHash, user.id)
+          .run();
+      }
+    } catch (rehashError) {
+      logger.warn("opportunistic password rehash failed (login not affected)", {
+        userId: user.id,
+        error: rehashError?.message,
+      });
+    }
+
+    // Password proven — now safe to reveal account state without enumeration risk.
+
+    // Check if account is not yet activated (registered but email not confirmed)
+    if (user.is_active === 0 && !user.activated_at) {
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "activation_required",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: user.id,
+      });
+
+      // Password was proven above, so revealing requiresActivation here does not
+      // enable account enumeration — the caller already knows the password is correct.
+      return new Response(
+        JSON.stringify({
+          error: "Authentication failed",
+          message: "Invalid email or password",
+          requiresActivation: true,
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Check if account has been deactivated by an admin
+    if (user.is_active === 0) {
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.login,
+        email,
+        failureReason: "account_disabled",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: user.id,
+      });
+
+      return new Response(
+        JSON.stringify({
+          error: "Authentication failed",
+          message: "Invalid email or password",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -208,18 +232,25 @@ export async function onRequestPost(context) {
             DB,
             trustedDeviceToken,
             ipAddress,
-            userAgent
+            userAgent,
           );
           if (trustedUserId === user.id) {
-            console.log("[Login] Trusted device validated, skipping MFA for user:", user.id);
+            logger.debug("trusted device validated, skipping MFA", {
+              userId: user.id,
+            });
             skipMfa = true;
           } else if (trustedUserId !== null) {
-            console.log("[Login] Trusted device belongs to different user");
+            logger.debug("trusted device belongs to different user", {
+              userId: user.id,
+            });
           }
         }
       } catch (trustedDeviceError) {
         // Don't fail login if trusted device check fails - just require MFA
-        console.error("[Login] Trusted device check failed:", trustedDeviceError?.message || trustedDeviceError);
+        console.error(
+          "[Login] Trusted device check failed:",
+          trustedDeviceError?.message || trustedDeviceError,
+        );
         skipMfa = false;
       }
     }
@@ -229,7 +260,10 @@ export async function onRequestPost(context) {
       try {
         totpSecretState = await loadTotpSecret(user.totp_secret, env);
       } catch (error) {
-        console.error("[Login] Failed to decrypt TOTP secret:", error?.message || error);
+        console.error(
+          "[Login] Failed to decrypt TOTP secret:",
+          error?.message || error,
+        );
         return new Response(
           JSON.stringify({
             error: "MFA configuration error",
@@ -239,7 +273,7 @@ export async function onRequestPost(context) {
           {
             status: 500,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -247,7 +281,7 @@ export async function onRequestPost(context) {
         await DB.prepare(
           `UPDATE users
            SET totp_secret = ?
-           WHERE id = ? AND totp_secret = ?`
+           WHERE id = ? AND totp_secret = ?`,
         )
           .bind(totpSecretState.encryptedSecret, user.id, user.totp_secret)
           .run();
@@ -266,7 +300,7 @@ export async function onRequestPost(context) {
           {
             status: 500,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -277,7 +311,7 @@ export async function onRequestPost(context) {
       // which would allow expired challenges to pass the verify query.
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
         .toISOString()
-        .replace('T', ' ')
+        .replace("T", " ")
         .slice(0, 19);
 
       await DB.prepare(
@@ -290,7 +324,7 @@ export async function onRequestPost(context) {
            expires_at = excluded.expires_at,
            used = 0,
            used_at = NULL,
-           created_at = datetime('now')`
+           created_at = datetime('now')`,
       )
         .bind(mfaToken, user.id, ipAddress, userAgent, expiresAt)
         .run();
@@ -322,7 +356,7 @@ export async function onRequestPost(context) {
         {
           status: 200,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -333,14 +367,14 @@ export async function onRequestPost(context) {
     await DB.prepare(
       `UPDATE lucia_sessions
        SET ip_address = ?, user_agent = ?, remember_me = ?
-       WHERE id = ?`
+       WHERE id = ?`,
     )
       .bind(ipAddress, userAgent, 0, session.id)
       .run();
 
     // Update last login
     await DB.prepare(
-      "UPDATE users SET last_login = datetime('now') WHERE id = ?"
+      "UPDATE users SET last_login = datetime('now') WHERE id = ?",
     )
       .bind(user.id)
       .run();
@@ -362,7 +396,10 @@ export async function onRequestPost(context) {
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", lucia.createSessionCookie(session.id).serialize());
+    headers.append(
+      "Set-Cookie",
+      lucia.createSessionCookie(session.id).serialize(),
+    );
     headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     return new Response(
@@ -383,7 +420,7 @@ export async function onRequestPost(context) {
       {
         status: 200,
         headers,
-      }
+      },
     );
   } catch (error) {
     console.error("Login error:", error);
@@ -396,7 +433,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

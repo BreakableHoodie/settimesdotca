@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { normalizeBandName } from "../utils/bandName.js";
 
 export function createTestDB() {
   const db = new Database(":memory:");
@@ -406,7 +407,7 @@ export function insertBand(
   } = {},
 ) {
   // Insert into band_profiles + performances (v2 schema)
-  const nameNormalized = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const nameNormalized = normalizeBandName(name);
   let profileId;
   const resolvedSocialLinks =
     social_links ?? (url ? JSON.stringify({ website: url }) : null);

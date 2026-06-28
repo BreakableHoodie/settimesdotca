@@ -18,6 +18,7 @@ import {
 } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
 import { parseOrigin } from "../../utils/parseOrigin.js";
+import { normalizeBandName } from "../../utils/bandName.js";
 
 const ROLE_LEVELS = { admin: 3, editor: 2, viewer: 1 };
 
@@ -31,12 +32,6 @@ function sanitizeOptionalText(value, maxLength) {
   }
   return text;
 }
-
-// Helper to normalize band name for uniqueness check
-function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
 
 // Helper to unpack social links
 function unpackSocialLinks(performer) {
@@ -130,7 +125,10 @@ export async function onRequestGet(context) {
       return new Response(
         JSON.stringify({
           success: true,
-          performer: { ...redactPerformerForRole(unpackSocialLinks(performer), role), stats },
+          performer: {
+            ...redactPerformerForRole(unpackSocialLinks(performer), role),
+            stats,
+          },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
@@ -221,7 +219,7 @@ export async function onRequestPost(context) {
     }
 
     const resolvedName = sanitizeOptionalText(name, FIELD_LIMITS.bandName.max);
-    const nameNormalized = normalizeName(resolvedName);
+    const nameNormalized = normalizeBandName(resolvedName);
 
     // Check for duplicate name
     const existing = await DB.prepare(
@@ -247,28 +245,58 @@ export async function onRequestPost(context) {
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
-    const resolvedGenre = sanitizeOptionalText(genre, FIELD_LIMITS.bandGenre.max);
-    const resolvedDescription = sanitizeOptionalText(description, FIELD_LIMITS.bandDescription.max);
+    const resolvedGenre = sanitizeOptionalText(
+      genre,
+      FIELD_LIMITS.bandGenre.max,
+    );
+    const resolvedDescription = sanitizeOptionalText(
+      description,
+      FIELD_LIMITS.bandDescription.max,
+    );
     let resolvedPhotoUrl;
     let resolvedWebsite;
     let resolvedBandcamp;
     let resolvedFacebook;
     try {
-      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL");
-      resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
-      resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max, "Bandcamp URL");
-      resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max, "Facebook URL");
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(
+        photo_url,
+        FIELD_LIMITS.bandUrl.max,
+        "Photo URL",
+      );
+      resolvedWebsite = sanitizeOptionalHttpUrl(
+        url,
+        FIELD_LIMITS.bandUrl.max,
+        "Website URL",
+      );
+      resolvedBandcamp = sanitizeOptionalHttpUrl(
+        bandcamp,
+        FIELD_LIMITS.bandUrl.max,
+        "Bandcamp URL",
+      );
+      resolvedFacebook = sanitizeOptionalHttpUrl(
+        facebook,
+        FIELD_LIMITS.bandUrl.max,
+        "Facebook URL",
+      );
     } catch (error) {
       return new Response(
         JSON.stringify({ error: error.message || "Invalid URL" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
-    const resolvedInstagram = sanitizeOptionalText(instagram, FIELD_LIMITS.socialHandle.max);
-    const resolvedContactEmail = sanitizeOptionalText(contact_email, FIELD_LIMITS.bandContactEmail.max);
+    const resolvedInstagram = sanitizeOptionalText(
+      instagram,
+      FIELD_LIMITS.socialHandle.max,
+    );
+    const resolvedContactEmail = sanitizeOptionalText(
+      contact_email,
+      FIELD_LIMITS.bandContactEmail.max,
+    );
     if (resolvedContactEmail && !isValidEmail(resolvedContactEmail)) {
       return new Response(
-        JSON.stringify({ error: "Contact email must be a valid email address" }),
+        JSON.stringify({
+          error: "Contact email must be a valid email address",
+        }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -413,14 +441,17 @@ export async function onRequestPut(context) {
     // Check for duplicate name (if name is being changed)
     let nameNormalized = null;
     if (name) {
-      const resolvedName = sanitizeOptionalText(name, FIELD_LIMITS.bandName.max);
+      const resolvedName = sanitizeOptionalText(
+        name,
+        FIELD_LIMITS.bandName.max,
+      );
       if (!resolvedName) {
         return new Response(
           JSON.stringify({ error: "Performer name cannot be empty" }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
-      nameNormalized = normalizeName(resolvedName);
+      nameNormalized = normalizeBandName(resolvedName);
       const duplicate = await DB.prepare(
         "SELECT id FROM band_profiles WHERE name_normalized = ? AND id != ?",
       )
@@ -438,28 +469,58 @@ export async function onRequestPut(context) {
     }
 
     // Pack social links
-    const resolvedGenre = sanitizeOptionalText(genre, FIELD_LIMITS.bandGenre.max);
-    const resolvedDescription = sanitizeOptionalText(description, FIELD_LIMITS.bandDescription.max);
+    const resolvedGenre = sanitizeOptionalText(
+      genre,
+      FIELD_LIMITS.bandGenre.max,
+    );
+    const resolvedDescription = sanitizeOptionalText(
+      description,
+      FIELD_LIMITS.bandDescription.max,
+    );
     let resolvedPhotoUrl;
     let resolvedWebsite;
     let resolvedBandcamp;
     let resolvedFacebook;
     try {
-      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL");
-      resolvedWebsite = sanitizeOptionalHttpUrl(performerUrl, FIELD_LIMITS.bandUrl.max, "Website URL");
-      resolvedBandcamp = sanitizeOptionalHttpUrl(bandcamp, FIELD_LIMITS.bandUrl.max, "Bandcamp URL");
-      resolvedFacebook = sanitizeOptionalHttpUrl(facebook, FIELD_LIMITS.bandUrl.max, "Facebook URL");
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(
+        photo_url,
+        FIELD_LIMITS.bandUrl.max,
+        "Photo URL",
+      );
+      resolvedWebsite = sanitizeOptionalHttpUrl(
+        performerUrl,
+        FIELD_LIMITS.bandUrl.max,
+        "Website URL",
+      );
+      resolvedBandcamp = sanitizeOptionalHttpUrl(
+        bandcamp,
+        FIELD_LIMITS.bandUrl.max,
+        "Bandcamp URL",
+      );
+      resolvedFacebook = sanitizeOptionalHttpUrl(
+        facebook,
+        FIELD_LIMITS.bandUrl.max,
+        "Facebook URL",
+      );
     } catch (error) {
       return new Response(
         JSON.stringify({ error: error.message || "Invalid URL" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
-    const resolvedInstagram = sanitizeOptionalText(instagram, FIELD_LIMITS.socialHandle.max);
-    const resolvedContactEmail = sanitizeOptionalText(contact_email, FIELD_LIMITS.bandContactEmail.max);
+    const resolvedInstagram = sanitizeOptionalText(
+      instagram,
+      FIELD_LIMITS.socialHandle.max,
+    );
+    const resolvedContactEmail = sanitizeOptionalText(
+      contact_email,
+      FIELD_LIMITS.bandContactEmail.max,
+    );
     if (resolvedContactEmail && !isValidEmail(resolvedContactEmail)) {
       return new Response(
-        JSON.stringify({ error: "Contact email must be a valid email address" }),
+        JSON.stringify({
+          error: "Contact email must be a valid email address",
+        }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -550,8 +611,8 @@ export async function onRequestDelete(context) {
 
   // RBAC: Require admin role
   const permCheck = await checkPermission(context, "admin");
-    const currentUser = permCheck.user;
-    const ipAddress = getClientIP(request);
+  const currentUser = permCheck.user;
+  const ipAddress = getClientIP(request);
 
   if (permCheck.error) {
     return permCheck.response;

@@ -2,6 +2,7 @@
 // Tests for GET /api/admin/bands/stats/{name}
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { normalizeBandName } from "../../../../utils/bandName.js";
 import { onRequestGet } from "../stats/[name].js";
 import {
   createTestDB,
@@ -77,32 +78,65 @@ function insertBandWithProfile(db, data) {
     social_links = null,
   } = data;
 
-  const nameNormalized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const existingProfile = db.prepare("SELECT id FROM band_profiles WHERE name_normalized = ?").get(nameNormalized);
+  const nameNormalized = normalizeBandName(name);
+  const existingProfile = db
+    .prepare("SELECT id FROM band_profiles WHERE name_normalized = ?")
+    .get(nameNormalized);
   const profileId = existingProfile
     ? existingProfile.id
-    : db.prepare(
-      "INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).run(name, nameNormalized, genre, origin, description, photo_url, social_links).lastInsertRowid;
+    : db
+        .prepare(
+          "INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .run(
+          name,
+          nameNormalized,
+          genre,
+          origin,
+          description,
+          photo_url,
+          social_links,
+        ).lastInsertRowid;
 
   if (existingProfile) {
     const updates = [];
     const values = [];
-    if (genre !== null) { updates.push('genre = ?'); values.push(genre); }
-    if (origin !== null) { updates.push('origin = ?'); values.push(origin); }
-    if (description !== null) { updates.push('description = ?'); values.push(description); }
-    if (photo_url !== null) { updates.push('photo_url = ?'); values.push(photo_url); }
-    if (social_links !== null) { updates.push('social_links = ?'); values.push(social_links); }
+    if (genre !== null) {
+      updates.push("genre = ?");
+      values.push(genre);
+    }
+    if (origin !== null) {
+      updates.push("origin = ?");
+      values.push(origin);
+    }
+    if (description !== null) {
+      updates.push("description = ?");
+      values.push(description);
+    }
+    if (photo_url !== null) {
+      updates.push("photo_url = ?");
+      values.push(photo_url);
+    }
+    if (social_links !== null) {
+      updates.push("social_links = ?");
+      values.push(social_links);
+    }
     if (updates.length > 0) {
-      db.prepare(`UPDATE band_profiles SET ${updates.join(', ')} WHERE id = ?`).run(...values, profileId);
+      db.prepare(
+        `UPDATE band_profiles SET ${updates.join(", ")} WHERE id = ?`,
+      ).run(...values, profileId);
     }
   }
 
-  const info = db.prepare(
-    "INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(event_id, venue_id, profileId, start_time, end_time, null);
+  const info = db
+    .prepare(
+      "INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes) VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .run(event_id, venue_id, profileId, start_time, end_time, null);
 
-  return db.prepare("SELECT * FROM performances WHERE id = ?").get(info.lastInsertRowid);
+  return db
+    .prepare("SELECT * FROM performances WHERE id = ?")
+    .get(info.lastInsertRowid);
 }
 
 describe("GET /api/admin/bands/stats/:name", () => {
@@ -121,7 +155,10 @@ describe("GET /api/admin/bands/stats/:name", () => {
   describe("Authentication & Authorization", () => {
     it("should allow viewer role to access stats", async () => {
       // Arrange
-      const event = insertEvent(db, { name: "Test Event", slug: "test-event-1" });
+      const event = insertEvent(db, {
+        name: "Test Event",
+        slug: "test-event-1",
+      });
       const venue = insertVenue(db, { name: "Test Venue" });
       insertBandWithProfile(db, {
         name: "Test Band",
@@ -157,7 +194,10 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should allow editor and admin roles", async () => {
       // Arrange
-      const event = insertEvent(db, { name: "Test Event", slug: "test-event-2" });
+      const event = insertEvent(db, {
+        name: "Test Event",
+        slug: "test-event-2",
+      });
       const venue = insertVenue(db, { name: "Test Venue" });
       insertBandWithProfile(db, {
         name: "Test Band",
@@ -224,7 +264,10 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should handle URL-encoded band names", async () => {
       // Arrange
-      const event = insertEvent(db, { name: "Test Event", slug: "test-event-3" });
+      const event = insertEvent(db, {
+        name: "Test Event",
+        slug: "test-event-3",
+      });
       const venue = insertVenue(db, { name: "Test Venue" });
       insertBandWithProfile(db, {
         name: "The Rock Band",
@@ -255,7 +298,10 @@ describe("GET /api/admin/bands/stats/:name", () => {
   describe("Data Retrieval", () => {
     it("should return stats for existing band", async () => {
       // Arrange
-      const event = insertEvent(db, { name: "Test Event", slug: "test-event-4" });
+      const event = insertEvent(db, {
+        name: "Test Event",
+        slug: "test-event-4",
+      });
       const venue = insertVenue(db, { name: "Test Venue" });
       insertBandWithProfile(db, {
         name: "Test Band",
@@ -294,7 +340,10 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should be case-insensitive when matching band names", async () => {
       // Arrange
-      const event = insertEvent(db, { name: "Test Event", slug: "test-event-5" });
+      const event = insertEvent(db, {
+        name: "Test Event",
+        slug: "test-event-5",
+      });
       const venue = insertVenue(db, { name: "Test Venue" });
       insertBandWithProfile(db, {
         name: "Test Band",
@@ -378,7 +427,11 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should count unique venues correctly", async () => {
       // Arrange - Same band at 3 different venues
-      const event = insertEvent(db, { name: "Event", slug: "multi-venue-event", date: "2025-06-01" });
+      const event = insertEvent(db, {
+        name: "Event",
+        slug: "multi-venue-event",
+        date: "2025-06-01",
+      });
       const venue1 = insertVenue(db, { name: "Venue 1" });
       const venue2 = insertVenue(db, { name: "Venue 2" });
       const venue3 = insertVenue(db, { name: "Venue 3" });
@@ -484,7 +537,11 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should handle bands with null venue_id", async () => {
       // Arrange - Band with event but no venue
-      const event = insertEvent(db, { name: "Virtual Event", slug: "virtual-event", date: "2025-06-01" });
+      const event = insertEvent(db, {
+        name: "Virtual Event",
+        slug: "virtual-event",
+        date: "2025-06-01",
+      });
       insertBandWithProfile(db, {
         name: "Virtual Band",
         event_id: event.id,
@@ -563,7 +620,11 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should include all profile fields", async () => {
       // Arrange
-      const event = insertEvent(db, { name: "Test Event", slug: "profile-test-event", date: "2025-06-01" });
+      const event = insertEvent(db, {
+        name: "Test Event",
+        slug: "profile-test-event",
+        date: "2025-06-01",
+      });
       const venue = insertVenue(db, { name: "Test Venue" });
       insertBandWithProfile(db, {
         name: "Complete Band",
@@ -673,7 +734,10 @@ describe("GET /api/admin/bands/stats/:name", () => {
         date: "2025-07-15",
       });
       // Update event city
-      db.prepare("UPDATE events SET city = ? WHERE id = ?").run("Central Park", event.id);
+      db.prepare("UPDATE events SET city = ? WHERE id = ?").run(
+        "Central Park",
+        event.id,
+      );
 
       const venue = insertVenue(db, { name: "Main Stage" });
       insertBandWithProfile(db, {
@@ -703,7 +767,11 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should include venue details when present", async () => {
       // Arrange
-      const event = insertEvent(db, { name: "Jazz Night", slug: "jazz-night", date: "2025-06-01" });
+      const event = insertEvent(db, {
+        name: "Jazz Night",
+        slug: "jazz-night",
+        date: "2025-06-01",
+      });
       const venue = insertVenue(db, {
         name: "Blue Note Jazz Club",
         address: "131 W 3rd St, New York, NY",
@@ -803,8 +871,15 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should match response format specification", async () => {
       // Arrange
-      const event = insertEvent(db, { name: "Format Test", slug: "format-test", date: "2025-06-01" });
-      db.prepare("UPDATE events SET city = ? WHERE id = ?").run("Test Location", event.id);
+      const event = insertEvent(db, {
+        name: "Format Test",
+        slug: "format-test",
+        date: "2025-06-01",
+      });
+      db.prepare("UPDATE events SET city = ? WHERE id = ?").run(
+        "Test Location",
+        event.id,
+      );
 
       const venue = insertVenue(db, {
         name: "Format Venue",

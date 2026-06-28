@@ -9,6 +9,7 @@
 import { auditLog, checkPermission } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
 import { isValidTime } from "../../../utils/validation.js";
+import { normalizeBandName } from "../../../utils/bandName.js";
 
 const MAX_IMPORT_ROWS = 200;
 const MAX_NAME_LENGTH = 200;
@@ -18,10 +19,6 @@ function json(body, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
-}
-
-function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 export async function onRequestPost(context) {
@@ -101,7 +98,7 @@ export async function onRequestPost(context) {
     }
     return {
       name,
-      nameNormalized: normalizeName(name),
+      nameNormalized: normalizeBandName(name),
       genre: row.genre ? String(row.genre).trim() : null,
       origin: row.origin ? String(row.origin).trim() : null,
       startTime,

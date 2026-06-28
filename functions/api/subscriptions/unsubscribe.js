@@ -1,17 +1,7 @@
 // Unsubscribe endpoint
 // GET /api/subscriptions/unsubscribe?token=xxx
 
-// HTML escape function to prevent XSS
-function escapeHtml(text) {
-  const map = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  };
-  return text.replace(/[&<>"']/g, (m) => map[m]);
-}
+import { escapeHtml } from "../../utils/html.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;

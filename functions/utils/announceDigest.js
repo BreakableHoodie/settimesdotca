@@ -11,14 +11,7 @@
 
 import { sendEmail } from "./email.js";
 import { logger } from "./logger.js";
-
-const escapeHtml = (s) =>
-  String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+import { escapeHtml } from "./html.js";
 
 export async function flushAnnounceDigest(env, DB) {
   const publicUrl = env.PUBLIC_URL || "https://settimes.ca";

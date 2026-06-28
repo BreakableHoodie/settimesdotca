@@ -4,13 +4,7 @@
 // (see admin/bands/[id].js + resend-announcement.js). Returns a friendly HTML
 // page; messaging is generic to avoid leaking whether a given token was valid.
 
-const escapeHtml = (s) =>
-  String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+import { escapeHtml } from "../../../utils/html.js";
 
 const htmlPage = (heading, body) =>
   new Response(

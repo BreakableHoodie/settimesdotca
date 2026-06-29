@@ -14,6 +14,7 @@ import * as eventsHandler from "../../events.js";
 import * as eventIdHandler from "../[id].js";
 import * as archiveHandler from "../[id]/archive.js";
 import * as publishHandler from "../[id]/publish.js";
+import * as duplicateHandler from "../[id]/duplicate.js";
 
 // Mock the middleware module used by the handler
 vi.mock("../../_middleware.js", () => ({
@@ -410,7 +411,11 @@ describe("Event API - handler integration", () => {
       },
     );
 
-    const res = await eventIdHandler.onRequestPost({ request, env });
+    const res = await duplicateHandler.onRequestPost({
+      request,
+      env,
+      params: { id: String(original.id) },
+    });
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.event.slug).toBe("original-copy");
@@ -643,7 +648,11 @@ describe("Event duplication atomicity (P0-B2)", () => {
       },
     );
 
-    const res = await eventIdHandler.onRequestPost({ request, env });
+    const res = await duplicateHandler.onRequestPost({
+      request,
+      env,
+      params: { id: String(original.id) },
+    });
     expect(res.status).toBe(500);
 
     // The new event must have been cleaned up — no orphan

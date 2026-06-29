@@ -39,8 +39,6 @@ tags:
     description: Performance, roster-assignment, and media endpoints
   - name: Admin - Venues
     description: Venue management endpoints
-  - name: Admin - Performers
-    description: Global performer registry endpoints
   - name: Admin - Users
     description: User administration endpoints
   - name: Admin - Invites
@@ -2156,49 +2154,6 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /api/admin/performers:
-    get:
-      tags:
-        - Admin - Performers
-      summary: List performers
-      security:
-        - AdminSessionCookie: []
-      responses:
-        "200":
-          description: Performer list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PerformerListResponse"
-        "500":
-          $ref: "#/components/responses/ServerError"
-    post:
-      tags:
-        - Admin - Performers
-      summary: Create a performer
-      security:
-        - AdminSessionCookie: []
-          CsrfToken: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PerformerInput"
-      responses:
-        "201":
-          description: Performer created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PerformerResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
   /api/admin/users:
     get:
       tags:
@@ -3910,75 +3865,6 @@ components:
           type: integer
         type:
           type: string
-
-    PerformerInput:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-        genre:
-          type: string
-          nullable: true
-        origin:
-          type: string
-          nullable: true
-        origin_city:
-          type: string
-          nullable: true
-        origin_region:
-          type: string
-          nullable: true
-        contact_email:
-          type: string
-          format: email
-          nullable: true
-        is_active:
-          oneOf:
-            - type: integer
-            - type: boolean
-          nullable: true
-        description:
-          type: string
-          nullable: true
-        photo_url:
-          type: string
-          nullable: true
-        photo_alt_text:
-          type: string
-          nullable: true
-          description: Accessible alt text for the band photo; falls back to the band name when empty.
-        url:
-          type: string
-          nullable: true
-        instagram:
-          type: string
-          nullable: true
-        bandcamp:
-          type: string
-          nullable: true
-        facebook:
-          type: string
-          nullable: true
-
-    PerformerListResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        performers:
-          type: array
-          items:
-            $ref: "#/components/schemas/GenericRecord"
-
-    PerformerResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        performer:
-          $ref: "#/components/schemas/GenericRecord"
 
     UserSummary:
       type: object

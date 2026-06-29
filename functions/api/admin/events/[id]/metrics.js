@@ -16,69 +16,45 @@ export async function onRequestGet(context) {
   }
 
   try {
-    // Get event metrics
-    const metrics = await DB.prepare(
-      `
-      SELECT
-        COUNT(*) as total_schedule_builds,
-        COUNT(DISTINCT user_session) as unique_visitors,
-        MAX(created_at) as last_updated
-      FROM schedule_builds
-      WHERE event_id = ?
-    `,
-    )
-      .bind(eventId)
-      .first();
+    const [metricsRes, popularBandsRes, shareStatsRes, topRoutesRes] = await DB.batch([
+      DB.prepare(
+        `SELECT COUNT(*) as total_schedule_builds,
+                COUNT(DISTINCT user_session) as unique_visitors,
+                MAX(created_at) as last_updated
+         FROM schedule_builds WHERE event_id = ?`,
+      ).bind(eventId),
+      DB.prepare(
+        `SELECT bp.id as band_id, bp.name as band_name,
+                COUNT(sb.performance_id) as schedule_count
+         FROM schedule_builds sb
+         JOIN performances p ON sb.performance_id = p.id
+         JOIN band_profiles bp ON p.band_profile_id = bp.id
+         WHERE sb.event_id = ?
+         GROUP BY bp.id, bp.name
+         ORDER BY schedule_count DESC
+         LIMIT 10`,
+      ).bind(eventId),
+      DB.prepare(
+        `SELECT COUNT(*) AS total_shares,
+                COALESCE(SUM(view_count), 0) AS total_share_views
+         FROM share_links WHERE event_id = ?`,
+      ).bind(eventId),
+      DB.prepare(
+        `SELECT slug, view_count FROM share_links
+         WHERE event_id = ?
+         ORDER BY view_count DESC, created_at DESC
+         LIMIT 10`,
+      ).bind(eventId),
+    ]);
 
-    // Get most popular bands
-    let popularBands;
-    try {
-      popularBands = await DB.prepare(
-        `
-        SELECT
-          bp.id as band_id,
-          bp.name as band_name,
-          COUNT(sb.performance_id) as schedule_count
-        FROM schedule_builds sb
-        JOIN performances p ON sb.performance_id = p.id
-        JOIN band_profiles bp ON p.band_profile_id = bp.id
-        WHERE sb.event_id = ?
-        GROUP BY bp.id, bp.name
-        ORDER BY schedule_count DESC
-        LIMIT 10
-      `,
-      )
-        .bind(eventId)
-        .all();
-    } catch (error) {
-      if (!String(error).includes("performance_id")) {
-        throw error;
-      }
-
-      popularBands = { results: [] };
-    }
+    const metrics = metricsRes.results?.[0];
+    const popularBands = popularBandsRes.results || [];
+    const shareStats = shareStatsRes.results?.[0];
+    const topSharedRoutes = topRoutesRes.results || [];
 
     // Share-link analytics: shares created + total views + top routes by views.
     // Derived directly from share_links (creates are rows; views are view_count),
     // so no separate share telemetry path is needed.
-    const shareStats = await DB.prepare(
-      `SELECT COUNT(*) AS total_shares,
-              COALESCE(SUM(view_count), 0) AS total_share_views
-       FROM share_links WHERE event_id = ?`,
-    )
-      .bind(eventId)
-      .first();
-
-    const topSharedRoutes = await DB.prepare(
-      `SELECT slug, view_count
-       FROM share_links
-       WHERE event_id = ?
-       ORDER BY view_count DESC, created_at DESC
-       LIMIT 10`,
-    )
-      .bind(eventId)
-      .all();
-
     return new Response(
       JSON.stringify({
         success: true,
@@ -86,10 +62,10 @@ export async function onRequestGet(context) {
           totalScheduleBuilds: metrics?.total_schedule_builds || 0,
           uniqueVisitors: metrics?.unique_visitors || 0,
           lastUpdated: metrics?.last_updated,
-          popularBands: popularBands.results || [],
+          popularBands: popularBands,
           totalShares: shareStats?.total_shares || 0,
           totalShareViews: shareStats?.total_share_views || 0,
-          topSharedRoutes: topSharedRoutes.results || [],
+          topSharedRoutes: topSharedRoutes,
         },
       }),
       {

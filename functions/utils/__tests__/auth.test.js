@@ -1,7 +1,7 @@
 // functions/utils/__tests__/auth.test.js
 import { describe, test, expect, beforeEach } from 'vitest';
 import { createTestDB, createDBEnv, mockUsers } from '../../api/test-utils.js';
-import { initializeLucia } from '../auth.js';
+import { initializeLucia, isDevRequest } from '../auth.js';
 
 function makeEnv(rawDb, opts = {}) {
   return {
@@ -15,6 +15,54 @@ function makeRequest(opts = {}) {
     headers: opts.headers ?? {},
   });
 }
+
+describe('isDevRequest', () => {
+  const localhostRequest = new Request('http://localhost:8788/api/x', {
+    headers: { Host: 'localhost:8788' },
+  });
+  const prodRequest = new Request('https://settimes.ca/api/x', {
+    headers: { Host: 'settimes.ca' },
+  });
+
+  test('returns false when ENVIRONMENT is "production"', () => {
+    expect(isDevRequest(prodRequest, { ENVIRONMENT: 'production' })).toBe(false);
+  });
+
+  test('returns true when ENVIRONMENT is "development"', () => {
+    expect(isDevRequest(localhostRequest, { ENVIRONMENT: 'development' })).toBe(true);
+  });
+
+  test('returns true when ENVIRONMENT is "test"', () => {
+    expect(isDevRequest(localhostRequest, { ENVIRONMENT: 'test' })).toBe(true);
+  });
+
+  test('returns false for a deployed non-allowlisted ENVIRONMENT like "staging" (secure by default)', () => {
+    expect(isDevRequest(prodRequest, { ENVIRONMENT: 'staging' })).toBe(false);
+  });
+
+  test('fails CLOSED (secure) for a typo / case / whitespace variant of "production"', () => {
+    // A misconfigured prod ENVIRONMENT value must never downgrade to insecure dev mode.
+    expect(isDevRequest(prodRequest, { ENVIRONMENT: 'Production' })).toBe(false);
+    expect(isDevRequest(prodRequest, { ENVIRONMENT: 'PRODUCTION' })).toBe(false);
+    expect(isDevRequest(prodRequest, { ENVIRONMENT: 'prod' })).toBe(false);
+    expect(isDevRequest(prodRequest, { ENVIRONMENT: 'production\n' })).toBe(false);
+    expect(isDevRequest(prodRequest, { ENVIRONMENT: '  production  ' })).toBe(false);
+  });
+
+  test('returns false when ENVIRONMENT is unset ({}), even for a localhost Host/url (#425 security)', () => {
+    // The Host header is client-controlled — trusting it when env is unset would let
+    // an attacker coerce a misconfigured deploy into dev (insecure) cookie behavior.
+    expect(isDevRequest(localhostRequest, {})).toBe(false);
+  });
+
+  test('returns false when env is null, even for a localhost request', () => {
+    expect(isDevRequest(localhostRequest, null)).toBe(false);
+  });
+
+  test('returns false when called without env argument (isDevRequest(request))', () => {
+    expect(isDevRequest(localhostRequest)).toBe(false);
+  });
+});
 
 describe('initializeLucia / session manager', () => {
   let rawDb;

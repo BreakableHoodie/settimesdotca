@@ -22,8 +22,10 @@ cp .dev.vars.example .dev.vars   # then fill in CSRF_SECRET, etc.
 npm run migrate:local
 
 # 5. Start the local full-stack server (Pages Functions + Vite HMR)
-cd frontend && npx wrangler pages dev --port 8788
+npm run pages:dev
 ```
+
+> **`ENVIRONMENT=development` is required for local dev.** Without it, `isDevRequest()` defaults to production-secure behavior and the session cookie is set with the `Secure` flag, which browsers reject over plain `http://localhost`. `npm run pages:dev` passes `--binding ENVIRONMENT=development` automatically, so you do not need to set it manually.
 
 The admin panel is at `http://localhost:8788/admin`. Create a first admin user with:
 

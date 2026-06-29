@@ -16,7 +16,11 @@ export function createMockContext(mockDB) {
   return {
     env: {
       DB: mockDB,
-      PUBLIC_URL: 'https://example.com'
+      PUBLIC_URL: 'https://example.com',
+      // Required so isDevRequest() returns true and Turnstile/CSRF skip in
+      // unit tests.  Without an explicit ENVIRONMENT the security default is
+      // now "production" (secure/closed), not localhost-sniffing. (#425)
+      ENVIRONMENT: 'test',
     }
   }
 }

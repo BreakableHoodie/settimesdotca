@@ -1,19 +1,28 @@
-const CACHE_VERSION = 'v3'
-const CACHE_NAME = `schedule-${CACHE_VERSION}`
+const CACHE_VERSION = 'v4'
+const STATIC_CACHE = `schedule-${CACHE_VERSION}`
+const API_CACHE = `api-${CACHE_VERSION}`
+
+// Public API responses are only an offline fallback (navigations and API calls
+// are network-first), so this cache is bounded to keep storage from growing
+// without limit across every /api/schedule, /s/*, timeline call.
+const API_CACHE_MAX_ENTRIES = 50
+
+const CURRENT_CACHES = [STATIC_CACHE, API_CACHE]
 
 // Only cache stable, non-hashed assets on install.
 // Vite hashes JS/CSS filenames (e.g. assets/index-a3f9c.js) so those
 // cannot be precached by name — they are picked up by runtime caching instead.
-const STATIC_ASSETS = ['/', '/index.html', '/manifest.json']
+const STATIC_ASSETS = ['/', '/index.html', '/manifest.json', '/offline.html']
 
 // Install: cache static assets
 self.addEventListener('install', event => {
   console.log('[SW] Installing service worker', CACHE_VERSION)
 
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
+    caches.open(STATIC_CACHE).then(cache => {
       console.log('[SW] Caching static assets')
-      return cache.addAll(STATIC_ASSETS)
+      // Don't let one missing optional asset (e.g. offline.html) abort install.
+      return Promise.allSettled(STATIC_ASSETS.map(asset => cache.add(asset)))
     })
   )
 
@@ -21,7 +30,7 @@ self.addEventListener('install', event => {
   self.skipWaiting()
 })
 
-// Activate: clean up old caches
+// Activate: clean up old caches (both the static and api families)
 self.addEventListener('activate', event => {
   console.log('[SW] Activating service worker', CACHE_VERSION)
 
@@ -29,7 +38,11 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames
-          .filter(name => name.startsWith('schedule-') && name !== CACHE_NAME)
+          .filter(
+            name =>
+              (name.startsWith('schedule-') || name.startsWith('api-')) &&
+              !CURRENT_CACHES.includes(name)
+          )
           .map(name => {
             console.log('[SW] Deleting old cache:', name)
             return caches.delete(name)
@@ -42,12 +55,12 @@ self.addEventListener('activate', event => {
   self.clients.claim()
 })
 
-// Fetch: Cache-first with network fallback
+// Fetch routing
 self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
 
-  // Only cache same-origin requests
+  // Only handle same-origin requests
   if (url.origin !== self.location.origin) {
     return
   }
@@ -58,23 +71,67 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Public API requests: Network-first with cache fallback
+  // Public API requests: network-first with a bounded cache fallback.
+  // Must come before the navigate check so that navigations to /api/ URLs
+  // (e.g. /api/bands/:name/confirm-follow, /api/feeds/ical) are handled here
+  // instead of navigationStrategy — preventing non-shell content from being
+  // written to the /index.html cache slot.
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstStrategy(request))
     return
   }
 
-  // Static assets: Cache-first with network fallback
+  // Navigations (the HTML document): network-first so a deploy's fresh shell —
+  // which references the current hashed chunks — is always used when online.
+  // Serving a cached shell here pinned stale HTML and caused ChunkLoadError /
+  // blank screens after a deploy until the cache version was bumped.
+  // /api/ paths are already handled above — only true SPA routes reach here.
+  if (request.mode === 'navigate') {
+    event.respondWith(navigationStrategy(request))
+    return
+  }
+
+  // Static assets (hashed JS/CSS/images, manifest): cache-first. These are
+  // content-hashed and immutable, so a cached copy is never stale.
   event.respondWith(cacheFirstStrategy(request))
 })
 
-// Cache-first strategy (for static assets)
+// Network-first navigation strategy. Refreshes the cached shell on success and
+// falls back to it (then the offline page) when the network is unavailable.
+async function navigationStrategy(request) {
+  try {
+    const response = await fetch(request)
+
+    const contentType = response.headers?.get?.('content-type') || ''
+    if (response.ok && contentType.includes('text/html')) {
+      const cache = await caches.open(STATIC_CACHE)
+      // Best-effort shell refresh; swallow rejections so a failed put never
+      // surfaces as an unhandled rejection (the response is returned regardless).
+      cache.put('/index.html', response.clone()).catch(() => {})
+    }
+
+    return response
+  } catch (error) {
+    const cachedShell =
+      (await caches.match('/index.html')) || (await caches.match('/'))
+    if (cachedShell) return cachedShell
+
+    const offlinePage = await caches.match('/offline.html')
+    if (offlinePage) return offlinePage
+
+    return new Response('Offline - content not cached', {
+      status: 503,
+      statusText: 'Service Unavailable',
+    })
+  }
+}
+
+// Cache-first strategy (for immutable, content-hashed static assets)
 async function cacheFirstStrategy(request) {
   const cached = await caches.match(request)
 
   if (cached) {
-    // Return cached version immediately
-    // Update cache in background
+    // Return cached version immediately; refresh in the background.
     updateCache(request)
     return cached
   }
@@ -83,9 +140,8 @@ async function cacheFirstStrategy(request) {
   try {
     const response = await fetch(request)
 
-    // Cache successful responses
     if (response.ok) {
-      const cache = await caches.open(CACHE_NAME)
+      const cache = await caches.open(STATIC_CACHE)
       cache.put(request, response.clone())
     }
 
@@ -93,11 +149,9 @@ async function cacheFirstStrategy(request) {
   } catch (error) {
     console.error('[SW] Fetch failed:', error)
 
-    // Return offline page if available
     const offlinePage = await caches.match('/offline.html')
     if (offlinePage) return offlinePage
 
-    // Return basic error response
     return new Response('Offline - content not cached', {
       status: 503,
       statusText: 'Service Unavailable',
@@ -105,15 +159,16 @@ async function cacheFirstStrategy(request) {
   }
 }
 
-// Network-first strategy (for API requests)
+// Network-first strategy (for public API requests) with a bounded fallback cache
 async function networkFirstStrategy(request) {
   try {
     const response = await fetch(request)
 
-    // Cache successful GET requests
+    // Cache successful GETs as an offline fallback, capping the cache size.
     if (response.ok && request.method === 'GET') {
-      const cache = await caches.open(CACHE_NAME)
-      cache.put(request, response.clone())
+      const cache = await caches.open(API_CACHE)
+      await cache.put(request, response.clone())
+      await trimCache(cache, API_CACHE_MAX_ENTRIES)
     }
 
     return response
@@ -130,13 +185,22 @@ async function networkFirstStrategy(request) {
   }
 }
 
-// Update cache in background
+// Evict oldest entries (Cache.keys() preserves insertion order → FIFO) until the
+// cache holds at most maxEntries.
+async function trimCache(cache, maxEntries) {
+  const keys = await cache.keys()
+  for (let i = 0; i < keys.length - maxEntries; i++) {
+    await cache.delete(keys[i])
+  }
+}
+
+// Update the static cache in the background (best-effort)
 async function updateCache(request) {
   try {
     const response = await fetch(request)
 
     if (response.ok) {
-      const cache = await caches.open(CACHE_NAME)
+      const cache = await caches.open(STATIC_CACHE)
       await cache.put(request, response)
     }
   } catch (error) {

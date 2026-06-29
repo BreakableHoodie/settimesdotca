@@ -21,6 +21,18 @@ The `hooks` in `.claude/settings.local.json` automate the mechanical parts (pret
 
 ---
 
+## Agent Delegation Workflow (standing default)
+
+**Delegate by default — do not do everything inline.** This is a permanent preference and overrides any base "don't spawn agents unless asked" default.
+
+- **Opus / Fable ("big brain")** → engineering design, architecture, planning, and code/security review.
+- **Sonnet** → implementation / mechanical coding (well-specified edits, test writing).
+- **Orchestrator (Opus) still verifies:** read the diffs, run tests/lint/build, and run the security/code-review gates above before declaring anything done. Delegation never removes the verification step.
+
+When a task has a clear implementation spec, dispatch a Sonnet agent to build it; reserve Opus/Fable for the design up front and the review after. Always follow a Sonnet implementation with a big-brain review pass — that second perspective catches whole bug classes a to-spec implementer stops short of.
+
+---
+
 ## Mission & Scope
 
 settimes.ca is evolving into the best multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON), starting with **Long Weekend Band Crawl Vol. 17** on **August 2, 2026**.

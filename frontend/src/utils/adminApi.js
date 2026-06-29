@@ -708,54 +708,6 @@ export const bandsApi = {
   },
 }
 
-// Performers API
-export const performersApi = {
-  async list() {
-    const response = await fetchWithCSRFRetry(`${API_BASE}/performers`, {
-      headers: getHeaders(),
-      credentials: 'include',
-    })
-    return handleResponse(response)
-  },
-
-  async get(id) {
-    const response = await fetchWithCSRFRetry(`${API_BASE}/performers/${id}`, {
-      headers: getHeaders(),
-      credentials: 'include',
-    })
-    return handleResponse(response)
-  },
-
-  async create(data) {
-    const response = await fetchWithCSRFRetry(`${API_BASE}/performers`, {
-      method: 'POST',
-      headers: getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify(data),
-    })
-    return handleResponse(response)
-  },
-
-  async update(id, data) {
-    const response = await fetchWithCSRFRetry(`${API_BASE}/performers/${id}`, {
-      method: 'PUT',
-      headers: getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify(data),
-    })
-    return handleResponse(response)
-  },
-
-  async delete(id) {
-    const response = await fetchWithCSRFRetry(`${API_BASE}/performers/${id}`, {
-      method: 'DELETE',
-      headers: getHeaders(),
-      credentials: 'include',
-    })
-    return handleResponse(response)
-  },
-}
-
 // Trusted Devices API
 export const trustedDevicesApi = {
   async list() {

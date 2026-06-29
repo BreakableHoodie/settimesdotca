@@ -184,8 +184,6 @@ All admin routes require a valid session cookie. State-changing routes also requ
 | `/api/admin/bands/bulk`              | `DELETE` | editor       | Bulk deletes performances or profile-only rows. Body: `{ band_ids }`.                                                                                                  |
 | `/api/admin/bands/photos`            | `POST`   | editor       | `multipart/form-data` upload with `photo` and optional `band_id`. Stores assets in R2 and can update `photo_url`.                                                      |
 | `/api/admin/bands/stats/{name}`      | `GET`    | viewer       | Internal stats and history view for a band profile.                                                                                                                    |
-| `/api/admin/performers`              | `GET`    | viewer       | Lists the global performer registry.                                                                                                                                   |
-| `/api/admin/performers`              | `POST`   | editor       | Creates a global performer record.                                                                                                                                     |
 
 ### User administration, invites, analytics, and maintenance
 

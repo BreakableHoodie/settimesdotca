@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8788';
 const useWrangler = process.env.PLAYWRIGHT_USE_WRANGLER !== 'false';
 const webServerCommand = useWrangler
-  ? 'npx wrangler pages dev frontend/dist --port 8788'
+  ? 'npx wrangler pages dev frontend/dist --port 8788 --binding ENVIRONMENT=development'
   : 'npm run dev --prefix frontend';
 const storageStatePath = 'e2e/.auth/admin.json';
 const skipA11yVisual = process.env.PLAYWRIGHT_SKIP_A11Y_VISUAL === 'true';

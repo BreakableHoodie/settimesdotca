@@ -6,12 +6,18 @@ export const SESSION_CONFIG = {
 };
 
 export function isDevRequest(request, env = null) {
-  if (env?.ENVIRONMENT === 'production') return false;
-  if (env?.ENVIRONMENT && env.ENVIRONMENT !== 'production') return true;
-  if (!request) return false;
-  const host = request.headers.get('Host') || '';
-  const url = request.url || '';
-  return host.includes('localhost') || url.includes('localhost');
+  // Secure by default: dev (insecure-over-http cookie / CSRF / Turnstile)
+  // behavior is enabled ONLY for an explicit, known dev ENVIRONMENT value.
+  // Everything else fails CLOSED to secure — production, a typo/case/whitespace
+  // variant of the prod value ("Production", "prod", " production\n"), an
+  // unexpected value, or unset. We never trust the client-controlled Host
+  // header to decide this. (#425)
+  const environment = (env?.ENVIRONMENT ?? "").trim().toLowerCase();
+  return (
+    environment === "development" ||
+    environment === "dev" ||
+    environment === "test"
+  );
 }
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days

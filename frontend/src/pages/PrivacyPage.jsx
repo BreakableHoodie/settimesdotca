@@ -166,10 +166,11 @@ export default function PrivacyPage() {
             <h2 className="text-text-primary text-lg font-semibold mb-3">CASL and commercial email</h2>
             <p>
               All email communications require your express consent (double opt-in). Every email includes a one-click
-              unsubscribe link. Our sender identity and mailing address are:{' '}
-              <strong className="text-text-secondary">
-                [TODO: legal — operator legal name + mailing address required by CASL]
-              </strong>
+              unsubscribe link and identifies the sender as <strong className="text-text-secondary">SetTimes</strong>.
+              You can reach us at{' '}
+              <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+                hello@settimes.ca
+              </a>
               .
             </p>
           </section>

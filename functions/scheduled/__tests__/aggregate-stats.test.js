@@ -19,10 +19,10 @@ describe('aggregate-stats scheduled job (P1-P3)', () => {
       'INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)'
     ).run('Stat Band', 'statband')
 
-    rawDb.prepare('INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks, share_count) VALUES (?, ?, ?, ?, ?)')
-      .run(profileId, '2026-05-01', 100, 5, 2)
-    rawDb.prepare('INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks, share_count) VALUES (?, ?, ?, ?, ?)')
-      .run(profileId, '2026-05-02', 200, 10, 3)
+    rawDb.prepare('INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks) VALUES (?, ?, ?, ?)')
+      .run(profileId, '2026-05-01', 100, 5)
+    rawDb.prepare('INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks) VALUES (?, ?, ?, ?)')
+      .run(profileId, '2026-05-02', 200, 10)
 
     await runScheduled(env)
 
@@ -55,19 +55,19 @@ describe('aggregate-stats scheduled job (P1-P3)', () => {
     ).run('Trending Band', 'trendingband')
 
     // Recent row — should count toward popularity
-    rawDb.prepare('INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks, share_count) VALUES (?, ?, ?, ?, ?)')
-      .run(profileId, daysAgo(5), 10, 4, 1)
+    rawDb.prepare('INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks) VALUES (?, ?, ?, ?)')
+      .run(profileId, daysAgo(5), 10, 4)
     // Old row — should NOT count toward popularity (> 30 days ago)
-    rawDb.prepare('INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks, share_count) VALUES (?, ?, ?, ?, ?)')
-      .run(profileId, daysAgo(60), 1000, 500, 200)
+    rawDb.prepare('INSERT INTO artist_daily_stats (band_profile_id, date, page_views, social_clicks) VALUES (?, ?, ?, ?)')
+      .run(profileId, daysAgo(60), 1000, 500)
 
     await runScheduled(env)
 
     const profile = rawDb.prepare('SELECT total_views, popularity_score FROM band_profiles WHERE id = ?').get(profileId)
     // total_views sums ALL history
     expect(profile.total_views).toBe(1010)
-    // popularity_score only counts recent: 10*1 + 4*3 + 1*5 = 27
-    expect(profile.popularity_score).toBeCloseTo(27, 1)
+    // popularity_score only counts recent: 10*1 + 4*3 = 22
+    expect(profile.popularity_score).toBeCloseTo(22, 1)
   })
 
   it('deletes artist_daily_stats older than 90 days', async () => {

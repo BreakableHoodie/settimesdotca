@@ -1077,6 +1077,101 @@ describe('Admin bands API - bulk-preview after-midnight conflict detection (T2/V
   })
 })
 
+describe('Admin bands API - venue-optional PUT (Closes #407)', () => {
+  it('PUT with venueId: 0 on a venue-less performance returns 200 and keeps venue NULL', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'NullVenuePut0', slug: 'null-venue-put0' })
+    // insertBand default: venue_id = null
+    const band = insertBand(rawDb, { name: 'No Venue Band 0', event_id: ev.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({
+        venueId: 0,
+        social_links: JSON.stringify({ website: 'https://example.com' }),
+      }),
+    })
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(200)
+    const row = rawDb.prepare('SELECT venue_id FROM performances WHERE id = ?').get(band.id)
+    expect(row.venue_id).toBeNull()
+  })
+
+  it('PUT with venueId: "" on a venue-less performance returns 200 and keeps venue NULL', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'NullVenuePutEmpty', slug: 'null-venue-put-empty' })
+    const band = insertBand(rawDb, { name: 'No Venue Band Empty', event_id: ev.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({
+        venueId: '',
+        social_links: JSON.stringify({ instagram: '@testband' }),
+      }),
+    })
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(200)
+    const row = rawDb.prepare('SELECT venue_id FROM performances WHERE id = ?').get(band.id)
+    expect(row.venue_id).toBeNull()
+  })
+
+  it('PUT without venueId on a venue-less performance returns 200 and keeps venue NULL', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'NullVenuePutOmit', slug: 'null-venue-put-omit' })
+    const band = insertBand(rawDb, { name: 'No Venue Band Omit', event_id: ev.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ social_links: JSON.stringify({ bandcamp: 'https://band.bandcamp.com' }) }),
+    })
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(200)
+    const row = rawDb.prepare('SELECT venue_id FROM performances WHERE id = ?').get(band.id)
+    expect(row.venue_id).toBeNull()
+  })
+
+  it('PUT with a positive invalid venueId still returns 404 (guard still fires)', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'InvalidVenuePut', slug: 'invalid-venue-put' })
+    const band = insertBand(rawDb, { name: 'Invalid Venue Band', event_id: ev.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ venueId: 99999 }),
+    })
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(404)
+    const data = await res.json()
+    expect(data.message).toBe('Venue not found')
+  })
+
+  it('PUT with venueId: null clears an existing venue assignment', async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: 'editor' })
+    const ev = insertEvent(rawDb, { name: 'ClearVenuePut', slug: 'clear-venue-put' })
+    const venue = insertVenue(rawDb, { name: 'Clear Test Venue' })
+    const band = insertBand(rawDb, { name: 'Clear Venue Band', event_id: ev.id, venue_id: venue.id })
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ venueId: null }),
+    })
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: 'editor' } } })
+    expect(res.status).toBe(200)
+    const row = rawDb.prepare('SELECT venue_id FROM performances WHERE id = ?').get(band.id)
+    expect(row.venue_id).toBeNull()
+  })
+})
+
 describe('Admin bands API - PUT conflict self-exclusion (T3)', () => {
   it('PUT update does not conflict with the band being updated (self-exclusion)', async () => {
     const { env, rawDb, headers } = createTestEnv({ role: 'editor' })

@@ -143,6 +143,16 @@ export async function onRequestPut(context) {
       photo_alt_text,
       social_links,
     } = body;
+
+    // Normalize venueId: treat "", 0, "0" as null (no venue assigned).
+    // Guards against the frontend sending Number("") = 0 when no venue is selected,
+    // which would otherwise pass the !== null check and then 404 on "Venue not found".
+    const normalizedVenueId =
+      venueId === undefined
+        ? undefined
+        : !venueId || Number(venueId) <= 0
+          ? null
+          : Number(venueId);
     let resolvedPhotoUrl;
     try {
       resolvedPhotoUrl =
@@ -211,7 +221,7 @@ export async function onRequestPut(context) {
       // events the band has played. Only block when a performance field is the
       // thing actually being changed.
       const editsPerformanceFields =
-        venueId !== undefined ||
+        normalizedVenueId !== undefined ||
         startTime !== undefined ||
         endTime !== undefined;
       if (linkedEvent?.status === "archived" && editsPerformanceFields) {
@@ -341,7 +351,7 @@ export async function onRequestPut(context) {
     const actualEndTime =
       endTime !== undefined ? endTime : performance.end_time;
     const actualVenueId =
-      venueId !== undefined ? venueId : performance.venue_id;
+      normalizedVenueId !== undefined ? normalizedVenueId : performance.venue_id;
 
     // Validate times (allow sets that cross midnight; prevent zero-length sets)
     if (actualStartTime && actualEndTime && actualStartTime === actualEndTime) {
@@ -357,14 +367,14 @@ export async function onRequestPut(context) {
       );
     }
 
-    // Check if venue exists (only if venueId is being changed)
-    if (venueId !== undefined && venueId !== null) {
+    // Check if venue exists (only when a specific positive venue id was provided)
+    if (normalizedVenueId != null) {
       const venue = await DB.prepare(
         `
         SELECT id FROM venues WHERE id = ?
       `,
       )
-        .bind(venueId)
+        .bind(normalizedVenueId)
         .first();
 
       if (!venue) {
@@ -560,9 +570,9 @@ export async function onRequestPut(context) {
 
     // Handle performance updates (ONLY if it's a real performance)
     if (!isProfileUpdate) {
-      if (venueId !== undefined) {
+      if (normalizedVenueId !== undefined) {
         updates.push("venue_id = ?");
-        params.push(venueId);
+        params.push(normalizedVenueId);
       }
       if (startTime !== undefined) {
         updates.push("start_time = ?");

@@ -272,7 +272,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
       const payload = {
         eventId: Number(formData.event_id),
-        venueId: Number(formData.venue_id),
+        venueId: formData.venue_id ? Number(formData.venue_id) : null,
         name: formData.name,
         startTime: formData.start_time,
         endTime: formData.end_time,

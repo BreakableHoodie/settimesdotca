@@ -10,6 +10,7 @@ import { getClientIP } from '../../../../utils/request.js';
 import { sendEmail, isEmailConfigured } from '../../../../utils/email.js';
 import { buildResetPasswordEmail } from '../../../../utils/emailTemplates.js';
 import { revokeAllTrustedDevices } from '../../../../utils/trustedDevice.js';
+import { getPublicBaseUrl } from '../../../../utils/publicUrl.js';
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
@@ -96,7 +97,7 @@ export async function onRequestPost(context) {
 
     await revokeAllTrustedDevices(DB, userId);
 
-    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    const baseUrl = getPublicBaseUrl(env);
     // Use a hash fragment so the token is never sent to the server, logged by
     // Cloudflare access logs, stored in browser history, or leaked via Referer.
     const resetUrl = `${baseUrl}/reset-password#token=${resetToken.token}`;

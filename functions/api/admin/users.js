@@ -11,6 +11,7 @@ import {
 import { getClientIP } from '../../utils/request.js';
 import { sendEmail, isEmailConfigured } from '../../utils/email.js';
 import { buildInviteEmail } from '../../utils/emailTemplates.js';
+import { getPublicBaseUrl } from '../../utils/publicUrl.js';
 
 // GET - List all users (admin only)
 export async function onRequestGet(context) {
@@ -137,7 +138,7 @@ export async function onRequestPost(context) {
       .bind(inviteCode, email, role, currentUser.userId, expiresAt)
       .first();
 
-    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    const baseUrl = getPublicBaseUrl(env);
     const inviteUrl = new URL('/admin/signup', baseUrl);
     inviteUrl.searchParams.set('code', inviteCode);
 

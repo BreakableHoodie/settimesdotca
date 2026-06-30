@@ -6,6 +6,7 @@ import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { isValidEmail } from "../../utils/validation.js";
 import { verifyTurnstile } from "../../utils/turnstile.js";
 import { escapeHtml } from "../../utils/html.js";
+import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 
 const FREQUENCY_OPTIONS = new Set(["daily", "weekly", "monthly"]);
 const MAX_EMAIL_LENGTH = 320;
@@ -219,7 +220,7 @@ export async function onRequestPost(context) {
 }
 
 async function sendVerificationEmail(env, email, city, genre, token) {
-  const baseUrl = env.PUBLIC_URL || "http://localhost:5173";
+  const baseUrl = getPublicBaseUrl(env);
   const verifyUrl = `${baseUrl}/verify?token=${token}`;
   const subject = "Confirm your SetTimes subscription";
   const safeCity = escapeHtml(city);

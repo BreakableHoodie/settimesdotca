@@ -1,6 +1,8 @@
 // Email verification endpoint
 // GET /api/subscriptions/verify?token=xxx
 
+import { getPublicBaseUrl } from "../../utils/publicUrl.js";
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -63,7 +65,7 @@ export async function onRequestGet(context) {
     }
 
     // Redirect to success page
-    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    const baseUrl = getPublicBaseUrl(env);
     return Response.redirect(`${baseUrl}/subscribe?verified=true`, 302);
   } catch (error) {
     console.error("Verification error:", error);

@@ -8,6 +8,7 @@
 // endpoint (bands/[id]/resend-announcement.js).
 import { sendEmail } from "./email.js";
 import { logger } from "./logger.js";
+import { getPublicBaseUrl } from "./publicUrl.js";
 import { escapeHtml } from "./html.js";
 
 export async function notifyBandFollowers(
@@ -15,7 +16,7 @@ export async function notifyBandFollowers(
   DB,
   { performanceId, bandProfileId, bandName, eventName, followers },
 ) {
-  const publicUrl = env.PUBLIC_URL || "https://settimes.ca";
+  const publicUrl = getPublicBaseUrl(env);
 
   const results = await Promise.allSettled(
     followers.map(async (follower) => {

@@ -44,26 +44,31 @@ jobs:
                       frontend: 'frontend/**'
                       e2e: 'e2e/**'
                       functions: 'functions/**'
+                      schema: |
+                          migrations/**
+                          database/**
 
             - name: Install dependencies
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true' || steps.affected.outputs['schema'] == 'true'
               run: npm ci
 
             - name: Install frontend dependencies
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true' || steps.affected.outputs['schema'] == 'true'
               working-directory: frontend
               run: npm ci
 
             - name: Cache Playwright browsers
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true' || steps.affected.outputs['schema'] == 'true'
               id: playwright-cache
               uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: ~/.cache/ms-playwright
                   key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+                  restore-keys: |
+                      playwright-${{ runner.os }}-
 
             - name: Install Playwright browsers
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true' || steps.affected.outputs['schema'] == 'true'
               run: |
                   if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
                       npx playwright install-deps chromium
@@ -73,12 +78,12 @@ jobs:
                   fi
 
             - name: Build frontend
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true' || steps.affected.outputs['schema'] == 'true'
               working-directory: frontend
               run: npm run build
 
             - name: Initialize D1 database with schema
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true' || steps.affected.outputs['schema'] == 'true'
               env:
                   E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
                   E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
@@ -106,7 +111,7 @@ jobs:
                   echo "✓ Database initialization complete"
 
             - name: Start Pages Functions server
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true' || steps.affected.outputs['schema'] == 'true'
               timeout-minutes: 5
               run: |
                   ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state > /tmp/wrangler.log 2>&1 &
@@ -141,7 +146,7 @@ jobs:
                   exit 1
 
             - name: Run Playwright tests
-              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true'
+              if: github.event_name == 'push' || steps.affected.outputs['frontend'] == 'true' || steps.affected.outputs['e2e'] == 'true' || steps.affected.outputs['functions'] == 'true' || steps.affected.outputs['schema'] == 'true'
               env:
                   ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
                   ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}

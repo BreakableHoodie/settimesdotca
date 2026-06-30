@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
+import DownloadPdfButton from '../components/DownloadPdfButton'
 
 export default function TermsPage() {
   // react-helmet-async does not reliably set document.title in React 19 — set it
@@ -20,10 +21,13 @@ export default function TermsPage() {
         <link rel="canonical" href="https://settimes.ca/terms" />
       </Helmet>
 
-      <div className="container mx-auto px-4 max-w-2xl py-12">
-        <Link to="/" className="text-accent-400 hover:text-accent-500 text-sm mb-8 inline-block transition-colors">
-          ← Back to SetTimes
-        </Link>
+      <div className="container mx-auto px-4 max-w-2xl py-12 legal-document">
+        <div className="no-print mb-8 flex items-center justify-between gap-3">
+          <Link to="/" className="text-accent-400 hover:text-accent-500 text-sm transition-colors">
+            ← Back to SetTimes
+          </Link>
+          <DownloadPdfButton />
+        </div>
 
         <h1 className="text-text-primary text-3xl font-bold mb-2">Terms of Service</h1>
         <p className="text-text-tertiary text-sm mb-4">Last updated: June 2026</p>

@@ -2,6 +2,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import LockInLineupPanel from '../components/LockInLineupPanel'
 import { Alert, BandCardSkeleton } from '../components/ui'
 import { fetchPublicJson } from '../utils/publicApi'
 
@@ -138,6 +139,8 @@ export default function SharePreviewPage() {
           Add {shareData.band_names.length} stop{shareData.band_names.length !== 1 ? 's' : ''} to my route for{' '}
           {shareData.event_name}
         </button>
+
+        <LockInLineupPanel performanceIds={shareData.performance_ids} bandCount={shareData.band_names.length} />
       </div>
     </div>
   )

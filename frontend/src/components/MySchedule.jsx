@@ -24,6 +24,7 @@ import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx
 import { copyToClipboard } from '../utils/clipboard'
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
+import LockInLineupPanel from './LockInLineupPanel'
 import { walkMinutesBetween } from '../utils/walkTime'
 
 // Label a break between two sets at the same venue.
@@ -229,6 +230,17 @@ function MySchedule({
 
   const bandById = useMemo(() => new Map(visibleBands.map(b => [b.id, b])), [visibleBands])
   const bandNameById = useMemo(() => new Map(visibleBands.map(b => [b.id, b.name])), [visibleBands])
+
+  // Extract numeric performance IDs from band composite IDs (e.g. "event-slug-perf-42" → 42).
+  // Mirrors the same split used in handleShareSchedule so the two stay in sync.
+  const performanceIds = useMemo(() => {
+    return bands.reduce((acc, band) => {
+      const parts = band.id.split('-')
+      const id = parseInt(parts[parts.length - 1], 10)
+      if (Number.isFinite(id) && id > 0) acc.push(id)
+      return acc
+    }, [])
+  }, [bands])
 
   // Detect overlaps and conflicts
   const { conflicts, overlaps, overlapCount } = useMemo(() => {
@@ -650,6 +662,10 @@ function MySchedule({
             </div>
           )
         })}
+      </div>
+
+      <div className="max-w-5xl mx-auto">
+        <LockInLineupPanel performanceIds={performanceIds} bandCount={performanceIds.length} />
       </div>
 
       <div className="max-w-5xl mx-auto mt-8 text-center text-xs text-text-tertiary">

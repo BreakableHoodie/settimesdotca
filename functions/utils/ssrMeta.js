@@ -20,15 +20,46 @@ export function escapeAttr(str) {
     .replace(/>/g, "&gt;");
 }
 
-// Strip HTML tags + collapse whitespace for a meta description, truncating to a
-// crawler-friendly length. Band/event descriptions may contain sanitized HTML.
-export function toPlainText(html, maxLength = 200) {
-  const text = String(html ?? "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/\s+/g, " ")
-    .trim();
+// Strip markdown syntax and HTML tags + collapse whitespace for a meta
+// description, truncating to a crawler-friendly length. Band descriptions may
+// contain markdown, sanitized HTML, or plain text — all must produce clean text.
+export function toPlainText(rawInput, maxLength = 200) {
+  let text = String(rawInput ?? "");
+
+  // --- Strip markdown syntax (order matters) ---
+
+  // Code fences (``` ... ```) — remove the fence markers, keep content
+  text = text.replace(/```[\s\S]*?```/g, (m) =>
+    m.replace(/```[^\n]*\n?/g, "").trim(),
+  );
+  // Inline code: `code` → code
+  text = text.replace(/`([^`]+)`/g, "$1");
+  // Images: ![alt](url) → alt
+  text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
+  // Links: [text](url) → text
+  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  // Headings: ## text → text
+  text = text.replace(/^#{1,6}\s+/gm, "");
+  // Bold/italic: **text**, __text__, *text*, _text_ → text
+  text = text.replace(/(\*\*|__)(.*?)\1/g, "$2");
+  text = text.replace(/([*_])(.*?)\1/g, "$2");
+  // Blockquotes: > text → text
+  text = text.replace(/^>\s*/gm, "");
+  // Horizontal rules
+  text = text.replace(/^[-*_]{3,}\s*$/gm, "");
+  // List markers: - item / * item / 1. item → item
+  text = text.replace(/^[\s]*[-*+]\s+/gm, "");
+  text = text.replace(/^[\s]*\d+\.\s+/gm, "");
+
+  // --- Strip HTML tags ---
+  text = text.replace(/<[^>]*>/g, " ");
+  text = text.replace(/&nbsp;/gi, " ");
+  text = text.replace(/&amp;/gi, "&");
+  text = text.replace(/&lt;/gi, "<");
+  text = text.replace(/&gt;/gi, ">");
+  text = text.replace(/&quot;/gi, '"');
+
+  text = text.replace(/\s+/g, " ").trim();
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1).trimEnd()}…`;
 }

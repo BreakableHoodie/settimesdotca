@@ -13,6 +13,7 @@ import {
   writeAuthAttempt,
 } from "../../../utils/authAttempts.js";
 import { logger } from "../../../utils/logger.js";
+import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -277,7 +278,7 @@ export async function onRequestPost(context) {
       userId: user.id,
     });
 
-    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    const baseUrl = getPublicBaseUrl(env);
     const activationUrl = new URL("/activate", baseUrl);
     activationUrl.searchParams.set("token", activationToken);
 

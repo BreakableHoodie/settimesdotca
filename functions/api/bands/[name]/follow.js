@@ -5,6 +5,7 @@ import { verifyTurnstile } from "../../../utils/turnstile.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 
 import { escapeHtml } from "../../../utils/html.js";
+import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 
 const MAX_EMAIL_LENGTH = 320;
 
@@ -77,7 +78,7 @@ export async function onRequestPost(context) {
     // changes=0 → this email already follows the band (verified or pending). Say
     // nothing further: don't leak follow state and don't re-send on every POST.
     const isNewFollow = result.meta.changes > 0;
-    const publicUrl = env.PUBLIC_URL || "https://settimes.ca";
+    const publicUrl = getPublicBaseUrl(env);
     const confirmUrl = `${publicUrl}/api/bands/${band.id}/confirm-follow?token=${verificationToken}`;
 
     if (isNewFollow && isEmailConfigured(env)) {

@@ -25,6 +25,7 @@ import { generateToken } from "../../utils/tokens.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { verifyTurnstile } from "../../utils/turnstile.js";
 import { escapeHtml } from "../../utils/html.js";
+import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 
 const MAX_EMAIL_LENGTH = 320;
 const MAX_BATCH_SIZE = 30;
@@ -93,7 +94,7 @@ export async function onRequestPost(context) {
     // One shared batch_token ties all the rows together so a single confirm link
     // can flip all of them to verified=1.
     const batchToken = generateToken();
-    const publicUrl = env.PUBLIC_URL || "https://settimes.ca";
+    const publicUrl = getPublicBaseUrl(env);
     const confirmUrl = `${publicUrl}/api/bands/confirm-follow-batch?token=${batchToken}`;
 
     // Build one INSERT OR IGNORE per band. Each row gets a unique per-row

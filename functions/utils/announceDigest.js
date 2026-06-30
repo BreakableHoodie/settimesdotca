@@ -15,11 +15,12 @@
 import { sendEmail } from "./email.js";
 import { logger } from "./logger.js";
 import { escapeHtml } from "./html.js";
+import { getPublicBaseUrl } from "./publicUrl.js";
 
 const SEND_CONCURRENCY = 8;
 
 export async function flushAnnounceDigest(env, DB) {
-  const publicUrl = env.PUBLIC_URL || "https://settimes.ca";
+  const publicUrl = getPublicBaseUrl(env);
 
   // Fetch every pending entry, joining band_follows for email + unsubscribe_token.
   const { results: queue } = await DB.prepare(

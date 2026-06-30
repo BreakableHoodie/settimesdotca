@@ -1,6 +1,7 @@
 import { isValidEmail } from "../../utils/validation.js";
 import { isEmailConfigured, sendEmail } from "../../utils/email.js";
 import { buildActivationEmail } from "../../utils/emailTemplates.js";
+import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -100,7 +101,7 @@ export async function onRequestPost(context) {
       return genericResponse;
     }
 
-    const baseUrl = env.PUBLIC_URL || new URL(request.url).origin;
+    const baseUrl = getPublicBaseUrl(env);
     const activationUrl = new URL("/activate", baseUrl);
     activationUrl.searchParams.set("token", activationToken);
 

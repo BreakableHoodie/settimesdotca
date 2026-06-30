@@ -18,6 +18,9 @@ function Footer() {
             <Link to="/privacy" className="text-text-tertiary hover:text-accent-400 transition-colors">
               Privacy Policy
             </Link>
+            <Link to="/terms" className="text-text-tertiary hover:text-accent-400 transition-colors">
+              Terms of Service
+            </Link>
           </div>
 
           <p className="text-text-tertiary text-xs">Times are subject to change - late starts happen!</p>

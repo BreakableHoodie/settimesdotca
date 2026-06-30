@@ -2,7 +2,7 @@
 // JSON-LD for crawlers. See functions/utils/ssrMeta.js for rationale + fallback.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import { escapeAttr, serveWithInjectedMeta } from "../utils/ssrMeta.js";
+import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST } from "../utils/ssrMeta.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -15,7 +15,8 @@ export async function onRequest(context) {
   let venue = null;
   try {
     venue = await env.DB.prepare(
-      `SELECT name, address, address_line1, city, region, postal_code, latitude, longitude
+      `SELECT name, address, address_line1, city, region, postal_code, latitude, longitude,
+              website, phone, instagram, facebook
        FROM venues WHERE id = ?`,
     )
       .bind(Number(id))
@@ -26,8 +27,8 @@ export async function onRequest(context) {
   }
   if (!venue) return env.ASSETS.fetch(request);
 
-  const origin = new URL(request.url).origin;
-  const url = `${origin}/venue/${id}`;
+  // Pin to the production host — preview deploys must not self-canonicalise.
+  const url = `${CANONICAL_HOST}/venue/${id}`;
   const locality = venue.city || "Waterloo";
   const description =
     [venue.name, venue.address].filter(Boolean).join(" — ") ||
@@ -46,23 +47,54 @@ export async function onRequest(context) {
   ];
 
   const hasGeo = typeof venue.latitude === "number" && typeof venue.longitude === "number";
-  const jsonLd = {
+
+  // Build sameAs from URL-valued social columns; filter out nulls and bare handles.
+  const sameAs = [venue.website, venue.instagram, venue.facebook].filter(
+    (v) => v && (v.startsWith("http://") || v.startsWith("https://")),
+  );
+
+  const musicVenue = {
     "@context": "https://schema.org",
     "@type": "MusicVenue",
     name: venue.name,
     url,
     address: {
       "@type": "PostalAddress",
-      ...(venue.address_line1 || venue.address ? { streetAddress: venue.address_line1 || venue.address } : {}),
+      ...(venue.address_line1 || venue.address
+        ? { streetAddress: venue.address_line1 || venue.address }
+        : {}),
       addressLocality: locality,
       addressRegion: venue.region || "ON",
-      ...(venue.postal_code && { postalCode: venue.postal_code }),
+      ...(venue.postal_code ? { postalCode: venue.postal_code } : {}),
       addressCountry: "CA",
     },
-    ...(hasGeo && {
-      geo: { "@type": "GeoCoordinates", latitude: venue.latitude, longitude: venue.longitude },
-    }),
+    ...(hasGeo
+      ? { geo: { "@type": "GeoCoordinates", latitude: venue.latitude, longitude: venue.longitude } }
+      : {}),
+    ...(venue.phone ? { telephone: venue.phone } : {}),
+    ...(sameAs.length > 0 ? { sameAs } : {}),
   };
 
-  return serveWithInjectedMeta(context, { title: `${venue.name} | SetTimes`, metaTags, jsonLd });
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Venues",
+        item: `${CANONICAL_HOST}/venues`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: venue.name,
+        item: url,
+      },
+    ],
+  };
+
+  const title = `${venue.name} — Live Music Venue in Waterloo, ON | SetTimes`;
+
+  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicVenue, breadcrumb] });
 }

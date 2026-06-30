@@ -131,9 +131,7 @@ CREATE TABLE IF NOT EXISTS artist_daily_stats (
   band_profile_id INTEGER NOT NULL,
   date TEXT NOT NULL,
   page_views INTEGER DEFAULT 0,
-  profile_clicks INTEGER DEFAULT 0,
   social_clicks INTEGER DEFAULT 0,
-  share_count INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   UNIQUE(band_profile_id, date),
   FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE CASCADE

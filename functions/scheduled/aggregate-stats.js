@@ -28,7 +28,7 @@ export async function scheduled(_event, env, _ctx) {
              SUM(social_clicks) AS total_social_clicks,
              SUM(
                CASE WHEN date >= date('now', '-30 days')
-                    THEN page_views * 1.0 + social_clicks * 3.0 + share_count * 5.0
+                    THEN page_views * 1.0 + social_clicks * 3.0
                     ELSE 0 END
              ) AS popularity_score
            FROM artist_daily_stats

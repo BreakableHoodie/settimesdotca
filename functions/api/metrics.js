@@ -94,7 +94,6 @@ export async function onRequestPost(context) {
       const bandViewCounts = new Map();
       const socialClickCounts = new Map();
       const pageCounts = new Map(); // page path → count
-      const eventViewCounts = new Map(); // event_id → count
 
       for (const event of validEvents) {
         if (event.event === "artist_profile_view") {
@@ -117,15 +116,6 @@ export async function onRequestPost(context) {
         if (event.event === "page_view") {
           const page = String(event.props?.page || "/").slice(0, 255);
           pageCounts.set(page, (pageCounts.get(page) || 0) + 1);
-        }
-
-        if (event.event === "event_view" || event.event === "ticket_click") {
-          const eventId = parseInteger(event.props?.event_id);
-          const prefix = event.event === "ticket_click" ? "ticket" : "event";
-          if (eventId) {
-            const key = `${prefix}:${eventId}`;
-            eventViewCounts.set(key, (eventViewCounts.get(key) || 0) + 1);
-          }
         }
       }
 
@@ -154,8 +144,12 @@ export async function onRequestPost(context) {
         await executeInChunks(env.DB, stmts);
       }
 
-      // Store page views and event views in a separate batch so a missing
-      // page_views_daily table doesn't break artist_daily_stats writes
+      // Store page views in a separate batch so a missing
+      // page_views_daily table doesn't break artist_daily_stats writes.
+      // Only real path keys (page_view events) are written here — event_view and
+      // ticket_click synthetic keys (event:N / ticket:N) are intentionally not
+      // stored: the page_view for the same page already captures the visit, and
+      // the synthetic rows caused double-counting under two key formats (#445).
       const pvStmts = [];
       for (const [page, count] of pageCounts) {
         pvStmts.push(
@@ -165,17 +159,6 @@ export async function onRequestPost(context) {
              ON CONFLICT (page, date)
              DO UPDATE SET views = views + ?`,
           ).bind(page, today, count, count),
-        );
-      }
-
-      for (const [key, count] of eventViewCounts) {
-        pvStmts.push(
-          env.DB.prepare(
-            `INSERT INTO page_views_daily (page, date, views)
-             VALUES (?, ?, ?)
-             ON CONFLICT (page, date)
-             DO UPDATE SET views = views + ?`,
-          ).bind(key, today, count, count),
         );
       }
 

@@ -1,6 +1,7 @@
 // Tests for POST /api/metrics
-// Covers: break-removal (all event_view counts written even above MAX_BATCH_STATEMENTS)
-// and catch-logging (swallowed page_views_daily failure now emits logger.warn).
+// Covers: event_view/ticket_click no longer written to page_views_daily (#445 fix),
+// page_view events still written as real path keys, and catch-logging (swallowed
+// page_views_daily failure now emits logger.warn).
 import { describe, expect, test, vi, afterEach } from "vitest";
 import { onRequestPost } from "../metrics.js";
 import * as loggerModule from "../../utils/logger.js";
@@ -19,11 +20,12 @@ describe("POST /api/metrics", () => {
     vi.restoreAllMocks();
   });
 
-  test("writes ALL event_view counts when count exceeds MAX_BATCH_STATEMENTS (break removed)", async () => {
+  test("event_view events do NOT write synthetic keys to page_views_daily (#445)", async () => {
     const { env, rawDb } = createTestEnv();
 
-    // Generate 25 unique event_view events — MAX_BATCH_STATEMENTS is 20, so without
-    // the fix the last 5 would have been silently dropped.
+    // 25 event_view events — before the fix these wrote 25 event:N rows; now they
+    // should write nothing to page_views_daily (the path page_view already captures
+    // the visit; storing synthetic keys caused double-counting).
     const events = Array.from({ length: 25 }, (_, i) => ({
       event: "event_view",
       props: { event_id: i + 1 },
@@ -33,12 +35,40 @@ describe("POST /api/metrics", () => {
     expect(res.status).toBe(200);
 
     const rows = rawDb.prepare("SELECT * FROM page_views_daily").all();
-    expect(rows).toHaveLength(25);
-    // Verify all 25 event IDs appear as keys
-    const pages = new Set(rows.map((r) => r.page));
-    for (let i = 1; i <= 25; i++) {
-      expect(pages.has(`event:${i}`)).toBe(true);
-    }
+    expect(rows).toHaveLength(0);
+  });
+
+  test("ticket_click events do NOT write synthetic keys to page_views_daily (#445)", async () => {
+    const { env, rawDb } = createTestEnv();
+
+    const events = [
+      { event: "ticket_click", props: { event_id: 1 } },
+      { event: "ticket_click", props: { event_id: 2 } },
+    ];
+
+    const res = await onRequestPost({ request: makeRequest(events), env });
+    expect(res.status).toBe(200);
+
+    const rows = rawDb.prepare("SELECT * FROM page_views_daily").all();
+    expect(rows).toHaveLength(0);
+  });
+
+  test("page_view events still write real path keys to page_views_daily", async () => {
+    const { env, rawDb } = createTestEnv();
+
+    const events = [
+      { event: "page_view", props: { page: "/event/lwbc16" } },
+      { event: "page_view", props: { page: "/event/lwbc16" } },
+      { event: "page_view", props: { page: "/bands/cool-band" } },
+    ];
+
+    const res = await onRequestPost({ request: makeRequest(events), env });
+    expect(res.status).toBe(200);
+
+    const rows = rawDb.prepare("SELECT page, views FROM page_views_daily ORDER BY page").all();
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.page === "/event/lwbc16").views).toBe(2);
+    expect(rows.find((r) => r.page === "/bands/cool-band").views).toBe(1);
   });
 
   test("returns 200 and logs a warning when page_views_daily batch fails", async () => {

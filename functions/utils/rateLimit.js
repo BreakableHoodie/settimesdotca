@@ -21,6 +21,11 @@ const RATE_LIMIT_PREFIX = "rate-limit:";
 const BAND_ACTION_RE =
   /^\/api\/bands\/[^/]+\/(follow|unfollow|confirm-follow)$/;
 
+// Batch follow endpoints — flat paths under /api/bands/ (not nested under {name}).
+// Same fail-closed treatment as BAND_ACTION_RE: they send email, so D1-backed
+// globally-consistent rate limiting applies.
+const BATCH_FOLLOW_RE = /^\/api\/bands\/(follow-batch|confirm-follow-batch)$/;
+
 // Rate limit configurations by endpoint pattern.
 // Order matters: more-specific prefixes must appear before less-specific ones.
 const RATE_LIMITS = {
@@ -63,6 +68,7 @@ const FAIL_CLOSED_PATTERNS = [
 function shouldFailClosed(pathname) {
   return (
     BAND_ACTION_RE.test(pathname) ||
+    BATCH_FOLLOW_RE.test(pathname) ||
     FAIL_CLOSED_PATTERNS.some((pattern) => pathname.startsWith(pattern))
   );
 }
@@ -86,6 +92,10 @@ function getRateLimitConfig(pathname) {
   // Band action endpoints (follow/unfollow/confirm-follow) — checked before the
   // prefix loop so that the tight fail-closed limit takes precedence over 'default'.
   if (BAND_ACTION_RE.test(pathname)) return { requests: 5, window: 300 };
+
+  // Batch follow endpoints — tighter than single-band follow (3/5min) because a
+  // single request can cover up to 30 bands and triggers an email send.
+  if (BATCH_FOLLOW_RE.test(pathname)) return { requests: 3, window: 300 };
 
   // Find matching config
   for (const [pattern, config] of Object.entries(RATE_LIMITS)) {

@@ -231,8 +231,10 @@ export function createTestDB() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       consent_ip TEXT,
       consent_method TEXT NOT NULL DEFAULT 'web_form',
+      batch_token TEXT,
       UNIQUE(email, band_profile_id)
     );
+    CREATE INDEX IF NOT EXISTS idx_band_follows_batch_token ON band_follows(batch_token);
 
     CREATE TABLE band_follow_notifications (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -6,6 +6,8 @@ on:
         paths:
             - 'e2e/accessibility/**'
             - 'e2e/visual-regression.spec.js'
+            - 'migrations/**'
+            - 'database/**'
     schedule:
         - cron: '0 7 * * 1'
 
@@ -53,6 +55,8 @@ jobs:
               with:
                   path: ~/.cache/ms-playwright
                   key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+                  restore-keys: |
+                      playwright-${{ runner.os }}-
 
             - name: Install Playwright browsers
               run: |

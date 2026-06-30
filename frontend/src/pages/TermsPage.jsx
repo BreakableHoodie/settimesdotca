@@ -26,7 +26,7 @@ export default function TermsPage() {
         </Link>
 
         <h1 className="text-text-primary text-3xl font-bold mb-2">Terms of Service</h1>
-        <p className="text-text-tertiary text-sm mb-4">Last updated: [DATE]</p>
+        <p className="text-text-tertiary text-sm mb-4">Last updated: June 2026</p>
 
         {/* Draft banner — visible until legal review is complete */}
         <div className="border border-border bg-surface rounded-lg px-4 py-3 mb-10 text-sm text-text-secondary">
@@ -41,9 +41,7 @@ export default function TermsPage() {
             <p>
               settimes.ca (&ldquo;SetTimes&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is a free,
               community-run event-schedule tool for live-music events in Waterloo Region, Ontario, Canada. It is
-              operated by{' '}
-              <strong className="text-text-secondary">[TODO: legal — legal name of operator / sole proprietor]</strong>,
-              based in <strong className="text-text-secondary">[TODO: legal — city], Ontario, Canada</strong>. You can
+              operated from <strong className="text-text-secondary">Waterloo Region, Ontario, Canada</strong>. You can
               reach us at{' '}
               <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
                 hello@settimes.ca

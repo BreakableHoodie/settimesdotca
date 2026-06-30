@@ -237,31 +237,6 @@ export default function TermsPage() {
               .
             </p>
           </section>
-
-          <section className="border-t border-border pt-8">
-            <h2 className="text-text-primary text-lg font-semibold mb-3">Open items flagged for the lawyer</h2>
-            <ol className="list-decimal list-outside pl-5 space-y-2 text-text-tertiary text-sm">
-              <li>
-                <strong className="text-text-secondary">Operator identity / mailing address.</strong> CASL requires a
-                valid sender identity and mailing address in every commercial email; a sole-proprietor name + Ontario
-                mailing address (or PO box) should be confirmed and added here and in email footers.
-              </li>
-              <li>
-                <strong className="text-text-secondary">Minors.</strong> Events may be 19+, but the website and its
-                email signup are open to all ages. Consider whether to restrict email collection to 16+/18+ and add an
-                age statement (CASL/PIPEDA consent from minors is a known grey area).
-              </li>
-              <li>
-                <strong className="text-text-secondary">&ldquo;Commercial activity&rdquo; / liability cap.</strong> A
-                free, non-commercial tool may not need a damages cap or may want a different one; confirm the cap and
-                indemnity posture for a hobby/community project vs. a business.
-              </li>
-              <li>
-                <strong className="text-text-secondary">Ticketing/third-party links.</strong> If affiliate or paid
-                ticket links are ever added, revisit Sections 2, 5, and 7.
-              </li>
-            </ol>
-          </section>
         </div>
       </div>
     </div>

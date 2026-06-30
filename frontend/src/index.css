@@ -644,3 +644,60 @@ body {
 .ghost-bob {
   animation: ghost-bob 1.6s ease-in-out infinite;
 }
+
+/* Print / Save-as-PDF for the legal pages (Terms, Privacy). The "Download PDF"
+   button calls window.print(); these rules isolate the .legal-document content
+   into a clean dark-on-white document and hide all app chrome (nav, footer,
+   gradient background, the button itself). The legal text stays single-source in
+   the React page — no duplicated content, no PDF library. */
+@page {
+  margin: 2cm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Hide everything, then reveal only the legal document. */
+  body * {
+    visibility: hidden;
+  }
+  .legal-document,
+  .legal-document * {
+    visibility: visible;
+  }
+  .legal-document {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 0;
+  }
+
+  /* Force legible dark-on-white (the on-screen theme is light-on-dark). */
+  .legal-document,
+  .legal-document * {
+    color: #1a1a1a !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .legal-document a {
+    color: #1a1a1a !important;
+    text-decoration: underline;
+  }
+
+  /* Elements excluded from the printed output (back link, the button itself). */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Keep headings with their content; don't split sections across pages. */
+  .legal-document h1,
+  .legal-document h2 {
+    page-break-after: avoid;
+  }
+  .legal-document section {
+    break-inside: avoid;
+  }
+}

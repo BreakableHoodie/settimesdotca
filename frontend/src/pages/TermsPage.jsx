@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
+import DownloadPdfButton from '../components/DownloadPdfButton'
 
 export default function TermsPage() {
   // react-helmet-async does not reliably set document.title in React 19 — set it
@@ -20,19 +21,24 @@ export default function TermsPage() {
         <link rel="canonical" href="https://settimes.ca/terms" />
       </Helmet>
 
-      <div className="container mx-auto px-4 max-w-2xl py-12">
-        <Link to="/" className="text-accent-400 hover:text-accent-500 text-sm mb-8 inline-block transition-colors">
-          ← Back to SetTimes
-        </Link>
+      <div className="container mx-auto px-4 max-w-2xl py-12 legal-document">
+        <div className="no-print mb-8 flex items-center justify-between gap-3">
+          <Link to="/" className="text-accent-400 hover:text-accent-500 text-sm transition-colors">
+            ← Back to SetTimes
+          </Link>
+          <DownloadPdfButton />
+        </div>
 
         <h1 className="text-text-primary text-3xl font-bold mb-2">Terms of Service</h1>
         <p className="text-text-tertiary text-sm mb-4">Last updated: June 2026</p>
 
-        {/* Draft banner — visible until legal review is complete */}
+        {/* Good-faith notice for a free community project (not legal advice). */}
         <div className="border border-border bg-surface rounded-lg px-4 py-3 mb-10 text-sm text-text-secondary">
-          <strong className="text-text-primary">Draft for legal review.</strong> This is a first draft prepared by the
-          settimes.ca team, not legal advice. A qualified Ontario lawyer should review it before publication. Bracketed{' '}
-          <code className="text-accent-400 text-sm">[…]</code> items must be filled in.
+          <strong className="text-text-primary">SetTimes is a free, community-run project.</strong> These terms are
+          provided in good faith to be clear and fair — not legal advice. Questions?{' '}
+          <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+            hello@settimes.ca
+          </a>
         </div>
 
         <div className="space-y-8 text-text-secondary leading-relaxed">

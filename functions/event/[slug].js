@@ -2,7 +2,13 @@
 // JSON-LD for crawlers. See functions/utils/ssrMeta.js for rationale + fallback.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import { escapeAttr, toPlainText, serveWithInjectedMeta, WATERLOO_ADDRESS } from "../utils/ssrMeta.js";
+import {
+  escapeAttr,
+  toPlainText,
+  serveWithInjectedMeta,
+  WATERLOO_ADDRESS,
+  CANONICAL_HOST,
+} from "../utils/ssrMeta.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -15,7 +21,8 @@ export async function onRequest(context) {
   let event = null;
   try {
     event = await env.DB.prepare(
-      `SELECT name, date, slug, description, city FROM events
+      `SELECT id, name, date, end_date, slug, description, city, ticket_url
+       FROM events
        WHERE slug = ? AND (is_published = 1 OR status = 'archived')`,
     )
       .bind(slug)
@@ -26,11 +33,44 @@ export async function onRequest(context) {
   }
   if (!event) return env.ASSETS.fetch(request);
 
-  const origin = new URL(request.url).origin;
-  const url = `${origin}/event/${event.slug}`;
+  // Fetch the event's bands and distinct venues in parallel.
+  let bands = [];
+  let venues = [];
+  try {
+    const [bandsResult, venuesResult] = await Promise.all([
+      env.DB.prepare(
+        `SELECT DISTINCT bp.id, bp.name
+         FROM performances p
+         JOIN band_profiles bp ON p.band_profile_id = bp.id
+         WHERE p.event_id = ?
+         ORDER BY bp.name`,
+      )
+        .bind(event.id)
+        .all(),
+      env.DB.prepare(
+        `SELECT DISTINCT v.id, v.name, v.address_line1, v.address, v.city, v.region, v.postal_code
+         FROM performances p
+         JOIN venues v ON p.venue_id = v.id
+         WHERE p.event_id = ?
+         ORDER BY v.name`,
+      )
+        .bind(event.id)
+        .all(),
+    ]);
+    bands = bandsResult.results ?? [];
+    venues = venuesResult.results ?? [];
+  } catch (err) {
+    // Non-fatal: fall through with empty arrays; MusicEvent still renders.
+    console.error("SSR event bands/venues lookup failed:", slug, err);
+  }
+
+  // Pin to the production host — preview deploys must not self-canonicalise.
+  const url = `${CANONICAL_HOST}/event/${event.slug}`;
   const where = event.city || "Waterloo Region";
   const plainDesc = toPlainText(event.description, 200);
-  const description = plainDesc || `${event.name} — live music in ${where} on SetTimes.${event.date ? ` ${event.date}.` : ""}`;
+  const description =
+    plainDesc ||
+    `${event.name} — live music in ${where} on SetTimes.${event.date ? ` ${event.date}.` : ""}`;
 
   const metaTags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
@@ -44,19 +84,84 @@ export async function onRequest(context) {
     `<link rel="canonical" href="${escapeAttr(url)}" />`,
   ];
 
-  const jsonLd = {
+  // Build MusicEvent location: use per-venue MusicVenue entries when available,
+  // otherwise fall back to a generic Place for the Waterloo Region.
+  const location =
+    venues.length > 0
+      ? venues.map((v) => ({
+          "@type": "MusicVenue",
+          name: v.name,
+          address: {
+            "@type": "PostalAddress",
+            ...(v.address_line1 || v.address
+              ? { streetAddress: v.address_line1 || v.address }
+              : {}),
+            addressLocality: v.city || "Waterloo",
+            addressRegion: v.region || "ON",
+            ...(v.postal_code ? { postalCode: v.postal_code } : {}),
+            addressCountry: "CA",
+          },
+        }))
+      : {
+          "@type": "Place",
+          name: event.city || "Waterloo Region, ON",
+          address: WATERLOO_ADDRESS,
+        };
+
+  const musicEvent = {
     "@context": "https://schema.org",
     "@type": "MusicEvent",
     name: event.name,
     url,
-    ...(event.date && { startDate: event.date }),
-    location: {
-      "@type": "Place",
-      name: event.city || "Waterloo Region, ON",
-      address: WATERLOO_ADDRESS,
-    },
-    ...(plainDesc && { description: plainDesc }),
+    eventStatus: "EventScheduled",
+    eventAttendanceMode: "OfflineEventAttendanceMode",
+    // Show doors at 6:30PM; set times start 6:45PM — use the show-start per spec.
+    ...(event.date ? { startDate: `${event.date}T18:45:00-04:00` } : {}),
+    ...(event.date ? { endDate: event.end_date || event.date } : {}),
+    location,
+    ...(plainDesc ? { description: plainDesc } : {}),
+    ...(event.ticket_url
+      ? {
+          offers: {
+            "@type": "Offer",
+            url: event.ticket_url,
+            price: "0",
+            priceCurrency: "CAD",
+            availability: "https://schema.org/InStock",
+          },
+        }
+      : {}),
+    ...(bands.length > 0
+      ? {
+          performer: bands.map((b) => ({
+            "@type": "MusicGroup",
+            name: b.name,
+            url: `${CANONICAL_HOST}/band/${b.id}`,
+          })),
+        }
+      : {}),
   };
 
-  return serveWithInjectedMeta(context, { title: `${event.name} | SetTimes`, metaTags, jsonLd });
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Events",
+        item: `${CANONICAL_HOST}/`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: event.name,
+        item: url,
+      },
+    ],
+  };
+
+  const title = `${event.name} — Set Times & Lineup in Waterloo | SetTimes`;
+
+  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicEvent, breadcrumb] });
 }

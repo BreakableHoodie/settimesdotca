@@ -8,6 +8,10 @@
 // fetch fail) the caller falls back to env.ASSETS.fetch(request) — the SPA still
 // renders client-side, just without the rich tags.
 
+// Canonical host for SSR-injected canonicals and og:url. Preview deploys
+// (*.pages.dev) must NOT emit their own host as the canonical — pin to prod.
+export const CANONICAL_HOST = "https://settimes.ca";
+
 export function escapeAttr(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -37,8 +41,10 @@ const DEFAULT_META_RE =
 
 // Fetch the SPA index.html, strip the default homepage meta, swap the <title>, and
 // inject the page-specific meta tags + an optional JSON-LD block just before </head>.
-// metaTags is an array of HTML strings; jsonLd is a JS object; title sets <title>.
-// Returns the rewritten HTML Response, or falls back to the raw asset on failure.
+// metaTags is an array of HTML strings; jsonLd is a JS object OR an array of objects
+// (for pages that need multiple schemas, e.g. MusicEvent + BreadcrumbList); title
+// sets <title>. Returns the rewritten HTML Response, or falls back to the raw asset
+// on failure. Existing single-object callers are unaffected.
 export async function serveWithInjectedMeta(context, { title = null, metaTags = [], jsonLd = null } = {}) {
   const { request, env } = context;
   try {
@@ -55,9 +61,13 @@ export async function serveWithInjectedMeta(context, { title = null, metaTags = 
     }
 
     const headParts = [...metaTags];
-    if (jsonLd) {
+    // jsonLd may be a single schema object or an array of schema objects.
+    // Each is injected as its own <script type="application/ld+json"> block so
+    // validators see independent schemas rather than requiring @graph parsing.
+    const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : [];
+    for (const schema of schemas) {
       // Escape "<" so a "</script>" inside any string value can't break out of the tag.
-      const json = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+      const json = JSON.stringify(schema).replace(/</g, "\\u003c");
       headParts.push(`<script type="application/ld+json">${json}</script>`);
     }
     const injected = html.replace("</head>", `    ${headParts.join("\n    ")}\n  </head>`);

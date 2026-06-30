@@ -2,6 +2,10 @@
 // Social crawlers (iMessage, WhatsApp, Twitter) hit this URL and need server-rendered
 // meta tags — React Helmet only runs client-side and crawlers won't see it.
 
+// Pin og:url to the production host so preview deploys (*.pages.dev) don't
+// self-canonicalise — same class of bug as #443.
+const CANONICAL_HOST = "https://settimes.ca";
+
 function escapeAttr(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -60,7 +64,7 @@ export async function onRequest(context) {
   const ogDescription = `Featuring ${featured}${remainder}`;
 
   const origin = new URL(request.url).origin;
-  const ogUrl = `${origin}/s/${slug}`;
+  const ogUrl = `${CANONICAL_HOST}/s/${slug}`;
   const indexResponse = await env.ASSETS.fetch(new Request(`${origin}/`));
   if (!indexResponse.ok) {
     return env.ASSETS.fetch(request);

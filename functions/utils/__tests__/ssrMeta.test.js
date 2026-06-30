@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { escapeAttr, toPlainText, serveWithInjectedMeta } from "../ssrMeta.js";
+import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST } from "../ssrMeta.js";
 
 const DEFAULT_HTML = `<!doctype html><html><head>
     <meta name="description" content="Homepage description" />
@@ -84,5 +84,21 @@ describe("ssrMeta.serveWithInjectedMeta", () => {
       metaTags: ['<meta property="og:title" content="X" />'],
     });
     expect(res.status).toBe(500);
+  });
+
+  it("injects multiple JSON-LD schemas when given an array (MusicEvent + BreadcrumbList)", async () => {
+    const res = await serveWithInjectedMeta(makeContext(), {
+      jsonLd: [
+        { "@type": "MusicEvent", name: "Long Weekend Band Crawl Vol. 17", url: `${CANONICAL_HOST}/event/lwbc17` },
+        { "@type": "BreadcrumbList", itemListElement: [] },
+      ],
+    });
+    const html = await res.text();
+    const blocks = html.match(/application\/ld\+json/g) || [];
+
+    expect(blocks).toHaveLength(2); // two independent schema blocks, not one @graph
+    expect(html).toContain("MusicEvent");
+    expect(html).toContain("BreadcrumbList");
+    expect(html).toContain(`${CANONICAL_HOST}/event/lwbc17`); // canonical host pinned
   });
 });

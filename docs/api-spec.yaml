@@ -603,6 +603,84 @@ paths:
               schema:
                 type: string
 
+  /api/bands/follow-batch:
+    post:
+      tags:
+        - Public
+      summary: Batch follow bands (double opt-in)
+      description: |
+        Registers an email to be notified when any of the given bands joins a
+        lineup. `performance_ids` is resolved to distinct `band_profile_ids`;
+        one `band_follows` row per band is inserted (`verified=0`,
+        `INSERT OR IGNORE`). All rows share a single `batch_token` so that
+        **exactly one** combined confirmation email is sent — one Turnstile
+        solve → one email, regardless of how many bands are in the batch
+        (amplification mitigation). A confirmed address receives announcement
+        emails only after clicking the confirm link (`verify=1`). Always
+        returns `200` for valid input (no enumeration of existing follows).
+        `confirmUrl` is returned only when email delivery is unconfigured
+        (local/dev).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BandFollowBatchRequest"
+      responses:
+        "200":
+          description: Batch accepted (one confirmation email sent if any follow was new)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BandFollowResponse"
+        "400":
+          description: Invalid email, failed bot verification, or invalid performance_ids
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/bands/confirm-follow-batch:
+    get:
+      tags:
+        - Public
+      summary: Confirm a pending batch band follow
+      description: |
+        Verifies all pending (`verified=0`) `band_follows` rows that share the
+        given `batch_token`, setting `verified=1` and clearing the token in one
+        statement. Idempotent: a second click finds no matching rows (token is
+        `NULL` after the first confirm) and returns the same success page.
+        Messaging is generic to avoid revealing whether the token was valid.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          description: Shared batch_token from the confirmation email link
+          schema:
+            type: string
+            maxLength: 256
+      responses:
+        "200":
+          description: HTML confirmation page (success or already-confirmed)
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing or oversized token
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Server error
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /api/feeds/ical:
     get:
       tags:
@@ -3508,6 +3586,28 @@ components:
         confirmUrl:
           type: string
           description: Returned only when email delivery is unconfigured (local/dev)
+
+    BandFollowBatchRequest:
+      type: object
+      required:
+        - email
+        - performance_ids
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        performance_ids:
+          type: array
+          description: Performance IDs to follow; resolved to distinct band_profile_ids
+          minItems: 1
+          maxItems: 30
+          items:
+            type: integer
+            minimum: 1
+        turnstileToken:
+          type: string
+          description: Cloudflare Turnstile token; required in production
 
     ScheduleShareRequest:
       type: object

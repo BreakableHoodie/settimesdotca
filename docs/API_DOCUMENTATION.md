@@ -90,6 +90,8 @@ Following a band is **double opt-in**: a follow is created unverified and only a
 | `/api/bands/{name}/follow`         | `POST` | Body: `{ email, turnstileToken? }`. Bot-protected by Turnstile. Always returns `200` for valid input (no enumeration). `confirmUrl` is returned only when email is unconfigured (dev). |
 | `/api/bands/{name}/confirm-follow` | `GET`  | Verifies a pending follow via `?token=` and renders an HTML page. Idempotent; messaging is generic to avoid leaking token validity.                                                    |
 | `/api/bands/{name}/unfollow`       | `GET`  | Deletes the follow tied to the unsubscribe `?token=` and renders an HTML page. Returns `200` whether or not the token existed.                                                         |
+| `/api/bands/follow-batch`          | `POST` | Body: `{ email, performance_ids: number[], turnstileToken? }`. Resolves performance IDs to bands; inserts one `verified=0` row per band (INSERT OR IGNORE), all sharing a `batch_token`. Sends **exactly one** combined confirmation email (amplification mitigation). Always returns `200` for valid input; `confirmUrl` only in dev. |
+| `/api/bands/confirm-follow-batch`  | `GET`  | `?token=<batch_token>` — flips all rows sharing that token to `verified=1` and clears the token (idempotent). Generic HTML page; no enumeration of token validity.                    |
 
 ### Public request notes
 

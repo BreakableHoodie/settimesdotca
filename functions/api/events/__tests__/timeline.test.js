@@ -649,3 +649,40 @@ describe("Timeline real-DB — reveal_mode JOIN gate (SQL exercise)", () => {
     expect(found.bands).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Real-DB regression — "upcoming" must NOT be capped to a fixed day-window.
+// A flagship event published weeks out (e.g. the Vol-17 crawl ~6 weeks ahead)
+// must appear in "upcoming" the moment it's published — not only once it falls
+// inside an arbitrary horizon. Regression for the old `AND date <= date(?,
+// '+30 days')` cap, which hid Vol-17 (~33 days out when published) entirely.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — upcoming has no fixed day-window cap (SQL exercise)", () => {
+  test("a published event more than 30 days out appears in 'upcoming'", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 45 days out — comfortably past the old 30-day horizon.
+    const farFuture = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+
+    const event = insertEvent(rawDb, {
+      name: "Flagship Crawl",
+      slug: "timeline-realdb-far-future",
+      date: farFuture,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.upcoming.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.slug).toBe("timeline-realdb-far-future");
+  });
+});

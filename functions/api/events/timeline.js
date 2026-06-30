@@ -184,7 +184,11 @@ export async function onRequestGet(context) {
       );
     }
 
-    // "Upcoming" events (future events, next 30 days) - single JOIN query
+    // "Upcoming" events (all future published events, soonest first) - single
+    // JOIN query. No fixed day-window cap: a flagship event weeks out (e.g. the
+    // Vol-17 crawl ~6 weeks ahead) must be visible the moment it's published, not
+    // only once it falls inside an arbitrary 30-day horizon. The LIMIT 10 in the
+    // subquery bounds the result size, matching the cap-free /api/events/public.
     if (includeUpcoming) {
       slots.upcoming = statements.length;
       statements.push(
@@ -221,18 +225,16 @@ export async function onRequestGet(context) {
         LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1
         AND e.date > ?
-        AND e.date <= date(?, '+30 days')
         AND e.id IN (
           SELECT id FROM events
           WHERE is_published = 1
           AND date > ?
-          AND date <= date(?, '+30 days')
           ORDER BY date ASC
           LIMIT 10
         )
         ORDER BY e.date ASC, p.start_time, v.name
       `,
-        ).bind(today, today, today, today),
+        ).bind(today, today),
       );
     }
 

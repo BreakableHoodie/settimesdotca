@@ -108,12 +108,8 @@ export async function onRequestGet(context) {
 
     // Calculate statistics
     const totalShows = history.filter((p) => p.event_id !== null).length;
-    const uniqueVenues = new Set(
-      history.filter((p) => p.venue_id !== null).map((p) => p.venue_id),
-    );
-    const uniqueEvents = new Set(
-      history.filter((p) => p.event_id !== null).map((p) => p.event_id),
-    );
+    const uniqueVenues = new Set(history.filter((p) => p.venue_id !== null).map((p) => p.venue_id));
+    const uniqueEvents = new Set(history.filter((p) => p.event_id !== null).map((p) => p.event_id));
 
     // Get band profile data from most recent entry
     const latestEntry = history[0];

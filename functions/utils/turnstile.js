@@ -11,21 +11,16 @@
 // the production Pages project, or these endpoints will reject every request.
 import { isDevRequest } from "./auth.js";
 
-const SITEVERIFY_URL =
-  "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 export async function verifyTurnstile(request, env, token) {
   const secret = env?.TURNSTILE_SECRET_KEY;
   if (!secret) {
     if (isDevRequest(request, env)) {
-      console.warn(
-        "[Turnstile] TURNSTILE_SECRET_KEY not set — skipping bot verification (local dev only).",
-      );
+      console.warn("[Turnstile] TURNSTILE_SECRET_KEY not set — skipping bot verification (local dev only).");
       return true;
     }
-    console.error(
-      "[Turnstile] TURNSTILE_SECRET_KEY is required in production; rejecting request.",
-    );
+    console.error("[Turnstile] TURNSTILE_SECRET_KEY is required in production; rejecting request.");
     return false;
   }
 

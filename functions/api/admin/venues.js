@@ -112,9 +112,7 @@ export async function onRequestPost(context) {
       contact_email,
     } = validation.sanitized;
 
-    const postal_code = rawPostalCode
-      ? normalizePostalCode(rawPostalCode)
-      : rawPostalCode;
+    const postal_code = rawPostalCode ? normalizePostalCode(rawPostalCode) : rawPostalCode;
 
     const formattedAddress =
       formatVenueAddress({
@@ -124,10 +122,11 @@ export async function onRequestPost(context) {
         region,
         postal_code,
         country,
-      }) || address || null;
+      }) ||
+      address ||
+      null;
 
-    const resolvedAddressLine1 =
-      address_line1 || (address ? address.trim() : null);
+    const resolvedAddressLine1 = address_line1 || (address ? address.trim() : null);
 
     // Check if venue already exists
     const existingVenue = await DB.prepare(

@@ -16,14 +16,9 @@ export async function onRequestGet(context) {
 
   const formatVenueAddress = (venue) => {
     if (!venue) return null;
-    const line1 = [venue.address_line1, venue.address_line2]
-      .filter(Boolean)
-      .join(", ");
+    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
     const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-    const line3 = [venue.postal_code, venue.country]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
+    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
     return [line1, line2, line3].filter(Boolean).join(", ");
   };
 
@@ -48,10 +43,10 @@ export async function onRequestGet(context) {
       .first();
 
     if (!event) {
-      return new Response(
-        JSON.stringify({ error: "Event not found or not published" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Event not found or not published" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const bandsResult = await DB.prepare(
@@ -129,9 +124,9 @@ export async function onRequestGet(context) {
     );
   } catch (error) {
     console.error("Error fetching event details:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch event details" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch event details" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

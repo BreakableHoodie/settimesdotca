@@ -19,7 +19,7 @@ export async function onRequestGet(context) {
     SELECT totp_enabled, totp_secret, backup_codes
     FROM users
     WHERE id = ?
-  `
+  `,
   )
     .bind(userId)
     .first();
@@ -33,7 +33,7 @@ export async function onRequestGet(context) {
       {
         status: 404,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -50,6 +50,6 @@ export async function onRequestGet(context) {
     {
       status: 200,
       headers: { "Content-Type": "application/json" },
-    }
+    },
   );
 }

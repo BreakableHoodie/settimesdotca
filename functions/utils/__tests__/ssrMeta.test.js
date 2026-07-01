@@ -26,7 +26,7 @@ function makeContext({ url = "https://settimes.ca/band/49", assetsOk = true } = 
 }
 
 describe("ssrMeta.escapeAttr", () => {
-  it("escapes &, \", <, >", () => {
+  it('escapes &, ", <, >', () => {
     expect(escapeAttr('Tom & "Jerry" <b>')).toBe("Tom &amp; &quot;Jerry&quot; &lt;b&gt;");
   });
   it("handles null/undefined", () => {

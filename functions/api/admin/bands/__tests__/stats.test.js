@@ -4,13 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { normalizeBandName } from "../../../../utils/bandName.js";
 import { onRequestGet } from "../stats/[name].js";
-import {
-  createTestDB,
-  createDBEnv,
-  insertBand,
-  insertEvent,
-  insertVenue,
-} from "../../../test-utils.js";
+import { createTestDB, createDBEnv, insertBand, insertEvent, insertVenue } from "../../../test-utils.js";
 
 // Mock the middleware
 vi.mock("../../_middleware.js", () => ({
@@ -79,24 +73,14 @@ function insertBandWithProfile(db, data) {
   } = data;
 
   const nameNormalized = normalizeBandName(name);
-  const existingProfile = db
-    .prepare("SELECT id FROM band_profiles WHERE name_normalized = ?")
-    .get(nameNormalized);
+  const existingProfile = db.prepare("SELECT id FROM band_profiles WHERE name_normalized = ?").get(nameNormalized);
   const profileId = existingProfile
     ? existingProfile.id
     : db
         .prepare(
           "INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links) VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
-        .run(
-          name,
-          nameNormalized,
-          genre,
-          origin,
-          description,
-          photo_url,
-          social_links,
-        ).lastInsertRowid;
+        .run(name, nameNormalized, genre, origin, description, photo_url, social_links).lastInsertRowid;
 
   if (existingProfile) {
     const updates = [];
@@ -122,9 +106,7 @@ function insertBandWithProfile(db, data) {
       values.push(social_links);
     }
     if (updates.length > 0) {
-      db.prepare(
-        `UPDATE band_profiles SET ${updates.join(", ")} WHERE id = ?`,
-      ).run(...values, profileId);
+      db.prepare(`UPDATE band_profiles SET ${updates.join(", ")} WHERE id = ?`).run(...values, profileId);
     }
   }
 
@@ -134,9 +116,7 @@ function insertBandWithProfile(db, data) {
     )
     .run(event_id, venue_id, profileId, start_time, end_time, null);
 
-  return db
-    .prepare("SELECT * FROM performances WHERE id = ?")
-    .get(info.lastInsertRowid);
+  return db.prepare("SELECT * FROM performances WHERE id = ?").get(info.lastInsertRowid);
 }
 
 describe("GET /api/admin/bands/stats/:name", () => {
@@ -169,10 +149,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Test%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Test%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -181,9 +160,7 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should reject unauthenticated requests", async () => {
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Test%20Band",
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Test%20Band");
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -208,10 +185,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Test editor role
-      const editorRequest = new Request(
-        "https://example.test/api/admin/bands/stats/Test%20Band",
-        { headers: { "x-test-role": "editor" } },
-      );
+      const editorRequest = new Request("https://example.test/api/admin/bands/stats/Test%20Band", {
+        headers: { "x-test-role": "editor" },
+      });
       const editorResponse = await onRequestGet({
         request: editorRequest,
         env,
@@ -219,10 +195,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       expect(editorResponse.status).toBe(200);
 
       // Test admin role
-      const adminRequest = new Request(
-        "https://example.test/api/admin/bands/stats/Test%20Band",
-        { headers: { "x-test-role": "admin" } },
-      );
+      const adminRequest = new Request("https://example.test/api/admin/bands/stats/Test%20Band", {
+        headers: { "x-test-role": "admin" },
+      });
       const adminResponse = await onRequestGet({ request: adminRequest, env });
       expect(adminResponse.status).toBe(200);
     });
@@ -235,10 +210,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
   describe("Input Validation", () => {
     it("should return 400 for missing band name", async () => {
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -250,10 +224,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should return 400 for empty band name", async () => {
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/%20",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/%20", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -278,10 +251,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/The%20Rock%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/The%20Rock%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -312,10 +284,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Test%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Test%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -326,10 +297,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
     it("should return 404 for non-existent band", async () => {
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/NonExistent%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/NonExistent%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -354,10 +324,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act - Request with different case
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/test%20band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/test%20band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -414,10 +383,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Popular%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Popular%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -459,10 +427,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Touring%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Touring%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -500,10 +467,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Festival%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Festival%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -523,10 +489,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Rolodex%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Rolodex%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -551,10 +516,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Virtual%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Virtual%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -606,10 +570,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Evolving%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Evolving%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -643,10 +606,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Complete%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Complete%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -712,10 +674,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Time%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Time%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -734,10 +695,7 @@ describe("GET /api/admin/bands/stats/:name", () => {
         date: "2025-07-15",
       });
       // Update event city
-      db.prepare("UPDATE events SET city = ? WHERE id = ?").run(
-        "Central Park",
-        event.id,
-      );
+      db.prepare("UPDATE events SET city = ? WHERE id = ?").run("Central Park", event.id);
 
       const venue = insertVenue(db, { name: "Main Stage" });
       insertBandWithProfile(db, {
@@ -749,10 +707,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Event%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Event%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -785,10 +742,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Venue%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Venue%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -811,10 +767,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Orphan%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Orphan%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -838,10 +793,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       // But we can test it by querying a name that doesn't exist
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Never%20Performed",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Never%20Performed", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert
@@ -856,10 +810,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       const invalidEnv = { DB: null };
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Test%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Test%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env: invalidEnv });
 
       // Assert
@@ -876,10 +829,7 @@ describe("GET /api/admin/bands/stats/:name", () => {
         slug: "format-test",
         date: "2025-06-01",
       });
-      db.prepare("UPDATE events SET city = ? WHERE id = ?").run(
-        "Test Location",
-        event.id,
-      );
+      db.prepare("UPDATE events SET city = ? WHERE id = ?").run("Test Location", event.id);
 
       const venue = insertVenue(db, {
         name: "Format Venue",
@@ -899,10 +849,9 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
 
       // Act
-      const request = new Request(
-        "https://example.test/api/admin/bands/stats/Format%20Band",
-        { headers: { "x-test-role": "viewer" } },
-      );
+      const request = new Request("https://example.test/api/admin/bands/stats/Format%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
       const response = await onRequestGet({ request, env });
 
       // Assert

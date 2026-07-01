@@ -8,10 +8,10 @@
 // being able to forge or replay the underlying credential.
 async function sessionRevocationToken(sessionId) {
   const data = new TextEncoder().encode(sessionId);
-  const hash = await crypto.subtle.digest('SHA-256', data);
+  const hash = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export async function onRequestGet(context) {
@@ -32,7 +32,7 @@ export async function onRequestGet(context) {
       FROM lucia_sessions
       WHERE user_id = ?
       ORDER BY last_activity_at DESC
-    `
+    `,
     )
       .bind(user.userId)
       .all();
@@ -44,24 +44,22 @@ export async function onRequestGet(context) {
         user_agent: row.user_agent,
         created_at: row.created_at,
         last_activity_at: row.last_activity_at,
-        expires_at: row.expires_at
-          ? new Date(row.expires_at * 1000).toISOString()
-          : null,
+        expires_at: row.expires_at ? new Date(row.expires_at * 1000).toISOString() : null,
         current: currentSessionId ? row.id === currentSessionId : false,
-      }))
+      })),
     );
 
     return new Response(
       JSON.stringify({
         sessions,
       }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error('Failed to load sessions:', error);
-    return new Response(JSON.stringify({ error: 'Failed to load sessions' }), {
+    console.error("Failed to load sessions:", error);
+    return new Response(JSON.stringify({ error: "Failed to load sessions" }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   }
 }
@@ -75,50 +73,40 @@ export async function onRequestDelete(context) {
     const revocationToken = body.revocationToken;
 
     if (!revocationToken) {
-      return new Response(
-        JSON.stringify({ error: 'Revocation token is required' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ error: "Revocation token is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Resolve the opaque token back to a real session id. Compute all hashes
     // in parallel first so no extra round-trips are needed per session.
-    const { results: userSessions } = await env.DB.prepare(
-      'SELECT id FROM lucia_sessions WHERE user_id = ?'
-    )
+    const { results: userSessions } = await env.DB.prepare("SELECT id FROM lucia_sessions WHERE user_id = ?")
       .bind(user.userId)
       .all();
 
     const tokenMap = new Map(
-      await Promise.all(
-        (userSessions || []).map(async (s) => [
-          await sessionRevocationToken(s.id),
-          s.id,
-        ])
-      )
+      await Promise.all((userSessions || []).map(async (s) => [await sessionRevocationToken(s.id), s.id])),
     );
     const targetSessionId = tokenMap.get(revocationToken) ?? null;
 
     if (!targetSessionId) {
-      return new Response(JSON.stringify({ error: 'Session not found' }), {
+      return new Response(JSON.stringify({ error: "Session not found" }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     await lucia.invalidateSession(targetSessionId);
 
     return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error('Failed to delete session:', error);
-    return new Response(JSON.stringify({ error: 'Failed to delete session' }), {
+    console.error("Failed to delete session:", error);
+    return new Response(JSON.stringify({ error: "Failed to delete session" }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   }
 }

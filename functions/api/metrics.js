@@ -43,11 +43,7 @@ function parseInteger(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-async function executeInChunks(
-  db,
-  statements,
-  chunkSize = MAX_BATCH_STATEMENTS,
-) {
+async function executeInChunks(db, statements, chunkSize = MAX_BATCH_STATEMENTS) {
   for (let i = 0; i < statements.length; i += chunkSize) {
     await db.batch(statements.slice(i, i + chunkSize));
   }
@@ -64,10 +60,7 @@ export async function onRequestPost(context) {
       return new Response("OK", { status: 200 });
     }
 
-    const validEvents = rawEvents
-      .map(sanitizeEvent)
-      .filter(Boolean)
-      .slice(0, 50);
+    const validEvents = rawEvents.map(sanitizeEvent).filter(Boolean).slice(0, 50);
 
     if (validEvents.length === 0) {
       return new Response("OK", { status: 200 });
@@ -106,10 +99,7 @@ export async function onRequestPost(context) {
         if (event.event === "social_link_click") {
           const bandId = parseInteger(event.props?.band_profile_id);
           if (bandId) {
-            socialClickCounts.set(
-              bandId,
-              (socialClickCounts.get(bandId) || 0) + 1,
-            );
+            socialClickCounts.set(bandId, (socialClickCounts.get(bandId) || 0) + 1);
           }
         }
 
@@ -120,10 +110,7 @@ export async function onRequestPost(context) {
       }
 
       // Merge view and click counts per band into a single upsert each
-      const allBandIds = new Set([
-        ...bandViewCounts.keys(),
-        ...socialClickCounts.keys(),
-      ]);
+      const allBandIds = new Set([...bandViewCounts.keys(), ...socialClickCounts.keys()]);
 
       const stmts = [];
       for (const bandId of allBandIds) {
@@ -166,10 +153,10 @@ export async function onRequestPost(context) {
         try {
           await executeInChunks(env.DB, pvStmts);
         } catch (err) {
-          logger.warn(
-            "page_views_daily upsert failed (table may be missing or write error)",
-            { error: err, statementCount: pvStmts.length },
-          );
+          logger.warn("page_views_daily upsert failed (table may be missing or write error)", {
+            error: err,
+            statementCount: pvStmts.length,
+          });
         }
       }
     }

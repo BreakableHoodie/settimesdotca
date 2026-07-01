@@ -8,10 +8,7 @@ import { getClientIP } from "../../../../utils/request.js";
 import { initializeLucia } from "../../../../utils/auth.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../../utils/authAttempts.js";
 import { loadTotpSecret } from "../../../../utils/mfaSecrets.js";
-import {
-  createTrustedDevice,
-  createTrustedDeviceCookie,
-} from "../../../../utils/trustedDevice.js";
+import { createTrustedDevice, createTrustedDeviceCookie } from "../../../../utils/trustedDevice.js";
 
 function parseBackupCodes(raw) {
   if (!raw) return [];
@@ -43,7 +40,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -63,7 +60,7 @@ export async function onRequestPost(context) {
       FROM mfa_challenges c
       INNER JOIN users u ON u.id = c.user_id
       WHERE c.token = ? AND c.used = 0 AND c.expires_at > datetime('now')
-    `
+    `,
     )
       .bind(mfaToken)
       .first();
@@ -83,7 +80,7 @@ export async function onRequestPost(context) {
           {
             status: 429,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -103,7 +100,7 @@ export async function onRequestPost(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -113,10 +110,7 @@ export async function onRequestPost(context) {
       ipAddress !== "unknown" &&
       challenge.ip_address !== ipAddress;
     const uaMismatch =
-      challenge.user_agent &&
-      userAgent &&
-      challenge.user_agent !== "unknown" &&
-      challenge.user_agent !== userAgent;
+      challenge.user_agent && userAgent && challenge.user_agent !== "unknown" && challenge.user_agent !== userAgent;
 
     if (ipMismatch || uaMismatch) {
       await writeAuthAttempt(DB, {
@@ -137,7 +131,7 @@ export async function onRequestPost(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -160,7 +154,7 @@ export async function onRequestPost(context) {
         {
           status: 403,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -179,7 +173,7 @@ export async function onRequestPost(context) {
         {
           status: 429,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -226,7 +220,7 @@ export async function onRequestPost(context) {
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -249,7 +243,7 @@ export async function onRequestPost(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -258,7 +252,7 @@ export async function onRequestPost(context) {
     const markUsed = await DB.prepare(
       `UPDATE mfa_challenges
        SET used = 1, used_at = datetime('now')
-       WHERE id = ? AND used = 0`
+       WHERE id = ? AND used = 0`,
     )
       .bind(challenge.challenge_id)
       .run();
@@ -272,7 +266,7 @@ export async function onRequestPost(context) {
         {
           status: 401,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -287,9 +281,7 @@ export async function onRequestPost(context) {
 
       if (usedBackupCode) {
         const nextCodes =
-          remainingBackupCodes && remainingBackupCodes.length > 0
-            ? JSON.stringify(remainingBackupCodes)
-            : null;
+          remainingBackupCodes && remainingBackupCodes.length > 0 ? JSON.stringify(remainingBackupCodes) : null;
         setClauses.push("backup_codes = ?");
         bindValues.push(nextCodes);
       }
@@ -297,7 +289,7 @@ export async function onRequestPost(context) {
       await DB.prepare(
         `UPDATE users
          SET ${setClauses.join(", ")}
-         WHERE id = ?`
+         WHERE id = ?`,
       )
         .bind(...bindValues, challenge.user_id)
         .run();
@@ -310,16 +302,12 @@ export async function onRequestPost(context) {
     await DB.prepare(
       `UPDATE lucia_sessions
        SET ip_address = ?, user_agent = ?, remember_me = ?
-       WHERE id = ?`
+       WHERE id = ?`,
     )
       .bind(ipAddress, userAgent, 0, session.id)
       .run();
 
-    await DB.prepare(
-      "UPDATE users SET last_login = datetime('now') WHERE id = ?"
-    )
-      .bind(challenge.user_id)
-      .run();
+    await DB.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").bind(challenge.user_id).run();
 
     await writeAuthAttempt(DB, {
       attemptType: AUTH_ATTEMPT_TYPES.mfa,
@@ -340,16 +328,8 @@ export async function onRequestPost(context) {
     // Create trusted device if requested
     if (rememberDevice) {
       try {
-        const trustedDevice = await createTrustedDevice(
-          DB,
-          challenge.user_id,
-          ipAddress,
-          userAgent
-        );
-        headers.append(
-          "Set-Cookie",
-          createTrustedDeviceCookie(trustedDevice.token, request, env)
-        );
+        const trustedDevice = await createTrustedDevice(DB, challenge.user_id, ipAddress, userAgent);
+        headers.append("Set-Cookie", createTrustedDeviceCookie(trustedDevice.token, request, env));
       } catch (err) {
         // Don't fail login if trusted device creation fails
         console.error("[MFA Verify] Failed to create trusted device:", err);
@@ -369,7 +349,7 @@ export async function onRequestPost(context) {
       {
         status: 200,
         headers,
-      }
+      },
     );
   } catch (error) {
     console.error("MFA verify error:", error);
@@ -382,7 +362,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

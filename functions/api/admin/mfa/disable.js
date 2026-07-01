@@ -43,13 +43,11 @@ export async function onRequestPost(context) {
       {
         status: 400,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
-  const user = await DB.prepare(
-    "SELECT email, totp_secret, totp_enabled, backup_codes FROM users WHERE id = ?"
-  )
+  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled, backup_codes FROM users WHERE id = ?")
     .bind(userId)
     .first();
 
@@ -62,7 +60,7 @@ export async function onRequestPost(context) {
       {
         status: 404,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -75,7 +73,7 @@ export async function onRequestPost(context) {
       {
         status: 400,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -94,7 +92,7 @@ export async function onRequestPost(context) {
       {
         status: 429,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -129,7 +127,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -152,14 +150,14 @@ export async function onRequestPost(context) {
       {
         status: 401,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
   await DB.prepare(
     `UPDATE users
      SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL
-     WHERE id = ?`
+     WHERE id = ?`,
   )
     .bind(userId)
     .run();
@@ -175,15 +173,7 @@ export async function onRequestPost(context) {
     userId,
   });
 
-  await auditLog(
-    env,
-    userId,
-    "mfa.disabled",
-    "user",
-    userId,
-    { email: user.email },
-    ipAddress
-  );
+  await auditLog(env, userId, "mfa.disabled", "user", userId, { email: user.email }, ipAddress);
 
   return new Response(
     JSON.stringify({
@@ -192,6 +182,6 @@ export async function onRequestPost(context) {
     {
       status: 200,
       headers: { "Content-Type": "application/json" },
-    }
+    },
   );
 }

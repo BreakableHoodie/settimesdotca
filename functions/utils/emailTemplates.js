@@ -7,15 +7,7 @@ const BRAND = {
   muted: "#9ca3af",
 };
 
-function renderEmail({
-  title,
-  preheader,
-  intro,
-  ctaLabel,
-  ctaUrl,
-  bodyHtml,
-  footerNote,
-}) {
+function renderEmail({ title, preheader, intro, ctaLabel, ctaUrl, bodyHtml, footerNote }) {
   const preheaderText = preheader ? String(preheader) : "";
   const safeTitle = String(title);
 
@@ -51,7 +43,9 @@ function renderEmail({
                       ${safeTitle}
                     </h1>
                     ${intro ? `<p style="margin:0 0 16px; font-size:15px; color:${BRAND.muted};">${intro}</p>` : ""}
-                    ${ctaLabel && ctaUrl ? `
+                    ${
+                      ctaLabel && ctaUrl
+                        ? `
                       <div style="margin:24px 0;">
                         <a href="${ctaUrl}" style="display:inline-block; background:${BRAND.accent}; color:${BRAND.background}; text-decoration:none; font-weight:700; padding:12px 20px; border-radius:10px;">
                           ${ctaLabel}
@@ -61,7 +55,9 @@ function renderEmail({
                         Or copy this link:<br />
                         <a href="${ctaUrl}" style="color:${BRAND.accent}; text-decoration:none;">${ctaUrl}</a>
                       </div>
-                    ` : ""}
+                    `
+                        : ""
+                    }
                     ${bodyHtml ? `<div style="margin-top:20px; font-size:14px; color:${BRAND.text}; line-height:1.6;">${bodyHtml}</div>` : ""}
                   </td>
                 </tr>
@@ -155,9 +151,7 @@ export function buildResetPasswordEmail({ resetUrl, recipientName }) {
 }
 
 export function buildActivationEmail({ activationUrl, recipientName }) {
-  const intro = recipientName
-    ? `Hi ${recipientName}, welcome to SetTimes!`
-    : "Welcome to SetTimes!";
+  const intro = recipientName ? `Hi ${recipientName}, welcome to SetTimes!` : "Welcome to SetTimes!";
 
   const bodyHtml = `
     <p style="margin:0 0 12px;">Click the button above to activate your account and start managing events.</p>

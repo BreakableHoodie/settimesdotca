@@ -48,9 +48,7 @@ describe("Password Validation", () => {
   it("should enforce uppercase requirement when set", () => {
     const result = validatePassword("lowercase123", { requireUppercase: true });
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain(
-      "Password must contain at least one uppercase letter",
-    );
+    expect(result.errors).toContain("Password must contain at least one uppercase letter");
 
     const result2 = validatePassword("Uppercase123", { requireUppercase: true });
     expect(result2.valid).toBe(true);

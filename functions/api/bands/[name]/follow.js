@@ -15,8 +15,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const email =
-      typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const turnstileToken = body.turnstileToken;
 
     if (!email || email.length > MAX_EMAIL_LENGTH || !isValidEmail(email)) {
@@ -28,26 +27,20 @@ export async function onRequestPost(context) {
 
     const turnstileValid = await verifyTurnstile(request, env, turnstileToken);
     if (!turnstileValid) {
-      return new Response(
-        JSON.stringify({ error: "Bot verification failed" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Bot verification failed" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Resolve band profile — params.name may be numeric ID or normalized name
     const nameOrId = params.name;
     let band;
     if (/^\d+$/.test(nameOrId)) {
-      band = await DB.prepare("SELECT id, name FROM band_profiles WHERE id = ?")
-        .bind(Number(nameOrId))
-        .first();
+      band = await DB.prepare("SELECT id, name FROM band_profiles WHERE id = ?").bind(Number(nameOrId)).first();
     } else {
       const normalized = normalizeBandName(nameOrId);
-      band = await DB.prepare(
-        "SELECT id, name FROM band_profiles WHERE name_normalized = ?",
-      )
-        .bind(normalized)
-        .first();
+      band = await DB.prepare("SELECT id, name FROM band_profiles WHERE name_normalized = ?").bind(normalized).first();
     }
 
     if (!band) {
@@ -92,17 +85,11 @@ export async function onRequestPost(context) {
         })
           .then((emailResult) => {
             if (!emailResult?.delivered) {
-              console.warn(
-                "[band-follow] Confirmation email not delivered:",
-                emailResult?.reason,
-              );
+              console.warn("[band-follow] Confirmation email not delivered:", emailResult?.reason);
             }
           })
           .catch((err) => {
-            console.error(
-              "[band-follow] Failed to send confirmation email:",
-              err,
-            );
+            console.error("[band-follow] Failed to send confirmation email:", err);
           }),
       );
     }

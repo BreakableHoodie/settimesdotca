@@ -18,11 +18,7 @@ export async function onRequestPost(context) {
 
   const userId = auth.user.userId;
 
-  const user = await DB.prepare(
-    "SELECT email, totp_enabled FROM users WHERE id = ?"
-  )
-    .bind(userId)
-    .first();
+  const user = await DB.prepare("SELECT email, totp_enabled FROM users WHERE id = ?").bind(userId).first();
 
   if (!user) {
     return new Response(
@@ -33,7 +29,7 @@ export async function onRequestPost(context) {
       {
         status: 404,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -46,7 +42,7 @@ export async function onRequestPost(context) {
       {
         status: 409,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -70,27 +66,19 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
   await DB.prepare(
     `UPDATE users
      SET totp_secret = ?, totp_enabled = 0, backup_codes = NULL
-     WHERE id = ?`
+     WHERE id = ?`,
   )
     .bind(encryptedSecret, userId)
     .run();
 
-  await auditLog(
-    env,
-    userId,
-    "mfa.setup",
-    "user",
-    userId,
-    { email: user.email },
-    ipAddress
-  );
+  await auditLog(env, userId, "mfa.setup", "user", userId, { email: user.email }, ipAddress);
 
   return new Response(
     JSON.stringify({
@@ -100,6 +88,6 @@ export async function onRequestPost(context) {
     {
       status: 200,
       headers: { "Content-Type": "application/json" },
-    }
+    },
   );
 }

@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  checkRateLimit,
-  rateLimitHeaders,
-  rateLimitResponse,
-} from "../rateLimit.js";
+import { checkRateLimit, rateLimitHeaders, rateLimitResponse } from "../rateLimit.js";
 
 // Mock the caches global (Cache API, used for non-sensitive endpoints)
 const mockCache = {
@@ -281,10 +277,7 @@ describe("Rate Limiting", () => {
     it("unknown IP fails closed on fail-closed (auth) endpoints", async () => {
       const db = makeMockDB({ count: 0 });
       const env = { DB: db };
-      const request = new Request(
-        "https://example.com/api/admin/auth/login",
-        {},
-      ); // no IP headers
+      const request = new Request("https://example.com/api/admin/auth/login", {}); // no IP headers
 
       const result = await checkRateLimit(request, env);
 
@@ -309,12 +302,9 @@ describe("Rate Limiting", () => {
     it("/api/bands/<name>/follow is fail-closed (uses D1) with limit 5/300s", async () => {
       const db = makeMockDB({ count: 3 }); // under the 5-req/300s limit
       const env = { DB: db };
-      const request = new Request(
-        "https://example.com/api/bands/my-band/follow",
-        {
-          headers: { "CF-Connecting-IP": "1.2.3.4" },
-        },
-      );
+      const request = new Request("https://example.com/api/bands/my-band/follow", {
+        headers: { "CF-Connecting-IP": "1.2.3.4" },
+      });
 
       const result = await checkRateLimit(request, env);
 
@@ -328,12 +318,9 @@ describe("Rate Limiting", () => {
     it("/api/bands/<name>/follow fails closed when limit is exceeded", async () => {
       const db = makeMockDB({ count: 6 }); // over the 5-req/300s limit
       const env = { DB: db };
-      const request = new Request(
-        "https://example.com/api/bands/my-band/follow",
-        {
-          headers: { "CF-Connecting-IP": "1.2.3.4" },
-        },
-      );
+      const request = new Request("https://example.com/api/bands/my-band/follow", {
+        headers: { "CF-Connecting-IP": "1.2.3.4" },
+      });
 
       const result = await checkRateLimit(request, env);
 
@@ -344,12 +331,9 @@ describe("Rate Limiting", () => {
     it("/api/bands/<name>/unfollow is fail-closed with the same tight limit", async () => {
       const db = makeMockDB({ count: 1 });
       const env = { DB: db };
-      const request = new Request(
-        "https://example.com/api/bands/my-band/unfollow",
-        {
-          headers: { "CF-Connecting-IP": "1.2.3.4" },
-        },
-      );
+      const request = new Request("https://example.com/api/bands/my-band/unfollow", {
+        headers: { "CF-Connecting-IP": "1.2.3.4" },
+      });
 
       const result = await checkRateLimit(request, env);
 
@@ -361,12 +345,9 @@ describe("Rate Limiting", () => {
     it("/api/bands/<name>/confirm-follow is fail-closed with the tight limit", async () => {
       const db = makeMockDB({ count: 1 });
       const env = { DB: db };
-      const request = new Request(
-        "https://example.com/api/bands/my-band/confirm-follow",
-        {
-          headers: { "CF-Connecting-IP": "1.2.3.4" },
-        },
-      );
+      const request = new Request("https://example.com/api/bands/my-band/confirm-follow", {
+        headers: { "CF-Connecting-IP": "1.2.3.4" },
+      });
 
       const result = await checkRateLimit(request, env);
 
@@ -385,12 +366,9 @@ describe("Rate Limiting", () => {
         }),
       };
       const env = { DB: db };
-      const request = new Request(
-        "https://example.com/api/bands/my-band/follow",
-        {
-          headers: { "CF-Connecting-IP": "1.2.3.4" },
-        },
-      );
+      const request = new Request("https://example.com/api/bands/my-band/follow", {
+        headers: { "CF-Connecting-IP": "1.2.3.4" },
+      });
 
       const result = await checkRateLimit(request, env);
 
@@ -421,12 +399,10 @@ describe("Rate Limiting", () => {
           return {
             bind: vi.fn().mockReturnValue({
               run: vi.fn().mockResolvedValue({}),
-              first: vi
-                .fn()
-                .mockResolvedValue({
-                  count: 1,
-                  window_start: Math.floor(Date.now() / 1000),
-                }),
+              first: vi.fn().mockResolvedValue({
+                count: 1,
+                window_start: Math.floor(Date.now() / 1000),
+              }),
             }),
           };
         }),
@@ -450,9 +426,7 @@ describe("Rate Limiting", () => {
       expect(db.prepare).toHaveBeenCalledTimes(4);
 
       // Extract the bind arguments from the key upsert calls to confirm distinct keys
-      const bindCalls = db.prepare.mock.results
-        .map((r) => r.value.bind.mock.calls[0])
-        .filter(Boolean);
+      const bindCalls = db.prepare.mock.results.map((r) => r.value.bind.mock.calls[0]).filter(Boolean);
 
       // The first positional arg to bind is the key — should differ for /follow vs /unfollow
       const keys = bindCalls.map((args) => args[0]);

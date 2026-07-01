@@ -17,14 +17,9 @@ function formatOrigin(profile) {
 
 function formatVenueAddress(venue) {
   if (!venue) return null;
-  const line1 = [venue.address_line1, venue.address_line2]
-    .filter(Boolean)
-    .join(", ");
+  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
   const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-  const line3 = [venue.postal_code, venue.country]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
   return [line1, line2, line3].filter(Boolean).join(", ");
 }
 
@@ -42,10 +37,10 @@ export async function onRequestGet(context) {
     const searchParam = decodeURIComponent(parts[parts.length - 1]);
 
     if (!searchParam) {
-      return new Response(
-        JSON.stringify({ error: "Band identifier is required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Band identifier is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Check if it's a numeric ID or a name
@@ -131,9 +126,7 @@ export async function onRequestGet(context) {
 
     let socialLinks = {};
     try {
-      socialLinks = bandProfile.social_links
-        ? JSON.parse(bandProfile.social_links)
-        : {};
+      socialLinks = bandProfile.social_links ? JSON.parse(bandProfile.social_links) : {};
     } catch (_error) {
       socialLinks = {};
     }
@@ -168,12 +161,7 @@ export async function onRequestGet(context) {
       },
     });
   } catch (error) {
-    console.error(
-      "Error fetching band profile:",
-      error,
-      error.message,
-      error.stack,
-    );
+    console.error("Error fetching band profile:", error, error.message, error.stack);
 
     return new Response(
       JSON.stringify({

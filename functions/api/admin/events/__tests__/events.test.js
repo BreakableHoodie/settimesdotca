@@ -1,11 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createDBEnv,
-  createTestDB,
-  createTestEnv,
-  insertBand,
-  insertEvent,
-} from "../../../test-utils";
+import { createDBEnv, createTestDB, createTestEnv, insertBand, insertEvent } from "../../../test-utils";
 
 // We'll import the handler under test. It expects to be called as
 // onRequestPost({ request, env }) and uses env.DB. We also need to mock
@@ -28,10 +22,10 @@ vi.mock("../../_middleware.js", () => ({
     if (level === "admin" && role !== "admin") {
       return {
         error: true,
-        response: new Response(
-          JSON.stringify({ error: "Forbidden", message: "Admin required" }),
-          { status: 403, headers: { "Content-Type": "application/json" } },
-        ),
+        response: new Response(JSON.stringify({ error: "Forbidden", message: "Admin required" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }),
       };
     }
 
@@ -75,13 +69,9 @@ describe("Event API - smoke tests", () => {
   it.todo("POST /api/admin/events - should create event with valid data");
   it.todo("POST /api/admin/events - should validate required fields");
   it.todo("PATCH /api/admin/events/:id - should update event fields");
-  it.todo(
-    "POST /api/admin/events/:id/publish - should publish when bands >= 1",
-  );
+  it.todo("POST /api/admin/events/:id/publish - should publish when bands >= 1");
   it.todo("POST /api/admin/events/:id/archive - should archive only for admin");
-  it.todo(
-    "DELETE /api/admin/events/:id - should delete event and orphan bands",
-  );
+  it.todo("DELETE /api/admin/events/:id - should delete event and orphan bands");
 });
 
 describe("Event API - handler integration", () => {
@@ -122,17 +112,14 @@ describe("Event API - handler integration", () => {
     const ev = insertEvent(rawDb, { name: "Old Name", slug: "old-name" });
 
     const body = { name: "New Name" };
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify(body),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     const res = await eventIdHandler.onRequestPatch({ request, env });
     expect(res.status).toBe(200);
@@ -149,24 +136,19 @@ describe("Event API - handler integration", () => {
     insertBand(rawDb, { name: "Band A", event_id: ev.id });
 
     const body = { publish: true };
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}/publish`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify(body),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     const res = await publishHandler.onRequestPost({ request, env });
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(
-      data.event.is_published === 1 || data.event.is_published === true,
-    ).toBeTruthy();
+    expect(data.event.is_published === 1 || data.event.is_published === true).toBeTruthy();
   });
 
   // Negative / validation cases
@@ -224,17 +206,14 @@ describe("Event API - handler integration", () => {
 
     const ev = insertEvent(rawDb, { name: "NoBands", slug: "nobands" });
     const body = { publish: true };
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}/publish`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify(body),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     const res = await publishHandler.onRequestPost({ request, env });
     expect(res.status).toBe(400);
@@ -276,17 +255,14 @@ describe("Event API - handler integration", () => {
     });
 
     const body = { publish: false };
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}/publish`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify(body),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     const res = await publishHandler.onRequestPost({ request, env });
     expect(res.status).toBe(400);
@@ -303,17 +279,14 @@ describe("Event API - handler integration", () => {
       slug: "no-slug-change",
     });
     const body = { slug: "new-slug" };
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify(body),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     const res = await eventIdHandler.onRequestPatch({ request, env });
     expect(res.status).toBe(400);
@@ -326,16 +299,13 @@ describe("Event API - handler integration", () => {
     const env = { DB: createDBEnv(rawDb) };
     const ev = insertEvent(rawDb, { name: "Protected", slug: "protected" });
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}/archive`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/archive`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+    });
 
     const res = await archiveHandler.onRequestPost({ request, env });
     expect(res.status).toBe(403);
@@ -349,16 +319,13 @@ describe("Event API - handler integration", () => {
       slug: "protected-delete",
     });
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}`,
-      {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+    });
 
     const res = await eventIdHandler.onRequestDelete({ request, env });
     expect(res.status).toBe(403);
@@ -371,13 +338,10 @@ describe("Event API - handler integration", () => {
     // Create event
     const ev = insertEvent(rawDb, { name: "To Archive", slug: "to-archive" });
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}/archive`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-test-role": "admin" },
-      },
-    );
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/archive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+    });
 
     const res = await archiveHandler.onRequestPost({ request, env });
     expect(res.status).toBe(200);
@@ -399,17 +363,14 @@ describe("Event API - handler integration", () => {
       date: "2026-01-01",
       slug: "original-copy",
     };
-    const request = new Request(
-      `https://example.test/api/admin/events/${original.id}/duplicate`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify(body),
+    const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     const res = await duplicateHandler.onRequestPost({
       request,
@@ -430,14 +391,11 @@ describe("Event API - handler integration", () => {
     const ev = insertEvent(rawDb, { name: "ToDelete", slug: "to-delete" });
     insertBand(rawDb, { name: "SoloBand", event_id: ev.id });
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}`,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json", "x-test-role": "admin" },
-        body: JSON.stringify({ confirmCascade: true }),
-      },
-    );
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+      body: JSON.stringify({ confirmCascade: true }),
+    });
 
     const res = await eventIdHandler.onRequestDelete({ request, env });
     expect(res.status).toBe(200);
@@ -455,14 +413,11 @@ describe("Event API - handler integration", () => {
     });
     const b = insertBand(rawDb, { name: "OrphanBand", event_id: ev.id });
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}`,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json", "x-test-role": "admin" },
-        body: JSON.stringify({ confirmCascade: true }),
-      },
-    );
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+      body: JSON.stringify({ confirmCascade: true }),
+    });
 
     const res = await eventIdHandler.onRequestDelete({ request, env });
     expect(res.status).toBe(200);
@@ -470,9 +425,7 @@ describe("Event API - handler integration", () => {
     expect(data.success).toBeTruthy();
 
     // Check performance was removed by cascade
-    const row = rawDb
-      .prepare("SELECT * FROM performances WHERE id = ?")
-      .get(b.id);
+    const row = rawDb.prepare("SELECT * FROM performances WHERE id = ?").get(b.id);
     expect(row).toBeUndefined();
   });
 
@@ -485,13 +438,10 @@ describe("Event API - handler integration", () => {
     });
     insertBand(rawDb, { name: "NeedsConfirm", event_id: ev.id });
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}`,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json", "x-test-role": "admin" },
-      },
-    );
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+    });
 
     const res = await eventIdHandler.onRequestDelete({ request, env });
     expect(res.status).toBe(409);
@@ -509,17 +459,14 @@ describe("Event API - handler integration", () => {
     });
 
     const body = { date: "2026-03-03", status: "published" };
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify(body),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     const res = await eventIdHandler.onRequestPatch({ request, env });
     expect(res.status).toBe(200);
@@ -537,17 +484,14 @@ describe("Event API - handler integration", () => {
     });
 
     const body = { status: "archived" };
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify(body),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     const res = await eventIdHandler.onRequestPatch({ request, env });
     expect(res.status).toBe(400);
@@ -564,17 +508,14 @@ describe("Event API - handler integration", () => {
     });
     insertBand(rawDb, { name: "A Band", event_id: ev.id });
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}/publish`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify({ publish: "yes" }),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify({ publish: "yes" }),
+    });
 
     const res = await publishHandler.onRequestPost({ request, env });
     expect(res.status).toBe(400);
@@ -589,17 +530,14 @@ describe("Event API - handler integration", () => {
     });
     insertBand(rawDb, { name: "A Band 2", event_id: ev.id });
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${ev.id}/publish`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify({ publish: 1 }),
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify({ publish: 1 }),
+    });
 
     const res = await publishHandler.onRequestPost({ request, env });
     expect(res.status).toBe(400);
@@ -632,21 +570,18 @@ describe("Event duplication atomicity (P0-B2)", () => {
       return originalPrepare(sql);
     };
 
-    const request = new Request(
-      `https://example.test/api/admin/events/${original.id}/duplicate`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-test-role": "editor",
-        },
-        body: JSON.stringify({
-          name: "Copy",
-          date: "2027-01-01",
-          slug: "copy-event",
-        }),
+    const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
       },
-    );
+      body: JSON.stringify({
+        name: "Copy",
+        date: "2027-01-01",
+        slug: "copy-event",
+      }),
+    });
 
     const res = await duplicateHandler.onRequestPost({
       request,
@@ -656,9 +591,7 @@ describe("Event duplication atomicity (P0-B2)", () => {
     expect(res.status).toBe(500);
 
     // The new event must have been cleaned up — no orphan
-    const orphan = rawDb
-      .prepare("SELECT id FROM events WHERE slug = 'copy-event'")
-      .get();
+    const orphan = rawDb.prepare("SELECT id FROM events WHERE slug = 'copy-event'").get();
     expect(orphan).toBeUndefined();
   });
 });

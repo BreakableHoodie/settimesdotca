@@ -36,9 +36,7 @@ async function ensureFile(rule) {
     throw new Error(`${rule.path} is empty`);
   }
 
-  const missingTables = rule.tables.filter(
-    (table) => !hasCreateTable(sql, table),
-  );
+  const missingTables = rule.tables.filter((table) => !hasCreateTable(sql, table));
   if (missingTables.length) {
     throw new Error(
       `${rule.path} is missing required tables: ${missingTables.join(", ")}. ` +
@@ -46,11 +44,8 @@ async function ensureFile(rule) {
     );
   }
 
-  const missingColumns = Object.entries(rule.requiredColumns || {}).flatMap(
-    ([table, columns]) =>
-      columns
-        .filter((column) => !hasColumn(sql, table, column))
-        .map((column) => `${table}.${column}`),
+  const missingColumns = Object.entries(rule.requiredColumns || {}).flatMap(([table, columns]) =>
+    columns.filter((column) => !hasColumn(sql, table, column)).map((column) => `${table}.${column}`),
   );
 
   if (missingColumns.length) {
@@ -69,10 +64,7 @@ function hasCreateTable(sql, table) {
 }
 
 function hasColumn(sql, table, column) {
-  const tablePattern = new RegExp(
-    `CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${table}\\s*\\((.*?)\\)\\s*;`,
-    "is",
-  );
+  const tablePattern = new RegExp(`CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${table}\\s*\\((.*?)\\)\\s*;`, "is");
   const tableMatch = sql.match(tablePattern);
   if (!tableMatch) return false;
 
@@ -89,9 +81,7 @@ async function main() {
 
     console.log("✅ Database schema validated:");
     for (const summary of summaries) {
-      console.log(
-        `  • ${summary.file} (${summary.tables} required tables present)`,
-      );
+      console.log(`  • ${summary.file} (${summary.tables} required tables present)`);
     }
   } catch (error) {
     console.error("❌ Schema validation failed:");

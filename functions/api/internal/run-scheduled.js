@@ -37,18 +37,14 @@ export async function onRequestPost(context) {
 
   // Fail closed: CRON_SECRET must be configured in the Cloudflare Pages project.
   if (!env.CRON_SECRET) {
-    console.error(
-      "[run-scheduled] CRON_SECRET is not configured — refusing request.",
-    );
+    console.error("[run-scheduled] CRON_SECRET is not configured — refusing request.");
     return Response.json({ error: "Service unavailable" }, { status: 503 });
   }
 
   // Accept token from Authorization: Bearer <token> or X-Cron-Secret: <token>.
   const authHeader = request.headers.get("Authorization") ?? "";
   const cronHeader = request.headers.get("X-Cron-Secret") ?? "";
-  const presented = authHeader.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : cronHeader || null;
+  const presented = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : cronHeader || null;
 
   if (!presented || !secretsMatch(presented, env.CRON_SECRET)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });

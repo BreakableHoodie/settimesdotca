@@ -18,27 +18,19 @@ describe("getPublicBaseUrl", () => {
 
   describe("when PUBLIC_URL is set", () => {
     it("returns PUBLIC_URL as-is when it has no trailing slash", () => {
-      expect(getPublicBaseUrl({ PUBLIC_URL: "https://example.com" })).toBe(
-        "https://example.com",
-      );
+      expect(getPublicBaseUrl({ PUBLIC_URL: "https://example.com" })).toBe("https://example.com");
     });
 
     it("strips a single trailing slash from PUBLIC_URL", () => {
-      expect(getPublicBaseUrl({ PUBLIC_URL: "https://example.com/" })).toBe(
-        "https://example.com",
-      );
+      expect(getPublicBaseUrl({ PUBLIC_URL: "https://example.com/" })).toBe("https://example.com");
     });
 
     it("strips multiple trailing slashes from PUBLIC_URL", () => {
-      expect(getPublicBaseUrl({ PUBLIC_URL: "https://example.com///" })).toBe(
-        "https://example.com",
-      );
+      expect(getPublicBaseUrl({ PUBLIC_URL: "https://example.com///" })).toBe("https://example.com");
     });
 
     it("trims surrounding whitespace from PUBLIC_URL before using it", () => {
-      expect(
-        getPublicBaseUrl({ PUBLIC_URL: "  https://example.com  " }),
-      ).toBe("https://example.com");
+      expect(getPublicBaseUrl({ PUBLIC_URL: "  https://example.com  " })).toBe("https://example.com");
     });
 
     it("does not emit a warning when PUBLIC_URL is set", () => {

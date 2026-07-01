@@ -28,10 +28,7 @@ export async function onRequestPost(context) {
   if (perm.error) return perm.response;
 
   if (!isEmailConfigured(env)) {
-    return json(
-      { error: "Email not configured", message: "Configure an email provider before flushing." },
-      400,
-    );
+    return json({ error: "Email not configured", message: "Configure an email provider before flushing." }, 400);
   }
 
   const { sent, failed, skipped } = await flushAnnounceDigest(env, DB);

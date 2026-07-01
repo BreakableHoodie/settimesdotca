@@ -25,12 +25,7 @@ async function detectMimeType(file) {
   const length = header.length;
 
   // JPEG: FF D8 FF
-  if (
-    length >= 3 &&
-    header[0] === 0xff &&
-    header[1] === 0xd8 &&
-    header[2] === 0xff
-  ) {
+  if (length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) {
     return "image/jpeg";
   }
   // PNG: 89 50 4E 47 0D 0A 1A 0A (full 8-byte signature)
@@ -103,9 +98,7 @@ export async function onRequestPost(context) {
     if (file.size > MAX_FILE_SIZE) {
       return new Response(
         JSON.stringify({
-          error: `File too large. Maximum size is ${
-            MAX_FILE_SIZE / 1024 / 1024
-          }MB`,
+          error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
         }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
@@ -124,9 +117,7 @@ export async function onRequestPost(context) {
 
     // Generate unique filename with timestamp
     const timestamp = Date.now();
-    const sanitizedName = file.name
-      .replace(/[^a-zA-Z0-9.-]/g, "_")
-      .toLowerCase();
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_").toLowerCase();
     const filename = `band-photos/${timestamp}-${sanitizedName}`;
 
     // Upload to R2 bucket — use the server-verified type, not the client-supplied one.
@@ -145,8 +136,7 @@ export async function onRequestPost(context) {
     // Generate the public URL for the stored object. The base is configurable via
     // BAND_PHOTOS_PUBLIC_URL so dev/staging/prod can point at different R2 public
     // buckets / custom domains; falls back to the production custom domain.
-    const photoBaseUrl =
-      env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca";
+    const photoBaseUrl = env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca";
     const publicUrl = `${photoBaseUrl}/${filename}`;
 
     // If band_id provided, update the band profile record
@@ -157,17 +147,13 @@ export async function onRequestPost(context) {
       if (bandIdValue.startsWith("profile_")) {
         bandProfileId = Number(bandIdValue.replace("profile_", ""));
       } else if (!Number.isNaN(Number(bandIdValue))) {
-        const performance = await env.DB.prepare(
-          "SELECT band_profile_id FROM performances WHERE id = ?",
-        )
+        const performance = await env.DB.prepare("SELECT band_profile_id FROM performances WHERE id = ?")
           .bind(Number(bandIdValue))
           .first();
 
         bandProfileId = performance?.band_profile_id ?? null;
         if (!bandProfileId) {
-          const profile = await env.DB.prepare(
-            "SELECT id FROM band_profiles WHERE id = ?",
-          )
+          const profile = await env.DB.prepare("SELECT id FROM band_profiles WHERE id = ?")
             .bind(Number(bandIdValue))
             .first();
           bandProfileId = profile?.id ?? null;
@@ -175,9 +161,7 @@ export async function onRequestPost(context) {
       }
 
       if (bandProfileId) {
-        await env.DB.prepare(
-          "UPDATE band_profiles SET photo_url = ? WHERE id = ?",
-        )
+        await env.DB.prepare("UPDATE band_profiles SET photo_url = ? WHERE id = ?")
           .bind(publicUrl, bandProfileId)
           .run();
       }

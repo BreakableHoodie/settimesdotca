@@ -27,13 +27,7 @@ export function timingSafeEqual(a, b) {
  */
 async function deriveKey(password, salt, iterations) {
   const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
+  const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
 
   const derived = await crypto.subtle.deriveBits(
     {
@@ -101,9 +95,7 @@ export async function verifyPassword(password, storedHash) {
     const salt = Uint8Array.from(atob(saltBase64), (c) => c.charCodeAt(0));
 
     const hashArray = await deriveKey(password, salt, iterations);
-    const storedHashArray = Uint8Array.from(atob(hashBase64), (c) =>
-      c.charCodeAt(0),
-    );
+    const storedHashArray = Uint8Array.from(atob(hashBase64), (c) => c.charCodeAt(0));
 
     return timingSafeEqual(hashArray, storedHashArray);
   } catch (error) {

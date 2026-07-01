@@ -30,16 +30,10 @@ describe("totp utilities", () => {
   // real authenticator app (Google Authenticator, Authy) would — i.e. it is
   // RFC-correct, not merely self-consistent.
   it("matches RFC 6238 test vectors", async () => {
-    const RFC_SECRET = base32Encode(
-      new TextEncoder().encode("12345678901234567890"),
-    );
+    const RFC_SECRET = base32Encode(new TextEncoder().encode("12345678901234567890"));
     expect(await generateTotpCode(RFC_SECRET, 59 * 1000)).toBe("287082");
-    expect(await generateTotpCode(RFC_SECRET, 1111111109 * 1000)).toBe(
-      "081804",
-    );
-    expect(await generateTotpCode(RFC_SECRET, 1234567890 * 1000)).toBe(
-      "005924",
-    );
+    expect(await generateTotpCode(RFC_SECRET, 1111111109 * 1000)).toBe("081804");
+    expect(await generateTotpCode(RFC_SECRET, 1234567890 * 1000)).toBe("005924");
   });
 
   it("verifies and consumes backup codes", async () => {

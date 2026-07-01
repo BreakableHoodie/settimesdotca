@@ -1,11 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { onRequestGet } from "../[name].js";
-import {
-  createTestEnv,
-  insertEvent,
-  insertVenue,
-  insertBand,
-} from "../../../test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
 
 describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
   // Use a far-future date so performances land in the "upcoming" bucket
@@ -23,21 +18,15 @@ describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
       date: futureDate,
       status: "published",
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Stats Hidden Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=0 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=0 WHERE id=?").run(perf.id);
 
-    const request = new Request(
-      "https://example.test/api/bands/stats/Stats%20Hidden%20Band",
-    );
+    const request = new Request("https://example.test/api/bands/stats/Stats%20Hidden%20Band");
     const response = await onRequestGet({ request, env });
 
     expect(response.status).toBe(200);
@@ -58,21 +47,15 @@ describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
       date: futureDate,
       status: "published",
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Stats Revealed Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=1 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=1 WHERE id=?").run(perf.id);
 
-    const request = new Request(
-      "https://example.test/api/bands/stats/Stats%20Revealed%20Band",
-    );
+    const request = new Request("https://example.test/api/bands/stats/Stats%20Revealed%20Band");
     const response = await onRequestGet({ request, env });
 
     expect(response.status).toBe(200);
@@ -93,21 +76,15 @@ describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
       date: futureDate,
       status: "published",
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Stats Normal Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=0 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=0 WHERE id=?").run(perf.id);
 
-    const request = new Request(
-      "https://example.test/api/bands/stats/Stats%20Normal%20Band",
-    );
+    const request = new Request("https://example.test/api/bands/stats/Stats%20Normal%20Band");
     const response = await onRequestGet({ request, env });
 
     expect(response.status).toBe(200);

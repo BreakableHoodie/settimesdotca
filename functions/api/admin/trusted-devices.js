@@ -19,21 +19,20 @@ export async function onRequestGet(context) {
       FROM trusted_devices
       WHERE user_id = ? AND expires_at > datetime('now')
       ORDER BY last_used_at DESC, created_at DESC
-    `
+    `,
     )
       .bind(user.userId)
       .all();
 
-    return new Response(
-      JSON.stringify({ devices: result.results || [] }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ devices: result.results || [] }), {
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Failed to load trusted devices:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to load trusted devices" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to load trusted devices" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
 
@@ -61,9 +60,7 @@ export async function onRequestDelete(context) {
 
   try {
     // Verify the device belongs to the requesting user before deleting
-    const device = await env.DB.prepare(
-      "SELECT user_id FROM trusted_devices WHERE id = ?"
-    )
+    const device = await env.DB.prepare("SELECT user_id FROM trusted_devices WHERE id = ?")
       .bind(Number(deviceId))
       .first();
 
@@ -83,9 +80,9 @@ export async function onRequestDelete(context) {
     });
   } catch (error) {
     console.error("Failed to revoke trusted device:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to revoke device" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to revoke device" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

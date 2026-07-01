@@ -21,12 +21,7 @@ function formatLocation(v) {
 
 function formatAddress(v) {
   const cityRegion = [v.city, v.region].filter(Boolean).join(", ");
-  const parts = [
-    v.address_line1,
-    v.address_line2,
-    cityRegion,
-    v.postal_code,
-  ].filter(Boolean);
+  const parts = [v.address_line1, v.address_line2, cityRegion, v.postal_code].filter(Boolean);
   return parts.length ? parts.join(", ") : v.address || null;
 }
 
@@ -45,9 +40,7 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const venue = await DB.prepare("SELECT * FROM venues WHERE id = ?")
-      .bind(id)
-      .first();
+    const venue = await DB.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first();
     if (!venue) {
       return json({ error: "Venue not found" }, 404);
     }
@@ -114,9 +107,6 @@ export async function onRequestGet(context) {
     );
   } catch (error) {
     console.error("Error fetching venue:", error);
-    return json(
-      { error: "Database error", message: "Failed to fetch venue" },
-      500,
-    );
+    return json({ error: "Database error", message: "Failed to fetch venue" }, 500);
   }
 }

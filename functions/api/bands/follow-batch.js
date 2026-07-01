@@ -36,8 +36,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const email =
-      typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const turnstileToken = body.turnstileToken;
     const performanceIds = body.performance_ids;
 
@@ -64,10 +63,10 @@ export async function onRequestPost(context) {
 
     const turnstileValid = await verifyTurnstile(request, env, turnstileToken);
     if (!turnstileValid) {
-      return new Response(
-        JSON.stringify({ error: "Bot verification failed" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Bot verification failed" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Resolve performance_ids → distinct band_profile_ids + band names.
@@ -115,14 +114,7 @@ export async function onRequestPost(context) {
            (email, band_profile_id, verified, verification_token, unsubscribe_token,
             consent_ip, consent_method, batch_token)
          VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?)`,
-      ).bind(
-        email,
-        band_profile_id,
-        verificationToken,
-        unsubscribeToken,
-        consentIp,
-        batchToken,
-      );
+      ).bind(email, band_profile_id, verificationToken, unsubscribeToken, consentIp, batchToken);
     });
 
     const results = await DB.batch(stmts);
@@ -130,12 +122,8 @@ export async function onRequestPost(context) {
     const isNewBatch = results.some((r) => r.meta.changes > 0);
 
     if (isNewBatch && isEmailConfigured(env)) {
-      const bandListText = bands.results
-        .map((b) => `• ${b.band_name}`)
-        .join("\n");
-      const bandListHtml = bands.results
-        .map((b) => `<li>${escapeHtml(b.band_name)}</li>`)
-        .join("");
+      const bandListText = bands.results.map((b) => `• ${b.band_name}`).join("\n");
+      const bandListHtml = bands.results.map((b) => `<li>${escapeHtml(b.band_name)}</li>`).join("");
 
       // ONE email for the whole batch — the core amplification mitigation.
       waitUntil(
@@ -160,17 +148,11 @@ export async function onRequestPost(context) {
         })
           .then((emailResult) => {
             if (!emailResult?.delivered) {
-              console.warn(
-                "[band-follow-batch] Confirmation email not delivered:",
-                emailResult?.reason,
-              );
+              console.warn("[band-follow-batch] Confirmation email not delivered:", emailResult?.reason);
             }
           })
           .catch((err) => {
-            console.error(
-              "[band-follow-batch] Failed to send confirmation email:",
-              err,
-            );
+            console.error("[band-follow-batch] Failed to send confirmation email:", err);
           }),
       );
     }

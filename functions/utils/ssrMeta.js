@@ -29,9 +29,7 @@ export function toPlainText(rawInput, maxLength = 200) {
   // --- Strip markdown syntax (order matters) ---
 
   // Code fences (``` ... ```) — remove the fence markers, keep content
-  text = text.replace(/```[\s\S]*?```/g, (m) =>
-    m.replace(/```[^\n]*\n?/g, "").trim(),
-  );
+  text = text.replace(/```[\s\S]*?```/g, (m) => m.replace(/```[^\n]*\n?/g, "").trim());
   // Inline code: `code` → code
   text = text.replace(/`([^`]+)`/g, "$1");
   // Images: ![alt](url) → alt
@@ -65,10 +63,7 @@ export function toPlainText(rawInput, maxLength = 200) {
     "&quot;": '"',
     "&#39;": "'",
   };
-  text = text.replace(
-    /&(?:nbsp|amp|lt|gt|quot|#39);/gi,
-    (m) => ENTITY_MAP[m.toLowerCase()] ?? m,
-  );
+  text = text.replace(/&(?:nbsp|amp|lt|gt|quot|#39);/gi, (m) => ENTITY_MAP[m.toLowerCase()] ?? m);
 
   text = text.replace(/\s+/g, " ").trim();
   if (text.length <= maxLength) return text;

@@ -7,16 +7,9 @@ import { verifyPassword, hashPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
-import {
-  AUTH_ATTEMPT_TYPES,
-  checkAuthRateLimit,
-  writeAuthAttempt,
-} from "../../../utils/authAttempts.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
-import {
-  getTrustedDeviceToken,
-  validateTrustedDevice,
-} from "../../../utils/trustedDevice.js";
+import { getTrustedDeviceToken, validateTrustedDevice } from "../../../utils/trustedDevice.js";
 import { logger } from "../../../utils/logger.js";
 
 export async function onRequestPost(context) {
@@ -157,9 +150,7 @@ export async function onRequestPost(context) {
       const storedIterations = Number(user.password_hash.split("$")[1]);
       if (storedIterations && storedIterations < 600000) {
         const newHash = await hashPassword(password);
-        await DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
-          .bind(newHash, user.id)
-          .run();
+        await DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(newHash, user.id).run();
       }
     } catch (rehashError) {
       logger.warn("opportunistic password rehash failed (login not affected)", {
@@ -228,12 +219,7 @@ export async function onRequestPost(context) {
       try {
         const trustedDeviceToken = getTrustedDeviceToken(request);
         if (trustedDeviceToken) {
-          const trustedUserId = await validateTrustedDevice(
-            DB,
-            trustedDeviceToken,
-            ipAddress,
-            userAgent,
-          );
+          const trustedUserId = await validateTrustedDevice(DB, trustedDeviceToken, ipAddress, userAgent);
           if (trustedUserId === user.id) {
             logger.debug("trusted device validated, skipping MFA", {
               userId: user.id,
@@ -247,10 +233,7 @@ export async function onRequestPost(context) {
         }
       } catch (trustedDeviceError) {
         // Don't fail login if trusted device check fails - just require MFA
-        console.error(
-          "[Login] Trusted device check failed:",
-          trustedDeviceError?.message || trustedDeviceError,
-        );
+        console.error("[Login] Trusted device check failed:", trustedDeviceError?.message || trustedDeviceError);
         skipMfa = false;
       }
     }
@@ -260,15 +243,11 @@ export async function onRequestPost(context) {
       try {
         totpSecretState = await loadTotpSecret(user.totp_secret, env);
       } catch (error) {
-        console.error(
-          "[Login] Failed to decrypt TOTP secret:",
-          error?.message || error,
-        );
+        console.error("[Login] Failed to decrypt TOTP secret:", error?.message || error);
         return new Response(
           JSON.stringify({
             error: "MFA configuration error",
-            message:
-              "Multi-factor authentication is not configured correctly. Contact an administrator.",
+            message: "Multi-factor authentication is not configured correctly. Contact an administrator.",
           }),
           {
             status: 500,
@@ -294,8 +273,7 @@ export async function onRequestPost(context) {
         return new Response(
           JSON.stringify({
             error: "MFA configuration error",
-            message:
-              "Multi-factor authentication is not configured correctly. Contact an administrator.",
+            message: "Multi-factor authentication is not configured correctly. Contact an administrator.",
           }),
           {
             status: 500,
@@ -309,10 +287,7 @@ export async function onRequestPost(context) {
       // against datetime('now') are lexicographically correct. ISO 8601 with 'T'
       // sorts greater than the space-separated SQLite format at the same instant,
       // which would allow expired challenges to pass the verify query.
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
-        .toISOString()
-        .replace("T", " ")
-        .slice(0, 19);
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
 
       await DB.prepare(
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at, used, used_at)
@@ -344,10 +319,7 @@ export async function onRequestPost(context) {
           mfaToken,
           user: {
             email: user.email,
-            name:
-              user.name ||
-              [user.first_name, user.last_name].filter(Boolean).join(" ") ||
-              null,
+            name: user.name || [user.first_name, user.last_name].filter(Boolean).join(" ") || null,
             firstName: user.first_name || null,
             lastName: user.last_name || null,
             role: user.role,
@@ -373,11 +345,7 @@ export async function onRequestPost(context) {
       .run();
 
     // Update last login
-    await DB.prepare(
-      "UPDATE users SET last_login = datetime('now') WHERE id = ?",
-    )
-      .bind(user.id)
-      .run();
+    await DB.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").bind(user.id).run();
 
     // Log successful login
     await writeAuthAttempt(DB, {
@@ -396,10 +364,7 @@ export async function onRequestPost(context) {
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append(
-      "Set-Cookie",
-      lucia.createSessionCookie(session.id).serialize(),
-    );
+    headers.append("Set-Cookie", lucia.createSessionCookie(session.id).serialize());
     headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     return new Response(
@@ -408,10 +373,7 @@ export async function onRequestPost(context) {
         user: {
           id: user.id,
           email: user.email,
-          name:
-            user.name ||
-            [user.first_name, user.last_name].filter(Boolean).join(" ") ||
-            null,
+          name: user.name || [user.first_name, user.last_name].filter(Boolean).join(" ") || null,
           firstName: user.first_name || null,
           lastName: user.last_name || null,
           role: user.role,

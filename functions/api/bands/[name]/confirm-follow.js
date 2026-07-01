@@ -50,11 +50,7 @@ export async function onRequestGet(context) {
 
     // Verify and clear the one-time token in one statement. This is idempotent:
     // a second click finds no matching token (already NULL) and changes nothing.
-    await DB.prepare(
-      "UPDATE band_follows SET verified = 1, verification_token = NULL WHERE id = ?",
-    )
-      .bind(row.id)
-      .run();
+    await DB.prepare("UPDATE band_follows SET verified = 1, verification_token = NULL WHERE id = ?").bind(row.id).run();
 
     return htmlPage(
       `You're following ${escapeHtml(row.band_name)}`,

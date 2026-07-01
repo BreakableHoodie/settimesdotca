@@ -90,11 +90,7 @@ function buildRequestAdapter(request, env, sessionIdentifierOverride = null) {
     headers: headersAdapter,
     cookies,
     csrfSecret: resolveCsrfSecret(env, request),
-    sessionIdentifier: getSessionIdentifier(
-      request,
-      cookies,
-      sessionIdentifierOverride
-    ),
+    sessionIdentifier: getSessionIdentifier(request, cookies, sessionIdentifierOverride),
   };
 }
 
@@ -127,12 +123,7 @@ function serializeCookie(name, value, options) {
     parts.push("HttpOnly");
   }
   if (options?.sameSite) {
-    const sameSite =
-      options.sameSite === "none"
-        ? "None"
-        : options.sameSite === "lax"
-          ? "Lax"
-          : "Strict";
+    const sameSite = options.sameSite === "none" ? "None" : options.sameSite === "lax" ? "Lax" : "Strict";
     parts.push(`SameSite=${sameSite}`);
   }
   return parts.join("; ");
@@ -149,8 +140,7 @@ export function setCSRFCookie(token, request = null, env = null) {
 export function deleteCSRFCookie(request = null, env = null) {
   const options = getCookieConfig(request, env);
   const secure = options.secure ? "Secure; " : "";
-  const sameSite =
-    options.sameSite === "none" ? "None" : options.sameSite === "lax" ? "Lax" : "Strict";
+  const sameSite = options.sameSite === "none" ? "None" : options.sameSite === "lax" ? "Lax" : "Strict";
   return `csrf_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=${sameSite}`;
 }
 
@@ -192,7 +182,7 @@ export function validateCSRFMiddleware(request, env = null) {
           error: "CSRF validation failed",
           message: "Invalid or missing CSRF token",
         }),
-        { status: 403, headers }
+        { status: 403, headers },
       );
     }
     return null;
@@ -210,7 +200,7 @@ export function validateCSRFMiddleware(request, env = null) {
         {
           status: 403,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
     return null;
@@ -231,7 +221,7 @@ export function validateCSRFMiddleware(request, env = null) {
       {
         status: 403,
         headers,
-      }
+      },
     );
   }
 

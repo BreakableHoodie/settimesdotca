@@ -32,15 +32,11 @@ export async function onRequestPost(context) {
       {
         status: 400,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
-  const user = await DB.prepare(
-    "SELECT email, totp_secret, totp_enabled FROM users WHERE id = ?"
-  )
-    .bind(userId)
-    .first();
+  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled FROM users WHERE id = ?").bind(userId).first();
 
   if (!user) {
     return new Response(
@@ -51,7 +47,7 @@ export async function onRequestPost(context) {
       {
         status: 404,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -64,7 +60,7 @@ export async function onRequestPost(context) {
       {
         status: 409,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -77,7 +73,7 @@ export async function onRequestPost(context) {
       {
         status: 400,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -96,7 +92,7 @@ export async function onRequestPost(context) {
       {
         status: 429,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -113,7 +109,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -137,26 +133,22 @@ export async function onRequestPost(context) {
       {
         status: 401,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
   const backupCodes = generateBackupCodes();
-  const hashedCodes = await Promise.all(
-    backupCodes.map(codeValue => hashBackupCode(codeValue))
-  );
+  const hashedCodes = await Promise.all(backupCodes.map((codeValue) => hashBackupCode(codeValue)));
 
   await DB.prepare(
     `UPDATE users
      SET totp_enabled = 1, backup_codes = ?, totp_secret = ?
-     WHERE id = ?`
+     WHERE id = ?`,
   )
     .bind(
       JSON.stringify(hashedCodes),
-      totpSecretState?.shouldPersist
-        ? totpSecretState.encryptedSecret
-        : user.totp_secret,
-      userId
+      totpSecretState?.shouldPersist ? totpSecretState.encryptedSecret : user.totp_secret,
+      userId,
     )
     .run();
 
@@ -171,15 +163,7 @@ export async function onRequestPost(context) {
     userId,
   });
 
-  await auditLog(
-    env,
-    userId,
-    "mfa.enabled",
-    "user",
-    userId,
-    { email: user.email },
-    ipAddress
-  );
+  await auditLog(env, userId, "mfa.enabled", "user", userId, { email: user.email }, ipAddress);
 
   return new Response(
     JSON.stringify({
@@ -189,6 +173,6 @@ export async function onRequestPost(context) {
     {
       status: 200,
       headers: { "Content-Type": "application/json" },
-    }
+    },
   );
 }

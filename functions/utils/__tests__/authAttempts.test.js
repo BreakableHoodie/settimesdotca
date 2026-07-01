@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDBEnv, createTestDB } from "../../api/test-utils.js";
-import {
-  AUTH_ATTEMPT_TYPES,
-  checkAuthRateLimit,
-  writeAuthAttempt,
-} from "../authAttempts.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../authAttempts.js";
 
 describe("authAttempts", () => {
   let rawDb;
@@ -24,9 +20,7 @@ describe("authAttempts", () => {
       userAgent: "test-agent",
     });
 
-    const row = rawDb
-      .prepare("SELECT * FROM auth_attempts WHERE attempt_type = ?")
-      .get(AUTH_ATTEMPT_TYPES.mfa);
+    const row = rawDb.prepare("SELECT * FROM auth_attempts WHERE attempt_type = ?").get(AUTH_ATTEMPT_TYPES.mfa);
 
     expect(row.email).toBeNull();
     expect(row.user_id).toBeNull();
@@ -130,7 +124,7 @@ describe("authAttempts", () => {
         email: null,
         ipAddress: "1.2.3.4",
         scope: "email",
-      })
+      }),
     ).rejects.toThrow('checkAuthRateLimit: email is required for scope "email"');
   });
 

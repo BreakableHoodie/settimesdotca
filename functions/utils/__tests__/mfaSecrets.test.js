@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  decryptTotpSecret,
-  encryptTotpSecret,
-  isEncryptedTotpSecret,
-  loadTotpSecret,
-} from "../mfaSecrets.js";
+import { decryptTotpSecret, encryptTotpSecret, isEncryptedTotpSecret, loadTotpSecret } from "../mfaSecrets.js";
 
 describe("mfaSecrets", () => {
   it("encrypts and decrypts TOTP secrets with a configured key", async () => {
@@ -19,9 +14,9 @@ describe("mfaSecrets", () => {
   });
 
   it("keeps legacy plaintext secrets readable for backward compatibility", async () => {
-    await expect(
-      decryptTotpSecret("JBSWY3DPEHPK3PXP", { ENVIRONMENT: "production" }),
-    ).resolves.toBe("JBSWY3DPEHPK3PXP");
+    await expect(decryptTotpSecret("JBSWY3DPEHPK3PXP", { ENVIRONMENT: "production" })).resolves.toBe(
+      "JBSWY3DPEHPK3PXP",
+    );
   });
 
   it("requires an encryption key to decrypt encrypted secrets in production", async () => {
@@ -30,9 +25,9 @@ describe("mfaSecrets", () => {
       ENVIRONMENT: "production",
     });
 
-    await expect(
-      decryptTotpSecret(encrypted, { ENVIRONMENT: "production" }),
-    ).rejects.toThrow("MFA_TOTP_ENCRYPTION_KEY environment variable is required");
+    await expect(decryptTotpSecret(encrypted, { ENVIRONMENT: "production" })).rejects.toThrow(
+      "MFA_TOTP_ENCRYPTION_KEY environment variable is required",
+    );
   });
 
   it("prepares legacy plaintext secrets for migration when a key is configured", async () => {

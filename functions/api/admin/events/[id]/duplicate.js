@@ -51,24 +51,17 @@ export async function onRequestPost(context) {
     }
 
     // Source event to copy from.
-    const originalEvent = await DB.prepare("SELECT * FROM events WHERE id = ?")
-      .bind(eventId)
-      .first();
+    const originalEvent = await DB.prepare("SELECT * FROM events WHERE id = ?").bind(eventId).first();
 
     if (!originalEvent) {
       return json({ error: "Not found", message: "Original event not found" }, 404);
     }
 
     // Slug is unique — reject before inserting.
-    const existingEvent = await DB.prepare("SELECT id FROM events WHERE slug = ?")
-      .bind(slug)
-      .first();
+    const existingEvent = await DB.prepare("SELECT id FROM events WHERE slug = ?").bind(slug).first();
 
     if (existingEvent) {
-      return json(
-        { error: "Conflict", message: "An event with this slug already exists" },
-        409,
-      );
+      return json({ error: "Conflict", message: "An event with this slug already exists" }, 409);
     }
 
     // Create the new event as an unpublished draft, carrying over the source's
@@ -116,9 +109,7 @@ export async function onRequestPost(context) {
       throw copyError;
     }
 
-    const bandCount = await DB.prepare(
-      "SELECT COUNT(*) as count FROM performances WHERE event_id = ?",
-    )
+    const bandCount = await DB.prepare("SELECT COUNT(*) as count FROM performances WHERE event_id = ?")
       .bind(newEvent.id)
       .first();
 

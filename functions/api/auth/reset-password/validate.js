@@ -43,24 +43,28 @@ export async function onRequestPost(context) {
       .first();
 
     if (!resetToken) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    if (new Date(resetToken.expires_at.includes('T') ? resetToken.expires_at : resetToken.expires_at.replace(' ', 'T') + 'Z') < new Date()) {
-      return new Response(
-        JSON.stringify({ error: "Reset token has expired", code: "TOKEN_EXPIRED" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+    if (
+      new Date(
+        resetToken.expires_at.includes("T") ? resetToken.expires_at : resetToken.expires_at.replace(" ", "T") + "Z",
+      ) < new Date()
+    ) {
+      return new Response(JSON.stringify({ error: "Reset token has expired", code: "TOKEN_EXPIRED" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (resetToken.is_active === 0) {
-      return new Response(
-        JSON.stringify({ error: "User account is inactive", code: "USER_INACTIVE" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "User account is inactive", code: "USER_INACTIVE" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     return new Response(
@@ -76,9 +80,9 @@ export async function onRequestPost(context) {
     );
   } catch (error) {
     console.error("Reset token validation error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to verify reset token", code: "TOKEN_VERIFY_FAILED" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to verify reset token", code: "TOKEN_VERIFY_FAILED" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

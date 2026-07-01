@@ -19,7 +19,7 @@ export async function onRequestPost(context) {
       {
         status: 400,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
              activation_token_expires_at, activated_at
       FROM users
       WHERE activation_token = ?
-    `
+    `,
     )
       .bind(token)
       .first();
@@ -39,20 +39,16 @@ export async function onRequestPost(context) {
       return new Response(
         JSON.stringify({
           error: "Invalid or expired token",
-          message:
-            "This activation link is invalid or has expired. Please request a new one.",
+          message: "This activation link is invalid or has expired. Please request a new one.",
         }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
-    if (
-      user.activation_token_expires_at &&
-      new Date(user.activation_token_expires_at) < new Date()
-    ) {
+    if (user.activation_token_expires_at && new Date(user.activation_token_expires_at) < new Date()) {
       return new Response(
         JSON.stringify({
           error: "Activation link expired",
@@ -61,7 +57,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -74,7 +70,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -88,7 +84,7 @@ export async function onRequestPost(context) {
       WHERE activation_token = ?
         AND is_active = 0
         AND (activation_token_expires_at IS NULL OR activation_token_expires_at >= datetime('now'))
-    `
+    `,
     )
       .bind(token)
       .run();
@@ -97,13 +93,12 @@ export async function onRequestPost(context) {
       return new Response(
         JSON.stringify({
           error: "Invalid or expired token",
-          message:
-            "This activation link is invalid, expired, or has already been used.",
+          message: "This activation link is invalid, expired, or has already been used.",
         }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -115,7 +110,7 @@ export async function onRequestPost(context) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Account activation error:", error);
@@ -127,7 +122,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

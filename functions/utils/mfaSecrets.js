@@ -27,20 +27,11 @@ async function importEncryptionKey(env) {
   const encoded = new TextEncoder().encode(keyMaterial);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
 
-  return crypto.subtle.importKey(
-    "raw",
-    digest,
-    { name: "AES-GCM" },
-    false,
-    ["encrypt", "decrypt"],
-  );
+  return crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 
 export function isEncryptedTotpSecret(value) {
-  return (
-    typeof value === "string" &&
-    value.startsWith(`${ENCRYPTED_TOTP_SECRET_PREFIX}:`)
-  );
+  return typeof value === "string" && value.startsWith(`${ENCRYPTED_TOTP_SECRET_PREFIX}:`);
 }
 
 export async function loadTotpSecret(storedSecret, env) {
@@ -89,15 +80,9 @@ export async function encryptTotpSecret(secret, env) {
   const key = await importEncryptionKey(env);
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const payload = new TextEncoder().encode(normalizedSecret);
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    payload,
-  );
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, payload);
 
-  return `${ENCRYPTED_TOTP_SECRET_PREFIX}:${toBase64(iv)}:${toBase64(
-    new Uint8Array(encrypted),
-  )}`;
+  return `${ENCRYPTED_TOTP_SECRET_PREFIX}:${toBase64(iv)}:${toBase64(new Uint8Array(encrypted))}`;
 }
 
 export async function decryptTotpSecret(storedSecret, env) {

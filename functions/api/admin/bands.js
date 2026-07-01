@@ -17,9 +17,7 @@ import { normalizeBandName } from "../../utils/bandName.js";
 async function getEventStatus(DB, eventId) {
   if (!eventId) return null;
 
-  const event = await DB.prepare(`SELECT id, status FROM events WHERE id = ?`)
-    .bind(eventId)
-    .first();
+  const event = await DB.prepare(`SELECT id, status FROM events WHERE id = ?`).bind(eventId).first();
 
   return event || null;
 }
@@ -33,10 +31,7 @@ function unpackSocialLinks(band) {
   } catch (_e) {
     social = {};
   }
-  const origin =
-    [band.origin_city, band.origin_region].filter(Boolean).join(", ") ||
-    band.origin ||
-    "";
+  const origin = [band.origin_city, band.origin_region].filter(Boolean).join(", ") || band.origin || "";
   return {
     ...band,
     origin,
@@ -51,14 +46,7 @@ function unpackSocialLinks(band) {
   };
 }
 
-async function checkConflicts(
-  DB,
-  eventId,
-  venueId,
-  startTime,
-  endTime,
-  excludePerformanceId = null,
-) {
+async function checkConflicts(DB, eventId, venueId, startTime, endTime, excludePerformanceId = null) {
   let query = `
     SELECT p.id, p.start_time, p.end_time, bp.name
     FROM performances p
@@ -80,19 +68,14 @@ async function checkConflicts(
   for (const perf of existingPerformances) {
     if (!perf.start_time || !perf.end_time) continue;
     const perfIntervals = buildIntervals(perf.start_time, perf.end_time);
-    const hasOverlap = perfIntervals.some((b) =>
-      newIntervals.some((a) => intervalsOverlap(a, b)),
-    );
+    const hasOverlap = perfIntervals.some((b) => newIntervals.some((a) => intervalsOverlap(a, b)));
     if (hasOverlap) {
       conflicts.push({
         id: perf.id,
         name: perf.name,
         startTime: perf.start_time,
         endTime: perf.end_time,
-        type:
-          perf.start_time === startTime && perf.end_time === endTime
-            ? "conflict"
-            : "overlap",
+        type: perf.start_time === startTime && perf.end_time === endTime ? "conflict" : "overlap",
       });
     }
   }
@@ -113,20 +96,10 @@ export async function onRequestGet(context) {
 
   const url = new URL(request.url);
   const eventId = url.searchParams.get("event_id");
-  const requestedLimit = Number.parseInt(
-    url.searchParams.get("limit") || "200",
-    10,
-  );
-  const requestedOffset = Number.parseInt(
-    url.searchParams.get("offset") || "0",
-    10,
-  );
-  const limit = Number.isFinite(requestedLimit)
-    ? Math.min(Math.max(requestedLimit, 1), 500)
-    : 200;
-  const offset = Number.isFinite(requestedOffset)
-    ? Math.max(requestedOffset, 0)
-    : 0;
+  const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "200", 10);
+  const requestedOffset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 200;
+  const offset = Number.isFinite(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
 
   try {
     let result;
@@ -259,29 +232,19 @@ export async function onRequestPost(context) {
 
     const resolvedName = sanitizeString(name || "");
     const resolvedVenueId = venueId ? Number(venueId) : null;
-    const resolvedDescription =
-      description !== undefined ? sanitizeString(description) || null : null;
-    const resolvedGenre =
-      genre !== undefined ? sanitizeString(genre) || null : null;
+    const resolvedDescription = description !== undefined ? sanitizeString(description) || null : null;
+    const resolvedGenre = genre !== undefined ? sanitizeString(genre) || null : null;
     let resolvedPhotoUrl;
     let resolvedWebsite;
 
     try {
-      resolvedPhotoUrl = sanitizeOptionalHttpUrl(
-        photo_url,
-        FIELD_LIMITS.bandUrl.max,
-        "Photo URL",
-      );
-      resolvedWebsite = sanitizeOptionalHttpUrl(
-        url,
-        FIELD_LIMITS.bandUrl.max,
-        "Website URL",
-      );
+      resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL");
+      resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
     } catch (error) {
-      return new Response(
-        JSON.stringify({ error: "Validation error", message: error.message }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Validation error", message: error.message }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (contact_email && !isValidEmail(contact_email)) {
@@ -320,18 +283,17 @@ export async function onRequestPost(context) {
 
       const event = await getEventStatus(DB, eventId);
       if (!event) {
-        return new Response(
-          JSON.stringify({ error: "Not found", message: "Event not found" }),
-          { status: 404, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: "Not found", message: "Event not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       if (event.status === "archived") {
         return new Response(
           JSON.stringify({
             error: "Validation error",
-            message:
-              "Cannot add performances to an archived event. Copy it as a template instead.",
+            message: "Cannot add performances to an archived event. Copy it as a template instead.",
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
@@ -339,10 +301,7 @@ export async function onRequestPost(context) {
     }
 
     // Validate time format (only if schedule is provided)
-    if (
-      (startTime && !/^\d{2}:\d{2}$/.test(startTime)) ||
-      (endTime && !/^\d{2}:\d{2}$/.test(endTime))
-    ) {
+    if ((startTime && !/^\d{2}:\d{2}$/.test(startTime)) || (endTime && !/^\d{2}:\d{2}$/.test(endTime))) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -386,13 +345,7 @@ export async function onRequestPost(context) {
 
     // Check for conflicts (only if times are provided)
     if (!isGlobalAdd && resolvedVenueId && startTime && endTime) {
-      const conflicts = await checkConflicts(
-        DB,
-        eventId,
-        resolvedVenueId,
-        startTime,
-        endTime,
-      );
+      const conflicts = await checkConflicts(DB, eventId, resolvedVenueId, startTime, endTime);
       if (conflicts.length > 0) {
         return new Response(
           JSON.stringify({
@@ -408,21 +361,12 @@ export async function onRequestPost(context) {
     // 1. Find or Create Band Profile
     const nameNormalized = normalizeBandName(resolvedName);
     const parsedOrigin = parseOrigin(origin?.trim());
-    const trimmedOriginCity = origin_city
-      ? origin_city.trim()
-      : parsedOrigin.city;
-    const trimmedOriginRegion = origin_region
-      ? origin_region.trim()
-      : parsedOrigin.region;
+    const trimmedOriginCity = origin_city ? origin_city.trim() : parsedOrigin.city;
+    const trimmedOriginRegion = origin_region ? origin_region.trim() : parsedOrigin.region;
     const computedOrigin =
-      origin?.trim() ||
-      [trimmedOriginCity, trimmedOriginRegion].filter(Boolean).join(", ") ||
-      null;
-    const resolvedIsActive =
-      is_active === undefined ? 1 : Number(is_active) === 1 ? 1 : 0;
-    const existingProfile = await DB.prepare(
-      "SELECT id FROM band_profiles WHERE name_normalized = ?",
-    )
+      origin?.trim() || [trimmedOriginCity, trimmedOriginRegion].filter(Boolean).join(", ") || null;
+    const resolvedIsActive = is_active === undefined ? 1 : Number(is_active) === 1 ? 1 : 0;
+    const existingProfile = await DB.prepare("SELECT id FROM band_profiles WHERE name_normalized = ?")
       .bind(nameNormalized)
       .first();
 
@@ -434,14 +378,13 @@ export async function onRequestPost(context) {
       let socialLinksJson;
       try {
         socialLinksJson = sanitizeBandSocialLinks(
-          social_links ||
-            (resolvedWebsite ? { website: resolvedWebsite } : null),
+          social_links || (resolvedWebsite ? { website: resolvedWebsite } : null),
         );
       } catch (error) {
-        return new Response(
-          JSON.stringify({ error: "Validation error", message: error.message }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: "Validation error", message: error.message }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       bandProfile = await DB.prepare(
@@ -492,29 +435,19 @@ export async function onRequestPost(context) {
            VALUES (?, ?, ?, ?, ?)
            RETURNING id`,
         )
-          .bind(
-            eventId,
-            resolvedVenueId,
-            bandProfile.id,
-            startTime || null,
-            endTime || null,
-          )
+          .bind(eventId, resolvedVenueId, bandProfile.id, startTime || null, endTime || null)
           .first();
       } catch (perfError) {
         // Compensating delete: only undo profiles we just created, not pre-existing ones
         if (createdNewProfile) {
-          await DB.prepare("DELETE FROM band_profiles WHERE id = ?")
-            .bind(bandProfile.id)
-            .run();
+          await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(bandProfile.id).run();
         }
         throw perfError;
       }
 
       if (!perfResult) {
         if (createdNewProfile) {
-          await DB.prepare("DELETE FROM band_profiles WHERE id = ?")
-            .bind(bandProfile.id)
-            .run();
+          await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(bandProfile.id).run();
         }
         throw new Error("performances INSERT returned null");
       }
@@ -531,10 +464,10 @@ export async function onRequestPost(context) {
     );
   } catch (error) {
     console.error("Failed to create band:", error);
-    return new Response(
-      JSON.stringify({ success: false, error: "Failed to create band" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ success: false, error: "Failed to create band" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
 

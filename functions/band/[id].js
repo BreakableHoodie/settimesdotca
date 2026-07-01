@@ -32,8 +32,7 @@ export async function onRequest(context) {
   const plainDesc = toPlainText(band.description, 200);
   const tagline = [band.genre, band.origin].filter(Boolean).join(" · ");
   const description =
-    plainDesc ||
-    `${band.name}${tagline ? ` — ${tagline}` : ""} on SetTimes, Waterloo Region's live music platform.`;
+    plainDesc || `${band.name}${tagline ? ` — ${tagline}` : ""} on SetTimes, Waterloo Region's live music platform.`;
 
   const metaTags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
@@ -70,20 +69,19 @@ export async function onRequest(context) {
 
   // Prefer the structured origin_city/origin_region columns; fall back to the
   // legacy free-text origin string (used as-is in foundingLocation.name).
-  const foundingLocation =
-    band.origin_city
-      ? {
-          "@type": "Place",
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: band.origin_city,
-            ...(band.origin_region ? { addressRegion: band.origin_region } : {}),
-            addressCountry: "CA",
-          },
-        }
-      : band.origin
-        ? { "@type": "Place", name: band.origin }
-        : null;
+  const foundingLocation = band.origin_city
+    ? {
+        "@type": "Place",
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: band.origin_city,
+          ...(band.origin_region ? { addressRegion: band.origin_region } : {}),
+          addressCountry: "CA",
+        },
+      }
+    : band.origin
+      ? { "@type": "Place", name: band.origin }
+      : null;
 
   const musicGroup = {
     "@context": "https://schema.org",

@@ -13,40 +13,33 @@
  * - It never publishes the event (is_published = 0).
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const args = process.argv.slice(2);
 
 const getArgValue = (flag) => {
   const withEquals = args.find((arg) => arg.startsWith(`${flag}=`));
   if (withEquals) {
-    return withEquals.split('=').slice(1).join('=');
+    return withEquals.split("=").slice(1).join("=");
   }
   const idx = args.indexOf(flag);
   if (idx === -1) return null;
   return args[idx + 1] || null;
 };
 
-const schedulePath = getArgValue('--file') || 'band_crawl_schedule.json';
-const overrideDate = getArgValue('--date');
-const overrideSlug = getArgValue('--slug');
-const allowInvalid = args.includes('--allow-invalid');
-const dryRun = args.includes('--dry-run');
+const schedulePath = getArgValue("--file") || "band_crawl_schedule.json";
+const overrideDate = getArgValue("--date");
+const overrideSlug = getArgValue("--slug");
+const allowInvalid = args.includes("--allow-invalid");
+const dryRun = args.includes("--dry-run");
 
 const PROJECT_ROOT = process.cwd();
-const DB_DIR = path.join(
-  PROJECT_ROOT,
-  '.wrangler',
-  'state',
-  'v3',
-  'd1',
-  'miniflare-D1DatabaseObject',
-);
+const DB_DIR = path.join(PROJECT_ROOT, ".wrangler", "state", "v3", "d1", "miniflare-D1DatabaseObject");
 
 const sqlEscape = (value) => {
-  if (value == null) return 'NULL';
+  if (value == null) return "NULL";
   const text = String(value);
   return `'${text.replace(/'/g, "''")}'`;
 };
@@ -55,11 +48,10 @@ const slugify = (value) =>
   value
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
-const normalizeName = (value) =>
-  value.toLowerCase().replace(/[^a-z0-9]/g, '');
+const normalizeName = (value) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const normalizeTime = (value) => {
   if (!value) return null;
@@ -71,44 +63,31 @@ const normalizeTime = (value) => {
   }
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes) ||
-    hours < 0 ||
-    hours > 23 ||
-    minutes < 0 ||
-    minutes > 59
-  ) {
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
     if (allowInvalid) return raw;
     throw new Error(`Invalid time value: "${raw}"`);
   }
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };
 
 const runSql = (dbFile, sql) => {
-  return execFileSync('sqlite3', ['-batch', dbFile, sql], {
-    encoding: 'utf8',
+  return execFileSync("sqlite3", ["-batch", dbFile, sql], {
+    encoding: "utf8",
   }).trim();
 };
 
 const findDbFile = () => {
   if (!fs.existsSync(DB_DIR)) {
-    throw new Error(
-      'Local database directory not found. Start wrangler dev first to create it.',
-    );
+    throw new Error("Local database directory not found. Start wrangler dev first to create it.");
   }
   const files = fs
     .readdirSync(DB_DIR)
-    .filter((file) => file.endsWith('.sqlite'))
+    .filter((file) => file.endsWith(".sqlite"))
     .map((file) => path.join(DB_DIR, file));
   if (!files.length) {
-    throw new Error(
-      'No local sqlite files found. Start wrangler dev first to create one.',
-    );
+    throw new Error("No local sqlite files found. Start wrangler dev first to create one.");
   }
-  return files
-    .map((file) => ({ file, size: fs.statSync(file).size }))
-    .sort((a, b) => b.size - a.size)[0].file;
+  return files.map((file) => ({ file, size: fs.statSync(file).size })).sort((a, b) => b.size - a.size)[0].file;
 };
 
 const resolveEventDate = (scheduleDate) => {
@@ -127,9 +106,9 @@ const main = () => {
     throw new Error(`Schedule file not found: ${absoluteSchedulePath}`);
   }
 
-  const schedule = JSON.parse(fs.readFileSync(absoluteSchedulePath, 'utf8'));
-  if (!schedule || typeof schedule !== 'object') {
-    throw new Error('Schedule JSON is empty or invalid.');
+  const schedule = JSON.parse(fs.readFileSync(absoluteSchedulePath, "utf8"));
+  if (!schedule || typeof schedule !== "object") {
+    throw new Error("Schedule JSON is empty or invalid.");
   }
 
   const eventName = schedule.event?.trim();
@@ -139,14 +118,12 @@ const main = () => {
 
   const eventDate = resolveEventDate(schedule.date);
   if (!eventDate) {
-    throw new Error(
-      'Event date must be provided as YYYY-MM-DD (use --date).',
-    );
+    throw new Error("Event date must be provided as YYYY-MM-DD (use --date).");
   }
 
   const baseSlug = overrideSlug || slugify(eventName);
   if (!baseSlug) {
-    throw new Error('Unable to derive a slug from the event name.');
+    throw new Error("Unable to derive a slug from the event name.");
   }
 
   const dbFile = findDbFile();
@@ -155,12 +132,12 @@ const main = () => {
   let suffix = 0;
   while (runSql(dbFile, `SELECT id FROM events WHERE slug = ${sqlEscape(slug)} LIMIT 1;`)) {
     suffix += 1;
-    slug = `${baseSlug}-local${suffix === 1 ? '' : `-${suffix}`}`;
+    slug = `${baseSlug}-local${suffix === 1 ? "" : `-${suffix}`}`;
   }
 
   const venues = Array.isArray(schedule.venues) ? schedule.venues : [];
   if (!venues.length) {
-    throw new Error('Schedule JSON has no venues to import.');
+    throw new Error("Schedule JSON has no venues to import.");
   }
 
   const venueNames = new Set();
@@ -197,16 +174,16 @@ const main = () => {
 
   if (invalidTimes.length && !allowInvalid) {
     throw new Error(
-      `Schedule contains invalid times. Fix them or re-run with --allow-invalid.\n${invalidTimes.join('\n')}`,
+      `Schedule contains invalid times. Fix them or re-run with --allow-invalid.\n${invalidTimes.join("\n")}`,
     );
   }
 
   if (!performances.length) {
-    throw new Error('No performances found to import.');
+    throw new Error("No performances found to import.");
   }
 
   if (dryRun) {
-    console.log('Dry run: no database changes were made.');
+    console.log("Dry run: no database changes were made.");
     console.log(`Event: ${eventName}`);
     console.log(`Date: ${eventDate}`);
     console.log(`Slug: ${slug}`);
@@ -223,18 +200,12 @@ const main = () => {
     dbFile,
     `INSERT INTO events (name, date, slug, is_published, city) VALUES (${sqlEscape(eventName)}, ${sqlEscape(eventDate)}, ${sqlEscape(slug)}, 0, ${sqlEscape(schedule.location || null)});`,
   );
-  const eventId = runSql(
-    dbFile,
-    `SELECT id FROM events WHERE slug = ${sqlEscape(slug)} LIMIT 1;`,
-  );
+  const eventId = runSql(dbFile, `SELECT id FROM events WHERE slug = ${sqlEscape(slug)} LIMIT 1;`);
 
   // Ensure venues exist
   const venueIdByName = new Map();
   venueNames.forEach((name) => {
-    const existing = runSql(
-      dbFile,
-      `SELECT id FROM venues WHERE name = ${sqlEscape(name)} LIMIT 1;`,
-    );
+    const existing = runSql(dbFile, `SELECT id FROM venues WHERE name = ${sqlEscape(name)} LIMIT 1;`);
     if (existing) {
       venueIdByName.set(name, Number(existing));
       return;
@@ -243,7 +214,7 @@ const main = () => {
       dbFile,
       `INSERT INTO venues (name, city) VALUES (${sqlEscape(name)}, ${sqlEscape(schedule.location || null)});`,
     );
-    const venueId = runSql(dbFile, 'SELECT last_insert_rowid();');
+    const venueId = runSql(dbFile, "SELECT last_insert_rowid();");
     venueIdByName.set(name, Number(venueId));
   });
 
@@ -265,7 +236,7 @@ const main = () => {
       dbFile,
       `INSERT INTO band_profiles (name, name_normalized) VALUES (${sqlEscape(performance.bandName)}, ${sqlEscape(normalized)});`,
     );
-    const bandId = runSql(dbFile, 'SELECT last_insert_rowid();');
+    const bandId = runSql(dbFile, "SELECT last_insert_rowid();");
     bandIdByNormalized.set(normalized, Number(bandId));
   });
 
@@ -280,7 +251,7 @@ const main = () => {
     );
   });
 
-  console.log('Local schedule import complete.');
+  console.log("Local schedule import complete.");
   console.log(`Event ID: ${eventId}`);
   console.log(`Slug: ${slug}`);
   console.log(`Venues imported: ${venueNames.size}`);

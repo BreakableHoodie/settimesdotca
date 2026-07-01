@@ -17,21 +17,14 @@ export async function onRequestPost(context) {
     // (handles __Host-session_token in production vs session_token in dev).
     // SECURITY: Bearer token auth is for non-production environments only.
     const lucia = initializeLucia(DB, request, env);
-    const allowHeaderAuth =
-      env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
+    const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
     const sessionToken =
       lucia.readSessionCookie(request.headers.get("Cookie") ?? "") ||
-      (allowHeaderAuth
-        ? request.headers.get("Authorization")?.replace("Bearer ", "")
-        : null);
+      (allowHeaderAuth ? request.headers.get("Authorization")?.replace("Bearer ", "") : null);
 
     if (sessionToken) {
       // Get user ID from session before deleting
-      const session = await DB.prepare(
-        `SELECT user_id FROM lucia_sessions WHERE id = ?`,
-      )
-        .bind(sessionToken)
-        .first();
+      const session = await DB.prepare(`SELECT user_id FROM lucia_sessions WHERE id = ?`).bind(sessionToken).first();
 
       await lucia.invalidateSession(sessionToken);
 

@@ -49,9 +49,7 @@ export async function onRequestPost(context) {
       logDebug("missing_fields", { hasToken: Boolean(token) });
       await logFailure("MISSING_FIELDS", { hasToken: Boolean(token) });
       return new Response(
-        JSON.stringify(
-          withDebug({ error: "Token and new password are required", code: "MISSING_FIELDS" })
-        ),
+        JSON.stringify(withDebug({ error: "Token and new password are required", code: "MISSING_FIELDS" })),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -101,9 +99,7 @@ export async function onRequestPost(context) {
       logDebug("token_invalid", {});
       await logFailure("TOKEN_INVALID");
       return new Response(
-        JSON.stringify(
-          withDebug({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" })
-        ),
+        JSON.stringify(withDebug({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" })),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -112,41 +108,32 @@ export async function onRequestPost(context) {
     }
 
     // Check if token is expired
-    if (new Date(resetToken.expires_at.includes('T') ? resetToken.expires_at : resetToken.expires_at.replace(' ', 'T') + 'Z') < new Date()) {
+    if (
+      new Date(
+        resetToken.expires_at.includes("T") ? resetToken.expires_at : resetToken.expires_at.replace(" ", "T") + "Z",
+      ) < new Date()
+    ) {
       logDebug("token_expired", { expiresAt: resetToken.expires_at });
       await logFailure("TOKEN_EXPIRED", { expiresAt: resetToken.expires_at });
-      return new Response(
-        JSON.stringify(
-          withDebug({ error: "Reset token has expired", code: "TOKEN_EXPIRED" })
-        ),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify(withDebug({ error: "Reset token has expired", code: "TOKEN_EXPIRED" })), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Check if user is active
     if (resetToken.is_active === 0) {
       logDebug("user_inactive", { userId: resetToken.user_id });
       await logFailure("USER_INACTIVE", { userId: resetToken.user_id });
-      return new Response(
-        JSON.stringify(
-          withDebug({ error: "User account is inactive", code: "USER_INACTIVE" })
-        ),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify(withDebug({ error: "User account is inactive", code: "USER_INACTIVE" })), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Prevent password reuse
     if (resetToken.password_hash) {
-      const samePassword = await verifyPassword(
-        newPassword,
-        resetToken.password_hash,
-      );
+      const samePassword = await verifyPassword(newPassword, resetToken.password_hash);
       if (samePassword) {
         logDebug("password_reuse", { userId: resetToken.user_id });
         await logFailure("PASSWORD_REUSE", { userId: resetToken.user_id });
@@ -171,7 +158,7 @@ export async function onRequestPost(context) {
       UPDATE password_reset_tokens
       SET used = 1, used_at = datetime('now')
       WHERE id = ? AND used = 0
-    `
+    `,
     )
       .bind(resetToken.id)
       .run();
@@ -180,9 +167,7 @@ export async function onRequestPost(context) {
       logDebug("token_already_used", { tokenId: resetToken.id });
       await logFailure("TOKEN_ALREADY_USED", { tokenId: resetToken.id });
       return new Response(
-        JSON.stringify(
-          withDebug({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" })
-        ),
+        JSON.stringify(withDebug({ error: "Invalid or expired reset token", code: "TOKEN_INVALID" })),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -238,8 +223,7 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        message:
-          "Password has been reset successfully. Please log in with your new password.",
+        message: "Password has been reset successfully. Please log in with your new password.",
       }),
       {
         status: 200,

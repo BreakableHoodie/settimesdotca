@@ -19,12 +19,7 @@ export function setSecureCookie(name, value, options = {}) {
 
   // Apply dev-specific defaults
   const secure = options.secure !== undefined ? options.secure : !isDev;
-  const sameSite =
-    options.sameSite !== undefined
-      ? options.sameSite
-      : isDev
-      ? "Lax"
-      : "Strict";
+  const sameSite = options.sameSite !== undefined ? options.sameSite : isDev ? "Lax" : "Strict";
 
   const parts = [`${name}=${value}`];
 
@@ -61,12 +56,7 @@ export function deleteCookie(name, options = {}) {
   const path = options.path !== undefined ? options.path : "/";
   const isDev = options.isDev !== undefined ? options.isDev : false;
   const secure = options.secure !== undefined ? options.secure : !isDev;
-  const sameSite =
-    options.sameSite !== undefined
-      ? options.sameSite
-      : isDev
-      ? "Lax"
-      : "Strict";
+  const sameSite = options.sameSite !== undefined ? options.sameSite : isDev ? "Lax" : "Strict";
 
   const parts = [`${name}=`];
   if (path) {
@@ -118,4 +108,3 @@ export function getCookie(request, name) {
   const cookies = parseCookies(cookieHeader);
   return cookies[name] || null;
 }
-

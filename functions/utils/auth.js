@@ -13,35 +13,31 @@ export function isDevRequest(request, env = null) {
   // unexpected value, or unset. We never trust the client-controlled Host
   // header to decide this. (#425)
   const environment = (env?.ENVIRONMENT ?? "").trim().toLowerCase();
-  return (
-    environment === "development" ||
-    environment === "dev" ||
-    environment === "test"
-  );
+  return environment === "development" || environment === "dev" || environment === "test";
 }
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
 function serializeCookie(name, value, { secure, sameSite, maxAge }) {
-  const parts = [`${name}=${value}`, 'Path=/', 'HttpOnly', `SameSite=${sameSite}`, `Max-Age=${maxAge}`];
-  if (secure) parts.push('Secure');
-  return parts.join('; ');
+  const parts = [`${name}=${value}`, "Path=/", "HttpOnly", `SameSite=${sameSite}`, `Max-Age=${maxAge}`];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
 }
 
 export function initializeLucia(DB, request = null, env = null) {
   const isDev = request ? isDevRequest(request, env) : false;
-  const cookieName = isDev ? 'session_token' : '__Host-session_token';
+  const cookieName = isDev ? "session_token" : "__Host-session_token";
   const cookieOpts = {
     secure: !isDev,
-    sameSite: isDev ? 'Lax' : 'Strict',
+    sameSite: isDev ? "Lax" : "Strict",
   };
 
   return {
     readSessionCookie(cookieHeader) {
       if (!cookieHeader) return null;
-      for (const part of cookieHeader.split(';')) {
-        const [k, ...rest] = part.trim().split('=');
-        if (k.trim() === cookieName) return rest.join('=').trim() || null;
+      for (const part of cookieHeader.split(";")) {
+        const [k, ...rest] = part.trim().split("=");
+        if (k.trim() === cookieName) return rest.join("=").trim() || null;
       }
       return null;
     },
@@ -52,7 +48,7 @@ export function initializeLucia(DB, request = null, env = null) {
                 u.email, u.role, u.name, u.first_name, u.last_name, u.is_active
          FROM lucia_sessions s
          JOIN users u ON u.id = s.user_id
-         WHERE s.id = ?`
+         WHERE s.id = ?`,
       )
         .bind(sessionId)
         .first();
@@ -60,7 +56,7 @@ export function initializeLucia(DB, request = null, env = null) {
       if (!row) return { session: null, user: null };
 
       if (row.expires_at * 1000 < Date.now()) {
-        await DB.prepare('DELETE FROM lucia_sessions WHERE id = ?').bind(sessionId).run();
+        await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionId).run();
         return { session: null, user: null };
       }
 
@@ -88,7 +84,7 @@ export function initializeLucia(DB, request = null, env = null) {
       const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
       await DB.prepare(
         `INSERT INTO lucia_sessions (id, user_id, expires_at, created_at, last_activity_at)
-         VALUES (?, ?, ?, datetime('now'), datetime('now'))`
+         VALUES (?, ?, ?, datetime('now'), datetime('now'))`,
       )
         .bind(id, userId, expiresAt)
         .run();
@@ -96,11 +92,11 @@ export function initializeLucia(DB, request = null, env = null) {
     },
 
     async invalidateSession(sessionId) {
-      await DB.prepare('DELETE FROM lucia_sessions WHERE id = ?').bind(sessionId).run();
+      await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionId).run();
     },
 
     async invalidateUserSessions(userId) {
-      await DB.prepare('DELETE FROM lucia_sessions WHERE user_id = ?').bind(userId).run();
+      await DB.prepare("DELETE FROM lucia_sessions WHERE user_id = ?").bind(userId).run();
     },
 
     createSessionCookie(sessionId) {
@@ -111,7 +107,7 @@ export function initializeLucia(DB, request = null, env = null) {
 
     createBlankSessionCookie() {
       return {
-        serialize: () => serializeCookie(cookieName, '', { ...cookieOpts, maxAge: 0 }),
+        serialize: () => serializeCookie(cookieName, "", { ...cookieOpts, maxAge: 0 }),
       };
     },
   };

@@ -35,10 +35,7 @@ export async function onRequestPost(context) {
     const email = typeof body.email === "string" ? body.email.trim() : "";
     const city = typeof body.city === "string" ? body.city.trim() : "";
     const genre = typeof body.genre === "string" ? body.genre.trim() : "";
-    const frequency =
-      typeof body.frequency === "string"
-        ? body.frequency.trim().toLowerCase()
-        : "";
+    const frequency = typeof body.frequency === "string" ? body.frequency.trim().toLowerCase() : "";
     const turnstileToken = body.turnstileToken;
 
     // Validation
@@ -50,48 +47,32 @@ export async function onRequestPost(context) {
     }
 
     if (!city || !genre || !frequency) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    if (
-      city.length > MAX_CITY_LENGTH ||
-      genre.length > MAX_GENRE_LENGTH ||
-      frequency.length > MAX_FREQUENCY_LENGTH
-    ) {
-      return new Response(
-        JSON.stringify({ error: "One or more fields exceed maximum length" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    if (city.length > MAX_CITY_LENGTH || genre.length > MAX_GENRE_LENGTH || frequency.length > MAX_FREQUENCY_LENGTH) {
+      return new Response(JSON.stringify({ error: "One or more fields exceed maximum length" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (!FREQUENCY_OPTIONS.has(frequency)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid frequency value" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ error: "Invalid frequency value" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const turnstileValid = await verifyTurnstile(request, env, turnstileToken);
     if (!turnstileValid) {
-      return new Response(
-        JSON.stringify({ error: "Bot verification failed" }),
-        {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ error: "Bot verification failed" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Generate tokens
@@ -121,19 +102,12 @@ export async function onRequestPost(context) {
         );
       } else {
         // Re-send verification email
-        const emailResult = await sendVerificationEmail(
-          env,
-          email,
-          city,
-          genre,
-          existing[0].verification_token,
-        );
+        const emailResult = await sendVerificationEmail(env, email, city, genre, existing[0].verification_token);
 
         if (!emailResult.delivered && emailResult.reason === "not_configured") {
           return subscriptionResponse(
             {
-              message:
-                "Email delivery is not configured. Use the link below to verify your subscription.",
+              message: "Email delivery is not configured. Use the link below to verify your subscription.",
             },
             200,
             emailResult,
@@ -161,34 +135,20 @@ export async function onRequestPost(context) {
         VALUES (?, ?, ?, ?, ?, ?, ?, 'web_form')
       `,
       )
-        .bind(
-          email,
-          city,
-          genre,
-          frequency,
-          verificationToken,
-          unsubscribeToken,
-          consentIp,
-        )
+        .bind(email, city, genre, frequency, verificationToken, unsubscribeToken, consentIp)
         .run();
     } catch (insertError) {
       if (insertError?.message?.includes("UNIQUE constraint failed")) {
-        return new Response(
-          JSON.stringify({ error: "You are already subscribed to this feed" }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: "You are already subscribed to this feed" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
       }
       throw insertError;
     }
 
     // Send verification email
-    const emailResult = await sendVerificationEmail(
-      env,
-      email,
-      city,
-      genre,
-      verificationToken,
-    );
+    const emailResult = await sendVerificationEmail(env, email, city, genre, verificationToken);
 
     if (!emailResult.delivered && emailResult.reason === "not_configured") {
       return subscriptionResponse(
@@ -241,9 +201,7 @@ async function sendVerificationEmail(env, email, city, genre, token) {
     });
     return { ...emailResult, verifyUrl };
   } else {
-    console.warn(
-      "[Subscribe] Email not configured; verification email was not sent.",
-    );
+    console.warn("[Subscribe] Email not configured; verification email was not sent.");
     return { delivered: false, reason: "not_configured", verifyUrl };
   }
 }

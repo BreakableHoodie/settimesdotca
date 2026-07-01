@@ -2,6 +2,12 @@ import { test, expect } from '@playwright/test';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+// Wait for all web fonts (e.g. the Bebas Neue display font) to finish loading so
+// screenshots don't race the font-display:swap — the source of baseline flake (#470).
+// Explicitly discard the resolved value: FontFaceSet isn't structured-cloneable, and
+// while current Playwright resolves that to undefined, returning void is robust across versions.
+const waitForFonts = (page) => page.evaluate(async () => void (await document.fonts.ready));
+
 const createComponentPage = async (page, componentHtml) => {
   await page.setContent(`
     <!DOCTYPE html>
@@ -33,6 +39,7 @@ test.describe('Visual Regression', () => {
   test('admin login page', async ({ page }) => {
     await page.goto('/admin/login');
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible();
+    await waitForFonts(page);
     await expect(page).toHaveScreenshot('admin-login.png', { fullPage: true });
   });
 
@@ -52,6 +59,7 @@ test.describe('Visual Regression', () => {
       `
     );
 
+    await waitForFonts(page);
     await expect(page).toHaveScreenshot('design-system.png', { fullPage: true });
   });
 });

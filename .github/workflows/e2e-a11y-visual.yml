@@ -6,6 +6,7 @@ on:
         paths:
             - 'e2e/accessibility/**'
             - 'e2e/visual-regression.spec.js'
+            - 'frontend/**'
     schedule:
         - cron: '0 7 * * 1'
 

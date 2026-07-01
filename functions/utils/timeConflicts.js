@@ -52,9 +52,9 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
   const conflicts = [];
   const placeholders = bandIds.map(() => "?").join(",");
 
-  // Fetch performance data for the batch (non-archived only).
-  // Archived-event filtering is intentionally skipped here; callers that need
-  // archived-event error messages (bulk-preview) handle that themselves.
+  // Fetch all performance data for the batch (including archived events), then
+  // filter out archived-event rows before scheduling-conflict checks. Callers
+  // that need archived-event error messages (bulk-preview) handle those separately.
   const bands = await env.DB.prepare(
     `SELECT p.id, p.start_time, p.end_time, p.venue_id, p.event_id, bp.name, e.status AS event_status
      FROM performances p

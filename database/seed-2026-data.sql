@@ -6,19 +6,19 @@
 -- ============================================
 
 INSERT OR REPLACE INTO events (id, name, date, slug, is_published, status, description, city, ticket_url) VALUES
-(28, 'Winter Warm-Up 2026', '2026-01-17', 'winter-warm-up-2026', 1, 'published', 'Annual winter festival returns for its third year. Bigger, louder, warmer.', 'Ottawa', 'https://ticketscene.ca/winter-warmup-2026'),
-(29, 'Frost Fest 2026', '2026-02-14', 'frost-fest-2026', 1, 'published', 'Valentine''s weekend meets Winterlude. Love and music in the cold.', 'Ottawa', 'https://ticketscene.ca/frost-fest-2026'),
+(28, 'Winter Warm-Up 2026', '2026-01-17', 'winter-warm-up-2026', 1, 'published', 'Annual winter festival returns for its third year. Bigger, louder, warmer.', 'Waterloo', 'https://ticketscene.ca/winter-warmup-2026'),
+(29, 'Frost Fest 2026', '2026-02-14', 'frost-fest-2026', 1, 'published', 'Valentine''s weekend meets Winterlude. Love and music in the cold.', 'Waterloo', 'https://ticketscene.ca/frost-fest-2026'),
 (30, 'Spring Thaw 2026', '2026-03-21', 'spring-thaw-2026', 1, 'published', 'First day of spring celebration. New beginnings, new sounds.', 'Toronto', 'https://ticketscene.ca/spring-thaw-2026'),
 (31, 'April Amplified 2026', '2026-04-11', 'april-amplified-2026', 1, 'published', 'Turn it up to 11. Heavy music festival returns.', 'Montreal', 'https://ticketscene.ca/april-amp-2026'),
-(32, 'Tulip Tunes 2026', '2026-05-16', 'tulip-tunes-2026', 1, 'published', 'Blooming music festival. Outdoor stages and garden parties.', 'Ottawa', 'https://ticketscene.ca/tulip-2026'),
+(32, 'Tulip Tunes 2026', '2026-05-16', 'tulip-tunes-2026', 1, 'published', 'Blooming music festival. Outdoor stages and garden parties.', 'Waterloo', 'https://ticketscene.ca/tulip-2026'),
 (33, 'Summer Solstice 2026', '2026-06-20', 'summer-solstice-2026', 1, 'published', 'Longest day of the year, longest music festival. 15 hours of performances.', 'Toronto', 'https://ticketscene.ca/solstice-2026'),
-(34, 'Canada Day Festival 2026', '2026-07-01', 'canada-day-2026', 1, 'published', 'Celebrating 159 years of Canada with coast-to-coast music.', 'Ottawa', 'https://ticketscene.ca/canada-day-2026'),
+(34, 'Canada Day Festival 2026', '2026-07-01', 'canada-day-2026', 1, 'published', 'Celebrating 159 years of Canada with coast-to-coast music.', 'Waterloo', 'https://ticketscene.ca/canada-day-2026'),
 (35, 'August Heat Wave 2026', '2026-08-08', 'august-heat-2026', 1, 'published', 'Summer''s hottest weekend. Dance floors and outdoor stages.', 'Montreal', 'https://ticketscene.ca/august-heat-2026'),
 (36, 'Labour Day Loud 2026', '2026-09-07', 'labour-day-2026', 1, 'published', 'Working class music festival. Punk, hardcore, and union solidarity.', 'Hamilton', 'https://ticketscene.ca/labour-loud-2026'),
 (37, 'Autumn Acoustics 2026', '2026-10-10', 'autumn-acoustics-2026', 1, 'published', 'Thanksgiving weekend acoustic showcase. Intimate venues, grateful vibes.', 'Kingston', 'https://ticketscene.ca/autumn-2026'),
 (38, 'Halloween Havoc 2026', '2026-10-31', 'halloween-havoc-2026', 1, 'published', 'All Hallows Eve spectacular. Goth, industrial, and dark electronica.', 'Toronto', 'https://ticketscene.ca/halloween-2026'),
 (39, 'November Noise 2026', '2026-11-14', 'november-noise-2026', 1, 'published', 'Experimental music weekend. Push boundaries, break rules.', 'Montreal', 'https://ticketscene.ca/noise-2026'),
-(40, 'Holiday Hootenanny 2026', '2026-12-12', 'holiday-hootenanny-2026', 1, 'published', 'Fourth annual holiday party. Community celebration and music.', 'Ottawa', 'https://ticketscene.ca/holiday-2026');
+(40, 'Holiday Hootenanny 2026', '2026-12-12', 'holiday-hootenanny-2026', 1, 'published', 'Fourth annual holiday party. Community celebration and music.', 'Waterloo', 'https://ticketscene.ca/holiday-2026');
 
 -- ============================================
 -- 2026 BANDS (150+ new bands)
@@ -26,10 +26,10 @@ INSERT OR REPLACE INTO events (id, name, date, slug, is_published, status, descr
 
 -- Winter Warm-Up 2026 (Event 28)
 INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time, genre, origin, description) VALUES
-(151, 28, 1, 'The Icicles', '19:00', '19:45', 'Indie Rock', 'Ottawa', 'Crystalline indie rock'),
+(151, 28, 1, 'The Icicles', '19:00', '19:45', 'Indie Rock', 'Waterloo', 'Crystalline indie rock'),
 (152, 28, 1, 'Deep Freeze', '20:00', '20:45', 'Post-Rock', 'Iceland', 'Icelandic post-rock legends'),
 (153, 28, 1, 'Subzero', '21:00', '22:00', 'Metal', 'Norway', 'Black metal from the north'),
-(154, 28, 2, 'Hot Toddies', '20:00', '20:45', 'Folk Rock', 'Ottawa', 'Warming folk rock'),
+(154, 28, 2, 'Hot Toddies', '20:00', '20:45', 'Folk Rock', 'Waterloo', 'Warming folk rock'),
 (155, 28, 2, 'The Furnace', '21:00', '21:45', 'Blues Rock', 'Chicago', 'Scorching blues rock'),
 (156, 28, 3, 'Thermal Mass', '21:30', '22:15', 'Industrial', 'Detroit', 'Heavy industrial heat'),
 (157, 28, 4, 'Windchill Factor', '22:00', '23:00', 'Electronic', 'Toronto', 'Chilling electronic beats'),
@@ -37,11 +37,11 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 
 -- Frost Fest 2026 (Event 29)
 INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time, genre, origin, description) VALUES
-(159, 29, 1, 'Valentine Rough', '19:00', '19:45', 'Post-Punk', 'Ottawa', 'Anti-romantic post-punk'),
+(159, 29, 1, 'Valentine Rough', '19:00', '19:45', 'Post-Punk', 'Waterloo', 'Anti-romantic post-punk'),
 (160, 29, 1, 'Sweethearts', '20:00', '20:45', 'Pop Punk', 'Toronto', 'Candy-sweet pop punk'),
 (161, 29, 1, 'Heartbreak Hotel', '21:00', '22:00', 'Emo', 'Las Vegas', 'Emotional rock ballads'),
 (162, 29, 2, 'The Crushes', '20:00', '20:45', 'Indie Pop', 'Montreal', 'Charming indie pop'),
-(163, 29, 2, 'Cupid''s Arrow', '21:00', '21:45', 'Synth Pop', 'Ottawa', 'Aimed synth pop'),
+(163, 29, 2, 'Cupid''s Arrow', '21:00', '21:45', 'Synth Pop', 'Waterloo', 'Aimed synth pop'),
 (164, 29, 3, 'Broken Hearts Club', '21:30', '22:15', 'Emo Pop', 'Toronto', 'Sad boi anthems'),
 (165, 29, 4, 'Love Languages', '22:00', '23:00', 'R&B', 'Atlanta', 'Smooth R&B grooves'),
 (166, 29, 5, 'The Romantics', '20:00', '20:45', 'Power Pop', 'Detroit', 'Classic power pop');
@@ -52,7 +52,7 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 (168, 30, 6, 'The Crocuses', '20:00', '20:45', 'Indie Pop', 'Montreal', 'Early blooming indie'),
 (169, 30, 6, 'Vernal Equinox', '21:00', '22:00', 'Progressive Rock', 'Vancouver', 'Balanced prog rock'),
 (170, 30, 7, 'Rain Dance', '20:00', '20:45', 'World Music', 'Brazil', 'Brazilian rain rhythms'),
-(171, 30, 7, 'The Seedlings', '21:00', '21:45', 'Singer-Songwriter', 'Ottawa', 'Growing songwriter talent'),
+(171, 30, 7, 'The Seedlings', '21:00', '21:45', 'Singer-Songwriter', 'Waterloo', 'Growing songwriter talent'),
 (172, 30, 8, 'Thaw', '21:30', '22:15', 'Ambient', 'Toronto', 'Melting ambient soundscapes'),
 (173, 30, 9, 'The Greenery', '22:00', '23:00', 'Psych Rock', 'Portland', 'Lush psychedelic rock'),
 (174, 30, 10, 'Rebirth', '20:00', '20:45', 'Electronic', 'Montreal', 'Regenerative electronic');
@@ -71,14 +71,14 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 
 -- Tulip Tunes 2026 (Event 32)
 INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time, genre, origin, description) VALUES
-(184, 32, 1, 'The Gardeners', '14:00', '14:45', 'Folk', 'Ottawa', 'Cultivated folk music'),
+(184, 32, 1, 'The Gardeners', '14:00', '14:45', 'Folk', 'Waterloo', 'Cultivated folk music'),
 (185, 32, 1, 'Bloom', '15:00', '15:45', 'Dream Pop', 'Toronto', 'Flowering dream pop'),
 (186, 32, 1, 'The Botanists', '16:00', '16:45', 'Indie Rock', 'Montreal', 'Scientific indie rock'),
 (187, 32, 1, 'Petal Power', '17:00', '17:45', 'Psychedelic', 'San Francisco', 'Flower power psych'),
 (188, 32, 1, 'Dutch Courage', '18:00', '19:00', 'Rock', 'Netherlands', 'Dutch rock visitors'),
 (189, 32, 2, 'The Stems', '19:00', '19:45', 'Garage Rock', 'Perth', 'Australian garage'),
 (190, 32, 2, 'Root System', '20:00', '20:45', 'Dub', 'Kingston JM', 'Deep roots reggae'),
-(191, 32, 2, 'Bulb Fiction', '21:00', '21:45', 'Alternative', 'Ottawa', 'Planted alternative rock'),
+(191, 32, 2, 'Bulb Fiction', '21:00', '21:45', 'Alternative', 'Waterloo', 'Planted alternative rock'),
 (192, 32, 3, 'The Florists', '20:00', '20:45', 'Pop', 'Toronto', 'Arranged pop music'),
 (193, 32, 3, 'Garden State', '21:00', '21:45', 'Indie Folk', 'New Jersey', 'Jersey folk rock');
 
@@ -89,7 +89,7 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 (196, 33, 6, 'The Early Birds', '08:00', '08:45', 'Jazz', 'Montreal', 'Early morning jazz'),
 (197, 33, 6, 'Noon Day Sun', '12:00', '12:45', 'Rock', 'Calgary', 'High noon rock'),
 (198, 33, 6, 'Afternoon Delight', '15:00', '15:45', 'Soft Rock', 'Vancouver', 'Mellow afternoon vibes'),
-(199, 33, 6, 'Golden Hour', '18:00', '18:45', 'Indie Pop', 'Ottawa', 'Magic hour music'),
+(199, 33, 6, 'Golden Hour', '18:00', '18:45', 'Indie Pop', 'Waterloo', 'Magic hour music'),
 (200, 33, 6, 'Sunset Strip', '19:00', '19:45', 'Rock', 'Los Angeles', 'LA sunset rock'),
 (201, 33, 7, 'Twilight Zone', '20:00', '20:45', 'Post-Punk', 'Manchester', 'UK post-punk'),
 (202, 33, 7, 'Dusk Till Dawn', '21:00', '21:45', 'Electronic', 'London', 'All-night electronic'),
@@ -170,11 +170,11 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 
 -- Holiday Hootenanny 2026 (Event 40)
 INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time, genre, origin, description) VALUES
-(259, 40, 1, 'Jingle All The Way', '19:00', '19:45', 'Pop Punk', 'Ottawa', 'Holiday pop punk'),
+(259, 40, 1, 'Jingle All The Way', '19:00', '19:45', 'Pop Punk', 'Waterloo', 'Holiday pop punk'),
 (260, 40, 1, 'The Snow Angels', '20:00', '20:45', 'Indie Pop', 'Toronto', 'Heavenly indie pop'),
 (261, 40, 1, 'Mistletoe', '21:00', '22:00', 'Folk Rock', 'Montreal', 'Kissing folk rock'),
 (262, 40, 2, 'The Reindeer', '20:00', '20:45', 'Alternative', 'Alaska', 'Arctic alternative'),
-(263, 40, 2, 'Candy Cane Lane', '21:00', '21:45', 'Indie Rock', 'Ottawa', 'Sweet indie rock'),
+(263, 40, 2, 'Candy Cane Lane', '21:00', '21:45', 'Indie Rock', 'Waterloo', 'Sweet indie rock'),
 (264, 40, 3, 'Scrooge', '21:30', '22:15', 'Punk', 'London', 'Bah humbug punk'),
 (265, 40, 4, 'The Yule Log', '22:00', '23:00', 'Ambient', 'Norway', 'Burning ambient'),
 (266, 40, 5, 'New Year''s Eve', '20:00', '20:45', 'Dance', 'Times Square', 'Countdown dance');
@@ -187,7 +187,7 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 
 -- Canada Day 2026 extras
 INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time, genre, origin, description) VALUES
-(269, 34, 1, 'The Confederation', '18:30', '19:30', 'Progressive Rock', 'Ottawa', 'Historical prog rock'),
+(269, 34, 1, 'The Confederation', '18:30', '19:30', 'Progressive Rock', 'Waterloo', 'Historical prog rock'),
 (270, 34, 2, 'Nunavut', '22:30', '23:30', 'Throat Singing', 'Iqaluit', 'Inuit throat singing');
 
 -- Summer Solstice 2026 extras

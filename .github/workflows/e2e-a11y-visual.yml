@@ -6,8 +6,6 @@ on:
         paths:
             - 'e2e/accessibility/**'
             - 'e2e/visual-regression.spec.js'
-            - 'migrations/**'
-            - 'database/**'
     schedule:
         - cron: '0 7 * * 1'
 

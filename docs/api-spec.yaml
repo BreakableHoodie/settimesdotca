@@ -2084,6 +2084,55 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+    patch:
+      tags:
+        - Admin - Bands
+      summary: Bulk update performances (change_time, move_venue, or delete)
+      description: >
+        Applies a bulk action to a set of performances. For `change_time` and
+        `move_venue`, scheduling conflicts are checked **before** any write. If
+        conflicts are found and `ignore_conflicts` is not `true`, the request is
+        rejected with **409** and no changes are applied. Pass
+        `ignore_conflicts: true` to force the apply despite conflicts. The
+        `delete` action has no conflict check.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkPatchRequest"
+      responses:
+        "200":
+          description: Bulk operation applied successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: >
+            Scheduling conflicts detected; no changes were applied. Re-submit
+            with `ignore_conflicts: true` to force the apply.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: conflicts
+                  conflicts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BulkConflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
     delete:
       tags:
         - Admin - Bands
@@ -3879,6 +3928,56 @@ components:
         warning:
           type: string
           nullable: true
+
+    BulkPatchRequest:
+      type: object
+      required:
+        - band_ids
+        - action
+      properties:
+        band_ids:
+          type: array
+          maxItems: 200
+          items:
+            type: integer
+          description: Performance IDs to update
+        action:
+          type: string
+          enum:
+            - move_venue
+            - change_time
+            - delete
+        venue_id:
+          type: integer
+          nullable: true
+          description: Required for move_venue
+        start_time:
+          type: string
+          nullable: true
+          description: "Required for change_time; HH:MM format"
+        ignore_conflicts:
+          type: boolean
+          default: false
+          description: >
+            When true, skips conflict detection and forces the apply.
+            When false or absent, the request is rejected with 409 if
+            scheduling conflicts exist.
+
+    BulkConflict:
+      type: object
+      properties:
+        band_id:
+          type: integer
+        type:
+          type: string
+          enum:
+            - conflict
+            - overlap
+        message:
+          type: string
+        severity:
+          type: string
+          example: error
 
     BulkPreviewRequest:
       type: object

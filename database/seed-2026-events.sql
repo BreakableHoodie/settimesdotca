@@ -11,7 +11,7 @@ VALUES (
   1,
   'published',
   'Start the year with electrifying performances to shake off the winter chill.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/winter-warmup-2026'
 );
 
@@ -24,7 +24,7 @@ VALUES (
   1,
   'published',
   'Valentine''s Day celebration with romantic tunes and rock anthems.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/frostfest-2026'
 );
 
@@ -37,7 +37,7 @@ VALUES (
   1,
   'published',
   'Welcome spring with fresh sounds and emerging artists.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/spring-thaw-2026'
 );
 
@@ -50,7 +50,7 @@ VALUES (
   1,
   'published',
   'Turn up the volume with a diverse lineup of local and touring acts.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/april-amplified-2026'
 );
 
@@ -62,8 +62,8 @@ VALUES (
   'tulip-tunes-2026',
   1,
   'published',
-  'Celebrate Ottawa''s famous tulips with an outdoor music festival.',
-  'Ottawa',
+  'Celebrate spring in Waterloo Region with an outdoor music festival.',
+  'Waterloo',
   'https://ticketscene.ca/tulip-tunes-2026'
 );
 
@@ -76,7 +76,7 @@ VALUES (
   1,
   'published',
   'The longest day of the year deserves the longest night of music.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/solstice-2026'
 );
 
@@ -89,7 +89,7 @@ VALUES (
   1,
   'published',
   'Celebrate Canada''s birthday with an all-day music extravaganza.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/canada-day-2026'
 );
 
@@ -102,7 +102,7 @@ VALUES (
   1,
   'published',
   'Beat the heat with hot summer performances from top regional artists.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/august-heat-2026'
 );
 
@@ -115,7 +115,7 @@ VALUES (
   1,
   'published',
   'End the summer with a bang at our annual Labour Day blowout.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/labour-day-2026'
 );
 
@@ -128,7 +128,7 @@ VALUES (
   1,
   'published',
   'Intimate acoustic performances as the leaves change colors.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/autumn-acoustics-2026'
 );
 
@@ -141,7 +141,7 @@ VALUES (
   1,
   'published',
   'Spooky performances and costume contests in a hauntingly good venue crawl.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/halloween-2026'
 );
 
@@ -154,7 +154,7 @@ VALUES (
   1,
   'published',
   'Make some noise before the holiday season with hard-hitting performances.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/november-noise-2026'
 );
 
@@ -167,7 +167,7 @@ VALUES (
   1,
   'published',
   'Annual holiday celebration with community favorites and festive cheer.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/holiday-2026'
 );
 
@@ -180,6 +180,6 @@ VALUES (
   1,
   'published',
   'Ring in 2027 with a multi-venue countdown party you won''t forget.',
-  'Ottawa',
+  'Waterloo',
   'https://ticketscene.ca/nye-2026'
 );

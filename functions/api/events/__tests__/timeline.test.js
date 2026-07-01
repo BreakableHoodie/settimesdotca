@@ -75,7 +75,7 @@ const resultForQuery = (query) => {
           end_time: "20:00",
           url: "https://pastband.com",
           genre: "Blues",
-          origin: "Ottawa",
+          origin: "Kitchener",
           photo_url: "https://example.com/band3.jpg",
           venue_id: 3,
           venue_name: "Past Venue",

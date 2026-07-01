@@ -9,10 +9,10 @@ vi.mock("../../_middleware.js", () => ({
     if (role !== "admin") {
       return {
         error: true,
-        response: new Response(
-          JSON.stringify({ error: "Forbidden", message: "Admin required" }),
-          { status: 403, headers: { "Content-Type": "application/json" } },
-        ),
+        response: new Response(JSON.stringify({ error: "Forbidden", message: "Admin required" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }),
       };
     }
     return { error: false, user: { userId: 1, role: "admin" } };
@@ -40,9 +40,7 @@ function futureDate() {
 const basePayload = () => ({
   event: { name: "Test Fest", date: futureDate(), slug: "test-fest" },
   venues: [{ name: "The Venue", address: "123 Main St" }],
-  bands: [
-    { name: "Band One", venueIndex: 0, startTime: "20:00", endTime: "21:00" },
-  ],
+  bands: [{ name: "Band One", venueIndex: 0, startTime: "20:00", endTime: "21:00" }],
 });
 
 let rawDb;
@@ -130,9 +128,7 @@ describe("POST /api/admin/events/wizard - venue validation", () => {
     const data = await res.json();
 
     // The performance should reference the pre-existing venue, not a new one
-    const perf = rawDb
-      .prepare("SELECT * FROM performances WHERE event_id = ?")
-      .get(data.event.id);
+    const perf = rawDb.prepare("SELECT * FROM performances WHERE event_id = ?").get(data.event.id);
     expect(perf.venue_id).toBe(existingId);
   });
 });
@@ -228,15 +224,11 @@ describe("POST /api/admin/events/wizard - successful creation", () => {
     expect(data.success).toBe(true);
     expect(data.event.slug).toBe("test-fest");
 
-    const perf = rawDb
-      .prepare("SELECT * FROM performances WHERE event_id = ?")
-      .get(data.event.id);
+    const perf = rawDb.prepare("SELECT * FROM performances WHERE event_id = ?").get(data.event.id);
     expect(perf).toBeTruthy();
     expect(perf.start_time).toBe("20:00");
 
-    const profile = rawDb
-      .prepare("SELECT * FROM band_profiles WHERE id = ?")
-      .get(perf.band_profile_id);
+    const profile = rawDb.prepare("SELECT * FROM band_profiles WHERE id = ?").get(perf.band_profile_id);
     expect(profile.name).toBe("Band One");
   });
 
@@ -248,9 +240,7 @@ describe("POST /api/admin/events/wizard - successful creation", () => {
     });
     expect(res.status).toBe(201);
     const data = await res.json();
-    const perfs = rawDb
-      .prepare("SELECT * FROM performances WHERE event_id = ?")
-      .all(data.event.id);
+    const perfs = rawDb.prepare("SELECT * FROM performances WHERE event_id = ?").all(data.event.id);
     expect(perfs.length).toBe(0);
   });
 });
@@ -275,9 +265,7 @@ describe("POST /api/admin/events/wizard - error cleanup", () => {
     expect(res.status).toBe(500);
 
     // The compensating DELETE should have removed the orphan event row.
-    const orphan = rawDb
-      .prepare("SELECT id FROM events WHERE slug = ?")
-      .get("test-fest");
+    const orphan = rawDb.prepare("SELECT id FROM events WHERE slug = ?").get("test-fest");
     expect(orphan).toBeUndefined();
   });
 });

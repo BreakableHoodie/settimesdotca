@@ -51,18 +51,14 @@ export async function onRequestPost(context) {
     return json({ error: `Maximum ${MAX_IMPORT_ROWS} bands per import` }, 400);
   }
 
-  const event = await DB.prepare("SELECT id FROM events WHERE id = ?")
-    .bind(eventId)
-    .first();
+  const event = await DB.prepare("SELECT id FROM events WHERE id = ?").bind(eventId).first();
   if (!event) {
     return json({ error: "Event not found" }, 404);
   }
 
   // Resolve venues by name (case-insensitive) up front.
   const venues = await DB.prepare("SELECT id, name FROM venues").all();
-  const venueByName = new Map(
-    (venues.results || []).map((v) => [v.name.toLowerCase(), v.id]),
-  );
+  const venueByName = new Map((venues.results || []).map((v) => [v.name.toLowerCase(), v.id]));
 
   // Validate every row before writing anything — import is all-or-nothing.
   const errors = [];
@@ -117,9 +113,7 @@ export async function onRequestPost(context) {
   const createdProfileIds = [];
   try {
     for (const p of prepared) {
-      let profile = await DB.prepare(
-        "SELECT id FROM band_profiles WHERE name_normalized = ?",
-      )
+      let profile = await DB.prepare("SELECT id FROM band_profiles WHERE name_normalized = ?")
         .bind(p.nameNormalized)
         .first();
 
@@ -152,10 +146,7 @@ export async function onRequestPost(context) {
       await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();
     }
     console.error("Bulk import failed, rolled back:", err);
-    return json(
-      { error: "Import failed", message: "No bands were imported" },
-      500,
-    );
+    return json({ error: "Import failed", message: "No bands were imported" }, 500);
   }
 
   await auditLog(

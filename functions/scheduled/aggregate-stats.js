@@ -12,9 +12,7 @@ export async function scheduled(_event, env, _ctx) {
     // Two-pass approach: reset all to 0, then fill from a single GROUP BY aggregation.
     // This replaces three correlated subqueries (O(B×S)) with one scan of artist_daily_stats.
     await DB.batch([
-      DB.prepare(
-        `UPDATE band_profiles SET total_views = 0, total_social_clicks = 0, popularity_score = 0`,
-      ),
+      DB.prepare(`UPDATE band_profiles SET total_views = 0, total_social_clicks = 0, popularity_score = 0`),
       DB.prepare(
         `UPDATE band_profiles
          SET

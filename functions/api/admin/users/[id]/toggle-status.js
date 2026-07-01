@@ -20,13 +20,12 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-
     const idResult = validateId(params.id);
     if (!idResult.valid) {
-      return new Response(
-        JSON.stringify({ error: "Bad request", message: idResult.error }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Bad request", message: idResult.error }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     const userId = idResult.value;
 
@@ -50,13 +49,10 @@ export async function onRequestPost(context) {
 
     // Prevent admin from deactivating themselves
     if (targetUser.id === user.userId) {
-      return new Response(
-        JSON.stringify({ error: "Cannot deactivate your own account" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ error: "Cannot deactivate your own account" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Toggle user status
@@ -110,12 +106,9 @@ export async function onRequestPost(context) {
     );
   } catch (error) {
     console.error("Toggle user status error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to update user status" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    return new Response(JSON.stringify({ error: "Failed to update user status" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

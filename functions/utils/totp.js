@@ -61,16 +61,8 @@ async function hotp(secretBytes, counter, digits) {
     counterBytes[i] = remaining & 0xff;
     remaining = Math.floor(remaining / 256);
   }
-  const key = await crypto.subtle.importKey(
-    "raw",
-    secretBytes,
-    { name: "HMAC", hash: "SHA-1" },
-    false,
-    ["sign"],
-  );
-  const mac = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, counterBytes),
-  );
+  const key = await crypto.subtle.importKey("raw", secretBytes, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, counterBytes));
   const offset = mac[mac.length - 1] & 0x0f;
   const binary =
     ((mac[offset] & 0x7f) << 24) |
@@ -130,11 +122,7 @@ export async function verifyTotp(secret, code, window = 1) {
   let matched = false;
   // Walk the full ± window without early-exit so a match's step index doesn't leak.
   for (let offset = -span; offset <= span; offset += 1) {
-    const candidate = await hotp(
-      secretBytes,
-      counter + offset,
-      DEFAULT_TOTP_DIGITS,
-    );
+    const candidate = await hotp(secretBytes, counter + offset, DEFAULT_TOTP_DIGITS);
     if (constantTimeEqual(candidate, normalized)) {
       matched = true;
     }

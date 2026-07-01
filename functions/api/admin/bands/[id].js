@@ -11,10 +11,7 @@ import {
   sanitizeString,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
-import {
-  buildIntervals,
-  intervalsOverlap,
-} from "../../../utils/timeConflicts.js";
+import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
 import { parseOrigin } from "../../../utils/parseOrigin.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 
@@ -41,14 +38,7 @@ async function getEventForPerformance(DB, performanceId) {
     .first();
 }
 
-async function checkConflicts(
-  DB,
-  eventId,
-  venueId,
-  startTime,
-  endTime,
-  excludePerformanceId = null,
-) {
+async function checkConflicts(DB, eventId, venueId, startTime, endTime, excludePerformanceId = null) {
   const query = excludePerformanceId
     ? `SELECT p.id, p.start_time, p.end_time, bp.name
        FROM performances p
@@ -59,9 +49,7 @@ async function checkConflicts(
        JOIN band_profiles bp ON p.band_profile_id = bp.id
        WHERE p.event_id = ? AND p.venue_id = ?`;
 
-  const bindings = excludePerformanceId
-    ? [eventId, venueId, excludePerformanceId]
-    : [eventId, venueId];
+  const bindings = excludePerformanceId ? [eventId, venueId, excludePerformanceId] : [eventId, venueId];
 
   const { results: existingBands } = await DB.prepare(query)
     .bind(...bindings)
@@ -72,19 +60,14 @@ async function checkConflicts(
   for (const band of existingBands) {
     if (!band.start_time || !band.end_time) continue;
     const bandIntervals = buildIntervals(band.start_time, band.end_time);
-    const hasOverlap = bandIntervals.some((b) =>
-      newIntervals.some((a) => intervalsOverlap(a, b)),
-    );
+    const hasOverlap = bandIntervals.some((b) => newIntervals.some((a) => intervalsOverlap(a, b)));
     if (hasOverlap) {
       conflicts.push({
         id: band.id,
         name: band.name,
         startTime: band.start_time,
         endTime: band.end_time,
-        type:
-          band.start_time === startTime && band.end_time === endTime
-            ? "conflict"
-            : "overlap",
+        type: band.start_time === startTime && band.end_time === endTime ? "conflict" : "overlap",
       });
     }
   }
@@ -148,26 +131,16 @@ export async function onRequestPut(context) {
     // Guards against the frontend sending Number("") = 0 when no venue is selected,
     // which would otherwise pass the !== null check and then 404 on "Venue not found".
     const normalizedVenueId =
-      venueId === undefined
-        ? undefined
-        : !venueId || Number(venueId) <= 0
-          ? null
-          : Number(venueId);
+      venueId === undefined ? undefined : !venueId || Number(venueId) <= 0 ? null : Number(venueId);
     let resolvedPhotoUrl;
     try {
       resolvedPhotoUrl =
-        photo_url !== undefined
-          ? sanitizeOptionalHttpUrl(
-              photo_url,
-              FIELD_LIMITS.bandUrl.max,
-              "Photo URL",
-            )
-          : undefined;
+        photo_url !== undefined ? sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL") : undefined;
     } catch (error) {
-      return new Response(
-        JSON.stringify({ error: "Validation error", message: error.message }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Validation error", message: error.message }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     let realPerformanceId = performanceId;
     let bandProfileId = null;
@@ -221,26 +194,19 @@ export async function onRequestPut(context) {
       // events the band has played. Only block when a performance field is the
       // thing actually being changed.
       const editsPerformanceFields =
-        normalizedVenueId !== undefined ||
-        startTime !== undefined ||
-        endTime !== undefined;
+        normalizedVenueId !== undefined || startTime !== undefined || endTime !== undefined;
       if (linkedEvent?.status === "archived" && editsPerformanceFields) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
-            message:
-              "Archived event set times cannot be edited. Copy the event as a template instead.",
+            message: "Archived event set times cannot be edited. Copy the event as a template instead.",
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
     } else {
       // Fetch profile directly
-      const profile = await DB.prepare(
-        "SELECT * FROM band_profiles WHERE id = ?",
-      )
-        .bind(bandProfileId)
-        .first();
+      const profile = await DB.prepare("SELECT * FROM band_profiles WHERE id = ?").bind(bandProfileId).first();
 
       if (!profile) {
         return new Response(
@@ -282,9 +248,7 @@ export async function onRequestPut(context) {
       // For now, let's just update the profile name if it's unique, or switch if it exists.
 
       const nameNormalized = normalizeBandName(name);
-      const existingProfile = await DB.prepare(
-        `SELECT id FROM band_profiles WHERE name_normalized = ? AND id != ?`,
-      )
+      const existingProfile = await DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? AND id != ?`)
         .bind(nameNormalized, performance.band_profile_id)
         .first();
 
@@ -293,11 +257,7 @@ export async function onRequestPut(context) {
       }
     }
 
-    if (
-      contact_email !== undefined &&
-      contact_email &&
-      !isValidEmail(contact_email)
-    ) {
+    if (contact_email !== undefined && contact_email && !isValidEmail(contact_email)) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -311,11 +271,7 @@ export async function onRequestPut(context) {
     }
 
     // Validate time format (only if a non-empty time is provided; empty string = TBD)
-    if (
-      startTime !== undefined &&
-      startTime !== "" &&
-      !/^\d{2}:\d{2}$/.test(startTime)
-    ) {
+    if (startTime !== undefined && startTime !== "" && !/^\d{2}:\d{2}$/.test(startTime)) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -328,11 +284,7 @@ export async function onRequestPut(context) {
       );
     }
 
-    if (
-      endTime !== undefined &&
-      endTime !== "" &&
-      !/^\d{2}:\d{2}$/.test(endTime)
-    ) {
+    if (endTime !== undefined && endTime !== "" && !/^\d{2}:\d{2}$/.test(endTime)) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -346,12 +298,9 @@ export async function onRequestPut(context) {
     }
 
     // Determine actual times to use (provided or existing)
-    const actualStartTime =
-      startTime !== undefined ? startTime : performance.start_time;
-    const actualEndTime =
-      endTime !== undefined ? endTime : performance.end_time;
-    const actualVenueId =
-      normalizedVenueId !== undefined ? normalizedVenueId : performance.venue_id;
+    const actualStartTime = startTime !== undefined ? startTime : performance.start_time;
+    const actualEndTime = endTime !== undefined ? endTime : performance.end_time;
+    const actualVenueId = normalizedVenueId !== undefined ? normalizedVenueId : performance.venue_id;
 
     // Validate times (allow sets that cross midnight; prevent zero-length sets)
     if (actualStartTime && actualEndTime && actualStartTime === actualEndTime) {
@@ -393,12 +342,7 @@ export async function onRequestPut(context) {
 
     // Check for conflicts only if we have all required scheduling fields
     let conflicts = [];
-    if (
-      actualVenueId &&
-      actualStartTime &&
-      actualEndTime &&
-      performance.event_id
-    ) {
+    if (actualVenueId && actualStartTime && actualEndTime && performance.event_id) {
       conflicts = await checkConflicts(
         DB,
         performance.event_id,
@@ -459,20 +403,13 @@ export async function onRequestPut(context) {
         profileUpdates.push("genre = ?");
         profileParams.push(sanitizeString(genre) || null);
       }
-      const parsedOrigin =
-        origin !== undefined
-          ? parseOrigin(origin)
-          : { city: null, region: null };
-      const resolvedOriginCity =
-        origin_city !== undefined ? origin_city : parsedOrigin.city;
-      const resolvedOriginRegion =
-        origin_region !== undefined ? origin_region : parsedOrigin.region;
+      const parsedOrigin = origin !== undefined ? parseOrigin(origin) : { city: null, region: null };
+      const resolvedOriginCity = origin_city !== undefined ? origin_city : parsedOrigin.city;
+      const resolvedOriginRegion = origin_region !== undefined ? origin_region : parsedOrigin.region;
       const computedOrigin =
         origin !== undefined
           ? origin
-          : [resolvedOriginCity, resolvedOriginRegion]
-              .filter(Boolean)
-              .join(", ") || undefined;
+          : [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ") || undefined;
 
       if (origin !== undefined || origin_city !== undefined) {
         profileUpdates.push("origin_city = ?");
@@ -528,19 +465,13 @@ export async function onRequestPut(context) {
         // Legacy update of just website
         let existingLinks = {};
         try {
-          const profile = await DB.prepare(
-            "SELECT social_links FROM band_profiles WHERE id = ?",
-          )
+          const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?")
             .bind(performance.band_profile_id)
             .first();
           existingLinks = JSON.parse(profile.social_links || "{}");
         } catch (e) {}
         try {
-          existingLinks.website = sanitizeOptionalHttpUrl(
-            url,
-            FIELD_LIMITS.bandUrl.max,
-            "Website URL",
-          );
+          existingLinks.website = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
           newSocialLinks = sanitizeBandSocialLinks(existingLinks);
         } catch (error) {
           return new Response(
@@ -560,9 +491,7 @@ export async function onRequestPut(context) {
 
       if (profileUpdates.length > 0) {
         profileParams.push(performance.band_profile_id);
-        await DB.prepare(
-          `UPDATE band_profiles SET ${profileUpdates.join(", ")} WHERE id = ?`,
-        )
+        await DB.prepare(`UPDATE band_profiles SET ${profileUpdates.join(", ")} WHERE id = ?`)
           .bind(...profileParams)
           .run();
       }
@@ -628,11 +557,7 @@ export async function onRequestPut(context) {
         .bind(realPerformanceId)
         .first();
     } else {
-      const profile = await DB.prepare(
-        "SELECT * FROM band_profiles WHERE id = ?",
-      )
-        .bind(bandProfileId)
-        .first();
+      const profile = await DB.prepare("SELECT * FROM band_profiles WHERE id = ?").bind(bandProfileId).first();
       result = {
         id: `profile_${profile.id}`,
         name: profile.name,
@@ -652,10 +577,7 @@ export async function onRequestPut(context) {
       social = JSON.parse(result.social_links || "{}");
     } catch (e) {}
     result.url = social.website || "";
-    result.origin =
-      [result.origin_city, result.origin_region].filter(Boolean).join(", ") ||
-      result.origin ||
-      "";
+    result.origin = [result.origin_city, result.origin_region].filter(Boolean).join(", ") || result.origin || "";
 
     // Audit log the update
     await auditLog(
@@ -739,9 +661,7 @@ export async function onRequestPatch(context) {
       );
     }
 
-    const performance = await DB.prepare(
-      "SELECT id, is_announced, band_follow_notified FROM performances WHERE id = ?",
-    )
+    const performance = await DB.prepare("SELECT id, is_announced, band_follow_notified FROM performances WHERE id = ?")
       .bind(performanceId)
       .first();
 
@@ -767,20 +687,14 @@ export async function onRequestPatch(context) {
     }
 
     const newValue = body.is_announced ? 1 : 0;
-    await DB.prepare(
-      "UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?",
-    )
+    await DB.prepare("UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(newValue, performanceId)
       .run();
 
     // Queue band-follower notifications on first 0 → 1 transition.
     // Followers are batched into band_announce_queue; POST /api/admin/flush-announce-digest
     // groups them by (email, event) and sends one digest per fan per event.
-    if (
-      newValue === 1 &&
-      performance.is_announced === 0 &&
-      !performance.band_follow_notified
-    ) {
+    if (newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified) {
       const perf = await DB.prepare(
         `SELECT p.band_profile_id, bp.name as band_name,
                 e.id as event_id, e.name as event_name, e.slug as event_slug
@@ -842,9 +756,7 @@ export async function onRequestPatch(context) {
       ipAddress,
     );
 
-    const updated = await DB.prepare(
-      "SELECT band_follow_notified FROM performances WHERE id = ?",
-    )
+    const updated = await DB.prepare("SELECT band_follow_notified FROM performances WHERE id = ?")
       .bind(performanceId)
       .first();
 
@@ -916,9 +828,7 @@ export async function onRequestDelete(context) {
         );
       }
       // Check if any performances exist
-      const perfCount = await DB.prepare(
-        "SELECT COUNT(*) as count FROM performances WHERE band_profile_id = ?",
-      )
+      const perfCount = await DB.prepare("SELECT COUNT(*) as count FROM performances WHERE band_profile_id = ?")
         .bind(bandProfileId)
         .first();
 
@@ -926,8 +836,7 @@ export async function onRequestDelete(context) {
         return new Response(
           JSON.stringify({
             error: "Conflict",
-            message:
-              "Cannot delete band profile because it has associated performances. Delete performances first.",
+            message: "Cannot delete band profile because it has associated performances. Delete performances first.",
           }),
           {
             status: 409,
@@ -948,9 +857,7 @@ export async function onRequestDelete(context) {
       );
 
       // Delete profile
-      await DB.prepare("DELETE FROM band_profiles WHERE id = ?")
-        .bind(bandProfileId)
-        .run();
+      await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(bandProfileId).run();
 
       return new Response(
         JSON.stringify({
@@ -991,8 +898,7 @@ export async function onRequestDelete(context) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
-          message:
-            "Archived event performances cannot be deleted. Copy the event as a template instead.",
+          message: "Archived event performances cannot be deleted. Copy the event as a template instead.",
         }),
         {
           status: 400,

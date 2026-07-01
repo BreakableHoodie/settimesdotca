@@ -16,8 +16,7 @@ function parseSessionDate(value) {
 
 function normalizeUser(user) {
   if (!user) return null;
-  const displayName =
-    user.name || [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+  const displayName = user.name || [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
   return {
     userId: user.id,
     email: user.email,
@@ -33,13 +32,10 @@ async function resolveSession(request, env) {
   const lucia = initializeLucia(env.DB, request, env);
   // SECURITY: Bearer token auth is for non-production environments only.
   // In production, only cookie-based sessions are accepted.
-  const allowHeaderAuth =
-    env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
+  const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
   const sessionId =
     lucia.readSessionCookie(request.headers.get("Cookie") ?? "") ||
-    (allowHeaderAuth
-      ? request.headers.get("Authorization")?.replace("Bearer ", "")
-      : null);
+    (allowHeaderAuth ? request.headers.get("Authorization")?.replace("Bearer ", "") : null);
 
   if (!sessionId) {
     return { lucia, sessionId: null, session: null, user: null, sessionMeta: null };
@@ -51,9 +47,7 @@ async function resolveSession(request, env) {
       return { lucia, sessionId, session: null, user: null, sessionMeta: null };
     }
 
-    const sessionMeta = await env.DB.prepare(
-      "SELECT created_at, last_activity_at FROM lucia_sessions WHERE id = ?"
-    )
+    const sessionMeta = await env.DB.prepare("SELECT created_at, last_activity_at FROM lucia_sessions WHERE id = ?")
       .bind(sessionId)
       .first();
 
@@ -74,20 +68,20 @@ async function enforceSession(request, env) {
       headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
     }
     return {
-      response: new Response(
-        JSON.stringify({ error: "Unauthorized", message: "Valid session required" }),
-        { status: 401, headers }
-      ),
+      response: new Response(JSON.stringify({ error: "Unauthorized", message: "Valid session required" }), {
+        status: 401,
+        headers,
+      }),
       result,
     };
   }
 
   if (!user.isActive) {
     return {
-      response: new Response(
-        JSON.stringify({ error: "Account deactivated" }),
-        { status: 403, headers: { "Content-Type": "application/json" } }
-      ),
+      response: new Response(JSON.stringify({ error: "Account deactivated" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }),
       result,
     };
   }
@@ -96,14 +90,8 @@ async function enforceSession(request, env) {
   const createdAt = parseSessionDate(sessionMeta?.created_at) || now;
   const lastActivityAt = parseSessionDate(sessionMeta?.last_activity_at) || createdAt;
 
-  const idleTimeout =
-    user.role === "admin"
-      ? SESSION_CONFIG.adminIdleTimeout
-      : SESSION_CONFIG.idleTimeout;
-  const absoluteTimeout =
-    user.role === "admin"
-      ? SESSION_CONFIG.adminAbsoluteTimeout
-      : SESSION_CONFIG.absoluteTimeout;
+  const idleTimeout = user.role === "admin" ? SESSION_CONFIG.adminIdleTimeout : SESSION_CONFIG.idleTimeout;
+  const absoluteTimeout = user.role === "admin" ? SESSION_CONFIG.adminAbsoluteTimeout : SESSION_CONFIG.absoluteTimeout;
 
   const idleElapsed = now.getTime() - lastActivityAt.getTime();
   const absoluteElapsed = now.getTime() - createdAt.getTime();
@@ -119,15 +107,13 @@ async function enforceSession(request, env) {
           error: "Session expired",
           reason: idleElapsed > idleTimeout ? "inactivity" : "absolute",
         }),
-        { status: 401, headers }
+        { status: 401, headers },
       ),
       result,
     };
   }
 
-  await env.DB.prepare(
-    "UPDATE lucia_sessions SET last_activity_at = datetime('now') WHERE id = ?"
-  )
+  await env.DB.prepare("UPDATE lucia_sessions SET last_activity_at = datetime('now') WHERE id = ?")
     .bind(sessionId)
     .run();
 
@@ -166,7 +152,7 @@ export async function checkPermission(context, requiredRole) {
             error: "Forbidden",
             message: "Insufficient permissions",
           }),
-          { status: 403, headers: { "Content-Type": "application/json" } }
+          { status: 403, headers: { "Content-Type": "application/json" } },
         ),
       };
     }
@@ -192,7 +178,7 @@ export async function checkPermission(context, requiredRole) {
           error: "Forbidden",
           message: "Insufficient permissions",
         }),
-        { status: 403, headers: { "Content-Type": "application/json" } }
+        { status: 403, headers: { "Content-Type": "application/json" } },
       ),
     };
   }
@@ -201,22 +187,13 @@ export async function checkPermission(context, requiredRole) {
 }
 
 // Audit log function - logs all admin actions
-export async function auditLog(
-  env,
-  userId,
-  action,
-  resourceType,
-  resourceId,
-  details,
-  ipAddress,
-  log = null
-) {
+export async function auditLog(env, userId, action, resourceType, resourceId, details, ipAddress, log = null) {
   try {
     await env.DB.prepare(
       `
       INSERT INTO audit_log (user_id, action, resource_type, resource_id, details, ip_address)
       VALUES (?, ?, ?, ?, ?, ?)
-    `
+    `,
     )
       .bind(
         userId,
@@ -224,7 +201,7 @@ export async function auditLog(
         resourceType || null,
         resourceId || null,
         details ? JSON.stringify(details) : null,
-        ipAddress || "unknown"
+        ipAddress || "unknown",
       )
       .run();
   } catch (error) {
@@ -323,7 +300,7 @@ export async function onRequest(context) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

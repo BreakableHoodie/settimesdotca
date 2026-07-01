@@ -6,7 +6,10 @@ export async function onRequestGet(context) {
   const { DB } = env;
   const { valid, value: eventId, error: idError } = validateId(params.id);
   if (!valid) {
-    return new Response(JSON.stringify({ error: idError }), { status: 400, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: idError }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   // RBAC: Require viewer role or higher (read-only metrics)

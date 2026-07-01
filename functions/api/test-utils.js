@@ -355,9 +355,7 @@ export function createTestDB() {
     );
   `);
 
-  const insertUser = db.prepare(
-    "INSERT INTO users (email, role, activated_at) VALUES (?, ?, datetime('now'))",
-  );
+  const insertUser = db.prepare("INSERT INTO users (email, role, activated_at) VALUES (?, ?, datetime('now'))");
   insertUser.run("admin@test", "admin");
   insertUser.run("editor@test", "editor");
   insertUser.run("viewer@test", "viewer");
@@ -373,21 +371,11 @@ export const mockUsers = {
 
 export function insertEvent(
   db,
-  {
-    name = "Test Event",
-    slug = "test-event",
-    date = "2025-12-15",
-    status = "draft",
-    created_by = 1,
-  } = {},
+  { name = "Test Event", slug = "test-event", date = "2025-12-15", status = "draft", created_by = 1 } = {},
 ) {
-  const stmt = db.prepare(
-    "INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)",
-  );
+  const stmt = db.prepare("INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)");
   const info = stmt.run(name, slug, date, status, created_by);
-  return db
-    .prepare("SELECT * FROM events WHERE id = ?")
-    .get(info.lastInsertRowid);
+  return db.prepare("SELECT * FROM events WHERE id = ?").get(info.lastInsertRowid);
 }
 
 export function insertBand(
@@ -409,11 +397,8 @@ export function insertBand(
   // Insert into band_profiles + performances (v2 schema)
   const nameNormalized = normalizeBandName(name);
   let profileId;
-  const resolvedSocialLinks =
-    social_links ?? (url ? JSON.stringify({ website: url }) : null);
-  const existingProfile = db
-    .prepare("SELECT * FROM band_profiles WHERE name_normalized = ?")
-    .get(nameNormalized);
+  const resolvedSocialLinks = social_links ?? (url ? JSON.stringify({ website: url }) : null);
+  const existingProfile = db.prepare("SELECT * FROM band_profiles WHERE name_normalized = ?").get(nameNormalized);
   if (existingProfile) {
     profileId = existingProfile.id;
     const updates = [];
@@ -439,24 +424,14 @@ export function insertBand(
       values.push(resolvedSocialLinks);
     }
     if (updates.length > 0) {
-      db.prepare(
-        `UPDATE band_profiles SET ${updates.join(", ")} WHERE id = ?`,
-      ).run(...values, profileId);
+      db.prepare(`UPDATE band_profiles SET ${updates.join(", ")} WHERE id = ?`).run(...values, profileId);
     }
   } else {
     const profileInfo = db
       .prepare(
         "INSERT INTO band_profiles (name, name_normalized, genre, origin, description, photo_url, social_links) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(
-        name,
-        nameNormalized,
-        genre,
-        origin,
-        description,
-        photo_url,
-        resolvedSocialLinks,
-      );
+      .run(name, nameNormalized, genre, origin, description, photo_url, resolvedSocialLinks);
     profileId = profileInfo.lastInsertRowid;
   }
 
@@ -519,9 +494,7 @@ export function insertVenue(
     contact_email,
     address,
   );
-  return db
-    .prepare("SELECT * FROM venues WHERE id = ?")
-    .get(info.lastInsertRowid);
+  return db.prepare("SELECT * FROM venues WHERE id = ?").get(info.lastInsertRowid);
 }
 
 export function createDBEnv(db) {
@@ -617,9 +590,7 @@ export function createTestEnv({ role = "editor" } = {}) {
   const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
 
   rawDb
-    .prepare(
-      "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
-    )
+    .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)")
     .run(sessionId, userId, expiresAt, "127.0.0.1", "test-agent");
 
   return {
@@ -669,7 +640,5 @@ export function insertShareLink(
     JSON.stringify(band_names),
     expiresAt,
   );
-  return db
-    .prepare("SELECT * FROM share_links WHERE id = ?")
-    .get(info.lastInsertRowid);
+  return db.prepare("SELECT * FROM share_links WHERE id = ?").get(info.lastInsertRowid);
 }

@@ -42,9 +42,7 @@ export async function onRequestPost(context) {
     }
 
     // Get current event
-    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`)
-      .bind(eventId)
-      .first();
+    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(eventId).first();
 
     if (!event) {
       return new Response(

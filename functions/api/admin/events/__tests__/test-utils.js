@@ -74,9 +74,7 @@ export function createTestDB() {
   `);
 
   // Insert fixture users
-  const insertUser = db.prepare(
-    "INSERT INTO users (email, role) VALUES (?, ?)",
-  );
+  const insertUser = db.prepare("INSERT INTO users (email, role) VALUES (?, ?)");
   insertUser.run("admin@test", "admin");
   insertUser.run("editor@test", "editor");
   insertUser.run("viewer@test", "viewer");
@@ -92,44 +90,23 @@ export const mockUsers = {
 
 export function insertEvent(
   db,
-  {
-    name = "Test Event",
-    slug = "test-event",
-    date = "2025-12-15",
-    status = "draft",
-    created_by = 1,
-  } = {},
+  { name = "Test Event", slug = "test-event", date = "2025-12-15", status = "draft", created_by = 1 } = {},
 ) {
-  const stmt = db.prepare(
-    "INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)",
-  );
+  const stmt = db.prepare("INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)");
   const info = stmt.run(name, slug, date, status, created_by);
-  return db
-    .prepare("SELECT * FROM events WHERE id = ?")
-    .get(info.lastInsertRowid);
+  return db.prepare("SELECT * FROM events WHERE id = ?").get(info.lastInsertRowid);
 }
 
 export function insertBand(
   db,
-  {
-    name = "Test Band",
-    event_id = null,
-    venue_id = null,
-    start_time = "20:00",
-    end_time = "21:00",
-  } = {},
+  { name = "Test Band", event_id = null, venue_id = null, start_time = "20:00", end_time = "21:00" } = {},
 ) {
   const nameNormalized = normalizeBandName(name);
-  const existingProfile = db
-    .prepare("SELECT id FROM band_profiles WHERE name_normalized = ?")
-    .get(nameNormalized);
+  const existingProfile = db.prepare("SELECT id FROM band_profiles WHERE name_normalized = ?").get(nameNormalized);
   const profileId = existingProfile
     ? existingProfile.id
-    : db
-        .prepare(
-          "INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)",
-        )
-        .run(name, nameNormalized).lastInsertRowid;
+    : db.prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)").run(name, nameNormalized)
+        .lastInsertRowid;
 
   const info = db
     .prepare(
@@ -137,22 +114,13 @@ export function insertBand(
     )
     .run(event_id, venue_id, profileId, start_time, end_time);
 
-  return db
-    .prepare("SELECT * FROM performances WHERE id = ?")
-    .get(info.lastInsertRowid);
+  return db.prepare("SELECT * FROM performances WHERE id = ?").get(info.lastInsertRowid);
 }
 
-export function insertVenue(
-  db,
-  { name = "Test Venue", city = "Portland", address = null } = {},
-) {
-  const stmt = db.prepare(
-    "INSERT INTO venues (name, city, address) VALUES (?, ?, ?)",
-  );
+export function insertVenue(db, { name = "Test Venue", city = "Portland", address = null } = {}) {
+  const stmt = db.prepare("INSERT INTO venues (name, city, address) VALUES (?, ?, ?)");
   const info = stmt.run(name, city, address);
-  return db
-    .prepare("SELECT * FROM venues WHERE id = ?")
-    .get(info.lastInsertRowid);
+  return db.prepare("SELECT * FROM venues WHERE id = ?").get(info.lastInsertRowid);
 }
 
 /**

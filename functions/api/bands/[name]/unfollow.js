@@ -31,9 +31,7 @@ export async function onRequestGet(context) {
       .bind(token)
       .first();
 
-    await DB.prepare("DELETE FROM band_follows WHERE unsubscribe_token = ?")
-      .bind(token)
-      .run();
+    await DB.prepare("DELETE FROM band_follows WHERE unsubscribe_token = ?").bind(token).run();
 
     const bandName = follow?.band_name ? escapeHtml(follow.band_name) : null;
     const heading = bandName ? `Unfollowed ${bandName}` : "Unfollowed";

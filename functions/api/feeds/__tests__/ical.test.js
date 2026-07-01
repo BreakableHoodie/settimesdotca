@@ -1,20 +1,10 @@
 import { describe, it, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestGet } from "../ical.js";
-import {
-  createTestEnv,
-  insertEvent,
-  insertVenue,
-  insertBand,
-} from "../../test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 import { MockD1Database } from "../../subscriptions/__tests__/mocks/d1.js";
 
 // Reuse helpers from events tests
-import {
-  createMockEvent,
-  createMockVenue,
-  createMockBand,
-  seedMockData,
-} from "../../events/__tests__/helpers.js";
+import { createMockEvent, createMockVenue, createMockBand, seedMockData } from "../../events/__tests__/helpers.js";
 
 describe("GET /api/feeds/ical", () => {
   let mockDB;
@@ -73,9 +63,7 @@ describe("GET /api/feeds/ical", () => {
     const response = await onRequestGet(context);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toBe(
-      "text/calendar; charset=utf-8",
-    );
+    expect(response.headers.get("Content-Type")).toBe("text/calendar; charset=utf-8");
   });
 
   it("should include iCal headers VERSION, PRODID, CALSCALE", async () => {
@@ -222,12 +210,8 @@ describe("GET /api/feeds/ical", () => {
     expect(icalData).toContain("SUMMARY:Band Two");
 
     // UIDs should be unique (using performance IDs)
-    expect(icalData).toContain(
-      `UID:performance-1-${dateStr}@concertschedule.app`,
-    );
-    expect(icalData).toContain(
-      `UID:performance-2-${dateStr}@concertschedule.app`,
-    );
+    expect(icalData).toContain(`UID:performance-1-${dateStr}@concertschedule.app`);
+    expect(icalData).toContain(`UID:performance-2-${dateStr}@concertschedule.app`);
 
     // Count VEVENT blocks - should be 2
     const vevents = icalData.split("BEGIN:VEVENT").length - 1;
@@ -252,18 +236,14 @@ describe("GET /api/feeds/ical — reveal_mode gate (real-DB)", () => {
       slug: "ical-reveal-hidden",
       date: futureDate,
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const perf = insertBand(rawDb, {
       name: "Hidden iCal Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=0 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=0 WHERE id=?").run(perf.id);
 
     const request = new Request("https://example.test/api/feeds/ical");
     const response = await onRequestGet({ request, env });
@@ -283,18 +263,14 @@ describe("GET /api/feeds/ical — reveal_mode gate (real-DB)", () => {
       slug: "ical-reveal-shown",
       date: futureDate,
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Princess Cafe" });
     const perf = insertBand(rawDb, {
       name: "Revealed iCal Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=1 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=1 WHERE id=?").run(perf.id);
 
     const request = new Request("https://example.test/api/feeds/ical");
     const response = await onRequestGet({ request, env });
@@ -314,18 +290,14 @@ describe("GET /api/feeds/ical — reveal_mode gate (real-DB)", () => {
       slug: "ical-reveal-mode0",
       date: futureDate,
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Room 47" });
     const perf = insertBand(rawDb, {
       name: "Normal iCal Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=0 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=0 WHERE id=?").run(perf.id);
 
     const request = new Request("https://example.test/api/feeds/ical");
     const response = await onRequestGet({ request, env });

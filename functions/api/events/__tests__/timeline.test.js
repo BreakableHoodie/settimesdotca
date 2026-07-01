@@ -7,12 +7,7 @@
 
 import { describe, it, test, expect, beforeEach, vi } from "vitest";
 import { onRequestGet as timelineHandler } from "../timeline.js";
-import {
-  createTestEnv,
-  insertEvent,
-  insertVenue,
-  insertBand,
-} from "../../test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 
 // Returns the mock result set for a query string, keyed off the distinctive
 // WHERE clause for each period (now / upcoming / past).
@@ -101,8 +96,7 @@ const createMockDB = () => {
 
   return {
     prepare: mockPrepare,
-    batch: async (statements) =>
-      statements.map((statement) => resultForQuery(statement.query)),
+    batch: async (statements) => statements.map((statement) => resultForQuery(statement.query)),
   };
 };
 
@@ -175,9 +169,7 @@ describe("Timeline API - Optimized JOIN Queries", () => {
 
   describe("Query Parameters", () => {
     it('should support disabling "now" events', async () => {
-      mockContext.request = new Request(
-        "https://example.com/api/events/timeline?now=false",
-      );
+      mockContext.request = new Request("https://example.com/api/events/timeline?now=false");
       const response = await onRequestGet(mockContext);
       const data = await response.json();
 
@@ -185,9 +177,7 @@ describe("Timeline API - Optimized JOIN Queries", () => {
     });
 
     it('should support disabling "upcoming" events', async () => {
-      mockContext.request = new Request(
-        "https://example.com/api/events/timeline?upcoming=false",
-      );
+      mockContext.request = new Request("https://example.com/api/events/timeline?upcoming=false");
       const response = await onRequestGet(mockContext);
       const data = await response.json();
 
@@ -195,9 +185,7 @@ describe("Timeline API - Optimized JOIN Queries", () => {
     });
 
     it('should support disabling "past" events', async () => {
-      mockContext.request = new Request(
-        "https://example.com/api/events/timeline?past=false",
-      );
+      mockContext.request = new Request("https://example.com/api/events/timeline?past=false");
       const response = await onRequestGet(mockContext);
       const data = await response.json();
 
@@ -205,9 +193,7 @@ describe("Timeline API - Optimized JOIN Queries", () => {
     });
 
     it("should respect pastLimit parameter", async () => {
-      mockContext.request = new Request(
-        "https://example.com/api/events/timeline?pastLimit=5",
-      );
+      mockContext.request = new Request("https://example.com/api/events/timeline?pastLimit=5");
       const response = await onRequestGet(mockContext);
       const data = await response.json();
 
@@ -388,9 +374,7 @@ describe("Timeline API - Optimized JOIN Queries", () => {
         ],
       };
 
-      mockContext.request = new Request(
-        "https://example.test/api/events/timeline",
-      );
+      mockContext.request = new Request("https://example.test/api/events/timeline");
       const response = await onRequestGet(mockContext);
       const data = await response.json();
 
@@ -444,9 +428,7 @@ describe("Timeline API - Optimized JOIN Queries", () => {
         ],
       };
 
-      mockContext.request = new Request(
-        "https://example.test/api/events/timeline",
-      );
+      mockContext.request = new Request("https://example.test/api/events/timeline");
       const response = await onRequestGet(mockContext);
       const data = await response.json();
 
@@ -500,9 +482,7 @@ describe("Timeline API - Optimized JOIN Queries", () => {
         ],
       };
 
-      mockContext.request = new Request(
-        "https://example.test/api/events/timeline",
-      );
+      mockContext.request = new Request("https://example.test/api/events/timeline");
       const response = await onRequestGet(mockContext);
       const data = await response.json();
 
@@ -620,9 +600,7 @@ describe("Timeline real-DB — reveal_mode JOIN gate (SQL exercise)", () => {
       date: today,
       status: "published",
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const perf = insertBand(rawDb, {
@@ -630,9 +608,7 @@ describe("Timeline real-DB — reveal_mode JOIN gate (SQL exercise)", () => {
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=0 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=0 WHERE id=?").run(perf.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -663,9 +639,7 @@ describe("Timeline real-DB — upcoming has no fixed day-window cap (SQL exercis
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
     // 45 days out — comfortably past the old 30-day horizon.
-    const farFuture = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const farFuture = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
     const event = insertEvent(rawDb, {
       name: "Flagship Crawl",

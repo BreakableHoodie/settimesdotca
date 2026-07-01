@@ -42,9 +42,7 @@ export async function onRequestPost(context) {
     }
 
     // Get current event
-    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`)
-      .bind(eventId)
-      .first();
+    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(eventId).first();
 
     if (!event) {
       return new Response(
@@ -63,10 +61,10 @@ export async function onRequestPost(context) {
     const { publish } = body;
 
     if (typeof publish !== "boolean") {
-      return new Response(
-        JSON.stringify({ error: "Bad request", message: "publish must be a boolean" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Bad request", message: "publish must be a boolean" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (event.status === "archived") {
@@ -87,9 +85,7 @@ export async function onRequestPost(context) {
 
     // If publishing, check that event has at least 1 band
     if (publish) {
-      const bandCount = await DB.prepare(
-        `SELECT COUNT(*) as count FROM performances WHERE event_id = ?`,
-      )
+      const bandCount = await DB.prepare(`SELECT COUNT(*) as count FROM performances WHERE event_id = ?`)
         .bind(eventId)
         .first();
 
@@ -97,8 +93,7 @@ export async function onRequestPost(context) {
         return new Response(
           JSON.stringify({
             error: "Validation error",
-            message:
-              "Cannot publish event with no bands. Add at least one band first.",
+            message: "Cannot publish event with no bands. Add at least one band first.",
           }),
           {
             status: 400,
@@ -138,9 +133,7 @@ export async function onRequestPost(context) {
       JSON.stringify({
         success: true,
         event: result,
-        message: publish
-          ? "Event published successfully"
-          : "Event unpublished successfully",
+        message: publish ? "Event published successfully" : "Event unpublished successfully",
       }),
       {
         status: 200,

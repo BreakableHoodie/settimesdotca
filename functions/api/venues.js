@@ -27,13 +27,8 @@ export async function onRequestGet(context) {
   const q = (url.searchParams.get("q") || "").trim().slice(0, 100);
 
   const parsedLimit = Number.parseInt(url.searchParams.get("limit") || "", 10);
-  const parsedOffset = Number.parseInt(
-    url.searchParams.get("offset") || "",
-    10,
-  );
-  const limit = Number.isFinite(parsedLimit)
-    ? Math.min(Math.max(parsedLimit, 1), MAX_LIMIT)
-    : DEFAULT_LIMIT;
+  const parsedOffset = Number.parseInt(url.searchParams.get("offset") || "", 10);
+  const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), MAX_LIMIT) : DEFAULT_LIMIT;
   const offset = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
 
   const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;

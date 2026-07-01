@@ -20,59 +20,59 @@ const LOG_LEVELS = {
 // over-redact unrelated keys such as 'emailDelivered').
 const SENSITIVE_KEYS = new Set([
   // Password variants
-  'password',
-  'password_hash',
-  'passwordhash',       // camelCase 'passwordHash'
+  "password",
+  "password_hash",
+  "passwordhash", // camelCase 'passwordHash'
 
   // Token variants
-  'token',
-  'access_token',
-  'accesstoken',        // camelCase 'accessToken'
-  'refresh_token',
-  'refreshtoken',       // camelCase 'refreshToken'
-  'verification_token',
-  'verificationtoken',  // camelCase 'verificationToken'
-  'reset_token',
-  'resettoken',         // camelCase 'resetToken'
-  'invite_token',
-  'invitetoken',        // camelCase 'inviteToken'
-  'api_token',
-  'apitoken',           // camelCase 'apiToken'
+  "token",
+  "access_token",
+  "accesstoken", // camelCase 'accessToken'
+  "refresh_token",
+  "refreshtoken", // camelCase 'refreshToken'
+  "verification_token",
+  "verificationtoken", // camelCase 'verificationToken'
+  "reset_token",
+  "resettoken", // camelCase 'resetToken'
+  "invite_token",
+  "invitetoken", // camelCase 'inviteToken'
+  "api_token",
+  "apitoken", // camelCase 'apiToken'
 
   // Secret variants
-  'secret',
-  'totp_secret',
-  'totpsecret',         // camelCase 'totpSecret'
-  'client_secret',
-  'clientsecret',       // camelCase 'clientSecret'
+  "secret",
+  "totp_secret",
+  "totpsecret", // camelCase 'totpSecret'
+  "client_secret",
+  "clientsecret", // camelCase 'clientSecret'
 
   // Key variants
-  'key',
-  'api_key',
-  'apikey',             // camelCase 'apiKey'
-  'private_key',
-  'privatekey',         // camelCase 'privateKey'
-  'encryption_key',
-  'encryptionkey',      // camelCase 'encryptionKey'
+  "key",
+  "api_key",
+  "apikey", // camelCase 'apiKey'
+  "private_key",
+  "privatekey", // camelCase 'privateKey'
+  "encryption_key",
+  "encryptionkey", // camelCase 'encryptionKey'
 
   // Auth headers / cookies
-  'authorization',
-  'cookie',
-  'bearer',
+  "authorization",
+  "cookie",
+  "bearer",
 
   // Email (exact only – avoids over-redacting 'emailDelivered' etc.)
-  'email',
-  'user_email',
-  'useremail',          // camelCase 'userEmail'
+  "email",
+  "user_email",
+  "useremail", // camelCase 'userEmail'
 
   // IP address variants
-  'ip',
-  'ipaddress',          // camelCase 'ipAddress'
-  'ip_address',
+  "ip",
+  "ipaddress", // camelCase 'ipAddress'
+  "ip_address",
 
   // User-agent variants
-  'useragent',          // camelCase 'userAgent'
-  'user_agent',
+  "useragent", // camelCase 'userAgent'
+  "user_agent",
 ]);
 
 /**
@@ -83,7 +83,7 @@ function getLogLevel(env) {
   if (env?.LOG_LEVEL && LOG_LEVELS[env.LOG_LEVEL] !== undefined) {
     return env.LOG_LEVEL;
   }
-  return env?.ENVIRONMENT === 'production' ? 'info' : 'debug';
+  return env?.ENVIRONMENT === "production" ? "info" : "debug";
 }
 
 /**
@@ -103,11 +103,11 @@ function serializeError(error) {
     return {
       name: error.name,
       message: error.message,
-      stack: error.stack?.split('\n').slice(0, 5).join('\n'), // First 5 lines
+      stack: error.stack?.split("\n").slice(0, 5).join("\n"), // First 5 lines
     };
   }
 
-  if (typeof error === 'object') {
+  if (typeof error === "object") {
     try {
       return JSON.parse(JSON.stringify(error));
     } catch {
@@ -122,7 +122,7 @@ function serializeError(error) {
  * Safely stringify metadata, handling circular references
  */
 function serializeMetadata(meta) {
-  if (!meta || typeof meta !== 'object') return meta;
+  if (!meta || typeof meta !== "object") return meta;
 
   try {
     // Handle common non-serializable types
@@ -130,7 +130,7 @@ function serializeMetadata(meta) {
     for (const [key, value] of Object.entries(meta)) {
       // Redact sensitive keys
       if (SENSITIVE_KEYS.has(key.toLowerCase())) {
-        cleaned[key] = '[REDACTED]';
+        cleaned[key] = "[REDACTED]";
         continue;
       }
 
@@ -140,15 +140,15 @@ function serializeMetadata(meta) {
         cleaned[key] = { status: value.status, statusText: value.statusText };
       } else if (value instanceof Error) {
         cleaned[key] = serializeError(value);
-      } else if (typeof value === 'function') {
-        cleaned[key] = '[Function]';
+      } else if (typeof value === "function") {
+        cleaned[key] = "[Function]";
       } else {
         cleaned[key] = value;
       }
     }
     return JSON.parse(JSON.stringify(cleaned));
   } catch {
-    return '[Unserializable]';
+    return "[Unserializable]";
   }
 }
 
@@ -163,9 +163,9 @@ function formatLogEntry(level, message, meta = {}) {
   };
 
   // Add metadata if present
-  if (meta && typeof meta === 'object' && Object.keys(meta).length > 0) {
+  if (meta && typeof meta === "object" && Object.keys(meta).length > 0) {
     const serialized = serializeMetadata(meta);
-    if (serialized && typeof serialized === 'object') {
+    if (serialized && typeof serialized === "object") {
       Object.assign(entry, serialized);
     }
   }
@@ -195,16 +195,16 @@ export function createLogger(options = {}) {
 
     // Use appropriate console method
     switch (level) {
-      case 'debug':
+      case "debug":
         console.debug(formatted);
         break;
-      case 'info':
+      case "info":
         console.info(formatted);
         break;
-      case 'warn':
+      case "warn":
         console.warn(formatted);
         break;
-      case 'error':
+      case "error":
         console.error(formatted);
         break;
       default:
@@ -213,10 +213,10 @@ export function createLogger(options = {}) {
   };
 
   return {
-    debug: (message, meta) => log('debug', message, meta),
-    info: (message, meta) => log('info', message, meta),
-    warn: (message, meta) => log('warn', message, meta),
-    error: (message, meta) => log('error', message, meta),
+    debug: (message, meta) => log("debug", message, meta),
+    info: (message, meta) => log("info", message, meta),
+    warn: (message, meta) => log("warn", message, meta),
+    error: (message, meta) => log("error", message, meta),
 
     // Create a child logger with additional context
     child: (childOptions) =>
@@ -242,7 +242,7 @@ export function createRequestLogger(context) {
 
   return createLogger({
     env,
-    module: url.pathname.split('/').slice(0, 4).join('/'),
+    module: url.pathname.split("/").slice(0, 4).join("/"),
   });
 }
 
@@ -251,12 +251,10 @@ export function createRequestLogger(context) {
  * Use when you don't have request context
  */
 export const logger = {
-  debug: (message, meta) =>
-    console.debug(formatLogEntry('debug', message, meta)),
-  info: (message, meta) => console.info(formatLogEntry('info', message, meta)),
-  warn: (message, meta) => console.warn(formatLogEntry('warn', message, meta)),
-  error: (message, meta) =>
-    console.error(formatLogEntry('error', message, meta)),
+  debug: (message, meta) => console.debug(formatLogEntry("debug", message, meta)),
+  info: (message, meta) => console.info(formatLogEntry("info", message, meta)),
+  warn: (message, meta) => console.warn(formatLogEntry("warn", message, meta)),
+  error: (message, meta) => console.error(formatLogEntry("error", message, meta)),
 };
 
 /**
@@ -265,12 +263,12 @@ export const logger = {
  */
 export function logError(loggerOrMessage, errorOrMeta, metaOrUndefined) {
   // Handle both (logger, error, meta) and (message, error) signatures
-  if (typeof loggerOrMessage === 'object' && loggerOrMessage.error) {
+  if (typeof loggerOrMessage === "object" && loggerOrMessage.error) {
     // Called as logError(logger, error, meta)
     const log = loggerOrMessage;
     const error = errorOrMeta;
     const meta = metaOrUndefined || {};
-    log.error(error?.message || 'Unknown error', {
+    log.error(error?.message || "Unknown error", {
       ...meta,
       error: serializeError(error),
     });

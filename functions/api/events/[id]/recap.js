@@ -25,22 +25,18 @@ export async function onRequestGet(context) {
 
   try {
     const event = isNumeric
-      ? await DB.prepare(
-          `SELECT id, name, slug, date FROM events WHERE id = ? AND status = 'archived' LIMIT 1`
-        )
+      ? await DB.prepare(`SELECT id, name, slug, date FROM events WHERE id = ? AND status = 'archived' LIMIT 1`)
           .bind(numericId)
           .first()
-      : await DB.prepare(
-          `SELECT id, name, slug, date FROM events WHERE slug = ? AND status = 'archived' LIMIT 1`
-        )
+      : await DB.prepare(`SELECT id, name, slug, date FROM events WHERE slug = ? AND status = 'archived' LIMIT 1`)
           .bind(rawId)
           .first();
 
     if (!event) {
-      return new Response(
-        JSON.stringify({ error: "Event not found or not archived" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Event not found or not archived" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const bandsResult = await DB.prepare(
@@ -67,7 +63,7 @@ export async function onRequestGet(context) {
       LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
       ORDER BY p.start_time NULLS LAST, bp.name
-      `
+      `,
     )
       .bind(event.id, event.id)
       .all();
@@ -111,21 +107,18 @@ export async function onRequestGet(context) {
       returning_acts: returningActs,
     };
 
-    return new Response(
-      JSON.stringify({ event, stats, bands }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=3600",
-        },
-      }
-    );
+    return new Response(JSON.stringify({ event, stats, bands }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
   } catch (error) {
     console.error("Error fetching event recap:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch event recap" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch event recap" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

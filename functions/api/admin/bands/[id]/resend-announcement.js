@@ -29,10 +29,7 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   if (!isEmailConfigured(env)) {
-    return json(
-      { error: "Email not configured", message: "Email is not configured" },
-      400,
-    );
+    return json({ error: "Email not configured", message: "Email is not configured" }, 400);
   }
 
   const perf = await DB.prepare(
@@ -50,10 +47,7 @@ export async function onRequestPost(context) {
   }
 
   if (!perf.is_announced) {
-    return json(
-      { error: "Bad request", message: "Performance has not been announced" },
-      400,
-    );
+    return json({ error: "Bad request", message: "Performance has not been announced" }, 400);
   }
 
   // Verified followers WITHOUT a notification row for this performance.

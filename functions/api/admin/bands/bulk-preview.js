@@ -69,9 +69,7 @@ export async function onRequestPost(context) {
     .all();
 
   const bandResults = bands.results || [];
-  const mutableBandResults = bandResults.filter(
-    (band) => band.event_status !== "archived",
-  );
+  const mutableBandResults = bandResults.filter((band) => band.event_status !== "archived");
 
   bandResults
     .filter((band) => band.event_status === "archived")
@@ -85,9 +83,7 @@ export async function onRequestPost(context) {
 
   if (action === "move_venue") {
     const { venue_id } = params;
-    const venue = await env.DB.prepare("SELECT name FROM venues WHERE id = ?")
-      .bind(venue_id)
-      .first();
+    const venue = await env.DB.prepare("SELECT name FROM venues WHERE id = ?").bind(venue_id).first();
 
     if (!venue) {
       return new Response(JSON.stringify({ error: "Target venue not found" }), {
@@ -129,10 +125,8 @@ export async function onRequestPost(context) {
       for (const other of existing) {
         if (!other.start_time || !other.end_time) continue;
         const otherIntervals = buildIntervals(other.start_time, other.end_time);
-        if (bandIntervals.some(a => otherIntervals.some(b => intervalsOverlap(a, b)))) {
-          const isExact =
-            other.start_time === band.start_time &&
-            other.end_time === band.end_time;
+        if (bandIntervals.some((a) => otherIntervals.some((b) => intervalsOverlap(a, b)))) {
+          const isExact = other.start_time === band.start_time && other.end_time === band.end_time;
           conflicts.push({
             band_id: band.id,
             type: isExact ? "conflict" : "overlap",
@@ -224,9 +218,8 @@ export async function onRequestPost(context) {
       for (const other of existing) {
         if (!other.start_time || !other.end_time) continue;
         const otherIntervals = buildIntervals(other.start_time, other.end_time);
-        if (bandIntervals.some(a => otherIntervals.some(b => intervalsOverlap(a, b)))) {
-          const isExact =
-            other.start_time === start_time && other.end_time === newEndTime;
+        if (bandIntervals.some((a) => otherIntervals.some((b) => intervalsOverlap(a, b)))) {
+          const isExact = other.start_time === start_time && other.end_time === newEndTime;
           conflicts.push({
             band_id: band.id,
             type: isExact ? "conflict" : "overlap",

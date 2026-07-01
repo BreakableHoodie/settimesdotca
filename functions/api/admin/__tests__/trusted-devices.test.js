@@ -9,9 +9,7 @@ function makeCtx(env, userId) {
 }
 
 function insertDevice(rawDb, { userId, expired = false } = {}) {
-  const expiresExpr = expired
-    ? "datetime('now', '-1 day')"
-    : "datetime('now', '+30 days')";
+  const expiresExpr = expired ? "datetime('now', '-1 day')" : "datetime('now', '+30 days')";
   const info = rawDb
     .prepare(
       `INSERT INTO trusted_devices (user_id, token, device_fingerprint, ip_address, user_agent, expires_at, last_used_at)
@@ -27,7 +25,7 @@ describe("GET /api/admin/trusted-devices", () => {
     insertDevice(rawDb, { userId: mockUsers.editor.id });
     insertDevice(rawDb, { userId: mockUsers.editor.id });
     insertDevice(rawDb, { userId: mockUsers.editor.id, expired: true }); // should not appear
-    insertDevice(rawDb, { userId: mockUsers.admin.id });                 // another user's device
+    insertDevice(rawDb, { userId: mockUsers.admin.id }); // another user's device
 
     const response = await onRequestGet({
       request: new Request(BASE_URL),

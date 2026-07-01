@@ -29,9 +29,7 @@ describe("POST /api/schedule/build", () => {
     const response = await onRequestPost({ request, env });
     expect(response.status).toBe(200);
 
-    const row = rawDb
-      .prepare("SELECT * FROM schedule_builds WHERE event_id = ?")
-      .get(event.id);
+    const row = rawDb.prepare("SELECT * FROM schedule_builds WHERE event_id = ?").get(event.id);
     expect(row).toMatchObject({
       event_id: event.id,
       performance_id: performance.id,

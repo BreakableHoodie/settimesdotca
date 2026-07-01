@@ -115,16 +115,10 @@ function generateICal(bands, city, genre) {
     const uid = `performance-${band.performance_id}-${eventDate}@concertschedule.app`;
 
     // Location
-    const location = band.venue_name
-      ? `${band.venue_name}${band.address ? ", " + band.address : ""}`
-      : "TBD";
+    const location = band.venue_name ? `${band.venue_name}${band.address ? ", " + band.address : ""}` : "TBD";
 
     // Description
-    const description = [
-      band.band_name,
-      band.venue_name ? `Venue: ${band.venue_name}` : "",
-      band.description || "",
-    ]
+    const description = [band.band_name, band.venue_name ? `Venue: ${band.venue_name}` : "", band.description || ""]
       .filter(Boolean)
       .join("\\n");
 

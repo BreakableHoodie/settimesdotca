@@ -18,8 +18,7 @@ const RATE_LIMIT_PREFIX = "rate-limit:";
 // Band action endpoints that send email and must be fail-closed with a tight limit.
 // Scoped to the /follow|unfollow|confirm-follow suffix so that public GET reads
 // (e.g. /api/bands/<name>) are not affected.
-const BAND_ACTION_RE =
-  /^\/api\/bands\/[^/]+\/(follow|unfollow|confirm-follow)$/;
+const BAND_ACTION_RE = /^\/api\/bands\/[^/]+\/(follow|unfollow|confirm-follow)$/;
 
 // Batch follow endpoints — flat paths under /api/bands/ (not nested under {name}).
 // Same fail-closed treatment as BAND_ACTION_RE: they send email, so D1-backed
@@ -59,11 +58,7 @@ const SKIP_PATTERNS = [
 
 // Endpoints where a rate-limit failure blocks the request (fail closed).
 // These use D1 for globally-consistent counters.
-const FAIL_CLOSED_PATTERNS = [
-  "/api/admin/auth/",
-  "/api/auth/",
-  "/api/subscriptions",
-];
+const FAIL_CLOSED_PATTERNS = ["/api/admin/auth/", "/api/auth/", "/api/subscriptions"];
 
 function shouldFailClosed(pathname) {
   return (
@@ -114,9 +109,7 @@ function getRateLimitConfig(pathname) {
  */
 function getRateLimitKey(ip, pathname) {
   const depth =
-    pathname.startsWith("/api/admin/auth/") ||
-    pathname.startsWith("/api/auth/") ||
-    BAND_ACTION_RE.test(pathname)
+    pathname.startsWith("/api/admin/auth/") || pathname.startsWith("/api/auth/") || BAND_ACTION_RE.test(pathname)
       ? 5
       : 4;
   const basePath = pathname.split("/").slice(0, depth).join("/");
@@ -147,11 +140,7 @@ async function checkRateLimitD1(DB, ip, pathname, config) {
       .bind(key, now, config.window)
       .run();
 
-    const row = await DB.prepare(
-      "SELECT count, window_start FROM rate_limits WHERE key = ?",
-    )
-      .bind(key)
-      .first();
+    const row = await DB.prepare("SELECT count, window_start FROM rate_limits WHERE key = ?").bind(key).first();
 
     const count = row?.count ?? 1;
     const windowStart = row?.window_start ?? now;
@@ -307,10 +296,7 @@ export function rateLimitHeaders(result) {
  * Create 429 Too Many Requests response
  */
 export function rateLimitResponse(result, corsHeaders = {}) {
-  const retryAfter = Math.max(
-    1,
-    result.resetAt - Math.floor(Date.now() / 1000),
-  );
+  const retryAfter = Math.max(1, result.resetAt - Math.floor(Date.now() / 1000));
 
   return new Response(
     JSON.stringify({

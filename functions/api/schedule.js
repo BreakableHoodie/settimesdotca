@@ -15,12 +15,8 @@ export async function onRequestGet(context) {
 
   try {
     const { DB } = env;
-    const configuredTtl = Number.parseInt(
-      env.SCHEDULE_CACHE_TTL_SECONDS || "60",
-      10,
-    );
-    const cacheTtl =
-      Number.isFinite(configuredTtl) && configuredTtl >= 0 ? configuredTtl : 60;
+    const configuredTtl = Number.parseInt(env.SCHEDULE_CACHE_TTL_SECONDS || "60", 10);
+    const cacheTtl = Number.isFinite(configuredTtl) && configuredTtl >= 0 ? configuredTtl : 60;
 
     let event;
 
@@ -116,13 +112,7 @@ export async function onRequestGet(context) {
         if (band.social_links) {
           const links = JSON.parse(band.social_links);
           // Prioritize website, then bandcamp, then instagram, etc.
-          primaryUrl =
-            links.website ||
-            links.bandcamp ||
-            links.instagram ||
-            links.facebook ||
-            links.spotify ||
-            null;
+          primaryUrl = links.website || links.bandcamp || links.instagram || links.facebook || links.spotify || null;
         }
       } catch (_) {
         // Ignore JSON parse errors

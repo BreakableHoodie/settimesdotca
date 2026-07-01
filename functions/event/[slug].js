@@ -2,13 +2,7 @@
 // JSON-LD for crawlers. See functions/utils/ssrMeta.js for rationale + fallback.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import {
-  escapeAttr,
-  toPlainText,
-  serveWithInjectedMeta,
-  WATERLOO_ADDRESS,
-  CANONICAL_HOST,
-} from "../utils/ssrMeta.js";
+import { escapeAttr, toPlainText, serveWithInjectedMeta, WATERLOO_ADDRESS, CANONICAL_HOST } from "../utils/ssrMeta.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -69,8 +63,7 @@ export async function onRequest(context) {
   const where = event.city || "Waterloo Region";
   const plainDesc = toPlainText(event.description, 200);
   const description =
-    plainDesc ||
-    `${event.name} — live music in ${where} on SetTimes.${event.date ? ` ${event.date}.` : ""}`;
+    plainDesc || `${event.name} — live music in ${where} on SetTimes.${event.date ? ` ${event.date}.` : ""}`;
 
   const metaTags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
@@ -93,9 +86,7 @@ export async function onRequest(context) {
           name: v.name,
           address: {
             "@type": "PostalAddress",
-            ...(v.address_line1 || v.address
-              ? { streetAddress: v.address_line1 || v.address }
-              : {}),
+            ...(v.address_line1 || v.address ? { streetAddress: v.address_line1 || v.address } : {}),
             addressLocality: v.city || "Waterloo",
             addressRegion: v.region || "ON",
             ...(v.postal_code ? { postalCode: v.postal_code } : {}),

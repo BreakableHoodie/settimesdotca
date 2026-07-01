@@ -6,14 +6,14 @@ describe("admin signup", () => {
   it("creates an inactive user and requires activation", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     env.ALLOW_ADMIN_SIGNUP = "true";
-    
+
     // Create a valid invite code for the test
     const inviteCode = "TEST-INVITE-CODE-123";
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    rawDb.prepare(
-      "INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)"
-    ).run(inviteCode, "editor", expiresAt, 1);
-    
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", expiresAt, 1);
+
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -32,17 +32,15 @@ describe("admin signup", () => {
     expect(payload.success).toBe(true);
     expect(payload.requiresActivation).toBe(true);
     expect(payload.user).toBeUndefined();
-    
+
     // Verify the invite code was marked as used
-    const usedInvite = rawDb
-      .prepare("SELECT * FROM invite_codes WHERE code = ?")
-      .get(inviteCode);
+    const usedInvite = rawDb.prepare("SELECT * FROM invite_codes WHERE code = ?").get(inviteCode);
     expect(usedInvite.used_by_user_id).toBeDefined();
     expect(usedInvite.used_at).toBeDefined();
 
     const createdUser = rawDb
       .prepare(
-        "SELECT email, is_active, activation_token, activation_token_expires_at, activated_at FROM users WHERE email = ?"
+        "SELECT email, is_active, activation_token, activation_token_expires_at, activated_at FROM users WHERE email = ?",
       )
       .get("new.user@example.com");
     expect(createdUser).toBeDefined();
@@ -58,9 +56,9 @@ describe("admin signup", () => {
 
     const expiredCode = "EXPIRED-CODE-123";
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    rawDb.prepare(
-      "INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)"
-    ).run(expiredCode, "editor", yesterday, 1);
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(expiredCode, "editor", yesterday, 1);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",
@@ -85,13 +83,13 @@ describe("admin signup", () => {
     const usedCode = "USED-CODE-456";
     const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     // Insert existing user to reference as used_by_user_id
-    rawDb.prepare("INSERT INTO users (email, password_hash, name, role, is_active) VALUES (?, ?, ?, ?, ?)").run(
-      "existing@example.com", "hash", "Existing", "editor", 1
-    );
+    rawDb
+      .prepare("INSERT INTO users (email, password_hash, name, role, is_active) VALUES (?, ?, ?, ?, ?)")
+      .run("existing@example.com", "hash", "Existing", "editor", 1);
     const existingUser = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("existing@example.com");
-    rawDb.prepare(
-      "INSERT INTO invite_codes (code, role, expires_at, is_active, used_by_user_id) VALUES (?, ?, ?, ?, ?)"
-    ).run(usedCode, "editor", futureDate, 1, existingUser.id);
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active, used_by_user_id) VALUES (?, ?, ?, ?, ?)")
+      .run(usedCode, "editor", futureDate, 1, existingUser.id);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",
@@ -114,9 +112,9 @@ describe("admin signup", () => {
 
     const inviteCode = "INVITE-S6-TEST";
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    rawDb.prepare(
-      "INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)"
-    ).run(inviteCode, "editor", expiresAt, 1);
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", expiresAt, 1);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",

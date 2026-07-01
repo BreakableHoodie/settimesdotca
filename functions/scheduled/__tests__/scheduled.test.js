@@ -3,9 +3,7 @@ import { createTestEnv } from "../../api/test-utils.js";
 
 // Mock announce digest so we can assert it was called without real email I/O.
 vi.mock("../../utils/announceDigest.js", () => ({
-  flushAnnounceDigest: vi.fn(() =>
-    Promise.resolve({ sent: 0, failed: 0, skipped: 0 }),
-  ),
+  flushAnnounceDigest: vi.fn(() => Promise.resolve({ sent: 0, failed: 0, skipped: 0 })),
 }));
 
 import { flushAnnounceDigest } from "../../utils/announceDigest.js";

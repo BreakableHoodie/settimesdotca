@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  createTestEnv,
-  insertEvent,
-  insertBand,
-  insertVenue,
-} from "../test-utils";
+import { createTestEnv, insertEvent, insertBand, insertVenue } from "../test-utils";
 import * as venues from "../venues.js";
 import * as venueDetail from "../venues/[id].js";
 

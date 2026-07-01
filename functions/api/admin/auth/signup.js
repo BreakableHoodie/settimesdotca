@@ -1,17 +1,9 @@
 import { hashPassword } from "../../../utils/crypto.js";
-import {
-  isValidEmail,
-  validatePassword,
-  FIELD_LIMITS,
-} from "../../../utils/validation.js";
+import { isValidEmail, validatePassword, FIELD_LIMITS } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 import { isEmailConfigured, sendEmail } from "../../../utils/email.js";
 import { buildActivationEmail } from "../../../utils/emailTemplates.js";
-import {
-  AUTH_ATTEMPT_TYPES,
-  checkAuthRateLimit,
-  writeAuthAttempt,
-} from "../../../utils/authAttempts.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { logger } from "../../../utils/logger.js";
 import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 
@@ -21,8 +13,7 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const { email, password, name, firstName, lastName, role, inviteCode } =
-      await request.json();
+    const { email, password, name, firstName, lastName, role, inviteCode } = await request.json();
 
     // SECURITY: Require invite code for all signups
     if (!inviteCode) {
@@ -134,8 +125,7 @@ export async function onRequestPost(context) {
       return new Response(
         JSON.stringify({
           error: "Invalid invite code",
-          message:
-            "The invite code is invalid, expired, or has already been used",
+          message: "The invite code is invalid, expired, or has already been used",
         }),
         {
           status: 403,
@@ -158,8 +148,7 @@ export async function onRequestPost(context) {
       return new Response(
         JSON.stringify({
           error: "Email mismatch",
-          message:
-            "This invite code is restricted to a different email address",
+          message: "This invite code is restricted to a different email address",
         }),
         {
           status: 403,
@@ -174,17 +163,11 @@ export async function onRequestPost(context) {
 
     // Ignore any role parameter passed by client to prevent privilege escalation
     if (role === "admin") {
-      console.warn(
-        `Signup attempt with admin role blocked for email: ${email}`,
-      );
+      console.warn(`Signup attempt with admin role blocked for email: ${email}`);
     }
 
     // Check if user already exists
-    const existingUser = await DB.prepare(
-      "SELECT id FROM users WHERE email = ?",
-    )
-      .bind(email)
-      .first();
+    const existingUser = await DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
 
     if (existingUser) {
       return new Response(
@@ -199,16 +182,9 @@ export async function onRequestPost(context) {
       );
     }
 
-    const fallbackName =
-      name !== undefined && name !== null ? String(name).trim() : "";
-    let resolvedFirstName =
-      firstName !== undefined && firstName !== null
-        ? String(firstName).trim()
-        : "";
-    let resolvedLastName =
-      lastName !== undefined && lastName !== null
-        ? String(lastName).trim()
-        : "";
+    const fallbackName = name !== undefined && name !== null ? String(name).trim() : "";
+    let resolvedFirstName = firstName !== undefined && firstName !== null ? String(firstName).trim() : "";
+    let resolvedLastName = lastName !== undefined && lastName !== null ? String(lastName).trim() : "";
 
     if ((!resolvedFirstName || !resolvedLastName) && fallbackName) {
       const parts = fallbackName.split(/\s+/).filter(Boolean);
@@ -238,11 +214,8 @@ export async function onRequestPost(context) {
     // Hash password
     const passwordHash = await hashPassword(password);
 
-    const activationToken =
-      crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
-    const activationExpires = new Date(
-      Date.now() + 24 * 60 * 60 * 1000,
-    ).toISOString();
+    const activationToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+    const activationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     // Create user (inactive until activation)
     const user = await DB.prepare(
@@ -262,9 +235,7 @@ export async function onRequestPost(context) {
       .first();
 
     // Mark invite code as used
-    await DB.prepare(
-      "UPDATE invite_codes SET used_by_user_id = ?, used_at = datetime('now') WHERE code = ?",
-    )
+    await DB.prepare("UPDATE invite_codes SET used_by_user_id = ?, used_at = datetime('now') WHERE code = ?")
       .bind(user.id, inviteCode)
       .run();
 
@@ -304,16 +275,13 @@ export async function onRequestPost(context) {
       });
       logger.debug("activation email delivery attempted", { userId: user.id });
     } else {
-      console.warn(
-        "[Signup] Email not configured; activation email was not sent.",
-      );
+      console.warn("[Signup] Email not configured; activation email was not sent.");
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message:
-          "Account created. Please check your email to activate your account.",
+        message: "Account created. Please check your email to activate your account.",
         requiresActivation: true,
         email: { delivered: !!emailResult?.delivered },
       }),

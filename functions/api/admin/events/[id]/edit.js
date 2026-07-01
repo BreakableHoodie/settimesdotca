@@ -3,91 +3,92 @@
 // Body: { name, date, slug }
 // Returns: { success: true, event: {...} } or error
 
-import { checkPermission, auditLog } from "../../_middleware.js"
-import { getClientIP } from "../../../../utils/request.js"
-import { validateId } from "../../../../utils/validation.js"
+import { checkPermission, auditLog } from "../../_middleware.js";
+import { getClientIP } from "../../../../utils/request.js";
+import { validateId } from "../../../../utils/validation.js";
 
 export async function onRequestPut(context) {
-  const { request, env, params } = context
-  const { DB } = env
-  const { valid, value: eventId, error: idError } = validateId(params.id)
+  const { request, env, params } = context;
+  const { DB } = env;
+  const { valid, value: eventId, error: idError } = validateId(params.id);
   if (!valid) {
-    return new Response(JSON.stringify({ error: idError }), { status: 400, headers: { "Content-Type": "application/json" } })
+    return new Response(JSON.stringify({ error: idError }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-  const ipAddress = getClientIP(request)
+  const ipAddress = getClientIP(request);
 
   try {
-    const auth = await checkPermission(context, "editor")
+    const auth = await checkPermission(context, "editor");
     if (auth.error) {
-      return auth.response
+      return auth.response;
     }
 
-    const body = await request.json().catch(() => ({}))
-    const { name, date, slug, ticket_url } = body
+    const body = await request.json().catch(() => ({}));
+    const { name, date, slug, ticket_url } = body;
 
     // Validation
     if (!name || !date || !slug) {
       return new Response(
         JSON.stringify({
-          error: 'Validation error',
-          message: 'Name, date, and slug are required'
+          error: "Validation error",
+          message: "Name, date, and slug are required",
         }),
         {
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      )
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Validate ticket_url URL if provided
     if (ticket_url && !ticket_url.match(/^https?:\/\//)) {
       return new Response(
         JSON.stringify({
-          error: 'Validation error',
-          message: 'Ticket link must be a valid URL starting with http:// or https://'
+          error: "Validation error",
+          message: "Ticket link must be a valid URL starting with http:// or https://",
         }),
         {
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      )
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Check if event exists
-    const existingEvent = await DB.prepare(
-      'SELECT * FROM events WHERE id = ?'
-    ).bind(eventId).first()
+    const existingEvent = await DB.prepare("SELECT * FROM events WHERE id = ?").bind(eventId).first();
 
     if (!existingEvent) {
       return new Response(
         JSON.stringify({
-          error: 'Not found',
-          message: 'Event not found'
+          error: "Not found",
+          message: "Event not found",
         }),
         {
           status: 404,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      )
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Check if slug is already taken by another event
     if (slug !== existingEvent.slug) {
-      const slugCheck = await DB.prepare(
-        'SELECT id FROM events WHERE slug = ? AND id != ?'
-      ).bind(slug, eventId).first()
+      const slugCheck = await DB.prepare("SELECT id FROM events WHERE slug = ? AND id != ?")
+        .bind(slug, eventId)
+        .first();
 
       if (slugCheck) {
         return new Response(
           JSON.stringify({
-            error: 'Conflict',
-            message: 'An event with this slug already exists'
+            error: "Conflict",
+            message: "An event with this slug already exists",
           }),
           {
             status: 409,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        )
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       }
     }
 
@@ -98,10 +99,10 @@ export async function onRequestPut(context) {
       SET name = ?, date = ?, slug = ?, ticket_url = ?
       WHERE id = ?
       RETURNING *
-    `
+    `,
     )
       .bind(name, date, slug, ticket_url || null, eventId)
-      .first()
+      .first();
 
     await auditLog(
       env,
@@ -115,31 +116,31 @@ export async function onRequestPut(context) {
         slug,
         ticket_url: ticket_url || null,
       },
-      ipAddress
-    )
+      ipAddress,
+    );
 
     return new Response(
       JSON.stringify({
         success: true,
         event: result,
-        message: 'Event updated successfully'
+        message: "Event updated successfully",
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    )
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
-    console.error('Event edit error:', error)
+    console.error("Event edit error:", error);
     return new Response(
       JSON.stringify({
-        error: 'Database error',
-        message: 'Failed to update event'
+        error: "Database error",
+        message: "Failed to update event",
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    )
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }

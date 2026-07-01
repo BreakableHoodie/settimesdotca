@@ -46,28 +46,19 @@ describe("POST /api/internal/run-scheduled", () => {
   });
 
   it("returns 401 when Bearer token is wrong", async () => {
-    const ctx = makeContext(
-      makeRequest({ Authorization: "Bearer wrong-secret" }),
-      { CRON_SECRET: SECRET },
-    );
+    const ctx = makeContext(makeRequest({ Authorization: "Bearer wrong-secret" }), { CRON_SECRET: SECRET });
     const res = await onRequestPost(ctx);
     expect(res.status).toBe(401);
   });
 
   it("returns 401 when X-Cron-Secret header has wrong token", async () => {
-    const ctx = makeContext(
-      makeRequest({ "X-Cron-Secret": "not-the-secret" }),
-      { CRON_SECRET: SECRET },
-    );
+    const ctx = makeContext(makeRequest({ "X-Cron-Secret": "not-the-secret" }), { CRON_SECRET: SECRET });
     const res = await onRequestPost(ctx);
     expect(res.status).toBe(401);
   });
 
   it("returns 200 and invokes scheduled handler when Bearer token is correct", async () => {
-    const ctx = makeContext(
-      makeRequest({ Authorization: `Bearer ${SECRET}` }),
-      { CRON_SECRET: SECRET },
-    );
+    const ctx = makeContext(makeRequest({ Authorization: `Bearer ${SECRET}` }), { CRON_SECRET: SECRET });
     const res = await onRequestPost(ctx);
     expect(res.status).toBe(200);
     const body = await res.json();

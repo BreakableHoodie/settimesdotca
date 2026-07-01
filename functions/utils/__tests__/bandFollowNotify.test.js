@@ -7,12 +7,7 @@ vi.mock("../email.js", () => ({
 import { sendEmail } from "../email.js";
 import { notifyBandFollowers } from "../bandFollowNotify.js";
 import * as loggerModule from "../logger.js";
-import {
-  createTestEnv,
-  insertEvent,
-  insertVenue,
-  insertBand,
-} from "../../api/test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
 
 describe("notifyBandFollowers", () => {
   afterEach(() => {
@@ -30,20 +25,14 @@ describe("notifyBandFollowers", () => {
     const bandProfileId = perf.band_profile_id;
 
     const f1 = rawDb
-      .prepare(
-        "INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)",
-      )
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
       .run("a@example.com", bandProfileId, "tok-a").lastInsertRowid;
     const f2 = rawDb
-      .prepare(
-        "INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)",
-      )
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
       .run("b@example.com", bandProfileId, "tok-b").lastInsertRowid;
 
     // First delivers, second fails.
-    sendEmail.mockImplementation((_env, { to }) =>
-      Promise.resolve({ delivered: to === "a@example.com" }),
-    );
+    sendEmail.mockImplementation((_env, { to }) => Promise.resolve({ delivered: to === "a@example.com" }));
 
     const result = await notifyBandFollowers(env, env.DB, {
       performanceId: perf.id,
@@ -59,9 +48,7 @@ describe("notifyBandFollowers", () => {
     expect(result).toEqual({ sent: 1, failed: 1 });
 
     const notified = rawDb
-      .prepare(
-        "SELECT band_follow_id FROM band_follow_notifications WHERE performance_id = ? ORDER BY band_follow_id",
-      )
+      .prepare("SELECT band_follow_id FROM band_follow_notifications WHERE performance_id = ? ORDER BY band_follow_id")
       .all(perf.id);
     expect(notified.map((r) => r.band_follow_id)).toEqual([f1]);
   });
@@ -78,16 +65,12 @@ describe("notifyBandFollowers", () => {
     const bandProfileId = perf.band_profile_id;
 
     const fId = rawDb
-      .prepare(
-        "INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)",
-      )
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
       .run("fan@example.com", bandProfileId, "tok").lastInsertRowid;
 
     // Pre-claim the follower as if another concurrent request already did
     rawDb
-      .prepare(
-        "INSERT INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)",
-      )
+      .prepare("INSERT INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)")
       .run(perf.id, fId);
 
     sendEmail.mockReset();
@@ -98,9 +81,7 @@ describe("notifyBandFollowers", () => {
       bandProfileId,
       bandName: "Band",
       eventName: "Test",
-      followers: [
-        { id: fId, email: "fan@example.com", unsubscribe_token: "tok" },
-      ],
+      followers: [{ id: fId, email: "fan@example.com", unsubscribe_token: "tok" }],
     });
 
     expect(result).toEqual({ sent: 0, failed: 1 });
@@ -120,9 +101,7 @@ describe("notifyBandFollowers", () => {
     const bandProfileId = perf.band_profile_id;
 
     const fId = rawDb
-      .prepare(
-        "INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)",
-      )
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
       .run("fan@example.com", bandProfileId, "tok").lastInsertRowid;
 
     sendEmail.mockReset();
@@ -135,9 +114,7 @@ describe("notifyBandFollowers", () => {
       bandProfileId,
       bandName: "Band",
       eventName: "Test",
-      followers: [
-        { id: fId, email: "fan@example.com", unsubscribe_token: "tok" },
-      ],
+      followers: [{ id: fId, email: "fan@example.com", unsubscribe_token: "tok" }],
     });
 
     expect(result.failed).toBeGreaterThan(0);
@@ -162,9 +139,7 @@ describe("notifyBandFollowers", () => {
     const bandProfileId = perf.band_profile_id;
 
     const fId = rawDb
-      .prepare(
-        "INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)",
-      )
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
       .run("fan@example.com", bandProfileId, "tok").lastInsertRowid;
 
     sendEmail.mockReset();
@@ -175,18 +150,14 @@ describe("notifyBandFollowers", () => {
       bandProfileId,
       bandName: "Band",
       eventName: "Test",
-      followers: [
-        { id: fId, email: "fan@example.com", unsubscribe_token: "tok" },
-      ],
+      followers: [{ id: fId, email: "fan@example.com", unsubscribe_token: "tok" }],
     });
 
     expect(result).toEqual({ sent: 0, failed: 1 });
 
     // The claim row should have been deleted — resend will pick up this follower
     const rows = rawDb
-      .prepare(
-        "SELECT id FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?",
-      )
+      .prepare("SELECT id FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
       .all(perf.id, fId);
     expect(rows).toHaveLength(0);
   });

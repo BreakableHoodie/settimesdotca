@@ -18,7 +18,6 @@ export async function onRequestGet(context) {
   const ipAddress = getClientIP(request);
 
   try {
-
     // Total subscriptions
     const { results: total } = await DB.prepare(
       `
@@ -99,10 +98,7 @@ export async function onRequestGet(context) {
         by_frequency: byFrequency,
         growth_30_days: growth,
         total_unsubscribes: unsubscribes[0].count,
-        unsubscribe_rate:
-          total[0].count > 0
-            ? ((unsubscribes[0].count / total[0].count) * 100).toFixed(2) + "%"
-            : "0%",
+        unsubscribe_rate: total[0].count > 0 ? ((unsubscribes[0].count / total[0].count) * 100).toFixed(2) + "%" : "0%",
       }),
       {
         headers: { "Content-Type": "application/json" },
@@ -110,12 +106,9 @@ export async function onRequestGet(context) {
     );
   } catch (error) {
     console.error("Analytics error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch analytics" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch analytics" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

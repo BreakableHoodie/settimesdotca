@@ -1,11 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { onRequestGet } from "../[id].js";
-import {
-  createTestEnv,
-  insertEvent,
-  insertVenue,
-  insertBand,
-} from "../../test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 
 describe("GET /api/venues/:id — reveal_mode gate", () => {
   // Use a far-future date so performances land in the "upcoming" bucket.
@@ -21,17 +16,13 @@ describe("GET /api/venues/:id — reveal_mode gate", () => {
       slug: "venue-reveal-hidden",
       date: futureDate,
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Hidden Venue Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=0 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=0 WHERE id=?").run(perf.id);
 
     const response = await onRequestGet({
       env,
@@ -54,17 +45,13 @@ describe("GET /api/venues/:id — reveal_mode gate", () => {
       slug: "venue-reveal-shown",
       date: futureDate,
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Revealed Venue Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=1 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=1 WHERE id=?").run(perf.id);
 
     const response = await onRequestGet({
       env,
@@ -87,17 +74,13 @@ describe("GET /api/venues/:id — reveal_mode gate", () => {
       slug: "venue-reveal-mode0",
       date: futureDate,
     });
-    rawDb
-      .prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?")
-      .run(event.id);
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Normal Venue Band",
       event_id: event.id,
       venue_id: venue.id,
     });
-    rawDb
-      .prepare("UPDATE performances SET is_announced=0 WHERE id=?")
-      .run(perf.id);
+    rawDb.prepare("UPDATE performances SET is_announced=0 WHERE id=?").run(perf.id);
 
     const response = await onRequestGet({
       env,

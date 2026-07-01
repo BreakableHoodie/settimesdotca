@@ -11,11 +11,7 @@ import { logger } from "./logger.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
 import { escapeHtml } from "./html.js";
 
-export async function notifyBandFollowers(
-  env,
-  DB,
-  { performanceId, bandProfileId, bandName, eventName, followers },
-) {
+export async function notifyBandFollowers(env, DB, { performanceId, bandProfileId, bandName, eventName, followers }) {
   const publicUrl = getPublicBaseUrl(env);
 
   const results = await Promise.allSettled(
@@ -44,9 +40,7 @@ export async function notifyBandFollowers(
       const delivered = result?.delivered === true;
       if (!delivered) {
         // Email failed — release the claim so a future resend can retry.
-        await DB.prepare(
-          "DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?",
-        )
+        await DB.prepare("DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
           .bind(performanceId, follower.id)
           .run();
       }

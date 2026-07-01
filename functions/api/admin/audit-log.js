@@ -76,8 +76,7 @@ export async function onRequestGet(context) {
       params.push(resourceType);
     }
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     // Get total count
     const countQuery = `
@@ -144,12 +143,9 @@ export async function onRequestGet(context) {
     );
   } catch (error) {
     console.error("Get audit log error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch audit log" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch audit log" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

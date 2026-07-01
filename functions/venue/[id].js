@@ -60,17 +60,13 @@ export async function onRequest(context) {
     url,
     address: {
       "@type": "PostalAddress",
-      ...(venue.address_line1 || venue.address
-        ? { streetAddress: venue.address_line1 || venue.address }
-        : {}),
+      ...(venue.address_line1 || venue.address ? { streetAddress: venue.address_line1 || venue.address } : {}),
       addressLocality: locality,
       addressRegion: venue.region || "ON",
       ...(venue.postal_code ? { postalCode: venue.postal_code } : {}),
       addressCountry: "CA",
     },
-    ...(hasGeo
-      ? { geo: { "@type": "GeoCoordinates", latitude: venue.latitude, longitude: venue.longitude } }
-      : {}),
+    ...(hasGeo ? { geo: { "@type": "GeoCoordinates", latitude: venue.latitude, longitude: venue.longitude } } : {}),
     ...(venue.phone ? { telephone: venue.phone } : {}),
     ...(sameAs.length > 0 ? { sameAs } : {}),
   };

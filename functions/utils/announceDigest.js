@@ -68,13 +68,7 @@ export async function flushAnnounceDigest(env, DB) {
 
     // Delete every queue entry for this group — whether claimed now or
     // already handled by a concurrent path.
-    await DB.batch(
-      items.map((item) =>
-        DB.prepare("DELETE FROM band_announce_queue WHERE id = ?").bind(
-          item.id,
-        ),
-      ),
-    );
+    await DB.batch(items.map((item) => DB.prepare("DELETE FROM band_announce_queue WHERE id = ?").bind(item.id)));
 
     if (!claimed.length) {
       skipped += items.length;
@@ -135,9 +129,10 @@ export async function flushAnnounceDigest(env, DB) {
       // Release claims so resend-announcement can recover this fan.
       await DB.batch(
         task.claimed.map((item) =>
-          DB.prepare(
-            "DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?",
-          ).bind(item.performance_id, item.band_follow_id),
+          DB.prepare("DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?").bind(
+            item.performance_id,
+            item.band_follow_id,
+          ),
         ),
       );
       failed++;

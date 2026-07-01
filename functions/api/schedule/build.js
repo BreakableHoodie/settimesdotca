@@ -27,39 +27,33 @@ export async function onRequestPost(context) {
           : [];
 
     if (!Number.isFinite(eventId)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid event_id" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Invalid event_id" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    if (
-      !userSession ||
-      userSession.length > MAX_USER_SESSION_LENGTH ||
-      !isSafeSessionId(userSession)
-    ) {
-      return new Response(
-        JSON.stringify({ error: "Invalid user_session" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+    if (!userSession || userSession.length > MAX_USER_SESSION_LENGTH || !isSafeSessionId(userSession)) {
+      return new Response(JSON.stringify({ error: "Invalid user_session" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (performanceIdsInput.length > MAX_PERFORMANCE_IDS) {
-      return new Response(
-        JSON.stringify({ error: "Too many performance_ids provided" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Too many performance_ids provided" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const performanceIds = performanceIdsInput
-      .map((id) => Number(id))
-      .filter((id) => Number.isFinite(id));
+    const performanceIds = performanceIdsInput.map((id) => Number(id)).filter((id) => Number.isFinite(id));
 
     if (performanceIds.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No performance_ids provided" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "No performance_ids provided" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const statements = performanceIds.map((performanceId) =>
@@ -96,9 +90,9 @@ export async function onRequestPost(context) {
     });
   } catch (error) {
     console.error("Schedule build tracking error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to record schedule build" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to record schedule build" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

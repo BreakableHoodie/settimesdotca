@@ -76,16 +76,19 @@ function getRateLimitBindings(scope, { email, ipAddress, userId, attemptType, wi
   throw new Error(`Unsupported auth rate-limit scope: ${scope}`);
 }
 
-export async function checkAuthRateLimit(DB, {
-  attemptType,
-  email = null,
-  ipAddress,
-  maxFailures = DEFAULT_MAX_FAILURES,
-  scope,
-  userId = null,
-  windowMs = DEFAULT_WINDOW_MS,
-}) {
-  if (scope === 'email' && !email) {
+export async function checkAuthRateLimit(
+  DB,
+  {
+    attemptType,
+    email = null,
+    ipAddress,
+    maxFailures = DEFAULT_MAX_FAILURES,
+    scope,
+    userId = null,
+    windowMs = DEFAULT_WINDOW_MS,
+  },
+) {
+  if (scope === "email" && !email) {
     throw new Error(`checkAuthRateLimit: email is required for scope "email"`);
   }
 
@@ -105,7 +108,7 @@ export async function checkAuthRateLimit(DB, {
 
   if (Number(attempts.count) >= maxFailures) {
     const earliestTs = attempts.earliest_attempt
-      ? new Date(attempts.earliest_attempt.replace(' ', 'T') + 'Z').getTime()
+      ? new Date(attempts.earliest_attempt.replace(" ", "T") + "Z").getTime()
       : Date.now();
     const elapsed = Date.now() - earliestTs;
     const remainingMs = Math.max(0, windowMs - elapsed);
@@ -120,27 +123,22 @@ export async function checkAuthRateLimit(DB, {
   return { allowed: true };
 }
 
-export async function writeAuthAttempt(DB, {
-  attemptType,
-  email = null,
-  failureReason = null,
-  ipAddress = "unknown",
-  success,
-  userAgent = "unknown",
-  userId = null,
-}) {
+export async function writeAuthAttempt(
+  DB,
+  {
+    attemptType,
+    email = null,
+    failureReason = null,
+    ipAddress = "unknown",
+    success,
+    userAgent = "unknown",
+    userId = null,
+  },
+) {
   await DB.prepare(
     `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
-    .bind(
-      userId,
-      email,
-      ipAddress,
-      userAgent,
-      attemptType,
-      success ? 1 : 0,
-      failureReason,
-    )
+    .bind(userId, email, ipAddress, userAgent, attemptType, success ? 1 : 0, failureReason)
     .run();
 }

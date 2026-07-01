@@ -60,18 +60,8 @@ export async function onRequestPut(context) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const {
-      name,
-      address,
-      address_line1,
-      address_line2,
-      city,
-      region,
-      postal_code,
-      country,
-      phone,
-      contact_email,
-    } = body;
+    const { name, address, address_line1, address_line2, city, region, postal_code, country, phone, contact_email } =
+      body;
 
     const trimmedName = name ? sanitizeString(name) : "";
 
@@ -222,23 +212,12 @@ export async function onRequestPut(context) {
 
     // Update venue
     const nextAddressLine1 =
-      address_line1 !== undefined
-        ? address_line1 || null
-        : address
-          ? address.trim()
-          : venue.address_line1 || null;
-    const nextAddressLine2 =
-      address_line2 !== undefined
-        ? address_line2 || null
-        : venue.address_line2 || null;
+      address_line1 !== undefined ? address_line1 || null : address ? address.trim() : venue.address_line1 || null;
+    const nextAddressLine2 = address_line2 !== undefined ? address_line2 || null : venue.address_line2 || null;
     const nextCity = city !== undefined ? city || null : venue.city || null;
     const nextRegion = region !== undefined ? region || null : venue.region || null;
-    const nextPostal =
-      postal_code !== undefined
-        ? normalizePostalCode(postal_code)
-        : venue.postal_code || null;
-    const nextCountry =
-      country !== undefined ? country || null : venue.country || null;
+    const nextPostal = postal_code !== undefined ? normalizePostalCode(postal_code) : venue.postal_code || null;
+    const nextCountry = country !== undefined ? country || null : venue.country || null;
 
     const formattedAddress =
       formatVenueAddress({
@@ -440,7 +419,7 @@ export async function onRequestDelete(context) {
     return new Response(
       JSON.stringify({
         error: "Database error",
-        message: "Failed to delete venue"
+        message: "Failed to delete venue",
       }),
       {
         status: 500,

@@ -7,21 +7,18 @@ import { validate as validateEmail } from "email-validator";
  * UUID validation regex (RFC 4122 compliant)
  * Validates UUID v1-5 format
  */
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * ISO 8601 date format regex
  * Matches YYYY-MM-DD and full ISO datetime formats
  */
-const ISO_DATE_REGEX =
-  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/;
 
 /**
  * Postal code regex (supports US ZIP and Canadian postal codes)
  */
-const POSTAL_CODE_REGEX =
-  /^(?:\d{5}(?:-\d{4})?|[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d)$/;
+const POSTAL_CODE_REGEX = /^(?:\d{5}(?:-\d{4})?|[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d)$/;
 
 /**
  * Phone number regex (permissive, digits + formatting)
@@ -1134,9 +1131,7 @@ export const VALIDATION_SCHEMAS = {
           requireNumber: true,
           requireSpecial: true,
         });
-        return result.valid
-          ? { valid: true }
-          : { valid: false, error: result.errors[0] };
+        return result.valid ? { valid: true } : { valid: false, error: result.errors[0] };
       },
     },
     firstName: {

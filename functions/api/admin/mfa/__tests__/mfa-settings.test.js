@@ -90,9 +90,7 @@ describe("admin mfa settings", () => {
     const enablePayload = await enableRes.json();
     expect(enablePayload.backupCodes?.length).toBeGreaterThan(0);
 
-    const user = rawDb
-      .prepare("SELECT totp_enabled, backup_codes FROM users WHERE id = 1")
-      .get();
+    const user = rawDb.prepare("SELECT totp_enabled, backup_codes FROM users WHERE id = 1").get();
     expect(user.totp_enabled).toBe(1);
     expect(user.backup_codes).toBeTruthy();
   });
@@ -149,9 +147,7 @@ describe("admin mfa settings", () => {
       .get(1, AUTH_ATTEMPT_TYPES.mfaDisable);
     expect(disableAttempt.success).toBe(1);
 
-    const user = rawDb
-      .prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = 1")
-      .get();
+    const user = rawDb.prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = 1").get();
     expect(user.totp_enabled).toBe(0);
     expect(user.totp_secret).toBeNull();
   });

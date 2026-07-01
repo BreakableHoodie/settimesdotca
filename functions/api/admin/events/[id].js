@@ -82,9 +82,7 @@ export async function onRequestPatch(context) {
     }
 
     // Get current event
-    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`)
-      .bind(eventId)
-      .first();
+    const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(eventId).first();
 
     if (!event) {
       return new Response(
@@ -103,18 +101,8 @@ export async function onRequestPatch(context) {
     if (body.ticketLink && !body.ticket_url) {
       body.ticket_url = body.ticketLink;
     }
-    const {
-      name,
-      date,
-      end_date,
-      status,
-      description,
-      city,
-      ticket_url,
-      venue_info,
-      social_links,
-      theme_colors,
-    } = body;
+    const { name, date, end_date, status, description, city, ticket_url, venue_info, social_links, theme_colors } =
+      body;
 
     // Build update query dynamically based on provided fields
     const updates = [];
@@ -153,10 +141,10 @@ export async function onRequestPatch(context) {
     if (date !== undefined) {
       const dateResult = validateDate(date);
       if (!dateResult.valid) {
-        return new Response(
-          JSON.stringify({ error: "Validation error", message: dateResult.error }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ error: "Validation error", message: dateResult.error }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
       }
       updates.push("date = ?");
       params.push(date);
@@ -167,10 +155,10 @@ export async function onRequestPatch(context) {
       if (normalizedEndDate !== null) {
         const endDateResult = validateDate(normalizedEndDate);
         if (!endDateResult.valid) {
-          return new Response(
-            JSON.stringify({ error: "Validation error", message: endDateResult.error }),
-            { status: 400, headers: { "Content-Type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ error: "Validation error", message: endDateResult.error }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
         }
         const effectiveStartDate = date ?? event.date;
         if (normalizedEndDate < effectiveStartDate) {
@@ -393,9 +381,7 @@ export async function onRequestPatch(context) {
     }
 
     // Execute update
-    const result = await DB.prepare(
-      `UPDATE events SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
-    )
+    const result = await DB.prepare(`UPDATE events SET ${updates.join(", ")} WHERE id = ? RETURNING *`)
       .bind(...params)
       .first();
 
@@ -585,9 +571,7 @@ export async function onRequestDelete(context) {
     }
 
     // Check if event exists
-    const event = await DB.prepare("SELECT id, name FROM events WHERE id = ?")
-      .bind(eventIdNum)
-      .first();
+    const event = await DB.prepare("SELECT id, name FROM events WHERE id = ?").bind(eventIdNum).first();
 
     if (!event) {
       return new Response(JSON.stringify({ error: "Event not found" }), {
@@ -597,17 +581,13 @@ export async function onRequestDelete(context) {
     }
 
     // Check if event has any bands (for informational message)
-    const bandCount = await DB.prepare(
-      "SELECT COUNT(*) as count FROM performances WHERE event_id = ?",
-    )
+    const bandCount = await DB.prepare("SELECT COUNT(*) as count FROM performances WHERE event_id = ?")
       .bind(eventIdNum)
       .first();
 
     const body = await request.json().catch(() => ({}));
     const url = new URL(request.url);
-    const confirmCascade =
-      body?.confirmCascade === true ||
-      url.searchParams.get("confirmCascade") === "true";
+    const confirmCascade = body?.confirmCascade === true || url.searchParams.get("confirmCascade") === "true";
 
     if (bandCount.count > 0 && !confirmCascade) {
       return new Response(

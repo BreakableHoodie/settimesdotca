@@ -14,14 +14,9 @@ export async function onRequestPost(context) {
   await env.DB.prepare(
     `UPDATE lucia_sessions
      SET ip_address = ?, user_agent = ?, remember_me = ?
-     WHERE id = ?`
+     WHERE id = ?`,
   )
-    .bind(
-      request.headers.get("CF-Connecting-IP"),
-      request.headers.get("User-Agent"),
-      0,
-      newSession.id
-    )
+    .bind(request.headers.get("CF-Connecting-IP"), request.headers.get("User-Agent"), 0, newSession.id)
     .run();
 
   const csrfToken = generateCSRFToken(request, env, newSession.id);
@@ -35,6 +30,6 @@ export async function onRequestPost(context) {
       success: true,
       message: "All other sessions revoked",
     }),
-    { headers }
+    { headers },
   );
 }

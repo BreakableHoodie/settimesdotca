@@ -13,10 +13,7 @@ const TRUSTED_DEVICE_EXPIRY_DAYS = 30;
  */
 async function sha256Hex(input) {
   const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest(
-    "SHA-256",
-    encoder.encode(input),
-  );
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(input));
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -73,9 +70,7 @@ export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
   // TEXT comparisons against datetime('now') are lexicographically correct.
   // ISO 8601 with 'T' compares greater than space-separated format at the
   // same instant, which would allow expired devices to pass validation.
-  const expiresAt = new Date(
-    Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
-  )
+  const expiresAt = new Date(Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
     .toISOString()
     .replace("T", " ")
     .slice(0, 19);
@@ -84,15 +79,7 @@ export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
     `INSERT INTO trusted_devices (user_id, token, device_fingerprint, ua_hash, ip_address, user_agent, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
-    .bind(
-      userId,
-      tokenHash,
-      fingerprint,
-      uaHash,
-      ipAddress,
-      userAgent,
-      expiresAt,
-    )
+    .bind(userId, tokenHash, fingerprint, uaHash, ipAddress, userAgent, expiresAt)
     .run();
 
   return { token, expiresAt };
@@ -135,16 +122,10 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
   //      password-authenticated login — it is not a standalone credential.
   // If the threat model tightens (e.g. admin-only high-value accounts), revisit
   // by adding IP-range/ASN checks rather than exact-IP pinning.
-  const currentFingerprint = await generateDeviceFingerprint(
-    ipAddress,
-    userAgent,
-  );
+  const currentFingerprint = await generateDeviceFingerprint(ipAddress, userAgent);
   const currentUaHash = await generateUaHash(userAgent);
 
-  const fingerprintMatch = timingSafeStringEqual(
-    device.device_fingerprint,
-    currentFingerprint,
-  );
+  const fingerprintMatch = timingSafeStringEqual(device.device_fingerprint, currentFingerprint);
 
   if (device.ua_hash) {
     const uaMatch = timingSafeStringEqual(device.ua_hash, currentUaHash);
@@ -157,10 +138,7 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
     if (!fingerprintMatch) {
       // UA matches but IP changed — normal for DHCP, mobile, VPN users.
       // Fingerprint is refreshed in the update below.
-      logger.debug(
-        "trusted device IP changed for known UA, refreshing fingerprint",
-        { userId: device.user_id },
-      );
+      logger.debug("trusted device IP changed for known UA, refreshing fingerprint", { userId: device.user_id });
     }
   } else if (!fingerprintMatch) {
     logger.debug("trusted device fingerprint mismatch, device not trusted", {
@@ -184,27 +162,21 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
  */
 export async function revokeTrustedDevice(DB, token) {
   const tokenHash = await hashTrustedDeviceToken(token);
-  await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`)
-    .bind(tokenHash)
-    .run();
+  await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`).bind(tokenHash).run();
 }
 
 /**
  * Remove all trusted devices for a user (e.g., on password change)
  */
 export async function revokeAllTrustedDevices(DB, userId) {
-  await DB.prepare(`DELETE FROM trusted_devices WHERE user_id = ?`)
-    .bind(userId)
-    .run();
+  await DB.prepare(`DELETE FROM trusted_devices WHERE user_id = ?`).bind(userId).run();
 }
 
 /**
  * Clean up expired trusted devices
  */
 export async function cleanupExpiredDevices(DB) {
-  await DB.prepare(
-    `DELETE FROM trusted_devices WHERE expires_at <= datetime('now')`,
-  ).run();
+  await DB.prepare(`DELETE FROM trusted_devices WHERE expires_at <= datetime('now')`).run();
 }
 
 /**
@@ -213,18 +185,10 @@ export async function cleanupExpiredDevices(DB) {
  */
 export function createTrustedDeviceCookie(token, request, env) {
   const isDev = isDevRequest(request, env);
-  const cookieName = isDev
-    ? TRUSTED_DEVICE_COOKIE_NAME_DEV
-    : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
+  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
   const maxAge = TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60;
 
-  const parts = [
-    `${cookieName}=${token}`,
-    `Path=/`,
-    `Max-Age=${maxAge}`,
-    `SameSite=Strict`,
-    `HttpOnly`,
-  ];
+  const parts = [`${cookieName}=${token}`, `Path=/`, `Max-Age=${maxAge}`, `SameSite=Strict`, `HttpOnly`];
 
   if (!isDev) {
     parts.push("Secure");
@@ -238,9 +202,7 @@ export function createTrustedDeviceCookie(token, request, env) {
  */
 export function deleteTrustedDeviceCookie(request, env) {
   const isDev = isDevRequest(request, env);
-  const cookieName = isDev
-    ? TRUSTED_DEVICE_COOKIE_NAME_DEV
-    : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
+  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
   const secure = isDev ? "" : "Secure; ";
 
   return `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
@@ -256,10 +218,7 @@ export function getTrustedDeviceToken(request) {
   const cookies = cookieHeader.split(";");
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split("=");
-    if (
-      name === TRUSTED_DEVICE_COOKIE_NAME_SECURE ||
-      name === TRUSTED_DEVICE_COOKIE_NAME_DEV
-    ) {
+    if (name === TRUSTED_DEVICE_COOKIE_NAME_SECURE || name === TRUSTED_DEVICE_COOKIE_NAME_DEV) {
       return value;
     }
   }

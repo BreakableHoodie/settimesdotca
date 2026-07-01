@@ -27,20 +27,10 @@ export async function onRequestGet(context) {
     // Parse query parameters
     const url = new URL(request.url);
     const showArchived = url.searchParams.get("archived") === "true";
-    const requestedLimit = Number.parseInt(
-      url.searchParams.get("limit") || "1000",
-      10,
-    );
-    const requestedOffset = Number.parseInt(
-      url.searchParams.get("offset") || "0",
-      10,
-    );
-    const limit = Number.isFinite(requestedLimit)
-      ? Math.min(Math.max(requestedLimit, 1), 1000)
-      : 1000;
-    const offset = Number.isFinite(requestedOffset)
-      ? Math.max(requestedOffset, 0)
-      : 0;
+    const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "1000", 10);
+    const requestedOffset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 1000) : 1000;
+    const offset = Number.isFinite(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
 
     // Build query based on archived filter
     let query = `
@@ -173,9 +163,7 @@ export async function onRequestPost(context) {
     }
 
     if (end_date && end_date < date) {
-      return validationErrorResponse(
-        "End date must be on or after the event start date",
-      );
+      return validationErrorResponse("End date must be on or after the event start date");
     }
 
     // Check if slug already exists

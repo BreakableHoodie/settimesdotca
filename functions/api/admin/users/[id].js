@@ -11,10 +11,10 @@ export async function onRequestPatch(context) {
   const { DB } = env;
   const userId = Number(params.id);
   if (!Number.isInteger(userId) || userId < 1) {
-    return new Response(
-      JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   const ipAddress = getClientIP(request);
 
@@ -31,9 +31,7 @@ export async function onRequestPatch(context) {
     const body = await request.json().catch(() => ({}));
     const { role, name, firstName, lastName, isActive } = body;
     const allowedFields = new Set(["role", "name", "firstName", "lastName", "isActive"]);
-    const unknownFields = Object.keys(body || {}).filter(
-      key => !allowedFields.has(key),
-    );
+    const unknownFields = Object.keys(body || {}).filter((key) => !allowedFields.has(key));
     if (unknownFields.length) {
       return new Response(
         JSON.stringify({
@@ -102,8 +100,7 @@ export async function onRequestPatch(context) {
           return new Response(
             JSON.stringify({
               error: "Cannot modify last admin",
-              message:
-                "Cannot remove admin role from the last active admin user",
+              message: "Cannot remove admin role from the last active admin user",
             }),
             {
               status: 400,
@@ -118,10 +115,8 @@ export async function onRequestPatch(context) {
     }
 
     if (firstName !== undefined || lastName !== undefined) {
-      const nextFirstName =
-        firstName !== undefined ? String(firstName).trim() : user.first_name || "";
-      const nextLastName =
-        lastName !== undefined ? String(lastName).trim() : user.last_name || "";
+      const nextFirstName = firstName !== undefined ? String(firstName).trim() : user.first_name || "";
+      const nextLastName = lastName !== undefined ? String(lastName).trim() : user.last_name || "";
 
       if (!nextFirstName) {
         return new Response(
@@ -265,10 +260,7 @@ export async function onRequestPatch(context) {
     return new Response(
       JSON.stringify({
         ...updatedUser,
-        name:
-          updatedUser.name ||
-          [updatedUser.first_name, updatedUser.last_name].filter(Boolean).join(" ") ||
-          null,
+        name: updatedUser.name || [updatedUser.first_name, updatedUser.last_name].filter(Boolean).join(" ") || null,
         firstName: updatedUser.first_name || null,
         lastName: updatedUser.last_name || null,
         isActive: updatedUser.is_active === 1,
@@ -293,10 +285,10 @@ export async function onRequestDelete(context) {
   const { DB } = env;
   const userId = Number(params.id);
   if (!Number.isInteger(userId) || userId < 1) {
-    return new Response(
-      JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   const ipAddress = getClientIP(request);
 
@@ -378,35 +370,21 @@ export async function onRequestDelete(context) {
 
     const cleanupStmts = [
       // Delink from Events
-      DB.prepare(
-        "UPDATE events SET created_by_user_id = NULL WHERE created_by_user_id = ?",
-      ).bind(userId),
-      DB.prepare(
-        "UPDATE events SET updated_by_user_id = NULL WHERE updated_by_user_id = ?",
-      ).bind(userId),
+      DB.prepare("UPDATE events SET created_by_user_id = NULL WHERE created_by_user_id = ?").bind(userId),
+      DB.prepare("UPDATE events SET updated_by_user_id = NULL WHERE updated_by_user_id = ?").bind(userId),
 
       // Delink from Venues
-      DB.prepare(
-        "UPDATE venues SET created_by_user_id = NULL WHERE created_by_user_id = ?",
-      ).bind(userId),
-      DB.prepare(
-        "UPDATE venues SET updated_by_user_id = NULL WHERE updated_by_user_id = ?",
-      ).bind(userId),
+      DB.prepare("UPDATE venues SET created_by_user_id = NULL WHERE created_by_user_id = ?").bind(userId),
+      DB.prepare("UPDATE venues SET updated_by_user_id = NULL WHERE updated_by_user_id = ?").bind(userId),
 
       // Delink from Bands
-      DB.prepare(
-        "UPDATE band_profiles SET created_by_user_id = NULL WHERE created_by_user_id = ?",
-      ).bind(userId),
+      DB.prepare("UPDATE band_profiles SET created_by_user_id = NULL WHERE created_by_user_id = ?").bind(userId),
       // band_profiles doesn't have updated_by_user_id in v2 schema generally, but let's check schema to be safe
       // Schema says: updated_at TEXT NOT NULL DEFAULT (datetime('now')) - No updated_by_user_id column logic in schema provided
 
       // Delink from Performances
-      DB.prepare(
-        "UPDATE performances SET created_by_user_id = NULL WHERE created_by_user_id = ?",
-      ).bind(userId),
-      DB.prepare(
-        "UPDATE performances SET updated_by_user_id = NULL WHERE updated_by_user_id = ?",
-      ).bind(userId),
+      DB.prepare("UPDATE performances SET created_by_user_id = NULL WHERE created_by_user_id = ?").bind(userId),
+      DB.prepare("UPDATE performances SET updated_by_user_id = NULL WHERE updated_by_user_id = ?").bind(userId),
 
       // Delete the user - this will trigger ON DELETE CASCADE for sessions/tokens
       DB.prepare("DELETE FROM users WHERE id = ?").bind(userId),

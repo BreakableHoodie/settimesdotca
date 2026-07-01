@@ -44,8 +44,7 @@ export async function onRequestPost(context) {
   const genericResponse = new Response(
     JSON.stringify({
       success: true,
-      message:
-        "If an inactive account exists with this email, an activation link has been sent.",
+      message: "If an inactive account exists with this email, an activation link has been sent.",
     }),
     {
       status: 200,
@@ -72,11 +71,8 @@ export async function onRequestPost(context) {
       return genericResponse;
     }
 
-    const activationToken =
-      crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
-    const activationExpires = new Date(
-      Date.now() + 24 * 60 * 60 * 1000,
-    ).toISOString();
+    const activationToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+    const activationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     try {
       await DB.prepare(
@@ -94,10 +90,7 @@ export async function onRequestPost(context) {
       // enumeration resistance), but a failed token write is infrastructural,
       // not a benign not-found/already-active branch — log it distinctly so it
       // is alertable rather than hidden behind the generic 200.
-      console.error(
-        "[ResendActivation] activation token write failed:",
-        writeErr,
-      );
+      console.error("[ResendActivation] activation token write failed:", writeErr);
       return genericResponse;
     }
 
@@ -106,10 +99,7 @@ export async function onRequestPost(context) {
     activationUrl.searchParams.set("token", activationToken);
 
     if (isEmailConfigured(env)) {
-      const fullName = [user.first_name, user.last_name]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
       const emailPayload = buildActivationEmail({
         activationUrl: activationUrl.toString(),
         recipientName: fullName || null,
@@ -121,14 +111,9 @@ export async function onRequestPost(context) {
         text: emailPayload.text,
         html: emailPayload.html,
       });
-      console.log(
-        "[ResendActivation] Activation email delivery attempted:",
-        emailResult.reason || "delivered",
-      );
+      console.log("[ResendActivation] Activation email delivery attempted:", emailResult.reason || "delivered");
     } else {
-      console.warn(
-        "[ResendActivation] Email not configured; activation email was not sent.",
-      );
+      console.warn("[ResendActivation] Email not configured; activation email was not sent.");
     }
 
     return genericResponse;

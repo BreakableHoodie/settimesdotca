@@ -17,10 +17,7 @@ describe("Admin audit log API", () => {
       )
       .run(1, "event.updated", "event", 11, JSON.stringify({ name: "B" }), "127.0.0.1");
 
-    const req = new Request(
-      "https://example.test/api/admin/audit-log?limit=1&offset=0",
-      { headers },
-    );
+    const req = new Request("https://example.test/api/admin/audit-log?limit=1&offset=0", { headers });
     const res = await auditLogHandler.onRequestGet({ request: req, env });
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -45,10 +42,7 @@ describe("Admin audit log API", () => {
       )
       .run(2, "user.updated", "user", 98, JSON.stringify({ email: "y@test" }), "127.0.0.1");
 
-    const req = new Request(
-      "https://example.test/api/admin/audit-log?user_id=1&action=user.created",
-      { headers },
-    );
+    const req = new Request("https://example.test/api/admin/audit-log?user_id=1&action=user.created", { headers });
     const res = await auditLogHandler.onRequestGet({ request: req, env });
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -60,10 +54,7 @@ describe("Admin audit log API", () => {
   it("rejects limit over 100", async () => {
     const { env, headers } = createTestEnv({ role: "admin" });
 
-    const req = new Request(
-      "https://example.test/api/admin/audit-log?limit=250",
-      { headers },
-    );
+    const req = new Request("https://example.test/api/admin/audit-log?limit=250", { headers });
     const res = await auditLogHandler.onRequestGet({ request: req, env });
     expect(res.status).toBe(400);
   });

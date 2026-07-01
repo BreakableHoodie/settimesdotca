@@ -43,16 +43,7 @@ async function postLogin(env, { email, password }) {
   return onRequestPost({ request, env });
 }
 
-function insertUser(
-  rawDb,
-  {
-    email,
-    hash,
-    isActive = 1,
-    activatedAt = "2025-01-01 00:00:00",
-    role = "editor",
-  } = {},
-) {
+function insertUser(rawDb, { email, hash, isActive = 1, activatedAt = "2025-01-01 00:00:00", role = "editor" } = {}) {
   rawDb
     .prepare(
       `INSERT INTO users

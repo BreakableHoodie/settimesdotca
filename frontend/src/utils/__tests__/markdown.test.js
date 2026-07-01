@@ -172,13 +172,14 @@ describe('renderMarkdownToSafeHtml — XSS protection', () => {
     expect(result).toContain('x')
   })
 
-  it('keeps our forced rel first even when a raw-HTML anchor sets target=_blank', () => {
+  it('forces rel="noopener noreferrer" on a raw-HTML target=_blank anchor (anti reverse-tabnabbing)', () => {
     const result = renderMarkdownToSafeHtml('<a href="https://evil.com" target="_blank">x</a>')
-    // sanitized output must not leave a bare target without our noopener guard;
-    // BandProfilePage force-prepends rel="noopener noreferrer" downstream, but the
-    // href itself must be a safe scheme and no script attrs may survive.
     expect(result).not.toMatch(/on\w+=/i)
-    expect(result).toContain('href="https://evil.com"')
+    expect(result).toContain('rel="noopener noreferrer"')
+  })
+
+  it('forces rel on markdown-syntax links too', () => {
+    expect(renderMarkdownToSafeHtml('[x](https://settimes.ca)')).toContain('rel="noopener noreferrer"')
   })
 })
 

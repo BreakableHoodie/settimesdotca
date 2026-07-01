@@ -127,8 +127,9 @@ export default function BandProfilePage() {
     if (!profile?.description) return ''
     // Parse markdown → HTML, then DOMPurify-sanitize (pipeline in markdown.js).
     let cleaned = renderMarkdownToSafeHtml(profile.description)
-    // Force rel="noopener noreferrer" on all outbound links to prevent window.opener access
-    cleaned = cleaned.replace(/<a\s/gi, '<a rel="noopener noreferrer" ')
+    // rel="noopener noreferrer" is already forced on every link inside
+    // renderMarkdownToSafeHtml (DOMPurify hook), so no prepend is needed here —
+    // and doing it here would double the rel attr on links that already have one.
     // Normalize text: convert multiple <br> tags to paragraph breaks
     cleaned = cleaned.replace(/(<br\s*\/?>\s*){2,}/gi, '</p><p>')
     // Replace single <br> tags with spaces for proper text flow

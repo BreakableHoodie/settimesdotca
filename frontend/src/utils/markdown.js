@@ -16,24 +16,21 @@ import { marked } from 'marked'
 // h1/h2 are intentionally excluded — page and section headings are SEO/layout
 // concerns reserved for the page shell, not user content. img/iframe/script are
 // always excluded to block embedding and execution.
-const ALLOWED_TAGS = [
-  'p',
-  'br',
-  'strong',
-  'em',
-  'u',
-  'ul',
-  'ol',
-  'li',
-  'a',
-  'h3',
-  'h4',
-  'code',
-  'pre',
-  'blockquote',
-  'hr',
-]
+const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a', 'h3', 'h4', 'code', 'blockquote', 'hr']
 const ALLOWED_ATTR = ['href', 'target', 'rel']
+
+// pre (preformatted code blocks) is intentionally NOT allowed: band bios are
+// prose, and downstream whitespace-normalization would destroy the significant
+// whitespace inside <pre> anyway. Inline <code> is fine (normal-flow whitespace).
+
+// Force rel="noopener noreferrer" on every sanitized link so this util's output
+// is self-contained-safe — no caller can reintroduce reverse-tabnabbing, and no
+// separate string-surgery step is needed (which also avoids duplicate rel attrs).
+function forceLinkRel(node) {
+  if (node.tagName === 'A' && node.hasAttribute('href')) {
+    node.setAttribute('rel', 'noopener noreferrer')
+  }
+}
 
 /**
  * Parse markdown to HTML and sanitize the result.
@@ -46,7 +43,14 @@ export function renderMarkdownToSafeHtml(md) {
   if (typeof DOMPurify.sanitize !== 'function') return ''
 
   const html = marked.parse(md, { async: false })
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
+  // Scope the rel-forcing hook to this call (add before, remove after) so there
+  // are no global DOMPurify side effects.
+  DOMPurify.addHook('afterSanitizeAttributes', forceLinkRel)
+  try {
+    return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
+  } finally {
+    DOMPurify.removeHook('afterSanitizeAttributes')
+  }
 }
 
 /**

@@ -89,8 +89,9 @@ describe('renderMarkdownToSafeHtml — paragraph preservation (pasted plain-text
     // Simulate the full BandProfilePage post-processing pipeline after renderMarkdownToSafeHtml
     const input = 'Bio line one.\n\nBio line two.\n\nBio line three.'
     let cleaned = renderMarkdownToSafeHtml(input)
-    // replicate BandProfilePage post-processing
-    cleaned = cleaned.replace(/<a\s/gi, '<a rel="noopener noreferrer" ')
+    // Replicate BandProfilePage post-processing. Note: rel is already forced on
+    // links inside renderMarkdownToSafeHtml (DOMPurify hook), so — matching the
+    // real pipeline — there is NO rel string-prepend here anymore.
     cleaned = cleaned.replace(/(<br\s*\/?>\s*){2,}/gi, '</p><p>')
     cleaned = cleaned.replace(/<br\s*\/?>/gi, ' ')
     cleaned = cleaned.replace(/\s+/g, ' ').trim()

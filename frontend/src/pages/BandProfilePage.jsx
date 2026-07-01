@@ -147,7 +147,6 @@ export default function BandProfilePage() {
       !cleaned.startsWith('<h3>') &&
       !cleaned.startsWith('<h4>') &&
       !cleaned.startsWith('<blockquote>') &&
-      !cleaned.startsWith('<pre>') &&
       !cleaned.startsWith('<hr')
     ) {
       cleaned = `<p>${cleaned}</p>`

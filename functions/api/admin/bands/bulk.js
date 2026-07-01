@@ -1,6 +1,6 @@
 import { auditLog, checkPermission } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
-import { computeNewEndTime } from "../../../utils/timeConflicts.js";
+import { computeNewEndTime, detectBulkConflicts } from "../../../utils/timeConflicts.js";
 import { isValidTime, validateIdArray } from "../../../utils/validation.js";
 
 const MAX_BULK_BAND_IDS = 200;
@@ -403,11 +403,7 @@ export async function onRequestPatch(context) {
       headers: { "Content-Type": "application/json" },
     });
   }
-  // NOTE: ignore_conflicts is accepted by the API (frontend sends it via bulkUpdate) but the
-  // PATCH handler does not currently perform conflict detection — so the flag has no effect.
-  // This is a known gap: conflict detection should be run here for change_time/move_venue actions
-  // and the flag should gate whether a conflict aborts the request. Track as a separate issue.
-  const { band_ids, action, ignore_conflicts: _ignore_conflicts, ...params } = body;
+  const { band_ids, action, ignore_conflicts, ...params } = body;
 
   if (!Array.isArray(band_ids) || band_ids.length === 0) {
     return new Response(JSON.stringify({ error: "Invalid band_ids" }), {
@@ -481,6 +477,23 @@ export async function onRequestPatch(context) {
         });
       }
 
+      // Conflict detection runs BEFORE any write. When ignore_conflicts is not
+      // explicitly true, reject with 409 if scheduling conflicts exist so the
+      // caller can re-confirm before applying.
+      if (ignore_conflicts !== true) {
+        const conflicts = await detectBulkConflicts(env, {
+          action,
+          bandIds: validatedBandIds,
+          params: { venue_id },
+        });
+        if (conflicts.length > 0) {
+          return new Response(JSON.stringify({ error: "conflicts", conflicts }), {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      }
+
       // Build batch update statements (ATOMIC - all or nothing)
       const statements = validatedBandIds.map((id) =>
         env.DB.prepare("UPDATE performances SET venue_id = ? WHERE id = ?").bind(venue_id, id),
@@ -496,6 +509,22 @@ export async function onRequestPatch(context) {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
+      }
+
+      // Conflict detection runs BEFORE any write. When ignore_conflicts is not
+      // explicitly true, reject with 409 if scheduling conflicts exist.
+      if (ignore_conflicts !== true) {
+        const conflicts = await detectBulkConflicts(env, {
+          action,
+          bandIds: validatedBandIds,
+          params: { start_time },
+        });
+        if (conflicts.length > 0) {
+          return new Response(JSON.stringify({ error: "conflicts", conflicts }), {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
       }
 
       // Fetch current times so we can compute new end_time in JS.

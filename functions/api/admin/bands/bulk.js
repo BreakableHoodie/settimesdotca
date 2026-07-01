@@ -403,6 +403,10 @@ export async function onRequestPatch(context) {
       headers: { "Content-Type": "application/json" },
     });
   }
+  // NOTE: ignore_conflicts is accepted by the API (frontend sends it via bulkUpdate) but the
+  // PATCH handler does not currently perform conflict detection — so the flag has no effect.
+  // This is a known gap: conflict detection should be run here for change_time/move_venue actions
+  // and the flag should gate whether a conflict aborts the request. Track as a separate issue.
   const { band_ids, action, ignore_conflicts: _ignore_conflicts, ...params } = body;
 
   if (!Array.isArray(band_ids) || band_ids.length === 0) {

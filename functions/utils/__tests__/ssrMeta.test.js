@@ -39,6 +39,13 @@ describe("ssrMeta.toPlainText", () => {
   it("strips tags, decodes entities, collapses whitespace", () => {
     expect(toPlainText("<p>Heavy   <strong>doom</strong> &amp; sludge.</p>")).toBe("Heavy doom & sludge.");
   });
+  it("decodes entities in a single pass (no double-unescaping)", () => {
+    // &amp;lt; must decode ONCE to the literal "&lt;", never cascade to "<".
+    expect(toPlainText("a &amp;lt; b")).toBe("a &lt; b");
+    expect(toPlainText("Rock &amp; Roll")).toBe("Rock & Roll");
+    // &amp;amp; decodes once to "&amp;", not "&".
+    expect(toPlainText("&amp;amp;")).toBe("&amp;");
+  });
   it("truncates with an ellipsis", () => {
     const out = toPlainText("x".repeat(250), 50);
     expect(out.length).toBe(50);

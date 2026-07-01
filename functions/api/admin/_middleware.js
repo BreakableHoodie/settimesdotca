@@ -52,7 +52,7 @@ async function resolveSession(request, env) {
       .first();
 
     return { lucia, sessionId, session, user, sessionMeta };
-  } catch (error) {
+  } catch (_error) {
     // Log silently - session validation failures are common (expired, invalid)
     return { lucia, sessionId, session: null, user: null, sessionMeta: null };
   }

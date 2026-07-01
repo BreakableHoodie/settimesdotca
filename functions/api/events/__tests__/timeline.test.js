@@ -195,7 +195,7 @@ describe("Timeline API - Optimized JOIN Queries", () => {
     it("should respect pastLimit parameter", async () => {
       mockContext.request = new Request("https://example.com/api/events/timeline?pastLimit=5");
       const response = await onRequestGet(mockContext);
-      const data = await response.json();
+      await response.json();
 
       // Should not throw, limit is passed to query
       expect(response.status).toBe(200);

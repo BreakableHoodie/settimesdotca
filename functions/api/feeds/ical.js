@@ -89,7 +89,7 @@ export async function onRequestGet(context) {
 function generateICal(bands, city, genre) {
   const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 
-  let ical = [
+  const ical = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Concert Schedule//EN",

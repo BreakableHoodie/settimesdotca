@@ -128,8 +128,8 @@ describe("GET /api/events/:id/recap", () => {
 
     const venue = insertVenue(rawDb, { name: "Main Stage", city: "Portland" });
 
-    // Returning act: appears in prior event
-    const returningAct = insertBand(rawDb, {
+    // Returning act: appears in prior event (inserted for side effect; return value unused)
+    insertBand(rawDb, {
       name: "Returning Band",
       event_id: priorEvent.id,
       venue_id: venue.id,

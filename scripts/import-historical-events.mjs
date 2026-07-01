@@ -84,7 +84,7 @@ async function generateSqlInserts(events) {
 
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
-    const eventNum = i + 1;
+    const _eventNum = i + 1;
 
     if (!event.name || !event.date) {
       console.warn(`Skipping event ${event.url} - missing name or date`);

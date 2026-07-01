@@ -17,18 +17,23 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "format": "prettier --write \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\"",
-    "format:check": "prettier --check \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\""
+    "format:check": "prettier --check \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\"",
+    "lint": "eslint functions/ scripts/"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
     "@axe-core/playwright": "^4.12.1",
+    "@eslint/js": "^9.30.0",
     "@playwright/test": "^1.61.1",
     "@vitest/coverage-v8": "^4.1.9",
     "baseline-browser-mapping": "^2.10.40",
     "better-sqlite3": "^12.11.1",
+    "eslint": "^9.30.0",
+    "eslint-config-prettier": "^10.1.5",
+    "globals": "^16.2.0",
+    "prettier": "^3.9.3",
     "vite": "^8.1.0",
-    "vitest": "^4.1.9",
-    "prettier": "^3.9.3"
+    "vitest": "^4.1.9"
   },
   "dependencies": {
     "csrf-csrf": "^4.0.3",

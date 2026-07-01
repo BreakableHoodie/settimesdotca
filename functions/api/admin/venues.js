@@ -21,7 +21,7 @@ function formatVenueAddress(venue) {
 
 // GET - List all venues
 export async function onRequestGet(context) {
-  const { request, env } = context;
+  const { env } = context;
   const { DB } = env;
 
   // RBAC: Require viewer role or higher

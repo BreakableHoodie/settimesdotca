@@ -148,7 +148,7 @@ export function validateCSRFToken(request, env = null) {
   try {
     const req = buildRequestAdapter(request, env);
     return csrf.validateRequest(req);
-  } catch (error) {
+  } catch (_error) {
     console.error("[CSRF] Validation error");
     return false;
   }

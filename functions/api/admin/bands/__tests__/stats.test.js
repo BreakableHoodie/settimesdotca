@@ -4,11 +4,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { normalizeBandName } from "../../../../utils/bandName.js";
 import { onRequestGet } from "../stats/[name].js";
-import { createTestDB, createDBEnv, insertBand, insertEvent, insertVenue } from "../../../test-utils.js";
+import { createTestDB, createDBEnv, insertEvent, insertVenue } from "../../../test-utils.js";
 
 // Mock the middleware
 vi.mock("../../_middleware.js", () => ({
-  checkPermission: async (context, level) => {
+  checkPermission: async (context, _level) => {
     const { request, data } = context;
     const role = data?.user?.role || request?.headers?.get("x-test-role");
 

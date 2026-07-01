@@ -117,7 +117,7 @@ describe("Admin user item API", () => {
   });
 
   test("deleting user unlinks created content instead of cascading delete", async () => {
-    const { env, rawDb, headers, user } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, user: _user } = createTestEnv({ role: "admin" });
 
     // Create a user to be deleted
     rawDb

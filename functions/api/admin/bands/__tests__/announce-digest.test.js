@@ -123,7 +123,7 @@ describe("flushAnnounceDigest", () => {
       .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
       .run("fan2@example.com", perf.band_profile_id, "tok-f2").lastInsertRowid;
 
-    for (const [followId, token] of [
+    for (const [followId, _token] of [
       [f1, "tok-f1"],
       [f2, "tok-f2"],
     ]) {
@@ -143,7 +143,7 @@ describe("flushAnnounceDigest", () => {
   });
 
   it("returns empty stats when the queue is empty", async () => {
-    const { env, rawDb } = createTestEnv();
+    const { env } = createTestEnv();
     const stats = await flushAnnounceDigest(env, env.DB);
     expect(stats).toEqual({ sent: 0, failed: 0, skipped: 0 });
     expect(sendEmail).not.toHaveBeenCalled();

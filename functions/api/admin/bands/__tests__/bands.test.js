@@ -29,7 +29,7 @@ describe("Admin bands API - CRUD operations", () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
     const ev = insertEvent(rawDb, { name: "ListEvent", slug: "list-event" });
     const venue = insertVenue(rawDb, { name: "List Venue" });
-    const band = insertBand(rawDb, { name: "List Band", event_id: ev.id, venue_id: venue.id });
+    insertBand(rawDb, { name: "List Band", event_id: ev.id, venue_id: venue.id });
 
     const getReq = new Request(`https://example.test/api/admin/bands?event_id=${ev.id}`, { headers });
     const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
@@ -392,8 +392,8 @@ describe("Admin bands API - Conflicts", () => {
     const ev = insertEvent(rawDb, { name: "ConflictEvent", slug: "conflict-event" });
     const venue = insertVenue(rawDb, { name: "Conflict Venue" });
 
-    // Existing band
-    const band1 = insertBand(rawDb, {
+    // Existing band (inserted for side effect; return value unused)
+    insertBand(rawDb, {
       name: "Band One",
       event_id: ev.id,
       venue_id: venue.id,
@@ -908,8 +908,8 @@ describe("Admin bands API - Atomicity (P0-B1, P1-B6)", () => {
 describe("Admin bands API - Input validation (P1-S2)", () => {
   it("bulk PATCH rejects non-integer band_ids (string injection)", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
-    const ev = insertEvent(rawDb, { name: "InjEvent", slug: "inj-event" });
-    const venue = insertVenue(rawDb, { name: "InjVenue" });
+    insertEvent(rawDb, { name: "InjEvent", slug: "inj-event" });
+    insertVenue(rawDb, { name: "InjVenue" });
 
     const body = { band_ids: ["1; DROP TABLE performances; --"], action: "delete" };
     const request = new Request("https://example.test/api/admin/bands/bulk", {

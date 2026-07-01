@@ -41,6 +41,7 @@ const ALLOWED_EXTERNAL_PROTOCOLS = new Set(["http:", "https:"]);
  * Control characters to remove during sanitization
  * Removes: null bytes (\x00), control characters except tab/newline (\x0B-\x1F), and DEL (\x7F)
  */
+// eslint-disable-next-line no-control-regex -- intentional: matches control chars for security sanitization
 const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g;
 
 /**

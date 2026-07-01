@@ -403,7 +403,7 @@ export async function onRequestPatch(context) {
       headers: { "Content-Type": "application/json" },
     });
   }
-  const { band_ids, action, ignore_conflicts, ...params } = body;
+  const { band_ids, action, ignore_conflicts: _ignore_conflicts, ...params } = body;
 
   if (!Array.isArray(band_ids) || band_ids.length === 0) {
     return new Response(JSON.stringify({ error: "Invalid band_ids" }), {

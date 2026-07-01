@@ -80,7 +80,9 @@ export async function onRequestGet(context) {
               try {
                 const links = JSON.parse(row.social_links);
                 url = links.website || links.bandcamp || links.instagram || null;
-              } catch (_) {}
+              } catch (_) {
+                /* ignore malformed JSON — url stays null */
+              }
             }
 
             event.bands.push({

@@ -4,7 +4,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 // Wait for all web fonts (e.g. the Bebas Neue display font) to finish loading so
 // screenshots don't race the font-display:swap — the source of baseline flake (#470).
-const waitForFonts = (page) => page.evaluate(() => document.fonts.ready);
+// Explicitly discard the resolved value: FontFaceSet isn't structured-cloneable, and
+// while current Playwright resolves that to undefined, returning void is robust across versions.
+const waitForFonts = (page) => page.evaluate(async () => void (await document.fonts.ready));
 
 const createComponentPage = async (page, componentHtml) => {
   await page.setContent(`

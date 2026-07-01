@@ -469,7 +469,9 @@ export async function onRequestPut(context) {
             .bind(performance.band_profile_id)
             .first();
           existingLinks = JSON.parse(profile.social_links || "{}");
-        } catch (e) {}
+        } catch (_e) {
+          /* ignore malformed JSON — existingLinks stays {} */
+        }
         try {
           existingLinks.website = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
           newSocialLinks = sanitizeBandSocialLinks(existingLinks);
@@ -575,7 +577,9 @@ export async function onRequestPut(context) {
     let social = {};
     try {
       social = JSON.parse(result.social_links || "{}");
-    } catch (e) {}
+    } catch (_e) {
+      /* ignore malformed JSON — social stays {} */
+    }
     result.url = social.website || "";
     result.origin = [result.origin_city, result.origin_region].filter(Boolean).join(", ") || result.origin || "";
 

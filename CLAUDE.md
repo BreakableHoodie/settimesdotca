@@ -228,6 +228,9 @@ npm run build                                        # catch import/compile erro
 
 **Backend changes (`functions/`):**
 ```bash
+npm run format              # prettier --write on functions/ + scripts/ (fix first)
+npm run format:check        # verify formatting is clean
+npm run lint                # ESLint on functions/ + scripts/ (must be 0 errors)
 npm run validate:openapi    # if openapi.yaml changed
 npm test                    # from repo root (may fail on Apple Silicon — run in CI)
 ```

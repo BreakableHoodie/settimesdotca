@@ -11,7 +11,7 @@ import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 
 // GET - List all users (admin only)
 export async function onRequestGet(context) {
-  const { request, env } = context;
+  const { env } = context;
   const { DB } = env;
 
   try {

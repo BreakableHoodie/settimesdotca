@@ -286,7 +286,7 @@ export class MockD1Database {
     //                [cityFilter] if only city filter
     //                [] if no filters
 
-    let results = [];
+    const results = [];
     let cityFilter = null;
     let genreFilter = null;
 

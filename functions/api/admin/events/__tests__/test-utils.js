@@ -150,19 +150,10 @@ export function createDBEnv(db) {
       const wrapper = {
         // Support direct calls without bind: .prepare(...).all()
         first() {
-          try {
-            return stmt.get();
-          } catch (err) {
-            throw err;
-          }
+          return stmt.get();
         },
         all() {
-          try {
-            const rows = stmt.all();
-            return { results: rows };
-          } catch (err) {
-            throw err;
-          }
+          return { results: stmt.all() };
         },
         run() {
           return stmt.run();
@@ -172,19 +163,10 @@ export function createDBEnv(db) {
           const bound = params;
           return {
             first() {
-              try {
-                return stmt.get(...bound);
-              } catch (err) {
-                throw err;
-              }
+              return stmt.get(...bound);
             },
             all() {
-              try {
-                const rows = stmt.all(...bound);
-                return { results: rows };
-              } catch (err) {
-                throw err;
-              }
+              return { results: stmt.all(...bound) };
             },
             run() {
               return stmt.run(...bound);

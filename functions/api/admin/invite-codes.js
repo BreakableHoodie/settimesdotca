@@ -9,7 +9,7 @@ import { getClientIP } from "../../utils/request.js";
 
 // GET - List all invite codes
 export async function onRequestGet(context) {
-  const { request, env } = context;
+  const { env } = context;
   const { DB } = env;
 
   // RBAC: Require admin role

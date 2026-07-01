@@ -5,7 +5,7 @@ import * as venuesHandler from "../../venues.js";
 
 describe("Admin venues API - CRUD operations", () => {
   it("can create a venue and then list it", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, headers } = createTestEnv({ role: "admin" });
 
     const body = { name: "The Roxy", address: "123 Main St" };
     const request = new Request("https://example.test/api/admin/venues", {
@@ -133,7 +133,7 @@ describe("Admin venues API - Validation", () => {
   it("update conflicts when renaming to existing venue name", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     const v1 = insertVenue(rawDb, { name: "Venue 1" });
-    const v2 = insertVenue(rawDb, { name: "Taken" });
+    insertVenue(rawDb, { name: "Taken" });
 
     const putReq = new Request(`https://example.test/api/admin/venues/${v1.id}`, {
       method: "PUT",

@@ -503,19 +503,10 @@ export function createDBEnv(db) {
       const stmt = db.prepare(sql);
       const wrapper = {
         first() {
-          try {
-            return stmt.get();
-          } catch (err) {
-            throw err;
-          }
+          return stmt.get();
         },
         all() {
-          try {
-            const rows = stmt.all();
-            return { results: rows };
-          } catch (err) {
-            throw err;
-          }
+          return { results: stmt.all() };
         },
         run() {
           const result = stmt.run();
@@ -532,19 +523,10 @@ export function createDBEnv(db) {
           const bound = params;
           return {
             first() {
-              try {
-                return stmt.get(...bound);
-              } catch (err) {
-                throw err;
-              }
+              return stmt.get(...bound);
             },
             all() {
-              try {
-                const rows = stmt.all(...bound);
-                return { results: rows };
-              } catch (err) {
-                throw err;
-              }
+              return { results: stmt.all(...bound) };
             },
             run() {
               const result = stmt.run(...bound);

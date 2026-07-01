@@ -2,7 +2,7 @@ import { checkPermission } from "../../_middleware.js";
 import { validateId } from "../../../../utils/validation.js";
 
 export async function onRequestGet(context) {
-  const { request, env, params } = context;
+  const { env, params } = context;
   const { DB } = env;
   const { valid, value: eventId, error: idError } = validateId(params.id);
   if (!valid) {

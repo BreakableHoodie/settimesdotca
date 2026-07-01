@@ -162,6 +162,24 @@ describe('renderMarkdownToSafeHtml — XSS protection', () => {
     const result = renderMarkdownToSafeHtml('<style>body { display:none }</style>Bio.')
     expect(result).not.toContain('<style')
   })
+
+  // Cass (security review, PR #468): pin the raw-HTML anchor paths, not just the
+  // markdown link syntax — marked passes raw inline HTML through to DOMPurify.
+  it('strips javascript: href on a raw-HTML anchor (not just markdown links)', () => {
+    const result = renderMarkdownToSafeHtml('<a href="javascript:alert(1)">x</a>')
+    expect(result).not.toContain('javascript:')
+    // the anchor text survives; only the dangerous href is removed
+    expect(result).toContain('x')
+  })
+
+  it('keeps our forced rel first even when a raw-HTML anchor sets target=_blank', () => {
+    const result = renderMarkdownToSafeHtml('<a href="https://evil.com" target="_blank">x</a>')
+    // sanitized output must not leave a bare target without our noopener guard;
+    // BandProfilePage force-prepends rel="noopener noreferrer" downstream, but the
+    // href itself must be a safe scheme and no script attrs may survive.
+    expect(result).not.toMatch(/on\w+=/i)
+    expect(result).toContain('href="https://evil.com"')
+  })
 })
 
 // ---------------------------------------------------------------------------

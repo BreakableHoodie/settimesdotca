@@ -46,7 +46,7 @@ export function renderMarkdownToSafeHtml(md) {
   if (typeof DOMPurify.sanitize !== 'function') return ''
 
   const html = marked.parse(md, { async: false })
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ADD_ATTR: ['rel'] })
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
 }
 
 /**

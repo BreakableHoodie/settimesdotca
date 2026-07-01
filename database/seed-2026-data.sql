@@ -7,7 +7,7 @@
 
 INSERT OR REPLACE INTO events (id, name, date, slug, is_published, status, description, city, ticket_url) VALUES
 (28, 'Winter Warm-Up 2026', '2026-01-17', 'winter-warm-up-2026', 1, 'published', 'Annual winter festival returns for its third year. Bigger, louder, warmer.', 'Waterloo', 'https://ticketscene.ca/winter-warmup-2026'),
-(29, 'Frost Fest 2026', '2026-02-14', 'frost-fest-2026', 1, 'published', 'Valentine''s weekend meets Winterlude. Love and music in the cold.', 'Waterloo', 'https://ticketscene.ca/frost-fest-2026'),
+(29, 'Frost Fest 2026', '2026-02-14', 'frost-fest-2026', 1, 'published', 'Valentine''s weekend meets the deep freeze. Love and music in the cold.', 'Waterloo', 'https://ticketscene.ca/frost-fest-2026'),
 (30, 'Spring Thaw 2026', '2026-03-21', 'spring-thaw-2026', 1, 'published', 'First day of spring celebration. New beginnings, new sounds.', 'Toronto', 'https://ticketscene.ca/spring-thaw-2026'),
 (31, 'April Amplified 2026', '2026-04-11', 'april-amplified-2026', 1, 'published', 'Turn it up to 11. Heavy music festival returns.', 'Montreal', 'https://ticketscene.ca/april-amp-2026'),
 (32, 'Tulip Tunes 2026', '2026-05-16', 'tulip-tunes-2026', 1, 'published', 'Blooming music festival. Outdoor stages and garden parties.', 'Waterloo', 'https://ticketscene.ca/tulip-2026'),

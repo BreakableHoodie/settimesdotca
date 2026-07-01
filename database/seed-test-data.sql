@@ -106,7 +106,7 @@ INSERT OR REPLACE INTO bands (id, event_id, venue_id, name, start_time, end_time
 (20, 7, 1, 'Maple Leaf Rag', '13:00', '13:45', 'Jazz', 'Toronto', 'Swinging jazz with Canadian flair'),
 (21, 7, 1, 'The Canadians', '14:00', '14:45', 'Pop Rock', 'Vancouver', 'Catchy pop rock celebrating home'),
 (22, 7, 1, 'Northern Soul', '15:00', '15:45', 'Soul', 'Montreal', 'Canadian soul and R&B'),
-(23, 7, 1, 'Parliament Funk', '16:00', '16:45', 'Funk', 'Waterloo', 'Funky grooves from the capital'),
+(23, 7, 1, 'Grand River Funk', '16:00', '16:45', 'Funk', 'Waterloo', 'Funky grooves from the Grand'),
 (24, 7, 1, 'Confederation', '17:00', '18:00', 'Prog Rock', 'Toronto', 'Epic prog rock about Canadian history'),
 (25, 7, 2, 'Beaver Tales', '19:00', '19:45', 'Folk Punk', 'Waterloo', 'Raucous folk punk'),
 (26, 7, 2, 'The Loons', '20:00', '20:45', 'Indie Rock', 'Muskoka', 'Cottage country indie rock'),

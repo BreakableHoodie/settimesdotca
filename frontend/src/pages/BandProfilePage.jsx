@@ -8,8 +8,8 @@ import {
   SpotifyIcon,
   YouTubeIcon,
 } from '../components/ui/SocialIcons'
-import DOMPurify from 'dompurify'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { renderMarkdownToSafeHtml, stripMarkdownToText } from '../utils/markdown'
 import { Helmet } from 'react-helmet-async'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import BandFacts from '../components/BandFacts'
@@ -125,13 +125,11 @@ export default function BandProfilePage() {
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const sanitizedDescription = useMemo(() => {
     if (!profile?.description) return ''
-    let cleaned = DOMPurify.sanitize(profile.description, {
-      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a'],
-      ALLOWED_ATTR: ['href', 'target', 'rel'],
-      ADD_ATTR: ['rel'],
-    })
-    // Force rel="noopener noreferrer" on all outbound links to prevent window.opener access
-    cleaned = cleaned.replace(/<a\s/gi, '<a rel="noopener noreferrer" ')
+    // Parse markdown → HTML, then DOMPurify-sanitize (pipeline in markdown.js).
+    let cleaned = renderMarkdownToSafeHtml(profile.description)
+    // rel="noopener noreferrer" is already forced on every link inside
+    // renderMarkdownToSafeHtml (DOMPurify hook), so no prepend is needed here —
+    // and doing it here would double the rel attr on links that already have one.
     // Normalize text: convert multiple <br> tags to paragraph breaks
     cleaned = cleaned.replace(/(<br\s*\/?>\s*){2,}/gi, '</p><p>')
     // Replace single <br> tags with spaces for proper text flow
@@ -141,7 +139,16 @@ export default function BandProfilePage() {
     cleaned = cleaned.replace(/\s+/g, ' ').trim()
     cleaned = stripZeroWidthCharacters(cleaned)
     // Wrap in paragraph if not already structured
-    if (cleaned && !cleaned.startsWith('<p>') && !cleaned.startsWith('<ul>') && !cleaned.startsWith('<ol>')) {
+    if (
+      cleaned &&
+      !cleaned.startsWith('<p>') &&
+      !cleaned.startsWith('<ul>') &&
+      !cleaned.startsWith('<ol>') &&
+      !cleaned.startsWith('<h3>') &&
+      !cleaned.startsWith('<h4>') &&
+      !cleaned.startsWith('<blockquote>') &&
+      !cleaned.startsWith('<hr')
+    ) {
       cleaned = `<p>${cleaned}</p>`
     }
     return cleaned
@@ -150,10 +157,8 @@ export default function BandProfilePage() {
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const plainDescription = useMemo(() => {
     if (!profile?.description) return ''
-    return DOMPurify.sanitize(profile.description, {
-      ALLOWED_TAGS: [],
-      ALLOWED_ATTR: [],
-    })
+    // Render markdown then strip all tags \u2192 clean plain text for meta/og.
+    return stripMarkdownToText(profile.description)
       .replace(NBSP_ENTITY_REGEX, ' ')
       .replace(/\u00A0/g, ' ')
       .replace(ZERO_WIDTH_ENTITY_REGEX, '')

@@ -53,11 +53,22 @@ export function toPlainText(rawInput, maxLength = 200) {
 
   // --- Strip HTML tags ---
   text = text.replace(/<[^>]*>/g, " ");
-  text = text.replace(/&nbsp;/gi, " ");
-  text = text.replace(/&amp;/gi, "&");
-  text = text.replace(/&lt;/gi, "<");
-  text = text.replace(/&gt;/gi, ">");
-  text = text.replace(/&quot;/gi, '"');
+  // Decode a small set of HTML entities in a SINGLE pass, so no replacement can
+  // re-introduce an entity that a later pass would decode again — the
+  // double-unescaping class CodeQL flags (e.g. "&amp;lt;" must become "&lt;",
+  // never "<"). Decoding &amp; first-then-cascade is the bug.
+  const ENTITY_MAP = {
+    "&nbsp;": " ",
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+  };
+  text = text.replace(
+    /&(?:nbsp|amp|lt|gt|quot|#39);/gi,
+    (m) => ENTITY_MAP[m.toLowerCase()] ?? m,
+  );
 
   text = text.replace(/\s+/g, " ").trim();
   if (text.length <= maxLength) return text;

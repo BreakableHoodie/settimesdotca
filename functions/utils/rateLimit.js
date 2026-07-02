@@ -2,10 +2,12 @@
 //
 // Two strategies are used depending on endpoint sensitivity:
 //
-// 1. D1-backed (globally consistent) — used for FAIL_CLOSED_PATTERNS (auth, subscriptions).
-//    D1 is a globally-replicated SQLite database, so counters are shared across all
-//    Cloudflare PoPs. This prevents distributed brute-force attacks from bypassing
-//    limits by spreading requests across geographic regions.
+// 1. D1-backed (globally consistent) — used for FAIL_CLOSED_PATTERNS (auth, subscriptions,
+//    metrics). D1 is a globally-replicated SQLite database, so counters are shared across
+//    all Cloudflare PoPs. This prevents distributed brute-force attacks from bypassing
+//    limits by spreading requests across geographic regions. /api/metrics is included here
+//    not for credential protection but for write-amplification control: PoP-local counting
+//    would let 40 req/min scale to 40 × N-PoPs × up to 50 D1 upserts per request (#482).
 //
 // 2. Cache API (PoP-local) — used for non-sensitive public endpoints (events, schedule,
 //    feeds). PoP-local is acceptable here; the goal is DoS protection, not security
@@ -57,8 +59,10 @@ const SKIP_PATTERNS = [
 ];
 
 // Endpoints where a rate-limit failure blocks the request (fail closed).
-// These use D1 for globally-consistent counters.
-const FAIL_CLOSED_PATTERNS = ["/api/admin/auth/", "/api/auth/", "/api/subscriptions"];
+// These use D1 for globally-consistent counters. /api/metrics is here for
+// write-amplification control (up to 50 D1 upserts per request), not credential
+// protection — see file header and #482.
+const FAIL_CLOSED_PATTERNS = ["/api/admin/auth/", "/api/auth/", "/api/subscriptions", "/api/metrics"];
 
 function shouldFailClosed(pathname) {
   return (

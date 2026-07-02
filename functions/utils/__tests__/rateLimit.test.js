@@ -246,6 +246,54 @@ describe("Rate Limiting", () => {
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
     });
+
+    it("/api/metrics is fail-closed (uses D1) when env.DB is present (#482 write-amplification control)", async () => {
+      const db = makeMockDB({ count: 3 }); // under the 40-req/min limit
+      const env = { DB: db };
+      const request = new Request("https://example.com/api/metrics", {
+        headers: { "CF-Connecting-IP": "1.2.3.4" },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(37); // 40 - 3
+      // D1 must be used (fail-closed path), not Cache API
+      expect(db.prepare).toHaveBeenCalled();
+      expect(mockCache.match).not.toHaveBeenCalled();
+    });
+
+    it("/api/metrics blocks the 41st request in the window from one IP", async () => {
+      const db = makeMockDB({ count: 41 }); // over the 40-req/min limit
+      const env = { DB: db };
+      const request = new Request("https://example.com/api/metrics", {
+        headers: { "CF-Connecting-IP": "1.2.3.4" },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(false);
+      expect(result.remaining).toBe(0);
+    });
+
+    it("/api/metrics fails closed when D1 throws (#482)", async () => {
+      const db = {
+        prepare: vi.fn().mockReturnValue({
+          bind: vi.fn().mockReturnValue({
+            run: vi.fn().mockRejectedValue(new Error("D1 unavailable")),
+            first: vi.fn().mockResolvedValue(null),
+          }),
+        }),
+      };
+      const env = { DB: db };
+      const request = new Request("https://example.com/api/metrics", {
+        headers: { "CF-Connecting-IP": "1.2.3.4" },
+      });
+
+      const result = await checkRateLimit(request, env);
+
+      expect(result.allowed).toBe(false); // must fail closed, not open
+    });
   });
 
   describe("IP bypass behaviour", () => {

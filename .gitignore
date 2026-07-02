@@ -58,7 +58,8 @@ e2e/.auth/
 workers-mcp-server/
 chatmodes/
 claudedocs/
-instructions/
+# Root-level only — .github/instructions/ is tracked (Copilot path instructions)
+/instructions/
 prompts/
 plugins/
 .github/chatmodes/

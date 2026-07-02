@@ -619,11 +619,49 @@ describe("GET /api/admin/bands/stats/:name", () => {
         description: "A great band",
         genre: "Rock",
         origin: "Seattle, WA",
+        // Read-path sanitized (#493): the website URL is re-normalized via
+        // safeReflectSocialLinksString, which adds the trailing slash `new
+        // URL(...).toString()` produces for a bare origin.
         social_links: JSON.stringify({
-          website: "https://example.com",
+          website: "https://example.com/",
           instagram: "@band",
         }),
       });
+    });
+
+    it("nulls out a javascript: scheme in social_links but keeps a legitimate handle (#493)", async () => {
+      // Arrange
+      const event = insertEvent(db, {
+        name: "Scheme Stats Event",
+        slug: "scheme-stats-event",
+        date: "2025-06-01",
+      });
+      const venue = insertVenue(db, { name: "Scheme Stats Venue" });
+      insertBandWithProfile(db, {
+        name: "Scheme Stats Band",
+        event_id: event.id,
+        venue_id: venue.id,
+        start_time: "20:00",
+        end_time: "21:00",
+        social_links: JSON.stringify({
+          // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #493 admin read-path guard
+          website: "javascript:alert(1)",
+          instagram: "legit_handle",
+        }),
+      });
+
+      // Act
+      const request = new Request("https://example.test/api/admin/bands/stats/Scheme%20Stats%20Band", {
+        headers: { "x-test-role": "viewer" },
+      });
+      const response = await onRequestGet({ request, env });
+
+      // Assert
+      const data = await response.json();
+      expect(typeof data.profile.social_links).toBe("string");
+      const parsed = JSON.parse(data.profile.social_links);
+      expect(parsed.website).toBeNull();
+      expect(parsed.instagram).toBe("legit_handle");
     });
   });
 

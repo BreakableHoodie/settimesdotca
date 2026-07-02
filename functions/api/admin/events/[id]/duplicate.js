@@ -10,7 +10,7 @@
 
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP } from "../../../../utils/request.js";
-import { validateId } from "../../../../utils/validation.js";
+import { safeReflectSocialLinksString, validateId } from "../../../../utils/validation.js";
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -92,6 +92,14 @@ export async function onRequestPost(context) {
     if (!newEvent) {
       throw new Error("events INSERT returned null");
     }
+
+    // Read-path sanitize (#493): social_links is copied verbatim from the
+    // source event (INSERT ... originalEvent.social_links), so it may carry
+    // a pre-#483 (or otherwise legacy) value. Sanitize what's reflected back
+    // here; every other admin read path is sanitized too, so the stored
+    // duplicate is never echoed unsanitized regardless of which one serves
+    // a later request.
+    newEvent.social_links = safeReflectSocialLinksString(newEvent.social_links, ["instagram", "x", "tiktok"]);
 
     // Copy performances. If the copy fails, compensate by deleting the new event
     // so we never leave an empty orphan draft behind (D1 has no BEGIN/COMMIT).

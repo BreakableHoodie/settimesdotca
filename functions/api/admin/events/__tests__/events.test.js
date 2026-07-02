@@ -127,6 +127,66 @@ describe("Event API - handler integration", () => {
     expect(data.event.name).toBe("New Name");
   });
 
+  it("onRequestPatch response sanitizes a javascript: scheme in social_links untouched by the request (#493)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, { name: "Scheme Event", slug: "scheme-event" });
+    rawDb.prepare("UPDATE events SET social_links = ? WHERE id = ?").run(
+      JSON.stringify({
+        // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #493 admin read-path guard
+        instagram: "javascript:alert(1)",
+        x: "legit_handle",
+        website: "https://example.com",
+      }),
+      ev.id,
+    );
+
+    // Update an unrelated field (city) — the request never touches social_links.
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ city: "Kitchener" }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(typeof data.event.social_links).toBe("string");
+    const parsed = JSON.parse(data.event.social_links);
+    expect(parsed.instagram).toBeNull();
+    expect(parsed.x).toBe("legit_handle");
+    expect(parsed.website).toBe("https://example.com/");
+  });
+
+  it("GET /api/admin/events sanitizes a javascript: scheme in social_links across the list", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, { name: "Scheme List Event", slug: "scheme-list-event" });
+    rawDb.prepare("UPDATE events SET social_links = ? WHERE id = ?").run(
+      JSON.stringify({
+        // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #493 admin read-path guard
+        tiktok: "javascript:alert(1)",
+        instagram: "legit_handle",
+      }),
+      ev.id,
+    );
+
+    const request = new Request("https://example.test/api/admin/events", {
+      headers: { "x-test-role": "viewer" },
+    });
+    const res = await eventsHandler.onRequestGet({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    const found = data.events.find((e) => e.id === ev.id);
+    expect(found).toBeDefined();
+    expect(typeof found.social_links).toBe("string");
+    const parsed = JSON.parse(found.social_links);
+    expect(parsed.tiktok).toBeNull();
+    expect(parsed.instagram).toBe("legit_handle");
+  });
+
   it("publish endpoint requires >=1 band and publishes event", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };

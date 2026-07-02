@@ -15,7 +15,8 @@ export async function onRequestGet(context) {
   // Query parameters
   const city = url.searchParams.get("city") || "all";
   const genre = url.searchParams.get("genre") || "all";
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
+  const rawLimit = parseInt(url.searchParams.get("limit") || "50", 10);
+  const limit = Number.isFinite(rawLimit) && rawLimit >= 1 ? Math.min(rawLimit, 100) : 50;
   const upcoming = url.searchParams.get("upcoming") !== "false"; // Default true
 
   try {

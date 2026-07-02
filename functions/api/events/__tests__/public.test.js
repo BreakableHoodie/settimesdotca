@@ -3,6 +3,26 @@ import { onRequestGet } from "../public.js";
 import { MockD1Database } from "../../subscriptions/__tests__/mocks/d1.js";
 import { createMockEvent, createMockVenue, createMockBand, seedMockData } from "./helpers.js";
 
+// Generates `count` unique, published, upcoming events (distinct future dates)
+// so tests can distinguish "default limit applied" from "all rows returned".
+function createMockEvents(count, overrides = {}) {
+  const events = [];
+  for (let i = 0; i < count; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() + 1 + i);
+    events.push(
+      createMockEvent({
+        id: i + 1,
+        slug: `event-${i + 1}`,
+        name: `Event ${i + 1}`,
+        date: date.toISOString().split("T")[0],
+        ...overrides,
+      }),
+    );
+  }
+  return events;
+}
+
 describe("GET /api/events/public", () => {
   let mockDB;
   let mockEnv;
@@ -219,5 +239,85 @@ describe("GET /api/events/public", () => {
     const dates = data.events.map((e) => e.date);
     const sorted = [...dates].sort();
     expect(dates).toEqual(sorted);
+  });
+
+  describe("limit parameter guard (#480)", () => {
+    it("falls back to the default (50) when limit is non-numeric (?limit=abc)", async () => {
+      // Seed more than the default so an unguarded NaN -> LIMIT NULL bypass
+      // (which returns every row) is distinguishable from the correct 50-row default.
+      const events = createMockEvents(60);
+      seedMockData(mockDB, events, [], []);
+
+      const request = new Request("http://localhost/api/events/public?limit=abc");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.filters.limit).toBe(50);
+      expect(data.events).toHaveLength(50);
+      expect(data.count).toBe(50);
+    });
+
+    it("falls back to the default (50) when limit is 0", async () => {
+      const events = createMockEvents(60);
+      seedMockData(mockDB, events, [], []);
+
+      const request = new Request("http://localhost/api/events/public?limit=0");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.filters.limit).toBe(50);
+      expect(data.events).toHaveLength(50);
+    });
+
+    it("falls back to the default (50) when limit is negative", async () => {
+      const events = createMockEvents(60);
+      seedMockData(mockDB, events, [], []);
+
+      const request = new Request("http://localhost/api/events/public?limit=-5");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.filters.limit).toBe(50);
+      expect(data.events).toHaveLength(50);
+    });
+
+    it("caps limit at 100 when a larger value is requested", async () => {
+      const events = createMockEvents(105);
+      seedMockData(mockDB, events, [], []);
+
+      const request = new Request("http://localhost/api/events/public?limit=200");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.filters.limit).toBe(100);
+      expect(data.events).toHaveLength(100);
+    });
+
+    it("honours a valid in-range limit (?limit=7)", async () => {
+      const events = createMockEvents(10);
+      seedMockData(mockDB, events, [], []);
+
+      const request = new Request("http://localhost/api/events/public?limit=7");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.filters.limit).toBe(7);
+      expect(data.events).toHaveLength(7);
+    });
   });
 });

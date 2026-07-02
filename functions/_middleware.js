@@ -71,16 +71,117 @@ export async function onRequest(context) {
     return rateLimitResponse(rateLimit, corsHeaders);
   }
 
-  // Basic request size guard for non-upload API requests (1MB)
+  // Request size guard for mutating API requests. #481: parse Content-Length
+  // ourselves and count bytes when it's absent/unparseable, instead of
+  // trusting `Number(header || 0)`, which silently coerced an ABSENT header
+  // to 0 and let a chunked/streamed body of any size sail straight through to
+  // handlers like functions/api/metrics.js's unguarded `request.json()`.
+  // #495: no request is exempt from this guard anymore. It used to key a
+  // blanket multipart exemption solely off the client-supplied Content-Type,
+  // so any client could set `Content-Type: multipart/form-data` on e.g.
+  // /api/metrics and skip the 1MB limit entirely. Multipart now gets a raised
+  // ceiling instead of a bypass, and only on the one route that legitimately
+  // needs it.
   if (["POST", "PUT", "PATCH"].includes(request.method)) {
     const contentType = request.headers.get("Content-Type") || "";
     const isMultipart = contentType.includes("multipart/form-data");
-    const contentLength = Number(request.headers.get("Content-Length") || 0);
-    if (!isMultipart && contentLength > 1_000_000) {
-      return new Response(JSON.stringify({ error: "Payload too large" }), {
+
+    // The band photo upload (functions/api/admin/bands/photos.js) is the ONLY
+    // route that legitimately accepts multipart bodies, and it already
+    // enforces its own precise 5MB-per-file limit after parsing formData.
+    // Pin the raised ceiling to that exact pathname — Cloudflare Pages
+    // Functions match routes exactly, so this can't be satisfied by a
+    // sub-path or a different handler.
+    const isPhotoUpload = isMultipart && url.pathname === "/api/admin/bands/photos";
+
+    const MAX_BODY_BYTES = 1_000_000;
+    // Coarse DoS ceiling, not the business rule: 5MB file + multipart
+    // boundary/header overhead + other form fields. The precise 5MB-per-file
+    // limit stays enforced in photos.js; this guard only needs to reject
+    // bodies wildly larger than any real upload could be.
+    const MULTIPART_MAX_BODY_BYTES = 6_000_000;
+    const maxBodyBytes = isPhotoUpload ? MULTIPART_MAX_BODY_BYTES : MAX_BODY_BYTES;
+
+    const tooLargeResponse = () =>
+      new Response(JSON.stringify({ error: "Payload too large" }), {
         status: 413,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
+
+    // Strict parse: only a plain non-negative decimal integer counts as a
+    // usable Content-Length. A bare Number() would coerce "" → 0, "0x10" →
+    // 16 and "-1" → -1 into the "trusted" bucket below, letting a malformed
+    // CL skip the byte-counting fallback. Anything non-numeric maps to NaN
+    // and falls through to counting.
+    const rawContentLength = request.headers.get("Content-Length");
+    const contentLength =
+      rawContentLength !== null && /^\d+$/.test(rawContentLength.trim()) ? Number(rawContentLength) : NaN;
+
+    if (Number.isFinite(contentLength)) {
+      // SECURITY: a present, parseable Content-Length can be trusted without
+      // reading the body ourselves. Cloudflare's edge enforces HTTP framing
+      // against a declared Content-Length — HTTP/1.1 body reads stop at
+      // exactly CL bytes, and HTTP/2 treats a CL/DATA-frame-length mismatch
+      // as a protocol error and resets the stream. A client cannot declare a
+      // small CL and then smuggle a larger body past the edge. The bypass
+      // this fix closes is exclusively the CL-absent/unparseable (streamed)
+      // case, handled below.
+      if (contentLength > maxBodyBytes) {
+        return tooLargeResponse();
+      }
+    } else if (request.body) {
+      // No usable Content-Length (chunked/streamed request) — count actual
+      // bytes as they arrive instead of trusting a header that isn't there.
+      // We read from a CLONE of the request: Request.clone() tees the
+      // underlying ReadableStream, so bytes we pull here are also
+      // queued for the original body that the real handler will read later —
+      // cancelling our (cloned) reader does not affect the original. We
+      // deliberately never buffer the body ourselves (no arrayBuffer()/
+      // text()/concatenation) — only `value.byteLength` is accumulated — so
+      // this guard can't become a memory-DoS amplifier; the tee holds at
+      // most ~maxBodyBytes plus one in-flight chunk before we bail.
+      const reader = request.clone().body.getReader();
+      let totalBytes = 0;
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          totalBytes += value.byteLength;
+          if (totalBytes > maxBodyBytes) {
+            // Best-effort cleanup, deliberately NOT awaited: on a teed
+            // stream, cancelling one branch leaves the cancel promise
+            // pending until the other branch is also cancelled/closed
+            // (awaiting could hang the request forever), and on an errored
+            // stream it can reject (awaiting would bounce us into the catch
+            // below and fail OPEN a request we just proved oversized —
+            // reopening the #481 bypass). Cleanup must never change the
+            // outcome: the 413 is already decided by the byte count.
+            reader.cancel().catch(() => {});
+            return tooLargeResponse();
+          }
+        }
+      } catch (error) {
+        // Fail open: this guard exists to stop DoS payloads, not to police
+        // well-behaved clients. This catch is only reachable BELOW the limit
+        // (an over-limit total already returned 413 above), so the exposure
+        // is bounded. And a source error propagates to BOTH tee branches, so
+        // a request landing here cannot have its body successfully read
+        // downstream either — the handler's own read fails and surfaces its
+        // own error, with better attribution than a spurious 413/500 from us.
+        log.warn("Body-size guard: stream read failed, passing request through", {
+          error,
+          method: request.method,
+          path: url.pathname,
+          // A malformed (vs. absent) Content-Length is inherently suspicious —
+          // no legitimate client sends one. Logged with the applied limit so
+          // abuse probes are distinguishable from ordinary aborted uploads.
+          rawContentLength,
+          maxBodyBytes,
+          // How far we got before the read failed — distinguishes a benign
+          // early client abort from a stream that died near the limit.
+          totalBytes,
+        });
+      }
     }
   }
 

@@ -129,9 +129,11 @@ async function checkRateLimitD1(DB, ip, pathname, config) {
   const key = getRateLimitKey(ip, pathname);
 
   try {
-    // Atomically upsert: insert on first request, or increment/reset on subsequent ones.
+    // Single round trip: the upsert and the post-write read are combined via RETURNING,
+    // instead of a separate .run() + SELECT .first(). This halves D1 cost on the hot
+    // fail-closed path (auth, subscriptions, band follows, /api/metrics — #492).
     // The CASE expression resets the window when it has expired.
-    await DB.prepare(
+    const row = await DB.prepare(
       `
       INSERT INTO rate_limits (key, count, window_start, updated_at)
       VALUES (?1, 1, ?2, ?2)
@@ -139,13 +141,14 @@ async function checkRateLimitD1(DB, ip, pathname, config) {
         count = CASE WHEN (?2 - window_start) >= ?3 THEN 1 ELSE count + 1 END,
         window_start = CASE WHEN (?2 - window_start) >= ?3 THEN ?2 ELSE window_start END,
         updated_at = ?2
+      RETURNING count, window_start
     `,
     )
       .bind(key, now, config.window)
-      .run();
+      .first();
 
-    const row = await DB.prepare("SELECT count, window_start FROM rate_limits WHERE key = ?").bind(key).first();
-
+    // A RETURNING upsert always yields a row; these fallbacks guard shim/driver
+    // differences and cost nothing.
     const count = row?.count ?? 1;
     const windowStart = row?.window_start ?? now;
     const remaining = Math.max(0, config.requests - count);

@@ -407,6 +407,29 @@ export function safeReflectSocialLinks(jsonString, handleFields = ["instagram"])
   return sanitized;
 }
 
+/**
+ * String-in/string-out wrapper around `safeReflectSocialLinks`, for admin
+ * read endpoints (#493) that reflect `social_links` as a raw JSON string —
+ * the admin frontend (RosterTab.jsx, EventFormModal.jsx, LineupTab.jsx,
+ * admin/utils/pickerFormData.js) parses that string itself, so the response
+ * shape must stay a string rather than switching to a parsed object.
+ *
+ * A `null`/`undefined` column value (no social links set) is passed through
+ * unchanged rather than coerced to `"{}"`, so callers that never had a
+ * `social_links` value don't see one appear in the response.
+ *
+ * @param {string|null|undefined} jsonString - Raw `social_links` column value
+ * @param {string[]} handleFields - Keys that hold handles rather than URLs
+ * @returns {string|null|undefined} Sanitized JSON string, or the original
+ *   nullish value
+ */
+export function safeReflectSocialLinksString(jsonString, handleFields = ["instagram"]) {
+  if (jsonString === null || jsonString === undefined) {
+    return jsonString;
+  }
+  return JSON.stringify(safeReflectSocialLinks(jsonString, handleFields));
+}
+
 export function sanitizeOptionalHttpUrl(value, maxLength = FIELD_LIMITS.url.max, label = "URL") {
   const text = sanitizeOptionalText(value, maxLength, label);
   if (!text) {

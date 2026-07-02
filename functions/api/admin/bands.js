@@ -6,6 +6,8 @@ import { checkPermission } from "./_middleware.js";
 import {
   FIELD_LIMITS,
   isValidEmail,
+  safeReflectSocialLinks,
+  safeReflectSocialLinksString,
   sanitizeBandSocialLinks,
   sanitizeOptionalHttpUrl,
   sanitizeString,
@@ -25,15 +27,16 @@ async function getEventStatus(DB, eventId) {
 // Helper to unpack social links
 function unpackSocialLinks(band) {
   if (!band) return null;
-  let social = {};
-  try {
-    social = JSON.parse(band.social_links || "{}");
-  } catch (_e) {
-    social = {};
-  }
+  // Read-path sanitize (#493): `band.social_links` may be a pre-#483 (or
+  // otherwise legacy) DB value that was never routed through
+  // sanitizeBandSocialLinks on write. Never reflect it verbatim.
+  const social = safeReflectSocialLinks(band.social_links || "{}");
   const origin = [band.origin_city, band.origin_region].filter(Boolean).join(", ") || band.origin || "";
   return {
     ...band,
+    // Preserve the raw string/null shape — RosterTab.jsx JSON.parses this
+    // field directly — while sanitizing its contents.
+    social_links: safeReflectSocialLinksString(band.social_links),
     origin,
     url: social.website || "",
     instagram: social.instagram || "",

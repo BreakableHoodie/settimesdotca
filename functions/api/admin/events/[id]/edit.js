@@ -5,7 +5,7 @@
 
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP } from "../../../../utils/request.js";
-import { validateId } from "../../../../utils/validation.js";
+import { safeReflectSocialLinksString, validateId } from "../../../../utils/validation.js";
 
 export async function onRequestPut(context) {
   const { request, env, params } = context;
@@ -103,6 +103,11 @@ export async function onRequestPut(context) {
     )
       .bind(name, date, slug, ticket_url || null, eventId)
       .first();
+
+    // Read-path sanitize (#493): RETURNING * echoes the full row, so
+    // social_links may reflect a pre-#483 (or otherwise legacy) value even
+    // though this endpoint doesn't touch that column itself.
+    result.social_links = safeReflectSocialLinksString(result.social_links, ["instagram", "x", "tiktok"]);
 
     await auditLog(
       env,

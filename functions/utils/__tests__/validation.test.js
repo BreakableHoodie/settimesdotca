@@ -13,6 +13,7 @@ import {
   VALIDATION_SCHEMAS,
   safeReflectHandleOrUrl,
   safeReflectSocialLinks,
+  safeReflectSocialLinksString,
   sanitizeBandSocialLinks,
 } from "../validation.js";
 
@@ -311,6 +312,44 @@ describe("safeReflectSocialLinks (#483)", () => {
     ]);
     expect(result.x).toBeNull();
     expect(result.tiktok).toBe("the_band");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #493 — admin read endpoints reflect `social_links` as a raw JSON string
+// (the admin frontend parses it client-side), not a parsed object like the
+// public endpoints #483 fixed. safeReflectSocialLinksString wraps
+// safeReflectSocialLinks so those endpoints can sanitize without changing
+// that string response shape.
+// ---------------------------------------------------------------------------
+describe("safeReflectSocialLinksString (#493)", () => {
+  it("nulls out a javascript: scheme in a URL field but keeps a plain handle, re-serialized as a string", () => {
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #493 admin read-path guard
+    const jsonString = JSON.stringify({ website: "javascript:alert(1)", instagram: "the_band" });
+    expect(safeReflectSocialLinksString(jsonString)).toBe(JSON.stringify({ website: null, instagram: "the_band" }));
+  });
+
+  it("passes through a valid https URL, re-normalized, as a string", () => {
+    expect(safeReflectSocialLinksString(JSON.stringify({ website: "https://example.com" }))).toBe(
+      JSON.stringify({ website: "https://example.com/" }),
+    );
+  });
+
+  it("respects a custom handleFields list (event social_links: instagram/x/tiktok)", () => {
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #493 admin read-path guard
+    const jsonString = JSON.stringify({ x: "javascript:alert(1)", tiktok: "the_band" });
+    expect(safeReflectSocialLinksString(jsonString, ["instagram", "x", "tiktok"])).toBe(
+      JSON.stringify({ x: null, tiktok: "the_band" }),
+    );
+  });
+
+  it("returns '{}' for malformed JSON", () => {
+    expect(safeReflectSocialLinksString("not json")).toBe("{}");
+  });
+
+  it("passes null and undefined through unchanged, rather than coercing to '{}'", () => {
+    expect(safeReflectSocialLinksString(null)).toBeNull();
+    expect(safeReflectSocialLinksString(undefined)).toBeUndefined();
   });
 });
 

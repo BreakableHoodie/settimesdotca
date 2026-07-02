@@ -1419,3 +1419,74 @@ describe("Admin bands API - Bulk POST onRequestPost full flow (T6)", () => {
     expect(data.skipped.length).toBe(1);
   });
 });
+
+describe("Admin bands API - social_links read-path sanitization (#493)", () => {
+  it("GET /api/admin/bands nulls out a javascript: scheme while keeping a legitimate handle and URL", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "SchemeListEvent", slug: "scheme-list-event" });
+    const venue = insertVenue(rawDb, { name: "Scheme List Venue" });
+    insertBand(rawDb, {
+      name: "Scheme List Band",
+      event_id: ev.id,
+      venue_id: venue.id,
+      social_links: JSON.stringify({
+        // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #493 admin read-path guard
+        website: "javascript:alert(1)",
+        instagram: "the_band",
+        bandcamp: "https://theband.bandcamp.com",
+      }),
+    });
+
+    const request = new Request(`https://example.test/api/admin/bands?event_id=${ev.id}`, { headers });
+    const res = await bandsHandler.onRequestGet({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    const band = data.bands.find((b) => b.name === "Scheme List Band");
+    expect(band).toBeDefined();
+
+    // Unpacked per-platform fields sanitized.
+    expect(band.url).toBe("");
+    expect(band.instagram).toBe("the_band");
+    expect(band.bandcamp).toBe("https://theband.bandcamp.com/");
+
+    // The raw `social_links` string RosterTab.jsx parses is sanitized too,
+    // and stays a JSON string (response shape unchanged).
+    expect(typeof band.social_links).toBe("string");
+    const parsed = JSON.parse(band.social_links);
+    expect(parsed.website).toBeNull();
+    expect(parsed.instagram).toBe("the_band");
+    expect(parsed.bandcamp).toBe("https://theband.bandcamp.com/");
+  });
+
+  it("PUT /api/admin/bands/{id} response nulls out a javascript: scheme in social_links untouched by the request", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "SchemePutEvent", slug: "scheme-put-event" });
+    const venue = insertVenue(rawDb, { name: "Scheme Put Venue" });
+    const band = insertBand(rawDb, {
+      name: "Scheme Put Band",
+      event_id: ev.id,
+      venue_id: venue.id,
+      social_links: JSON.stringify({
+        // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #493 admin read-path guard
+        website: "javascript:alert(1)",
+        instagram: "legit_handle",
+      }),
+    });
+
+    // Update an unrelated field (genre) — the request never touches social_links.
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ genre: "Punk" }),
+    });
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    expect(data.band.url).toBe("");
+    expect(typeof data.band.social_links).toBe("string");
+    const parsed = JSON.parse(data.band.social_links);
+    expect(parsed.website).toBeNull();
+    expect(parsed.instagram).toBe("legit_handle");
+  });
+});

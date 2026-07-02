@@ -6,6 +6,7 @@ import { checkPermission, auditLog } from "../_middleware.js";
 import {
   FIELD_LIMITS,
   isValidEmail,
+  safeReflectSocialLinks,
   sanitizeBandSocialLinks,
   sanitizeOptionalHttpUrl,
   sanitizeString,
@@ -573,13 +574,15 @@ export async function onRequestPut(context) {
       };
     }
 
-    // Unpack social links for response compatibility
-    let social = {};
-    try {
-      social = JSON.parse(result.social_links || "{}");
-    } catch (_e) {
-      /* ignore malformed JSON — social stays {} */
-    }
+    // Unpack social links for response compatibility. Read-path sanitize
+    // (#493): `result.social_links` may reflect a pre-#483 (or otherwise
+    // untouched) DB value even when this request didn't itself update
+    // social_links — never echo it back verbatim.
+    const social = safeReflectSocialLinks(result.social_links || "{}");
+    // Preserve the raw string/null shape of `social_links` in the response —
+    // the admin frontend (RosterTab.jsx / LineupTab.jsx) JSON.parses this
+    // field directly.
+    result.social_links = result.social_links == null ? result.social_links : JSON.stringify(social);
     result.url = social.website || "";
     result.origin = [result.origin_city, result.origin_region].filter(Boolean).join(", ") || result.origin || "";
 

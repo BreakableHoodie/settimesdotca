@@ -8,6 +8,7 @@ import { checkPermission, auditLog } from "../_middleware.js";
 import {
   FIELD_LIMITS,
   isValidURL,
+  safeReflectSocialLinksString,
   sanitizeEventSocialLinks,
   sanitizeString,
   sanitizeVenueInfo,
@@ -385,6 +386,11 @@ export async function onRequestPatch(context) {
       .bind(...params)
       .first();
 
+    // Read-path sanitize (#493): RETURNING * echoes the full row, so
+    // social_links may reflect a pre-#483 (or otherwise legacy) value even
+    // when this request didn't touch social_links itself.
+    result.social_links = safeReflectSocialLinksString(result.social_links, ["instagram", "x", "tiktok"]);
+
     // Audit log
     await auditLog(
       env,
@@ -493,6 +499,9 @@ export async function onRequestPut(context) {
       )
         .bind(newStatus, nextStatus, currentUser.userId, eventId)
         .first();
+
+      // Read-path sanitize (#493): see the PATCH handler above.
+      result.social_links = safeReflectSocialLinksString(result.social_links, ["instagram", "x", "tiktok"]);
 
       // Audit log
       await auditLog(

@@ -7,6 +7,7 @@ import {
   validateEntity,
   VALIDATION_SCHEMAS,
   validationErrorResponse,
+  safeReflectSocialLinksString,
   sanitizeEventSocialLinks,
   sanitizeVenueInfo,
 } from "../../utils/validation.js";
@@ -59,9 +60,17 @@ export async function onRequestGet(context) {
       .bind(...queryParams)
       .all();
 
+    // Read-path sanitize (#493): `e.*` pulls in the raw social_links column,
+    // which may hold a pre-#483 (or otherwise legacy) value never routed
+    // through sanitizeEventSocialLinks on write.
+    const events = (result.results || []).map((event) => ({
+      ...event,
+      social_links: safeReflectSocialLinksString(event.social_links, ["instagram", "x", "tiktok"]),
+    }));
+
     return new Response(
       JSON.stringify({
-        events: result.results || [],
+        events,
       }),
       {
         status: 200,

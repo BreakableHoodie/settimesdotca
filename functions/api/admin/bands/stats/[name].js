@@ -2,6 +2,7 @@
 // GET /api/admin/bands/stats/{name} - Get performance history and stats for a band
 
 import { checkPermission } from "../../_middleware.js";
+import { safeReflectSocialLinksString } from "../../../../utils/validation.js";
 
 function formatOrigin(profile) {
   if (!profile) return null;
@@ -119,7 +120,9 @@ export async function onRequestGet(context) {
       description: latestEntry.description,
       genre: latestEntry.genre,
       origin: formatOrigin(latestEntry),
-      social_links: latestEntry.social_links,
+      // Read-path sanitize (#493): may be a pre-#483 (or otherwise legacy)
+      // value never routed through sanitizeBandSocialLinks on write.
+      social_links: safeReflectSocialLinksString(latestEntry.social_links),
     };
 
     return new Response(

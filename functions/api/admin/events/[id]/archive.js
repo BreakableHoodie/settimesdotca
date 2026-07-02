@@ -3,6 +3,7 @@
 
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP } from "../../../../utils/request.js";
+import { safeReflectSocialLinksString } from "../../../../utils/validation.js";
 
 // Helper to extract event ID from path
 function getEventId(request) {
@@ -82,6 +83,10 @@ export async function onRequestPost(context) {
     )
       .bind(currentUser.userId, eventId)
       .first();
+
+    // Read-path sanitize (#493): RETURNING * echoes the full row, so
+    // social_links may reflect a pre-#483 (or otherwise legacy) value.
+    result.social_links = safeReflectSocialLinksString(result.social_links, ["instagram", "x", "tiktok"]);
 
     // Audit log
     await auditLog(

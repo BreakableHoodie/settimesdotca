@@ -99,8 +99,9 @@ export async function onRequestGet(context) {
             });
           }
 
-          // Track venue
-          if (!event.venues.has(row.venue_id)) {
+          // Track venue (guard against NULL venue_id — a performance with no
+          // venue assigned must not be counted as a venue; see #479)
+          if (row.venue_id && !event.venues.has(row.venue_id)) {
             event.venues.set(row.venue_id, {
               id: row.venue_id,
               name: row.venue_name,
@@ -108,7 +109,9 @@ export async function onRequestGet(context) {
               band_count: 0,
             });
           }
-          event.venues.get(row.venue_id).band_count++;
+          if (row.venue_id) {
+            event.venues.get(row.venue_id).band_count++;
+          }
         }
       }
 

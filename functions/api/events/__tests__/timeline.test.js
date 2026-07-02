@@ -660,3 +660,45 @@ describe("Timeline real-DB — upcoming has no fixed day-window cap (SQL exercis
     expect(found.slug).toBe("timeline-realdb-far-future");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Real-DB regression — venue_count must be 0 (not 1) when every performance's
+// venue_id is NULL. `Map.has(null)` is `false`, so an unguarded
+// `!event.venues.has(row.venue_id)` check inserts a single spurious `null` key,
+// inflating venue_count to 1 instead of 0. The details endpoint
+// (functions/api/events/[id]/details.js) already guards on truthy
+// `row.venue_id` before touching its venues map, which is why the card's
+// venue count flipped from 1 (timeline) to 0 (details) on expand. Regression
+// for #479.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — NULL venue_id must not inflate venue_count (#479)", () => {
+  test("venue_count is 0 when all performances have venue_id = NULL", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const event = insertEvent(rawDb, {
+      name: "No Venue Event",
+      slug: "timeline-realdb-null-venue",
+      date: today,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    // venue_id defaults to null in insertBand — performance has no venue assigned
+    insertBand(rawDb, { name: "Unassigned Band", event_id: event.id });
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.band_count).toBe(1);
+    expect(found.venue_count).toBe(0);
+    expect(found.venues).toEqual([]);
+  });
+});

@@ -57,11 +57,15 @@ export async function onRequestGet(context) {
     }
 
     // Resolve band profile first (v2 schema)
+    // #484: explicit column list so future band_profiles columns don't
+    // silently join the public payload.
     let bandProfile = null;
     if (bandId) {
       bandProfile = await DB.prepare(
         `
-        SELECT * FROM band_profiles WHERE id = ? LIMIT 1
+        SELECT id, name, origin, origin_city, origin_region, social_links,
+               photo_url, photo_alt_text, description, genre
+        FROM band_profiles WHERE id = ? LIMIT 1
       `,
       )
         .bind(bandId)
@@ -70,7 +74,9 @@ export async function onRequestGet(context) {
       const normalized = normalizeBandName(searchName);
       bandProfile = await DB.prepare(
         `
-        SELECT * FROM band_profiles
+        SELECT id, name, origin, origin_city, origin_region, social_links,
+               photo_url, photo_alt_text, description, genre
+        FROM band_profiles
         WHERE name_normalized = ?
            OR LOWER(TRIM(name)) = LOWER(?)
         LIMIT 1

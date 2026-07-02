@@ -11,14 +11,15 @@ global.caches = {
   default: mockCache,
 };
 
-// Mock D1 database (used for fail-closed endpoints: /api/auth/*, /api/subscriptions)
+// Mock D1 database (used for fail-closed endpoints: /api/auth/*, /api/subscriptions).
+// checkRateLimitD1 issues a single INSERT ... ON CONFLICT ... RETURNING statement
+// (#492), so the mock only needs to satisfy .bind(...).first().
 function makeMockDB({ count = 1, window_start = null } = {}) {
   const now = Math.floor(Date.now() / 1000);
   const row = { count, window_start: window_start ?? now };
   return {
     prepare: vi.fn().mockReturnValue({
       bind: vi.fn().mockReturnValue({
-        run: vi.fn().mockResolvedValue({}),
         first: vi.fn().mockResolvedValue(row),
       }),
     }),
@@ -171,8 +172,7 @@ describe("Rate Limiting", () => {
       const db = {
         prepare: vi.fn().mockReturnValue({
           bind: vi.fn().mockReturnValue({
-            run: vi.fn().mockRejectedValue(new Error("D1 error")),
-            first: vi.fn().mockResolvedValue(null),
+            first: vi.fn().mockRejectedValue(new Error("D1 error")),
           }),
         }),
       };
@@ -219,8 +219,7 @@ describe("Rate Limiting", () => {
       const db = {
         prepare: vi.fn().mockReturnValue({
           bind: vi.fn().mockReturnValue({
-            run: vi.fn().mockRejectedValue(new Error("D1 unavailable")),
-            first: vi.fn().mockResolvedValue(null),
+            first: vi.fn().mockRejectedValue(new Error("D1 unavailable")),
           }),
         }),
       };
@@ -280,8 +279,7 @@ describe("Rate Limiting", () => {
       const db = {
         prepare: vi.fn().mockReturnValue({
           bind: vi.fn().mockReturnValue({
-            run: vi.fn().mockRejectedValue(new Error("D1 unavailable")),
-            first: vi.fn().mockResolvedValue(null),
+            first: vi.fn().mockRejectedValue(new Error("D1 unavailable")),
           }),
         }),
       };
@@ -408,8 +406,7 @@ describe("Rate Limiting", () => {
       const db = {
         prepare: vi.fn().mockReturnValue({
           bind: vi.fn().mockReturnValue({
-            run: vi.fn().mockRejectedValue(new Error("D1 error")),
-            first: vi.fn().mockResolvedValue(null),
+            first: vi.fn().mockRejectedValue(new Error("D1 error")),
           }),
         }),
       };
@@ -446,7 +443,6 @@ describe("Rate Limiting", () => {
           preparedCalls.push(sql);
           return {
             bind: vi.fn().mockReturnValue({
-              run: vi.fn().mockResolvedValue({}),
               first: vi.fn().mockResolvedValue({
                 count: 1,
                 window_start: Math.floor(Date.now() / 1000),
@@ -470,15 +466,15 @@ describe("Rate Limiting", () => {
         env,
       );
 
-      // Each call results in two D1 statements (upsert + select), so 4 total
-      expect(db.prepare).toHaveBeenCalledTimes(4);
+      // Each call issues a single RETURNING upsert statement (#492), so 2 total
+      expect(db.prepare).toHaveBeenCalledTimes(2);
 
-      // Extract the bind arguments from the key upsert calls to confirm distinct keys
+      // Extract the bind arguments from the upsert calls to confirm distinct keys
       const bindCalls = db.prepare.mock.results.map((r) => r.value.bind.mock.calls[0]).filter(Boolean);
 
       // The first positional arg to bind is the key — should differ for /follow vs /unfollow
       const keys = bindCalls.map((args) => args[0]);
-      // At least two distinct keys across the four bind calls
+      // Both calls must use distinct keys
       const uniqueKeys = [...new Set(keys)];
       expect(uniqueKeys.length).toBeGreaterThanOrEqual(2);
     });

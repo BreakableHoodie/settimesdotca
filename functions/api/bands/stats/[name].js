@@ -1,5 +1,6 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
+import { safeReflectSocialLinks } from "../../../utils/validation.js";
 
 /**
  * Public API: Get band profile with rich stats
@@ -173,12 +174,7 @@ export async function onRequestGet(context) {
     const debutDate = sortedDates.length > 0 ? sortedDates[0] : null;
     const latestDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : null;
 
-    let socialLinks = {};
-    try {
-      socialLinks = bandProfile.social_links ? JSON.parse(bandProfile.social_links) : {};
-    } catch (_error) {
-      socialLinks = {};
-    }
+    const socialLinks = safeReflectSocialLinks(bandProfile.social_links);
 
     // Build response
     const responseData = {

@@ -3033,8 +3033,10 @@ components:
           type: string
           nullable: true
         social_links:
-          type: string
           nullable: true
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/GenericRecord"
 
     ScheduleResponse:
       type: object

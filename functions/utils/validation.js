@@ -269,6 +269,14 @@ function sanitizeOptionalHandle(value, maxLength, label) {
     throw new Error(`${label} must not contain spaces`);
   }
 
+  // A handle is a bare @name — it must never carry a URL scheme (javascript:,
+  // data:, etc.) or path separators. Legitimate Instagram/X/TikTok handles
+  // never contain these characters, so any occurrence means the field is
+  // being used to smuggle a URL/scheme past the handle-only contract.
+  if (/[:/\\]/.test(text)) {
+    throw new Error(`${label} must not contain a URL scheme or path separator`);
+  }
+
   return text;
 }
 
@@ -328,6 +336,75 @@ export function normalizeHttpUrl(url) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Sanitize a stored handle-or-URL value for safe reflection in an API
+ * response. This is a read-path counterpart to `sanitizeOptionalHandleOrUrl`
+ * (the write-path validator) — it exists because rows written before the
+ * write-path guard existed (or written by a bypassed/legacy path) may still
+ * contain unsafe scheme values like `javascript:alert(1)` in the DB. Never
+ * reflect those verbatim.
+ *
+ * - Trimmed first, matching the write-path sanitizers, so a legacy value
+ *   with stray whitespace (" https://example.com") is recovered as a URL
+ *   instead of falling to the handle branch and being dropped. Trimming
+ *   cannot launder a scheme: a trimmed "javascript:…" still carries the
+ *   colon and is rejected below.
+ * - http(s):// values are re-validated/normalized via `normalizeHttpUrl`.
+ * - Anything else is treated as a bare handle. A colon is the necessary
+ *   condition for any URL scheme (javascript:, data:, vbscript:, …), so a
+ *   handle containing one is rejected. Deliberately lenient on slashes so
+ *   quirky legacy handles like "instagram.com/band" aren't dropped.
+ *
+ * @param {*} value - Raw stored value
+ * @returns {string|null} Safe value to reflect, or null
+ */
+export function safeReflectHandleOrUrl(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const text = value.trim();
+  if (!text) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(text)) {
+    return normalizeHttpUrl(text);
+  }
+
+  return text.includes(":") ? null : text;
+}
+
+/**
+ * Sanitize a stored social-links JSON string for safe reflection in an API
+ * response. Parses the JSON defensively (malformed JSON → `{}`) and routes
+ * each field through the appropriate read-path sanitizer: handle fields via
+ * `safeReflectHandleOrUrl`, everything else via `normalizeHttpUrl`.
+ *
+ * @param {string} jsonString - Raw `social_links` column value
+ * @param {string[]} handleFields - Keys that hold handles rather than URLs
+ * @returns {Object} Plain object of sanitized values
+ */
+export function safeReflectSocialLinks(jsonString, handleFields = ["instagram"]) {
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonString);
+  } catch {
+    return {};
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {};
+  }
+
+  const sanitized = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    sanitized[key] = handleFields.includes(key) ? safeReflectHandleOrUrl(value) : normalizeHttpUrl(value);
+  }
+
+  return sanitized;
 }
 
 export function sanitizeOptionalHttpUrl(value, maxLength = FIELD_LIMITS.url.max, label = "URL") {

@@ -11,6 +11,9 @@ import {
   normalizePostalCode,
   validateEntity,
   VALIDATION_SCHEMAS,
+  safeReflectHandleOrUrl,
+  safeReflectSocialLinks,
+  sanitizeBandSocialLinks,
 } from "../validation.js";
 
 describe("Email Validation", () => {
@@ -220,5 +223,105 @@ describe("Event schema end_date validation", () => {
     const result = validateEntity({ ...validBase, end_date: "not-a-date" }, VALIDATION_SCHEMAS.event);
     expect(result.valid).toBe(false);
     expect(result.errors.end_date).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #483 — social link URLs reflected from DB without read-path scheme
+// validation. These cover the read-path helpers (safeReflectHandleOrUrl /
+// safeReflectSocialLinks) that sanitize legacy/bypassed DB rows before they
+// are echoed back in API responses, plus the write-path scheme guard added
+// to the private sanitizeOptionalHandle (exercised indirectly through the
+// exported sanitizeBandSocialLinks, which routes the instagram field
+// through it).
+// ---------------------------------------------------------------------------
+describe("safeReflectHandleOrUrl (#483)", () => {
+  it("rejects a javascript: scheme value", () => {
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 read-path guard
+    expect(safeReflectHandleOrUrl("javascript:alert(1)")).toBeNull();
+  });
+
+  it("rejects a data: scheme value", () => {
+    expect(safeReflectHandleOrUrl("data:text/html,x")).toBeNull();
+  });
+
+  it("normalizes and passes through a valid https URL", () => {
+    expect(safeReflectHandleOrUrl("https://example.com/x")).toBe("https://example.com/x");
+  });
+
+  it("preserves a plain handle with a leading @", () => {
+    expect(safeReflectHandleOrUrl("@the_band")).toBe("@the_band");
+  });
+
+  it("preserves a plain handle without a leading @", () => {
+    expect(safeReflectHandleOrUrl("the_band")).toBe("the_band");
+  });
+
+  it("returns null for non-string or empty values", () => {
+    expect(safeReflectHandleOrUrl(null)).toBeNull();
+    expect(safeReflectHandleOrUrl(undefined)).toBeNull();
+    expect(safeReflectHandleOrUrl("")).toBeNull();
+    expect(safeReflectHandleOrUrl(42)).toBeNull();
+  });
+
+  it("is lenient on slashes in legacy handles (no colon present)", () => {
+    expect(safeReflectHandleOrUrl("instagram.com/band")).toBe("instagram.com/band");
+  });
+
+  it("trims before classifying: a whitespace-padded https URL is recovered, not dropped", () => {
+    expect(safeReflectHandleOrUrl(" https://example.com/x ")).toBe("https://example.com/x");
+    expect(safeReflectHandleOrUrl("  @the_band  ")).toBe("@the_band");
+    expect(safeReflectHandleOrUrl("   ")).toBeNull();
+  });
+
+  it("trimming does not launder a scheme: padded javascript: is still rejected", () => {
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 read-path guard
+    expect(safeReflectHandleOrUrl(" javascript:alert(1)")).toBeNull();
+  });
+});
+
+describe("safeReflectSocialLinks (#483)", () => {
+  it("returns {} for malformed JSON", () => {
+    expect(safeReflectSocialLinks("not json")).toEqual({});
+  });
+
+  it("returns {} for a null/undefined input", () => {
+    expect(safeReflectSocialLinks(null)).toEqual({});
+    expect(safeReflectSocialLinks(undefined)).toEqual({});
+  });
+
+  it("nulls out a javascript: scheme in a URL field but keeps a plain handle", () => {
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 read-path guard
+    const result = safeReflectSocialLinks(JSON.stringify({ website: "javascript:alert(1)", instagram: "the_band" }));
+    expect(result.website).toBeNull();
+    expect(result.instagram).toBe("the_band");
+  });
+
+  it("passes through a valid https URL unchanged", () => {
+    const result = safeReflectSocialLinks(JSON.stringify({ website: "https://example.com/" }));
+    expect(result.website).toBe("https://example.com/");
+  });
+
+  it("respects a custom handleFields list (event social_links: instagram/x/tiktok)", () => {
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 read-path guard
+    const result = safeReflectSocialLinks(JSON.stringify({ x: "javascript:alert(1)", tiktok: "the_band" }), [
+      "instagram",
+      "x",
+      "tiktok",
+    ]);
+    expect(result.x).toBeNull();
+    expect(result.tiktok).toBe("the_band");
+  });
+});
+
+describe("sanitizeOptionalHandle write-path scheme guard (#483, via sanitizeBandSocialLinks)", () => {
+  it("throws when the instagram handle contains a URL scheme", () => {
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 write-path guard
+    expect(() => sanitizeBandSocialLinks({ instagram: "javascript:x" })).toThrow();
+  });
+
+  it("still accepts a normal @handle", () => {
+    const result = sanitizeBandSocialLinks({ instagram: "@ok_handle" });
+    expect(JSON.parse(result).instagram).toBe("@ok_handle");
   });
 });

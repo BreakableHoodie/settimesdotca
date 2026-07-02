@@ -702,3 +702,89 @@ describe("Timeline real-DB — NULL venue_id must not inflate venue_count (#479)
     expect(found.venues).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Real-DB regression — the derived `bands[].url` fallback (website ||
+// bandcamp || instagram, extracted from social_links when the legacy `url`
+// column is empty) must never reflect an unsafe scheme. `social_links` is
+// seeded via insertBand's raw `social_links` param to simulate a legacy or
+// write-path-bypassed row — the write path itself now rejects unsafe
+// schemes, but rows written before that guard existed may still contain
+// them. Regression for #483.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — derived band url is scheme-validated (#483)", () => {
+  test("a band whose only link is a javascript: scheme resolves to url: null", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const event = insertEvent(rawDb, {
+      name: "Scheme Test Event",
+      slug: "timeline-realdb-483-null",
+      date: today,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    insertBand(rawDb, {
+      name: "Unsafe Link Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 read-path guard
+      social_links: JSON.stringify({ website: "javascript:alert(1)" }),
+    });
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    const band = found.bands.find((b) => b.name === "Unsafe Link Band");
+    expect(band).toBeDefined();
+    expect(band.url).toBeNull();
+  });
+
+  test("falls through to a valid https bandcamp URL when website is unsafe", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const event = insertEvent(rawDb, {
+      name: "Scheme Fallback Event",
+      slug: "timeline-realdb-483-fallback",
+      date: today,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    insertBand(rawDb, {
+      name: "Fallback Link Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      social_links: JSON.stringify({
+        // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 read-path guard
+        website: "javascript:alert(1)",
+        bandcamp: "https://fallbackband.bandcamp.com",
+      }),
+    });
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    const band = found.bands.find((b) => b.name === "Fallback Link Band");
+    expect(band).toBeDefined();
+    expect(band.url).toBe("https://fallbackband.bandcamp.com/");
+  });
+});

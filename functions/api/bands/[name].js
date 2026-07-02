@@ -1,5 +1,6 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { normalizeBandName } from "../../utils/bandName.js";
+import { safeReflectSocialLinks } from "../../utils/validation.js";
 
 /**
  * Public API: Get band profile by name
@@ -124,12 +125,7 @@ export async function onRequestGet(context) {
       });
     }
 
-    let socialLinks = {};
-    try {
-      socialLinks = bandProfile.social_links ? JSON.parse(bandProfile.social_links) : {};
-    } catch (_error) {
-      socialLinks = {};
-    }
+    const socialLinks = safeReflectSocialLinks(bandProfile.social_links);
 
     const profileData = {
       id: bandProfile.id,

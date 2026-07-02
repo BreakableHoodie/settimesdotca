@@ -94,3 +94,70 @@ describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
     expect(payload.stats.total_performances).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// #483 — social link URLs reflected from DB without read-path scheme
+// validation. `social_links` is seeded via a direct SQL insert (through
+// insertBand's `social_links` param) to simulate a legacy/bypassed row that
+// predates the write-path guard, since the write path itself now rejects
+// unsafe schemes.
+// ---------------------------------------------------------------------------
+describe("GET /api/bands/stats/:name - social_links scheme sanitization (#483)", () => {
+  const futureDate = "2099-01-01";
+
+  test("nulls a javascript: scheme website but preserves a plain instagram handle", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+    const event = insertEvent(rawDb, {
+      name: "Vol 17 Stats Unsafe",
+      slug: "stats-483-unsafe",
+      date: futureDate,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    insertBand(rawDb, {
+      name: "Stats Scheme Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 read-path guard
+      social_links: JSON.stringify({ website: "javascript:alert(1)", instagram: "the_band" }),
+    });
+
+    const request = new Request("https://example.test/api/bands/stats/Stats%20Scheme%20Band");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.social.website).toBeNull();
+    expect(payload.social.instagram).toBe("the_band");
+  });
+
+  test("passes a valid https website through unchanged", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+    const event = insertEvent(rawDb, {
+      name: "Vol 17 Stats Safe",
+      slug: "stats-483-safe",
+      date: futureDate,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    insertBand(rawDb, {
+      name: "Stats Valid Site Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      social_links: JSON.stringify({ website: "https://example.com/band" }),
+    });
+
+    const request = new Request("https://example.test/api/bands/stats/Stats%20Valid%20Site%20Band");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.social.website).toBe("https://example.com/band");
+  });
+});

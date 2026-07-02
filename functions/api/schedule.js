@@ -3,6 +3,7 @@
 // GET /api/schedule?event={slug}
 
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
+import { normalizeHttpUrl, safeReflectSocialLinks } from "../utils/validation.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -106,13 +107,21 @@ export async function onRequestGet(context) {
         return datetime.substring(0, 5); // Get HH:MM
       };
 
-      // Parse social links to find a primary URL
+      // Parse social links to find a primary URL. A bare handle (e.g. an
+      // Instagram handle with no scheme) never worked as an href, so only a
+      // real, normalized http(s) URL qualifies here.
       let primaryUrl = null;
       try {
         if (band.social_links) {
           const links = JSON.parse(band.social_links);
           // Prioritize website, then bandcamp, then instagram, etc.
-          primaryUrl = links.website || links.bandcamp || links.instagram || links.facebook || links.spotify || null;
+          primaryUrl =
+            normalizeHttpUrl(links.website) ||
+            normalizeHttpUrl(links.bandcamp) ||
+            normalizeHttpUrl(links.instagram) ||
+            normalizeHttpUrl(links.facebook) ||
+            normalizeHttpUrl(links.spotify) ||
+            null;
         }
       } catch (_) {
         // Ignore JSON parse errors
@@ -146,7 +155,7 @@ export async function onRequestGet(context) {
       is_archived: event.status === "archived",
       theme_colors: event.theme_colors,
       venue_info: event.venue_info,
-      social_links: event.social_links,
+      social_links: safeReflectSocialLinks(event.social_links, ["instagram", "x", "tiktok"]),
       reveal_mode: event.reveal_mode ?? 0,
     };
 

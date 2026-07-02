@@ -1,4 +1,5 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+import { normalizeHttpUrl } from "../../utils/validation.js";
 
 /**
  * Public API: Get events timeline (now, upcoming, past)
@@ -74,12 +75,19 @@ export async function onRequestGet(context) {
         if (row.band_id) {
           event.bandIds.add(row.band_id);
           if (includeBands) {
-            let url = row.url;
-            // Try to extract URL from social_links if url is missing
+            let url = normalizeHttpUrl(row.url);
+            // Try to extract URL from social_links if url is missing. A bare
+            // handle (e.g. an Instagram handle with no scheme) never worked
+            // as an href, so it no longer qualifies here — only a real,
+            // normalized http(s) URL is reflected.
             if (!url && row.social_links) {
               try {
                 const links = JSON.parse(row.social_links);
-                url = links.website || links.bandcamp || links.instagram || null;
+                url =
+                  normalizeHttpUrl(links.website) ||
+                  normalizeHttpUrl(links.bandcamp) ||
+                  normalizeHttpUrl(links.instagram) ||
+                  null;
               } catch (_) {
                 /* ignore malformed JSON — url stays null */
               }

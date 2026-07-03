@@ -10,7 +10,6 @@ const FILE_RULES = [
     tables: [
       "events",
       "venues",
-      "bands",
       "performances",
       "band_profiles",
       "artist_daily_stats",
@@ -64,7 +63,13 @@ function hasCreateTable(sql, table) {
 }
 
 function hasColumn(sql, table, column) {
-  const tablePattern = new RegExp(`CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${table}\\s*\\((.*?)\\)\\s*;`, "is");
+  // Table names may be quoted in generated SQL (sqlite_master preserves the
+  // original CREATE text, and migration 0032's recreated `"performances"`
+  // carries its quotes into the regenerated setup-complete.sql).
+  const tablePattern = new RegExp(
+    `CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?"?${table}"?\\s*\\((.*?)\\)\\s*;`,
+    "is",
+  );
   const tableMatch = sql.match(tablePattern);
   if (!tableMatch) return false;
 

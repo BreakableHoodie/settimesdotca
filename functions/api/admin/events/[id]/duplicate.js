@@ -83,7 +83,7 @@ export async function onRequestPost(context) {
         originalEvent.city || null,
         originalEvent.ticket_url || null,
         originalEvent.venue_info || null,
-        originalEvent.social_links || null,
+        safeReflectSocialLinksString(originalEvent.social_links || null, ["instagram", "x", "tiktok"]),
         originalEvent.theme_colors || null,
         currentUser.userId,
       )
@@ -93,12 +93,12 @@ export async function onRequestPost(context) {
       throw new Error("events INSERT returned null");
     }
 
-    // Read-path sanitize (#493): social_links is copied verbatim from the
-    // source event (INSERT ... originalEvent.social_links), so it may carry
-    // a pre-#483 (or otherwise legacy) value. Sanitize what's reflected back
-    // here; every other admin read path is sanitized too, so the stored
-    // duplicate is never echoed unsanitized regardless of which one serves
-    // a later request.
+    // Read-path sanitize (#493): the INSERT above already stores a sanitized
+    // copy of social_links (#499), so this row can no longer carry a stale
+    // pre-#483 value. This reflection sanitize stays anyway for consistency
+    // with every other admin read path (each RETURNING * / SELECT * echo is
+    // sanitized independently), so a future write path that skips
+    // sanitization still can't leak an unsafe value through this response.
     newEvent.social_links = safeReflectSocialLinksString(newEvent.social_links, ["instagram", "x", "tiktok"]);
 
     // Copy performances. If the copy fails, compensate by deleting the new event

@@ -443,6 +443,57 @@ describe("Event API - handler integration", () => {
     expect(data.bands_copied).toBeGreaterThanOrEqual(2);
   });
 
+  it("duplicate endpoint sanitizes a legacy javascript: social_links value at the write path (#499)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    // Original event, with a malicious social_links value seeded directly via
+    // SQL (bypassing write-path validation) to simulate a pre-#483 legacy row
+    // that never went through sanitizeEventSocialLinks.
+    const original = insertEvent(rawDb, { name: "Legacy Source", slug: "legacy-source" });
+    rawDb.prepare("UPDATE events SET social_links = ? WHERE id = ?").run(
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #499 write-path guard
+      JSON.stringify({ instagram: "javascript:alert(1)", website: "javascript:alert(1)", x: "someHandle" }),
+      original.id,
+    );
+
+    const body = {
+      name: "Copy of Legacy Source",
+      date: "2026-01-01",
+      slug: "legacy-source-copy",
+    };
+    const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const res = await duplicateHandler.onRequestPost({
+      request,
+      env,
+      params: { id: String(original.id) },
+    });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+
+    // Response echo is sanitized (defense-in-depth, unchanged behaviour).
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #499 write-path guard
+    expect(data.event.social_links).not.toContain("javascript:");
+
+    // The core assertion: the row actually stored in the DB is sanitized too,
+    // not just the response. Query it directly rather than trusting the echo.
+    const stored = rawDb.prepare("SELECT social_links FROM events WHERE id = ?").get(data.event.id);
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #499 write-path guard
+    expect(stored.social_links).not.toContain("javascript:");
+    const storedParsed = JSON.parse(stored.social_links);
+    expect(storedParsed.instagram).toBeNull();
+    expect(storedParsed.website).toBeNull();
+    expect(storedParsed.x).toBe("someHandle");
+  });
+
   it("delete endpoint requires admin and deletes event", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };

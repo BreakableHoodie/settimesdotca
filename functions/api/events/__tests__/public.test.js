@@ -320,4 +320,42 @@ describe("GET /api/events/public", () => {
       expect(data.events).toHaveLength(7);
     });
   });
+
+  describe("ticket_url sanitization (#504)", () => {
+    it("nulls out a legacy javascript: ticket_url value", async () => {
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 read-path guard
+      const event = createMockEvent({ ticket_url: "javascript:alert(1)" });
+      const venue = createMockVenue();
+      const band = createMockBand();
+
+      seedMockData(mockDB, [event], [venue], [band]);
+
+      const request = new Request("http://localhost/api/events/public");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.events).toHaveLength(1);
+      expect(data.events[0].ticket_url).toBeNull();
+    });
+
+    it("passes a normal https ticket_url value through unchanged", async () => {
+      const event = createMockEvent({ ticket_url: "https://tickets.example.com/summer-fest" });
+      const venue = createMockVenue();
+      const band = createMockBand();
+
+      seedMockData(mockDB, [event], [venue], [band]);
+
+      const request = new Request("http://localhost/api/events/public");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.events[0].ticket_url).toBe("https://tickets.example.com/summer-fest");
+    });
+  });
 });

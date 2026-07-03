@@ -1,4 +1,5 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
+import { normalizeHttpUrl } from "../../../utils/validation.js";
 
 /**
  * Public API: Get event details (bands + venues) for a single published event
@@ -48,6 +49,12 @@ export async function onRequestGet(context) {
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    // Read-path sanitize (#504): a pre-validation legacy ticket_url (e.g. a
+    // javascript: scheme) must not be reflected to this public, unauthenticated
+    // endpoint — normalizeHttpUrl returns null for anything that isn't a real
+    // http(s) URL.
+    event.ticket_url = normalizeHttpUrl(event.ticket_url);
 
     const bandsResult = await DB.prepare(
       `

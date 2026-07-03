@@ -494,6 +494,50 @@ describe("Event API - handler integration", () => {
     expect(storedParsed.x).toBe("someHandle");
   });
 
+  it("duplicate endpoint sanitizes a legacy javascript: ticket_url value at the write path (#504)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    // Original event, with a malicious ticket_url value seeded directly via
+    // SQL (bypassing write-path validation) to simulate a pre-guard legacy
+    // row that never went through the ticket_url URL validator.
+    const original = insertEvent(rawDb, { name: "Legacy Ticket Source", slug: "legacy-ticket-source" });
+    rawDb
+      .prepare("UPDATE events SET ticket_url = ? WHERE id = ?")
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 write-path guard
+      .run("javascript:alert(1)", original.id);
+
+    const body = {
+      name: "Copy of Legacy Ticket Source",
+      date: "2026-01-01",
+      slug: "legacy-ticket-source-copy",
+    };
+    const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-test-role": "editor",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const res = await duplicateHandler.onRequestPost({
+      request,
+      env,
+      params: { id: String(original.id) },
+    });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+
+    // Response echo is sanitized (defense-in-depth, unchanged behaviour).
+    expect(data.event.ticket_url).toBeNull();
+
+    // The core assertion: the row actually stored in the DB is sanitized too,
+    // not just the response. Query it directly rather than trusting the echo.
+    const stored = rawDb.prepare("SELECT ticket_url FROM events WHERE id = ?").get(data.event.id);
+    expect(stored.ticket_url).toBeNull();
+  });
+
   it("delete endpoint requires admin and deletes event", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };

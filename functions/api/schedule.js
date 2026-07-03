@@ -151,7 +151,7 @@ export async function onRequestGet(context) {
       end_date: event.end_date ?? null,
       city: event.city ?? null,
       slug: event.slug,
-      ticket_url: event.ticket_url,
+      ticket_url: normalizeHttpUrl(event.ticket_url),
       is_archived: event.status === "archived",
       theme_colors: event.theme_colors,
       venue_info: event.venue_info,

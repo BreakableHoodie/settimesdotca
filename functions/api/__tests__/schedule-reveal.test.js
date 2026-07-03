@@ -54,3 +54,36 @@ describe("GET /api/schedule - reveal mode", () => {
     expect(data.event.reveal_mode).toBe(1);
   });
 });
+
+describe("GET /api/schedule - ticket_url sanitization (#504)", () => {
+  it("nulls out a legacy javascript: ticket_url value seeded directly via SQL", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-unsafe-ticket" });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb
+      .prepare("UPDATE events SET ticket_url = ? WHERE id = ?")
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 read-path guard
+      .run("javascript:alert(1)", ev.id);
+
+    const req = new Request("https://example.test/api/schedule?event=vol6-unsafe-ticket");
+    const res = await scheduleHandler.onRequestGet({ request: req, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.ticket_url).toBeNull();
+  });
+
+  it("passes a normal https:// ticket_url value through unchanged", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-safe-ticket" });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/vol6", ev.id);
+
+    const req = new Request("https://example.test/api/schedule?event=vol6-safe-ticket");
+    const res = await scheduleHandler.onRequestGet({ request: req, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.ticket_url).toBe("https://tickets.example.com/vol6");
+  });
+});

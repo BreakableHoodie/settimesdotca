@@ -3,6 +3,7 @@
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
 import { escapeAttr, toPlainText, serveWithInjectedMeta, WATERLOO_ADDRESS, CANONICAL_HOST } from "../utils/ssrMeta.js";
+import { normalizeHttpUrl } from "../utils/validation.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -99,6 +100,12 @@ export async function onRequest(context) {
           address: WATERLOO_ADDRESS,
         };
 
+  // Read-path sanitize (#504): a pre-validation legacy ticket_url (e.g. a
+  // javascript: scheme) must never be reflected into the Offer.url of the
+  // MusicEvent JSON-LD — normalizeHttpUrl returns null for anything that
+  // isn't a real http(s) URL, which drops the offers block entirely below.
+  const safeTicketUrl = normalizeHttpUrl(event.ticket_url);
+
   const musicEvent = {
     "@context": "https://schema.org",
     "@type": "MusicEvent",
@@ -111,11 +118,11 @@ export async function onRequest(context) {
     ...(event.date ? { endDate: event.end_date || event.date } : {}),
     location,
     ...(plainDesc ? { description: plainDesc } : {}),
-    ...(event.ticket_url
+    ...(safeTicketUrl
       ? {
           offers: {
             "@type": "Offer",
-            url: event.ticket_url,
+            url: safeTicketUrl,
             price: "0",
             priceCurrency: "CAD",
             availability: "https://schema.org/InStock",

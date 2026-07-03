@@ -10,7 +10,7 @@
 
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP } from "../../../../utils/request.js";
-import { safeReflectSocialLinksString, validateId } from "../../../../utils/validation.js";
+import { normalizeHttpUrl, safeReflectSocialLinksString, validateId } from "../../../../utils/validation.js";
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -81,7 +81,7 @@ export async function onRequestPost(context) {
         "draft",
         originalEvent.description || null,
         originalEvent.city || null,
-        originalEvent.ticket_url || null,
+        normalizeHttpUrl(originalEvent.ticket_url || null),
         originalEvent.venue_info || null,
         safeReflectSocialLinksString(originalEvent.social_links || null, ["instagram", "x", "tiktok"]),
         originalEvent.theme_colors || null,
@@ -94,12 +94,14 @@ export async function onRequestPost(context) {
     }
 
     // Read-path sanitize (#493): the INSERT above already stores a sanitized
-    // copy of social_links (#499), so this row can no longer carry a stale
-    // pre-#483 value. This reflection sanitize stays anyway for consistency
-    // with every other admin read path (each RETURNING * / SELECT * echo is
-    // sanitized independently), so a future write path that skips
-    // sanitization still can't leak an unsafe value through this response.
+    // copy of social_links (#499) and ticket_url (#504), so this row can no
+    // longer carry a stale pre-guard value. This reflection sanitize stays
+    // anyway for consistency with every other admin read path (each
+    // RETURNING * / SELECT * echo is sanitized independently), so a future
+    // write path that skips sanitization still can't leak an unsafe value
+    // through this response.
     newEvent.social_links = safeReflectSocialLinksString(newEvent.social_links, ["instagram", "x", "tiktok"]);
+    newEvent.ticket_url = normalizeHttpUrl(newEvent.ticket_url);
 
     // Copy performances. If the copy fails, compensate by deleting the new event
     // so we never leave an empty orphan draft behind (D1 has no BEGIN/COMMIT).

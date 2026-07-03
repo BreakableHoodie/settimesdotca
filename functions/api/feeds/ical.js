@@ -1,5 +1,5 @@
 // iCal feed generation
-// Format: https://portland.ics?genre=indie
+// GET /api/feeds/ical?city=…&genre=…
 // Compatible with Google Calendar, Apple Calendar, Outlook
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
@@ -92,9 +92,9 @@ function generateICal(bands, city, genre) {
   const ical = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Concert Schedule//EN",
+    "PRODID:-//SetTimes//settimes.ca//EN",
     `X-WR-CALNAME:${escapeIcal(`${city} ${genre} Shows`)}`,
-    "X-WR-TIMEZONE:America/Los_Angeles",
+    "X-WR-TIMEZONE:America/Toronto",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
   ];
@@ -112,7 +112,7 @@ function generateICal(bands, city, genre) {
     const dtend = `${eventDate.replace(/-/g, "")}T${endTime.replace(/:/g, "")}00`;
 
     // Generate unique ID using performance ID to ensure uniqueness per band
-    const uid = `performance-${band.performance_id}-${eventDate}@concertschedule.app`;
+    const uid = `performance-${band.performance_id}-${eventDate}@settimes.ca`;
 
     // Location
     const location = band.venue_name ? `${band.venue_name}${band.address ? ", " + band.address : ""}` : "TBD";

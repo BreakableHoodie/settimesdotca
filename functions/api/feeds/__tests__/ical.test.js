@@ -81,8 +81,26 @@ describe("GET /api/feeds/ical", () => {
 
     expect(response.status).toBe(200);
     expect(icalData).toContain("VERSION:2.0");
-    expect(icalData).toContain("PRODID:-//Concert Schedule//EN");
+    expect(icalData).toContain("PRODID:-//SetTimes//settimes.ca//EN");
     expect(icalData).toContain("CALSCALE:GREGORIAN");
+  });
+
+  it("should declare America/Toronto as the calendar timezone (Waterloo Region, not America/Los_Angeles)", async () => {
+    const event = createMockEvent();
+    const venue = createMockVenue();
+    const band = createMockBand();
+
+    seedMockData(mockDB, [event], [venue], [band]);
+
+    const request = new Request("http://localhost/api/feeds/ical");
+    const context = { request, env: mockEnv };
+
+    const response = await onRequestGet(context);
+    const icalData = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(icalData).toContain("X-WR-TIMEZONE:America/Toronto");
+    expect(icalData).not.toContain("America/Los_Angeles");
   });
 
   it("should format each event with VEVENT block including DTSTART, DTEND, SUMMARY", async () => {
@@ -209,9 +227,9 @@ describe("GET /api/feeds/ical", () => {
     expect(icalData).toContain("SUMMARY:Band One");
     expect(icalData).toContain("SUMMARY:Band Two");
 
-    // UIDs should be unique (using performance IDs)
-    expect(icalData).toContain(`UID:performance-1-${dateStr}@concertschedule.app`);
-    expect(icalData).toContain(`UID:performance-2-${dateStr}@concertschedule.app`);
+    // UIDs should be unique (using performance IDs) and use the settimes.ca domain
+    expect(icalData).toContain(`UID:performance-1-${dateStr}@settimes.ca`);
+    expect(icalData).toContain(`UID:performance-2-${dateStr}@settimes.ca`);
 
     // Count VEVENT blocks - should be 2
     const vevents = icalData.split("BEGIN:VEVENT").length - 1;

@@ -589,8 +589,8 @@ export async function onRequestDelete(context) {
       });
     }
 
-    // Check if event has any bands (for informational message)
-    const bandCount = await DB.prepare("SELECT COUNT(*) as count FROM performances WHERE event_id = ?")
+    // Check if event has any performances (for informational message)
+    const performanceCount = await DB.prepare("SELECT COUNT(*) as count FROM performances WHERE event_id = ?")
       .bind(eventIdNum)
       .first();
 
@@ -598,13 +598,13 @@ export async function onRequestDelete(context) {
     const url = new URL(request.url);
     const confirmCascade = body?.confirmCascade === true || url.searchParams.get("confirmCascade") === "true";
 
-    if (bandCount.count > 0 && !confirmCascade) {
+    if (performanceCount.count > 0 && !confirmCascade) {
       return new Response(
         JSON.stringify({
           error: "Confirmation required",
           message:
             "Deleting this event will permanently remove associated performance records. Repeat the request with confirmCascade=true to continue.",
-          affected_performance_count: bandCount.count,
+          affected_performance_count: performanceCount.count,
         }),
         {
           status: 409,
@@ -625,7 +625,7 @@ export async function onRequestDelete(context) {
       eventIdNum,
       {
         name: event.name,
-        bandCount: bandCount.count,
+        performanceCount: performanceCount.count,
       },
       ipAddress,
     );
@@ -633,7 +633,7 @@ export async function onRequestDelete(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Event "${event.name}" deleted successfully${bandCount.count > 0 ? ` (${bandCount.count} performance record(s) were permanently deleted with this event)` : ""}`,
+        message: `Event "${event.name}" deleted successfully${performanceCount.count > 0 ? ` (${performanceCount.count} performance record(s) were permanently deleted with this event)` : ""}`,
       }),
       {
         headers: { "Content-Type": "application/json" },

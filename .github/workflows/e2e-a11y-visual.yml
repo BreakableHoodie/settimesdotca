@@ -2,7 +2,7 @@ name: E2E A11y + Visual
 
 on:
     pull_request:
-        branches: [main]
+        branches: [main, dev]
         paths:
             - 'e2e/accessibility/**'
             - 'e2e/visual-regression.spec.js'

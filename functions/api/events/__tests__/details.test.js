@@ -177,3 +177,54 @@ describe("GET /api/events/:id/details - reveal_mode gate", () => {
     expect(payload.bands[0].name).toBe("Unannounced But Visible");
   });
 });
+
+describe("GET /api/events/:id/details - ticket_url sanitization (#504)", () => {
+  test("nulls out a legacy javascript: ticket_url value seeded directly via SQL", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Unsafe Ticket Event",
+      slug: "details-504-unsafe-ticket",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb
+      .prepare("UPDATE events SET ticket_url = ? WHERE id = ?")
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 read-path guard
+      .run("javascript:alert(1)", event.id);
+
+    const request = new Request(`https://example.test/api/events/${event.id}/details`);
+    const response = await onRequestGet({
+      request,
+      env,
+      params: { id: String(event.id) },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.event.ticket_url).toBeNull();
+  });
+
+  test("passes a normal https ticket_url value through unchanged", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Safe Ticket Event",
+      slug: "details-504-safe-ticket",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/crawl", event.id);
+
+    const request = new Request(`https://example.test/api/events/${event.id}/details`);
+    const response = await onRequestGet({
+      request,
+      env,
+      params: { id: String(event.id) },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.event.ticket_url).toBe("https://tickets.example.com/crawl");
+  });
+});

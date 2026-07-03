@@ -3,6 +3,7 @@
 // Rate limited to prevent abuse
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+import { normalizeHttpUrl } from "../../utils/validation.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -77,10 +78,19 @@ export async function onRequestGet(context) {
       .bind(...params)
       .all();
 
+    // Read-path sanitize (#504): a pre-validation legacy ticket_url (e.g. a
+    // javascript: scheme) must not be reflected to this public, unauthenticated
+    // endpoint — normalizeHttpUrl returns null for anything that isn't a real
+    // http(s) URL.
+    const sanitizedEvents = filteredEvents.map((event) => ({
+      ...event,
+      ticket_url: normalizeHttpUrl(event.ticket_url),
+    }));
+
     // Return JSON
     return new Response(
       JSON.stringify({
-        events: filteredEvents,
+        events: sanitizedEvents,
         filters: {
           city: city,
           genre: genre,

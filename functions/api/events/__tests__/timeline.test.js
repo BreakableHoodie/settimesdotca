@@ -789,3 +789,65 @@ describe("Timeline real-DB — derived band url is scheme-validated (#483)", () 
     expect(band.url).toBe("https://fallbackband.bandcamp.com/");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Real-DB regression — the event-level `ticket_url` reflection must never
+// carry an unsafe scheme. Seeded via a direct SQL UPDATE (bypassing write-path
+// validation) to simulate a pre-guard legacy row. Regression for #504.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — event ticket_url is scheme-validated (#504)", () => {
+  test("an event with a javascript: ticket_url resolves to ticket_url: null", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const event = insertEvent(rawDb, {
+      name: "Unsafe Ticket Event",
+      slug: "timeline-realdb-504-null",
+      date: today,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb
+      .prepare("UPDATE events SET ticket_url = ? WHERE id = ?")
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 read-path guard
+      .run("javascript:alert(1)", event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.ticket_url).toBeNull();
+  });
+
+  test("an event with a normal https ticket_url passes through unchanged", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const event = insertEvent(rawDb, {
+      name: "Safe Ticket Event",
+      slug: "timeline-realdb-504-safe",
+      date: today,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/crawl", event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.ticket_url).toBe("https://tickets.example.com/crawl");
+  });
+});

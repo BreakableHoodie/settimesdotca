@@ -30,7 +30,46 @@ export async function parsePublicApiResponse(response, fallbackMessage = 'API re
   return data
 }
 
+const RETRY_DELAY_MS = 600
+const MAX_ATTEMPTS = 2
+
+function isRetryableRequest(options) {
+  const method = (options.method || 'GET').toUpperCase()
+  return method === 'GET'
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// Retries a single time on transient failures (network error or 5xx) for GET
+// reads only — never for mutating requests, where a retry could double the
+// side effect. This exists to ride out brief upstream blips (e.g. a
+// transient D1 5xx) without blanking the page on one bad response.
 export async function fetchPublicJson(url, options = {}, fallbackMessage = 'API request failed') {
-  const response = await fetch(url, options)
-  return parsePublicApiResponse(response, fallbackMessage)
+  const canRetry = isRetryableRequest(options)
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const isFinalAttempt = attempt === MAX_ATTEMPTS
+    let response
+
+    try {
+      response = await fetch(url, options)
+    } catch (networkError) {
+      if (canRetry && !isFinalAttempt) {
+        await delay(RETRY_DELAY_MS)
+        continue
+      }
+      throw networkError
+    }
+
+    if (canRetry && !isFinalAttempt && response.status >= 500) {
+      await delay(RETRY_DELAY_MS)
+      continue
+    }
+
+    return parsePublicApiResponse(response, fallbackMessage)
+  }
+
+  return undefined
 }

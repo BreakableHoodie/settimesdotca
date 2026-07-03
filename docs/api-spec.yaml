@@ -3611,7 +3611,7 @@ components:
           type: boolean
         event:
           $ref: "#/components/schemas/GenericRecord"
-        bandsCopied:
+        bands_copied:
           type: integer
         message:
           type: string

@@ -1,749 +1,832 @@
-# Database Schema Documentation
+# Database Schema
 
-**Database:** SetTimes
-**Type:** Cloudflare D1 (SQLite)
-**Status:** Active schema is managed through numbered migrations and local bootstrap SQL
-**Last Updated:** 2026-04-27
+**Type:** Cloudflare D1 (SQLite-compatible)
+
+This document is derived directly from `database/setup-complete.sql` — every
+table, column, and foreign key below reflects that file, except the four
+tables in "Subscriptions & schedule builds", which exist only in `migrations/`
+(see "Known schema drift"). When the schema changes, update
+`database/setup-complete.sql` and this document together (see `migrations/`
+history at the bottom for how schema changes are made).
 
 ## Overview
 
-The SetTimes database supports **multi-event management** with a **band profile system** that separates band identity (reusable across events) from performance scheduling (event-specific).
+Schema is managed two ways:
 
-## Source of Truth
+- **`migrations/0001…0048_*.sql`** — numbered, sequential migrations. These are
+  applied to the production D1 database automatically on deploy by the
+  "Apply remote D1 migrations" step in `.github/workflows/cloudflare-pages.yml`
+  (`wrangler d1 migrations apply <db> --remote`). Do not apply them manually.
+- **`database/setup-complete.sql`** — a full bootstrap script (every
+  `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`, plus three
+  seeded test-account rows) used to build a fresh database in one shot for
+  local dev and CI/E2E. It must stay in sync with the cumulative effect of
+  `migrations/`.
+- **`database/seed-test-data.sql`** — additional venues/events/band test data
+  layered on top of `setup-complete.sql` for local dev and E2E.
 
-- **Canonical schema for fresh installs:** `database/setup-complete.sql` — apply this alone when creating a new database.
-- **Active schema changes:** `migrations/*.sql` — numbered upgrade migrations for existing databases.
-- **Optional local-only starter data:** `database/setup-local-dev.sql`
-- **Local upgrade workflow:** `npm run migrate:local`
-- **Schema validation:** `scripts/validate-db-schema.js`
-- **Release-time remote verification:** `scripts/verify-remote-d1-schema.mjs`
-- **Special case:** `0002_migration-single-org.sql` is a one-time transition migration for older databases and should not be applied to a fresh `setup-complete.sql` install.
+### Local setup
 
-Do not add new schema changes to historical files under `database/` or to archived migration notes.
+Copied from the `Initialize D1 database with schema` step in
+`.github/actions/e2e-env/action.yml`, which is how CI provisions D1 for E2E:
 
-### Key Features
+```bash
+npx wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state \
+  --file=database/setup-complete.sql
 
-- **Band Library:** Reusable band profiles with photos, bios, and social links
-- **Smart Duplicate Detection:** Prevents accidental duplication while preserving artistic capitalization
-- **Multi-Event Support:** Same bands can perform across multiple events (Vol. 5, Vol. 6, etc.)
-- **Shared Venues:** Venue information reused across all events
-- **Security:** Authentication audit logging and IP-based rate limiting
-- **Publication Workflow:** Draft → published with granular control
-
-## Entity Relationship Diagram
-
-```mermaid
-erDiagram
-    events ||--o{ performances : "contains"
-    band_profiles ||--o{ performances : "performs"
-    venues ||--o{ performances : "hosts"
-
-    events {
-        INTEGER id PK "Auto-increment"
-        TEXT name "Event name"
-        TEXT date "YYYY-MM-DD format"
-        TEXT slug UK "URL-friendly, unique"
-        INTEGER is_published "0=draft, 1=published"
-        TEXT created_at "ISO 8601 timestamp"
-    }
-
-    band_profiles {
-        INTEGER id PK "Auto-increment"
-        TEXT name "Display name (artistic caps)"
-        TEXT name_normalized UK "Lowercase for dupes"
-        TEXT description "Band bio (markdown)"
-        TEXT photo_url "Hero image URL"
-        TEXT genre "Genre tags"
-        TEXT social_links "JSON social URLs"
-        TEXT created_at "ISO 8601 timestamp"
-        TEXT updated_at "ISO 8601 timestamp"
-    }
-
-    venues {
-        INTEGER id PK "Auto-increment"
-        TEXT name UK "Unique venue name"
-        TEXT address "Optional address"
-    }
-
-    performances {
-        INTEGER id PK "Auto-increment"
-        INTEGER event_id FK "→ events(id) CASCADE"
-        INTEGER band_profile_id FK "→ band_profiles(id) RESTRICT"
-        INTEGER venue_id FK "→ venues(id) RESTRICT"
-        TEXT start_time "HH:MM 24-hour"
-        TEXT end_time "HH:MM 24-hour"
-        TEXT notes "Optional per-perf notes"
-        TEXT created_at "ISO 8601 timestamp"
-    }
-
-    auth_audit {
-        INTEGER id PK "Auto-increment"
-        TEXT timestamp "ISO 8601 timestamp"
-        TEXT action "login_attempt, etc."
-        INTEGER success "0=failed, 1=success"
-        TEXT ip_address "Client IP"
-        TEXT user_agent "Browser/client info"
-        TEXT details "Optional JSON data"
-    }
-
-    rate_limit {
-        INTEGER id PK "Auto-increment"
-        TEXT ip_address UK "Unique IP address"
-        INTEGER failed_attempts "Counter (0-5+)"
-        TEXT lockout_until "ISO timestamp or NULL"
-        TEXT last_attempt "ISO 8601 timestamp"
-    }
+npx wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state \
+  --file=database/seed-test-data.sql
 ```
 
-## Band Profile System Architecture
-
-### Why This Design?
-
-**Problem:** The old schema duplicated band data for each event. If "The Harpoonist" played Vol. 5, Vol. 6, and Vol. 7, their name and URL were stored three times. Updating the band's website meant editing three rows.
-
-**Solution:** Separate band identity (profile) from performance scheduling:
-
-- **`band_profiles`:** Who the band is (name, bio, photos, social links)
-- **performances`:** When/where they played (event, venue, time)
-
-**Benefits:**
-
-1. Update band info once → reflects across all events
-2. See complete performance history per band
-3. Build searchable band library for reuse
-4. Enable future features (Bandcamp integration, discovery platform)
-
-### Smart Duplicate Detection
-
-**Challenge:** Prevent duplicates like "The Harpoonist" vs "THE HARPOONIST" while preserving artistic capitalization like "mxmtoon", "CHVRCHES", "deadmau5".
-
-**Solution:** Two-field approach:
-
-- `name`: Display name (preserves user input exactly)
-- `name_normalized`: Lowercase + trimmed for duplicate checking (UNIQUE constraint)
-
-**Normalization Rules:**
-
-```javascript
-// Convert to lowercase, trim, collapse multiple spaces
-const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
-
-// Examples:
-"The Harpoonist"  → "the harpoonist"
-"THE HARPOONIST"  → "the harpoonist"  // Duplicate detected!
-"The  Harpoonist" → "the harpoonist"  // Double space caught
-"mxmtoon"         → "mxmtoon"         // Artistic caps preserved
-"CHVRCHES"        → "chvrches"        // Stored as "CHVRCHES", normalized for lookup
-```
-
-**User Experience:**
-When creating a band that matches an existing normalized name:
-
-1. API returns 409 Conflict
-2. Frontend shows: "⚠️ Similar band found: The Harpoonist (played Vol. 5, Vol. 4)"
-3. User chooses: [Use This Band] or [Create Different Band]
-4. "Create Different Band" requires distinguishing detail (e.g., "The Harpoonist (Tribute)")
-
-### Migration from v1
-
-The v1→v2 migration script (`migration-v1-to-v2.sql`) has been removed along with the `migrations/legacy/` directory.
-
-**Summary:**
-
-1. Extract unique bands from old `bands` table using normalization
-2. Create `band_profiles` with deduplication
-3. Create `performances` linking to profiles
-4. Archive old `bands` table as `bands_deprecated_v1`
-
-## Table Details
-
-### `events`
-
-Stores each band crawl event (e.g., Vol. 5, Vol. 6).
-
-| Column         | Type    | Constraints                | Description                                           |
-| -------------- | ------- | -------------------------- | ----------------------------------------------------- |
-| `id`           | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique event identifier                               |
-| `name`         | TEXT    | NOT NULL                   | Display name (e.g., "Long Weekend Band Crawl Vol. 5") |
-| `date`         | TEXT    | NOT NULL                   | Event date in YYYY-MM-DD format                       |
-| `slug`         | TEXT    | NOT NULL, UNIQUE           | URL-friendly identifier (e.g., "vol-5", "vol-6")      |
-| `is_published` | INTEGER | NOT NULL, DEFAULT 0        | Publication status: 0 = draft, 1 = published          |
-| `created_at`   | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 creation timestamp                           |
-
-**Business Rules:**
-
-- `slug` must be lowercase, numbers, and hyphens only (validated at application layer)
-- Only published events (`is_published = 1`) are visible in public API
-- Deleting an event cascades to all associated bands
-
-**Indexes:**
-
-- `idx_events_published` on `is_published` - Fast filtering of published events
-- `idx_events_slug` on `slug` - Fast lookups for public schedule API
-
-### `venues`
-
-Stores venue information shared across all events.
-
-| Column    | Type    | Constraints                | Description                                  |
-| --------- | ------- | -------------------------- | -------------------------------------------- |
-| `id`      | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique venue identifier                      |
-| `name`    | TEXT    | NOT NULL, UNIQUE           | Venue name (e.g., "Room 47", "The Basement") |
-| `address` | TEXT    | NULL                       | Optional physical address                    |
-
-**Business Rules:**
-
-- Venue names must be unique across all events
-- Venues can be reused across multiple events (e.g., "Room 47" in Vol. 5 and Vol. 6)
-- Deleting a venue is RESTRICTED if bands are scheduled there
-
-**Design Decision:**
-Venues are shared across events (not event-specific) because:
-
-- Same physical venues are typically used year after year
-- Reduces data duplication
-- Simplifies venue management in admin panel
-
-### `band_profiles`
-
-Stores reusable band identity across all events. This is the "band library."
-
-| Column            | Type    | Constraints                | Description                                            |
-| ----------------- | ------- | -------------------------- | ------------------------------------------------------ |
-| `id`              | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique band profile identifier                         |
-| `name`            | TEXT    | NOT NULL                   | Display name (preserves artistic capitalization)       |
-| `name_normalized` | TEXT    | NOT NULL, UNIQUE           | Lowercase + trimmed for duplicate detection            |
-| `description`     | TEXT    | NULL                       | Band bio/description (markdown supported)              |
-| `photo_url`       | TEXT    | NULL                       | Hero image URL (uploaded or external link)             |
-| `genre`           | TEXT    | NULL                       | Genre tags (comma-separated for MVP)                   |
-| `social_links`    | TEXT    | NULL                       | JSON: {"bandcamp": "url", "instagram": "@handle", ...} |
-| `created_at`      | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 creation timestamp                            |
-| `updated_at`      | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 last update timestamp                         |
-
-**Business Rules:**
-
-- `name_normalized` enforces duplicate detection (see normalization rules above)
-- Artistic capitalization preserved in `name` field ("mxmtoon", "CHVRCHES")
-- `social_links` stores flexible JSON for any platform (Bandcamp, Instagram, Facebook, Spotify, YouTube, etc.)
-- Cannot delete if performances exist (FK RESTRICT)
-- Auto-updates `updated_at` on any edit (via trigger)
-
-**Indexes:**
-
-- `idx_band_profiles_normalized` on `name_normalized` (UNIQUE) - Fast duplicate detection
-- `idx_band_profiles_name` on `name` - Fast autocomplete search
-- `idx_band_profiles_genre` on `genre` - Fast filtering by genre
-
-### `performances`
-
-Links band profiles to events with scheduling details. Replaces old `bands` table.
-
-| Column            | Type    | Constraints                      | Description                                           |
-| ----------------- | ------- | -------------------------------- | ----------------------------------------------------- |
-| `id`              | INTEGER | PRIMARY KEY, AUTOINCREMENT       | Unique performance identifier                         |
-| `event_id`        | INTEGER | NOT NULL, FK → events(id)        | Event this performance belongs to                     |
-| `band_profile_id` | INTEGER | NOT NULL, FK → band_profiles(id) | Which band is performing                              |
-| `venue_id`        | INTEGER | NOT NULL, FK → venues(id)        | Venue where band performs                             |
-| `start_time`      | TEXT    | NOT NULL                         | Performance start time (HH:MM, 24-hour)               |
-| `end_time`        | TEXT    | NOT NULL                         | Performance end time (HH:MM, 24-hour)                 |
-| `notes`           | TEXT    | NULL                             | Optional per-performance notes (e.g., "acoustic set") |
-| `created_at`      | TEXT    | NOT NULL, DEFAULT now()          | ISO 8601 creation timestamp                           |
-
-**Foreign Keys:**
-
-- `event_id → events(id) ON DELETE CASCADE` - Deleting event removes performances
-- `band_profile_id → band_profiles(id) ON DELETE RESTRICT` - Cannot delete band if they have performances
-- `venue_id → venues(id) ON DELETE RESTRICT` - Cannot delete venue if performances scheduled
-
-**Business Rules:**
-
-- `end_time` must be after `start_time` (validated at application layer)
-- Conflict detection warns when performances overlap at same venue
-- Times are stored in 24-hour HH:MM format (e.g., "20:00", "21:30")
-- Same band can perform at multiple events (that's the point!)
-
-**Indexes:**
-
-- `idx_performances_event` on `event_id` - Fast filtering by event
-- `idx_performances_band` on `band_profile_id` - Fast performance history queries
-- `idx_performances_venue` on `venue_id` - Fast conflict detection
-- `idx_performances_event_time` on `(event_id, start_time)` - Fast sorted queries
-
-### `auth_audit`
-
-Logs all authentication attempts for security monitoring and forensics.
-
-| Column       | Type    | Constraints                | Description                                           |
-| ------------ | ------- | -------------------------- | ----------------------------------------------------- |
-| `id`         | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique audit log identifier                           |
-| `timestamp`  | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 timestamp of attempt                         |
-| `action`     | TEXT    | NOT NULL                   | Action type (e.g., "login_attempt", "password_reset") |
-| `success`    | INTEGER | NOT NULL                   | 0 = failed, 1 = successful                            |
-| `ip_address` | TEXT    | NOT NULL                   | Client IP address (from CF-Connecting-IP header)      |
-| `user_agent` | TEXT    | NULL                       | Browser/client user agent string                      |
-| `details`    | TEXT    | NULL                       | Optional JSON with additional context                 |
-
-**Business Rules:**
-
-- Every authentication attempt is logged (success and failure)
-- IP addresses are captured from Cloudflare's `CF-Connecting-IP` header
-- Audit logs are append-only (no updates or deletes in application logic)
-- Useful for security investigations and compliance
-
-**Indexes:**
-
-- `idx_auth_audit_timestamp` on `timestamp` - Fast time-based queries
-- `idx_auth_audit_ip` on `ip_address` - Fast IP-based queries
-
-**Query Examples:**
-
-```sql
--- Failed login attempts in last 24 hours
-SELECT * FROM auth_audit
-WHERE action = 'login_attempt'
-AND success = 0
-AND timestamp > datetime('now', '-1 day')
-ORDER BY timestamp DESC;
-
--- Suspicious activity from specific IP
-SELECT * FROM auth_audit
-WHERE ip_address = 'X.X.X.X'
-ORDER BY timestamp DESC;
-```
-
-### `rate_limit`
-
-Tracks failed login attempts and implements IP-based rate limiting.
-
-| Column            | Type    | Constraints                | Description                                             |
-| ----------------- | ------- | -------------------------- | ------------------------------------------------------- |
-| `id`              | INTEGER | PRIMARY KEY, AUTOINCREMENT | Unique rate limit record identifier                     |
-| `ip_address`      | TEXT    | NOT NULL, UNIQUE           | Client IP address                                       |
-| `failed_attempts` | INTEGER | NOT NULL, DEFAULT 0        | Counter of failed login attempts                        |
-| `lockout_until`   | TEXT    | NULL                       | ISO timestamp when lockout expires (NULL if not locked) |
-| `last_attempt`    | TEXT    | NOT NULL, DEFAULT now()    | ISO 8601 timestamp of last attempt                      |
-
-**Rate Limiting Algorithm:**
-
-1. **Window:** 10 minutes (rolling)
-2. **Threshold:** 5 failed attempts
-3. **Lockout:** 1 hour
-
-**Flow:**
-
-```text
-Attempt 1-4: Increment counter, allow retry
-Attempt 5:   Increment counter, set lockout_until = now + 1 hour
-Locked:      Reject all attempts until lockout_until expires
-Success:     Reset failed_attempts to 0, clear lockout_until
-```
-
-**Business Rules:**
-
-- One row per IP address (UNIQUE constraint)
-- Successful login resets the counter to 0
-- Lockout period begins after 5th failed attempt
-- Counter resets after 10 minutes of inactivity (checked at login time)
-
-**Indexes:**
-
-- `idx_rate_limit_ip` on `ip_address` - Fast lookups during login
-
-**Query Examples:**
-
-```sql
--- Currently locked-out IPs
-SELECT ip_address, lockout_until, failed_attempts
-FROM rate_limit
-WHERE lockout_until IS NOT NULL
-AND lockout_until > datetime('now');
-
--- Reset specific IP's lockout
-UPDATE rate_limit
-SET failed_attempts = 0,
-    lockout_until = NULL
-WHERE ip_address = 'X.X.X.X';
-```
+(`settimes-production-db` is the `database_name` bound to `env.DB` — see
+`wrangler.toml`.)
+
+## Conventions & gotchas
+
+These are project-wide invariants; see `CLAUDE.md` for the full detail behind
+each one.
+
+- **Datetime format:** stored timestamps use SQLite's `datetime('now')` format,
+  `YYYY-MM-DD HH:MM:SS` (space separator) — **not** JS `toISOString()`'s
+  `T`-separated format. Always normalize with `toSqliteDateTime()`
+  (`functions/utils/authAttempts.js:55`) before writing a computed timestamp.
+- **Exception:** `lucia_sessions.expires_at` is `INTEGER` (Unix epoch seconds),
+  the only `expires_at` column that isn't `TEXT`. Compare with
+  `row.expires_at * 1000 < Date.now()` in JS or `WHERE expires_at > unixepoch()`
+  in SQL — never `datetime('now')`.
+- **Foreign-key enforcement is guaranteed by the middleware, not assumed:**
+  `functions/_middleware.js` runs `PRAGMA foreign_keys = ON` before every
+  mutating request rather than relying on driver defaults (GET/HEAD are
+  skipped as read-only and cannot violate a constraint). Unit tests set the
+  PRAGMA unconditionally in `functions/api/test-utils.js`.
+- **No transactions:** the D1 binding has no `BEGIN`/`COMMIT`. Use
+  `env.DB.batch([...])` for atomic multi-statement writes (all-or-nothing), or
+  compensating deletes when a batch isn't possible — e.g. the event-duplication
+  handler (`functions/api/admin/events/[id]/duplicate.js`) deletes the
+  just-created event row if copying its performances fails, since it can't wrap
+  both inserts in one transaction.
+- **Password hashing is PBKDF2-SHA256, not bcrypt** (`functions/utils/crypto.js`).
+  Current hashes are stored in `users.password_hash` as
+  `pbkdf2$<iterations>$<salt-b64>$<hash-b64>`. `verifyPassword()` also accepts
+  a legacy `<salt-b64>:<hash-b64>` format at 100k iterations for hashes written
+  before the `pbkdf2$` format existed — the three seeded test accounts at the
+  bottom of `setup-complete.sql` are still in that legacy format.
+
+## Tables by domain
+
+### Core event data
+
+#### `events`
+
+One row per band-crawl event (e.g. Vol. 16, Vol. 17).
+
+| Column               | Type    | Notes                                                                                                             |
+| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `id`                 | INTEGER | PK, autoincrement                                                                                                 |
+| `name`               | TEXT    | NOT NULL                                                                                                          |
+| `date`               | TEXT    | NOT NULL, `YYYY-MM-DD`                                                                                            |
+| `end_date`           | TEXT    | Nullable; added in migration 0038 for multi-day events                                                            |
+| `slug`               | TEXT    | NOT NULL, UNIQUE                                                                                                  |
+| `is_published`       | INTEGER | NOT NULL, DEFAULT 0 (0 = draft, 1 = published)                                                                    |
+| `status`             | TEXT    | DEFAULT `'draft'` (e.g. also takes `'archived'`)                                                                  |
+| `archived_at`        | TEXT    | Nullable                                                                                                          |
+| `description`        | TEXT    | Nullable                                                                                                          |
+| `city`               | TEXT    | Nullable                                                                                                          |
+| `ticket_url`         | TEXT    | Nullable                                                                                                          |
+| `venue_info`         | TEXT    | Nullable (JSON)                                                                                                   |
+| `social_links`       | TEXT    | Nullable (JSON)                                                                                                   |
+| `theme_colors`       | TEXT    | Nullable (JSON)                                                                                                   |
+| `reveal_mode`        | INTEGER | NOT NULL, DEFAULT 0 — added in migration 0034; gates whether unannounced performances show in the public schedule |
+| `created_by_user_id` | INTEGER | Nullable, no FK constraint                                                                                        |
+| `updated_by_user_id` | INTEGER | Nullable, no FK constraint                                                                                        |
+| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                               |
+| `updated_at`         | TEXT    | DEFAULT `datetime('now')`                                                                                         |
+
+Indexes: `idx_events_published(is_published)`, `idx_events_slug(slug)`,
+`idx_events_status(status)`.
+
+#### `venues`
+
+Shared physical venues, reused across events.
+
+| Column          | Type    | Notes                                                                                 |
+| --------------- | ------- | ------------------------------------------------------------------------------------- |
+| `id`            | INTEGER | PK, autoincrement                                                                     |
+| `name`          | TEXT    | NOT NULL, UNIQUE                                                                      |
+| `address`       | TEXT    | Nullable                                                                              |
+| `address_line1` | TEXT    | Nullable                                                                              |
+| `address_line2` | TEXT    | Nullable                                                                              |
+| `city`          | TEXT    | Nullable — added in migration 0021                                                    |
+| `region`        | TEXT    | Nullable                                                                              |
+| `postal_code`   | TEXT    | Nullable                                                                              |
+| `country`       | TEXT    | Nullable                                                                              |
+| `capacity`      | INTEGER | Nullable                                                                              |
+| `website`       | TEXT    | Nullable                                                                              |
+| `instagram`     | TEXT    | Nullable — added in migration 0010                                                    |
+| `facebook`      | TEXT    | Nullable — added in migration 0010                                                    |
+| `phone`         | TEXT    | Nullable                                                                              |
+| `contact_email` | TEXT    | Nullable                                                                              |
+| `latitude`      | REAL    | Nullable — added in migration 0043, seeded for the 6 Vol. 17 King St N venues in 0044 |
+| `longitude`     | REAL    | Nullable — same as above                                                              |
+| `created_at`    | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                   |
+
+No indexes beyond the implicit one on the `UNIQUE` `name` column.
+
+#### `band_profiles`
+
+The reusable band identity — separate from any single event's schedule.
+
+| Column                | Type    | Notes                                                                            |
+| --------------------- | ------- | -------------------------------------------------------------------------------- |
+| `id`                  | INTEGER | PK, autoincrement                                                                |
+| `name`                | TEXT    | NOT NULL — display name, preserves artistic capitalization                       |
+| `name_normalized`     | TEXT    | NOT NULL, UNIQUE — lowercased/trimmed form used for duplicate detection          |
+| `description`         | TEXT    | Nullable                                                                         |
+| `genre`               | TEXT    | Nullable                                                                         |
+| `origin`              | TEXT    | Nullable                                                                         |
+| `origin_city`         | TEXT    | Nullable — added in migration 0020                                               |
+| `origin_region`       | TEXT    | Nullable — added in migration 0020                                               |
+| `contact_email`       | TEXT    | Nullable                                                                         |
+| `is_active`           | INTEGER | NOT NULL, DEFAULT 1                                                              |
+| `social_links`        | TEXT    | Nullable (JSON)                                                                  |
+| `photo_url`           | TEXT    | Nullable                                                                         |
+| `photo_alt_text`      | TEXT    | Nullable — added in migration 0042                                               |
+| `url`                 | TEXT    | Nullable — legacy compat column                                                  |
+| `band_name`           | TEXT    | Nullable — legacy compat column                                                  |
+| `bio`                 | TEXT    | Nullable — legacy compat column                                                  |
+| `genres`              | TEXT    | Nullable — legacy compat column                                                  |
+| `hometown`            | TEXT    | Nullable — legacy compat column                                                  |
+| `formed_year`         | INTEGER | Nullable                                                                         |
+| `website`             | TEXT    | Nullable                                                                         |
+| `total_views`         | INTEGER | DEFAULT 0 — aggregated by `functions/scheduled/aggregate-stats.js`               |
+| `total_social_clicks` | INTEGER | DEFAULT 0 — same aggregation job                                                 |
+| `popularity_score`    | REAL    | DEFAULT 0 — `page_views*1 + social_clicks*3` (formula updated in migration 0048) |
+| `created_at`          | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                              |
+| `updated_at`          | TEXT    | DEFAULT `datetime('now')`                                                        |
+
+Indexes: `idx_band_profiles_name(name)`,
+`idx_band_profiles_normalized(name_normalized)` (UNIQUE),
+`idx_band_profiles_genre(genre)`.
+
+#### `performances`
+
+Links a `band_profiles` row to an `events` row with scheduling detail — the
+event-specific "who's playing when/where."
+
+| Column                 | Type    | Notes                                                                                                                                                                                                                                         |
+| ---------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                   | INTEGER | PK, autoincrement                                                                                                                                                                                                                             |
+| `event_id`             | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE                                                                                                                                                                                                 |
+| `band_profile_id`      | INTEGER | NOT NULL, FK → `band_profiles(id)` ON DELETE RESTRICT                                                                                                                                                                                         |
+| `venue_id`             | INTEGER | Nullable, FK → `venues(id)` ON DELETE SET NULL                                                                                                                                                                                                |
+| `start_time`           | TEXT    | Nullable (made optional in migration 0032)                                                                                                                                                                                                    |
+| `end_time`             | TEXT    | Nullable (made optional in migration 0032)                                                                                                                                                                                                    |
+| `notes`                | TEXT    | Nullable                                                                                                                                                                                                                                      |
+| `band_id`              | INTEGER | Nullable, FK → `bands(id)` ON DELETE SET NULL — legacy compat, see `bands` below                                                                                                                                                              |
+| `band_name`            | TEXT    | Nullable — legacy compat column                                                                                                                                                                                                               |
+| `stage`                | TEXT    | Nullable                                                                                                                                                                                                                                      |
+| `is_announced`         | INTEGER | NOT NULL, DEFAULT 1 — gates the public schedule and triggers follower emails on 0→1                                                                                                                                                           |
+| `band_follow_notified` | INTEGER | NOT NULL, DEFAULT 0                                                                                                                                                                                                                           |
+| `created_at`           | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                                                                                                                           |
+| `created_by_user_id`   | INTEGER | Nullable, FK → `users(id)`                                                                                                                                                                                                                    |
+| `updated_by_user_id`   | INTEGER | Nullable, FK → `users(id)`                                                                                                                                                                                                                    |
+| `updated_at`           | TEXT    | DEFAULT `datetime('now')`, bumped on UPDATE by the `update_performances_timestamp` trigger defined in `migrations/0033_restore_performances_trigger.sql` (not present in `setup-complete.sql` — see "Schema drift worth knowing about" below) |
+
+Indexes: `idx_performances_event(event_id)`,
+`idx_performances_band(band_profile_id)`, `idx_performances_venue(venue_id)`,
+`idx_performances_event_time(event_id, start_time)`.
+
+The table was dropped and recreated in migration 0032 (SQLite has no
+`ALTER COLUMN`) to make `venue_id`/`start_time`/`end_time` nullable for
+schedule-first entry flows.
+
+### Legacy / compatibility
+
+#### `bands`
+
+A pre-band-profile-era table (event-scoped band + performance in one row).
+Still created by `setup-complete.sql` and still referenced by
+`performances.band_id`/`band_name` as compatibility columns, but no current
+endpoint under `functions/api/` reads from or writes to `bands` itself — all
+band/performance data flows through `band_profiles` + `performances`.
+
+| Column         | Type    | Notes                                          |
+| -------------- | ------- | ---------------------------------------------- |
+| `id`           | INTEGER | PK, autoincrement                              |
+| `event_id`     | INTEGER | Nullable, FK → `events(id)` ON DELETE SET NULL |
+| `venue_id`     | INTEGER | Nullable, FK → `venues(id)` ON DELETE SET NULL |
+| `name`         | TEXT    | NOT NULL                                       |
+| `start_time`   | TEXT    | Nullable                                       |
+| `end_time`     | TEXT    | Nullable                                       |
+| `url`          | TEXT    | Nullable                                       |
+| `photo_url`    | TEXT    | Nullable                                       |
+| `description`  | TEXT    | Nullable                                       |
+| `genre`        | TEXT    | Nullable                                       |
+| `origin`       | TEXT    | Nullable                                       |
+| `social_links` | TEXT    | Nullable (JSON)                                |
+| `created_at`   | TEXT    | NOT NULL, DEFAULT `datetime('now')`            |
+
+Indexes: `idx_bands_event(event_id)`, `idx_bands_venue(venue_id)`.
+
+#### `sessions`
+
+A pre-Lucia-migration session table. Still created by `setup-complete.sql`
+but no current endpoint reads from or writes to it — session management now
+goes entirely through `lucia_sessions` (see below and
+`functions/utils/auth.js`).
+
+| Column             | Type    | Notes                                        |
+| ------------------ | ------- | -------------------------------------------- |
+| `id`               | INTEGER | PK, autoincrement                            |
+| `session_token`    | TEXT    | UNIQUE, NOT NULL                             |
+| `user_id`          | INTEGER | NOT NULL, FK → `users(id)` ON DELETE CASCADE |
+| `ip_address`       | TEXT    | Nullable                                     |
+| `user_agent`       | TEXT    | Nullable                                     |
+| `remember_me`      | INTEGER | DEFAULT 0                                    |
+| `created_at`       | TEXT    | NOT NULL, DEFAULT `datetime('now')`          |
+| `last_activity_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`          |
+| `expires_at`       | TEXT    | NOT NULL                                     |
+
+Indexes: `idx_sessions_token(session_token)`, `idx_sessions_user(user_id)`.
+
+#### `rate_limit`
+
+A pre-sliding-window rate-limit table (one row per IP). Superseded by
+`rate_limits` (migration 0028); no current endpoint reads from or writes to
+`rate_limit`.
+
+| Column            | Type    | Notes                               |
+| ----------------- | ------- | ----------------------------------- |
+| `id`              | INTEGER | PK, autoincrement                   |
+| `ip_address`      | TEXT    | NOT NULL, UNIQUE                    |
+| `failed_attempts` | INTEGER | NOT NULL, DEFAULT 0                 |
+| `lockout_until`   | TEXT    | Nullable                            |
+| `last_attempt`    | TEXT    | NOT NULL, DEFAULT `datetime('now')` |
+
+Index: `idx_rate_limit_ip(ip_address)`.
+
+### Fan engagement
+
+#### `band_follows`
+
+A fan's follow of a band (double opt-in — see `CLAUDE.md` "Band Announcements").
+Added in migration 0035.
+
+| Column               | Type    | Notes                                                                                                                                                                    |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                 | INTEGER | PK, autoincrement                                                                                                                                                        |
+| `email`              | TEXT    | NOT NULL                                                                                                                                                                 |
+| `band_profile_id`    | INTEGER | NOT NULL, FK → `band_profiles(id)` ON DELETE CASCADE                                                                                                                     |
+| `verified`           | INTEGER | NOT NULL, DEFAULT 0 — set to 1 only via `confirm-follow`                                                                                                                 |
+| `verification_token` | TEXT    | UNIQUE, nullable — cleared once confirmed                                                                                                                                |
+| `unsubscribe_token`  | TEXT    | UNIQUE, NOT NULL                                                                                                                                                         |
+| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                                                      |
+| `consent_ip`         | TEXT    | Nullable — added in migration 0045                                                                                                                                       |
+| `consent_method`     | TEXT    | NOT NULL, DEFAULT `'web_form'` — added in migration 0045                                                                                                                 |
+| `batch_token`        | TEXT    | Nullable — added in migration 0047; ties together rows from one batch-follow submission so a multi-band follow sends a single confirmation email instead of one per band |
+
+Constraint: `UNIQUE(email, band_profile_id)`. Indexes:
+`idx_band_follows_band(band_profile_id)`, `idx_band_follows_email(email)`,
+`idx_band_follows_batch_token(batch_token)`.
+
+#### `band_follow_notifications`
+
+Per-follower delivery tracking for "this band just got announced" emails.
+Added in migration 0041 to replace a fire-once latch that silently dropped
+fans whose first send failed.
+
+| Column           | Type    | Notes                                               |
+| ---------------- | ------- | --------------------------------------------------- |
+| `id`             | INTEGER | PK, autoincrement                                   |
+| `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE |
+| `band_follow_id` | INTEGER | NOT NULL, FK → `band_follows(id)` ON DELETE CASCADE |
+| `notified_at`    | TEXT    | NOT NULL, DEFAULT `datetime('now')`                 |
+
+Constraint: `UNIQUE(performance_id, band_follow_id)` — an `INSERT OR IGNORE`
+against this constraint is how `notifyBandFollowers()`
+(`functions/utils/bandFollowNotify.js`) atomically claims a follower before
+sending, and deletes the row again if the send fails so a later resend can
+retry. Index: `idx_band_follow_notifications_performance(performance_id)`.
+
+#### `band_announce_queue`
+
+Queue of per-follower "band announced" events awaiting a digest send. Added in
+migration 0046.
+
+| Column            | Type    | Notes                                                           |
+| ----------------- | ------- | --------------------------------------------------------------- |
+| `id`              | INTEGER | PK, autoincrement                                               |
+| `band_follow_id`  | INTEGER | NOT NULL, FK → `band_follows(id)` ON DELETE CASCADE             |
+| `performance_id`  | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE             |
+| `event_id`        | INTEGER | NOT NULL — **no FK constraint** (denormalized snapshot)         |
+| `band_name`       | TEXT    | NOT NULL — denormalized snapshot of the band name at queue time |
+| `event_name`      | TEXT    | NOT NULL — denormalized snapshot                                |
+| `event_slug`      | TEXT    | NOT NULL — denormalized snapshot                                |
+| `band_profile_id` | INTEGER | NOT NULL — **no FK constraint** (denormalized snapshot)         |
+| `queued_at`       | TEXT    | NOT NULL, DEFAULT `datetime('now')`                             |
+
+Constraint: `UNIQUE(band_follow_id, performance_id)`. Indexes:
+`idx_band_announce_queue_event(event_id)`,
+`idx_band_announce_queue_follow(band_follow_id)`.
+
+#### `share_links`
+
+Server-side snapshot backing a shareable `/s/[slug]` schedule link. Added in
+migration 0037; `view_count` added in migration 0040.
+
+| Column            | Type    | Notes                                                                                                                              |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | INTEGER | PK, autoincrement                                                                                                                  |
+| `slug`            | TEXT    | NOT NULL, UNIQUE                                                                                                                   |
+| `event_id`        | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE                                                                                      |
+| `event_slug`      | TEXT    | NOT NULL                                                                                                                           |
+| `performance_ids` | TEXT    | NOT NULL (JSON array)                                                                                                              |
+| `band_names`      | TEXT    | NOT NULL (JSON array)                                                                                                              |
+| `created_at`      | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                |
+| `expires_at`      | TEXT    | NOT NULL                                                                                                                           |
+| `view_count`      | INTEGER | NOT NULL, DEFAULT 0 — best-effort increment on preview view, not on the post-import refetch (see `GET /api/schedule/share/[slug]`) |
+
+Indexes: `idx_share_links_slug(slug)`, `idx_share_links_expires_at(expires_at)`.
+Per `CLAUDE.md`, `share_links` — not telemetry events — is the source of truth
+for share create/view counts.
+
+### Subscriptions & schedule builds (migrations-only — see #506)
+
+These four tables are live and queried (`functions/api/subscriptions/*`,
+`functions/api/schedule/build.js`, `functions/api/admin/events/[id]/metrics.js`,
+`functions/api/admin/analytics/subscriptions.js`) but are created only by
+`migrations/0006_migration-subscriptions.sql` and
+`migrations/0007_migration-metrics.sql` — not by `database/setup-complete.sql`
+(tracked in issue #506). Columns below reflect their final form after later
+ALTERs (migrations 0027 and 0045).
+
+#### `email_subscriptions`
+
+City/genre email digest subscriptions, double opt-in via a verification link.
+Created by `POST /api/subscriptions/subscribe`.
+
+| Column               | Type    | Notes                                                                  |
+| -------------------- | ------- | ---------------------------------------------------------------------- |
+| `id`                 | INTEGER | PK, autoincrement                                                      |
+| `email`              | TEXT    | NOT NULL                                                               |
+| `city`               | TEXT    | NOT NULL — city name or `'all'`                                        |
+| `genre`              | TEXT    | NOT NULL — genre or `'all'`                                            |
+| `frequency`          | TEXT    | NOT NULL, DEFAULT `'weekly'` — `daily` \| `weekly` \| `monthly`        |
+| `verified`           | BOOLEAN | NOT NULL, DEFAULT 0 — declared BOOLEAN in the migration; stored as 0/1 |
+| `verification_token` | TEXT    | UNIQUE, nullable                                                       |
+| `unsubscribe_token`  | TEXT    | UNIQUE, NOT NULL                                                       |
+| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                    |
+| `last_email_sent`    | TEXT    | Nullable                                                               |
+| `consent_ip`         | TEXT    | Nullable — added in migration 0045                                     |
+| `consent_method`     | TEXT    | NOT NULL, DEFAULT `'web_form'` — added in migration 0045               |
+
+Constraint: `UNIQUE(email, city, genre)`. Indexes:
+`idx_subscriptions_email(email)`, `idx_subscriptions_city_genre(city, genre)`,
+`idx_subscriptions_verified(verified)`,
+`idx_subscriptions_verification_token(verification_token)`,
+`idx_subscriptions_unsubscribe_token(unsubscribe_token)`.
+
+#### `subscription_verifications`
+
+Log row written when a subscription is confirmed
+(`functions/api/subscriptions/verify.js`).
+
+| Column            | Type    | Notes                                                      |
+| ----------------- | ------- | ---------------------------------------------------------- |
+| `id`              | INTEGER | PK, autoincrement                                          |
+| `subscription_id` | INTEGER | NOT NULL, FK → `email_subscriptions(id)` ON DELETE CASCADE |
+| `verified_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')`                        |
+
+The original `ip_address` column was dropped in migration 0027 (never
+populated by any code path; PII storage minimisation). No indexes.
+
+#### `subscription_unsubscribes`
+
+Unsubscribe log for metrics (`functions/api/subscriptions/unsubscribe.js`).
+
+| Column            | Type    | Notes                                                      |
+| ----------------- | ------- | ---------------------------------------------------------- |
+| `id`              | INTEGER | PK, autoincrement                                          |
+| `subscription_id` | INTEGER | NOT NULL, FK → `email_subscriptions(id)` ON DELETE CASCADE |
+| `unsubscribed_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`                        |
+| `reason`          | TEXT    | Nullable — optional feedback                               |
+
+No indexes.
+
+#### `schedule_builds`
+
+One row per (event, performance, anonymous session), recorded when a fan adds
+a performance to their schedule (`POST /api/schedule/build`); read by the
+admin event metrics endpoint.
+
+| Column           | Type    | Notes                                               |
+| ---------------- | ------- | --------------------------------------------------- |
+| `id`             | INTEGER | PK, autoincrement                                   |
+| `event_id`       | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE       |
+| `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE |
+| `user_session`   | TEXT    | NOT NULL — anonymous session identifier (no PII)    |
+| `created_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')`                 |
+
+Indexes: `idx_schedule_builds_event(event_id)`,
+`idx_schedule_builds_session(user_session)`,
+`idx_schedule_builds_created(created_at)`, plus the UNIQUE index
+`idx_schedule_builds_unique(event_id, performance_id, user_session)` added in
+migration 0014 to deduplicate rows and prevent spam.
+
+### Auth & admin
+
+#### `users`
+
+| Column                        | Type    | Notes                                                          |
+| ----------------------------- | ------- | -------------------------------------------------------------- |
+| `id`                          | INTEGER | PK, autoincrement                                              |
+| `email`                       | TEXT    | UNIQUE, NOT NULL                                               |
+| `password_hash`               | TEXT    | NOT NULL — PBKDF2 format, see "Conventions & gotchas"          |
+| `role`                        | TEXT    | NOT NULL, DEFAULT `'editor'` — `viewer` \| `editor` \| `admin` |
+| `name`                        | TEXT    | Nullable                                                       |
+| `first_name`                  | TEXT    | Nullable — added in migration 0019                             |
+| `last_name`                   | TEXT    | Nullable — added in migration 0019                             |
+| `is_active`                   | INTEGER | NOT NULL, DEFAULT 1                                            |
+| `activation_token`            | TEXT    | Nullable — added in migration 0022                             |
+| `activation_token_expires_at` | TEXT    | Nullable — added in migration 0022                             |
+| `activated_at`                | TEXT    | Nullable — added in migration 0022                             |
+| `totp_secret`                 | TEXT    | Nullable                                                       |
+| `totp_enabled`                | INTEGER | DEFAULT 0                                                      |
+| `webauthn_enabled`            | INTEGER | DEFAULT 0                                                      |
+| `email_otp_enabled`           | INTEGER | DEFAULT 0                                                      |
+| `backup_codes`                | TEXT    | Nullable (JSON)                                                |
+| `require_2fa`                 | INTEGER | DEFAULT 1                                                      |
+| `deactivated_at`              | TEXT    | Nullable                                                       |
+| `deactivated_by`              | INTEGER | Nullable, FK → `users(id)` (self-referential)                  |
+| `created_at`                  | TEXT    | NOT NULL, DEFAULT `datetime('now')`                            |
+| `last_login`                  | TEXT    | Nullable                                                       |
+| `updated_at`                  | TEXT    | DEFAULT `datetime('now')`                                      |
+
+Indexes: `idx_users_email(email)`, `idx_users_activation_token(activation_token)`.
+
+#### `lucia_sessions`
+
+The active session store (despite the name, session management is a
+hand-rolled direct-D1 manager in `functions/utils/auth.js` — the `lucia`
+packages themselves were removed). Added in migration 0024.
+
+| Column             | Type    | Notes                                                             |
+| ------------------ | ------- | ----------------------------------------------------------------- |
+| `id`               | TEXT    | PK (session id, not autoincrement)                                |
+| `user_id`          | INTEGER | NOT NULL, FK → `users(id)` ON DELETE CASCADE                      |
+| `expires_at`       | INTEGER | NOT NULL — **Unix epoch seconds, not `TEXT`** (the one exception) |
+| `ip_address`       | TEXT    | Nullable                                                          |
+| `user_agent`       | TEXT    | Nullable                                                          |
+| `remember_me`      | INTEGER | DEFAULT 0                                                         |
+| `created_at`       | TEXT    | NOT NULL, DEFAULT `datetime('now')`                               |
+| `last_activity_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`                               |
+
+Indexes: `idx_lucia_sessions_user_id(user_id)`,
+`idx_lucia_sessions_expires_at(expires_at)`.
+
+#### `mfa_challenges`
+
+Short-lived state for an in-progress TOTP verification. Added in migration
+0015; the partial unique index enforcing a single active challenge per user
+was added in migration 0031.
+
+| Column       | Type    | Notes                                        |
+| ------------ | ------- | -------------------------------------------- |
+| `id`         | INTEGER | PK, autoincrement                            |
+| `token`      | TEXT    | NOT NULL, UNIQUE                             |
+| `user_id`    | INTEGER | NOT NULL, FK → `users(id)` ON DELETE CASCADE |
+| `ip_address` | TEXT    | Nullable                                     |
+| `user_agent` | TEXT    | Nullable                                     |
+| `expires_at` | TEXT    | NOT NULL                                     |
+| `used`       | INTEGER | DEFAULT 0                                    |
+| `used_at`    | TEXT    | Nullable                                     |
+| `created_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`          |
+
+Indexes: `idx_mfa_challenges_token(token)`,
+`idx_mfa_challenges_user_id(user_id)`, `idx_mfa_challenges_expires_at(expires_at)`,
+and a partial unique index `idx_mfa_challenges_active_user(user_id) WHERE used = 0`
+(at most one unused/active challenge per user).
+
+#### `invite_codes`
+
+Admin-issued signup invites (bypassed only by the test-only
+`ALLOW_ADMIN_SIGNUP` env var — never set in production). Added in migration 0009.
+
+| Column               | Type    | Notes                                                  |
+| -------------------- | ------- | ------------------------------------------------------ |
+| `id`                 | INTEGER | PK, autoincrement                                      |
+| `code`               | TEXT    | NOT NULL, UNIQUE                                       |
+| `email`              | TEXT    | Nullable                                               |
+| `role`               | TEXT    | NOT NULL, DEFAULT `'editor'`                           |
+| `created_by_user_id` | INTEGER | Nullable, FK → `users(id)` ON DELETE SET NULL          |
+| `used_by_user_id`    | INTEGER | Nullable, FK → `users(id)` ON DELETE SET NULL          |
+| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                    |
+| `used_at`            | TEXT    | Nullable                                               |
+| `expires_at`         | TEXT    | NOT NULL — see "SQLite datetime" gotcha above (SEC-F1) |
+| `is_active`          | INTEGER | NOT NULL, DEFAULT 1                                    |
+
+#### `webauthn_credentials`
+
+Registered WebAuthn/passkey credentials, an alternate second factor to TOTP.
+
+| Column          | Type    | Notes                                            |
+| --------------- | ------- | ------------------------------------------------ |
+| `id`            | INTEGER | PK, autoincrement                                |
+| `user_id`       | INTEGER | NOT NULL, FK → `users(id)` ON DELETE CASCADE     |
+| `credential_id` | TEXT    | UNIQUE, NOT NULL                                 |
+| `public_key`    | TEXT    | NOT NULL                                         |
+| `counter`       | INTEGER | NOT NULL, DEFAULT 0 — WebAuthn signature counter |
+| `device_name`   | TEXT    | Nullable                                         |
+| `created_at`    | TEXT    | NOT NULL, DEFAULT `datetime('now')`              |
+| `last_used_at`  | TEXT    | Nullable                                         |
+
+#### `email_otp_codes`
+
+One-time email codes, a fallback second factor.
+
+| Column       | Type    | Notes                                        |
+| ------------ | ------- | -------------------------------------------- |
+| `id`         | INTEGER | PK, autoincrement                            |
+| `user_id`    | INTEGER | NOT NULL, FK → `users(id)` ON DELETE CASCADE |
+| `code`       | TEXT    | NOT NULL                                     |
+| `expires_at` | TEXT    | NOT NULL                                     |
+| `used`       | INTEGER | NOT NULL, DEFAULT 0                          |
+| `created_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`          |
+
+#### `password_reset_tokens`
+
+Admin- or self-initiated password reset tokens.
+
+| Column       | Type    | Notes                                            |
+| ------------ | ------- | ------------------------------------------------ |
+| `id`         | INTEGER | PK, autoincrement                                |
+| `user_id`    | INTEGER | NOT NULL, FK → `users(id)` ON DELETE CASCADE     |
+| `token`      | TEXT    | UNIQUE, NOT NULL                                 |
+| `created_by` | INTEGER | NOT NULL, FK → `users(id)` ON DELETE SET NULL    |
+| `expires_at` | TEXT    | NOT NULL                                         |
+| `used`       | INTEGER | NOT NULL, DEFAULT 0                              |
+| `used_at`    | TEXT    | Nullable                                         |
+| `ip_address` | TEXT    | Nullable                                         |
+| `reason`     | TEXT    | Nullable — e.g. admin-initiated vs. self-service |
+| `created_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`              |
+
+#### `trusted_devices`
+
+"Remember this device" MFA bypass. Added in migration 0030.
+
+| Column               | Type    | Notes                                                        |
+| -------------------- | ------- | ------------------------------------------------------------ |
+| `id`                 | INTEGER | PK, autoincrement                                            |
+| `user_id`            | INTEGER | NOT NULL, FK → `users(id)` ON DELETE CASCADE                 |
+| `token`              | TEXT    | UNIQUE, NOT NULL                                             |
+| `device_fingerprint` | TEXT    | Nullable — hash of IP + User-Agent                           |
+| `ua_hash`            | TEXT    | Nullable — hash of User-Agent alone, validated independently |
+| `ip_address`         | TEXT    | Nullable                                                     |
+| `user_agent`         | TEXT    | Nullable                                                     |
+| `expires_at`         | TEXT    | NOT NULL                                                     |
+| `last_used_at`       | TEXT    | Nullable                                                     |
+| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                          |
+
+Indexes: `idx_trusted_devices_user(user_id)`, `idx_trusted_devices_token(token)`,
+`idx_trusted_devices_expires(expires_at)`.
+
+#### `audit_log`
+
+General admin-action audit trail (e.g. user role changes) — read by
+`GET /api/admin/audit-log`.
+
+| Column          | Type    | Notes                                         |
+| --------------- | ------- | --------------------------------------------- |
+| `id`            | INTEGER | PK, autoincrement                             |
+| `user_id`       | INTEGER | Nullable, FK → `users(id)` ON DELETE SET NULL |
+| `action`        | TEXT    | NOT NULL                                      |
+| `resource_type` | TEXT    | Nullable                                      |
+| `resource_id`   | INTEGER | Nullable                                      |
+| `details`       | TEXT    | Nullable (JSON)                               |
+| `ip_address`    | TEXT    | Nullable                                      |
+| `created_at`    | TEXT    | DEFAULT `datetime('now')`                     |
+
+#### `auth_audit`
+
+Authentication-event audit trail (distinct from `auth_attempts`, which is
+rate-limit bookkeeping — this table is append-only history read by
+`functions/api/admin/maintenance/retention.js` and
+`functions/api/auth/reset-password-complete.js`).
+
+| Column       | Type    | Notes                               |
+| ------------ | ------- | ----------------------------------- |
+| `id`         | INTEGER | PK, autoincrement                   |
+| `timestamp`  | TEXT    | NOT NULL, DEFAULT `datetime('now')` |
+| `action`     | TEXT    | NOT NULL                            |
+| `success`    | INTEGER | NOT NULL (0/1)                      |
+| `ip_address` | TEXT    | NOT NULL                            |
+| `user_agent` | TEXT    | Nullable                            |
+| `details`    | TEXT    | Nullable (JSON)                     |
+
+Indexes: `idx_auth_audit_timestamp(timestamp)`, `idx_auth_audit_ip(ip_address)`.
+
+#### `auth_attempts`
+
+Rate-limit bookkeeping for login/MFA/etc. attempts, queried by
+`functions/utils/authAttempts.js`.
+
+| Column           | Type    | Notes                               |
+| ---------------- | ------- | ----------------------------------- |
+| `id`             | INTEGER | PK, autoincrement                   |
+| `user_id`        | INTEGER | Nullable — **no FK constraint**     |
+| `email`          | TEXT    | Nullable                            |
+| `ip_address`     | TEXT    | NOT NULL                            |
+| `user_agent`     | TEXT    | Nullable                            |
+| `attempt_type`   | TEXT    | NOT NULL                            |
+| `success`        | INTEGER | NOT NULL (0/1)                      |
+| `failure_reason` | TEXT    | Nullable                            |
+| `created_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')` |
+
+Indexes: `idx_auth_attempts_email(email)`, `idx_auth_attempts_ip(ip_address)`.
+
+#### `rate_limits`
+
+Globally-consistent fixed-window counters (D1-backed), superseding the
+per-IP-only `rate_limit` table above. Added in migration 0028.
+
+| Column         | Type    | Notes                                                   |
+| -------------- | ------- | ------------------------------------------------------- |
+| `key`          | TEXT    | PK — composite rate-limit key (e.g. scope + identifier) |
+| `count`        | INTEGER | NOT NULL, DEFAULT 0                                     |
+| `window_start` | INTEGER | NOT NULL — Unix timestamp                               |
+| `updated_at`   | INTEGER | NOT NULL — Unix timestamp                               |
+
+Index: `idx_rate_limits_updated_at(updated_at)`.
+
+### Metrics
+
+#### `artist_daily_stats`
+
+Privacy-first, per-band-per-day aggregate (no raw event log). Added in
+migration 0023; `profile_clicks`/`share_count` columns were dropped in
+migration 0048 as dead weight (never written, so their weight in the
+popularity formula was silently inert).
+
+| Column            | Type    | Notes                                                |
+| ----------------- | ------- | ---------------------------------------------------- |
+| `id`              | INTEGER | PK, autoincrement                                    |
+| `band_profile_id` | INTEGER | NOT NULL, FK → `band_profiles(id)` ON DELETE CASCADE |
+| `date`            | TEXT    | NOT NULL, `YYYY-MM-DD`                               |
+| `page_views`      | INTEGER | DEFAULT 0                                            |
+| `social_clicks`   | INTEGER | DEFAULT 0                                            |
+| `created_at`      | TEXT    | DEFAULT `datetime('now')`                            |
+
+Constraint: `UNIQUE(band_profile_id, date)`. Indexes:
+`idx_artist_stats_date(date)`, `idx_artist_stats_band(band_profile_id)`.
+
+#### `page_views_daily`
+
+Per-page, per-day aggregate view counter. Added in migration 0039.
+
+| Column  | Type    | Notes                  |
+| ------- | ------- | ---------------------- |
+| `id`    | INTEGER | PK, autoincrement      |
+| `page`  | TEXT    | NOT NULL               |
+| `date`  | TEXT    | NOT NULL, `YYYY-MM-DD` |
+| `views` | INTEGER | DEFAULT 0              |
+
+Constraint: `UNIQUE(page, date)`. Index: `idx_page_views_date(date)`.
 
 ## Relationships
 
-### One-to-Many Relationships
+Foreign keys as declared in `database/setup-complete.sql` (only columns with
+an actual `REFERENCES` clause are FKs — several `*_id` columns above are
+plain denormalized integers with no constraint, called out individually):
 
-#### `events` → `bands` (1:N)
+| Child                       | Column               | → Parent            | On delete |
+| --------------------------- | -------------------- | ------------------- | --------- |
+| `bands`                     | `event_id`           | `events(id)`        | SET NULL  |
+| `bands`                     | `venue_id`           | `venues(id)`        | SET NULL  |
+| `performances`              | `event_id`           | `events(id)`        | CASCADE   |
+| `performances`              | `band_profile_id`    | `band_profiles(id)` | RESTRICT  |
+| `performances`              | `band_id`            | `bands(id)`         | SET NULL  |
+| `performances`              | `venue_id`           | `venues(id)`        | SET NULL  |
+| `performances`              | `created_by_user_id` | `users(id)`         | (none)    |
+| `performances`              | `updated_by_user_id` | `users(id)`         | (none)    |
+| `artist_daily_stats`        | `band_profile_id`    | `band_profiles(id)` | CASCADE   |
+| `users`                     | `deactivated_by`     | `users(id)` (self)  | (none)    |
+| `sessions`                  | `user_id`            | `users(id)`         | CASCADE   |
+| `lucia_sessions`            | `user_id`            | `users(id)`         | CASCADE   |
+| `mfa_challenges`            | `user_id`            | `users(id)`         | CASCADE   |
+| `invite_codes`              | `created_by_user_id` | `users(id)`         | SET NULL  |
+| `invite_codes`              | `used_by_user_id`    | `users(id)`         | SET NULL  |
+| `webauthn_credentials`      | `user_id`            | `users(id)`         | CASCADE   |
+| `email_otp_codes`           | `user_id`            | `users(id)`         | CASCADE   |
+| `password_reset_tokens`     | `user_id`            | `users(id)`         | CASCADE   |
+| `password_reset_tokens`     | `created_by`         | `users(id)`         | SET NULL  |
+| `trusted_devices`           | `user_id`            | `users(id)`         | CASCADE   |
+| `audit_log`                 | `user_id`            | `users(id)`         | SET NULL  |
+| `band_follows`              | `band_profile_id`    | `band_profiles(id)` | CASCADE   |
+| `band_follow_notifications` | `performance_id`     | `performances(id)`  | CASCADE   |
+| `band_follow_notifications` | `band_follow_id`     | `band_follows(id)`  | CASCADE   |
+| `band_announce_queue`       | `band_follow_id`     | `band_follows(id)`  | CASCADE   |
+| `band_announce_queue`       | `performance_id`     | `performances(id)`  | CASCADE   |
+| `share_links`               | `event_id`           | `events(id)`        | CASCADE   |
 
-- **Cardinality:** One event has many bands
-- **Cascade Behavior:** `ON DELETE CASCADE`
-- **Rationale:** When an event is deleted, all associated band performances should be removed
+The old "venues → bands (1:N)" world from earlier docs is gone in practice:
+current schedule data flows through `events → performances ← band_profiles`,
+with `venues → performances` as an optional (nullable) third leg. `bands` and
+its FKs still exist in the schema but sit outside every live query path (see
+"Legacy / compatibility" above).
 
-Example:
+## Common query patterns
 
-```text
-events (id=1, name="Vol. 5")
-  └─ bands (id=1, event_id=1, name="The Strokes")
-  └─ bands (id=2, event_id=1, name="Arctic Monkeys")
-  └─ bands (id=3, event_id=1, name="The Black Keys")
-```
+Pulled directly from current endpoint code, not invented.
 
-#### `venues` → `bands` (1:N)
-
-- **Cardinality:** One venue hosts many bands (across all events)
-- **Cascade Behavior:** `ON DELETE RESTRICT`
-- **Rationale:** Cannot delete a venue if bands are scheduled there (data integrity protection)
-
-Example:
-
-```text
-venues (id=1, name="Room 47")
-  └─ bands (id=1, venue_id=1, name="The Strokes", event_id=1)
-  └─ bands (id=5, venue_id=1, name="LCD Soundsystem", event_id=2)
-```
-
-### Many-to-Many Relationship (Implicit)
-
-#### `events` ↔ `venues` (M:N via `bands`)
-
-Events and venues have an implicit many-to-many relationship through the `bands` junction table:
-
-- One event can use multiple venues
-- One venue can be used by multiple events
-- The `bands` table acts as the junction table
-
-Example:
-
-```text
-Event "Vol. 5" uses venues: Room 47, The Basement, Exit/In
-Event "Vol. 6" uses venues: Room 47, The Basement, Marathon Music Works
-Venue "Room 47" is used by events: Vol. 5, Vol. 6
-```
-
-## Indexes and Performance
-
-### Query Optimization Strategy
-
-The database uses 8 strategic indexes to optimize common queries:
-
-#### Events Queries
+**Public schedule for an event** (`functions/api/schedule.js`) — the current
+`events → performances → band_profiles`/`venues` join, filtered by
+`reveal_mode` so unannounced performances stay hidden when the event has
+reveal mode on:
 
 ```sql
--- Fast: Uses idx_events_slug
-SELECT * FROM events WHERE slug = 'vol-5';
-
--- Fast: Uses idx_events_published
-SELECT * FROM events WHERE is_published = 1;
-```
-
-#### Bands Queries
-
-```sql
--- Fast: Uses idx_bands_event
-SELECT * FROM bands WHERE event_id = 1;
-
--- Fast: Uses idx_bands_event_time
-SELECT * FROM bands
-WHERE event_id = 1
-ORDER BY start_time ASC;
-
--- Fast: Uses idx_bands_venue (for conflict detection)
-SELECT * FROM bands
-WHERE venue_id = 1
-AND start_time < '21:00'
-AND end_time > '20:00';
-```
-
-#### Security Queries
-
-```sql
--- Fast: Uses idx_rate_limit_ip
-SELECT * FROM rate_limit WHERE ip_address = 'X.X.X.X';
-
--- Fast: Uses idx_auth_audit_timestamp
-SELECT * FROM auth_audit
-WHERE timestamp > datetime('now', '-1 day');
-```
-
-### Index Size Considerations
-
-- **Small Dataset:** Current indexes are lightweight (< 1KB each)
-- **Scalability:** Effective for databases with thousands of bands per event
-- **Composite Index:** `idx_bands_event_time` eliminates need for separate sort operation
-
-## Database Constraints
-
-### Primary Keys
-
-All tables use `INTEGER PRIMARY KEY AUTOINCREMENT` for:
-
-- Guaranteed uniqueness
-- Efficient joins
-- Automatic row ID generation
-
-### Unique Constraints
-
-- `events.slug` - Ensures URL-friendly identifiers are unique
-- `venues.name` - Prevents duplicate venue names
-- `rate_limit.ip_address` - One rate limit record per IP
-
-### Foreign Key Constraints
-
-- **CASCADE:** Deleting events removes associated bands
-- **RESTRICT:** Cannot delete venues with scheduled bands
-
-### NOT NULL Constraints
-
-Applied to all essential fields to enforce data integrity at database level.
-
-## Data Types and Formats
-
-### TEXT Fields
-
-| Field Type | Format     | Example                | Validation                            |
-| ---------- | ---------- | ---------------------- | ------------------------------------- |
-| Date       | YYYY-MM-DD | "2025-06-14"           | Regex: `^\d{4}-\d{2}-\d{2}$`          |
-| Time       | HH:MM      | "20:00", "21:30"       | Regex: `^([01]\d\|2[0-3]):([0-5]\d)$` |
-| Timestamp  | ISO 8601   | "2025-01-15T10:30:00Z" | SQLite datetime('now')                |
-| Slug       | kebab-case | "vol-5", "lwbc-2024"   | Regex: `^[a-z0-9-]+$`                 |
-| URL        | HTTP/HTTPS | `<https://band.com>`   | Optional, max 500 chars               |
-
-### INTEGER Fields
-
-| Field             | Range  | Usage                                     |
-| ----------------- | ------ | ----------------------------------------- |
-| `is_published`    | 0 or 1 | Boolean flag (0 = draft, 1 = published)   |
-| `success`         | 0 or 1 | Boolean flag (0 = failed, 1 = successful) |
-| `failed_attempts` | 0-5+   | Counter (5+ triggers lockout)             |
-
-## Common Query Patterns
-
-### Public API: Get Current Event Schedule
-
-```sql
--- Step 1: Find current event
-SELECT * FROM events
-WHERE is_published = 1
-ORDER BY date DESC
-LIMIT 1;
-
--- Step 2: Get all bands for event (with venue names)
 SELECT
-  b.id,
+  p.id as performance_id,
+  b.id as band_id,
   b.name,
-  b.start_time,
-  b.end_time,
-  b.url,
-  v.name AS venue_name,
-  e.date AS event_date
-FROM bands b
-JOIN venues v ON b.venue_id = v.id
-JOIN events e ON b.event_id = e.id
-WHERE b.event_id = ?
-ORDER BY b.start_time ASC;
+  p.start_time as startTime,
+  p.end_time as endTime,
+  b.social_links,
+  b.photo_url,
+  v.name as venue,
+  v.latitude as venue_lat,
+  v.longitude as venue_lng
+FROM performances p
+INNER JOIN band_profiles b ON p.band_profile_id = b.id
+LEFT JOIN venues v ON p.venue_id = v.id
+WHERE p.event_id = ?
+  AND (? = 0 OR p.is_announced = 1)
+ORDER BY p.start_time, v.name;
 ```
 
-### Admin: Conflict Detection
+**Share-link lookup** (`functions/api/schedule/share/[slug].js`) — relies on
+`ON DELETE CASCADE` from `events` so a deleted event's share links vanish with
+it, and the expiry check is a plain string comparison because `expires_at` is
+stored in the space-separated `datetime('now')` format:
 
 ```sql
--- Check for overlapping bands at same venue
-SELECT * FROM bands
-WHERE venue_id = ?
-AND event_id = ?
-AND id != ? -- Exclude current band (for updates)
-AND (
-  (start_time < ? AND end_time > ?) -- Current band overlaps existing
-  OR (start_time < ? AND end_time > ?) -- Existing overlaps current
-);
-
--- Algorithm: (startA < endB) AND (endA > startB)
--- Example: Band A (20:00-21:00), Band B (20:30-21:30)
--- (20:00 < 21:30) AND (21:00 > 20:30) = TRUE (conflict!)
+SELECT sl.slug, sl.event_slug, sl.performance_ids, sl.band_names, e.name AS event_name
+FROM share_links sl
+JOIN events e ON e.id = sl.event_id AND (e.is_published = 1 OR e.status = 'archived')
+WHERE sl.slug = ? AND sl.expires_at > datetime('now');
 ```
 
-### Admin: Event Management Dashboard
+**Atomic claim-before-send** (`functions/utils/bandFollowNotify.js`) — how
+`band_follow_notifications` prevents double-sending announcement emails under
+concurrent resend requests:
 
 ```sql
--- Get all events with band counts
-SELECT
-  e.*,
-  COUNT(b.id) AS band_count
-FROM events e
-LEFT JOIN bands b ON e.id = b.event_id
-GROUP BY e.id
-ORDER BY e.date DESC;
+INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id)
+VALUES (?, ?);
+-- changes === 0 means another request already claimed this follower.
+-- If the subsequent email send fails, the claim is released:
+DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?;
 ```
 
-### Security: Rate Limit Check
+**Compensating delete on a non-batchable mutation**
+(`functions/api/admin/events/[id]/duplicate.js`) — D1 has no transactions, so
+duplicating an event's performances into a copy is compensated manually if the
+copy fails:
 
 ```sql
--- Get rate limit record for IP
-SELECT * FROM rate_limit
-WHERE ip_address = ?;
-
--- If locked out, check if lockout expired
--- lockout_until > datetime('now') → still locked
--- lockout_until <= datetime('now') → lockout expired
-
--- Update after failed attempt
-UPDATE rate_limit
-SET failed_attempts = failed_attempts + 1,
-    last_attempt = datetime('now'),
-    lockout_until = CASE
-      WHEN failed_attempts >= 4 THEN datetime('now', '+1 hour')
-      ELSE lockout_until
-    END
-WHERE ip_address = ?;
+INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, notes)
+SELECT ?, venue_id, band_profile_id, start_time, end_time, notes
+FROM performances
+WHERE event_id = ?;
+-- on failure:
+DELETE FROM events WHERE id = ?;
 ```
 
-## Migration Strategy
-
-### Initial Setup
-
-```bash
-# Apply schema to D1 database
-npx wrangler d1 execute settimes-db --file=database/schema.sql --local
-npx wrangler d1 execute settimes-db --file=database/schema.sql --remote
-```
-
-### Future Migrations
-
-For schema changes, create sequentially numbered migration files:
-
-```bash
-migrations/
-  0031_add_band_genre.sql          # Next migration
-  0032_add_event_description.sql   # Following migration
-```
-
-**Migration Pattern:**
+**Event metrics batch** (`functions/api/admin/events/[id]/metrics.js`) — reads
+`schedule_builds` (documented under "Subscriptions & schedule builds" above;
+created by migrations only, not by `database/setup-complete.sql` — see "Known
+schema drift" below) alongside `performances` and `band_profiles` in one
+`DB.batch()`:
 
 ```sql
--- 0031_add_band_genre.sql
-ALTER TABLE bands ADD COLUMN genre TEXT;
-CREATE INDEX idx_bands_genre ON bands(genre);
+SELECT COUNT(*) as total_schedule_builds,
+       COUNT(DISTINCT user_session) as unique_visitors,
+       MAX(created_at) as last_updated
+FROM schedule_builds WHERE event_id = ?;
 ```
 
-### One-Off Ops Migrations
+## Known schema drift
 
-If a production database still has legacy `schedule_builds.band_id`, use the one-time script to rename it to `performance_id`:
+`database/setup-complete.sql` currently lags `migrations/` in two ways —
+four live tables (`email_subscriptions`, `subscription_verifications`,
+`subscription_unsubscribes`, `schedule_builds`; documented in the
+"Subscriptions & schedule builds" subsection above, since they exist only in
+migrations) and all `updated_at` triggers exist only in migrations. Tracked
+with full detail and a fix plan in
+[issue #506](https://github.com/BreakableHoodie/settimesdotca/issues/506);
+the bootstrap file should gain those tables and triggers when it closes.
 
-```bash
-# Only run if PRAGMA table_info(schedule_builds) shows band_id and no performance_id.
-npx wrangler d1 execute settimes-db --file=scripts/migrate-schedule-builds-performance-id.sql --remote
-```
+## Further reading
 
-### Data Seeding
-
-For testing/development:
-
-```bash
-# Use provided migration script
-node database/migrate-bands-json.js
-```
-
-## Security Considerations
-
-### Rate Limiting
-
-- **IP-based tracking:** Uses Cloudflare's `CF-Connecting-IP` header
-- **Window:** 10-minute rolling window
-- **Threshold:** 5 failed attempts → 1-hour lockout
-- **Reset:** Successful login clears counter
-
-### Audit Logging
-
-- **Immutable logs:** No application-level updates or deletes
-- **Comprehensive tracking:** All auth attempts logged
-- **Forensics support:** Timestamp and IP for investigation
-
-### Data Protection
-
-- **No passwords stored:** Admin password in environment variable only
-- **No PII in logs:** User agent is optional, no sensitive data
-- **Cascade protection:** Venue deletion restricted if bands scheduled
-
-## Best Practices
-
-### When Creating Events
-
-1. Choose a descriptive name (e.g., "Long Weekend Band Crawl Vol. 5")
-2. Use consistent slug format (e.g., "vol-5", "vol-6")
-3. Start as draft (`is_published = 0`)
-4. Add venues before adding bands
-5. Publish when ready (`is_published = 1`)
-
-### When Scheduling Bands
-
-1. Verify venue exists and is correct
-2. Use 24-hour time format (HH:MM)
-3. Ensure end time > start time
-4. Check for conflicts at same venue
-5. Add URL for band website/social (optional but recommended)
-
-### When Managing Venues
-
-1. Use consistent naming (e.g., "Room 47" not "room 47" or "Room47")
-2. Add address for attendee convenience
-3. Verify no bands scheduled before deleting
-
-### Database Maintenance
-
-1. **Monitor audit logs:** Check for suspicious activity weekly
-2. **Clean old logs:** Archive auth_audit older than 90 days
-3. **Analyze conflicts:** Review band conflicts for scheduling improvements
-4. **Backup regularly:** Export D1 data before major changes
-
-## Future Enhancements
-
-Potential schema extensions for future features:
-
-### Priority 1: CSV Import/Export
-
-- No schema changes required
-- Application-level feature using existing tables
-
-### Priority 2: Asset Management (R2)
-
-```sql
-ALTER TABLE events ADD COLUMN image_url TEXT;
-ALTER TABLE venues ADD COLUMN image_url TEXT;
-ALTER TABLE bands ADD COLUMN image_url TEXT;
-```
-
-### Priority 3: Analytics
-
-```sql
-CREATE TABLE band_selections (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  band_id INTEGER NOT NULL,
-  selected_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (band_id) REFERENCES bands(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_selections_band ON band_selections(band_id);
-CREATE INDEX idx_selections_timestamp ON band_selections(selected_at);
-```
-
-### Priority 4: Multi-Tenancy
-
-```sql
-CREATE TABLE organizations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-ALTER TABLE events ADD COLUMN org_id INTEGER REFERENCES organizations(id);
-```
-
-## References
-
-- **Schema Source Of Truth:** `migrations/*.sql` with local bootstrap in `database/setup-complete.sql`
-- **API Documentation:** `docs/api-spec.yaml`
-- **Backend Framework:** `docs/BACKEND_FRAMEWORK.md`
-- **Implementation Roadmap:** `docs/IMPLEMENTATION_ROADMAP.md`
-- **Cloudflare D1 Docs:** <https://developers.cloudflare.com/d1/>
-
----
-
-**Last Updated:** 2026-04-27
-**Schema Version:** migration-managed
-**Generated by:** `/sc:docs database --format mermaid`
+`migrations/` holds the authoritative, ordered history of every schema
+change described above — consult it directly for the exact SQL of any
+migration referenced by number in this document.

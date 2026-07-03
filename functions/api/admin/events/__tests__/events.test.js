@@ -440,7 +440,7 @@ describe("Event API - handler integration", () => {
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.event.slug).toBe("original-copy");
-    expect(data.bandsCopied).toBeGreaterThanOrEqual(2);
+    expect(data.bands_copied).toBeGreaterThanOrEqual(2);
   });
 
   it("delete endpoint requires admin and deletes event", async () => {
@@ -507,7 +507,7 @@ describe("Event API - handler integration", () => {
     expect(res.status).toBe(409);
     const data = await res.json();
     expect(data.error).toBe("Confirmation required");
-    expect(data.affectedPerformanceCount).toBe(1);
+    expect(data.affected_performance_count).toBe(1);
   });
 
   it("PATCH can update date and status to published", async () => {

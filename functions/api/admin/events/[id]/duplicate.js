@@ -1,7 +1,7 @@
 // Admin event duplication endpoint
 // POST /api/admin/events/{id}/duplicate
 // Body: { name, date, slug } — the new draft event's identity
-// Returns: { success, event, bandsCopied, message }
+// Returns: { success, event, bands_copied, message }
 //
 // Copies an event's performances into a new unpublished draft. Lives in its own
 // route file because Cloudflare Pages handlers match the path exactly — a
@@ -139,7 +139,7 @@ export async function onRequestPost(context) {
       {
         success: true,
         event: newEvent,
-        bandsCopied: bandCount.count,
+        bands_copied: bandCount.count,
         message: `Event duplicated successfully with ${bandCount.count} bands`,
       },
       201,

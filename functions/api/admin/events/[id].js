@@ -604,7 +604,7 @@ export async function onRequestDelete(context) {
           error: "Confirmation required",
           message:
             "Deleting this event will permanently remove associated performance records. Repeat the request with confirmCascade=true to continue.",
-          affectedPerformanceCount: bandCount.count,
+          affected_performance_count: bandCount.count,
         }),
         {
           status: 409,

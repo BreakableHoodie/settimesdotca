@@ -14,7 +14,7 @@ Invoke these without being asked — don't wait for the user to request them:
 | After writing or modifying error handling (`catch` blocks, `.catch()`, `try/finally`) in `functions/` | Invoke `pr-review-toolkit:silent-failure-hunter` agent |
 | Before declaring any multi-file feature complete | Invoke `pr-review-toolkit:code-reviewer` agent |
 | After editing `frontend/src/` public pages (outside `admin/`) | Scan for `text-white`/`bg-white` theme violations before finishing |
-| After editing `migrations/` or `setup-complete.sql` | Verify `setup-complete.sql` stays in sync (it seeds CI; drift causes 500s) |
+| After adding/editing anything in `migrations/` | Run `node scripts/regenerate-setup-complete.mjs` then `node scripts/check-schema-drift.mjs` — `setup-complete.sql`'s schema section is generated, never hand-edit it (CI enforces via quality.yml) |
 | When SEO-relevant pages change (band pages, event pages, venue pages) | Check structured data and `document.title` assignments |
 
 The `hooks` in `.claude/settings.local.json` automate the mechanical parts (prettier, ESLint, pre-PR gate). The triggers above require judgment — apply them proactively.

@@ -2,18 +2,18 @@
 
 **Type:** Cloudflare D1 (SQLite-compatible)
 
-This document is derived directly from `database/setup-complete.sql` — every
-table, column, and foreign key below reflects that file, except the four
-tables in "Subscriptions & schedule builds", which exist only in `migrations/`
-(see "Known schema drift"). When the schema changes, update
-`database/setup-complete.sql` and this document together (see `migrations/`
-history at the bottom for how schema changes are made).
+This document describes the schema produced by replaying `migrations/` in
+order — which, since #506, is exactly what `database/setup-complete.sql`
+contains: its schema section is **generated** by
+`scripts/regenerate-setup-complete.mjs` and CI verifies the two never diverge
+(`scripts/check-schema-drift.mjs` in `quality.yml`). To change the schema,
+add a migration, regenerate the bootstrap, and update this document together.
 
 ## Overview
 
 Schema is managed two ways:
 
-- **`migrations/0001…0048_*.sql`** — numbered, sequential migrations. These are
+- **`migrations/NNNN_*.sql`** — numbered, sequential migrations. These are
   applied to the production D1 database automatically on deploy by the
   "Apply remote D1 migrations" step in `.github/workflows/cloudflare-pages.yml`
   (`wrangler d1 migrations apply <db> --remote`). Do not apply them manually.
@@ -202,31 +202,15 @@ schedule-first entry flows.
 
 ### Legacy / compatibility
 
-#### `bands`
+#### `bands` and `rate_limit` (removed from the bootstrap, #506)
 
-A pre-band-profile-era table (event-scoped band + performance in one row).
-Still created by `setup-complete.sql` and still referenced by
-`performances.band_id`/`band_name` as compatibility columns, but no current
-endpoint under `functions/api/` reads from or writes to `bands` itself — all
-band/performance data flows through `band_profiles` + `performances`.
-
-| Column         | Type    | Notes                                          |
-| -------------- | ------- | ---------------------------------------------- |
-| `id`           | INTEGER | PK, autoincrement                              |
-| `event_id`     | INTEGER | Nullable, FK → `events(id)` ON DELETE SET NULL |
-| `venue_id`     | INTEGER | Nullable, FK → `venues(id)` ON DELETE SET NULL |
-| `name`         | TEXT    | NOT NULL                                       |
-| `start_time`   | TEXT    | Nullable                                       |
-| `end_time`     | TEXT    | Nullable                                       |
-| `url`          | TEXT    | Nullable                                       |
-| `photo_url`    | TEXT    | Nullable                                       |
-| `description`  | TEXT    | Nullable                                       |
-| `genre`        | TEXT    | Nullable                                       |
-| `origin`       | TEXT    | Nullable                                       |
-| `social_links` | TEXT    | Nullable (JSON)                                |
-| `created_at`   | TEXT    | NOT NULL, DEFAULT `datetime('now')`            |
-
-Indexes: `idx_bands_event(event_id)`, `idx_bands_venue(venue_id)`.
+Two pre-v2 tables (`bands`: event-scoped band+performance rows, superseded by
+`band_profiles` + `performances`; `rate_limit`: one-row-per-IP limiter,
+superseded by `rate_limits` in migration 0028) existed **only** in the
+hand-maintained bootstrap — no migration creates them, production does not
+have them, and no code reads or writes them. They were removed from
+`database/setup-complete.sql` when it was regenerated from the migrations
+replay (#506).
 
 #### `sessions`
 
@@ -248,22 +232,6 @@ goes entirely through `lucia_sessions` (see below and
 | `expires_at`       | TEXT    | NOT NULL                                     |
 
 Indexes: `idx_sessions_token(session_token)`, `idx_sessions_user(user_id)`.
-
-#### `rate_limit`
-
-A pre-sliding-window rate-limit table (one row per IP). Superseded by
-`rate_limits` (migration 0028); no current endpoint reads from or writes to
-`rate_limit`.
-
-| Column            | Type    | Notes                               |
-| ----------------- | ------- | ----------------------------------- |
-| `id`              | INTEGER | PK, autoincrement                   |
-| `ip_address`      | TEXT    | NOT NULL, UNIQUE                    |
-| `failed_attempts` | INTEGER | NOT NULL, DEFAULT 0                 |
-| `lockout_until`   | TEXT    | Nullable                            |
-| `last_attempt`    | TEXT    | NOT NULL, DEFAULT `datetime('now')` |
-
-Index: `idx_rate_limit_ip(ip_address)`.
 
 ### Fan engagement
 
@@ -350,7 +318,7 @@ Indexes: `idx_share_links_slug(slug)`, `idx_share_links_expires_at(expires_at)`.
 Per `CLAUDE.md`, `share_links` — not telemetry events — is the source of truth
 for share create/view counts.
 
-### Subscriptions & schedule builds (migrations-only — see #506)
+### Subscriptions & schedule builds
 
 These four tables are live and queried (`functions/api/subscriptions/*`,
 `functions/api/schedule/build.js`, `functions/api/admin/events/[id]/metrics.js`,
@@ -802,10 +770,8 @@ DELETE FROM events WHERE id = ?;
 ```
 
 **Event metrics batch** (`functions/api/admin/events/[id]/metrics.js`) — reads
-`schedule_builds` (documented under "Subscriptions & schedule builds" above;
-created by migrations only, not by `database/setup-complete.sql` — see "Known
-schema drift" below) alongside `performances` and `band_profiles` in one
-`DB.batch()`:
+`schedule_builds` (documented under "Subscriptions & schedule builds" above)
+alongside `performances` and `band_profiles` in one `DB.batch()`:
 
 ```sql
 SELECT COUNT(*) as total_schedule_builds,
@@ -814,16 +780,18 @@ SELECT COUNT(*) as total_schedule_builds,
 FROM schedule_builds WHERE event_id = ?;
 ```
 
-## Known schema drift
+## Schema drift protection
 
-`database/setup-complete.sql` currently lags `migrations/` in two ways —
-four live tables (`email_subscriptions`, `subscription_verifications`,
-`subscription_unsubscribes`, `schedule_builds`; documented in the
-"Subscriptions & schedule builds" subsection above, since they exist only in
-migrations) and all `updated_at` triggers exist only in migrations. Tracked
-with full detail and a fix plan in
-[issue #506](https://github.com/BreakableHoodie/settimesdotca/issues/506);
-the bootstrap file should gain those tables and triggers when it closes.
+Historical drift between `database/setup-complete.sql` and `migrations/`
+(whole tables, columns, foreign keys, indexes, and triggers — see
+[issue #506](https://github.com/BreakableHoodie/settimesdotca/issues/506))
+was eliminated by regenerating the bootstrap from the migrations replay.
+Two scripts keep it that way:
+
+- `node scripts/regenerate-setup-complete.mjs` — rewrites the bootstrap's
+  schema section from `migrations/` (run after adding any migration).
+- `node scripts/check-schema-drift.mjs` — structurally compares the two and
+  fails on any divergence; runs in CI (`quality.yml`, Schema Drift Check).
 
 ## Further reading
 

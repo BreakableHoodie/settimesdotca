@@ -10,7 +10,6 @@ const FILE_RULES = [
     tables: [
       "events",
       "venues",
-      "bands",
       "performances",
       "band_profiles",
       "artist_daily_stats",

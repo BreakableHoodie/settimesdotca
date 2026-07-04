@@ -12,6 +12,11 @@ superseded_by: ""
 
 Accepted
 
+_Superseded context: Lucia was removed entirely in PR #290. The `lucia_sessions` table name is
+retained for historical/compatibility reasons but is now managed by the direct D1 session manager
+in `functions/utils/auth.js`, not by Lucia. The INTEGER Unix-epoch `expires_at` invariant described
+below still holds exactly as written._
+
 ## Context
 
 SetTimes uses Cloudflare D1 as its primary database. D1 is SQLite-compatible, and SQLite TEXT comparisons are strictly lexicographic — they compare strings character-by-character using ASCII values.
@@ -21,7 +26,7 @@ Two incompatible datetime string formats are in play:
 - **D1 native format**: `datetime('now')` returns `YYYY-MM-DD HH:MM:SS` (space separator, no timezone suffix).
 - **JavaScript native format**: `new Date().toISOString()` returns `YYYY-MM-DDThh:mm:ssZ` (T separator, Z suffix).
 
-The ASCII value of `T` (84) is greater than the ASCII value of space (32). This means that at any given instant, the T-separated ISO 8601 representation of a datetime sorts lexicographically *higher* than the equivalent space-separated SQLite representation of the same instant:
+The ASCII value of `T` (84) is greater than the ASCII value of space (32). This means that at any given instant, the T-separated ISO 8601 representation of a datetime sorts lexicographically _higher_ than the equivalent space-separated SQLite representation of the same instant:
 
 ```
 "2026-05-14 12:00:00"  <  "2026-05-14T12:00:00Z"
@@ -38,7 +43,7 @@ A secondary complexity exists with the `lucia_sessions` table, which stores `exp
 All datetime values written to D1 TEXT columns must be normalized to space-separated SQLite format before storage using the pattern:
 
 ```js
-new Date(Date.now() + ms).toISOString().replace("T", " ").slice(0, 19)
+new Date(Date.now() + ms).toISOString().replace("T", " ").slice(0, 19);
 ```
 
 A reusable helper `toSqliteDateTime(date)` is defined in `functions/utils/authAttempts.js` (line 55). New code that stores datetimes in D1 TEXT columns must use `toSqliteDateTime()` or the equivalent inline pattern. ISO 8601 strings from JavaScript must never be stored directly in D1 TEXT columns.

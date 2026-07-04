@@ -667,7 +667,7 @@ SetTimes uses industry-standard security:
 - **CSRF protection** on all state-changing requests
 - **Role-based access control** (only editors/admins can modify data)
 - **Audit logging** tracks all important actions
-- **Regular security audits** (latest: November 2025 - Rating A)
+- **Regular security audits** — see `docs/code-review/` for the review history
 
 ### Best Practices
 
@@ -722,7 +722,7 @@ A: Database export tools are available to administrators. Contact support for as
 ---
 
 **Version:** 2.0
-**Last Updated:** November 2025
+**Last Updated:** 2026-07-04
 **For:** SetTimes Platform (settimes.ca)
 
 ---

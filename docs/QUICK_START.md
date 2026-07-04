@@ -53,10 +53,10 @@ Before you start, make sure you have:
 **Example:**
 
 ```text
-Event Name: Long Weekend Band Crawl Vol. 16
-Date: May 16, 2026
-Slug: lwbc16
-Description: Annual music crawl featuring 20+ bands across downtown
+Event Name: Long Weekend Band Crawl Vol. 17
+Date: August 2, 2026
+Slug: lwbc17
+Description: Annual music crawl featuring 22 bands across 6 venues in downtown Waterloo
 ```
 
 3. Click **"Next"** to continue
@@ -68,7 +68,7 @@ Description: Annual music crawl featuring 20+ bands across downtown
 For each performance location:
 
 1. Enter the **venue name**
-   - Example: "The Analog Cafe"
+   - Example: "Blue Room"
 2. Enter the **address** (optional but recommended)
    - Example: "123 Main Street, City, Province"
 3. Click **"Add Venue"**
@@ -79,9 +79,9 @@ For each performance location:
 
 **Example Venues:**
 
-- The Analog Cafe - 123 Main St
-- Black Cat Tavern - 456 Queen St
-- Velvet Underground - 789 King St
+- Blue Room - 28 King St N, Waterloo
+- Princess Cafe - 46 King St N, Waterloo
+- Room 47 - 47 King St N, Waterloo
 
 ---
 
@@ -106,17 +106,17 @@ Repeat for all bands
 
 ```
 Band: The Sunset Trio
-Venue: The Analog Cafe
+Venue: Blue Room
 Start: 7:00 PM
 End: 8:00 PM
 
 Band: Electric Dreams
-Venue: The Analog Cafe
+Venue: Blue Room
 Start: 8:30 PM
 End: 9:30 PM
 
 Band: Northern Lights
-Venue: Black Cat Tavern
+Venue: Princess Cafe
 Start: 7:00 PM
 End: 8:00 PM
 ```
@@ -383,7 +383,7 @@ Events tab → Find event → Edit → Uncheck "Published" → Save
 ---
 
 **Version:** 1.0
-**Last Updated:** November 2025
+**Last Updated:** 2026-07-04
 **For:** SetTimes Platform (settimes.ca)
 
 ---

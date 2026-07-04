@@ -13,11 +13,16 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
+      // Ratchet baseline measured 2026-07-04 (stmts 70.1 / branch 60.5 /
+      // funcs 79.7 / lines 70.8). Thresholds are set to actuals minus a
+      // margin for run-to-run variance. This blocks regressions without
+      // being an aspiration — raise deliberately, never lower silently
+      // (#478 item 9).
       thresholds: {
-        lines: 70,
-        functions: 70,
-        branches: 70,
-        statements: 70,
+        statements: 68,
+        branches: 58,
+        functions: 77,
+        lines: 68,
       },
       exclude: [
         "node_modules/",

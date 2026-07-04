@@ -3,6 +3,14 @@ name: Quality Checks
 on:
   pull_request:
     branches: [main, dev]
+    # Skip docs-only PRs — but docs/api-spec.yaml is the OpenAPI contract this
+    # workflow's "OpenAPI Validation" job exists to check, so re-include it.
+    # (paths patterns evaluate in order; the last matching pattern decides.)
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!**.md"
+      - "docs/api-spec.yaml"
 
 permissions:
   contents: read

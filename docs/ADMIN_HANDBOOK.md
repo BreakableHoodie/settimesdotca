@@ -680,7 +680,7 @@ wrangler d1 execute settimes-production-db --command="EXPLAIN QUERY PLAN <your_q
 
 ```javascript
 // In functions/api/_middleware.js
-console.log('[DEBUG]', { user, action, details });
+console.log("[DEBUG]", { user, action, details });
 ```
 
 **View Debug Logs:**
@@ -780,7 +780,7 @@ ENVIRONMENT = "development"
 ---
 
 **Version**: 1.0
-**Last Updated**: November 2025
+**Last Updated**: 2026-07-04
 **For**: SetTimes.ca Platform
 
 ---

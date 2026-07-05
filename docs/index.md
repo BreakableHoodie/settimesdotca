@@ -1,6 +1,6 @@
 # SetTimes Docs
 
-SetTimes.ca is a multi-venue, multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). It's a Cloudflare Pages application — React frontend, Cloudflare Pages Functions API, and a D1 (SQLite-compatible) database — built to run a real music festival: schedules, band profiles, venue maps, and an admin backend for the organizers running the show. The current target event is **Long Weekend Band Crawl Vol. 17** on **August 2, 2026**: 6 venues along King St N, 22 bands, doors 6:30 PM.
+SetTimes.ca is a multi-venue, multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). It's a Cloudflare Pages application — React frontend, Cloudflare Pages Functions API, and a D1 (SQLite-compatible) database — built to run real music festivals: schedules, band profiles, venue maps, and an admin backend for the organizers running the show.
 
 This site is generated from the Markdown in [`docs/`](https://github.com/BreakableHoodie/settimesdotca/tree/main/docs) in the main repository — if something here looks stale, the fix belongs there (use the "Edit this page" link in the header).
 

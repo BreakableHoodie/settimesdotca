@@ -11,6 +11,9 @@ import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import ActivatePage from './pages/ActivatePage.jsx'
 import PrivacyPage from './pages/PrivacyPage.jsx'
 import TermsPage from './pages/TermsPage.jsx'
+import AboutPage from './pages/AboutPage.jsx'
+import ContactPage from './pages/ContactPage.jsx'
+import StatsPage from './pages/StatsPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
@@ -88,6 +91,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="/activate" element={<ActivatePage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/stats" element={<StatsPage />} />
 
               {/* Event recap: Lazy loaded */}
               <Route

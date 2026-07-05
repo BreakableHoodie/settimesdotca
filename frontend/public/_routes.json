@@ -1,5 +1,5 @@
 {
   "version": 1,
   "include": ["/api/*", "/s/*", "/sitemap.xml", "/event/*", "/band/*", "/venue/*"],
-  "exclude": ["/", "/admin/*", "/privacy", "/terms", "/assets/*", "/favicon.ico", "/favicon.svg", "/favicon-*.png", "/apple-touch-icon.png", "/android-chrome-*.png", "/manifest.json", "/robots.txt", "/sw.js", "/offline.html"]
+  "exclude": ["/", "/admin/*", "/privacy", "/terms", "/about", "/contact", "/stats", "/assets/*", "/favicon.ico", "/favicon.svg", "/favicon-*.png", "/apple-touch-icon.png", "/android-chrome-*.png", "/manifest.json", "/robots.txt", "/sw.js", "/offline.html"]
 }

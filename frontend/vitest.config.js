@@ -11,16 +11,16 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', 'src/test/', '*.config.js', 'dist/'],
-      // Ratchet baseline measured 2026-07-04 (stmts 57.45 / branch 50.29 /
-      // funcs 60.85 / lines 58.44). Thresholds are set to actuals minus a
-      // margin for run-to-run variance. This blocks regressions without
-      // being an aspiration — raise deliberately, never lower silently
-      // (#478 item 9).
+      // Ratchet baseline re-measured 2026-07-05 (stmts 59.68 / branch 52.23 /
+      // funcs 62.05 / lines 60.71) after adding util tests in #519. Thresholds
+      // are set to actuals minus a margin for run-to-run variance. This blocks
+      // regressions without being an aspiration — raise deliberately, never
+      // lower silently (#478 item 9, ratcheted by #519).
       thresholds: {
-        statements: 55,
-        branches: 48,
-        functions: 58,
-        lines: 56,
+        statements: 57,
+        branches: 50,
+        functions: 60,
+        lines: 58,
       },
     },
   },

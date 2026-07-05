@@ -1,5 +1,5 @@
 ---
-title: "ADR-0004: Offset band sort times by +24h for performances starting before 6 AM"
+title: "ADR-0007: Offset band sort times by +24h for performances starting before 6 AM"
 status: "Accepted"
 date: "2026-05-14"
 authors: "Platform Engineering"
@@ -42,30 +42,29 @@ The threshold between "this set belongs to the previous evening" and "this is a 
 Any performance whose `startTime` hour is strictly less than `AFTER_MIDNIGHT_THRESHOLD_HOUR` (6) is treated as an after-midnight set belonging to the previous evening. The `prepareBands()` function in `frontend/src/utils/bandUtils.js` adds `MS_PER_DAY` (86,400,000 ms) to both `startMs` and `endMs` for these performances before they enter any sort, filter, conflict-detection, or time-display path.
 
 ```js
-const MS_PER_DAY = 24 * 60 * 60 * 1000
-const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6;
 
 export function prepareBands(list) {
-  return list.map(band => {
-    let startMs = Date.parse(`${band.date}T${band.startTime}:00`)
-    let endMs   = Date.parse(`${band.date}T${band.endTime}:00`)
+  return list.map((band) => {
+    let startMs = Date.parse(`${band.date}T${band.startTime}:00`);
+    let endMs = Date.parse(`${band.date}T${band.endTime}:00`);
 
     if (!Number.isNaN(startMs)) {
-      const startHour = parseInt(String(band.startTime ?? '').split(':')[0], 10)
+      const startHour = parseInt(String(band.startTime ?? "").split(":")[0], 10);
       if (Number.isFinite(startHour) && startHour < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
-        startMs += MS_PER_DAY
-        if (!Number.isNaN(endMs)) endMs += MS_PER_DAY
+        startMs += MS_PER_DAY;
+        if (!Number.isNaN(endMs)) endMs += MS_PER_DAY;
       }
     }
 
     // Correct end times that cross midnight without triggering the threshold
     if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs < startMs) {
-      endMs += MS_PER_DAY
+      endMs += MS_PER_DAY;
     }
 
-    return { ...band, startMs: Number.isNaN(startMs) ? 0 : startMs,
-                      endMs:   Number.isNaN(endMs)   ? 0 : endMs }
-  })
+    return { ...band, startMs: Number.isNaN(startMs) ? 0 : startMs, endMs: Number.isNaN(endMs) ? 0 : endMs };
+  });
 }
 ```
 

@@ -1,5 +1,5 @@
 ---
-title: "ADR-0002: Use PBKDF2-SHA256 via Web Crypto API instead of bcrypt for password hashing"
+title: "ADR-0005: Use PBKDF2-SHA256 via Web Crypto API instead of bcrypt for password hashing"
 status: "Accepted"
 date: "2026-05-14"
 authors: "Platform Engineering"
@@ -38,11 +38,11 @@ pbkdf2$<iterations>$<base64url-salt>$<base64url-hash>
 
 Implementation constants in `functions/utils/crypto.js`:
 
-| Constant | Value | Purpose |
-|---|---|---|
-| `SALT_LENGTH` | 16 bytes | Per-password random salt from `crypto.getRandomValues()` |
-| `DEFAULT_ITERATIONS` | 100,000 | Work factor for new hashes |
-| `KEY_LENGTH` | 32 bytes | Derived key length (256 bits) |
+| Constant             | Value    | Purpose                                                  |
+| -------------------- | -------- | -------------------------------------------------------- |
+| `SALT_LENGTH`        | 16 bytes | Per-password random salt from `crypto.getRandomValues()` |
+| `DEFAULT_ITERATIONS` | 100,000  | Work factor for new hashes                               |
+| `KEY_LENGTH`         | 32 bytes | Derived key length (256 bits)                            |
 
 Comparison is performed with a constant-time `timingSafeEqual` function to prevent timing side-channels. The iteration count is embedded in the stored hash string so future iteration increases can be handled transparently via rehash-on-login without requiring a forced password reset.
 

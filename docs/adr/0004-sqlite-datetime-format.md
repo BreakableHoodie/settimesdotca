@@ -1,5 +1,5 @@
 ---
-title: "ADR-0001: Normalize all datetime values to space-separated SQLite format before storage"
+title: "ADR-0004: Normalize all datetime values to space-separated SQLite format before storage"
 status: "Accepted"
 date: "2026-05-14"
 authors: "Platform Engineering"

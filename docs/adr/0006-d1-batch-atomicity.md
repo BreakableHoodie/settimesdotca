@@ -1,5 +1,5 @@
 ---
-title: "ADR-0003: Use DB.batch() for atomic multi-statement mutations; no BEGIN/COMMIT"
+title: "ADR-0006: Use DB.batch() for atomic multi-statement mutations; no BEGIN/COMMIT"
 status: "Accepted"
 date: "2026-05-14"
 authors: "Platform Engineering"

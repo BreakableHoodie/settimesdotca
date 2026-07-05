@@ -21,6 +21,9 @@ function Footer() {
             <Link to="/contact" className="text-text-tertiary hover:text-accent-400 transition-colors">
               Contact
             </Link>
+            <Link to="/stats" className="text-text-tertiary hover:text-accent-400 transition-colors">
+              Stats
+            </Link>
             <Link to="/privacy" className="text-text-tertiary hover:text-accent-400 transition-colors">
               Privacy Policy
             </Link>

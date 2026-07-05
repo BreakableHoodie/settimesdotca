@@ -82,12 +82,18 @@ export default function AboutPage() {
           </section>
 
           <section>
-            <h2 className="text-text-primary text-lg font-semibold mb-3">The flagship</h2>
+            <h2 className="text-text-primary text-lg font-semibold mb-3">Where we started</h2>
             <p>
-              Our flagship event is the Long Weekend Band Crawl, now in its 17th edition. Vol. 17 takes place{' '}
-              <strong className="text-text-secondary">August 2, 2026</strong>, with 22 bands across 6 venues on King St
-              N in Waterloo — Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, and Roost. Doors
-              at 6:30 PM, first sets at 6:45 PM. Ages 19+.
+              SetTimes was originally built to power the{' '}
+              <strong className="text-text-secondary">Long Weekend Band Crawl</strong> — a one-night, multi-venue
+              live-music event in Waterloo Region where bands play back-to-back across a cluster of nearby venues. That
+              crawl is still our flagship, and it&apos;s what shaped everything here: plan a route across venues, catch
+              the sets you want, and don&apos;t miss a band. For the current edition&apos;s date and full lineup, head
+              to the{' '}
+              <Link to="/" className="text-accent-400 hover:text-accent-500 transition-colors">
+                schedule
+              </Link>
+              .
             </p>
           </section>
 

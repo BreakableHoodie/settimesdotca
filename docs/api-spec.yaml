@@ -224,6 +224,71 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/stats/public:
+    get:
+      tags:
+        - Public
+      summary: Privacy-safe aggregate platform stats
+      description: |
+        Aggregate-only counts, sums, and a top-N-by-popularity band list for the
+        public stats page (social proof for the Vol-17 push). Never returns any
+        individual/PII/joinable-to-a-person data: `fans_following` is a
+        `COUNT(*) WHERE verified = 1` over `band_follows` (no emails, tokens, or
+        IPs are ever selected), and `routes_shared`/`route_views` are a
+        `COUNT`/`SUM(view_count)` over `share_links` (no slugs, band names, or
+        performance IDs). Gated by `PUBLIC_DATA_PUBLISH_ENABLED`. Cached 5 minutes.
+      responses:
+        "200":
+          description: Aggregate platform stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bands:
+                    type: integer
+                    description: Count of active band profiles
+                  venues:
+                    type: integer
+                    description: Count of venues
+                  events:
+                    type: integer
+                    description: Count of published events
+                  performances:
+                    type: integer
+                    description: Count of performances belonging to published events
+                  routes_shared:
+                    type: integer
+                    description: Count of share_links rows (schedules shared)
+                  route_views:
+                    type: integer
+                    description: Sum of share_links.view_count
+                  fans_following:
+                    type: integer
+                    description: Count of verified band_follows rows
+                  page_views:
+                    type: integer
+                    description: Sum of page_views_daily.views
+                  top_bands:
+                    type: array
+                    maxItems: 8
+                    description: Top bands by popularity_score (falls back to alphabetical order pre-event, when all scores are zero)
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        slug:
+                          type: string
+                          description: URL-safe band-name slug for display; the frontend builds its own band-page link from `name`
+                        score:
+                          type: integer
+                          description: Rounded popularity_score
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/schedule:
     get:
       tags:

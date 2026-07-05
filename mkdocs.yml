@@ -1,0 +1,107 @@
+site_name: SetTimes Docs
+site_url: https://breakablehoodie.github.io/settimesdotca/
+repo_url: https://github.com/BreakableHoodie/settimesdotca
+repo_name: BreakableHoodie/settimesdotca
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - swagger-ui-tag
+
+# Material's native exclude (gitignore-style globs, relative to docs_dir).
+# Confidential/internal planning docs and single-source pointer files stay
+# out of the built site without being removed from the repo.
+exclude_docs: |
+  code-review/
+  prompts/
+  ux/
+  superpowers/
+  adr/adr-*.md
+  SETTIMES_V2_IMPLEMENTATION_PLAN.md
+  SETTIMES_V2_UX_BRIEF.md
+  SETTIMES_V2_WIREFRAMES.md
+  /README.md
+  requirements.txt
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Start: QUICK_START.md
+      - Contributing: CONTRIBUTING.md
+  - Architecture:
+      - Backend Framework: BACKEND_FRAMEWORK.md
+      - Database: DATABASE.md
+      - Session Management: SESSION_MANAGEMENT.md
+  - API Reference:
+      - API Documentation: API_DOCUMENTATION.md
+      - Interactive OpenAPI Explorer: api-reference/openapi.md
+      - Admin API Usage Examples: frontend/ADMIN_INTEGRATION_EXAMPLE.md
+  - Admin & Users:
+      - Admin Handbook: ADMIN_HANDBOOK.md
+      - Admin Panel Guide: admin/README.md
+      - User Guide: USER_GUIDE.md
+  - Operations:
+      - Deployment: DEPLOYMENT.md
+      - Frontend Deploy Branches: frontend/DEPLOY.md
+      - Frontend Deployment Notes: frontend/DEPLOYMENT_NOTES.md
+      - D1 Setup: D1_SETUP.md
+      - Testing: TESTING.md
+      - Troubleshooting: TROUBLESHOOTING.md
+      - Security: SECURITY.md
+      - SQL Safety: SQL_SAFETY.md
+      - Performance Recommendations: PERFORMANCE_RECOMMENDATIONS.md
+  - Design System:
+      - Design System: design-system/DESIGN_SYSTEM.md
+      - Component Usage: design-system/COMPONENT_USAGE.md
+  # Labels are descriptive only — the canonical set's filenames (0004–0007)
+  # disagree with their own title frontmatter (ADR-0001–0004); numbering is
+  # reconciled separately in #521, so the nav avoids baking in either scheme.
+  - Decisions (ADRs):
+      - SQLite Datetime Format: adr/0004-sqlite-datetime-format.md
+      - PBKDF2 Password Hashing: adr/0005-pbkdf2-password-hashing.md
+      - D1 Batch Atomicity: adr/0006-d1-batch-atomicity.md
+      - After-Midnight Sort Threshold: adr/0007-after-midnight-sort-threshold.md
+      - Browse all ADRs (GitHub): https://github.com/BreakableHoodie/settimesdotca/tree/main/docs/adr
+  - Roadmap: ROADMAP.md

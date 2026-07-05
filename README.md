@@ -195,7 +195,7 @@ e2e/           Playwright end-to-end coverage
 
 ## More Documentation
 
-- [docs/INDEX.md](docs/INDEX.md) - documentation hub
+- [docs/index.md](docs/index.md) - documentation home (published at the docs site)
 - [docs/D1_SETUP.md](docs/D1_SETUP.md) - local and remote D1 workflow
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - release pipeline and operator setup
 - [docs/SESSION_MANAGEMENT.md](docs/SESSION_MANAGEMENT.md) - current session model

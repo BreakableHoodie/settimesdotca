@@ -149,7 +149,7 @@ Key values:
 - `EMAIL_PROVIDER`, `EMAIL_FROM`, and provider secret when email delivery is enabled
 - `CSP_ENFORCE=true` in production unless you are intentionally running report-only
 
-See [.env.example](../.env.example) and [docs/DEPLOYMENT.md](DEPLOYMENT.md) for the complete runtime list.
+See [.env.example](https://github.com/BreakableHoodie/settimesdotca/blob/main/.env.example) and [docs/DEPLOYMENT.md](DEPLOYMENT.md) for the complete runtime list.
 
 ## Remote Migrations and Release Flow
 
@@ -223,7 +223,7 @@ Wrangler can create multiple local SQLite files; the migration helper updates al
 
 ## Related Docs
 
-- [../README.md](../README.md)
+- [Project README](https://github.com/BreakableHoodie/settimesdotca/blob/main/README.md)
 - [DEPLOYMENT.md](DEPLOYMENT.md)
 - [SESSION_MANAGEMENT.md](SESSION_MANAGEMENT.md)
 - [DATABASE.md](DATABASE.md)

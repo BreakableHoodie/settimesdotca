@@ -21,7 +21,7 @@ export default function TermsPage() {
         <link rel="canonical" href="https://settimes.ca/terms" />
       </Helmet>
 
-      <div className="container mx-auto px-4 max-w-2xl py-12 legal-document">
+      <main id="main-content" tabIndex={-1} className="container mx-auto px-4 max-w-2xl py-12 legal-document">
         <div className="no-print mb-8 flex items-center justify-between gap-3">
           <Link to="/" className="text-accent-400 hover:text-accent-500 text-sm transition-colors">
             ← Back to SetTimes
@@ -238,7 +238,7 @@ export default function TermsPage() {
             </p>
           </section>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

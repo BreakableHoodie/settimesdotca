@@ -42,6 +42,9 @@ e2e/.auth/
 *.lcov
 .nyc_output/
 
+# MkDocs build output
+/site/
+
 # Docker
 .dockerignore
 

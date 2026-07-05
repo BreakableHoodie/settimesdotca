@@ -2,6 +2,8 @@
 
 SetTimes.ca is a Cloudflare Pages application for managing and publishing multi-venue music events. This repository contains the React frontend, Cloudflare Pages Functions API, D1 schema and migrations, admin authentication flows, and deployment automation.
 
+📖 **Documentation:** [docs.settimes.ca](https://docs.settimes.ca)
+
 ## Stack
 
 - Frontend: React 19, Vite 8, Tailwind CSS 4, React Router 7

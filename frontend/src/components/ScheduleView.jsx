@@ -8,17 +8,27 @@ import BandCard from './BandCard'
 const UNSCHEDULED = Symbol('unscheduled')
 const UNSCHEDULED_FILTER_VALUE = '__unscheduled__'
 
-function groupByTime(bands) {
+// Groups by (festival day, clock time) rather than bare clock time. `band.date`
+// is already the set's festival day (see AFTER_MIDNIGHT_THRESHOLD_HOUR /
+// prepareBands in bandUtils.js — after-midnight sets keep their *previous*
+// evening's date). Without the day component, two sets at the same clock time
+// on different festival days (e.g. both nights' 8 PM slot) would collapse into
+// one bucket (#538). In the single-day case `date` is constant across every
+// band, so the key degenerates to the old bare-time key and grouping is
+// byte-identical to before.
+export function groupByTime(bands) {
   const timeGroups = new Map()
   const grouped = []
   bands.forEach(band => {
     const slot = !band.startTime || band.startTime === 'TBD' ? 'TBD' : band.startTime
-    if (!timeGroups.has(slot)) {
-      const group = { time: slot, bands: [] }
-      timeGroups.set(slot, group)
+    const day = band.date ?? ''
+    const key = `${day}|${slot}`
+    if (!timeGroups.has(key)) {
+      const group = { time: slot, date: band.date, bands: [] }
+      timeGroups.set(key, group)
       grouped.push(group)
     }
-    timeGroups.get(slot).bands.push(band)
+    timeGroups.get(key).bands.push(band)
   })
   grouped.forEach(group => {
     group.bands.sort((a, b) => (a.venue ?? '').localeCompare(b.venue ?? ''))
@@ -480,8 +490,8 @@ function ScheduleView({
                 </h2>
                 <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
               </div>
-              {upcomingByTime.map(({ time, bands: timeBands }) => (
-                <div key={time} className="relative ml-0 sm:ml-4">
+              {upcomingByTime.map(({ time, date, bands: timeBands }) => (
+                <div key={`${date ?? ''}-${time}`} className="relative ml-0 sm:ml-4">
                   <div className="flex items-center mb-4">
                     <h3 className="bg-bg-navy text-text-primary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
@@ -517,8 +527,8 @@ function ScheduleView({
                 </h2>
                 <div className="flex-1 h-0.5 bg-surface ml-4"></div>
               </div>
-              {pastByTime.map(({ time, bands: timeBands }) => (
-                <div key={time} className="relative ml-0 sm:ml-4 opacity-60">
+              {pastByTime.map(({ time, date, bands: timeBands }) => (
+                <div key={`${date ?? ''}-${time}`} className="relative ml-0 sm:ml-4 opacity-60">
                   <div className="flex items-center mb-4">
                     <h3 className="bg-surface text-text-tertiary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                       {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}

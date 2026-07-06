@@ -47,6 +47,31 @@ export async function onRequestGet(context) {
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>`,
+      `  <url>
+    <loc>https://settimes.ca/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>`,
+      `  <url>
+    <loc>https://settimes.ca/contact</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>`,
+      `  <url>
+    <loc>https://settimes.ca/stats</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
+  </url>`,
+      `  <url>
+    <loc>https://settimes.ca/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>`,
+      `  <url>
+    <loc>https://settimes.ca/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>`,
     ];
 
     for (const event of events) {

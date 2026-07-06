@@ -22,6 +22,30 @@
     <meta name="twitter:title" content="SetTimes – Live Music Events & Show Schedules" />
     <meta name="twitter:description" content="Discover upcoming live music events and build your personalized show schedule." />
 
+    <!-- Site-wide structured data (JSON-LD data blocks — not executable, so no CSP hash needed).
+         Lives in the SPA shell so every route carries Organization + WebSite; SSR routes
+         (event/band/venue) add their own MusicEvent/MusicGroup/MusicVenue on top. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "SetTimes",
+        "url": "https://settimes.ca",
+        "logo": "https://settimes.ca/apple-touch-icon.png",
+        "email": "hello@settimes.ca",
+        "areaServed": "Waterloo Region, Ontario",
+        "description": "A free, community-run live-music event-schedule tool for Waterloo Region, Ontario."
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "SetTimes",
+        "url": "https://settimes.ca"
+      }
+    </script>
+
     <!-- Favicon: ICO first for Safari desktop fallback, then SVG for modern browsers, then PNGs -->
     <link rel="icon" href="/favicon.ico" sizes="32x32 16x16" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

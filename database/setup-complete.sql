@@ -374,7 +374,7 @@ CREATE TABLE IF NOT EXISTS "performances" (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   created_by_user_id INTEGER,
   updated_by_user_id INTEGER,
-  updated_at TEXT DEFAULT (datetime('now')), is_announced INTEGER NOT NULL DEFAULT 1, band_follow_notified INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT DEFAULT (datetime('now')), is_announced INTEGER NOT NULL DEFAULT 1, band_follow_notified INTEGER NOT NULL DEFAULT 0, performance_date TEXT,
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
   FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE RESTRICT,
   FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE SET NULL,

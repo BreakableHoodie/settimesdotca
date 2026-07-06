@@ -13,7 +13,7 @@ export async function onRequest(context) {
     return env.ASSETS.fetch(request);
   }
 
-  let event = null;
+  let event;
   try {
     event = await env.DB.prepare(
       `SELECT id, name, date, end_date, slug, description, city, ticket_url

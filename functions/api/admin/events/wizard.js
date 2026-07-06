@@ -149,7 +149,7 @@ export async function onRequestPost(context) {
           throw new Error(`Band ${i + 1}: end time must be after start time`);
         }
       }
-      let url = null;
+      let url;
       try {
         url = sanitizeOptionalHttpUrl(b?.url, FIELD_LIMITS.bandUrl.max, "Website URL");
       } catch {

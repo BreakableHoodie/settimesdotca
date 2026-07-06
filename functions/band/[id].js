@@ -13,7 +13,7 @@ export async function onRequest(context) {
     return env.ASSETS.fetch(request);
   }
 
-  let band = null;
+  let band;
   try {
     band = await env.DB.prepare(
       `SELECT name, genre, origin, origin_city, origin_region, description, photo_url, social_links

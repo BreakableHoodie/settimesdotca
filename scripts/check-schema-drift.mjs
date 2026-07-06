@@ -103,6 +103,7 @@ function applyMigration(db, sql, filename) {
     } catch (fallbackError) {
       throw new Error(
         `Failed to apply migration ${filename}:\n  whole-file error: ${wholeFileError.message}\n  fallback error: ${fallbackError.message}`,
+        { cause: fallbackError },
       );
     }
   }

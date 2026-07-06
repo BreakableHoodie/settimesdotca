@@ -152,8 +152,8 @@ const main = () => {
     sets.forEach((set) => {
       const bandName = set?.band?.trim();
       if (!bandName) return;
-      let startTime = null;
-      let endTime = null;
+      let startTime;
+      let endTime;
       try {
         startTime = normalizeTime(set?.start);
         endTime = normalizeTime(set?.end);

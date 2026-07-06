@@ -276,7 +276,6 @@ describe("safeReflectHandleOrUrl (#483)", () => {
   });
 
   it("trimming does not launder a scheme: padded javascript: is still rejected", () => {
-    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #483 read-path guard
     expect(safeReflectHandleOrUrl(" javascript:alert(1)")).toBeNull();
   });
 });

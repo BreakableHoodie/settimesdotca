@@ -19,7 +19,7 @@ export async function onRequest(context) {
     return env.ASSETS.fetch(request);
   }
 
-  let row = null;
+  let row;
   try {
     row = await DB.prepare(
       `SELECT sl.slug, sl.band_names, e.name AS event_name

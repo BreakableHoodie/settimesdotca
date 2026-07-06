@@ -9,3 +9,9 @@
 # docs/API_DOCUMENTATION.md contains a placeholder curl example with a fictional
 # session_token value — not a real credential.
 05735d9da9763dd7d509dd75605844da7c787e3d:docs/API_DOCUMENTATION.md:curl-auth-header:150
+
+# .github/instructions/security-and-owasp.instructions.md line 412 is a security
+# guidance "// BAD" example — const API_KEY = 'hardcoded-example-key-never-do-this'
+# (literally that placeholder string, not a real key). The stripe-access-token
+# rule matches its shape. The scheduled full-history scan flags it; suppress it.
+d309339626793c926544a15d8a3932882e1b5b16:.github/instructions/security-and-owasp.instructions.md:stripe-access-token:412

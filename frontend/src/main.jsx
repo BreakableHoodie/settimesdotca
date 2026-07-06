@@ -5,19 +5,24 @@ import { HelmetProvider } from 'react-helmet-async'
 import { ThemeProvider } from './components/ThemeProvider.jsx'
 import App from './App.jsx'
 import EventsPage from './pages/EventsPage.jsx'
-import EmbedPage from './pages/EmbedPage.jsx'
-import SubscribePage from './pages/SubscribePage.jsx'
-import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
-import ActivatePage from './pages/ActivatePage.jsx'
-import PrivacyPage from './pages/PrivacyPage.jsx'
-import TermsPage from './pages/TermsPage.jsx'
-import AboutPage from './pages/AboutPage.jsx'
-import ContactPage from './pages/ContactPage.jsx'
-import StatsPage from './pages/StatsPage.jsx'
-import NotFoundPage from './pages/NotFoundPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
 import './index.css'
+
+// Eager above: only the two primary fan-flow routes — the homepage (`/`,
+// EventsPage) and the event schedule (`/event/:slug`, App). Everything else is
+// lazy so it stays out of the homepage's critical bundle (was ~79 KiB of
+// unused JS on `/`, delaying FCP/LCP — see #532).
+const EmbedPage = lazy(() => import('./pages/EmbedPage.jsx'))
+const SubscribePage = lazy(() => import('./pages/SubscribePage.jsx'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage.jsx'))
+const ActivatePage = lazy(() => import('./pages/ActivatePage.jsx'))
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage.jsx'))
+const TermsPage = lazy(() => import('./pages/TermsPage.jsx'))
+const AboutPage = lazy(() => import('./pages/AboutPage.jsx'))
+const ContactPage = lazy(() => import('./pages/ContactPage.jsx'))
+const StatsPage = lazy(() => import('./pages/StatsPage.jsx'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
 // Lazy load admin panel and band profiles (not needed for initial page load)
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
@@ -81,107 +86,112 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             >
               Skip to main content
             </a>
-            <Routes>
-              {/* Fan experience: Load immediately */}
-              <Route path="/" element={<EventsPage />} />
-              <Route path="/event/:slug" element={<App />} />
-              <Route path="/embed/:slug" element={<EmbedPage />} />
-              <Route path="/subscribe" element={<SubscribePage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/activate" element={<ActivatePage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-              <Route path="/terms" element={<TermsPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/contact" element={<ContactPage />} />
-              <Route path="/stats" element={<StatsPage />} />
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
+                {/* Primary fan flow: eager (in the initial bundle) */}
+                <Route path="/" element={<EventsPage />} />
+                <Route path="/event/:slug" element={<App />} />
+                <Route path="/embed/:slug" element={<EmbedPage />} />
+                <Route path="/subscribe" element={<SubscribePage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/activate" element={<ActivatePage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/stats" element={<StatsPage />} />
 
-              {/* Event recap: Lazy loaded */}
-              <Route
-                path="/events/:slug/recap"
-                element={
-                  <ErrorBoundary title="Event Recap Error" message="Unable to load event recap. Please try again.">
-                    <Suspense fallback={<LoadingFallback />}>
-                      <EventRecapPage />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
+                {/* Event recap: Lazy loaded */}
+                <Route
+                  path="/events/:slug/recap"
+                  element={
+                    <ErrorBoundary title="Event Recap Error" message="Unable to load event recap. Please try again.">
+                      <Suspense fallback={<LoadingFallback />}>
+                        <EventRecapPage />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
 
-              {/* Band profiles: Lazy loaded */}
-              <Route
-                path="/band/:id"
-                element={
-                  <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
-                    <Suspense fallback={<LoadingFallback />}>
-                      <BandProfilePage />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
+                {/* Band profiles: Lazy loaded */}
+                <Route
+                  path="/band/:id"
+                  element={
+                    <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
+                      <Suspense fallback={<LoadingFallback />}>
+                        <BandProfilePage />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
 
-              {/* Artist directory: Lazy loaded */}
-              <Route
-                path="/artists"
-                element={
-                  <ErrorBoundary title="Artists Error" message="Unable to load the artist directory. Please try again.">
-                    <Suspense fallback={<LoadingFallback />}>
-                      <ArtistsPage />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
+                {/* Artist directory: Lazy loaded */}
+                <Route
+                  path="/artists"
+                  element={
+                    <ErrorBoundary
+                      title="Artists Error"
+                      message="Unable to load the artist directory. Please try again."
+                    >
+                      <Suspense fallback={<LoadingFallback />}>
+                        <ArtistsPage />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
 
-              {/* Venues: Lazy loaded */}
-              <Route
-                path="/venues"
-                element={
-                  <ErrorBoundary title="Venues Error" message="Unable to load venues. Please try again.">
-                    <Suspense fallback={<LoadingFallback />}>
-                      <VenuesPage />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/venue/:id"
-                element={
-                  <ErrorBoundary title="Venue Error" message="Unable to load this venue. Please try again.">
-                    <Suspense fallback={<LoadingFallback />}>
-                      <VenuePage />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
+                {/* Venues: Lazy loaded */}
+                <Route
+                  path="/venues"
+                  element={
+                    <ErrorBoundary title="Venues Error" message="Unable to load venues. Please try again.">
+                      <Suspense fallback={<LoadingFallback />}>
+                        <VenuesPage />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/venue/:id"
+                  element={
+                    <ErrorBoundary title="Venue Error" message="Unable to load this venue. Please try again.">
+                      <Suspense fallback={<LoadingFallback />}>
+                        <VenuePage />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
 
-              {/* Share preview: Lazy loaded */}
-              <Route
-                path="/s/:slug"
-                element={
-                  <ErrorBoundary title="Share Preview Error" message="Unable to load this shared route.">
-                    <Suspense fallback={<LoadingFallback />}>
-                      <SharePreviewPage />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
+                {/* Share preview: Lazy loaded */}
+                <Route
+                  path="/s/:slug"
+                  element={
+                    <ErrorBoundary title="Share Preview Error" message="Unable to load this shared route.">
+                      <Suspense fallback={<LoadingFallback />}>
+                        <SharePreviewPage />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
 
-              {/* Admin panel: Lazy loaded */}
-              <Route
-                path="/admin/*"
-                element={
-                  <ErrorBoundary
-                    title="Admin Panel Error"
-                    message="An error occurred in the admin panel. Please refresh."
-                  >
-                    <Suspense fallback={<LoadingFallback />}>
-                      <AdminApp />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
-              {/* 404 catch-all */}
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
+                {/* Admin panel: Lazy loaded */}
+                <Route
+                  path="/admin/*"
+                  element={
+                    <ErrorBoundary
+                      title="Admin Panel Error"
+                      message="An error occurred in the admin panel. Please refresh."
+                    >
+                      <Suspense fallback={<LoadingFallback />}>
+                        <AdminApp />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
+                {/* 404 catch-all */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </HelmetProvider>
       </ThemeProvider>

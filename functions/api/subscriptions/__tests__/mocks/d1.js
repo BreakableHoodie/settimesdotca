@@ -216,9 +216,7 @@ export class MockD1Database {
 
   _handleEventsQuery(queryLower, params) {
     // This is a complex query with JOINs - return aggregated data
-    let results = [];
-
-    results = this.data.events.map((event) => {
+    let results = this.data.events.map((event) => {
       const eventPerformances = this.data.performances.filter((p) => p.event_id === event.id);
       const uniqueBandIds = new Set(eventPerformances.map((p) => p.band_profile_id));
       const uniqueVenueIds = new Set(eventPerformances.map((p) => p.venue_id).filter(Boolean));
@@ -250,7 +248,7 @@ export class MockD1Database {
     }
 
     if (queryLower.includes("lower(bp.genre) = lower(?)") || queryLower.includes("lower(b.genre) = lower(?)")) {
-      const genre = params[paramIndex++];
+      const genre = params[paramIndex];
       results = results.filter((event) => {
         const performances = this.data.performances.filter((p) => p.event_id === event.id);
         return performances.some((perf) => {

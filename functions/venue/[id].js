@@ -12,7 +12,7 @@ export async function onRequest(context) {
     return env.ASSETS.fetch(request);
   }
 
-  let venue = null;
+  let venue;
   try {
     venue = await env.DB.prepare(
       `SELECT name, address, address_line1, city, region, postal_code, latitude, longitude,

@@ -1,9 +1,11 @@
 import { Check, Copy, Music } from 'lucide-react'
-import { memo, useMemo, useState } from 'react'
+import { Fragment, memo, useMemo, useState } from 'react'
 import { copyToClipboard } from '../utils/clipboard'
+import { dayNumberByDate, isMultiDay } from '../utils/festivalDays'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
 import BandCard from './BandCard'
+import { DayDivider } from './ui'
 
 const UNSCHEDULED = Symbol('unscheduled')
 const UNSCHEDULED_FILTER_VALUE = '__unscheduled__'
@@ -60,6 +62,12 @@ function ScheduleView({
     const d = currentTime instanceof Date ? currentTime : new Date(currentTime)
     return d.getTime()
   }, [currentTime])
+
+  // Day-divider support (#541): numbering/gate derive from the full incoming
+  // `bands` set (not the filtered/split subsets below) so day numbers stay
+  // consistent across the Upcoming and Past sections and across filter changes.
+  const dayNumberByDateMap = useMemo(() => dayNumberByDate(bands), [bands])
+  const multiDayEvent = useMemo(() => isMultiDay(bands), [bands])
 
   const uniqueVenues = useMemo(() => [...new Set(bands.map(b => b.venue).filter(Boolean))].sort(), [bands])
   const hasUnscheduled = useMemo(() => bands.some(b => !b.venue), [bands])
@@ -490,31 +498,38 @@ function ScheduleView({
                 </h2>
                 <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
               </div>
-              {upcomingByTime.map(({ time, date, bands: timeBands }) => (
-                <div key={`${date ?? ''}-${time}`} className="relative ml-0 sm:ml-4">
-                  <div className="flex items-center mb-4">
-                    <h3 className="bg-bg-navy text-text-primary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
-                      {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
-                    </h3>
-                    <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
-                    {timeBands.map(band => (
-                      <BandCard
-                        key={band.id}
-                        band={band}
-                        isSelected={selectedBandsSet.has(band.id)}
-                        onToggle={onToggleBand}
-                        clickable={canToggleBands}
-                        showToggleButton={canToggleBands}
-                        eventSlug={eventSlug}
-                        showVenue={true}
-                        currentTime={currentTime}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+              {upcomingByTime.map(({ time, date, bands: timeBands }, idx) => {
+                const previousDate = idx > 0 ? upcomingByTime[idx - 1].date : undefined
+                const showDayDivider = multiDayEvent && date !== previousDate
+                return (
+                  <Fragment key={`${date ?? ''}-${time}`}>
+                    {showDayDivider && <DayDivider date={date} dayNumber={dayNumberByDateMap.get(date)} />}
+                    <div className="relative ml-0 sm:ml-4">
+                      <div className="flex items-center mb-4">
+                        <h3 className="bg-bg-navy text-text-primary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                          {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
+                        </h3>
+                        <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
+                        {timeBands.map(band => (
+                          <BandCard
+                            key={band.id}
+                            band={band}
+                            isSelected={selectedBandsSet.has(band.id)}
+                            onToggle={onToggleBand}
+                            clickable={canToggleBands}
+                            showToggleButton={canToggleBands}
+                            eventSlug={eventSlug}
+                            showVenue={true}
+                            currentTime={currentTime}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </Fragment>
+                )
+              })}
             </div>
           )}
 
@@ -527,31 +542,38 @@ function ScheduleView({
                 </h2>
                 <div className="flex-1 h-0.5 bg-surface ml-4"></div>
               </div>
-              {pastByTime.map(({ time, date, bands: timeBands }) => (
-                <div key={`${date ?? ''}-${time}`} className="relative ml-0 sm:ml-4 opacity-60">
-                  <div className="flex items-center mb-4">
-                    <h3 className="bg-surface text-text-tertiary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
-                      {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
-                    </h3>
-                    <div className="flex-1 h-0.5 bg-surface ml-4"></div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
-                    {timeBands.map(band => (
-                      <BandCard
-                        key={band.id}
-                        band={band}
-                        isSelected={selectedBandsSet.has(band.id)}
-                        onToggle={onToggleBand}
-                        clickable={canToggleBands}
-                        showToggleButton={canToggleBands}
-                        eventSlug={eventSlug}
-                        showVenue={true}
-                        currentTime={currentTime}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+              {pastByTime.map(({ time, date, bands: timeBands }, idx) => {
+                const previousDate = idx > 0 ? pastByTime[idx - 1].date : undefined
+                const showDayDivider = multiDayEvent && date !== previousDate
+                return (
+                  <Fragment key={`${date ?? ''}-${time}`}>
+                    {showDayDivider && <DayDivider date={date} dayNumber={dayNumberByDateMap.get(date)} />}
+                    <div className="relative ml-0 sm:ml-4 opacity-60">
+                      <div className="flex items-center mb-4">
+                        <h3 className="bg-surface text-text-tertiary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
+                          {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
+                        </h3>
+                        <div className="flex-1 h-0.5 bg-surface ml-4"></div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
+                        {timeBands.map(band => (
+                          <BandCard
+                            key={band.id}
+                            band={band}
+                            isSelected={selectedBandsSet.has(band.id)}
+                            onToggle={onToggleBand}
+                            clickable={canToggleBands}
+                            showToggleButton={canToggleBands}
+                            eventSlug={eventSlug}
+                            showVenue={true}
+                            currentTime={currentTime}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </Fragment>
+                )
+              })}
             </div>
           )}
         </div>

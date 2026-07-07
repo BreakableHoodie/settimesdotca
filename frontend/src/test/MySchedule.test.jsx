@@ -4,17 +4,20 @@ import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import MySchedule from '../components/MySchedule'
 
-const makeMs = timeStr => new Date(`2026-05-17T${timeStr}:00`).getTime()
+const makeMs = (timeStr, date = '2026-05-17') => new Date(`${date}T${timeStr}:00`).getTime()
 
-const makeBand = (id, name, venue, startTime, endTime) => ({
+const makeBand = (id, name, venue, startTime, endTime, date = '2026-05-17') => ({
   id: `event-test-perf-${id}`,
   name,
   venue,
-  date: '2026-05-17',
+  date,
   startTime,
   endTime,
-  startMs: makeMs(startTime),
-  endMs: makeMs(endTime) > makeMs(startTime) ? makeMs(endTime) : makeMs(endTime) + 24 * 60 * 60 * 1000,
+  startMs: makeMs(startTime, date),
+  endMs:
+    makeMs(endTime, date) > makeMs(startTime, date)
+      ? makeMs(endTime, date)
+      : makeMs(endTime, date) + 24 * 60 * 60 * 1000,
   genre: null,
   performance_id: id,
 })
@@ -149,5 +152,65 @@ describe('MySchedule — conflict vs overlap severity', () => {
     // Band C must show only an overlap warning, no conflict label
     expect(screen.getAllByText(/Overlaps with Band A, Band B/i).length).toBeGreaterThan(0)
     expect(screen.queryByText(/Same time as Band C/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('MySchedule — #541: multi-day day dividers', () => {
+  it('renders no day dividers for a single-day schedule', () => {
+    const bands = [
+      makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30'),
+      makeBand(2, 'Band Beta', 'Stage B', '21:00', '21:30'),
+    ]
+    render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
+
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+  })
+
+  it('inserts a day-divider before Day 1 and again before the first Day 2 band, none for the second Day 1 band', () => {
+    const bands = [
+      makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30', '2026-05-17'),
+      makeBand(2, 'Band Beta', 'Stage B', '21:00', '21:30', '2026-05-17'),
+      makeBand(3, 'Band Gamma', 'Stage A', '20:00', '20:30', '2026-05-18'),
+    ]
+    const { container } = render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
+
+    // One divider before the very first band (Day 1) and one before the first
+    // Day 2 band (Gamma); Band Beta (2nd Day 1 band) gets none since its date
+    // matches the previous rendered band's date.
+    const dividers = screen.getAllByRole('separator')
+    expect(dividers).toHaveLength(2)
+    expect(dividers[0]).toHaveTextContent('Day 1')
+    expect(dividers[1]).toHaveTextContent('Day 2')
+
+    // The Day 2 divider must appear before Band Gamma (the first Day 2 band) in DOM order.
+    const text = container.textContent
+    expect(text.indexOf('Day 2')).toBeLessThan(text.indexOf('Band Gamma'))
+  })
+
+  it('inserts a divider for each subsequent day change across a 3-day schedule', () => {
+    const bands = [
+      makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30', '2026-05-17'),
+      makeBand(2, 'Band Beta', 'Stage A', '20:00', '20:30', '2026-05-18'),
+      makeBand(3, 'Band Gamma', 'Stage A', '20:00', '20:30', '2026-05-19'),
+    ]
+    render(
+      <MemoryRouter>
+        <MySchedule {...defaultProps} bands={bands} />
+      </MemoryRouter>
+    )
+
+    const dividers = screen.getAllByRole('separator')
+    expect(dividers).toHaveLength(3)
+    expect(dividers[0]).toHaveTextContent('Day 1')
+    expect(dividers[1]).toHaveTextContent('Day 2')
+    expect(dividers[2]).toHaveTextContent('Day 3')
   })
 })

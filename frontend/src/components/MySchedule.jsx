@@ -19,12 +19,14 @@ import {
   Trash2,
   Zap,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx'
 import { copyToClipboard } from '../utils/clipboard'
+import { dayNumberByDate, isMultiDay } from '../utils/festivalDays'
 import { formatTimeRange } from '../utils/timeFormat'
 import BandCard from './BandCard'
 import LockInLineupPanel from './LockInLineupPanel'
+import { DayDivider } from './ui'
 import { walkMinutesBetween } from '../utils/walkTime'
 
 // Label a break between two sets at the same venue.
@@ -222,6 +224,15 @@ function MySchedule({
   const visibleBands = showPast ? sortedBands : sortedBands.filter(band => band.endMs > effectiveNow.getTime())
 
   const hiddenFinishedCount = sortedBands.length - visibleBands.length
+
+  // Day-divider support (#541): a flat time-sorted list, so day boundaries are
+  // detected by comparing each rendered band's `.date` to the previous one
+  // (see the render loop below). Numbering + the multi-day gate use the full
+  // `sortedBands` (not the `showPast`-filtered `visibleBands`) so a day's number
+  // never shifts when past sets are hidden — keeping it consistent with
+  // ScheduleView. Single-day schedules render zero dividers, byte-identical.
+  const dayNumberByDateMap = useMemo(() => dayNumberByDate(sortedBands), [sortedBands])
+  const multiDayEvent = useMemo(() => isMultiDay(sortedBands), [sortedBands])
 
   // Find first highlighted band ID (only show reminder for the first one)
   const firstHighlightedBandId = useMemo(() => {
@@ -561,6 +572,11 @@ function MySchedule({
           const hasOverlap = overlaps.some(c => c.band1 === band.id || c.band2 === band.id)
           const showDreReminder = band.id === firstHighlightedBandId
 
+          // Day-divider: render above this band when its festival day differs
+          // from the previously-rendered band's day (#541).
+          const previousDate = idx > 0 ? visibleBands[idx - 1].date : undefined
+          const showDayDivider = multiDayEvent && band.date !== previousDate
+
           // Walk + buffer from the previous set — the crawl's "can I make it?" math.
           let transition = null
           if (idx > 0) {
@@ -581,85 +597,90 @@ function MySchedule({
           }
 
           return (
-            <div key={band.id} className="relative mb-6">
-              {/* Walk / break transition from the previous set */}
-              {transition && (
-                <div className="flex flex-wrap items-center justify-center gap-1.5 py-3 text-xs">
-                  {transition.walkMin != null ? (
-                    <span className="inline-flex flex-wrap items-center justify-center gap-1.5 text-text-tertiary">
-                      <Footprints size={14} aria-hidden="true" />
-                      <span>
-                        ~{transition.walkMin} min walk to {transition.venue}
-                      </span>
-                      {transition.buffer != null && (
-                        <span className={transition.buffer < 3 ? 'font-semibold text-error-600' : 'text-text-tertiary'}>
-                          · {bufferLabel(transition.buffer)}
+            <Fragment key={band.id}>
+              {showDayDivider && <DayDivider date={band.date} dayNumber={dayNumberByDateMap.get(band.date)} />}
+              <div className="relative mb-6">
+                {/* Walk / break transition from the previous set */}
+                {transition && (
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 py-3 text-xs">
+                    {transition.walkMin != null ? (
+                      <span className="inline-flex flex-wrap items-center justify-center gap-1.5 text-text-tertiary">
+                        <Footprints size={14} aria-hidden="true" />
+                        <span>
+                          ~{transition.walkMin} min walk to {transition.venue}
                         </span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="italic text-text-tertiary">{formatBreakLabel(transition.gapMinutes)}</span>
-                  )}
-                </div>
-              )}
-              {showDreReminder && (
-                <div className="text-center text-text-secondary text-xs italic pb-2 flex items-center justify-center gap-2">
-                  <Smile size={14} className="text-yellow-300" aria-hidden="true" />
-                  <span>{getHighlightMessage()}</span>
-                </div>
-              )}
-              <div className="space-y-2">
-                <div className={getTimeStatus(band).status === 'now' ? 'playing-now rounded-xl' : ''}>
-                  <BandCard
-                    band={band}
-                    isSelected={true}
-                    onToggle={onToggleBand}
-                    onRemove={onToggleBand}
-                    showVenue={true}
-                    clickable={false}
-                    eventSlug={eventSlug}
-                    currentTime={effectiveNow}
-                    warningType={hasConflict ? 'conflict' : hasOverlap ? 'overlap' : null}
-                    warningText={(() => {
-                      if (!hasConflict && !hasOverlap) return null
-                      const getNamesFrom = list => [
-                        ...new Set(
-                          list
-                            .filter(c => c.band1 === band.id || c.band2 === band.id)
-                            .map(c => {
-                              const otherId = c.band1 === band.id ? c.band2 : c.band1
-                              return bandNameById.get(otherId)
-                            })
-                            .filter(Boolean)
-                        ),
-                      ]
-                      const conflictNames = getNamesFrom(conflicts)
-                      const overlapNames = getNamesFrom(overlaps)
-                      const parts = []
-                      if (conflictNames.length > 0) parts.push(`Same time as ${conflictNames.join(', ')}`)
-                      if (overlapNames.length > 0) parts.push(`Overlaps with ${overlapNames.join(', ')}`)
-                      return parts.join(' · ')
-                    })()}
-                  />
-                </div>
-
-                {/* Countdown timer - appears BELOW the band card */}
-                {(() => {
-                  const timeStatus = getTimeStatus(band)
-                  return (
-                    <div
-                      className={`text-xs font-semibold px-3 py-1.5 rounded border ${timeStatus.color} flex items-center gap-2 leading-normal`}
-                    >
-                      {(() => {
-                        const StatusIcon = timeStatus.icon
-                        return <StatusIcon size={14} aria-hidden="true" />
+                        {transition.buffer != null && (
+                          <span
+                            className={transition.buffer < 3 ? 'font-semibold text-error-600' : 'text-text-tertiary'}
+                          >
+                            · {bufferLabel(transition.buffer)}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="italic text-text-tertiary">{formatBreakLabel(transition.gapMinutes)}</span>
+                    )}
+                  </div>
+                )}
+                {showDreReminder && (
+                  <div className="text-center text-text-secondary text-xs italic pb-2 flex items-center justify-center gap-2">
+                    <Smile size={14} className="text-yellow-300" aria-hidden="true" />
+                    <span>{getHighlightMessage()}</span>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <div className={getTimeStatus(band).status === 'now' ? 'playing-now rounded-xl' : ''}>
+                    <BandCard
+                      band={band}
+                      isSelected={true}
+                      onToggle={onToggleBand}
+                      onRemove={onToggleBand}
+                      showVenue={true}
+                      clickable={false}
+                      eventSlug={eventSlug}
+                      currentTime={effectiveNow}
+                      warningType={hasConflict ? 'conflict' : hasOverlap ? 'overlap' : null}
+                      warningText={(() => {
+                        if (!hasConflict && !hasOverlap) return null
+                        const getNamesFrom = list => [
+                          ...new Set(
+                            list
+                              .filter(c => c.band1 === band.id || c.band2 === band.id)
+                              .map(c => {
+                                const otherId = c.band1 === band.id ? c.band2 : c.band1
+                                return bandNameById.get(otherId)
+                              })
+                              .filter(Boolean)
+                          ),
+                        ]
+                        const conflictNames = getNamesFrom(conflicts)
+                        const overlapNames = getNamesFrom(overlaps)
+                        const parts = []
+                        if (conflictNames.length > 0) parts.push(`Same time as ${conflictNames.join(', ')}`)
+                        if (overlapNames.length > 0) parts.push(`Overlaps with ${overlapNames.join(', ')}`)
+                        return parts.join(' · ')
                       })()}
-                      <span>{timeStatus.text}</span>
-                    </div>
-                  )
-                })()}
+                    />
+                  </div>
+
+                  {/* Countdown timer - appears BELOW the band card */}
+                  {(() => {
+                    const timeStatus = getTimeStatus(band)
+                    return (
+                      <div
+                        className={`text-xs font-semibold px-3 py-1.5 rounded border ${timeStatus.color} flex items-center gap-2 leading-normal`}
+                      >
+                        {(() => {
+                          const StatusIcon = timeStatus.icon
+                          return <StatusIcon size={14} aria-hidden="true" />
+                        })()}
+                        <span>{timeStatus.text}</span>
+                      </div>
+                    )
+                  })()}
+                </div>
               </div>
-            </div>
+            </Fragment>
           )
         })}
       </div>

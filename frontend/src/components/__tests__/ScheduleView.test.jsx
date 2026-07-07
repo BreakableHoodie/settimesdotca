@@ -270,6 +270,94 @@ describe('ScheduleView — P2: copy action respects visible filters', () => {
   })
 })
 
+describe('ScheduleView — #541: multi-day day dividers', () => {
+  it('renders no day dividers for a single-day lineup', () => {
+    const bands = [
+      makeBand({
+        id: '1',
+        name: 'Alpha',
+        date: '2024-06-01',
+        startTime: '21:00',
+        startMs: Date.parse('2024-06-01T21:00:00'),
+        endMs: Date.parse('2024-06-01T22:00:00'),
+      }),
+      makeBand({
+        id: '2',
+        name: 'Beta',
+        date: '2024-06-01',
+        startTime: '22:00',
+        startMs: Date.parse('2024-06-01T22:00:00'),
+        endMs: Date.parse('2024-06-01T23:00:00'),
+      }),
+    ]
+    renderView({ bands })
+
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Day 1/)).not.toBeInTheDocument()
+  })
+
+  it('renders one day-divider per festival day, in ascending order, for a multi-day lineup', () => {
+    const bands = [
+      makeBand({
+        id: '1',
+        name: 'Alpha',
+        date: '2024-06-01',
+        startTime: '21:00',
+        startMs: Date.parse('2024-06-01T21:00:00'),
+        endMs: Date.parse('2024-06-01T22:00:00'),
+      }),
+      makeBand({
+        id: '2',
+        name: 'Beta',
+        date: '2024-06-02',
+        startTime: '21:00',
+        startMs: Date.parse('2024-06-02T21:00:00'),
+        endMs: Date.parse('2024-06-02T22:00:00'),
+      }),
+    ]
+    renderView({ bands, currentTime: new Date('2024-05-31T12:00:00') })
+
+    const dividers = screen.getAllByRole('separator')
+    expect(dividers).toHaveLength(2)
+    expect(dividers[0]).toHaveTextContent('Day 1')
+    expect(dividers[0]).toHaveTextContent('Saturday, June 1')
+    expect(dividers[1]).toHaveTextContent('Day 2')
+    expect(dividers[1]).toHaveTextContent('Sunday, June 2')
+  })
+
+  it('renders a divider once per day even with multiple time slots on the same day', () => {
+    const bands = [
+      makeBand({
+        id: '1',
+        name: 'Alpha',
+        date: '2024-06-01',
+        startTime: '20:00',
+        startMs: Date.parse('2024-06-01T20:00:00'),
+        endMs: Date.parse('2024-06-01T21:00:00'),
+      }),
+      makeBand({
+        id: '2',
+        name: 'Beta',
+        date: '2024-06-01',
+        startTime: '21:30',
+        startMs: Date.parse('2024-06-01T21:30:00'),
+        endMs: Date.parse('2024-06-01T22:30:00'),
+      }),
+      makeBand({
+        id: '3',
+        name: 'Gamma',
+        date: '2024-06-02',
+        startTime: '20:00',
+        startMs: Date.parse('2024-06-02T20:00:00'),
+        endMs: Date.parse('2024-06-02T21:00:00'),
+      }),
+    ]
+    renderView({ bands, currentTime: new Date('2024-05-31T12:00:00') })
+
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
+  })
+})
+
 describe('ScheduleView — P1: read-only schedule surfaces hide dead actions', () => {
   it('does not render schedule-building or past-toggle actions when handlers are absent', () => {
     const pastMs = NOW_MS - 2 * 60 * 60 * 1000

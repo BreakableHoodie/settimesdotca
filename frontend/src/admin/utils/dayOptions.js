@@ -8,6 +8,7 @@
  * an event — they never re-derive which day a given performance belongs to;
  * that's an explicit admin choice, stored in performances.performance_date.
  */
+import { formatFestivalDate } from '../../utils/festivalDays'
 
 const parseDateParts = dateStr => {
   const [year, month, day] = dateStr.split('-').map(Number)
@@ -55,16 +56,6 @@ export const enumerateFestivalDays = (startDate, endDate) => {
   return days
 }
 
-const formatDayLabel = dateValue => {
-  const { year, month, day } = parseDateParts(dateValue)
-  const label = new Date(year, month - 1, day).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
-  return label.replace(',', '')
-}
-
 /**
  * Builds <select> options for an event's festival days:
  * [{ value: 'YYYY-MM-DD', label: 'Day 1 (Sat Aug 2)' }, ...]
@@ -72,5 +63,5 @@ const formatDayLabel = dateValue => {
 export const buildDayOptions = (startDate, endDate) =>
   enumerateFestivalDays(startDate, endDate).map((value, index) => ({
     value,
-    label: `Day ${index + 1} (${formatDayLabel(value)})`,
+    label: `Day ${index + 1} (${formatFestivalDate(value, 'short')})`,
   }))

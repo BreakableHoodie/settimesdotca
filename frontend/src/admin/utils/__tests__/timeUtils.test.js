@@ -155,3 +155,55 @@ describe('detectConflicts — requires event_id on candidate', () => {
     expect(noIssues(detectConflicts(noEventId, [other]))).toBe(true)
   })
 })
+
+// ─── detectConflicts — festival-day scoping (#538) ──────────────────────────
+
+describe('detectConflicts — festival-day scoping (#538)', () => {
+  const dayBand = (id, start, end, performanceDate) => ({ ...band(id, start, end), performance_date: performanceDate })
+
+  it('does not conflict across different festival days even with identical clock times', () => {
+    const day1 = dayBand(1, '20:00', '23:00', '2026-08-02')
+    const day2 = dayBand(2, '20:00', '23:00', '2026-08-03')
+    expect(noIssues(detectConflicts(day1, [day1, day2]))).toBe(true)
+  })
+
+  it('does not conflict across different festival days for after-midnight sets', () => {
+    const day1Late = dayBand(1, '01:00', '02:00', '2026-08-02')
+    const day2Late = dayBand(2, '01:00', '02:00', '2026-08-03')
+    expect(noIssues(detectConflicts(day1Late, [day1Late, day2Late]))).toBe(true)
+  })
+
+  it('still flags a genuine overlap on the same festival day', () => {
+    const setA = dayBand(1, '20:00', '22:00', '2026-08-02')
+    const setB = dayBand(2, '21:00', '23:00', '2026-08-02')
+    const result = detectConflicts(setA, [setA, setB])
+    expect(result.overlaps).toEqual(['Band 2'])
+    expect(result.conflicts).toHaveLength(0)
+  })
+
+  it('still flags a genuine exact conflict on the same festival day', () => {
+    const setA = dayBand(1, '20:00', '22:00', '2026-08-02')
+    const setB = dayBand(2, '20:00', '22:00', '2026-08-02')
+    const result = detectConflicts(setA, [setA, setB])
+    expect(result.conflicts).toEqual(['Band 2'])
+    expect(result.overlaps).toHaveLength(0)
+  })
+
+  it('falls back to the supplied event date when performance_date is absent on one side', () => {
+    // `explicit` is pinned to Day 2; `implicit` has no performance_date, so it
+    // falls back to the eventDate argument (Day 1) — the two are on different
+    // festival days and must not conflict despite overlapping clock times.
+    const explicit = dayBand(1, '20:00', '22:00', '2026-08-03')
+    const implicit = band(2, '20:00', '22:00')
+    const result = detectConflicts(explicit, [explicit, implicit], '2026-08-02')
+    expect(noIssues(result)).toBe(true)
+  })
+
+  it('single-day invariant: with performance_date absent everywhere and no eventDate, behaves exactly as before', () => {
+    const setA = band(1, '20:00', '22:00')
+    const setB = band(2, '20:00', '22:00')
+    const result = detectConflicts(setA, [setA, setB])
+    expect(result.conflicts).toEqual(['Band 2'])
+    expect(result.overlaps).toHaveLength(0)
+  })
+})

@@ -102,9 +102,25 @@ export const deriveDurationMinutes = (startTime, endTime) => {
 
 const intervalsOverlap = (intervalA, intervalB) => intervalA[0] < intervalB[1] && intervalB[0] < intervalA[1]
 
+// The festival day a performance belongs to: its own performance_date if set,
+// else the fallback event date supplied by the caller. Returns null when
+// neither is available, which — critically — makes the day-scope check below
+// a no-op (see detectConflicts).
+const resolveFestivalDay = (performance, eventDate) => performance?.performance_date || eventDate || null
+
 // Returns { overlaps: string[], conflicts: string[] }
 // conflicts = exact same start AND end time; overlaps = any other time intersection
-export const detectConflicts = (candidateBand, bands) => {
+//
+// `eventDate` is an optional fallback festival day (typically the event's own
+// `date`) used for performances whose `performance_date` is NULL — i.e. every
+// row today, since performance_date is a brand-new nullable column (#537).
+// Two performances scoped to different festival days can never conflict, no
+// matter how their clock times compare (a Day-1 8 PM set and a Day-2 8 PM set
+// are not the same slot). When neither side has day info (no performance_date
+// on either performance AND no eventDate passed — today's single-day call
+// sites), resolveFestivalDay returns null for both and the day-scope check
+// short-circuits, leaving behavior byte-identical to before #538.
+export const detectConflicts = (candidateBand, bands, eventDate = null) => {
   const empty = { overlaps: [], conflicts: [] }
   if (!candidateBand || !bands?.length) return empty
 
@@ -114,6 +130,8 @@ export const detectConflicts = (candidateBand, bands) => {
   const bandIntervals = buildTimeIntervals(startTime, endTime)
   if (!bandIntervals.length) return empty
 
+  const candidateDay = resolveFestivalDay(candidateBand, eventDate)
+
   const overlaps = []
   const conflicts = []
 
@@ -122,6 +140,9 @@ export const detectConflicts = (candidateBand, bands) => {
     if (id != null && other.id === id) continue
     if (!other.event_id || !other.venue_id) continue
     if (Number(other.event_id) !== Number(eventId) || Number(other.venue_id) !== Number(venueId)) continue
+
+    const otherDay = resolveFestivalDay(other, eventDate)
+    if (candidateDay && otherDay && candidateDay !== otherDay) continue
 
     const otherIntervals = buildTimeIntervals(other.start_time, other.end_time)
     if (!otherIntervals.some(b => bandIntervals.some(a => intervalsOverlap(a, b)))) continue

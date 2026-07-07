@@ -139,3 +139,27 @@ describe('prepareBands — midnight-spanning real-world cases', () => {
     expect(bandA.endMs).toBeLessThan(bandB.startMs)
   })
 })
+
+describe('prepareBands — multi-day festival-day support (#538)', () => {
+  // prepareBands keys entirely off each band's own `date` field (its festival
+  // day), so it already generalizes to N days with NO code change — see the
+  // comment above prepareBands in bandUtils.js. This pins that: two sets with
+  // different `date`s sort correctly and land exactly one day apart, without
+  // any date-aware logic beyond what already existed.
+  it("sorts sets from different festival days using each set's own date, 24h apart", () => {
+    const bands = prepareBands([
+      makeBand('20:00', '23:00', '2026-08-03'), // Day 2 evening
+      makeBand('20:00', '23:00', '2026-08-02'), // Day 1 evening
+    ])
+    const sorted = [...bands].sort((a, b) => a.startMs - b.startMs)
+    expect(sorted[0].date).toBe('2026-08-02')
+    expect(sorted[1].date).toBe('2026-08-03')
+    expect(sorted[1].startMs - sorted[0].startMs).toBe(DAY_MS)
+  })
+
+  it("applies the after-midnight offset independently per set's own festival day", () => {
+    const [day1Late] = prepareBands([makeBand('01:00', '02:00', '2026-08-02')])
+    const [day2Late] = prepareBands([makeBand('01:00', '02:00', '2026-08-03')])
+    expect(day2Late.startMs - day1Late.startMs).toBe(DAY_MS)
+  })
+})

@@ -171,7 +171,8 @@ export function createTestDB() {
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       is_announced INTEGER NOT NULL DEFAULT 1,
-      band_follow_notified INTEGER NOT NULL DEFAULT 0
+      band_follow_notified INTEGER NOT NULL DEFAULT 0,
+      performance_date TEXT
     );
 
     CREATE TABLE schedule_builds (

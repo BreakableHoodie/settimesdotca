@@ -143,7 +143,11 @@ export async function onRequestGet(context) {
     const statements = [];
     const slots = {};
 
-    // "Now" events (happening today) - single JOIN query
+    // "Now" events (happening today) - single JOIN query.
+    // e.date <= today AND COALESCE(end_date, date) >= today: today falls within
+    // the event's [date, end_date] span, so a multi-day event stays "now" on
+    // day 2+ instead of sliding into "past" (#539). NULL end_date collapses
+    // this to the original `e.date = today` for single-day events.
     if (includeNow) {
       slots.now = statements.length;
       statements.push(
@@ -179,10 +183,11 @@ export async function onRequestGet(context) {
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1
-        AND e.date = ?
+        AND e.date <= ?
+        AND COALESCE(e.end_date, e.date) >= ?
         ORDER BY e.date DESC, p.start_time, v.name
       `,
-        ).bind(today),
+        ).bind(today, today),
       );
     }
 
@@ -240,7 +245,10 @@ export async function onRequestGet(context) {
       );
     }
 
-    // "Past" events (historical) - single JOIN query
+    // "Past" events (historical) - single JOIN query.
+    // COALESCE(end_date, date) < today: a multi-day event isn't "past" until
+    // its end_date has elapsed, so it doesn't slip out of "now" a day early
+    // (#539). NULL end_date collapses this to the original `e.date < today`.
     if (includePast) {
       slots.past = statements.length;
       statements.push(
@@ -277,12 +285,12 @@ export async function onRequestGet(context) {
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
         WHERE (
-          (e.is_published = 1 AND e.date < ?)
+          (e.is_published = 1 AND COALESCE(e.end_date, e.date) < ?)
           OR e.status = 'archived'
         )
         AND e.id IN (
           SELECT id FROM events
-          WHERE (is_published = 1 AND date < ?) OR status = 'archived'
+          WHERE (is_published = 1 AND COALESCE(end_date, date) < ?) OR status = 'archived'
           ORDER BY date DESC
           LIMIT ?
         )

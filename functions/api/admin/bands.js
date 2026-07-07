@@ -11,6 +11,7 @@ import {
   sanitizeBandSocialLinks,
   sanitizeOptionalHttpUrl,
   sanitizeString,
+  validatePerformanceDate,
 } from "../../utils/validation.js";
 import { buildIntervals, intervalsOverlap } from "../../utils/timeConflicts.js";
 import { parseOrigin } from "../../utils/parseOrigin.js";
@@ -19,7 +20,7 @@ import { normalizeBandName } from "../../utils/bandName.js";
 async function getEventStatus(DB, eventId) {
   if (!eventId) return null;
 
-  const event = await DB.prepare(`SELECT id, status FROM events WHERE id = ?`).bind(eventId).first();
+  const event = await DB.prepare(`SELECT id, status, date, end_date FROM events WHERE id = ?`).bind(eventId).first();
 
   return event || null;
 }
@@ -49,9 +50,18 @@ function unpackSocialLinks(band) {
   };
 }
 
-async function checkConflicts(DB, eventId, venueId, startTime, endTime, excludePerformanceId = null) {
+async function checkConflicts(
+  DB,
+  eventId,
+  venueId,
+  startTime,
+  endTime,
+  excludePerformanceId = null,
+  performanceDate = null,
+  eventDate = null,
+) {
   let query = `
-    SELECT p.id, p.start_time, p.end_time, bp.name
+    SELECT p.id, p.start_time, p.end_time, p.performance_date, bp.name
     FROM performances p
     JOIN band_profiles bp ON p.band_profile_id = bp.id
     WHERE p.event_id = ? AND p.venue_id = ?
@@ -66,10 +76,19 @@ async function checkConflicts(DB, eventId, venueId, startTime, endTime, excludeP
     .bind(...bindings)
     .all();
   const newIntervals = buildIntervals(startTime, endTime);
+  // Festival-day scoping (#540): two sets on different festival days never
+  // conflict, even at the same venue and clock time (a Day-1 8 PM and a Day-2
+  // 8 PM set at the same venue are distinct slots). Falls back to eventDate for
+  // NULL performance_date, so single-day events (both sides NULL → same day)
+  // keep conflicting exactly as before. Mirrors detectConflicts in
+  // frontend/src/admin/utils/timeUtils.js (#538).
+  const candidateDay = performanceDate || eventDate;
   const conflicts = [];
 
   for (const perf of existingPerformances) {
     if (!perf.start_time || !perf.end_time) continue;
+    const otherDay = perf.performance_date || eventDate;
+    if (candidateDay && otherDay && candidateDay !== otherDay) continue;
     const perfIntervals = buildIntervals(perf.start_time, perf.end_time);
     const hasOverlap = perfIntervals.some((b) => newIntervals.some((a) => intervalsOverlap(a, b)));
     if (hasOverlap) {
@@ -117,6 +136,7 @@ export async function onRequestGet(context) {
           p.venue_id,
           p.start_time,
           p.end_time,
+          p.performance_date,
           p.notes,
           p.is_announced,
           bp.id as band_profile_id,
@@ -157,6 +177,7 @@ export async function onRequestGet(context) {
           p.venue_id,
           p.start_time,
           p.end_time,
+          p.performance_date,
           p.notes,
           bp.id as band_profile_id,
           bp.name,
@@ -221,6 +242,7 @@ export async function onRequestPost(context) {
       name,
       startTime,
       endTime,
+      performanceDate,
       url,
       description,
       photo_url,
@@ -262,6 +284,7 @@ export async function onRequestPost(context) {
 
     // If we are in global view (no eventId), we just create/update the profile
     const isGlobalAdd = !eventId;
+    let event = null;
 
     if (isGlobalAdd) {
       if (!resolvedName) {
@@ -284,7 +307,7 @@ export async function onRequestPost(context) {
         );
       }
 
-      const event = await getEventStatus(DB, eventId);
+      event = await getEventStatus(DB, eventId);
       if (!event) {
         return new Response(JSON.stringify({ error: "Not found", message: "Event not found" }), {
           status: 404,
@@ -301,6 +324,21 @@ export async function onRequestPost(context) {
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
+    }
+
+    // Validate performance_date (#540): must fall within the event's festival-day
+    // span [event.date, event.end_date]. Only applies when scheduling into an
+    // event — global-add (profile-only) rows have no performance to date.
+    let resolvedPerformanceDate = null;
+    if (!isGlobalAdd) {
+      const performanceDateCheck = validatePerformanceDate(performanceDate, event);
+      if (!performanceDateCheck.valid) {
+        return new Response(JSON.stringify({ error: "Validation error", message: performanceDateCheck.error }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      resolvedPerformanceDate = performanceDateCheck.value;
     }
 
     // Validate time format (only if schedule is provided)
@@ -348,7 +386,16 @@ export async function onRequestPost(context) {
 
     // Check for conflicts (only if times are provided)
     if (!isGlobalAdd && resolvedVenueId && startTime && endTime) {
-      const conflicts = await checkConflicts(DB, eventId, resolvedVenueId, startTime, endTime);
+      const conflicts = await checkConflicts(
+        DB,
+        eventId,
+        resolvedVenueId,
+        startTime,
+        endTime,
+        null,
+        resolvedPerformanceDate,
+        event.date,
+      );
       if (conflicts.length > 0) {
         return new Response(
           JSON.stringify({
@@ -434,11 +481,11 @@ export async function onRequestPost(context) {
       let perfResult;
       try {
         perfResult = await DB.prepare(
-          `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time)
-           VALUES (?, ?, ?, ?, ?)
+          `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, performance_date)
+           VALUES (?, ?, ?, ?, ?, ?)
            RETURNING id`,
         )
-          .bind(eventId, resolvedVenueId, bandProfile.id, startTime || null, endTime || null)
+          .bind(eventId, resolvedVenueId, bandProfile.id, startTime || null, endTime || null, resolvedPerformanceDate)
           .first();
       } catch (perfError) {
         // Compensating delete: only undo profiles we just created, not pre-existing ones

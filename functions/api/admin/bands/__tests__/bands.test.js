@@ -414,6 +414,119 @@ describe("Admin bands API - Conflicts", () => {
     expect(data2.conflicts).toBeDefined();
     expect(data2.conflicts.length).toBeGreaterThan(0);
   });
+
+  it("multi-day: same venue + time on different festival days does NOT conflict (#540)", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayConflict",
+      slug: "multi-day-conflict",
+      date: "2026-08-01",
+      end_date: "2026-08-02",
+    });
+    const venue = insertVenue(rawDb, { name: "Shared Stage" });
+
+    const day1 = insertBand(rawDb, {
+      name: "Day One Band",
+      event_id: ev.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-01", day1.id);
+
+    // Same venue, same clock time, but Day 2 — the canonical multi-day pattern.
+    const body = {
+      eventId: ev.id,
+      venueId: venue.id,
+      name: "Day Two Band",
+      startTime: "20:00",
+      endTime: "21:00",
+      performanceDate: "2026-08-02",
+    };
+    const req = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const res = await bandsHandler.onRequestPost({ request: req, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(201);
+  });
+
+  it("multi-day: same venue + time on the SAME festival day still conflicts (#540)", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "SameDayConflict",
+      slug: "same-day-conflict",
+      date: "2026-08-01",
+      end_date: "2026-08-02",
+    });
+    const venue = insertVenue(rawDb, { name: "Same Day Stage" });
+
+    const existing = insertBand(rawDb, {
+      name: "First Set",
+      event_id: ev.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-01", existing.id);
+
+    const body = {
+      eventId: ev.id,
+      venueId: venue.id,
+      name: "Second Set",
+      startTime: "20:00",
+      endTime: "21:00",
+      performanceDate: "2026-08-01",
+    };
+    const req = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const res = await bandsHandler.onRequestPost({ request: req, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(409);
+  });
+
+  it("multi-day: moving a set to a time used on another day at the same venue does NOT conflict (#540)", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayUpdate",
+      slug: "multi-day-update",
+      date: "2026-08-01",
+      end_date: "2026-08-02",
+    });
+    const venue = insertVenue(rawDb, { name: "Update Stage" });
+
+    const day1 = insertBand(rawDb, {
+      name: "Day1 Set",
+      event_id: ev.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-01", day1.id);
+
+    const day2 = insertBand(rawDb, {
+      name: "Day2 Set",
+      event_id: ev.id,
+      venue_id: venue.id,
+      start_time: "22:00",
+      end_time: "23:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-02", day2.id);
+
+    // Move the Day-2 set onto the Day-1 set's clock time at the same venue.
+    // Different festival day → must NOT be a conflict.
+    const body = { startTime: "20:00", endTime: "21:00" };
+    const req = new Request(`https://example.test/api/admin/bands/${day2.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const res = await bandIdHandler.onRequestPut({ request: req, env, data: { user: { role: "editor" } } });
+    expect(res.status).not.toBe(409);
+  });
 });
 
 describe("Admin bands API - Bulk operations", () => {
@@ -1488,5 +1601,303 @@ describe("Admin bands API - social_links read-path sanitization (#493)", () => {
     const parsed = JSON.parse(data.band.social_links);
     expect(parsed.website).toBeNull();
     expect(parsed.instagram).toBe("legit_handle");
+  });
+});
+
+describe("Admin bands API - performance_date multi-day validation (#540)", () => {
+  it("create persists a performance_date within the event's festival-day span", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayEvent",
+      slug: "multi-day-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Venue" });
+    const body = {
+      eventId: ev.id,
+      venueId: venue.id,
+      name: "Day Two Band",
+      startTime: "18:00",
+      endTime: "19:00",
+      performanceDate: "2026-08-03",
+    };
+
+    const request = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(201);
+    const created201 = await res.json();
+
+    const row = rawDb.prepare("SELECT performance_date FROM performances WHERE id = ?").get(created201.band.id);
+    expect(row.performance_date).toBe("2026-08-03");
+
+    // Re-fetch via GET to confirm the persisted value round-trips through the API too.
+    const getReq = new Request(`https://example.test/api/admin/bands?event_id=${ev.id}`, { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    const list = await getRes.json();
+    const created = list.bands.find((b) => b.name === "Day Two Band");
+    expect(created.performance_date).toBe("2026-08-03");
+  });
+
+  it("create rejects a performance_date outside the event's festival-day span", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayRejectEvent",
+      slug: "multi-day-reject-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Reject Venue" });
+    const body = {
+      eventId: ev.id,
+      venueId: venue.id,
+      name: "Out Of Range Band",
+      startTime: "18:00",
+      endTime: "19:00",
+      performanceDate: "2026-08-05",
+    };
+
+    const request = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.message).toMatch(/performance_date/);
+  });
+
+  it("create rejects a malformed performance_date", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayMalformedEvent",
+      slug: "multi-day-malformed-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Malformed Venue" });
+    const body = {
+      eventId: ev.id,
+      venueId: venue.id,
+      name: "Malformed Date Band",
+      startTime: "18:00",
+      endTime: "19:00",
+      performanceDate: "08/03/2026",
+    };
+
+    const request = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(400);
+  });
+
+  it("create with no performance_date on a multi-day event leaves the column NULL (unassigned is allowed)", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayNullEvent",
+      slug: "multi-day-null-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Null Venue" });
+    const body = {
+      eventId: ev.id,
+      venueId: venue.id,
+      name: "No Date Band",
+      startTime: "18:00",
+      endTime: "19:00",
+    };
+
+    const request = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(201);
+
+    const getReq = new Request(`https://example.test/api/admin/bands?event_id=${ev.id}`, { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    const list = await getRes.json();
+    const created = list.bands.find((b) => b.name === "No Date Band");
+    expect(created.performance_date).toBeNull();
+  });
+
+  it("create on a single-day event rejects any performance_date (no valid days exist)", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "SingleDayEvent", slug: "single-day-event", date: "2026-08-02" });
+    const venue = insertVenue(rawDb, { name: "SingleDay Venue" });
+    const body = {
+      eventId: ev.id,
+      venueId: venue.id,
+      name: "Single Day Band",
+      startTime: "18:00",
+      endTime: "19:00",
+      performanceDate: "2026-08-03",
+    };
+
+    const request = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(400);
+  });
+
+  it("update persists a new performance_date within range", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayUpdateEvent",
+      slug: "multi-day-update-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Update Venue" });
+    const band = insertBand(rawDb, { name: "Update Date Band", event_id: ev.id, venue_id: venue.id });
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ performanceDate: "2026-08-04" }),
+    });
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.band.performance_date).toBe("2026-08-04");
+  });
+
+  it("update rejects an out-of-range performance_date", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayUpdateRejectEvent",
+      slug: "multi-day-update-reject-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Update Reject Venue" });
+    const band = insertBand(rawDb, { name: "Update Reject Band", event_id: ev.id, venue_id: venue.id });
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ performanceDate: "2026-08-01" }),
+    });
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.message).toMatch(/performance_date/);
+  });
+
+  it("update rejects a malformed performance_date", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayUpdateMalformedEvent",
+      slug: "multi-day-update-malformed-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Update Malformed Venue" });
+    const band = insertBand(rawDb, { name: "Update Malformed Band", event_id: ev.id, venue_id: venue.id });
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ performanceDate: "not-a-date" }),
+    });
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(400);
+  });
+
+  it("update with performanceDate omitted leaves an existing performance_date untouched", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayUpdateUntouchedEvent",
+      slug: "multi-day-update-untouched-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Update Untouched Venue" });
+    const band = insertBand(rawDb, { name: "Update Untouched Band", event_id: ev.id, venue_id: venue.id });
+    rawDb.prepare("UPDATE performances SET performance_date = ? WHERE id = ?").run("2026-08-03", band.id);
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ genre: "Punk" }),
+    });
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.band.performance_date).toBe("2026-08-03");
+  });
+
+  it("update with performanceDate: null clears an existing performance_date", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "MultiDayClearEvent",
+      slug: "multi-day-clear-event",
+      date: "2026-08-02",
+      end_date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "MultiDay Clear Venue" });
+    const band = insertBand(rawDb, { name: "Clear Date Band", event_id: ev.id, venue_id: venue.id });
+    rawDb.prepare("UPDATE performances SET performance_date = ? WHERE id = ?").run("2026-08-03", band.id);
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ performanceDate: null }),
+    });
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.band.performance_date).toBeNull();
+  });
+
+  it("single-day event: create/update without performance_date is byte-identical to pre-#540 behavior", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "SingleDayByteIdenticalEvent",
+      slug: "single-day-byte-identical-event",
+      date: "2026-08-02",
+    });
+    const venue = insertVenue(rawDb, { name: "SingleDay ByteIdentical Venue" });
+    const body = { eventId: ev.id, venueId: venue.id, name: "Plain Band", startTime: "18:00", endTime: "19:00" };
+
+    const createRequest = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    const createRes = await bandsHandler.onRequestPost({
+      request: createRequest,
+      env,
+      data: { user: { role: "editor" } },
+    });
+    expect(createRes.status).toBe(201);
+    const created = await createRes.json();
+
+    const updateRequest = new Request(`https://example.test/api/admin/bands/${created.band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ genre: "Indie" }),
+    });
+    const updateRes = await bandIdHandler.onRequestPut({
+      request: updateRequest,
+      env,
+      data: { user: { role: "editor" } },
+    });
+    expect(updateRes.status).toBe(200);
+    const updated = await updateRes.json();
+    expect(updated.band.performance_date).toBeNull();
   });
 });

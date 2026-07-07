@@ -36,6 +36,11 @@ describe('buildPickerFormData', () => {
     expect(result.duration).toBe('')
   })
 
+  it('never carries over performance_date from previous editing state', () => {
+    const result = buildPickerFormData(artist, '1')
+    expect(result.performance_date).toBe('')
+  })
+
   it('clears id (not editing an existing performance)', () => {
     const result = buildPickerFormData(artist, '1')
     expect(result.id).toBeNull()
@@ -79,6 +84,11 @@ describe('buildEmptyPickerFormData', () => {
     const result = buildEmptyPickerFormData('New Band', '1')
     expect(result.start_time).toBe('')
     expect(result.end_time).toBe('')
+  })
+
+  it('never carries over performance_date', () => {
+    const result = buildEmptyPickerFormData('New Band', '1')
+    expect(result.performance_date).toBe('')
   })
 
   it('sets the name from the argument', () => {

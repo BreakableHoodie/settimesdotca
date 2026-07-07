@@ -372,10 +372,19 @@ export const mockUsers = {
 
 export function insertEvent(
   db,
-  { name = "Test Event", slug = "test-event", date = "2025-12-15", status = "draft", created_by = 1 } = {},
+  {
+    name = "Test Event",
+    slug = "test-event",
+    date = "2025-12-15",
+    end_date = null,
+    status = "draft",
+    created_by = 1,
+  } = {},
 ) {
-  const stmt = db.prepare("INSERT INTO events (name, slug, date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?)");
-  const info = stmt.run(name, slug, date, status, created_by);
+  const stmt = db.prepare(
+    "INSERT INTO events (name, slug, date, end_date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?)",
+  );
+  const info = stmt.run(name, slug, date, end_date, status, created_by);
   return db.prepare("SELECT * FROM events WHERE id = ?").get(info.lastInsertRowid);
 }
 

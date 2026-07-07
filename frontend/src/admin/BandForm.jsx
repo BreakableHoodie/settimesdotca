@@ -23,6 +23,8 @@ export default function BandForm({
   originCitySuggestions = [],
   originRegionSuggestions = [],
   genreSuggestions = [],
+  isMultiDay = false,
+  dayOptions = [],
 }) {
   // In global view, we're editing band profile, not event-specific performance details
   const requireSchedule = globalView ? false : Boolean(formData.event_id)
@@ -362,6 +364,31 @@ export default function BandForm({
           </>
         )}
 
+        {requireSchedule && isMultiDay && (
+          <div className="sm:col-span-2">
+            <label htmlFor="band-performance-date" className="block text-white mb-2 text-sm">
+              Festival Day <span className="text-gray-400 text-xs ml-2">(optional)</span>
+            </label>
+            <select
+              id="band-performance-date"
+              name="performance_date"
+              value={formData.performance_date || ''}
+              onChange={onChange}
+              className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+            >
+              <option value="">Not assigned yet</option>
+              {dayOptions.map(day => (
+                <option key={day.value} value={day.value}>
+                  {day.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-gray-400 text-xs mt-2">
+              A set after midnight belongs to the night it started — e.g. a 1 AM set on Day 1 stays Day 1.
+            </p>
+          </div>
+        )}
+
         {requireSchedule && (
           <>
             <div>
@@ -577,6 +604,7 @@ BandForm.propTypes = {
     start_time: PropTypes.string,
     end_time: PropTypes.string,
     duration: PropTypes.string,
+    performance_date: PropTypes.string,
     url: PropTypes.string,
     origin: PropTypes.string,
     origin_city: PropTypes.string,
@@ -610,4 +638,11 @@ BandForm.propTypes = {
   originCitySuggestions: PropTypes.arrayOf(PropTypes.string),
   originRegionSuggestions: PropTypes.arrayOf(PropTypes.string),
   genreSuggestions: PropTypes.arrayOf(PropTypes.string),
+  isMultiDay: PropTypes.bool,
+  dayOptions: PropTypes.arrayOf(
+    PropTypes.shape({
+      value: PropTypes.string,
+      label: PropTypes.string,
+    })
+  ),
 }

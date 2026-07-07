@@ -10,6 +10,7 @@ import {
   sanitizeBandSocialLinks,
   sanitizeOptionalHttpUrl,
   sanitizeString,
+  validatePerformanceDate,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
@@ -29,7 +30,7 @@ async function getEventForPerformance(DB, performanceId) {
 
   return DB.prepare(
     `
-    SELECT e.id, e.status, e.name
+    SELECT e.id, e.status, e.name, e.date, e.end_date
     FROM performances p
     JOIN events e ON p.event_id = e.id
     WHERE p.id = ?
@@ -39,13 +40,22 @@ async function getEventForPerformance(DB, performanceId) {
     .first();
 }
 
-async function checkConflicts(DB, eventId, venueId, startTime, endTime, excludePerformanceId = null) {
+async function checkConflicts(
+  DB,
+  eventId,
+  venueId,
+  startTime,
+  endTime,
+  excludePerformanceId = null,
+  performanceDate = null,
+  eventDate = null,
+) {
   const query = excludePerformanceId
-    ? `SELECT p.id, p.start_time, p.end_time, bp.name
+    ? `SELECT p.id, p.start_time, p.end_time, p.performance_date, bp.name
        FROM performances p
        JOIN band_profiles bp ON p.band_profile_id = bp.id
        WHERE p.event_id = ? AND p.venue_id = ? AND p.id != ?`
-    : `SELECT p.id, p.start_time, p.end_time, bp.name
+    : `SELECT p.id, p.start_time, p.end_time, p.performance_date, bp.name
        FROM performances p
        JOIN band_profiles bp ON p.band_profile_id = bp.id
        WHERE p.event_id = ? AND p.venue_id = ?`;
@@ -56,10 +66,18 @@ async function checkConflicts(DB, eventId, venueId, startTime, endTime, excludeP
     .bind(...bindings)
     .all();
   const newIntervals = buildIntervals(startTime, endTime);
+  // Festival-day scoping (#540): two sets on different festival days never
+  // conflict, even at the same venue and clock time. Falls back to eventDate
+  // for NULL performance_date, so single-day events (both sides NULL → same
+  // day) keep conflicting exactly as before. Mirrors detectConflicts in
+  // frontend/src/admin/utils/timeUtils.js (#538).
+  const candidateDay = performanceDate || eventDate;
   const conflicts = [];
 
   for (const band of existingBands) {
     if (!band.start_time || !band.end_time) continue;
+    const otherDay = band.performance_date || eventDate;
+    if (candidateDay && otherDay && candidateDay !== otherDay) continue;
     const bandIntervals = buildIntervals(band.start_time, band.end_time);
     const hasOverlap = bandIntervals.some((b) => newIntervals.some((a) => intervalsOverlap(a, b)));
     if (hasOverlap) {
@@ -115,6 +133,7 @@ export async function onRequestPut(context) {
       name,
       startTime,
       endTime,
+      performanceDate,
       url,
       description,
       genre,
@@ -195,7 +214,10 @@ export async function onRequestPut(context) {
       // events the band has played. Only block when a performance field is the
       // thing actually being changed.
       const editsPerformanceFields =
-        normalizedVenueId !== undefined || startTime !== undefined || endTime !== undefined;
+        normalizedVenueId !== undefined ||
+        startTime !== undefined ||
+        endTime !== undefined ||
+        performanceDate !== undefined;
       if (linkedEvent?.status === "archived" && editsPerformanceFields) {
         return new Response(
           JSON.stringify({
@@ -298,6 +320,24 @@ export async function onRequestPut(context) {
       );
     }
 
+    // Validate performance_date (#540): must fall within the linked event's
+    // festival-day span [event.date, event.end_date]. Only applies to real
+    // performances — profile-only rows have no event/performance to date.
+    let resolvedPerformanceDate;
+    if (!isProfileUpdate && performanceDate !== undefined) {
+      const performanceDateCheck = validatePerformanceDate(performanceDate, linkedEvent);
+      if (!performanceDateCheck.valid) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: performanceDateCheck.error,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      resolvedPerformanceDate = performanceDateCheck.value;
+    }
+
     // Determine actual times to use (provided or existing)
     const actualStartTime = startTime !== undefined ? startTime : performance.start_time;
     const actualEndTime = endTime !== undefined ? endTime : performance.end_time;
@@ -351,6 +391,10 @@ export async function onRequestPut(context) {
         actualStartTime,
         actualEndTime,
         performanceId,
+        // The performance's festival day after this update: the newly supplied
+        // day if it's being changed, otherwise the day it already had.
+        performanceDate !== undefined ? resolvedPerformanceDate : performance.performance_date,
+        linkedEvent.date,
       );
     }
 
@@ -513,6 +557,10 @@ export async function onRequestPut(context) {
       if (endTime !== undefined) {
         updates.push("end_time = ?");
         params.push(endTime || null);
+      }
+      if (performanceDate !== undefined) {
+        updates.push("performance_date = ?");
+        params.push(resolvedPerformanceDate);
       }
 
       // If performance fields to update

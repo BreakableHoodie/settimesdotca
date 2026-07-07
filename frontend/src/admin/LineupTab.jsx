@@ -21,6 +21,7 @@ import {
   sortBandsByStart,
 } from './utils/timeUtils'
 import { buildPickerFormData, buildEmptyPickerFormData } from './utils/pickerFormData'
+import { buildDayOptions, isMultiDayEvent } from './utils/dayOptions'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -57,6 +58,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     start_time: '',
     end_time: '',
     duration: '',
+    performance_date: '',
     url: '',
     description: '',
     photo_url: '',
@@ -153,6 +155,17 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     })
     return getNormalizedGenreSuggestions(values, DEFAULT_GENRES)
   }, [allBands])
+
+  // Multi-day events (#540): the per-set day selector is shown only when the
+  // event spans more than one calendar day (string comparison — never
+  // `new Date()`, which parses YYYY-MM-DD as UTC and breaks in negative-offset
+  // timezones). Single-day events never render the selector and
+  // performance_date stays NULL, matching pre-#540 behavior exactly.
+  const isMultiDay = isMultiDayEvent(selectedEvent)
+  const dayOptions = useMemo(
+    () => (isMultiDay ? buildDayOptions(selectedEvent.date, selectedEvent.end_date) : []),
+    [isMultiDay, selectedEvent]
+  )
 
   useEffect(() => {
     if (selectedEventId) loadData()
@@ -276,6 +289,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         name: formData.name,
         startTime: formData.start_time,
         endTime: formData.end_time,
+        performanceDate: formData.performance_date || null,
         genre: formData.genre,
         origin: originDisplay,
         origin_city: formData.origin_city,
@@ -391,6 +405,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       start_time: band.start_time || '',
       end_time: band.end_time || '',
       duration: durationMinutes?.toString() || '',
+      performance_date: band.performance_date || '',
       url: band.url || '',
       description: band.description || '',
       photo_url: band.photo_url || '',
@@ -472,11 +487,15 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
 
   // Pre-compute conflict results for all bands once, keyed by band id.
   // Avoids O(n²) detectConflicts calls inside the render loop.
+  // Pass the event's own date as the festival-day fallback so sets on different
+  // days of a multi-day event aren't flagged as conflicting (#540). Mirrors the
+  // backend checkConflicts day-scoping; NULL performance_date inherits eventDate,
+  // keeping single-day behavior unchanged.
   const conflictsByBandId = useMemo(() => {
     const map = new Map()
-    for (const band of bands) map.set(band.id, detectConflicts(band, bands))
+    for (const band of bands) map.set(band.id, detectConflicts(band, bands, selectedEvent?.date))
     return map
-  }, [bands])
+  }, [bands, selectedEvent?.date])
 
   const formConflicts = useMemo(() => {
     if (!formData.venue_id || !formData.start_time || !formData.end_time) return { overlaps: [], conflicts: [] }
@@ -487,10 +506,21 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         venue_id: Number(formData.venue_id),
         start_time: formData.start_time,
         end_time: formData.end_time,
+        performance_date: formData.performance_date || null,
       },
-      bands
+      bands,
+      selectedEvent?.date
     )
-  }, [bands, editingId, formData.event_id, formData.venue_id, formData.start_time, formData.end_time])
+  }, [
+    bands,
+    editingId,
+    formData.event_id,
+    formData.venue_id,
+    formData.start_time,
+    formData.end_time,
+    formData.performance_date,
+    selectedEvent?.date,
+  ])
 
   const combinedConflicts = useMemo(
     () => ({
@@ -638,6 +668,8 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
             showEventIntro={false}
             globalView={false}
             selectedProfile={selectedProfile}
+            isMultiDay={isMultiDay}
+            dayOptions={dayOptions}
             onChange={handleInputChange}
             onSubmit={handleSubmit}
             onCancel={() => {

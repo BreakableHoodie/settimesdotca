@@ -723,6 +723,52 @@ export function validateDate(dateString) {
 }
 
 /**
+ * Validate a performance's festival-day assignment (#540, multi-day events).
+ *
+ * `performanceDate` is optional — null/undefined/"" all mean "inherit the
+ * event's single date" (the pre-#540 default for every existing row) and are
+ * always valid. When provided, it must be a real YYYY-MM-DD calendar date
+ * that falls within the event's festival-day span [event.date, event.end_date].
+ * A null `event.end_date` collapses that span to the single `event.date`
+ * (single-day events only ever have one valid value).
+ *
+ * Comparisons are plain lexicographic string comparisons on YYYY-MM-DD —
+ * never `new Date(...)`, which parses bare date strings as UTC and drifts a
+ * day in negative-offset timezones (see CLAUDE.md).
+ *
+ * @param {string|null|undefined} performanceDate
+ * @param {{ date: string, end_date: string|null }|null} event
+ * @returns {{ valid: boolean, error: string|null, value: string|null }}
+ */
+export function validatePerformanceDate(performanceDate, event) {
+  if (performanceDate === undefined || performanceDate === null || performanceDate === "") {
+    return { valid: true, error: null, value: null };
+  }
+
+  if (typeof performanceDate !== "string") {
+    return { valid: false, error: "performance_date must be a YYYY-MM-DD string", value: null };
+  }
+
+  const dateCheck = validateDate(performanceDate);
+  if (!dateCheck.valid) {
+    return { valid: false, error: dateCheck.error, value: null };
+  }
+
+  const minDate = event?.date || null;
+  const maxDate = event?.end_date || event?.date || null;
+
+  if (!minDate || performanceDate < minDate || performanceDate > maxDate) {
+    return {
+      valid: false,
+      error: `performance_date must be between ${minDate || "the event start"} and ${maxDate || "the event end"}`,
+      value: null,
+    };
+  }
+
+  return { valid: true, error: null, value: performanceDate };
+}
+
+/**
  * Validate a positive integer ID
  * @param {any} id - ID to validate
  * @returns {Object} { valid: boolean, value: number|null, error: string|null }

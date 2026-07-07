@@ -782,7 +782,18 @@ export default function BandProfilePage() {
                     <Card key={idx} variant="outline" hoverable className="p-4">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-accent-500 mb-2">{performance.event_name}</h3>
+                          <h3 className="text-xl font-semibold text-accent-500 mb-2">
+                            {performance.event_slug ? (
+                              <Link
+                                to={`/event/${performance.event_slug}`}
+                                className="transition-colors hover:text-accent-400 hover:underline"
+                              >
+                                {performance.event_name}
+                              </Link>
+                            ) : (
+                              performance.event_name
+                            )}
+                          </h3>
                           <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
                             {performance.event_date && (
                               <span className="flex items-center gap-2">
@@ -861,7 +872,18 @@ export default function BandProfilePage() {
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <h3 className="text-xl font-semibold text-accent-500">{performance.event_name}</h3>
+                            <h3 className="text-xl font-semibold text-accent-500">
+                              {performance.event_slug ? (
+                                <Link
+                                  to={`/event/${performance.event_slug}`}
+                                  className="transition-colors hover:text-accent-400 hover:underline"
+                                >
+                                  {performance.event_name}
+                                </Link>
+                              ) : (
+                                performance.event_name
+                              )}
+                            </h3>
                             {performance.event_status === 'archived' && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-text-primary/10 text-text-tertiary border border-text-primary/10">
                                 <Archive size={12} aria-hidden="true" />

@@ -653,6 +653,19 @@ function EventCard({
             >
               {isPast || event.status === 'archived' ? 'View Lineup' : 'Plan Your Night'}
             </Button>
+            {/* Past editions get a recap link — the recap page was previously
+                unreachable except by URL (#555). */}
+            {(isPast || event.status === 'archived') && event.slug && (
+              <Button
+                as={Link}
+                to={`/events/${event.slug}/recap`}
+                variant="secondary"
+                size="md"
+                className="w-full sm:w-auto sm:min-w-[160px]"
+              >
+                Recap
+              </Button>
+            )}
             {ticketHref !== '#' && (
               <Button
                 as="a"

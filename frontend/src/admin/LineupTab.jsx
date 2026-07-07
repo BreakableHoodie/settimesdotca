@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { bandsApi, venuesApi } from '../utils/adminApi'
+import { bandsApi, eventsApi, venuesApi } from '../utils/adminApi'
+import AnnouncementPlanningPanel from './AnnouncementPlanningPanel'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
 import BulkPreviewModal from './BulkPreviewModal'
@@ -41,6 +42,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [venues, setVenues] = useState([])
   const [loading, setLoading] = useState(true)
   const [rosterLoading, setRosterLoading] = useState(false)
+  const [announcementPlanning, setAnnouncementPlanning] = useState([]) // #556 engagement signals
 
   // Modes: 'list', 'picker', 'form'
   const [viewMode, setViewMode] = useState('list')
@@ -167,9 +169,27 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     [isMultiDay, selectedEvent]
   )
 
+  // Announcement planning (#556): per-performance follower-engagement signals
+  // from the event metrics endpoint (COUNT-based aggregates only — the API
+  // never returns follower PII). Failure is quiet: the panel simply doesn't
+  // render; it must never block the lineup.
+  const loadPlanning = useCallback(async () => {
+    if (!selectedEventId) return
+    try {
+      const res = await eventsApi.getMetrics(selectedEventId)
+      setAnnouncementPlanning(res.metrics?.announcementPlanning || [])
+    } catch {
+      setAnnouncementPlanning([])
+    }
+  }, [selectedEventId])
+
   useEffect(() => {
     if (selectedEventId) loadData()
   }, [selectedEventId, loadData])
+
+  useEffect(() => {
+    loadPlanning()
+  }, [loadPlanning])
 
   // Reset form when event changes
   useEffect(() => {
@@ -357,6 +377,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     try {
       await bandsApi.patch(performanceId, { is_announced: currentValue !== 1 })
       await loadData()
+      loadPlanning() // keep the announcement-planning panel in sync (#556)
     } catch (err) {
       showToast(err.message || 'Failed to update announced status', 'error')
     } finally {
@@ -687,6 +708,15 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
 
       {viewMode === 'list' && (
         <>
+          {/* Announcement planning (#556): engaged sets not yet announced.
+              The panel renders nothing when there's no follower signal. */}
+          <AnnouncementPlanningPanel
+            planning={announcementPlanning}
+            onAnnounce={toggleAnnounced}
+            togglingId={togglingId}
+            readOnly={readOnly}
+          />
+
           {/* Bulk Actions */}
           {!readOnly && selectedIds.size > 0 && (
             <BulkActionBar

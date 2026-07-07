@@ -103,4 +103,125 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     // uniqueVisitors: 3 distinct sessions
     expect(body.metrics.uniqueVisitors).toBe(3);
   });
+
+  describe("announcementPlanning (#556)", () => {
+    // Seeds: Alpha (unannounced) with 3 verified follows (2 in the last 7 days,
+    // 1 older), 1 unverified follow, and one verified follower already notified
+    // for Alpha's performance; Beta (announced) with 1 verified follow.
+    function seedEngagement(rawDb) {
+      const event = insertEvent(rawDb, { name: "Engage Fest", slug: "engage-fest" });
+      const alpha = insertBand(rawDb, { name: "Alpha Band", event_id: event.id });
+      const beta = insertBand(rawDb, { name: "Beta Band", event_id: event.id });
+      rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(alpha.id);
+      rawDb.prepare("UPDATE performances SET is_announced = 1 WHERE id = ?").run(beta.id);
+
+      // Two recent verified follows for Alpha
+      rawDb
+        .prepare(
+          `INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token, created_at)
+           VALUES (?, ?, 1, ?, datetime('now', '-1 days'))`,
+        )
+        .run("fan1@example.test", alpha.band_profile_id, "unsub-token-a1");
+      rawDb
+        .prepare(
+          `INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token, created_at)
+           VALUES (?, ?, 1, ?, datetime('now', '-2 days'))`,
+        )
+        .run("fan2@example.test", alpha.band_profile_id, "unsub-token-a2");
+      // One OLD verified follow for Alpha (outside the 7-day growth window)
+      rawDb
+        .prepare(
+          `INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token, created_at)
+           VALUES (?, ?, 1, ?, datetime('now', '-30 days'))`,
+        )
+        .run("fan3@example.test", alpha.band_profile_id, "unsub-token-a3");
+      // One UNVERIFIED follow for Alpha — must never count anywhere
+      rawDb
+        .prepare(
+          `INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token, created_at)
+           VALUES (?, ?, 0, ?, datetime('now'))`,
+        )
+        .run("pending@example.test", alpha.band_profile_id, "unsub-token-a4");
+      // fan1 was already notified for Alpha's performance → excluded from would_notify
+      const fan1 = rawDb
+        .prepare("SELECT id FROM band_follows WHERE email = ? AND band_profile_id = ?")
+        .get("fan1@example.test", alpha.band_profile_id);
+      rawDb
+        .prepare("INSERT INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)")
+        .run(alpha.id, fan1.id);
+      // Beta: two verified follows
+      rawDb
+        .prepare(
+          `INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token, created_at)
+           VALUES (?, ?, 1, ?, datetime('now'))`,
+        )
+        .run("fan4@example.test", beta.band_profile_id, "unsub-token-b1");
+      rawDb
+        .prepare(
+          `INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token, created_at)
+           VALUES (?, ?, 1, ?, datetime('now'))`,
+        )
+        .run("fan5@example.test", beta.band_profile_id, "unsub-token-b2");
+
+      return { event, alpha, beta };
+    }
+
+    test("returns per-performance engagement signals, unannounced first", async () => {
+      const { env, rawDb } = createTestEnv();
+      const { event, alpha, beta } = seedEngagement(rawDb);
+
+      const res = await call(env, event.id);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      const planning = body.metrics.announcementPlanning;
+
+      expect(Array.isArray(planning)).toBe(true);
+      expect(planning.length).toBe(2);
+
+      // Unannounced Alpha ranks first despite Beta being announced later in the list
+      expect(planning[0].performance_id).toBe(alpha.id);
+      expect(planning[0].band_name).toBe("Alpha Band");
+      expect(planning[0].is_announced).toBe(0);
+      // 3 verified follows (the unverified one never counts)
+      expect(planning[0].follower_count).toBe(3);
+      // Only the two follows within the last 7 days
+      expect(planning[0].recent_growth).toBe(2);
+      // fan1 already has a notification row for this performance → 3 - 1 = 2
+      expect(planning[0].would_notify_count).toBe(2);
+
+      expect(planning[1].performance_id).toBe(beta.id);
+      expect(planning[1].is_announced).toBe(1);
+      expect(planning[1].follower_count).toBe(2);
+    });
+
+    test("response contains no follower PII (emails, tokens, consent data)", async () => {
+      const { env, rawDb } = createTestEnv();
+      const { event } = seedEngagement(rawDb);
+
+      const res = await call(env, event.id);
+      expect(res.status).toBe(200);
+      const raw = await res.text();
+
+      // COUNT-only contract: none of the band_follows PII columns may leak.
+      expect(raw).not.toMatch(/@example\.test/);
+      expect(raw).not.toMatch(/unsub-token/);
+      expect(raw).not.toMatch(/verification_token|unsubscribe_token|consent_ip|consent_method/);
+      expect(raw).not.toMatch(/"email"/);
+    });
+
+    test("event with no follows returns zeroed signals, not errors", async () => {
+      const { env, rawDb } = createTestEnv();
+      const event = insertEvent(rawDb, { name: "Quiet Fest", slug: "quiet-fest" });
+      insertBand(rawDb, { name: "Solo Act", event_id: event.id });
+
+      const res = await call(env, event.id);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      const planning = body.metrics.announcementPlanning;
+      expect(planning.length).toBe(1);
+      expect(planning[0].follower_count).toBe(0);
+      expect(planning[0].recent_growth).toBe(0);
+      expect(planning[0].would_notify_count).toBe(0);
+    });
+  });
 });

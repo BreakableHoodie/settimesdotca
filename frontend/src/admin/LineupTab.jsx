@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { bandsApi, eventsApi, venuesApi } from '../utils/adminApi'
+import AnnouncementPlanningPanel from './AnnouncementPlanningPanel'
 import BandForm from './BandForm'
 import BulkActionBar from './BulkActionBar'
 import BulkPreviewModal from './BulkPreviewModal'
@@ -42,7 +43,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [loading, setLoading] = useState(true)
   const [rosterLoading, setRosterLoading] = useState(false)
   const [announcementPlanning, setAnnouncementPlanning] = useState([]) // #556 engagement signals
-  const [planningExpanded, setPlanningExpanded] = useState(false)
 
   // Modes: 'list', 'picker', 'form'
   const [viewMode, setViewMode] = useState('list')
@@ -167,13 +167,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const dayOptions = useMemo(
     () => (isMultiDay ? buildDayOptions(selectedEvent.date, selectedEvent.end_date) : []),
     [isMultiDay, selectedEvent]
-  )
-
-  // #556: unannounced sets with at least one verified follower, in the API's
-  // order (unannounced first, follower_count desc). Empty → panel hidden.
-  const planningRows = useMemo(
-    () => announcementPlanning.filter(row => !row.is_announced && row.follower_count > 0),
-    [announcementPlanning]
   )
 
   // Announcement planning (#556): per-performance follower-engagement signals
@@ -716,51 +709,13 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       {viewMode === 'list' && (
         <>
           {/* Announcement planning (#556): engaged sets not yet announced.
-              Renders nothing when there's no follower signal to act on. */}
-          {planningRows.length > 0 && (
-            <div className="bg-bg-purple rounded-lg border border-accent-500/20">
-              <button
-                type="button"
-                onClick={() => setPlanningExpanded(prev => !prev)}
-                className="w-full flex items-center justify-between px-4 py-3 min-h-[44px] text-left"
-                aria-expanded={planningExpanded}
-              >
-                <span className="font-semibold text-accent-400">
-                  Announcement planning — {planningRows.length} engaged {planningRows.length === 1 ? 'set' : 'sets'} not
-                  yet announced
-                </span>
-                <span className="text-white/60 text-sm">{planningExpanded ? 'Hide' : 'Show'}</span>
-              </button>
-              {planningExpanded && (
-                <ul className="px-4 pb-4 space-y-2">
-                  {planningRows.map(row => (
-                    <li
-                      key={row.performance_id}
-                      className="flex flex-wrap items-center justify-between gap-2 bg-bg-navy/40 rounded px-3 py-2"
-                    >
-                      <div>
-                        <span className="text-white font-medium">{row.band_name}</span>
-                        <span className="text-white/60 text-sm ml-3">
-                          {row.follower_count} {row.follower_count === 1 ? 'follower' : 'followers'} · +
-                          {row.recent_growth} this week · {row.would_notify_count} to notify
-                        </span>
-                      </div>
-                      {!readOnly && (
-                        <button
-                          type="button"
-                          onClick={() => toggleAnnounced(row.performance_id, row.is_announced)}
-                          disabled={togglingId === row.performance_id}
-                          className="px-4 py-2 min-h-[44px] bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors text-sm font-medium disabled:opacity-50"
-                        >
-                          {togglingId === row.performance_id ? 'Announcing…' : 'Announce'}
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+              The panel renders nothing when there's no follower signal. */}
+          <AnnouncementPlanningPanel
+            planning={announcementPlanning}
+            onAnnounce={toggleAnnounced}
+            togglingId={togglingId}
+            readOnly={readOnly}
+          />
 
           {/* Bulk Actions */}
           {!readOnly && selectedIds.size > 0 && (

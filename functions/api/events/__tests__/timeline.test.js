@@ -10,9 +10,11 @@ import { onRequestGet as timelineHandler } from "../timeline.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 
 // Returns the mock result set for a query string, keyed off the distinctive
-// WHERE clause for each period (now / upcoming / past).
+// WHERE clause for each period (now / upcoming / past). The "now" and "past"
+// clauses use COALESCE(end_date, date) (#539) so a multi-day event stays
+// "now" through its end_date instead of sliding into "past" a day early.
 const resultForQuery = (query) => {
-  if (query.includes("e.date = ?")) {
+  if (query.includes("e.date <= ?")) {
     // "Now" events query
     return {
       results: [
@@ -55,7 +57,7 @@ const resultForQuery = (query) => {
   } else if (query.includes("e.date > ?")) {
     // "Upcoming" events query
     return { results: [] };
-  } else if (query.includes("e.date < ?")) {
+  } else if (query.includes("COALESCE(e.end_date, e.date) < ?")) {
     // "Past" events query
     return {
       results: [

@@ -32,7 +32,7 @@ export async function onRequestGet(context) {
         e.description,
         e.city,
         e.ticket_url,
-        CASE WHEN e.date >= date('now', '-6 hours') THEN 1 ELSE 0 END as is_upcoming,
+        CASE WHEN COALESCE(e.end_date, e.date) >= date('now', '-6 hours') THEN 1 ELSE 0 END as is_upcoming,
         COUNT(DISTINCT p.band_profile_id) as band_count,
         COUNT(DISTINCT p.venue_id) as venue_count
       FROM events e
@@ -61,9 +61,11 @@ export async function onRequestGet(context) {
 
     // Filter by upcoming (future events only)
     // Use -6 hours offset to account for ET timezone (UTC-5/UTC-4)
-    // This prevents events from disappearing while still ongoing
+    // This prevents events from disappearing while still ongoing.
+    // COALESCE(end_date, date): a multi-day event stays "upcoming" through its
+    // end_date instead of dropping off the morning after it starts (#539).
     if (upcoming) {
-      query += ` AND e.date >= date('now', '-6 hours')`;
+      query += ` AND COALESCE(e.end_date, e.date) >= date('now', '-6 hours')`;
     }
 
     query += `

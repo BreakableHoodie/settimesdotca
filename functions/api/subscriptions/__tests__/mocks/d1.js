@@ -226,6 +226,7 @@ export class MockD1Database {
         name: event.name,
         slug: event.slug || `event-${event.id}`,
         date: event.date,
+        end_date: event.end_date ?? null,
         description: event.description,
         city: event.city,
         ticket_url: event.ticket_url,
@@ -258,9 +259,17 @@ export class MockD1Database {
       });
     }
 
-    if (queryLower.includes("where date >= date('now')") || queryLower.includes("e.date >= date('now'")) {
+    // Mirrors the COALESCE(end_date, date) >= date('now', ...) window (#539):
+    // a multi-day event stays "upcoming"/current through its end_date rather
+    // than dropping off the day after it starts. NULL end_date falls back to
+    // date, so single-day behavior is unchanged.
+    if (
+      queryLower.includes("where date >= date('now')") ||
+      queryLower.includes("e.date >= date('now'") ||
+      queryLower.includes("coalesce(e.end_date, e.date) >= date('now'")
+    ) {
       const today = new Date().toISOString().split("T")[0];
-      results = results.filter((e) => e.date >= today);
+      results = results.filter((e) => (e.end_date || e.date) >= today);
     }
 
     // Sort
@@ -311,9 +320,13 @@ export class MockD1Database {
 
       if (!event || !band) continue;
 
-      // Check future events only
+      // Check future events only. Mirrors the production
+      // COALESCE(e.end_date, e.date) >= date('now') window (#539): a
+      // multi-day event stays in the feed through its end_date instead of
+      // dropping out the day after it starts. NULL end_date falls back to
+      // date, so single-day behavior is unchanged.
       const today = new Date().toISOString().split("T")[0];
-      if (event.date < today) continue;
+      if ((event.end_date || event.date) < today) continue;
 
       // Apply city filter
       if (cityFilter && event.city?.toLowerCase() !== cityFilter.toLowerCase()) {

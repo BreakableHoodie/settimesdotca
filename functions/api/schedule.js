@@ -30,7 +30,7 @@ export async function onRequestGet(context) {
         SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
         FROM events
         WHERE is_published = 1
-          AND date >= date('now', '-6 hours')
+          AND COALESCE(end_date, date) >= date('now', '-6 hours')
         ORDER BY date ASC
         LIMIT 1
       `,
@@ -74,6 +74,7 @@ export async function onRequestGet(context) {
         b.name,
         p.start_time as startTime,
         p.end_time as endTime,
+        p.performance_date as performanceDate,
         b.social_links,
         b.photo_url,
         v.name as venue,
@@ -136,7 +137,10 @@ export async function onRequestGet(context) {
         venue: band.venue ?? null,
         venue_lat: typeof band.venue_lat === "number" ? band.venue_lat : null,
         venue_lng: typeof band.venue_lng === "number" ? band.venue_lng : null,
-        date: event.date,
+        // Per-set festival day: a performance carries its own performance_date
+        // when the event spans multiple days (epic #543); NULL inherits the
+        // event's single date, keeping single-day events byte-identical.
+        date: band.performanceDate || event.date,
         startTime: extractTime(band.startTime),
         endTime: extractTime(band.endTime),
         url: primaryUrl,

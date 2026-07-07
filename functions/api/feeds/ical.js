@@ -49,7 +49,7 @@ export async function onRequestGet(context) {
       LEFT JOIN band_profiles bp ON p.band_profile_id = bp.id
       LEFT JOIN venues v ON v.id = p.venue_id
       WHERE e.is_published = 1
-      AND e.date >= date('now')
+      AND COALESCE(e.end_date, e.date) >= date('now')
     `;
 
     const params = [];

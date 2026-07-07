@@ -1,6 +1,6 @@
 import { CalendarDays, ChevronDown, Clock, Route, Warehouse } from 'lucide-react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { getEventState } from '../utils/eventLifecycle'
+import { getLifecycleLabel } from '../utils/liveLabel'
 import GhostEasterEgg from './GhostEasterEgg'
 import TimeFilter from './TimeFilter'
 
@@ -21,33 +21,6 @@ function formatCurrentTime(value) {
     hour: 'numeric',
     minute: '2-digit',
   })
-}
-
-function isSameLocalDay(eventDate, currentTime) {
-  if (!eventDate) return false
-  const current = currentTime instanceof Date ? currentTime : new Date(currentTime)
-  const year = current.getFullYear()
-  const month = String(current.getMonth() + 1).padStart(2, '0')
-  const day = String(current.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}` === eventDate
-}
-
-function getLifecycleLabel(eventDate, currentTime) {
-  const state = getEventState(eventDate, currentTime)
-
-  if (state === 'archived') {
-    return { label: 'Archive', classes: 'bg-surface text-text-secondary border-border' }
-  }
-
-  if (state === 'recently_completed') {
-    return { label: 'Recap', classes: 'bg-info-500/15 text-info-400 border-info-500/30' }
-  }
-
-  if (isSameLocalDay(eventDate, currentTime)) {
-    return { label: 'Live Tonight', classes: 'bg-accent-500/15 text-accent-400 border-accent-500/30' }
-  }
-
-  return { label: 'Upcoming', classes: 'bg-blue-500/15 text-blue-300 border-blue-500/30' }
 }
 
 function LiveContextBar({
@@ -73,7 +46,10 @@ function LiveContextBar({
     return venueOptions.length
   }, [eventData?.venue_info, venueOptions.length])
 
-  const lifecycle = useMemo(() => getLifecycleLabel(eventData?.date, currentTime), [currentTime, eventData?.date])
+  const lifecycle = useMemo(
+    () => getLifecycleLabel(eventData?.date, currentTime, bands),
+    [bands, currentTime, eventData?.date]
+  )
   const [isFiltersOpen, setIsFiltersOpen] = useState(true)
   const [showGhost, setShowGhost] = useState(false)
   const tapCountRef = useRef(0)

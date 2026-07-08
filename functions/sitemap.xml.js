@@ -74,6 +74,10 @@ export async function onRequestGet(context) {
   </url>`,
     ];
 
+    // YYYY-MM-DD lexicographic comparison — never new Date('YYYY-MM-DD'),
+    // which UTC-parses and drifts a day (documented repo invariant).
+    const today = new Date().toISOString().split("T")[0];
+
     for (const event of events) {
       rows.push(`  <url>
     <loc>https://settimes.ca/event/${event.slug}</loc>
@@ -81,6 +85,17 @@ export async function onRequestGet(context) {
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`);
+      // Past editions also get their recap page (#555) — a content-rich page
+      // that was previously reachable only by typing the URL. Recaps only
+      // exist once the event has happened, so future events are excluded.
+      if (event.date < today) {
+        rows.push(`  <url>
+    <loc>https://settimes.ca/events/${event.slug}/recap</loc>
+    <lastmod>${event.date}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>`);
+      }
     }
 
     for (const band of bands) {

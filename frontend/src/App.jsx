@@ -723,6 +723,14 @@ function App() {
             <div>
               <span className="font-semibold text-text-primary">This event has concluded.</span> You&apos;re viewing the
               archived lineup for reference.
+              {eventData?.slug && (
+                <>
+                  {' '}
+                  <Link to={`/events/${eventData.slug}/recap`} className="text-accent-400 hover:underline">
+                    View the recap →
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

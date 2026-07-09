@@ -716,7 +716,7 @@ export default function BandProfilePage() {
               <p className="text-xs text-text-secondary">Get notified when they join a new lineup.</p>
             </div>
             {followStatus === 'success' ? (
-              <p className="inline-flex items-start gap-1.5 text-sm text-green-400 sm:max-w-sm">
+              <p className="inline-flex items-start gap-1.5 text-sm text-success-400 sm:max-w-sm">
                 <Check size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 Almost there — check your email to confirm your follow of {profile.name}.
               </p>
@@ -747,7 +747,7 @@ export default function BandProfilePage() {
               </form>
             )}
           </div>
-          {followStatus === 'error' && <p className="mt-2 text-xs text-red-400">{followError}</p>}
+          {followStatus === 'error' && <p className="mt-2 text-xs text-error-400">{followError}</p>}
         </div>
 
         {/* Stats/Facts (left) + Shows (right). When a band has no stats, the shows

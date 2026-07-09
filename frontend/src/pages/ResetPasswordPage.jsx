@@ -195,7 +195,7 @@ export default function ResetPasswordPage() {
           {message && (
             <div
               className={`p-4 rounded-lg ${
-                status === 'error' ? 'bg-red-500/20 text-red-200' : 'bg-green-500/20 text-green-200'
+                status === 'error' ? 'bg-error-500/20 text-text-primary' : 'bg-success-500/20 text-text-primary'
               }`}
             >
               {message}

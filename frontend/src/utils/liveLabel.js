@@ -18,7 +18,7 @@ const LABELS = {
   archive: { label: 'Archive', classes: 'bg-surface text-text-secondary border-border' },
   recap: { label: 'Recap', classes: 'bg-info-500/15 text-info-400 border-info-500/30' },
   live: { label: 'Live Tonight', classes: 'bg-accent-500/15 text-accent-400 border-accent-500/30' },
-  upcoming: { label: 'Upcoming', classes: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
+  upcoming: { label: 'Upcoming', classes: 'bg-info-500/15 text-info-400 border-info-500/30' },
 }
 
 const toMs = value => (value instanceof Date ? value : new Date(value)).getTime()

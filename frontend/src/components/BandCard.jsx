@@ -142,8 +142,8 @@ function BandCard({
                   ? 'bg-yellow-900/80 text-yellow-100'
                   : 'bg-red-900/70 text-red-100'
                 : warningType === 'overlap'
-                  ? 'bg-yellow-500/30 text-yellow-200'
-                  : 'bg-red-500/30 text-red-200'
+                  ? 'bg-warning-500/25 text-text-primary'
+                  : 'bg-error-500/25 text-text-primary'
             }`}
           >
             {warningType === 'overlap' ? (

@@ -137,7 +137,7 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
         </div>
 
         {followStatus === 'success' ? (
-          <p className="inline-flex items-start gap-1.5 text-sm text-success-500 sm:max-w-xs">
+          <p className="inline-flex items-start gap-1.5 text-sm text-success-400 sm:max-w-xs">
             <Check size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             Check your email to confirm — one click locks in all {n} {n === 1 ? 'band' : 'bands'}.
           </p>
@@ -171,7 +171,7 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
       </div>
 
       {followStatus === 'error' && (
-        <p className="mt-2 text-xs text-error-500" role="alert">
+        <p className="mt-2 text-xs text-error-400" role="alert">
           {followError}
         </p>
       )}

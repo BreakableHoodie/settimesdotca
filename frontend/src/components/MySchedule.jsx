@@ -533,7 +533,7 @@ function MySchedule({
       {/* Contextual reminder */}
       {reminder && (
         <div className="max-w-5xl mx-auto">
-          <div className="text-xs text-green-300 bg-green-900/20 px-4 py-2 rounded border border-green-500/30 text-center flex items-center justify-center gap-2 leading-normal">
+          <div className="text-xs text-text-primary bg-success-500/15 px-4 py-2 rounded border border-success-500/40 text-center flex items-center justify-center gap-2 leading-normal">
             {(() => {
               const ReminderIcon = reminder.icon
               return <ReminderIcon size={14} aria-hidden="true" />
@@ -624,7 +624,7 @@ function MySchedule({
                 )}
                 {showDreReminder && (
                   <div className="text-center text-text-secondary text-xs italic pb-2 flex items-center justify-center gap-2">
-                    <Smile size={14} className="text-yellow-300" aria-hidden="true" />
+                    <Smile size={14} className="text-warning-400" aria-hidden="true" />
                     <span>{getHighlightMessage()}</span>
                   </div>
                 )}

@@ -598,7 +598,7 @@ function App() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md text-center">
-          <div className="text-red-400 mb-4" aria-hidden="true">
+          <div className="text-error-400 mb-4" aria-hidden="true">
             <CircleAlert size={64} />
           </div>
           <h2 className="text-text-primary text-2xl font-bold mb-2">Oops! Something went wrong</h2>

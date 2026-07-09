@@ -14,9 +14,9 @@ const buildChecks = password => {
 
 const getStrength = checks => {
   const score = checks.filter(check => check.ok).length
-  if (score <= 2) return { label: 'Weak', color: 'bg-red-500', score }
-  if (score <= 4) return { label: 'Medium', color: 'bg-yellow-500', score }
-  return { label: 'Strong', color: 'bg-green-500', score }
+  if (score <= 2) return { label: 'Weak', color: 'bg-error-500', score }
+  if (score <= 4) return { label: 'Medium', color: 'bg-warning-500', score }
+  return { label: 'Strong', color: 'bg-success-500', score }
 }
 
 export default function PasswordStrength({ password }) {
@@ -42,7 +42,7 @@ export default function PasswordStrength({ password }) {
       <div className="grid gap-1 text-xs text-text-secondary sm:grid-cols-2">
         {checks.map(check => (
           <div key={check.label} className="flex items-center gap-2">
-            <span className={`inline-block h-2 w-2 rounded-full ${check.ok ? 'bg-green-400' : 'bg-surface'}`} />
+            <span className={`inline-block h-2 w-2 rounded-full ${check.ok ? 'bg-success-400' : 'bg-surface'}`} />
             <span className={check.ok ? 'text-text-primary' : ''}>{check.label}</span>
           </div>
         ))}

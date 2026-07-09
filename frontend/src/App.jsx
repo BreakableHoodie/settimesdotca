@@ -636,7 +636,12 @@ function App() {
             ? { address: { '@type': 'PostalAddress', addressLocality: eventData.city, addressCountry: 'CA' } }
             : { name: 'Canada', address: { '@type': 'PostalAddress', addressCountry: 'CA' } }),
         },
-        organizer: { '@type': 'Organization', name: 'SetTimes', url: 'https://settimes.ca' },
+        organizer: {
+          '@type': 'Organization',
+          name: 'SetTimes',
+          url: 'https://settimes.ca',
+          sameAs: ['https://www.instagram.com/settimes.ca'],
+        },
         ...(eventData.ticket_url && {
           offers: {
             '@type': 'Offer',

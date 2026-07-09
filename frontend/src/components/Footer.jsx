@@ -32,6 +32,18 @@ function Footer() {
             </Link>
           </div>
 
+          <div>
+            <a
+              href="https://www.instagram.com/settimes.ca"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent-400 hover:text-accent-500 transition-colors inline-flex items-center gap-1.5 text-sm font-medium"
+            >
+              <InstagramIcon size={16} />
+              <span>@settimes.ca</span>
+            </a>
+          </div>
+
           <p className="text-text-tertiary text-xs">Times are subject to change - late starts happen!</p>
 
           <p className="text-text-tertiary text-xs">

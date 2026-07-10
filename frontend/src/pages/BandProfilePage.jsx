@@ -286,6 +286,15 @@ export default function BandProfilePage() {
     document.title = pageTitle
   }, [pageTitle])
 
+  // Band-to-band navigation reuses this component instance: the follow form
+  // (and the Turnstile container inside it) unmounts for the loading skeleton
+  // and remounts for the new band. The widget dies with its container, so
+  // engagement must reset — the next focus re-activates a fresh widget
+  // (useTurnstile only renders on an inactive→active transition).
+  useEffect(() => {
+    setFollowEngaged(false)
+  }, [profile?.id])
+
   const submitFollow = async e => {
     e.preventDefault()
     if (!followEmail.trim()) return

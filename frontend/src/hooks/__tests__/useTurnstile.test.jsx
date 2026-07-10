@@ -109,4 +109,30 @@ describe('useTurnstile', () => {
     unmount()
     expect(window.turnstile.remove).toHaveBeenCalledWith('widget-1')
   })
+
+  it('deactivating tears down and re-activating renders a fresh widget', () => {
+    // The consumer contract for form remounts (band-to-band navigation, an
+    // emptied list): flip active false, then a later focus re-activates.
+    const { rerender } = render(<Harness active={true} />)
+    const [, config] = renderMock.mock.calls[0]
+    act(() => config.callback('tok-stale'))
+
+    rerender(<Harness active={false} />)
+    expect(window.turnstile.remove).toHaveBeenCalledWith('widget-1')
+    expect(screen.getByTestId('token').textContent).toBe('') // stale token cleared
+
+    rerender(<Harness active={true} />)
+    expect(renderMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('survives teardown of a widget whose DOM is already gone', () => {
+    window.turnstile.remove.mockImplementation(() => {
+      throw new Error('widget not found')
+    })
+    const { rerender } = render(<Harness active={true} />)
+    expect(() => rerender(<Harness active={false} />)).not.toThrow()
+    // A fresh activation still works after the failed teardown.
+    rerender(<Harness active={true} />)
+    expect(renderMock).toHaveBeenCalledTimes(2)
+  })
 })

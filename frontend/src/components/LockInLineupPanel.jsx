@@ -1,5 +1,5 @@
 import { Bell, Check } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTurnstile } from '../hooks/useTurnstile'
 
 /**
@@ -31,6 +31,15 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
     reset: resetTurnstile,
   } = useTurnstile(followEngaged)
   const hasPerformances = Array.isArray(performanceIds) && performanceIds.length > 0
+
+  // If the route empties (fan removes every band), the form — and the Turnstile
+  // widget's container — unmounts while this component instance survives.
+  // Reset engagement so the next focus re-activates a fresh widget.
+  useEffect(() => {
+    if (!hasPerformances) {
+      setFollowEngaged(false)
+    }
+  }, [hasPerformances])
 
   // Early return after hooks (React rules of hooks: no conditional hook calls)
   if (!hasPerformances) return null

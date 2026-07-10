@@ -15,6 +15,40 @@ export function InstagramIcon({ size = 24, className = '', ...props }) {
   )
 }
 
+export function XIcon({ size = 24, className = '', ...props }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M13.682 10.622 20.239 3h-1.554l-5.693 6.618L8.445 3H3.2l6.876 10.007L3.2 21h1.554l6.012-6.989L15.568 21h5.245l-7.131-10.378Zm-2.128 2.473-.697-.997-5.544-7.93h2.387l4.474 6.4.697.996 5.815 8.318h-2.387l-4.745-6.787Z" />
+    </svg>
+  )
+}
+
+export function TikTokIcon({ size = 24, className = '', ...props }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M16.6 5.82c-1.03-.9-1.6-2.2-1.6-3.57h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5c-1.42 0-2.6-1.16-2.6-2.6 0-1.72 1.66-3.01 3.37-2.48V8.9c-3.45-.46-6.47 2.22-6.47 5.64 0 3.33 2.76 5.7 5.69 5.7 3.14 0 5.69-2.55 5.69-5.7V9.01a7.35 7.35 0 0 0 4.3 1.38V7.31c-1.14 0-2.2-.55-2.7-1.49Z" />
+    </svg>
+  )
+}
+
 export function FacebookIcon({ size = 24, className = '', ...props }) {
   return (
     <svg

@@ -3,6 +3,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { getDoorsTimeForDate } from '../utils/doorsTime'
 import { getLifecycleLabel } from '../utils/liveLabel'
 import { formatTime } from '../utils/timeFormat'
+import EventSocialLinks from './EventSocialLinks'
 import GhostEasterEgg from './GhostEasterEgg'
 import TimeFilter from './TimeFilter'
 
@@ -171,6 +172,7 @@ function LiveContextBar({
           >
             {eventData.name}
           </h2>
+          <EventSocialLinks socialLinks={eventData.social_links} eventName={eventData.name} className="-ml-2 mt-0.5" />
 
           <div className="mt-1 flex items-center justify-between gap-2">
             <p className="truncate text-xs text-text-tertiary">{mobileSummary}</p>
@@ -212,6 +214,11 @@ function LiveContextBar({
               <h2 className="min-w-0 truncate text-base font-semibold text-text-primary md:text-lg">
                 {eventData.name}
               </h2>
+              <EventSocialLinks
+                socialLinks={eventData.social_links}
+                eventName={eventData.name}
+                className="-ml-2 shrink-0"
+              />
             </div>
             <p className="mt-1 truncate text-xs text-text-tertiary sm:hidden">{mobileSummary}</p>
             <p className="mt-1 hidden text-sm text-text-tertiary md:block">

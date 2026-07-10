@@ -6,6 +6,7 @@
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { validateId } from "../../utils/validation.js";
+import { eventLocalToday } from "../../utils/eventDay.js";
 
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -71,7 +72,7 @@ export async function onRequestGet(context) {
       .all();
 
     const all = perfs.results || [];
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
     const isPast = (p) => p.event_date < today || p.event_status === "archived";
 
     const mapPerf = (p) => ({

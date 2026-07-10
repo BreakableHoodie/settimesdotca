@@ -651,7 +651,7 @@ function EventCard({
                 }
               }}
             >
-              {isPast || event.status === 'archived' ? 'View Lineup' : 'Plan Your Night'}
+              {isPast || event.status === 'archived' ? 'View Lineup' : 'Build Your Schedule'}
             </Button>
             {/* Past editions get a recap link — the recap page was previously
                 unreachable except by URL (#555). */}

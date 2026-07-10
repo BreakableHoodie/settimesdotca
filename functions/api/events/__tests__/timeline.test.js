@@ -8,6 +8,7 @@
 import { describe, it, test, expect, beforeEach, vi } from "vitest";
 import { onRequestGet as timelineHandler } from "../timeline.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
+import { eventLocalToday } from "../../../utils/eventDay.js";
 
 // Returns the mock result set for a query string, keyed off the distinctive
 // WHERE clause for each period (now / upcoming / past). The "now" and "past"
@@ -595,7 +596,7 @@ describe("Timeline real-DB — reveal_mode JOIN gate (SQL exercise)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
 
     const event = insertEvent(rawDb, {
       name: "Embargo Event",
@@ -679,7 +680,7 @@ describe("Timeline real-DB — NULL venue_id must not inflate venue_count (#479)
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
 
     const event = insertEvent(rawDb, {
       name: "No Venue Event",
@@ -720,7 +721,7 @@ describe("Timeline real-DB — derived band url is scheme-validated (#483)", () 
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
 
     const event = insertEvent(rawDb, {
       name: "Scheme Test Event",
@@ -756,7 +757,7 @@ describe("Timeline real-DB — derived band url is scheme-validated (#483)", () 
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
 
     const event = insertEvent(rawDb, {
       name: "Scheme Fallback Event",
@@ -802,7 +803,7 @@ describe("Timeline real-DB — event ticket_url is scheme-validated (#504)", () 
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
 
     const event = insertEvent(rawDb, {
       name: "Unsafe Ticket Event",
@@ -831,7 +832,7 @@ describe("Timeline real-DB — event ticket_url is scheme-validated (#504)", () 
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
 
     const event = insertEvent(rawDb, {
       name: "Safe Ticket Event",

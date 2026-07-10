@@ -3,6 +3,9 @@ import EventStatusBadge from './components/EventStatusBadge'
 import { Button } from '../components/ui'
 import { eventsApi } from '../utils/adminApi'
 import { FIELD_LIMITS } from '../utils/validation'
+import { buildDayOptions, enumerateFestivalDays, isMultiDayEvent } from './utils/dayOptions'
+import { formatFestivalDate } from '../utils/festivalDays'
+import { parseDoorsJsonToForm, serializeDoorsForm } from './utils/doorsFormData'
 
 /**
  * EventFormModal - Modal for creating and editing events
@@ -44,6 +47,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
     social_youtube: '',
     reveal_mode: false,
   })
+  const [doorsForm, setDoorsForm] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [slugEdited, setSlugEdited] = useState(false)
@@ -102,6 +106,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         social_youtube: socialLinks.youtube || '',
         reveal_mode: event?.reveal_mode === 1 || event?.reveal_mode === true,
       })
+      setDoorsForm(parseDoorsJsonToForm(event.doors_json, enumerateFestivalDays(event.date, event.end_date)))
       setSlugEdited(true) // Prevent auto-generation when editing
     } else {
       setFormData({
@@ -121,10 +126,30 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         social_youtube: '',
         reveal_mode: false,
       })
+      setDoorsForm({})
       setSlugEdited(false)
     }
     setError('')
   }, [event, isOpen])
+
+  // Re-derive the festival-day list whenever date/end_date change (both on
+  // initial load and on live edits) and keep doorsForm's keys in sync: add a
+  // blank entry for a newly-added day, preserve values for days still in
+  // range, and drop entries for days no longer in range. This is a UI-level
+  // mirror of the pruning `serializeDoorsForm` does at submit time — belt
+  // and suspenders against a stale key ever reaching the payload (#573).
+  useEffect(() => {
+    const days = enumerateFestivalDays(formData.date, formData.end_date)
+    setDoorsForm(prev => {
+      const next = {}
+      let changed = days.length !== Object.keys(prev).length
+      for (const day of days) {
+        next[day] = Object.prototype.hasOwnProperty.call(prev, day) ? prev[day] : ''
+        if (next[day] !== prev[day]) changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [formData.date, formData.end_date])
 
   // Auto-generate slug from name (only when creating)
   const handleNameChange = e => {
@@ -246,6 +271,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
 
     try {
       const socialLinksPayload = buildSocialLinksPayload(formData)
+      const currentDays = enumerateFestivalDays(formData.date, formData.end_date)
       const payload = {
         name: formData.name,
         slug: formData.slug,
@@ -256,6 +282,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         city: formData.city,
         ticket_url: formData.ticket_url,
         social_links: socialLinksPayload,
+        doors_json: serializeDoorsForm(doorsForm, currentDays),
       }
 
       if (isEditing && formData.status === 'archived') {
@@ -294,6 +321,19 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
   // Not toISOString(): that is the UTC day, which flips to tomorrow at 8 PM
   // Eastern and blocks the admin from picking today's date in the evening.
   const today = new Date().toLocaleDateString('en-CA')
+
+  // One doors-time input per festival day; re-derived on every render from
+  // the live date/end_date fields so picking a date (or extending/shrinking
+  // a multi-day span) updates the inputs immediately. Single-day events never
+  // show a "Day 1" label (redundant on a single-day event, see CLAUDE.md) —
+  // only genuinely multi-day spans use buildDayOptions' "Day N (...)" label.
+  const isMultiDay = isMultiDayEvent({ date: formData.date, end_date: formData.end_date || null })
+  const festivalDays = isMultiDay
+    ? buildDayOptions(formData.date, formData.end_date)
+    : enumerateFestivalDays(formData.date, formData.end_date).map(value => ({
+        value,
+        label: formatFestivalDate(value, 'short'),
+      }))
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -415,6 +455,35 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
                 className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
               />
             </div>
+
+            {/* Doors / Gates Times */}
+            <fieldset>
+              <legend className="block text-white mb-2 text-sm font-medium">Doors</legend>
+              <p className="text-xs text-white/50 mb-2">Optional — when gates open; leave blank if unknown.</p>
+              {festivalDays.length === 0 ? (
+                <p className="text-xs text-white/50">Set an event date to add doors times.</p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {festivalDays.map(day => (
+                    <div key={day.value}>
+                      <label htmlFor={`event-doors-${day.value}`} className="block text-white mb-1 text-xs font-medium">
+                        {day.label}
+                      </label>
+                      <input
+                        id={`event-doors-${day.value}`}
+                        type="time"
+                        value={doorsForm[day.value] || ''}
+                        onChange={e => {
+                          const time = e.target.value
+                          setDoorsForm(prev => ({ ...prev, [day.value]: time }))
+                        }}
+                        className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </fieldset>
 
             {/* Description */}
             <div>

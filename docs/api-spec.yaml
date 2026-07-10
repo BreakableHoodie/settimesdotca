@@ -3097,6 +3097,13 @@ components:
         venue_info:
           type: string
           nullable: true
+        doors_json:
+          type: string
+          nullable: true
+          description: >-
+            JSON object mapping festival date "YYYY-MM-DD" to 24-hour "HH:MM"
+            gates-open time, e.g. {"2026-08-02":"16:00"}. Absent/null means no
+            doors info.
         social_links:
           nullable: true
           oneOf:
@@ -3436,6 +3443,13 @@ components:
           oneOf:
             - type: string
             - $ref: "#/components/schemas/GenericRecord"
+        doors_json:
+          type: string
+          nullable: true
+          description: >-
+            JSON object mapping festival date "YYYY-MM-DD" to 24-hour "HH:MM"
+            gates-open time, e.g. {"2026-08-02":"16:00"}. Absent/null means no
+            doors info.
 
     EventPatchInput:
       type: object
@@ -3474,6 +3488,13 @@ components:
           oneOf:
             - type: string
             - $ref: "#/components/schemas/GenericRecord"
+        doors_json:
+          type: string
+          nullable: true
+          description: >-
+            JSON object mapping festival date "YYYY-MM-DD" to 24-hour "HH:MM"
+            gates-open time, e.g. {"2026-08-02":"16:00"}. Absent/null means no
+            doors info.
 
     EventEditInput:
       type: object

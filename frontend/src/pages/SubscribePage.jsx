@@ -1,18 +1,22 @@
 import { CalendarDays, Rss } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-
-const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+import { useTurnstile } from '../hooks/useTurnstile'
 
 const PAGE_TITLE = 'Subscribe — Never Miss a Show | SetTimes'
 const PAGE_DESCRIPTION =
   'Get notified about new live music events and lineup announcements in Waterloo Region. Subscribe for show alerts from SetTimes.'
 
 export default function SubscribePage() {
-  const turnstileContainerRef = useRef(null)
-  const turnstileWidgetIdRef = useRef(null)
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
-  const turnstileEnabled = Boolean(turnstileSiteKey)
+  // Turnstile stays fully dormant (no script, no iframe, no layout space)
+  // until the visitor engages with the email field.
+  const [formEngaged, setFormEngaged] = useState(false)
+  const {
+    enabled: turnstileEnabled,
+    token: turnstileToken,
+    containerRef: turnstileContainerRef,
+    reset: resetTurnstile,
+  } = useTurnstile(formEngaged)
 
   const [formData, setFormData] = useState({
     email: '',
@@ -20,7 +24,6 @@ export default function SubscribePage() {
     genre: 'all',
     frequency: 'weekly',
   })
-  const [turnstileToken, setTurnstileToken] = useState('')
   const [status, setStatus] = useState('idle') // idle, submitting, success, error
   const [message, setMessage] = useState('')
 
@@ -29,68 +32,6 @@ export default function SubscribePage() {
   useEffect(() => {
     document.title = PAGE_TITLE
   }, [])
-
-  useEffect(() => {
-    if (!turnstileEnabled) {
-      return undefined
-    }
-
-    let cancelled = false
-    let scriptElement = document.querySelector('script[data-turnstile-script="true"]')
-
-    const renderTurnstile = () => {
-      if (cancelled || !window.turnstile || !turnstileContainerRef.current) {
-        return
-      }
-      if (turnstileWidgetIdRef.current !== null) {
-        return
-      }
-
-      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: turnstileSiteKey,
-        // Invisible unless Turnstile actually needs a human challenge — keeps the
-        // form uncluttered for legit visitors while preserving bot protection.
-        appearance: 'interaction-only',
-        callback: token => {
-          setTurnstileToken(token)
-        },
-        'expired-callback': () => {
-          setTurnstileToken('')
-        },
-        'error-callback': () => {
-          setTurnstileToken('')
-        },
-      })
-    }
-
-    if (scriptElement) {
-      if (window.turnstile) {
-        renderTurnstile()
-      } else {
-        scriptElement.addEventListener('load', renderTurnstile)
-      }
-    } else {
-      const script = document.createElement('script')
-      script.src = TURNSTILE_SCRIPT_SRC
-      script.async = true
-      script.defer = true
-      script.setAttribute('data-turnstile-script', 'true')
-      script.addEventListener('load', renderTurnstile)
-      document.head.appendChild(script)
-      scriptElement = script
-    }
-
-    return () => {
-      cancelled = true
-      if (scriptElement) {
-        scriptElement.removeEventListener('load', renderTurnstile)
-      }
-      if (window.turnstile && turnstileWidgetIdRef.current !== null) {
-        window.turnstile.remove(turnstileWidgetIdRef.current)
-        turnstileWidgetIdRef.current = null
-      }
-    }
-  }, [turnstileEnabled, turnstileSiteKey])
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -119,17 +60,18 @@ export default function SubscribePage() {
         setStatus('success')
         setMessage('Check your email to confirm your subscription!')
         setFormData({ email: '', city: 'kitchener', genre: 'all', frequency: 'weekly' })
-        setTurnstileToken('')
-        if (turnstileEnabled && window.turnstile && turnstileWidgetIdRef.current !== null) {
-          window.turnstile.reset(turnstileWidgetIdRef.current)
-        }
+        resetTurnstile()
       } else {
         setStatus('error')
         setMessage(data.error || 'Subscription failed. Please try again.')
+        // Tokens are single-use: without a reset here, a failed submit leaves a
+        // dead token in state and every retry 403s until a full page reload.
+        resetTurnstile()
       }
     } catch {
       setStatus('error')
       setMessage('Network error. Please try again.')
+      resetTurnstile()
     }
   }
 
@@ -170,7 +112,11 @@ export default function SubscribePage() {
                 id="email"
                 required
                 value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                onFocus={() => setFormEngaged(true)}
+                onChange={e => {
+                  setFormEngaged(true)
+                  setFormData({ ...formData, email: e.target.value })
+                }}
                 className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden placeholder-text-tertiary"
                 placeholder="you@example.com"
               />
@@ -232,7 +178,7 @@ export default function SubscribePage() {
             </div>
 
             {/* Submit */}
-            {turnstileEnabled && <div ref={turnstileContainerRef} className="min-h-[65px]" />}
+            {turnstileEnabled && formEngaged && <div ref={turnstileContainerRef} />}
             <button
               type="submit"
               disabled={status === 'submitting'}

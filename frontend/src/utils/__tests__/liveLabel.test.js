@@ -124,6 +124,22 @@ describe('getLifecycleLabel — start-edge gate (#569): doors → first set → 
     ]
     expect(labelOf('2026-08-02', new Date(2026, 7, 3, 8, 0), bands, multiDayDoors)).toBe('Live Tonight')
   })
+
+  it("day 1 with no sets of its own is Live from midnight — a later day's sets never gate day 1", () => {
+    // Regression: day-1 lineup empty, all sets belong to day 2 (`band.date`
+    // carries the festival day in multi-day payloads, #543). With no day-1
+    // signal at all the midnight fallback applies — day 2's noon set must
+    // not hold day 1 at "Upcoming".
+    const bands = [{ ...band(at(2026, 8, 3, 12, 0), at(2026, 8, 3, 13, 0)), date: '2026-08-03' }]
+    expect(labelOf('2026-08-02', at(2026, 8, 2, 9, 0), bands)).toBe('Live Tonight')
+  })
+
+  it('day 1 with no sets still gates on a day-1 doors time when one exists', () => {
+    const doors = JSON.stringify({ '2026-08-02': '16:00' })
+    const bands = [{ ...band(at(2026, 8, 3, 12, 0), at(2026, 8, 3, 13, 0)), date: '2026-08-03' }]
+    expect(labelOf('2026-08-02', at(2026, 8, 2, 9, 0), bands, doors)).toBe('Upcoming')
+    expect(labelOf('2026-08-02', at(2026, 8, 2, 16, 30), bands, doors)).toBe('Live Tonight')
+  })
 })
 
 describe('isSameLocalDay', () => {

@@ -67,6 +67,27 @@ function scheduleWindow(bands) {
 }
 
 /**
+ * Earliest set start among bands belonging to one festival day (`band.date`,
+ * already after-midnight-corrected by prepareBands). The day-1 start-edge
+ * gate must only consider DAY-1 sets — mirroring the server-side gate in
+ * functions/api/events/timeline.js — or a multi-day event whose first day has
+ * no sets yet would gate against a later day's timestamp and read "Upcoming"
+ * all of day 1 instead of falling back to the local-midnight rule.
+ *
+ * A band without a `.date` inherits the event's own date — the same rule the
+ * schedule payload applies to a NULL `performance_date` (#543) and the exact
+ * mirror of the server gate's `performance_date == null` branch.
+ */
+function firstStartOnDay(bands, date) {
+  let first = Infinity
+  for (const band of bands ?? []) {
+    const bandDay = band?.date ?? date
+    if (bandDay === date && band?.startMs > 0 && band.startMs < first) first = band.startMs
+  }
+  return first === Infinity ? null : first
+}
+
+/**
  * @param {string} eventDate - YYYY-MM-DD
  * @param {Date|number} currentTime
  * @param {Array<{startMs:number,endMs:number}>} bands - prepared bands (prepareBands)
@@ -103,7 +124,8 @@ export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson 
     // LOCAL-time construction, same pattern as baselineEnd above — never
     // bare `new Date('YYYY-MM-DD')` (see CLAUDE.md).
     const doorsMs = doorsTime ? new Date(eventDate + 'T' + doorsTime + ':00').getTime() : null
-    const signals = [doorsMs, firstStart].filter(value => value != null)
+    // Day-1 sets only — a later day's first set must never gate day 1.
+    const signals = [doorsMs, firstStartOnDay(bands, eventDate)].filter(value => value != null)
     if (signals.length > 0 && now < Math.min(...signals)) return LABELS.upcoming
     return LABELS.live
   }

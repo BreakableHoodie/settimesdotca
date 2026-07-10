@@ -1,5 +1,6 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
+import { eventLocalToday } from "../../utils/eventDay.js";
 
 /**
  * Public API: Get events timeline (now, upcoming, past)
@@ -48,7 +49,7 @@ export async function onRequestGet(context) {
       past: [],
     };
 
-    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const today = eventLocalToday(); // YYYY-MM-DD, events' local (Toronto) day — not UTC
 
     // Helper function to group bands by event (processes results from JOIN query)
     function groupEventData(rows) {

@@ -1,6 +1,7 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 import { safeReflectSocialLinks } from "../../../utils/validation.js";
+import { eventLocalToday } from "../../../utils/eventDay.js";
 
 /**
  * Public API: Get band profile with rich stats
@@ -129,7 +130,7 @@ export async function onRequestGet(context) {
     const allPerformances = performances.results || [];
 
     // Calculate statistics
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
 
     // Separate upcoming and past performances
     // Archived events always go to past regardless of date

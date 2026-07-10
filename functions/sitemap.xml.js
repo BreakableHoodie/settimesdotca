@@ -3,6 +3,7 @@
  * Includes all published events and band profiles with at least one published performance.
  */
 import { getPublicDataGateResponse } from "./utils/publicGate.js";
+import { eventLocalToday } from "./utils/eventDay.js";
 
 export async function onRequestGet(context) {
   const { env } = context;
@@ -76,7 +77,7 @@ export async function onRequestGet(context) {
 
     // YYYY-MM-DD lexicographic comparison — never new Date('YYYY-MM-DD'),
     // which UTC-parses and drifts a day (documented repo invariant).
-    const today = new Date().toISOString().split("T")[0];
+    const today = eventLocalToday();
 
     for (const event of events) {
       rows.push(`  <url>

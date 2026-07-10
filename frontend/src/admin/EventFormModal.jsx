@@ -290,8 +290,10 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
 
   if (!isOpen) return null
 
-  // Get today's date in YYYY-MM-DD format for min attribute
-  const today = new Date().toISOString().split('T')[0]
+  // Today's date (device-local, YYYY-MM-DD) for the min attribute.
+  // Not toISOString(): that is the UTC day, which flips to tomorrow at 8 PM
+  // Eastern and blocks the admin from picking today's date in the evening.
+  const today = new Date().toLocaleDateString('en-CA')
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">

@@ -64,10 +64,14 @@ export default function SubscribePage() {
       } else {
         setStatus('error')
         setMessage(data.error || 'Subscription failed. Please try again.')
+        // Tokens are single-use: without a reset here, a failed submit leaves a
+        // dead token in state and every retry 403s until a full page reload.
+        resetTurnstile()
       }
     } catch {
       setStatus('error')
       setMessage('Network error. Please try again.')
+      resetTurnstile()
     }
   }
 

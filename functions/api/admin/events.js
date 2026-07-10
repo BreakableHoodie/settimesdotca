@@ -10,6 +10,7 @@ import {
   safeReflectSocialLinksString,
   sanitizeEventSocialLinks,
   sanitizeVenueInfo,
+  validateDoorsJson,
 } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
 
@@ -132,6 +133,7 @@ export async function onRequestPost(context) {
       venue_info,
       social_links,
       theme_colors,
+      doors_json,
     } = validation.sanitized;
 
     let sanitizedVenueInfo;
@@ -142,6 +144,14 @@ export async function onRequestPost(context) {
     } catch (error) {
       return validationErrorResponse(error.message);
     }
+
+    // Cross-field check (needs date/end_date, so it can't live in the
+    // schema-level `validate` above) — mirrors validatePerformanceDate.
+    const doorsCheck = validateDoorsJson(doors_json, { date, end_date });
+    if (!doorsCheck.valid) {
+      return validationErrorResponse(doorsCheck.error);
+    }
+    const sanitizedDoorsJson = doorsCheck.value;
     if (status === "archived" && currentUser.role !== "admin") {
       return new Response(
         JSON.stringify({
@@ -213,9 +223,10 @@ export async function onRequestPost(context) {
         venue_info,
         social_links,
         theme_colors,
+        doors_json,
         created_by_user_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
@@ -232,6 +243,7 @@ export async function onRequestPost(context) {
         sanitizedVenueInfo,
         sanitizedSocialLinks,
         theme_colors,
+        sanitizedDoorsJson,
         currentUser.userId,
       )
       .first();

@@ -65,7 +65,12 @@ export async function onRequestPost(context) {
     }
 
     // Create the new event as an unpublished draft, carrying over the source's
-    // descriptive fields but not its publish state.
+    // descriptive fields but not its publish state. doors_json is deliberately
+    // NOT in this column list: the new event has a different date (and
+    // possibly no end_date at all), so the source's date-keyed doors times
+    // would no longer fall within the new event's festival-day span and
+    // would fail validateDoorsJson on the next edit anyway (#569). Leaving it
+    // out of INSERT defaults the column to NULL — start clean.
     const newEvent = await DB.prepare(
       `INSERT INTO events (
          name, date, slug, status, is_published, description, city,

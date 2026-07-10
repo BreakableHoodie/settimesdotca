@@ -15,6 +15,7 @@ import {
   safeReflectSocialLinks,
   safeReflectSocialLinksString,
   sanitizeBandSocialLinks,
+  validateDoorsJson,
 } from "../validation.js";
 
 describe("Email Validation", () => {
@@ -224,6 +225,98 @@ describe("Event schema end_date validation", () => {
     const result = validateEntity({ ...validBase, end_date: "not-a-date" }, VALIDATION_SCHEMAS.event);
     expect(result.valid).toBe(false);
     expect(result.errors.end_date).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #569 — events.doors_json: JSON map of festival date -> 24h "HH:MM" doors
+// time, validated against the event's [date, end_date] festival-day span
+// (same rule as validatePerformanceDate).
+// ---------------------------------------------------------------------------
+describe("validateDoorsJson (#569)", () => {
+  const singleDayEvent = { date: "2026-08-02", end_date: null };
+  const multiDayEvent = { date: "2026-07-10", end_date: "2026-07-11" };
+
+  it("absent/null/empty doors_json is valid (no doors info)", () => {
+    expect(validateDoorsJson(undefined, singleDayEvent)).toEqual({ valid: true, error: null, value: null });
+    expect(validateDoorsJson(null, singleDayEvent)).toEqual({ valid: true, error: null, value: null });
+    expect(validateDoorsJson("", singleDayEvent)).toEqual({ valid: true, error: null, value: null });
+  });
+
+  it("accepts a valid single-day map", () => {
+    const result = validateDoorsJson('{"2026-08-02":"18:30"}', singleDayEvent);
+    expect(result.valid).toBe(true);
+    expect(JSON.parse(result.value)).toEqual({ "2026-08-02": "18:30" });
+  });
+
+  it("accepts a valid multi-day map (BLR3-style: one key per festival day)", () => {
+    const result = validateDoorsJson('{"2026-07-10":"16:00","2026-07-11":"10:00"}', multiDayEvent);
+    expect(result.valid).toBe(true);
+    expect(JSON.parse(result.value)).toEqual({ "2026-07-10": "16:00", "2026-07-11": "10:00" });
+  });
+
+  it("accepts an already-parsed object (not just a JSON string)", () => {
+    const result = validateDoorsJson({ "2026-08-02": "18:30" }, singleDayEvent);
+    expect(result.valid).toBe(true);
+    expect(JSON.parse(result.value)).toEqual({ "2026-08-02": "18:30" });
+  });
+
+  it("rejects a key outside the event's festival-day span", () => {
+    const result = validateDoorsJson('{"2026-08-03":"18:30"}', singleDayEvent);
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/between/);
+  });
+
+  it("rejects a key one day before a multi-day event's span", () => {
+    const result = validateDoorsJson('{"2026-07-09":"16:00"}', multiDayEvent);
+    expect(result.valid).toBe(false);
+  });
+
+  it("rejects a key one day after a multi-day event's span", () => {
+    const result = validateDoorsJson('{"2026-07-12":"10:00"}', multiDayEvent);
+    expect(result.valid).toBe(false);
+  });
+
+  it("rejects a malformed key (not YYYY-MM-DD)", () => {
+    const result = validateDoorsJson('{"not-a-date":"18:30"}', singleDayEvent);
+    expect(result.valid).toBe(false);
+  });
+
+  it("rejects a bad time format", () => {
+    expect(validateDoorsJson('{"2026-08-02":"6:30 PM"}', singleDayEvent).valid).toBe(false);
+    expect(validateDoorsJson('{"2026-08-02":"25:00"}', singleDayEvent).valid).toBe(false);
+    expect(validateDoorsJson('{"2026-08-02":"18:60"}', singleDayEvent).valid).toBe(false);
+    expect(validateDoorsJson('{"2026-08-02":18.5}', singleDayEvent).valid).toBe(false);
+  });
+
+  it("rejects a non-object JSON value", () => {
+    expect(validateDoorsJson("[]", singleDayEvent).valid).toBe(false);
+    expect(validateDoorsJson('["2026-08-02"]', singleDayEvent).valid).toBe(false);
+    expect(validateDoorsJson('"18:30"', singleDayEvent).valid).toBe(false);
+    expect(validateDoorsJson("42", singleDayEvent).valid).toBe(false);
+  });
+
+  it("rejects invalid JSON", () => {
+    const result = validateDoorsJson("{not json", singleDayEvent);
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/valid JSON/);
+  });
+
+  it("normalizes an empty object to null", () => {
+    expect(validateDoorsJson("{}", singleDayEvent)).toEqual({ valid: true, error: null, value: null });
+  });
+
+  it("rejects oversize input (cap ~2000 chars)", () => {
+    // A single absurdly long time value pushes the raw string over the cap.
+    const oversized = `{"2026-08-02":"${"1".repeat(3000)}:30"}`;
+    const result = validateDoorsJson(oversized, singleDayEvent);
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/no more than/);
+  });
+
+  it("rejects when the event has no date to anchor the span", () => {
+    const result = validateDoorsJson('{"2026-08-02":"18:30"}', null);
+    expect(result.valid).toBe(false);
   });
 });
 

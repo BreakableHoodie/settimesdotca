@@ -78,4 +78,44 @@ describe('LiveContextBar', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /show filters/i })[0])
     expect(screen.getByLabelText(/Time filter/i)).toBeInTheDocument()
   })
+
+  it('does not show a Doors chip when the event has no doors_json (#569)', () => {
+    render(
+      <LiveContextBar
+        eventData={eventData}
+        currentTime={new Date('2026-05-06T19:30:00')}
+        bands={bands}
+        selectedCount={0}
+        view="all"
+        onViewChange={vi.fn()}
+        venueFilter={null}
+        onVenueFilterChange={vi.fn()}
+        timeFilter="all"
+        onTimeFilterChange={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByText(/Doors \d/i)).not.toBeInTheDocument()
+  })
+
+  it('shows a "Doors" chip for the event\'s first date when doors_json has a time for it (#569)', () => {
+    const eventWithDoors = { ...eventData, doors_json: JSON.stringify({ '2026-05-06': '18:30' }) }
+
+    render(
+      <LiveContextBar
+        eventData={eventWithDoors}
+        currentTime={new Date('2026-05-06T12:00:00')}
+        bands={bands}
+        selectedCount={0}
+        view="all"
+        onViewChange={vi.fn()}
+        venueFilter={null}
+        onVenueFilterChange={vi.fn()}
+        timeFilter="all"
+        onTimeFilterChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getAllByText('Doors 6:30 PM').length).toBeGreaterThan(0)
+  })
 })

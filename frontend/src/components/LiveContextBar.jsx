@@ -1,6 +1,8 @@
-import { CalendarDays, ChevronDown, Clock, Route, Warehouse } from 'lucide-react'
+import { CalendarDays, ChevronDown, Clock, DoorOpen, Route, Warehouse } from 'lucide-react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { getDoorsTimeForDate } from '../utils/doorsTime'
 import { getLifecycleLabel } from '../utils/liveLabel'
+import { formatTime } from '../utils/timeFormat'
 import GhostEasterEgg from './GhostEasterEgg'
 import TimeFilter from './TimeFilter'
 
@@ -47,8 +49,16 @@ function LiveContextBar({
   }, [eventData?.venue_info, venueOptions.length])
 
   const lifecycle = useMemo(
-    () => getLifecycleLabel(eventData?.date, currentTime, bands),
-    [bands, currentTime, eventData?.date]
+    () => getLifecycleLabel(eventData?.date, currentTime, bands, eventData?.doors_json),
+    [bands, currentTime, eventData?.date, eventData?.doors_json]
+  )
+
+  // Doors time for the event's FIRST date only (#569) — this header isn't
+  // per-day, so it always reflects day 1's gates-open time. Later festival
+  // days show their own doors time on the DayDivider instead.
+  const doorsTime = useMemo(
+    () => getDoorsTimeForDate(eventData?.doors_json, eventData?.date),
+    [eventData?.doors_json, eventData?.date]
   )
   const [isFiltersOpen, setIsFiltersOpen] = useState(true)
   const [showGhost, setShowGhost] = useState(false)
@@ -113,12 +123,16 @@ function LiveContextBar({
       `${bands.length} ${bands.length === 1 ? 'set' : 'sets'}`,
     ]
 
+    if (doorsTime) {
+      summaryItems.push(`Doors ${formatTime(doorsTime)}`)
+    }
+
     if (daysUntil !== null) {
       summaryItems.push(`${daysUntil} ${daysUntil === 1 ? 'day away' : 'days away'}`)
     }
 
     return summaryItems.join(' • ')
-  }, [bands.length, daysUntil, uniqueVenues])
+  }, [bands.length, daysUntil, doorsTime, uniqueVenues])
 
   if (!eventData?.name) {
     return null
@@ -226,6 +240,12 @@ function LiveContextBar({
               {bands.length} {bands.length === 1 ? 'set' : 'sets'}
             </span>
           </div>
+          {doorsTime && (
+            <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-text-secondary">
+              <DoorOpen size={14} aria-hidden="true" className="text-accent-400" />
+              <span>Doors {formatTime(doorsTime)}</span>
+            </div>
+          )}
           <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-accent-500/25 bg-accent-500/10 px-3 py-2 text-accent-400">
             <Route size={14} aria-hidden="true" />
             <span>

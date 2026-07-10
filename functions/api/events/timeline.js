@@ -1,6 +1,77 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
-import { eventLocalToday } from "../../utils/eventDay.js";
+import { eventLocalToday, eventLocalClock } from "../../utils/eventDay.js";
+
+/**
+ * 24-hour "HH:MM" time regex — mirrors DOORS_TIME_REGEX in validation.js.
+ * Kept local (not imported) so a malformed/legacy doors_json or start_time
+ * value here is simply treated as "no info" rather than throwing.
+ */
+const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Sets starting before 06:00 are after-midnight sets that belong to the
+ * PREVIOUS evening (the AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention, see
+ * frontend/src/utils/bandUtils.js and CLAUDE.md). They must never define the
+ * first day's start edge — a 1 AM set would otherwise mark the event
+ * "started" in the small hours of a morning whose show doesn't begin until
+ * evening.
+ */
+const AFTER_MIDNIGHT_THRESHOLD = "06:00";
+
+/**
+ * Normalizes a performances.start_time value ("HH:MM", "HH:MM:SS", or legacy
+ * "YYYY-MM-DD HH:MM") to zero-padded "HH:MM"; null when absent/unparseable.
+ */
+function normalizeStartTime(startTime) {
+  if (!startTime || typeof startTime !== "string") return null;
+  const timePart = startTime.includes(" ") ? startTime.split(" ")[1] : startTime;
+  const hhmm = timePart ? timePart.slice(0, 5) : "";
+  return HHMM_REGEX.test(hhmm) ? hhmm : null;
+}
+
+/**
+ * Start-edge gate (#569): an event's FIRST day isn't "Happening Now" at local
+ * midnight. The start edge is, in precedence order: the day's doors/gates
+ * time (doors_json) → the first set's start time → local midnight (no gate —
+ * pre-#569 behaviour when neither signal exists). The earliest available
+ * signal wins, so a set that is already playing is never gated even if
+ * doors_json claims a later opening. Only the first day is gated
+ * (`info.date === clock.date`); day 2+ of a multi-day event stays "now" from
+ * midnight (mid-festival mornings aren't re-gated). Malformed/missing
+ * doors_json is treated as absent — this never throws.
+ *
+ * @param {{ date: string, doors_json: string|null|undefined, firstDayStart: string|null }} info
+ * @param {{ date: string, time: string }} clock - eventLocalClock()
+ * @returns {boolean} true when the event should be held out of "now" until its start edge
+ */
+function isGatedBeforeStart(info, clock) {
+  if (info.date !== clock.date) {
+    return false;
+  }
+
+  let doorsTime = null;
+  if (info.doors_json) {
+    try {
+      const parsed = JSON.parse(info.doors_json);
+      const value = parsed?.[info.date];
+      if (typeof value === "string" && HHMM_REGEX.test(value)) {
+        doorsTime = value;
+      }
+    } catch {
+      // Malformed doors_json — treated as absent, fall through to first set.
+    }
+  }
+
+  const signals = [doorsTime, info.firstDayStart].filter(Boolean);
+  if (signals.length === 0) {
+    return false; // midnight fallback: never gated (pre-#569 behaviour)
+  }
+  const startEdge = signals.reduce((a, b) => (a < b ? a : b));
+  // Zero-padded HH:MM string compare — same trick used throughout the repo
+  // for YYYY-MM-DD (see CLAUDE.md).
+  return clock.time < startEdge;
+}
 
 /**
  * Public API: Get events timeline (now, upcoming, past)
@@ -159,11 +230,14 @@ export async function onRequestGet(context) {
           e.name as event_name,
           e.slug as event_slug,
           e.date as event_date,
+          e.end_date as event_end_date,
+          e.doors_json as doors_json,
           e.ticket_url as ticket_url,
           p.band_profile_id as band_id,
           b.name as band_name,
           p.start_time,
           p.end_time,
+          p.performance_date,
           b.social_links,
           b.genre,
           b.origin,
@@ -305,14 +379,65 @@ export async function onRequestGet(context) {
     // returned in the same order statements were pushed (tracked by `slots`).
     if (statements.length > 0) {
       const batchResults = await DB.batch(statements);
+
+      // Events bumped out of "now" by the start-edge gate below, prepended to
+      // `upcoming` once it's been computed.
+      const gatedToUpcoming = [];
+
       if (slots.now !== undefined) {
-        response.now = groupEventData(batchResults[slots.now].results || []);
+        const nowRows = batchResults[slots.now].results || [];
+        const groupedNow = groupEventData(nowRows);
+
+        // Start-edge gate (#569): groupEventData's output carries neither
+        // doors_json nor per-set festival days, so derive both per event
+        // straight from the raw rows (event-level columns repeat on every
+        // row). firstDayStart = earliest FIRST-day set: NULL performance_date
+        // inherits the event's own date (#543) so it counts; day-2+ sets
+        // never define day 1's edge; sub-06:00 sets are after-midnight sets
+        // of the previous evening and are excluded.
+        const gateInfoByEventId = new Map();
+        for (const row of nowRows) {
+          let info = gateInfoByEventId.get(row.event_id);
+          if (!info) {
+            info = { date: row.event_date, doors_json: row.doors_json, firstDayStart: null };
+            gateInfoByEventId.set(row.event_id, info);
+          }
+          if (row.performance_date == null || row.performance_date === row.event_date) {
+            const start = normalizeStartTime(row.start_time);
+            if (
+              start &&
+              start >= AFTER_MIDNIGHT_THRESHOLD &&
+              (info.firstDayStart === null || start < info.firstDayStart)
+            ) {
+              info.firstDayStart = start;
+            }
+          }
+        }
+
+        const clock = eventLocalClock(); // { date, time } in America/Toronto
+        const stillNow = [];
+        for (const event of groupedNow) {
+          const info = gateInfoByEventId.get(event.id);
+          if (info && isGatedBeforeStart(info, clock)) {
+            gatedToUpcoming.push(event);
+          } else {
+            stillNow.push(event);
+          }
+        }
+        response.now = stillNow;
       }
+
       if (slots.upcoming !== undefined) {
         response.upcoming = groupEventData(batchResults[slots.upcoming].results || []);
       }
       if (slots.past !== undefined) {
         response.past = groupEventData(batchResults[slots.past].results || []);
+      }
+
+      // Only merge into `upcoming` if the caller actually asked for it
+      // (`upcoming=false` means "omit entirely", not "gate into now").
+      if (gatedToUpcoming.length > 0 && includeUpcoming) {
+        response.upcoming = [...gatedToUpcoming, ...response.upcoming];
       }
     }
 

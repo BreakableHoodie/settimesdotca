@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
       // sets that span past midnight (e.g. 11:30pm-12:30am)
       event = await DB.prepare(
         `
-        SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
+        SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
         FROM events
         WHERE is_published = 1
           AND COALESCE(end_date, date) >= date('now', '-6 hours')
@@ -39,7 +39,7 @@ export async function onRequestGet(context) {
       // Get event by slug — includes archived events for read-only history browsing
       event = await DB.prepare(
         `
-        SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, reveal_mode
+        SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
         FROM events
         WHERE slug = ? AND (is_published = 1 OR status = 'archived')
       `,
@@ -160,6 +160,9 @@ export async function onRequestGet(context) {
       theme_colors: event.theme_colors,
       venue_info: event.venue_info,
       social_links: safeReflectSocialLinks(event.social_links, ["instagram", "x", "tiktok"]),
+      // Raw pass-through, same as venue_info — the client parses defensively
+      // (absent/malformed = no doors info, #569).
+      doors_json: event.doors_json ?? null,
       reveal_mode: event.reveal_mode ?? 0,
     };
 

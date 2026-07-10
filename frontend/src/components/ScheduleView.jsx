@@ -51,6 +51,7 @@ function ScheduleView({
   onVenueFilterChange,
   showVenueFilter = true,
   eventSlug,
+  doorsJson = null,
 }) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Visible Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
@@ -503,7 +504,9 @@ function ScheduleView({
                 const showDayDivider = multiDayEvent && date !== previousDate
                 return (
                   <Fragment key={`${date ?? ''}-${time}`}>
-                    {showDayDivider && <DayDivider date={date} dayNumber={dayNumberByDateMap.get(date)} />}
+                    {showDayDivider && (
+                      <DayDivider date={date} dayNumber={dayNumberByDateMap.get(date)} doorsJson={doorsJson} />
+                    )}
                     <div className="relative ml-0 sm:ml-4">
                       <div className="flex items-center mb-4">
                         <h3 className="bg-bg-navy text-text-primary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
@@ -547,7 +550,9 @@ function ScheduleView({
                 const showDayDivider = multiDayEvent && date !== previousDate
                 return (
                   <Fragment key={`${date ?? ''}-${time}`}>
-                    {showDayDivider && <DayDivider date={date} dayNumber={dayNumberByDateMap.get(date)} />}
+                    {showDayDivider && (
+                      <DayDivider date={date} dayNumber={dayNumberByDateMap.get(date)} doorsJson={doorsJson} />
+                    )}
                     <div className="relative ml-0 sm:ml-4 opacity-60">
                       <div className="flex items-center mb-4">
                         <h3 className="bg-surface text-text-tertiary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">

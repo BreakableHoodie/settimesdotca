@@ -38,6 +38,11 @@ const VALID_EVENT_STATUSES = ["draft", "published", "archived"];
 const ALLOWED_EXTERNAL_PROTOCOLS = new Set(["http:", "https:"]);
 
 /**
+ * 24-hour "HH:MM" time regex for `events.doors_json` values (#569).
+ */
+const DOORS_TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
  * Control characters to remove during sanitization
  * Removes: null bytes (\x00), control characters except tab/newline (\x0B-\x1F), and DEL (\x7F)
  */
@@ -87,6 +92,7 @@ export const FIELD_LIMITS = {
   eventVenueInfo: { min: 0, max: 5000 },
   eventSocialLinks: { min: 0, max: 2000 },
   eventThemeColors: { min: 0, max: 1000 },
+  eventDoorsJson: { min: 0, max: 2000 },
 
   // Generic
   url: { min: 0, max: 2000 },
@@ -769,6 +775,89 @@ export function validatePerformanceDate(performanceDate, event) {
 }
 
 /**
+ * Validate an event's per-day doors/gates-open time map (#569).
+ *
+ * `doorsJson` is optional — null/undefined/"" all mean "no doors info" (the
+ * default for every pre-#569 row) and are always valid. When provided it
+ * must be a JSON object whose keys are YYYY-MM-DD dates that fall within the
+ * event's festival-day span [event.date, event.end_date] (same rule and same
+ * lexicographic YYYY-MM-DD comparisons as `validatePerformanceDate` — never
+ * `new Date(...)`, see CLAUDE.md) and whose values are 24-hour "HH:MM"
+ * times. An empty object is normalized to null (equivalent to absent).
+ *
+ * @param {string|object|null|undefined} doorsJson - raw JSON string or already-parsed object
+ * @param {{ date: string, end_date: string|null }|null} event
+ * @returns {{ valid: boolean, error: string|null, value: string|null }}
+ */
+export function validateDoorsJson(doorsJson, event) {
+  if (doorsJson === undefined || doorsJson === null || doorsJson === "") {
+    return { valid: true, error: null, value: null };
+  }
+
+  let parsed;
+  if (typeof doorsJson === "string") {
+    if (doorsJson.length > FIELD_LIMITS.eventDoorsJson.max) {
+      return {
+        valid: false,
+        error: `Doors times must be no more than ${FIELD_LIMITS.eventDoorsJson.max} characters`,
+        value: null,
+      };
+    }
+    try {
+      parsed = JSON.parse(doorsJson);
+    } catch {
+      return { valid: false, error: "Doors times must be valid JSON", value: null };
+    }
+  } else if (typeof doorsJson === "object") {
+    parsed = doorsJson;
+  } else {
+    return { valid: false, error: "Doors times must be a JSON object", value: null };
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { valid: false, error: "Doors times must be a JSON object", value: null };
+  }
+
+  const entries = Object.entries(parsed);
+  if (entries.length === 0) {
+    return { valid: true, error: null, value: null };
+  }
+
+  const minDate = event?.date || null;
+  const maxDate = event?.end_date || event?.date || null;
+
+  for (const [dateKey, timeValue] of entries) {
+    const dateCheck = validateDate(dateKey);
+    if (!dateCheck.valid) {
+      return { valid: false, error: `Doors times key "${dateKey}" must be a valid YYYY-MM-DD date`, value: null };
+    }
+
+    if (!minDate || dateKey < minDate || dateKey > maxDate) {
+      return {
+        valid: false,
+        error: `Doors times date "${dateKey}" must be between ${minDate || "the event start"} and ${maxDate || "the event end"}`,
+        value: null,
+      };
+    }
+
+    if (typeof timeValue !== "string" || !DOORS_TIME_REGEX.test(timeValue)) {
+      return { valid: false, error: `Doors time for "${dateKey}" must be in 24-hour HH:MM format`, value: null };
+    }
+  }
+
+  const serialized = JSON.stringify(parsed);
+  if (serialized.length > FIELD_LIMITS.eventDoorsJson.max) {
+    return {
+      valid: false,
+      error: `Doors times must be no more than ${FIELD_LIMITS.eventDoorsJson.max} characters`,
+      value: null,
+    };
+  }
+
+  return { valid: true, error: null, value: serialized };
+}
+
+/**
  * Validate a positive integer ID
  * @param {any} id - ID to validate
  * @returns {Object} { valid: boolean, value: number|null, error: string|null }
@@ -1253,6 +1342,25 @@ export const VALIDATION_SCHEMAS = {
           return { valid: true };
         } catch {
           return { valid: false, error: "Theme colors must be valid JSON" };
+        }
+      },
+    },
+    // Schema-level check is deliberately shallow (generic JSON parseability,
+    // mirroring venue_info/social_links above) — the real semantic check
+    // (date-span + HH:MM shape) is `validateDoorsJson`, called explicitly by
+    // the create/update handlers once `date`/`end_date` are known (#569).
+    doors_json: {
+      type: "string",
+      required: false,
+      label: "Doors times",
+      min: FIELD_LIMITS.eventDoorsJson.min,
+      max: FIELD_LIMITS.eventDoorsJson.max,
+      validate: (value) => {
+        try {
+          JSON.parse(value);
+          return { valid: true };
+        } catch {
+          return { valid: false, error: "Doors times must be valid JSON" };
         }
       },
     },

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS events (
   slug TEXT NOT NULL UNIQUE,             -- URL-friendly identifier, e.g., "vol-5"
   is_published INTEGER NOT NULL DEFAULT 0, -- 0 = draft, 1 = published (visible to public)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
-, created_by_user_id INTEGER REFERENCES users(id), updated_by_user_id INTEGER REFERENCES users(id), updated_at TEXT DEFAULT (datetime('now')), status TEXT DEFAULT 'draft', archived_at TEXT, ticket_url TEXT, theme_colors TEXT, venue_info TEXT, social_links TEXT, city TEXT, description TEXT, reveal_mode INTEGER NOT NULL DEFAULT 0, end_date TEXT);
+, created_by_user_id INTEGER REFERENCES users(id), updated_by_user_id INTEGER REFERENCES users(id), updated_at TEXT DEFAULT (datetime('now')), status TEXT DEFAULT 'draft', archived_at TEXT, ticket_url TEXT, theme_colors TEXT, venue_info TEXT, social_links TEXT, city TEXT, description TEXT, reveal_mode INTEGER NOT NULL DEFAULT 0, end_date TEXT, doors_json TEXT);
 
 CREATE TABLE IF NOT EXISTS venues (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

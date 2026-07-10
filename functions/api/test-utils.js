@@ -107,6 +107,7 @@ export function createTestDB() {
       venue_info TEXT,
       social_links TEXT,
       theme_colors TEXT,
+      doors_json TEXT,
       archived_at TEXT,
       created_by_user_id INTEGER REFERENCES users(id),
       updated_by_user_id INTEGER,
@@ -379,12 +380,13 @@ export function insertEvent(
     end_date = null,
     status = "draft",
     created_by = 1,
+    doors_json = null,
   } = {},
 ) {
   const stmt = db.prepare(
-    "INSERT INTO events (name, slug, date, end_date, status, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO events (name, slug, date, end_date, status, created_by_user_id, doors_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
   );
-  const info = stmt.run(name, slug, date, end_date, status, created_by);
+  const info = stmt.run(name, slug, date, end_date, status, created_by, doors_json);
   return db.prepare("SELECT * FROM events WHERE id = ?").get(info.lastInsertRowid);
 }
 

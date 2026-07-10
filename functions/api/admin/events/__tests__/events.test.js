@@ -127,6 +127,122 @@ describe("Event API - handler integration", () => {
     expect(data.event.name).toBe("New Name");
   });
 
+  // ---------------------------------------------------------------------
+  // #569 — events.doors_json create/update wiring, end-to-end through the
+  // admin handlers (the validateDoorsJson unit tests in validation.test.js
+  // cover the pure-function rules; these confirm the handlers actually call
+  // it and persist/reflect the result).
+  // ---------------------------------------------------------------------
+  it("onRequestPost persists a valid doors_json map", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const body = {
+      name: "BLR3",
+      slug: "blr3-doors",
+      date: "2099-07-10",
+      end_date: "2099-07-11",
+      doors_json: JSON.stringify({ "2099-07-10": "16:00", "2099-07-11": "10:00" }),
+    };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(JSON.parse(data.event.doors_json)).toEqual({ "2099-07-10": "16:00", "2099-07-11": "10:00" });
+
+    const stored = rawDb.prepare("SELECT doors_json FROM events WHERE id = ?").get(data.event.id);
+    expect(JSON.parse(stored.doors_json)).toEqual({ "2099-07-10": "16:00", "2099-07-11": "10:00" });
+  });
+
+  it("onRequestPost rejects doors_json with a date key outside the event span", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const body = {
+      name: "Bad Doors Event",
+      slug: "bad-doors-event",
+      date: "2099-07-10",
+      doors_json: JSON.stringify({ "2099-07-15": "16:00" }),
+    };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.message).toMatch(/between/);
+
+    // Nothing was written — the whole request was rejected up front.
+    const stored = rawDb.prepare("SELECT id FROM events WHERE slug = ?").get("bad-doors-event");
+    expect(stored).toBeUndefined();
+  });
+
+  it("onRequestPatch updates doors_json, validated against the event's existing span", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, { name: "LWBC", slug: "lwbc-doors", date: "2099-08-02" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ doors_json: JSON.stringify({ "2099-08-02": "18:30" }) }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(JSON.parse(data.event.doors_json)).toEqual({ "2099-08-02": "18:30" });
+  });
+
+  it("onRequestPatch rejects a doors_json value with a bad HH:MM time format", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, { name: "LWBC", slug: "lwbc-doors-bad-time", date: "2099-08-02" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ doors_json: JSON.stringify({ "2099-08-02": "6:30 PM" }) }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(400);
+  });
+
+  it("onRequestPatch validates doors_json against a simultaneously-updated end_date (multi-day)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    // Single-day at creation; this request both extends it to a 2nd day AND
+    // sets doors for that new day in the same call — must validate against
+    // the NEW span, not the stale single-day one.
+    const ev = insertEvent(rawDb, { name: "BLR3", slug: "blr3-extend", date: "2099-07-10" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({
+        end_date: "2099-07-11",
+        doors_json: JSON.stringify({ "2099-07-10": "16:00", "2099-07-11": "10:00" }),
+      }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(JSON.parse(data.event.doors_json)).toEqual({ "2099-07-10": "16:00", "2099-07-11": "10:00" });
+  });
+
   it("onRequestPatch response sanitizes a javascript: scheme in social_links untouched by the request (#493)", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
@@ -441,6 +557,40 @@ describe("Event API - handler integration", () => {
     const data = await res.json();
     expect(data.event.slug).toBe("original-copy");
     expect(data.bands_copied).toBeGreaterThanOrEqual(2);
+  });
+
+  it("duplicate endpoint does NOT copy doors_json to the new event (#569)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const original = insertEvent(rawDb, {
+      name: "BLR3 Source",
+      slug: "blr3-doors-source",
+      date: "2099-07-10",
+      end_date: "2099-07-11",
+      doors_json: JSON.stringify({ "2099-07-10": "16:00", "2099-07-11": "10:00" }),
+    });
+
+    // New event has a different date span — the source's date-keyed doors
+    // times would no longer fall within it.
+    const body = { name: "BLR4", date: "2100-07-09", slug: "blr4-doors-copy" };
+    const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await duplicateHandler.onRequestPost({
+      request,
+      env,
+      params: { id: String(original.id) },
+    });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.event.doors_json).toBeNull();
+
+    const stored = rawDb.prepare("SELECT doors_json FROM events WHERE id = ?").get(data.event.id);
+    expect(stored.doors_json).toBeNull();
   });
 
   it("duplicate endpoint sanitizes a legacy javascript: social_links value at the write path (#499)", async () => {

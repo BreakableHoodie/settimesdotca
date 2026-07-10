@@ -1,6 +1,9 @@
+import { DoorOpen } from 'lucide-react'
 import { memo } from 'react'
 import PropTypes from 'prop-types'
+import { getDoorsTimeForDate } from '../../utils/doorsTime'
 import { formatFestivalDate } from '../../utils/festivalDays'
+import { formatTime } from '../../utils/timeFormat'
 
 /**
  * DayDivider - Design System v1.0
@@ -9,13 +12,19 @@ import { formatFestivalDate } from '../../utils/festivalDays'
  * event (#541): "DAY N · Saturday, August 2". Public / theme-following
  * surface — semantic tokens only, never hardcoded white.
  *
+ * When `doorsJson` (the event's `doors_json`) has a time for this day's
+ * `date`, appends a "Gates 4:00 PM"-style label (#569) — absent/malformed
+ * doorsJson renders nothing extra.
+ *
  * Shared between ScheduleView and MySchedule so both fan-facing surfaces
  * render identical day-divider styling.
  *
  * @example
- * <DayDivider date="2026-08-02" dayNumber={1} />
+ * <DayDivider date="2026-08-02" dayNumber={1} doorsJson={event.doors_json} />
  */
-const DayDivider = memo(function DayDivider({ date, dayNumber, className = '' }) {
+const DayDivider = memo(function DayDivider({ date, dayNumber, doorsJson = null, className = '' }) {
+  const doorsTime = getDoorsTimeForDate(doorsJson, date)
+
   return (
     <div
       className={`flex items-center gap-3 pt-2 ${className}`.trim()}
@@ -25,6 +34,12 @@ const DayDivider = memo(function DayDivider({ date, dayNumber, className = '' })
       <span className="text-xs font-bold tracking-widest uppercase text-text-primary bg-surface border border-border px-3 py-1.5 rounded-full whitespace-nowrap">
         Day {dayNumber} &middot; {formatFestivalDate(date, 'long')}
       </span>
+      {doorsTime && (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-text-secondary whitespace-nowrap">
+          <DoorOpen size={12} aria-hidden="true" className="text-text-tertiary" />
+          Gates {formatTime(doorsTime)}
+        </span>
+      )}
       <div className="flex-1 h-px bg-border"></div>
     </div>
   )
@@ -33,6 +48,7 @@ const DayDivider = memo(function DayDivider({ date, dayNumber, className = '' })
 DayDivider.propTypes = {
   date: PropTypes.string.isRequired,
   dayNumber: PropTypes.number,
+  doorsJson: PropTypes.string,
   className: PropTypes.string,
 }
 

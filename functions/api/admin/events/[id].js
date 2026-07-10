@@ -13,6 +13,7 @@ import {
   sanitizeString,
   sanitizeVenueInfo,
   validateDate,
+  validateDoorsJson,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 
@@ -102,8 +103,19 @@ export async function onRequestPatch(context) {
     if (body.ticketLink && !body.ticket_url) {
       body.ticket_url = body.ticketLink;
     }
-    const { name, date, end_date, status, description, city, ticket_url, venue_info, social_links, theme_colors } =
-      body;
+    const {
+      name,
+      date,
+      end_date,
+      status,
+      description,
+      city,
+      ticket_url,
+      venue_info,
+      social_links,
+      theme_colors,
+      doors_json,
+    } = body;
 
     // Build update query dynamically based on provided fields
     const updates = [];
@@ -358,6 +370,26 @@ export async function onRequestPatch(context) {
       }
       updates.push("theme_colors = ?");
       params.push(parsed.value ?? null);
+    }
+
+    if (doors_json !== undefined) {
+      // Validate against the EFFECTIVE date span — if this same request also
+      // changes date/end_date, doors_json must be checked against the new
+      // span, not the stale one on `event` (mirrors the end_date block above).
+      const effectiveDate = date !== undefined ? date : event.date;
+      const effectiveEndDate = end_date !== undefined ? end_date || null : event.end_date;
+      const doorsCheck = validateDoorsJson(doors_json, { date: effectiveDate, end_date: effectiveEndDate });
+      if (!doorsCheck.valid) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: doorsCheck.error,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("doors_json = ?");
+      params.push(doorsCheck.value);
     }
 
     // Always update updated_by_user_id

@@ -96,6 +96,7 @@ function MySchedule({
   onBrowseAll,
   eventSlug,
   eventId,
+  doorsJson = null,
 }) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
@@ -598,7 +599,9 @@ function MySchedule({
 
           return (
             <Fragment key={band.id}>
-              {showDayDivider && <DayDivider date={band.date} dayNumber={dayNumberByDateMap.get(band.date)} />}
+              {showDayDivider && (
+                <DayDivider date={band.date} dayNumber={dayNumberByDateMap.get(band.date)} doorsJson={doorsJson} />
+              )}
               <div className="relative mb-6">
                 {/* Walk / break transition from the previous set */}
                 {transition && (

@@ -5,7 +5,7 @@
  * Validates N+1 query fix and correct data grouping
  */
 
-import { describe, it, test, expect, beforeEach, vi } from "vitest";
+import { describe, it, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestGet as timelineHandler } from "../timeline.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 import { eventLocalToday } from "../../../utils/eventDay.js";
@@ -676,9 +676,19 @@ describe("Timeline real-DB — upcoming has no fixed day-window cap (SQL exercis
 // for #479.
 // ---------------------------------------------------------------------------
 describe("Timeline real-DB — NULL venue_id must not inflate venue_count (#479)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("venue_count is 0 when all performances have venue_id = NULL", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // Pin the clock to a Toronto evening: the start-edge gate (#569) would
+    // otherwise move this today-dated event (set at 18:00) into "upcoming"
+    // whenever the suite runs before 6 PM Toronto time.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T23:00:00Z")); // 19:00 EDT
 
     const today = eventLocalToday();
 
@@ -717,9 +727,19 @@ describe("Timeline real-DB — NULL venue_id must not inflate venue_count (#479)
 // them. Regression for #483.
 // ---------------------------------------------------------------------------
 describe("Timeline real-DB — derived band url is scheme-validated (#483)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("a band whose only link is a javascript: scheme resolves to url: null", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // Pinned to a Toronto evening so the start-edge gate (#569) never moves
+    // this today-dated event (set at 18:00) out of "now" — see the #479
+    // describe above.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T23:00:00Z")); // 19:00 EDT
 
     const today = eventLocalToday();
 
@@ -756,6 +776,9 @@ describe("Timeline real-DB — derived band url is scheme-validated (#483)", () 
   test("falls through to a valid https bandcamp URL when website is unsafe", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T23:00:00Z")); // 19:00 EDT
 
     const today = eventLocalToday();
 
@@ -852,5 +875,349 @@ describe("Timeline real-DB — event ticket_url is scheme-validated (#504)", () 
     const found = data.now.find((e) => e.id === event.id);
     expect(found).toBeDefined();
     expect(found.ticket_url).toBe("https://tickets.example.com/crawl");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real-DB — start-edge gate (#569). An event's FIRST day isn't "Happening
+// Now" at local midnight; it's held in "upcoming" (moved to the front) until
+// its start edge, which is in precedence order: that day's doors/gates time →
+// the first set's start time → local midnight (no gate). Day 2+ of a
+// multi-day event is never re-gated. Uses fake timers (`vi.setSystemTime`)
+// since `eventLocalToday`/`eventLocalClock` read the real clock by default —
+// Intl.DateTimeFormat still resolves against the faked `Date`, so
+// America/Toronto conversion is exercised for real, not stubbed out.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — start-edge gate (#569)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("first day, before doors → moved out of 'now' and into the front of 'upcoming'", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-10T18:00:00Z = 14:00 EDT — before the 16:00 doors time.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T18:00:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "BLR3 Friday",
+      slug: "timeline-doors-before",
+      date: "2026-07-10",
+      status: "published",
+      doors_json: JSON.stringify({ "2026-07-10": "16:00" }),
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeUndefined();
+    expect(data.upcoming[0]?.id).toBe(event.id);
+  });
+
+  test("first day, after doors → stays in 'now'", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-10T21:00:00Z = 17:00 EDT — after the 16:00 doors time.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T21:00:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "BLR3 Friday",
+      slug: "timeline-doors-after",
+      date: "2026-07-10",
+      status: "published",
+      doors_json: JSON.stringify({ "2026-07-10": "16:00" }),
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+    expect(data.upcoming.find((e) => e.id === event.id)).toBeUndefined();
+  });
+
+  test("multi-day event, day 2 morning before that day's doors → still 'now' (not re-gated)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-11T12:00:00Z = 08:00 EDT on day 2 — well before day 2's 10:00
+    // doors, but day 2 is never re-gated (only the event's FIRST day is).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T12:00:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "BLR3",
+      slug: "timeline-doors-day2",
+      date: "2026-07-10",
+      end_date: "2026-07-11",
+      status: "published",
+      doors_json: JSON.stringify({ "2026-07-10": "16:00", "2026-07-11": "10:00" }),
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+    expect(data.upcoming.find((e) => e.id === event.id)).toBeUndefined();
+  });
+
+  test("malformed doors_json is treated as absent — stays in 'now', never throws", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // Same instant as the "before doors" case above — if the malformed JSON
+    // were mishandled, this would either throw or wrongly gate the event.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T18:00:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "Malformed Doors Event",
+      slug: "timeline-doors-malformed",
+      date: "2026-07-10",
+      status: "published",
+    });
+    // Seed malformed JSON directly — bypasses validateDoorsJson, simulating a
+    // legacy/corrupt row.
+    rawDb.prepare("UPDATE events SET is_published=1, doors_json=? WHERE id=?").run("{not valid json", event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+    expect(data.upcoming.find((e) => e.id === event.id)).toBeUndefined();
+  });
+
+  test("no doors_json and no set times — 'now' from local midnight (last-resort fallback, pre-#569 behaviour)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // Just past local midnight on the event's day with NO start-edge signals
+    // at all — pre-#569 this was already "now"; that must not change.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T04:01:00Z")); // 00:01 EDT
+
+    const event = insertEvent(rawDb, {
+      name: "No Doors Info Event",
+      slug: "timeline-doors-absent",
+      date: "2026-07-10",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+  });
+
+  test("no doors_json, before the first set → gated to 'upcoming' (first-set fallback)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-10T18:00:00Z = 14:00 EDT — before the 19:00 first set, no doors.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T18:00:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "No Doors Timed Event",
+      slug: "timeline-firstset-before",
+      date: "2026-07-10",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    insertBand(rawDb, {
+      name: "Evening Opener",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "19:00",
+      end_time: "20:00",
+    });
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeUndefined();
+    expect(data.upcoming[0]?.id).toBe(event.id);
+  });
+
+  test("no doors_json, after the first set has started → stays in 'now'", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-10T23:30:00Z = 19:30 EDT — the 19:00 set is playing.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T23:30:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "No Doors Timed Event Live",
+      slug: "timeline-firstset-after",
+      date: "2026-07-10",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    insertBand(rawDb, {
+      name: "Evening Opener Live",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "19:00",
+      end_time: "20:00",
+    });
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+    expect(data.upcoming.find((e) => e.id === event.id)).toBeUndefined();
+  });
+
+  test("doors beats the first set start (live from doors, before the set begins)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-10T20:30:00Z = 16:30 EDT — after 16:00 doors, before the 19:15
+    // first set. Doors is the earlier signal, so the event is already "now".
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T20:30:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "BLR3 Doors Open",
+      slug: "timeline-doors-vs-firstset",
+      date: "2026-07-10",
+      status: "published",
+      doors_json: JSON.stringify({ "2026-07-10": "16:00" }),
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    insertBand(rawDb, {
+      name: "BLR3 Opener",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "19:15",
+      end_time: "20:15",
+    });
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+    expect(data.upcoming.find((e) => e.id === event.id)).toBeUndefined();
+  });
+
+  test("an after-midnight set (before 6 AM) never defines the first-day start edge", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-10T06:00:00Z = 02:00 EDT on the event's first day. The lineup
+    // has a 01:00 after-midnight set (which belongs to the PREVIOUS evening,
+    // i.e. it actually plays ~25h later) and a 19:00 evening set. If the
+    // 6 AM threshold were ignored, 02:00 >= 01:00 would wrongly mark the
+    // event started; the real edge is the 19:00 evening set → gated.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T06:00:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "After Midnight Edge Event",
+      slug: "timeline-firstset-aftermidnight",
+      date: "2026-07-10",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    insertBand(rawDb, {
+      name: "Night Owl Set",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "01:00",
+      end_time: "02:00",
+    });
+    insertBand(rawDb, {
+      name: "Evening Headliner",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "19:00",
+      end_time: "20:00",
+    });
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeUndefined();
+    expect(data.upcoming[0]?.id).toBe(event.id);
+  });
+
+  test("day-2 set times never define day 1's start edge (performance_date filter)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-10T17:00:00Z = 13:00 EDT on day 1. Day 2 has a noon set; if it
+    // leaked into day 1's edge, 13:00 >= 12:00 would wrongly mark the event
+    // started. Day 1's own first set is 19:15 → still gated.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T17:00:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "BLR3 Weekend",
+      slug: "timeline-firstset-day2-leak",
+      date: "2026-07-10",
+      end_date: "2026-07-11",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    const fridayPerf = insertBand(rawDb, {
+      name: "Friday Opener",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "19:15",
+      end_time: "20:15",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-07-10", fridayPerf.id);
+    const saturdayPerf = insertBand(rawDb, {
+      name: "Saturday Noon Act",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "12:00",
+      end_time: "13:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-07-11", saturdayPerf.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeUndefined();
+    expect(data.upcoming[0]?.id).toBe(event.id);
   });
 });

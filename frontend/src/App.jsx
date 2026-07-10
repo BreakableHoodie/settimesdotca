@@ -831,6 +831,7 @@ function App() {
             onVenueFilterChange={setVenueFilter}
             showVenueFilter={false}
             eventSlug={slug || eventData?.slug}
+            doorsJson={eventData?.doors_json}
           />
         ) : (
           <Suspense
@@ -850,6 +851,7 @@ function App() {
               onBrowseAll={() => setView('all')}
               eventSlug={slug || eventData?.slug}
               eventId={eventData?.id}
+              doorsJson={eventData?.doors_json}
             />
           </Suspense>
         )}

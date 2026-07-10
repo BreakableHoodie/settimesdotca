@@ -51,7 +51,7 @@ export async function flushAnnounceDigest(env, DB) {
 
   for (const items of groups.values()) {
     const { email, event_name, event_slug } = items[0];
-    const eventUrl = `${publicUrl}/events/${event_slug}`;
+    const eventUrl = `${publicUrl}/event/${event_slug}`;
 
     // Claim each (performance_id, band_follow_id) atomically before sending.
     // INSERT OR IGNORE: changes=0 means already claimed by a concurrent flush

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
 import { flushAnnounceDigest } from "../../../../utils/announceDigest.js";
+import { getPublicBaseUrl } from "../../../../utils/publicUrl.js";
 
 vi.mock("../../../../utils/email.js", () => ({
   sendEmail: vi.fn(() => Promise.resolve({ delivered: true })),
@@ -41,8 +42,19 @@ describe("flushAnnounceDigest", () => {
     expect(stats.sent).toBe(1);
     expect(stats.failed).toBe(0);
     expect(sendEmail).toHaveBeenCalledOnce();
-    const [, { subject }] = sendEmail.mock.calls[0];
+    const [, { subject, text, html }] = sendEmail.mock.calls[0];
     expect(subject).toBe("The Band just joined the lineup for Fest!");
+
+    // Regression: the "View the schedule" link must point at the singular
+    // /event/:slug route (frontend/src/main.jsx), not the plural /events/
+    // route (which only exists for /events/:slug/recap and 404s otherwise).
+    const publicUrl = getPublicBaseUrl(env);
+    const correctEventUrl = `${publicUrl}/event/fest-single`;
+    const wrongEventUrl = `${publicUrl}/events/fest-single`;
+    expect(text).toContain(correctEventUrl);
+    expect(html).toContain(correctEventUrl);
+    expect(text).not.toContain(wrongEventUrl);
+    expect(html).not.toContain(wrongEventUrl);
 
     // Queue entry consumed
     const remaining = rawDb.prepare("SELECT * FROM band_announce_queue").all();
@@ -97,8 +109,17 @@ describe("flushAnnounceDigest", () => {
     // One email for the fan, not two
     expect(stats.sent).toBe(1);
     expect(sendEmail).toHaveBeenCalledOnce();
-    const [, { subject }] = sendEmail.mock.calls[0];
+    const [, { subject, text, html }] = sendEmail.mock.calls[0];
     expect(subject).toBe("2 bands you follow are playing Crawl!");
+
+    // Regression: digest emails must also use the singular /event/:slug route.
+    const publicUrl = getPublicBaseUrl(env);
+    const correctEventUrl = `${publicUrl}/event/crawl-digest`;
+    const wrongEventUrl = `${publicUrl}/events/crawl-digest`;
+    expect(text).toContain(correctEventUrl);
+    expect(html).toContain(correctEventUrl);
+    expect(text).not.toContain(wrongEventUrl);
+    expect(html).not.toContain(wrongEventUrl);
 
     // Both queue entries consumed, both notification rows written
     expect(rawDb.prepare("SELECT * FROM band_announce_queue").all()).toHaveLength(0);

@@ -24,8 +24,8 @@ import { fetchPublicJson } from '../utils/publicApi'
 import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
 import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
+import { useTurnstile } from '../hooks/useTurnstile'
 
-const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
 
 const NBSP_ENTITY_REGEX = /&nbsp;|&#160;|&#xA0;/gi
@@ -98,11 +98,17 @@ export default function BandProfilePage() {
   const [followEmail, setFollowEmail] = useState('')
   const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'loading' | 'success' | 'error'
   const [followError, setFollowError] = useState('')
-  const turnstileContainerRef = useRef(null)
-  const turnstileWidgetIdRef = useRef(null)
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
-  const turnstileEnabled = Boolean(turnstileSiteKey)
-  const [turnstileToken, setTurnstileToken] = useState('')
+  // Turnstile stays dormant until the visitor engages with the follow email
+  // field. Engagement requires the form to be mounted, so this also replaces
+  // the old loading/error/profile effect gating (the null-container-on-skeleton
+  // race can no longer happen).
+  const [followEngaged, setFollowEngaged] = useState(false)
+  const {
+    enabled: turnstileEnabled,
+    token: turnstileToken,
+    containerRef: turnstileContainerRef,
+    reset: resetTurnstile,
+  } = useTurnstile(followEngaged)
   const [userHasSchedule] = useState(() => hasAnySchedule())
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
   const sourceEventSlug = searchParams.get('fromEvent') || location.state?.fromEventSlug || null
@@ -277,76 +283,6 @@ export default function BandProfilePage() {
   )
 
   useEffect(() => {
-    // The Turnstile container lives inside the follow form, which is NOT mounted
-    // while the page shows its loading skeleton (`if (loading) return <Skeleton>`).
-    // Gate on the loaded state AND depend on it so the effect re-runs once the
-    // form (and the container ref) actually exists. Without this, when
-    // window.turnstile becomes ready before the profile fetch resolves — always
-    // the case on SPA client-nav with a cached script — render() is attempted
-    // against a null container, bails, and never retries, leaving the Follow
-    // button permanently disabled.
-    if (!turnstileEnabled || loading || error || !profile) {
-      return undefined
-    }
-
-    let cancelled = false
-    let scriptElement = document.querySelector('script[data-turnstile-script="true"]')
-
-    const renderTurnstile = () => {
-      if (cancelled || !window.turnstile || !turnstileContainerRef.current) {
-        return
-      }
-      if (turnstileWidgetIdRef.current !== null) {
-        return
-      }
-
-      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: turnstileSiteKey,
-        // Invisible unless Turnstile actually needs a human challenge — keeps the
-        // form uncluttered for legit visitors while preserving bot protection.
-        appearance: 'interaction-only',
-        callback: token => {
-          setTurnstileToken(token)
-        },
-        'expired-callback': () => {
-          setTurnstileToken('')
-        },
-        'error-callback': () => {
-          setTurnstileToken('')
-        },
-      })
-    }
-
-    if (scriptElement) {
-      if (window.turnstile) {
-        renderTurnstile()
-      } else {
-        scriptElement.addEventListener('load', renderTurnstile)
-      }
-    } else {
-      const script = document.createElement('script')
-      script.src = TURNSTILE_SCRIPT_SRC
-      script.async = true
-      script.defer = true
-      script.setAttribute('data-turnstile-script', 'true')
-      script.addEventListener('load', renderTurnstile)
-      document.head.appendChild(script)
-      scriptElement = script
-    }
-
-    return () => {
-      cancelled = true
-      if (scriptElement) {
-        scriptElement.removeEventListener('load', renderTurnstile)
-      }
-      if (window.turnstile && turnstileWidgetIdRef.current !== null) {
-        window.turnstile.remove(turnstileWidgetIdRef.current)
-        turnstileWidgetIdRef.current = null
-      }
-    }
-  }, [turnstileEnabled, turnstileSiteKey, loading, error, profile])
-
-  useEffect(() => {
     document.title = pageTitle
   }, [pageTitle])
 
@@ -371,17 +307,11 @@ export default function BandProfilePage() {
         throw new Error(err.error || 'Something went wrong')
       }
       setFollowStatus('success')
-      setTurnstileToken('')
-      if (turnstileEnabled && window.turnstile && turnstileWidgetIdRef.current !== null) {
-        window.turnstile.reset(turnstileWidgetIdRef.current)
-      }
+      resetTurnstile()
     } catch (err) {
       setFollowStatus('error')
       setFollowError(err.message)
-      setTurnstileToken('')
-      if (turnstileEnabled && window.turnstile && turnstileWidgetIdRef.current !== null) {
-        window.turnstile.reset(turnstileWidgetIdRef.current)
-      }
+      resetTurnstile()
     }
   }
 
@@ -730,7 +660,11 @@ export default function BandProfilePage() {
                     id="follow-email"
                     type="email"
                     value={followEmail}
-                    onChange={e => setFollowEmail(e.target.value)}
+                    onFocus={() => setFollowEngaged(true)}
+                    onChange={e => {
+                      setFollowEngaged(true)
+                      setFollowEmail(e.target.value)
+                    }}
                     placeholder="your@email.com"
                     required
                     className="flex-1 min-w-0 px-3 py-2 rounded bg-bg-navy text-text-primary border border-text-primary/20 focus:border-accent-500 focus:outline-none text-sm"
@@ -743,7 +677,7 @@ export default function BandProfilePage() {
                     {followStatus === 'loading' ? 'Saving…' : 'Follow'}
                   </Button>
                 </div>
-                {turnstileEnabled && <div ref={turnstileContainerRef} className="mt-2" />}
+                {turnstileEnabled && followEngaged && <div ref={turnstileContainerRef} className="mt-2" />}
               </form>
             )}
           </div>

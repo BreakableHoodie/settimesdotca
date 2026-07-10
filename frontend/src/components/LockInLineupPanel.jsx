@@ -1,7 +1,6 @@
 import { Bell, Check } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-
-const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+import { useEffect, useState } from 'react'
+import { useTurnstile } from '../hooks/useTurnstile'
 
 /**
  * LockInLineupPanel — Batch follow CTA for "My Route" and shared-route import.
@@ -20,62 +19,27 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
   const [followEmail, setFollowEmail] = useState('')
   const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'loading' | 'success' | 'error'
   const [followError, setFollowError] = useState('')
-  const turnstileContainerRef = useRef(null)
-  const turnstileWidgetIdRef = useRef(null)
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
-  const turnstileEnabled = Boolean(turnstileSiteKey)
-  const [turnstileToken, setTurnstileToken] = useState('')
+  // Turnstile stays dormant until the visitor engages with the email field.
+  // Engagement is only possible when the form is mounted, which also covers
+  // the old hasPerformances gating (the component returns null without any
+  // performances, so the field can never be focused).
+  const [followEngaged, setFollowEngaged] = useState(false)
+  const {
+    enabled: turnstileEnabled,
+    token: turnstileToken,
+    containerRef: turnstileContainerRef,
+    reset: resetTurnstile,
+  } = useTurnstile(followEngaged)
   const hasPerformances = Array.isArray(performanceIds) && performanceIds.length > 0
 
-  // Mirror the Turnstile setup from BandProfilePage — explicit render, interaction-only
-  // appearance (invisible unless a human challenge fires), cleanup on unmount/re-run.
-  // Gate on hasPerformances so we don't try to render into a null container ref when
-  // the component returns null early.
+  // If the route empties (fan removes every band), the form — and the Turnstile
+  // widget's container — unmounts while this component instance survives.
+  // Reset engagement so the next focus re-activates a fresh widget.
   useEffect(() => {
-    if (!turnstileEnabled || !hasPerformances) return undefined
-
-    let cancelled = false
-    let scriptElement = document.querySelector('script[data-turnstile-script="true"]')
-
-    const renderTurnstile = () => {
-      if (cancelled || !window.turnstile || !turnstileContainerRef.current) return
-      if (turnstileWidgetIdRef.current !== null) return
-
-      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: turnstileSiteKey,
-        appearance: 'interaction-only',
-        callback: token => setTurnstileToken(token),
-        'expired-callback': () => setTurnstileToken(''),
-        'error-callback': () => setTurnstileToken(''),
-      })
+    if (!hasPerformances) {
+      setFollowEngaged(false)
     }
-
-    if (scriptElement) {
-      if (window.turnstile) {
-        renderTurnstile()
-      } else {
-        scriptElement.addEventListener('load', renderTurnstile)
-      }
-    } else {
-      const script = document.createElement('script')
-      script.src = TURNSTILE_SCRIPT_SRC
-      script.async = true
-      script.defer = true
-      script.setAttribute('data-turnstile-script', 'true')
-      script.addEventListener('load', renderTurnstile)
-      document.head.appendChild(script)
-      scriptElement = script
-    }
-
-    return () => {
-      cancelled = true
-      if (scriptElement) scriptElement.removeEventListener('load', renderTurnstile)
-      if (window.turnstile && turnstileWidgetIdRef.current !== null) {
-        window.turnstile.remove(turnstileWidgetIdRef.current)
-        turnstileWidgetIdRef.current = null
-      }
-    }
-  }, [turnstileEnabled, turnstileSiteKey, hasPerformances])
+  }, [hasPerformances])
 
   // Early return after hooks (React rules of hooks: no conditional hook calls)
   if (!hasPerformances) return null
@@ -107,17 +71,11 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
         throw new Error(err.error || 'Something went wrong — please try again.')
       }
       setFollowStatus('success')
-      setTurnstileToken('')
-      if (turnstileEnabled && window.turnstile && turnstileWidgetIdRef.current !== null) {
-        window.turnstile.reset(turnstileWidgetIdRef.current)
-      }
+      resetTurnstile()
     } catch (err) {
       setFollowStatus('error')
       setFollowError(err.message)
-      setTurnstileToken('')
-      if (turnstileEnabled && window.turnstile && turnstileWidgetIdRef.current !== null) {
-        window.turnstile.reset(turnstileWidgetIdRef.current)
-      }
+      resetTurnstile()
     }
   }
 
@@ -151,7 +109,11 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
                 id="lineup-follow-email"
                 type="email"
                 value={followEmail}
-                onChange={e => setFollowEmail(e.target.value)}
+                onFocus={() => setFollowEngaged(true)}
+                onChange={e => {
+                  setFollowEngaged(true)
+                  setFollowEmail(e.target.value)
+                }}
                 placeholder="your@email.com"
                 required
                 disabled={followStatus === 'loading'}
@@ -165,7 +127,7 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
                 {followStatus === 'loading' ? 'Saving…' : 'Notify me'}
               </button>
             </div>
-            {turnstileEnabled && <div ref={turnstileContainerRef} className="mt-2" />}
+            {turnstileEnabled && followEngaged && <div ref={turnstileContainerRef} className="mt-2" />}
           </form>
         )}
       </div>

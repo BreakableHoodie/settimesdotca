@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v4'
+const CACHE_VERSION = 'v5'
 const STATIC_CACHE = `schedule-${CACHE_VERSION}`
 const API_CACHE = `api-${CACHE_VERSION}`
 
@@ -12,7 +12,14 @@ const CURRENT_CACHES = [STATIC_CACHE, API_CACHE]
 // Only cache stable, non-hashed assets on install.
 // Vite hashes JS/CSS filenames (e.g. assets/index-a3f9c.js) so those
 // cannot be precached by name — they are picked up by runtime caching instead.
-const STATIC_ASSETS = ['/', '/index.html', '/manifest.json', '/offline.html']
+//
+// Use the CANONICAL (clean) URLs Cloudflare Pages actually serves at 200:
+// Pages redirects `/index.html` → `/` and `/offline.html` → `/offline` (308).
+// cache.add() follows the redirect and then rejects on the redirected
+// response, so precaching the `.html` forms silently dropped the offline
+// page (and stalled install under some runtimes). `/` already covers the
+// shell; `/offline` serves the branded offline page content directly (#578).
+const STATIC_ASSETS = ['/', '/manifest.json', '/offline']
 
 // Install: cache static assets
 self.addEventListener('install', event => {
@@ -21,8 +28,16 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => {
       console.log('[SW] Caching static assets')
-      // Don't let one missing optional asset (e.g. offline.html) abort install.
-      return Promise.allSettled(STATIC_ASSETS.map(asset => cache.add(asset)))
+      // allSettled so one unreachable asset (e.g. /offline) can't abort install.
+      // Log rejections so a silently-dropped precache entry (the #578 bug class:
+      // an asset that starts 308-redirecting) is visible rather than swallowed.
+      return Promise.allSettled(STATIC_ASSETS.map(asset => cache.add(asset))).then(results => {
+        results.forEach((result, i) => {
+          if (result.status === 'rejected') {
+            console.warn('[SW] precache failed for', STATIC_ASSETS[i], result.reason)
+          }
+        })
+      })
     })
   )
 
@@ -38,11 +53,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames
-          .filter(
-            name =>
-              (name.startsWith('schedule-') || name.startsWith('api-')) &&
-              !CURRENT_CACHES.includes(name)
-          )
+          .filter(name => (name.startsWith('schedule-') || name.startsWith('api-')) && !CURRENT_CACHES.includes(name))
           .map(name => {
             console.log('[SW] Deleting old cache:', name)
             return caches.delete(name)
@@ -112,11 +123,10 @@ async function navigationStrategy(request) {
 
     return response
   } catch (error) {
-    const cachedShell =
-      (await caches.match('/index.html')) || (await caches.match('/'))
+    const cachedShell = (await caches.match('/index.html')) || (await caches.match('/'))
     if (cachedShell) return cachedShell
 
-    const offlinePage = await caches.match('/offline.html')
+    const offlinePage = await caches.match('/offline')
     if (offlinePage) return offlinePage
 
     return new Response('Offline - content not cached', {
@@ -149,7 +159,7 @@ async function cacheFirstStrategy(request) {
   } catch (error) {
     console.error('[SW] Fetch failed:', error)
 
-    const offlinePage = await caches.match('/offline.html')
+    const offlinePage = await caches.match('/offline')
     if (offlinePage) return offlinePage
 
     return new Response('Offline - content not cached', {

@@ -56,7 +56,7 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
   // filter out archived-event rows before scheduling-conflict checks. Callers
   // that need archived-event error messages (bulk-preview) handle those separately.
   const bands = await env.DB.prepare(
-    `SELECT p.id, p.start_time, p.end_time, p.venue_id, p.event_id, bp.name, e.status AS event_status
+    `SELECT p.id, p.start_time, p.end_time, p.venue_id, p.event_id, p.performance_date, bp.name, e.status AS event_status, e.date AS event_date
      FROM performances p
      JOIN band_profiles bp ON p.band_profile_id = bp.id
      JOIN events e ON p.event_id = e.id
@@ -66,6 +66,14 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
     .all();
 
   const bandResults = (bands.results || []).filter((b) => b.event_status !== "archived");
+
+  // Festival-day scoping (#551): two sets on different festival days never
+  // conflict, even at the same venue and clock time (mirrors checkConflicts in
+  // functions/api/admin/bands.js, #540). Falls back to the event's date for a
+  // NULL performance_date, so single-day events (both sides NULL → same day)
+  // conflict exactly as before. move_venue/change_time never mutate
+  // performance_date, so a batch member's festival day is just its stored value.
+  const festivalDayOf = (row) => row.performance_date || row.event_date;
 
   if (action === "move_venue") {
     const { venue_id } = params;
@@ -82,9 +90,10 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
     const venuePerformancesByEvent = new Map();
     for (const eventId of eventIds) {
       const rows = await env.DB.prepare(
-        `SELECT p.id, p.start_time, p.end_time, bp.name
+        `SELECT p.id, p.start_time, p.end_time, p.performance_date, bp.name, e.date AS event_date
          FROM performances p
          JOIN band_profiles bp ON p.band_profile_id = bp.id
+         JOIN events e ON p.event_id = e.id
          WHERE p.venue_id = ? AND p.event_id = ? AND p.id NOT IN (${placeholders})`,
       )
         .bind(venue_id, eventId, ...bandIds)
@@ -96,9 +105,12 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
     for (const band of bandResults) {
       if (!band.start_time || !band.end_time) continue;
       const bandIntervals = buildIntervals(band.start_time, band.end_time);
+      const bandDay = festivalDayOf(band);
       const existing = venuePerformancesByEvent.get(band.event_id) || [];
       for (const other of existing) {
         if (!other.start_time || !other.end_time) continue;
+        const otherDay = festivalDayOf(other);
+        if (bandDay && otherDay && bandDay !== otherDay) continue;
         const otherIntervals = buildIntervals(other.start_time, other.end_time);
         if (bandIntervals.some((a) => otherIntervals.some((b) => intervalsOverlap(a, b)))) {
           const isExact = other.start_time === band.start_time && other.end_time === band.end_time;
@@ -122,11 +134,14 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
       const bandA = bandResults[i];
       if (!bandA.start_time || !bandA.end_time) continue;
       const intervalsA = buildIntervals(bandA.start_time, bandA.end_time);
+      const dayA = festivalDayOf(bandA);
 
       for (let j = i + 1; j < bandResults.length; j++) {
         const bandB = bandResults[j];
         if (!bandB.start_time || !bandB.end_time) continue;
         if (bandA.event_id !== bandB.event_id) continue;
+        const dayB = festivalDayOf(bandB);
+        if (dayA && dayB && dayA !== dayB) continue;
 
         const intervalsB = buildIntervals(bandB.start_time, bandB.end_time);
         if (!intervalsA.some((a) => intervalsB.some((b) => intervalsOverlap(a, b)))) continue;
@@ -158,9 +173,10 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
 
       if (!changeTimeCache.has(cacheKey)) {
         const rows = await env.DB.prepare(
-          `SELECT p.id, p.start_time, p.end_time, bp.name
+          `SELECT p.id, p.start_time, p.end_time, p.performance_date, bp.name, e.date AS event_date
            FROM performances p
            JOIN band_profiles bp ON p.band_profile_id = bp.id
+           JOIN events e ON p.event_id = e.id
            WHERE p.venue_id = ? AND p.event_id = ? AND p.id NOT IN (${placeholders})`,
         )
           .bind(band.venue_id, band.event_id, ...bandIds)
@@ -170,9 +186,12 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
 
       const existing = changeTimeCache.get(cacheKey);
       const bandIntervals = buildIntervals(start_time, newEndTime);
+      const bandDay = festivalDayOf(band);
 
       for (const other of existing) {
         if (!other.start_time || !other.end_time) continue;
+        const otherDay = festivalDayOf(other);
+        if (bandDay && otherDay && bandDay !== otherDay) continue;
         const otherIntervals = buildIntervals(other.start_time, other.end_time);
         if (bandIntervals.some((a) => otherIntervals.some((b) => intervalsOverlap(a, b)))) {
           const isExact = other.start_time === start_time && other.end_time === newEndTime;
@@ -194,11 +213,14 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
     for (let i = 0; i < bandResults.length; i++) {
       const bandA = bandResults[i];
       if (!bandA.start_time || !bandA.end_time || !bandA.venue_id) continue;
+      const dayA = festivalDayOf(bandA);
 
       for (let j = i + 1; j < bandResults.length; j++) {
         const bandB = bandResults[j];
         if (!bandB.start_time || !bandB.end_time || !bandB.venue_id) continue;
         if (bandA.venue_id !== bandB.venue_id || bandA.event_id !== bandB.event_id) continue;
+        const dayB = festivalDayOf(bandB);
+        if (dayA && dayB && dayA !== dayB) continue;
 
         const newEndA = computeNewEndTime(bandA.start_time, bandA.end_time, start_time);
         const newEndB = computeNewEndTime(bandB.start_time, bandB.end_time, start_time);

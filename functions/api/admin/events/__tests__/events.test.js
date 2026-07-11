@@ -104,6 +104,50 @@ describe("Event API - handler integration", () => {
     expect(data.event.slug).toBe("integration-event");
   });
 
+  it("accepts an event dated the Toronto-local today even after UTC has rolled over", async () => {
+    // Regression for the #568 bug class in the create path: the past-date guard
+    // must use the events' Toronto-local day, not the Worker's UTC day. At
+    // 2026-07-11T01:00:00Z it is 9:00 PM EDT on 2026-07-10 — UTC says "today"
+    // is the 11th, Toronto says the 10th. An event dated the 10th (the admin's
+    // actual today) must be accepted; the old UTC-based check rejected it as
+    // "in the past" every evening after 8 PM Eastern.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T01:00:00Z"));
+    try {
+      const rawDb = createTestDB();
+      const env = { DB: createDBEnv(rawDb) };
+      const request = new Request("https://example.test/api/admin/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Tonight Event", slug: "tonight-event", date: "2026-07-10" }),
+      });
+
+      const res = await eventsHandler.onRequestPost({ request, env });
+      expect(res.status).toBe(201);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still rejects an event dated before the Toronto-local today", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T01:00:00Z")); // 2026-07-10 21:00 EDT
+    try {
+      const rawDb = createTestDB();
+      const env = { DB: createDBEnv(rawDb) };
+      const request = new Request("https://example.test/api/admin/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Yesterday Event", slug: "yesterday-event", date: "2026-07-09" }),
+      });
+
+      const res = await eventsHandler.onRequestPost({ request, env });
+      expect(res.status).toBe(400);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("onRequestPatch updates event name", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };

@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { adjustForMidnight, detectConflicts, parseTimeToMinutes, sortBandsByStart } from '../timeUtils'
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../../../utils/festivalDays'
+import {
+  adjustForMidnight,
+  AFTER_MIDNIGHT_THRESHOLD_MINUTES,
+  detectConflicts,
+  parseTimeToMinutes,
+  sortBandsByStart,
+} from '../timeUtils'
+
+// ─── AFTER_MIDNIGHT_THRESHOLD_MINUTES derivation (#550) ─────────────────────
+
+describe('AFTER_MIDNIGHT_THRESHOLD_MINUTES', () => {
+  it('derives from the canonical AFTER_MIDNIGHT_THRESHOLD_HOUR (festivalDays.js), never a separate literal', () => {
+    expect(AFTER_MIDNIGHT_THRESHOLD_MINUTES).toBe(AFTER_MIDNIGHT_THRESHOLD_HOUR * 60)
+  })
+})
 
 // ─── sortBandsByStart ────────────────────────────────────────────────────────
 

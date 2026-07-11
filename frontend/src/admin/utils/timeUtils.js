@@ -1,6 +1,10 @@
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../../utils/festivalDays'
+
 const MINUTES_PER_DAY = 24 * 60
-// Bands starting before this hour are treated as after-midnight (same night as the preceding evening)
-export const AFTER_MIDNIGHT_THRESHOLD_MINUTES = 6 * 60
+// Bands starting before this hour are treated as after-midnight (same night as the preceding
+// evening). Derived from the canonical AFTER_MIDNIGHT_THRESHOLD_HOUR in festivalDays.js (#550)
+// so this offset can never drift from bandUtils.js's prepareBands offset.
+export const AFTER_MIDNIGHT_THRESHOLD_MINUTES = AFTER_MIDNIGHT_THRESHOLD_HOUR * 60
 
 const isNumber = value => typeof value === 'number' && Number.isFinite(value)
 

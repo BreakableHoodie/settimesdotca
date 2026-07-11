@@ -2,7 +2,7 @@
  * Festival-day helpers for multi-day events (#540).
  *
  * A festival day runs 6 AM -> 6 AM (see AFTER_MIDNIGHT_THRESHOLD_HOUR in
- * frontend/src/utils/bandUtils.js): a set starting at 1 AM belongs to the
+ * frontend/src/utils/festivalDays.js): a set starting at 1 AM belongs to the
  * festival day of the *evening it started*, not the calendar day its clock
  * time falls on. These helpers only build/label the set of festival days for
  * an event — they never re-derive which day a given performance belongs to;

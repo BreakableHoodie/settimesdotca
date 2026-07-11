@@ -1,6 +1,22 @@
 import { test, expect } from "@playwright/test";
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
 /* global navigator -- referenced inside a page.waitForFunction browser callback */
+
+// Re-establish the admin session in THIS context. The shared storageState
+// session (from auth.setup) is invalidated whenever another spec logs in —
+// lucia.invalidateUserSessions() kills all other sessions on re-auth — so
+// admin-mutating specs must log in themselves. Mirrors event-creation.spec.js.
+const loginAsAdmin = async (page) => {
+  await page.goto("/admin");
+  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
+  if (await page.locator('input[type="email"]').isVisible()) {
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
+  }
+};
 
 /**
  * Offline resilience (#578, #554).
@@ -39,14 +55,16 @@ const apiPost = async (page, url, data) => {
   return res.json();
 };
 
-test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
-
 test.describe("Offline resilience (#578)", () => {
   test("a saved schedule and route survive a network drop", async ({ page, context }) => {
     const suffix = uniqueSuffix();
     const today = localToday();
     const slug = `offline-${suffix}`;
     const bandName = `Offline Openers ${suffix}`;
+
+    // Admin login + seeding at desktop viewport — the dark-pinned admin panel's
+    // tabs aren't reliably visible at a 390px mobile width.
+    await loginAsAdmin(page);
 
     // Seed a published event dated today with an evening set.
     const created = await apiPost(page, "/api/admin/events", {
@@ -65,6 +83,10 @@ test.describe("Offline resilience (#578)", () => {
       endTime: "19:45",
     });
     await apiPost(page, `/api/admin/events/${eventId}/publish`, { publish: true });
+
+    // Switch to a phone viewport for the fan-facing flow — the venue scenario
+    // this covers (no-signal campground) is a phone in someone's pocket.
+    await page.setViewportSize({ width: 390, height: 844 });
 
     // Fixed clock in the morning: the set is upcoming, so it always renders
     // regardless of when the suite runs.

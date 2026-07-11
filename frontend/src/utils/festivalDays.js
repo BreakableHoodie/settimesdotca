@@ -13,6 +13,28 @@
  * already present in the data.
  */
 
+/**
+ * The 6 AM boundary a festival day runs on: 6 AM -> 6 AM, not midnight -> midnight.
+ * A set starting at 1 AM belongs to the festival day of the *evening it
+ * started* (the previous night's lineup), not the calendar day its clock
+ * time falls on.
+ *
+ * This is the single canonical definition (#550) — every consumer imports
+ * it rather than re-encoding `6`:
+ * - `frontend/src/utils/bandUtils.js` (`prepareBands`) offsets sub-6-AM
+ *   start times by `MS_PER_DAY` so they sort after the same evening's
+ *   earlier sets rather than at the top of the schedule.
+ * - `frontend/src/admin/utils/timeUtils.js` derives
+ *   `AFTER_MIDNIGHT_THRESHOLD_MINUTES` (`AFTER_MIDNIGHT_THRESHOLD_HOUR * 60`)
+ *   from this for its own minutes-based offset (`adjustForMidnight`).
+ *
+ * Repo invariant (see CLAUDE.md "After-midnight band sorting"): this value
+ * must never be removed or lowered — doing so is a recurring bug class
+ * (after-midnight sets sorting to the top of the schedule instead of the
+ * end).
+ */
+export const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6
+
 const parseDateParts = dateStr => {
   const [year, month, day] = dateStr.split('-').map(Number)
   return { year, month, day }

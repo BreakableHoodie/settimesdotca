@@ -11,9 +11,9 @@ const UNSCHEDULED = Symbol('unscheduled')
 const UNSCHEDULED_FILTER_VALUE = '__unscheduled__'
 
 // Groups by (festival day, clock time) rather than bare clock time. `band.date`
-// is already the set's festival day (see AFTER_MIDNIGHT_THRESHOLD_HOUR /
-// prepareBands in bandUtils.js — after-midnight sets keep their *previous*
-// evening's date). Without the day component, two sets at the same clock time
+// is already the set's festival day (see AFTER_MIDNIGHT_THRESHOLD_HOUR in
+// festivalDays.js / prepareBands in bandUtils.js — after-midnight sets keep
+// their *previous* evening's date). Without the day component, two sets at the same clock time
 // on different festival days (e.g. both nights' 8 PM slot) would collapse into
 // one bucket (#538). In the single-day case `date` is constant across every
 // band, so the key degenerates to the old bare-time key and grouping is

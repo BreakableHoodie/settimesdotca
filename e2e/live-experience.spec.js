@@ -1,4 +1,21 @@
 import { test, expect } from "@playwright/test";
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
+
+// Re-establish the admin session in THIS context. Another spec's admin login
+// invalidates the shared storageState session (lucia.invalidateUserSessions on
+// re-auth), so admin-mutating specs must log in themselves. The dark-pinned
+// admin panel isn't reliable at a mobile width, so this runs at desktop; the
+// test switches to a phone viewport for the fan-facing flow afterwards.
+const loginAsAdmin = async (page) => {
+  await page.goto("/admin");
+  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
+  if (await page.locator('input[type="email"]').isVisible()) {
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
+  }
+};
 
 /**
  * Live-experience lifecycle walkthrough (#554).
@@ -58,14 +75,15 @@ const nextLocalDay = (dateStr) => {
   return next.toLocaleDateString("en-CA");
 };
 
-// Phone-sized viewport: the issue's bar is "works flawlessly on a phone".
-test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
-
 test.describe("Live experience — lifecycle walkthrough at simulated times (#554)", () => {
   test("Upcoming → Live Tonight → mid-set → Recap", async ({ page }) => {
     const suffix = uniqueSuffix();
     const today = localToday();
     const slug = `live-walkthrough-${suffix}`;
+
+    // Admin login + seeding at desktop (the admin panel isn't reliable at
+    // mobile width); the fan-facing phases run at a phone viewport below.
+    await loginAsAdmin(page);
 
     // ── Seed: published event dated today, doors 16:00, two evening sets ──
     const created = await apiPost(page, "/api/admin/events", {
@@ -100,6 +118,9 @@ test.describe("Live experience — lifecycle walkthrough at simulated times (#55
     await apiPost(page, `/api/admin/events/${eventId}/publish`, { publish: true });
 
     const eventPage = `/event/${slug}`;
+
+    // Phone viewport for the fan-facing lifecycle — "works flawlessly on a phone".
+    await page.setViewportSize({ width: 390, height: 844 });
 
     // ── Phase A: 10:00, before doors — Upcoming, doors chip visible ──
     await page.clock.setFixedTime(localInstant(today, 10, 0));

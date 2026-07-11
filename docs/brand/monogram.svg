@@ -1,5 +1,7 @@
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <!-- SetTimes "ST" monogram — accent orange "S" + white "T" on midnight-ember navy -->
+  <!-- SetTimes "ST" monogram — accent orange "S" + white "T" on midnight-ember navy.
+       Canonical source; frontend/public/favicon.svg and the generated favicon/PWA
+       PNGs are rendered from this exact design. Regenerate them together if this changes. -->
   <rect width="64" height="64" fill="#0c0f1a" rx="12"/>
 
   <!-- "S" in accent orange -->

@@ -32,6 +32,9 @@ function makeCacheStorage() {
     async delete(req) {
       return store.delete(cacheKey(req))
     },
+    async add(req) {
+      store.set(cacheKey(req), { ok: true })
+    },
     async addAll(reqs) {
       for (const r of reqs) store.set(cacheKey(r), { ok: true })
     },
@@ -214,11 +217,11 @@ describe('service worker fetch routing', () => {
       mode: 'navigate',
     })
 
-    // After the fix this is routed to networkFirstStrategy (api-v4), not
+    // After the fix this is routed to networkFirstStrategy (api-v5), not
     // navigationStrategy, so the static cache must stay empty.
     expect(await globalThis.caches.match('/index.html')).toBeUndefined()
     // The response should be cached under its own URL in the API cache.
-    const apiStore = globalThis.caches._stores.get('api-v4')
+    const apiStore = globalThis.caches._stores.get('api-v5')
     expect(apiStore?.has(`${ORIGIN}/api/feeds/ical`)).toBe(true)
   })
 
@@ -289,18 +292,48 @@ describe('service worker activate', () => {
     await globalThis.caches.open('api-v3')
     await globalThis.caches.open('schedule-v4')
     await globalThis.caches.open('api-v4')
+    await globalThis.caches.open('schedule-v5')
+    await globalThis.caches.open('api-v5')
     await globalThis.caches.open('some-other-cache')
 
     const promises = []
     handlers.activate({ waitUntil: p => promises.push(p) })
     await Promise.all(promises)
 
-    // Old-version schedule-/api- families must be gone.
+    // Every older schedule-/api- version must be gone.
     expect(globalThis.caches._stores.has('schedule-v3')).toBe(false)
     expect(globalThis.caches._stores.has('api-v3')).toBe(false)
+    expect(globalThis.caches._stores.has('schedule-v4')).toBe(false)
+    expect(globalThis.caches._stores.has('api-v4')).toBe(false)
     // Current-version caches and unrelated cache must survive.
-    expect(globalThis.caches._stores.has('schedule-v4')).toBe(true)
-    expect(globalThis.caches._stores.has('api-v4')).toBe(true)
+    expect(globalThis.caches._stores.has('schedule-v5')).toBe(true)
+    expect(globalThis.caches._stores.has('api-v5')).toBe(true)
     expect(globalThis.caches._stores.has('some-other-cache')).toBe(true)
+  })
+})
+
+describe('service worker install', () => {
+  beforeEach(async () => {
+    await loadServiceWorker()
+  })
+
+  it('precaches only canonical (non-.html, non-redirecting) URLs', async () => {
+    const promises = []
+    handlers.install({ waitUntil: p => promises.push(p) })
+    await Promise.all(promises)
+
+    const store = globalThis.caches._stores.get('schedule-v5')
+    const keys = [...store.keys()]
+
+    // The shell, manifest, and branded offline page — by the 200 URLs Pages
+    // actually serves.
+    expect(keys).toContain(`${ORIGIN}/`)
+    expect(keys).toContain(`${ORIGIN}/manifest.json`)
+    expect(keys).toContain(`${ORIGIN}/offline`)
+
+    // Regression guard (#578): NO `.html`-suffixed entries. Pages 308-redirects
+    // /index.html and /offline.html; cache.add() rejects on the redirect and
+    // silently drops them. Precaching a `.html` name must never come back.
+    expect(keys.some(k => k.endsWith('.html'))).toBe(false)
   })
 })

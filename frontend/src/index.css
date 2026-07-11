@@ -310,7 +310,13 @@
   --color-primary-700: #334155;
 
   --color-accent-300: #93c5fd;
-  --color-accent-400: #2563eb;
+  /* Darkened from Tailwind blue-600 (#2563eb, the value silver-lining
+     previously shared with its own info-500/600 ramp): text-accent-400 is
+     commonly paired with its own bg-accent-500/10-20 tint (badges, pills, the
+     "back to event" link on the band profile page — see #567). #2563eb only
+     clears ~3.6:1 against that self-tint, failing WCAG AA; this value clears
+     >5:1 against the tint and >6.9:1 against the plain page background. */
+  --color-accent-400: #1e4fbc;
   --color-accent-500: #1d4ed8;
   --color-accent-600: #1e3a8a;
 

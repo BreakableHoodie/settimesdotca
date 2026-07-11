@@ -5,7 +5,9 @@ import {
   buildIntervals,
   intervalsOverlap,
   computeNewEndTime,
+  detectBulkConflicts,
 } from "../timeConflicts.js";
+import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../api/test-utils.js";
 
 describe("toMinutes", () => {
   it("converts HH:MM to total minutes", () => {
@@ -79,5 +81,287 @@ describe("computeNewEndTime", () => {
   it("handles a set that shifts across midnight", () => {
     // 22:00–23:00 is 60 minutes. Shift to 23:30 → should end at 00:30.
     expect(computeNewEndTime("22:00", "23:00", "23:30")).toBe("00:30");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectBulkConflicts — festival-day scoping (#551)
+//
+// #540 day-scoped the single create/update conflict check (checkConflicts in
+// functions/api/admin/bands.js). detectBulkConflicts (bulk move_venue /
+// change_time) was left out of that scope: it matched purely on
+// event_id + venue_id + clock overlap, so a multi-day event's bulk move/retime
+// would false-conflict against a different festival day. These tests cover
+// both action branches (move_venue, change_time) across both comparison sites
+// (batch member vs. existing performance, and pairwise within the batch).
+// ---------------------------------------------------------------------------
+
+describe("detectBulkConflicts — festival-day scoping (#551)", () => {
+  function multiDayFixture() {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, {
+      name: "Multi Day Event 551",
+      slug: "multi-day-event-551",
+      date: "2026-08-01",
+      end_date: "2026-08-02",
+      status: "draft",
+    });
+    const venueA = insertVenue(rawDb, { name: "Source Venue 551" });
+    const venueB = insertVenue(rawDb, { name: "Target Venue 551" });
+    return { env, rawDb, event, venueA, venueB };
+  }
+
+  function setPerformanceDate(rawDb, performanceId, date) {
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run(date, performanceId);
+  }
+
+  it("move_venue: different performance_date at same venue/time → no conflict", async () => {
+    const { env, rawDb, event, venueA, venueB } = multiDayFixture();
+
+    const moving = insertBand(rawDb, {
+      name: "Day Two Mover",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, moving.id, "2026-08-02");
+
+    const existing = insertBand(rawDb, {
+      name: "Day One Resident",
+      event_id: event.id,
+      venue_id: venueB.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, existing.id, "2026-08-01");
+
+    const conflicts = await detectBulkConflicts(env, {
+      action: "move_venue",
+      bandIds: [moving.id],
+      params: { venue_id: venueB.id },
+    });
+    expect(conflicts).toEqual([]);
+  });
+
+  it("move_venue: same performance_date at same venue/time → conflict still detected", async () => {
+    const { env, rawDb, event, venueA, venueB } = multiDayFixture();
+
+    const moving = insertBand(rawDb, {
+      name: "Day One Mover",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, moving.id, "2026-08-01");
+
+    const existing = insertBand(rawDb, {
+      name: "Day One Resident",
+      event_id: event.id,
+      venue_id: venueB.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, existing.id, "2026-08-01");
+
+    const conflicts = await detectBulkConflicts(env, {
+      action: "move_venue",
+      bandIds: [moving.id],
+      params: { venue_id: venueB.id },
+    });
+    expect(conflicts.length).toBeGreaterThan(0);
+    expect(conflicts[0].severity).toBe("error");
+  });
+
+  it("move_venue: NULL performance_date on both sides falls back to event date (single-day, still conflicts)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, {
+      name: "Single Day Event 551",
+      slug: "single-day-event-551",
+      date: "2026-08-01",
+      status: "draft",
+    });
+    const venueA = insertVenue(rawDb, { name: "Single Source Venue" });
+    const venueB = insertVenue(rawDb, { name: "Single Target Venue" });
+
+    // performance_date is left NULL on both — single-day event, byte-identical
+    // to pre-#551 behavior (both sides fall back to the same event date).
+    const moving = insertBand(rawDb, {
+      name: "Single Day Mover",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    insertBand(rawDb, {
+      name: "Single Day Resident",
+      event_id: event.id,
+      venue_id: venueB.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+
+    const conflicts = await detectBulkConflicts(env, {
+      action: "move_venue",
+      bandIds: [moving.id],
+      params: { venue_id: venueB.id },
+    });
+    expect(conflicts.length).toBeGreaterThan(0);
+  });
+
+  it("change_time: different performance_date at same venue/time → no conflict", async () => {
+    const { env, rawDb, event, venueA } = multiDayFixture();
+
+    const changing = insertBand(rawDb, {
+      name: "Day Two Changer",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "18:00",
+      end_time: "19:00",
+    });
+    setPerformanceDate(rawDb, changing.id, "2026-08-02");
+
+    const existing = insertBand(rawDb, {
+      name: "Day One Resident At Venue A",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, existing.id, "2026-08-01");
+
+    // Shift the Day-Two set's start onto the Day-One resident's clock slot.
+    const conflicts = await detectBulkConflicts(env, {
+      action: "change_time",
+      bandIds: [changing.id],
+      params: { start_time: "20:00" },
+    });
+    expect(conflicts).toEqual([]);
+  });
+
+  it("change_time: same performance_date at same venue/time → conflict still detected", async () => {
+    const { env, rawDb, event, venueA } = multiDayFixture();
+
+    const changing = insertBand(rawDb, {
+      name: "Day One Changer",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "18:00",
+      end_time: "19:00",
+    });
+    setPerformanceDate(rawDb, changing.id, "2026-08-01");
+
+    const existing = insertBand(rawDb, {
+      name: "Day One Resident At Venue A",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, existing.id, "2026-08-01");
+
+    const conflicts = await detectBulkConflicts(env, {
+      action: "change_time",
+      bandIds: [changing.id],
+      params: { start_time: "20:00" },
+    });
+    expect(conflicts.length).toBeGreaterThan(0);
+    expect(conflicts[0].severity).toBe("error");
+  });
+
+  it("move_venue pairwise: two batch members at same venue/time but different performance_date → no conflict", async () => {
+    const { env, rawDb, event, venueB } = multiDayFixture();
+    const venueSource = insertVenue(rawDb, { name: "Pairwise Source Venue 551" });
+
+    const memberDay1 = insertBand(rawDb, {
+      name: "Pairwise Day One",
+      event_id: event.id,
+      venue_id: venueSource.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, memberDay1.id, "2026-08-01");
+
+    const memberDay2 = insertBand(rawDb, {
+      name: "Pairwise Day Two",
+      event_id: event.id,
+      venue_id: venueSource.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, memberDay2.id, "2026-08-02");
+
+    // Both batch members move to the same target venue at the same clock
+    // time. venueB has no existing performances, so only the pairwise check
+    // could report a conflict here — and it must not, since they're on
+    // different festival days.
+    const conflicts = await detectBulkConflicts(env, {
+      action: "move_venue",
+      bandIds: [memberDay1.id, memberDay2.id],
+      params: { venue_id: venueB.id },
+    });
+    expect(conflicts).toEqual([]);
+  });
+
+  it("move_venue pairwise: two batch members at same venue/time with same performance_date → conflict detected", async () => {
+    const { env, rawDb, event, venueB } = multiDayFixture();
+    const venueSource = insertVenue(rawDb, { name: "Pairwise Source Venue 551b" });
+
+    const memberA = insertBand(rawDb, {
+      name: "Pairwise Same Day A",
+      event_id: event.id,
+      venue_id: venueSource.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, memberA.id, "2026-08-01");
+
+    const memberB = insertBand(rawDb, {
+      name: "Pairwise Same Day B",
+      event_id: event.id,
+      venue_id: venueSource.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    setPerformanceDate(rawDb, memberB.id, "2026-08-01");
+
+    const conflicts = await detectBulkConflicts(env, {
+      action: "move_venue",
+      bandIds: [memberA.id, memberB.id],
+      params: { venue_id: venueB.id },
+    });
+    expect(conflicts.length).toBeGreaterThan(0);
+  });
+
+  it("change_time pairwise: two batch members at same venue with different performance_date → no conflict", async () => {
+    const { env, rawDb, event, venueA } = multiDayFixture();
+
+    const memberDay1 = insertBand(rawDb, {
+      name: "CT Pairwise Day One",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "18:00",
+      end_time: "19:00",
+    });
+    setPerformanceDate(rawDb, memberDay1.id, "2026-08-01");
+
+    const memberDay2 = insertBand(rawDb, {
+      name: "CT Pairwise Day Two",
+      event_id: event.id,
+      venue_id: venueA.id,
+      start_time: "19:00",
+      end_time: "20:00",
+    });
+    setPerformanceDate(rawDb, memberDay2.id, "2026-08-02");
+
+    // Both shift to the same new start_time, landing at the same venue/clock
+    // slot — but different festival days must not conflict.
+    const conflicts = await detectBulkConflicts(env, {
+      action: "change_time",
+      bandIds: [memberDay1.id, memberDay2.id],
+      params: { start_time: "20:00" },
+    });
+    expect(conflicts).toEqual([]);
   });
 });

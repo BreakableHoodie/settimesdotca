@@ -13,6 +13,7 @@ import {
   validateDoorsJson,
 } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
+import { eventLocalToday } from "../../utils/eventDay.js";
 
 // GET - List all events (all authenticated users can view)
 export async function onRequestGet(context) {
@@ -166,13 +167,14 @@ export async function onRequestPost(context) {
     }
 
     // Validate date is not in past (unless status is archived for retroactive
-    // events). Compare YYYY-MM-DD strings lexicographically rather than via Date
-    // objects: new Date('YYYY-MM-DD') parses as UTC midnight, which reads as
-    // "yesterday" in UTC-negative timezones and would wrongly reject an event
-    // dated today (same bug class as the schedule-storage note in CLAUDE.md).
+    // events). "Today" must be the events' Toronto-local day, not the Worker's
+    // UTC day: new Date() components on Cloudflare are UTC, which roll to
+    // tomorrow at 8 PM Eastern and would reject an event dated the admin's
+    // actual local today all evening (the #568 bug class — see the
+    // "Toronto-local, never UTC-sliced" invariant in CLAUDE.md). String
+    // comparison is safe: both sides are zero-padded YYYY-MM-DD.
     const eventDateStr = String(date).slice(0, 10);
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayStr = eventLocalToday();
     if (eventDateStr < todayStr && status !== "archived") {
       return validationErrorResponse(
         currentUser.role === "admin"

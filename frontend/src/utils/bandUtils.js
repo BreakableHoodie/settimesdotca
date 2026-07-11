@@ -1,7 +1,9 @@
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from './festivalDays'
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000
-// Times starting before 6 AM are treated as after-midnight sets of the event night,
-// so they sort after same-day evening sets rather than appearing at the top of the schedule.
-const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6
+// Times starting before AFTER_MIDNIGHT_THRESHOLD_HOUR are treated as after-midnight sets
+// of the event night, so they sort after same-day evening sets rather than appearing at
+// the top of the schedule. Canonical definition lives in festivalDays.js (#550).
 
 /**
  * Enriches raw band data with precomputed startMs/endMs timestamps.

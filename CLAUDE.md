@@ -73,7 +73,7 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 
 Bands starting before 6 AM are "after-midnight" sets that belong to the *previous evening*. They must be offset by +1 day so they sort after the evening lineup, not at the top of the schedule.
 
-- Threshold: `AFTER_MIDNIGHT_THRESHOLD_HOUR = 6` in `frontend/src/utils/bandUtils.js`
+- Threshold: `AFTER_MIDNIGHT_THRESHOLD_HOUR = 6`, canonically defined in `frontend/src/utils/festivalDays.js` (#550). `frontend/src/utils/bandUtils.js` and `frontend/src/admin/utils/timeUtils.js` (`AFTER_MIDNIGHT_THRESHOLD_MINUTES = AFTER_MIDNIGHT_THRESHOLD_HOUR * 60`) both import it rather than re-encoding `6`.
 - Logic: `prepareBands()` adds `MS_PER_DAY` to `startMs`/`endMs` for times below this threshold
 - **Never remove or lower this threshold.** Any sort, filter, or conflict-detection that touches performance times must apply the same offset or delegate to `prepareBands`.
 

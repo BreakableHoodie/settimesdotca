@@ -614,7 +614,7 @@ function MySchedule({
                         </span>
                         {transition.buffer != null && (
                           <span
-                            className={transition.buffer < 3 ? 'font-semibold text-error-600' : 'text-text-tertiary'}
+                            className={transition.buffer < 3 ? 'font-semibold text-error-400' : 'text-text-tertiary'}
                           >
                             · {bufferLabel(transition.buffer)}
                           </span>

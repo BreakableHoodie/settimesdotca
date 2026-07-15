@@ -1221,3 +1221,111 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
     expect(data.upcoming[0]?.id).toBe(event.id);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Real-DB — end_date exposed on every timeline bucket (#542 PR-1). Clients key
+// schedule stale-detection on `end_date || date`; keying it on the start date
+// alone wipes a fan's saved schedule on day 2 of a multi-day event. The "now"
+// query always selected e.end_date (for the #539 COALESCE window) but
+// groupEventData dropped it from the response — these tests pin that the
+// field now survives to the JSON in all three buckets, and stays null for
+// single-day events.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — end_date exposed on event objects (#542 PR-1)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // 2026-07-11T12:00:00Z = 08:00 EDT → Toronto "today" is 2026-07-11.
+  const pinClock = () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T12:00:00Z"));
+  };
+
+  test("mid-run multi-day event in 'now' carries end_date", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    pinClock();
+
+    // Day 2 of a Jul 10-12 event: inside the #539 COALESCE window, and never
+    // start-edge gated (#569 gates the FIRST day only) — the exact
+    // production shape the staleness fix protects.
+    const event = insertEvent(rawDb, {
+      name: "Mid-Run Weekend",
+      slug: "timeline-enddate-now",
+      date: "2026-07-10",
+      end_date: "2026-07-12",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.end_date).toBe("2026-07-12");
+  });
+
+  test("upcoming multi-day event carries end_date; single-day event has end_date null", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    pinClock();
+
+    const multiDay = insertEvent(rawDb, {
+      name: "Future Weekend",
+      slug: "timeline-enddate-upcoming-multi",
+      date: "2026-07-20",
+      end_date: "2026-07-22",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(multiDay.id);
+
+    const singleDay = insertEvent(rawDb, {
+      name: "Future One-Nighter",
+      slug: "timeline-enddate-upcoming-single",
+      date: "2026-07-15",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(singleDay.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const foundMulti = data.upcoming.find((e) => e.id === multiDay.id);
+    expect(foundMulti).toBeDefined();
+    expect(foundMulti.end_date).toBe("2026-07-22");
+
+    const foundSingle = data.upcoming.find((e) => e.id === singleDay.id);
+    expect(foundSingle).toBeDefined();
+    expect(foundSingle.end_date).toBeNull();
+  });
+
+  test("past multi-day event carries end_date", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    pinClock();
+
+    const event = insertEvent(rawDb, {
+      name: "Last Weekend",
+      slug: "timeline-enddate-past",
+      date: "2026-07-04",
+      end_date: "2026-07-05",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.past.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.end_date).toBe("2026-07-05");
+  });
+});

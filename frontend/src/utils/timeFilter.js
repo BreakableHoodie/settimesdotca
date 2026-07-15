@@ -2,6 +2,8 @@
  * Time filtering utilities for concert performances
  */
 
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from './festivalDays'
+
 const DEBUG_TIME_KEY = '__debugScheduleTime'
 
 /**
@@ -19,43 +21,74 @@ export function getCurrentDateTime() {
 }
 
 /**
- * Get start of day (00:00:00) for a given date
+ * A "festival day" runs AFTER_MIDNIGHT_THRESHOLD_HOUR -> AFTER_MIDNIGHT_THRESHOLD_HOUR
+ * (6 AM -> 6 AM), not calendar midnight -> midnight (#542). A set starting at
+ * 1 AM is still "tonight" in festival terms (see AFTER_MIDNIGHT_THRESHOLD_HOUR's
+ * doc in festivalDays.js and prepareBands() in bandUtils.js, which offsets
+ * such sets' startMs/endMs by +1 day so they sort after the same evening's
+ * earlier sets). Returns a new Date at exactly AFTER_MIDNIGHT_THRESHOLD_HOUR
+ * on the calendar day this timestamp's festival day belongs to — shifting
+ * back one calendar day when `date`'s clock time is before the threshold, so
+ * that a 1 AM check and an 11 PM check the same festival evening both land
+ * on the same festival-day boundary.
+ */
+function festivalDayStart(date) {
+  const d = new Date(date)
+  if (d.getHours() < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
+    d.setDate(d.getDate() - 1)
+  }
+  d.setHours(AFTER_MIDNIGHT_THRESHOLD_HOUR, 0, 0, 0)
+  return d
+}
+
+/**
+ * Get start of the festival day (AFTER_MIDNIGHT_THRESHOLD_HOUR, e.g. 6 AM) for
+ * a given date/time.
  */
 export function getStartOfDay(date) {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d
+  return festivalDayStart(date)
 }
 
 /**
- * Get end of day (23:59:59) for a given date
+ * Get end of the festival day: 1 ms before the next festival day's start
+ * (AFTER_MIDNIGHT_THRESHOLD_HOUR on the following calendar day). Mirrors the
+ * previous calendar-midnight `23,59,59,999` precision, just shifted to the
+ * festival-day boundary so the instant AFTER_MIDNIGHT_THRESHOLD_HOUR itself
+ * belongs to exactly one day, never both.
  */
 export function getEndOfDay(date) {
-  const d = new Date(date)
-  d.setHours(23, 59, 59, 999)
+  const d = festivalDayStart(date)
+  d.setDate(d.getDate() + 1)
+  d.setMilliseconds(d.getMilliseconds() - 1)
   return d
 }
 
 /**
- * Get start of week (Monday) for a given date
+ * Get start of week (Monday, at the festival-day boundary) for a given date.
+ * Resolves the date to its festival day FIRST (via festivalDayStart, which
+ * also normalizes the time to the threshold hour so the day-of-week lookup
+ * below isn't re-shifted by a leftover pre-threshold hour) before finding
+ * that festival day's Monday — otherwise a 1 AM Monday check would use the
+ * calendar day-of-week (Monday) instead of the festival day-of-week (the
+ * previous Sunday), landing on the wrong week (#542).
  */
 export function getStartOfWeek(date) {
-  const d = new Date(date)
+  const d = festivalDayStart(date)
   const day = d.getDay()
   const diff = d.getDate() - day + (day === 0 ? -6 : 1) // Adjust when day is Sunday
   d.setDate(diff)
-  return getStartOfDay(d)
+  return d
 }
 
 /**
- * Get end of week (Sunday) for a given date
+ * Get end of week: 1 ms before the following week's start, mirroring
+ * getEndOfDay's approach so the two week boundaries never overlap.
  */
 export function getEndOfWeek(date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? 0 : 7) // Adjust when day is Sunday
-  d.setDate(diff)
-  return getEndOfDay(d)
+  const d = getStartOfWeek(date)
+  d.setDate(d.getDate() + 7)
+  d.setMilliseconds(d.getMilliseconds() - 1)
+  return d
 }
 
 /**

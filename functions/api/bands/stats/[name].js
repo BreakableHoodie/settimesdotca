@@ -114,6 +114,7 @@ export async function onRequestGet(context) {
         e.name as event_name,
         e.slug as event_slug,
         e.date as event_date,
+        e.end_date as event_end_date,
         e.status as event_status
       FROM performances p
       LEFT JOIN venues v ON p.venue_id = v.id
@@ -223,6 +224,10 @@ export async function onRequestGet(context) {
         event_name: p.event_name,
         event_slug: p.event_slug,
         event_date: p.event_date,
+        // NULL for single-day events. Clients key schedule stale-detection
+        // on event_end_date || event_date (#542 PR-1) so a multi-day
+        // event's saved schedule isn't wiped as stale on day 2.
+        event_end_date: p.event_end_date || null,
         event_status: p.event_status,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
@@ -236,6 +241,7 @@ export async function onRequestGet(context) {
         event_name: p.event_name,
         event_slug: p.event_slug,
         event_date: p.event_date,
+        event_end_date: p.event_end_date || null,
         event_status: p.event_status,
         venue_id: p.venue_id,
         venue_name: p.venue_name,

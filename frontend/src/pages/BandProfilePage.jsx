@@ -262,8 +262,13 @@ export default function BandProfilePage() {
           currentSet.add(scheduleId)
         }
 
-        // Save to localStorage with event date so stale past-event entries can be filtered
-        saveSelectedBands(eventSlug, Array.from(currentSet), performance.event_date)
+        // Save to localStorage with event date so stale past-event entries can
+        // be filtered. The date must be event_end_date || event_date (#542
+        // PR-1, see CLAUDE.md "Schedule Storage"): keying staleness on the
+        // start date wipes the fan's saved schedule on day 2 of a multi-day
+        // event. event_end_date comes from GET /api/bands/stats/:name (null
+        // for single-day events).
+        saveSelectedBands(eventSlug, Array.from(currentSet), performance.event_end_date || performance.event_date)
 
         return { ...prev, [eventSlug]: currentSet }
       })

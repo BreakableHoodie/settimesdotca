@@ -3188,6 +3188,10 @@ components:
           type: string
         date:
           type: string
+        end_date:
+          type: string
+          nullable: true
+          description: Last day of a multi-day event (YYYY-MM-DD); null for single-day events.
         status:
           type: string
           nullable: true

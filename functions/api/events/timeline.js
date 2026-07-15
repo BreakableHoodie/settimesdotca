@@ -133,6 +133,11 @@ export async function onRequestGet(context) {
             name: row.event_name,
             slug: row.event_slug,
             date: row.event_date,
+            // NULL for single-day events. Exposed so clients can pass
+            // end_date || date to schedule stale-detection (#542 PR-1) —
+            // keying staleness on the start date wipes a fan's saved
+            // schedule on day 2 of a multi-day event.
+            end_date: row.event_end_date || null,
             status: row.event_status || null,
             ticket_url: normalizeHttpUrl(row.ticket_url),
             bands: includeBands ? [] : null,
@@ -200,6 +205,7 @@ export async function onRequestGet(context) {
         name: event.name,
         slug: event.slug,
         date: event.date,
+        end_date: event.end_date,
         status: event.status,
         ticket_url: normalizeHttpUrl(event.ticket_url),
         band_count: event.bandIds.size,
@@ -281,6 +287,7 @@ export async function onRequestGet(context) {
           e.name as event_name,
           e.slug as event_slug,
           e.date as event_date,
+          e.end_date as event_end_date,
           e.ticket_url as ticket_url,
           p.band_profile_id as band_id,
           b.name as band_name,
@@ -334,6 +341,7 @@ export async function onRequestGet(context) {
           e.name as event_name,
           e.slug as event_slug,
           e.date as event_date,
+          e.end_date as event_end_date,
           e.status as event_status,
           e.ticket_url as ticket_url,
           p.band_profile_id as band_id,

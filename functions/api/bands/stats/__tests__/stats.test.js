@@ -161,3 +161,110 @@ describe("GET /api/bands/stats/:name - social_links scheme sanitization (#483)",
     expect(payload.social.website).toBe("https://example.com/band");
   });
 });
+
+// ---------------------------------------------------------------------------
+// #542 PR-1 — event_end_date exposed on performance rows. BandProfilePage
+// keys schedule stale-detection on event_end_date || event_date; keying it
+// on the start date alone wipes a fan's saved schedule on day 2 of a
+// multi-day event. Single-day events (NULL end_date) must stay null-safe.
+// ---------------------------------------------------------------------------
+describe("GET /api/bands/stats/:name — event_end_date exposure (#542 PR-1)", () => {
+  test("multi-day event performance carries event_end_date in upcoming", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Prohibition Warehouse" });
+    const event = insertEvent(rawDb, {
+      name: "Multi-Day Stats Event",
+      slug: "stats-542-multiday",
+      date: "2099-01-01",
+      end_date: "2099-01-03",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    insertBand(rawDb, {
+      name: "Stats Multiday Band",
+      event_id: event.id,
+      venue_id: venue.id,
+    });
+
+    const request = new Request("https://example.test/api/bands/stats/Stats%20Multiday%20Band");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.upcoming).toHaveLength(1);
+    expect(payload.upcoming[0].event_date).toBe("2099-01-01");
+    expect(payload.upcoming[0].event_end_date).toBe("2099-01-03");
+  });
+
+  test("single-day event performance has event_end_date null (upcoming and past)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    const futureEvent = insertEvent(rawDb, {
+      name: "Single-Day Future",
+      slug: "stats-542-single-future",
+      date: "2099-06-01",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(futureEvent.id);
+    insertBand(rawDb, {
+      name: "Stats Singleday Band",
+      event_id: futureEvent.id,
+      venue_id: venue.id,
+    });
+
+    const pastEvent = insertEvent(rawDb, {
+      name: "Single-Day Past",
+      slug: "stats-542-single-past",
+      date: "2001-01-01",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(pastEvent.id);
+    insertBand(rawDb, {
+      name: "Stats Singleday Band",
+      event_id: pastEvent.id,
+      venue_id: venue.id,
+    });
+
+    const request = new Request("https://example.test/api/bands/stats/Stats%20Singleday%20Band");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.upcoming).toHaveLength(1);
+    expect(payload.upcoming[0].event_end_date).toBeNull();
+    expect(payload.past).toHaveLength(1);
+    expect(payload.past[0].event_end_date).toBeNull();
+  });
+
+  test("past multi-day event performance carries event_end_date", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Princess Cafe" });
+    const event = insertEvent(rawDb, {
+      name: "Past Multi-Day Stats Event",
+      slug: "stats-542-past-multiday",
+      date: "2001-03-01",
+      end_date: "2001-03-03",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    insertBand(rawDb, {
+      name: "Stats Past Multiday Band",
+      event_id: event.id,
+      venue_id: venue.id,
+    });
+
+    const request = new Request("https://example.test/api/bands/stats/Stats%20Past%20Multiday%20Band");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.past).toHaveLength(1);
+    expect(payload.past[0].event_end_date).toBe("2001-03-03");
+  });
+});

@@ -1,6 +1,6 @@
 const BRAND = {
   name: "SetTimes",
-  accent: "#0ea5e9",
+  accent: "#f97316",
   background: "#0c0f1a",
   card: "#141927",
   text: "#e5e7eb",

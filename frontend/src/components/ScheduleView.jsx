@@ -1,6 +1,7 @@
 import { Check, Copy, Music } from 'lucide-react'
 import { Fragment, memo, useMemo, useState } from 'react'
 import { copyToClipboard } from '../utils/clipboard'
+import { compareByName } from '../utils/sortableName'
 import { dayNumberByDate, isMultiDay } from '../utils/festivalDays'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
@@ -119,7 +120,7 @@ function ScheduleView({
         const bTBD = !b.startTime || b.startTime === 'TBD'
         if (aTBD && !bTBD) return 1
         if (!aTBD && bTBD) return -1
-        if (aTBD && bTBD) return a.name.localeCompare(b.name)
+        if (aTBD && bTBD) return compareByName(a, b)
         const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
         const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
         return aTime === bTime ? (a.venue ?? '').localeCompare(b.venue ?? '') : aTime - bTime

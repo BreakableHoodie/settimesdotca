@@ -1,5 +1,6 @@
 import { checkPermission } from "../../_middleware.js";
 import { validateId } from "../../../../utils/validation.js";
+import { sortableName } from "../../../../utils/sortableName.js";
 
 export async function onRequestGet(context) {
   const { env, params } = context;
@@ -81,6 +82,17 @@ export async function onRequestGet(context) {
     const shareStats = shareStatsRes.results?.[0];
     const topSharedRoutes = topRoutesRes.results || [];
     const announcementPlanning = announcementPlanningRes.results || [];
+    // bp.name is only the final tiebreaker here (after is_announced, then
+    // follower_count) — SQLite ORDER BY can't strip a leading article inline
+    // (#587), so re-derive that last tiebreaker in JS with the article-stripped
+    // key. Cheap to do since is_announced/follower_count are already correct
+    // from SQL; this only reorders ties on both of those.
+    announcementPlanning.sort(
+      (a, b) =>
+        (a.is_announced ?? 0) - (b.is_announced ?? 0) ||
+        (b.follower_count ?? 0) - (a.follower_count ?? 0) ||
+        sortableName(a.band_name).localeCompare(sortableName(b.band_name)),
+    );
 
     // Share-link analytics: shares created + total views + top routes by views.
     // Derived directly from share_links (creates are rows; views are view_count),

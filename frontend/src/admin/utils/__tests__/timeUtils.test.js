@@ -50,6 +50,28 @@ describe('sortBandsByStart — after-midnight ordering', () => {
     expect(result.map(b => b.name)).toEqual(['Evening', 'Late', 'TBD'])
   })
 
+  it('falls back to article-stripped alphabetical order when both bands lack a start time (#587)', () => {
+    const bands = [
+      { id: 1, name: 'Zebras', start_time: null },
+      { id: 2, name: 'The Anti-Queens', start_time: null },
+      { id: 3, name: 'Beatles', start_time: null },
+    ]
+    const result = sortBandsByStart(bands)
+    // Raw byte order would be Beatles, The Anti-Queens, Zebras (T before Z).
+    // Article-stripped order puts "The Anti-Queens" under A.
+    expect(result.map(b => b.name)).toEqual(['The Anti-Queens', 'Beatles', 'Zebras'])
+  })
+
+  it('falls back to article-stripped alphabetical order when adjusted start times tie (#587)', () => {
+    const bands = [
+      { id: 1, name: 'Zebras', start_time: '20:00' },
+      { id: 2, name: 'The Anti-Queens', start_time: '20:00' },
+      { id: 3, name: 'Beatles', start_time: '20:00' },
+    ]
+    const result = sortBandsByStart(bands)
+    expect(result.map(b => b.name)).toEqual(['The Anti-Queens', 'Beatles', 'Zebras'])
+  })
+
   it('keeps TBD bands at the end when sorting descending (LineupTab inline sort regression)', () => {
     // Simulates the manual sort in LineupTab with direction = -1 (descending).
     // Null times must always go last regardless of sort direction.

@@ -5,6 +5,7 @@ import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
 import { Globe } from 'lucide-react'
 import { parseOrigin } from '../utils/parseOrigin'
+import { sortableName } from '../utils/sortableName'
 import {
   AppleMusicIcon,
   BandcampIcon,
@@ -280,6 +281,12 @@ export default function RosterTab({ showToast, readOnly = false }) {
         const aVal = a.follower_count ?? 0
         const bVal = b.follower_count ?? 0
         return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
+      }
+      if (sortConfig.key === 'name') {
+        // Article-stripped alphabetization (#587) — "The Anti-Queens" sorts under A.
+        const aVal = sortableName(a.name)
+        const bVal = sortableName(b.name)
+        return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
       }
       const aVal = (a[sortConfig.key] || '').toLowerCase()
       const bVal = (b[sortConfig.key] || '').toLowerCase()

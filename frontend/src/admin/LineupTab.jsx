@@ -10,6 +10,7 @@ import ArtistPicker from './components/ArtistPicker'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { parseOrigin } from '../utils/parseOrigin'
+import { sortableName } from '../utils/sortableName'
 import {
   adjustForMidnight,
   calculateEndTimeFromDuration,
@@ -502,8 +503,9 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
 
     return [...filteredBands].sort((a, b) => {
       if (sortConfig.key === 'name') {
-        const aVal = (a.name || '').toLowerCase()
-        const bVal = (b.name || '').toLowerCase()
+        // Article-stripped alphabetization (#587) — "The Anti-Queens" sorts under A.
+        const aVal = sortableName(a.name)
+        const bVal = sortableName(b.name)
         return aVal.localeCompare(bVal) * direction
       }
       if (sortConfig.key === 'venue') {

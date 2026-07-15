@@ -1,4 +1,17 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
+import { sortableName } from "../../../utils/sortableName.js";
+
+// SQLite `ORDER BY` can't strip a leading article inline (#587); the SQL
+// query below is a coarse pre-sort and this comparator re-derives the exact
+// ordering afterward, swapping the name comparison for the article-stripped
+// `sortableName` key. Mirrors SQLite's default NULLS-first-for-ASC handling
+// with an explicit NULLS LAST override (matching `... NULLS LAST` in the SQL).
+function compareStartTimeNullsLast(a, b) {
+  if (a.start_time == null && b.start_time == null) return 0;
+  if (a.start_time == null) return 1;
+  if (b.start_time == null) return -1;
+  return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0;
+}
 
 /**
  * Public API: Get recap stats and band list for a single archived event
@@ -99,6 +112,8 @@ export async function onRequestGet(context) {
         is_returning: isReturning,
       };
     });
+
+    bands.sort((a, b) => compareStartTimeNullsLast(a, b) || sortableName(a.name).localeCompare(sortableName(b.name)));
 
     const stats = {
       total_sets: rows.length, // performance slots; one band playing two sets counts as 2

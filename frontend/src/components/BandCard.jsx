@@ -120,6 +120,13 @@ function BandCard({
             </h3>
           )}
         </div>
+        {band.notes && (
+          <p
+            className={`text-xs italic text-center leading-snug line-clamp-2 ${onAmber ? 'text-bg-navy/80' : 'text-text-tertiary'}`}
+          >
+            {band.notes}
+          </p>
+        )}
         <p
           className={`text-sm md:text-base font-medium leading-snug ${
             isPlaying ? 'text-bg-navy font-semibold' : onAmber ? 'text-bg-navy' : 'text-text-secondary'

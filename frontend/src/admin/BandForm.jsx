@@ -437,6 +437,30 @@ export default function BandForm({
                 className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
               />
             </div>
+
+            <div className="sm:col-span-2">
+              <div className="flex items-center gap-2 mb-2">
+                <label htmlFor="band-notes" className="block text-white text-sm">
+                  Notes <span className="text-gray-400 text-xs ml-2">(optional, shown to fans)</span>
+                </label>
+                <Tooltip content='Short public annotation shown under this set on the schedule (e.g. "Bonus set: ALL w/ Scott (Reynolds) -- sold out"). Keep it fan-appropriate — this is not a private/internal field.'>
+                  <Info size={14} className="text-text-tertiary cursor-help" />
+                </Tooltip>
+              </div>
+              <textarea
+                id="band-notes"
+                name="notes"
+                value={formData.notes || ''}
+                onChange={onChange}
+                maxLength={FIELD_LIMITS.performanceNotes.max}
+                rows={2}
+                className="w-full px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
+                placeholder='Note shown to fans, e.g. "Bonus set: ALL w/ Scott (Reynolds) -- sold out"'
+              />
+              <p className="text-gray-400 text-xs mt-1">
+                Shown to fans under this set on the public schedule — keep it fan-appropriate, not internal shorthand.
+              </p>
+            </div>
           </>
         )}
 
@@ -605,6 +629,7 @@ BandForm.propTypes = {
     end_time: PropTypes.string,
     duration: PropTypes.string,
     performance_date: PropTypes.string,
+    notes: PropTypes.string,
     url: PropTypes.string,
     origin: PropTypes.string,
     origin_city: PropTypes.string,

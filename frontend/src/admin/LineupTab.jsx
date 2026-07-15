@@ -61,6 +61,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     end_time: '',
     duration: '',
     performance_date: '',
+    notes: '',
     url: '',
     description: '',
     photo_url: '',
@@ -310,6 +311,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         startTime: formData.start_time,
         endTime: formData.end_time,
         performanceDate: formData.performance_date || null,
+        notes: formData.notes,
         genre: formData.genre,
         origin: originDisplay,
         origin_city: formData.origin_city,
@@ -427,6 +429,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       end_time: band.end_time || '',
       duration: durationMinutes?.toString() || '',
       performance_date: band.performance_date || '',
+      notes: band.notes || '',
       url: band.url || '',
       description: band.description || '',
       photo_url: band.photo_url || '',
@@ -878,7 +881,17 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                 />
                               </td>
                             )}
-                            <td className="px-4 py-3 text-white font-medium">{band.name}</td>
+                            <td className="px-4 py-3 text-white font-medium">
+                              <div>{band.name}</div>
+                              {band.notes && (
+                                <div
+                                  className="text-xs font-normal text-text-tertiary mt-0.5 max-w-xs truncate"
+                                  title={band.notes}
+                                >
+                                  {band.notes}
+                                </div>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-white/70">{getVenueName(band.venue_id)}</td>
                             <td className="px-4 py-3 text-white/70">
                               {formatTimeRangeLabel(band.start_time, band.end_time)}
@@ -996,6 +1009,11 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                         <div className="text-sm text-text-secondary space-y-1">
                           <div>Venue: {getVenueName(band.venue_id)}</div>
                           <div>Time: {formatTimeRangeLabel(band.start_time, band.end_time)}</div>
+                          {band.notes && (
+                            <div className="text-text-tertiary italic truncate" title={band.notes}>
+                              {band.notes}
+                            </div>
+                          )}
                         </div>
                         {!readOnly && (
                           <div className="flex flex-wrap gap-2">

@@ -65,7 +65,7 @@ export async function onRequestGet(context) {
           <style>
             body {
               font-family: system-ui, sans-serif;
-              background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+              background: linear-gradient(180deg, #0c0f1a 0%, #141927 100%);
               color: white;
               margin: 0;
               padding: 2rem;
@@ -78,7 +78,7 @@ export async function onRequestGet(context) {
               text-align: center;
               max-width: 400px;
             }
-            h1 { color: #ff6b35; }
+            h1 { color: #f97316; }
             p { opacity: 0.9; }
           </style>
         </head>
@@ -86,7 +86,7 @@ export async function onRequestGet(context) {
           <div class="container">
             <h1>✓ Unsubscribed</h1>
             <p>You've been removed from ${escapeHtml(subscription.city)} ${escapeHtml(subscription.genre)} show notifications.</p>
-            <p>You can resubscribe anytime at <a href="${escapeHtml(env.PUBLIC_URL)}/subscribe" style="color: #ff6b35;">${escapeHtml(env.PUBLIC_URL)}/subscribe</a></p>
+            <p>You can resubscribe anytime at <a href="${escapeHtml(env.PUBLIC_URL)}/subscribe" style="color: #f97316;">${escapeHtml(env.PUBLIC_URL)}/subscribe</a></p>
           </div>
         </body>
       </html>

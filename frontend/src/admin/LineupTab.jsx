@@ -19,10 +19,12 @@ import {
   formatDurationLabel,
   formatTimeRangeLabel,
   parseTimeToMinutes,
+  resolveFestivalDay,
   sortBandsByStart,
 } from './utils/timeUtils'
 import { buildPickerFormData, buildEmptyPickerFormData } from './utils/pickerFormData'
 import { buildDayOptions, isMultiDayEvent } from './utils/dayOptions'
+import { formatFestivalDate } from '../utils/festivalDays'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -52,6 +54,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [sortConfig, setSortConfig] = useState({ key: 'start_time', direction: 'asc' })
   const [searchTerm, setSearchTerm] = useState('')
   const [venueFilter, setVenueFilter] = useState('all')
+  const [dayFilter, setDayFilter] = useState('all')
   const [formData, setFormData] = useState({
     id: null,
     name: '',
@@ -199,6 +202,9 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     setSelectedProfile(null)
     setSelectedIds(new Set())
     setBulkPreviewData(null)
+    // Day filter values are event-specific dates — a stale one from the
+    // previous event would match no rows in the new one (#588).
+    setDayFilter('all')
   }, [selectedEventId])
 
   const handleInputChange = e => {
@@ -455,6 +461,23 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   // Reuse sorting/conflict logic from BandsTab (simplified)
   const getVenueName = useCallback(id => venues.find(v => String(v.id) === String(id))?.name || 'Unknown', [venues])
 
+  // Festival day a performance belongs to (#588), via the same
+  // NULL-performance_date-inherits-event-start-date convention detectConflicts
+  // already uses for day-scoping (resolveFestivalDay in ./utils/timeUtils) —
+  // the Day column/sort/filter must never disagree with conflict detection
+  // about which day a row is on.
+  const bandFestivalDate = useCallback(band => resolveFestivalDay(band, selectedEvent?.date), [selectedEvent?.date])
+
+  // Day numbering for the Day column: derived from the same calendar-range
+  // dayOptions the filter dropdown and the event form use (buildDayOptions),
+  // so "Day N" always means the same date across every admin surface — a
+  // data-derived numbering (dayNumberByDate) drifts from the dropdown when an
+  // interior festival day has no performances yet (mid-setup). A
+  // performance_date outside the event's [date, end_date] range has no
+  // calendar day number; render '?' rather than "Day undefined".
+  const dayNumberMap = useMemo(() => new Map(dayOptions.map((opt, index) => [opt.value, index + 1])), [dayOptions])
+  const dayNumberLabel = useCallback(date => dayNumberMap.get(date) ?? '?', [dayNumberMap])
+
   const filteredBands = useMemo(() => {
     let next = bands
     if (searchTerm.trim()) {
@@ -464,8 +487,11 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     if (venueFilter !== 'all') {
       next = next.filter(band => String(band.venue_id) === String(venueFilter))
     }
+    if (isMultiDay && dayFilter !== 'all') {
+      next = next.filter(band => bandFestivalDate(band) === dayFilter)
+    }
     return next
-  }, [bands, searchTerm, venueFilter])
+  }, [bands, searchTerm, venueFilter, isMultiDay, dayFilter, bandFestivalDate])
 
   const sortedBands = useMemo(() => {
     if (!sortConfig.key) {
@@ -490,6 +516,15 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
         const bVal = deriveDurationMinutes(b.start_time, b.end_time) || 0
         return (aVal - bVal) * direction
       }
+      if (sortConfig.key === 'performance_date') {
+        // Plain YYYY-MM-DD string comparison sorts chronologically (#588) —
+        // same convention as festivalDays.js's orderedFestivalDays. NULL
+        // performance_date resolves to the event start date via
+        // bandFestivalDate, never re-deriving the fallback locally.
+        const aVal = bandFestivalDate(a) || ''
+        const bVal = bandFestivalDate(b) || ''
+        return aVal.localeCompare(bVal) * direction
+      }
 
       const aMin = parseTimeToMinutes(a.start_time)
       const bMin = parseTimeToMinutes(b.start_time)
@@ -500,7 +535,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       const bAdj = adjustForMidnight(bMin)
       return (aAdj - bAdj) * direction
     })
-  }, [filteredBands, sortConfig, getVenueName])
+  }, [filteredBands, sortConfig, getVenueName, bandFestivalDate])
 
   const handleSort = key => {
     setSortConfig(prev => ({
@@ -771,6 +806,20 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                 </option>
               ))}
             </select>
+            {isMultiDay && (
+              <select
+                value={dayFilter}
+                onChange={e => setDayFilter(e.target.value)}
+                className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
+              >
+                <option value="all">All days</option>
+                {dayOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            )}
             <span className="text-xs text-text-tertiary">
               {sortedBands.length} performance{sortedBands.length === 1 ? '' : 's'}
             </span>
@@ -798,6 +847,21 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                               onChange={e => handleSelectAll(e.target.checked)}
                               checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
                             />
+                          </th>
+                        )}
+                        {isMultiDay && (
+                          <th
+                            className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                            onClick={() => handleSort('performance_date')}
+                            aria-sort={
+                              sortConfig.key === 'performance_date'
+                                ? sortConfig.direction === 'asc'
+                                  ? 'ascending'
+                                  : 'descending'
+                                : 'none'
+                            }
+                          >
+                            Day <SortIcon col="performance_date" sortConfig={sortConfig} />
                           </th>
                         )}
                         <th
@@ -879,6 +943,16 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                   checked={selectedIds.has(band.id)}
                                   onChange={e => handleSelect(band.id, e.target.checked)}
                                 />
+                              </td>
+                            )}
+                            {isMultiDay && (
+                              <td className="px-4 py-3 text-white/70 whitespace-nowrap">
+                                <div className="font-medium text-white">
+                                  Day {dayNumberLabel(bandFestivalDate(band))}
+                                </div>
+                                <div className="text-xs text-text-tertiary">
+                                  {formatFestivalDate(bandFestivalDate(band), 'short')}
+                                </div>
                               </td>
                             )}
                             <td className="px-4 py-3 text-white font-medium">
@@ -1007,6 +1081,9 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                           )}
                         </div>
                         <div className="text-sm text-text-secondary space-y-1">
+                          {isMultiDay && (
+                            <div>{`Day ${dayNumberLabel(bandFestivalDate(band))} (${formatFestivalDate(bandFestivalDate(band), 'short')})`}</div>
+                          )}
                           <div>Venue: {getVenueName(band.venue_id)}</div>
                           <div>Time: {formatTimeRangeLabel(band.start_time, band.end_time)}</div>
                           {band.notes && (

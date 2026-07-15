@@ -5,6 +5,7 @@ import {
   AFTER_MIDNIGHT_THRESHOLD_MINUTES,
   detectConflicts,
   parseTimeToMinutes,
+  resolveFestivalDay,
   sortBandsByStart,
 } from '../timeUtils'
 
@@ -220,5 +221,35 @@ describe('detectConflicts — festival-day scoping (#538)', () => {
     const result = detectConflicts(setA, [setA, setB])
     expect(result.conflicts).toEqual(['Band 2'])
     expect(result.overlaps).toHaveLength(0)
+  })
+})
+
+// ─── resolveFestivalDay (#588) ───────────────────────────────────────────────
+// Exported so LineupTab's Day column/sort/filter resolve a performance's
+// festival day identically to detectConflicts's day-scoping — covered here
+// directly (rather than only indirectly through detectConflicts) since it is
+// now a standalone export other modules rely on.
+
+describe('resolveFestivalDay', () => {
+  it('returns the performance_date when set', () => {
+    expect(resolveFestivalDay({ performance_date: '2026-08-03' }, '2026-08-02')).toBe('2026-08-03')
+  })
+
+  it('falls back to the supplied eventDate when performance_date is null', () => {
+    expect(resolveFestivalDay({ performance_date: null }, '2026-08-02')).toBe('2026-08-02')
+  })
+
+  it('falls back to the supplied eventDate when performance_date is absent entirely', () => {
+    expect(resolveFestivalDay({}, '2026-08-02')).toBe('2026-08-02')
+  })
+
+  it('returns null when neither performance_date nor eventDate is available', () => {
+    expect(resolveFestivalDay({}, null)).toBeNull()
+    expect(resolveFestivalDay({}, undefined)).toBeNull()
+  })
+
+  it('returns null for a null/undefined performance with no eventDate', () => {
+    expect(resolveFestivalDay(null, null)).toBeNull()
+    expect(resolveFestivalDay(undefined, undefined)).toBeNull()
   })
 })

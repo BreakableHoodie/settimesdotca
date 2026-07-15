@@ -110,7 +110,12 @@ const intervalsOverlap = (intervalA, intervalB) => intervalA[0] < intervalB[1] &
 // else the fallback event date supplied by the caller. Returns null when
 // neither is available, which — critically — makes the day-scope check below
 // a no-op (see detectConflicts).
-const resolveFestivalDay = (performance, eventDate) => performance?.performance_date || eventDate || null
+//
+// Exported (#588) so LineupTab's Day column/sort/filter resolve a
+// performance's festival day the same way detectConflicts's day-scoping
+// does — the NULL-performance_date-inherits-event-start-date convention must
+// never drift between the two call sites.
+export const resolveFestivalDay = (performance, eventDate) => performance?.performance_date || eventDate || null
 
 // Returns { overlaps: string[], conflicts: string[] }
 // conflicts = exact same start AND end time; overlaps = any other time intersection

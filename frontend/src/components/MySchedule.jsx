@@ -316,7 +316,7 @@ function MySchedule({
         <div className="mt-4">
           <button
             onClick={onToggleShowPast}
-            className="text-xs px-3 py-1.5 rounded bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30 transition-colors"
+            className="inline-flex min-h-[44px] items-center justify-center text-xs px-3 py-1.5 rounded bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30 transition-colors"
           >
             Show finished sets
           </button>
@@ -466,7 +466,7 @@ function MySchedule({
             {hasFinishedBands && (
               <button
                 onClick={onToggleShowPast}
-                className={`text-xs px-3 py-1.5 rounded border transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
+                className={`inline-flex min-h-[44px] items-center justify-center text-xs px-3 py-1.5 rounded border transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
                   showPast
                     ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
                     : 'bg-bg-purple/50 border-accent-500/50 text-accent-400 hover:bg-bg-purple'
@@ -520,7 +520,7 @@ function MySchedule({
               )}
               <button
                 onClick={onClearSchedule}
-                className="text-xs px-3 py-1.5 rounded bg-error-500/20 border border-error-500/50 text-text-primary flex items-center gap-2 transition-transform duration-150 hover:bg-error-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-error-400"
+                className="min-h-[44px] text-xs px-3 py-1.5 rounded bg-error-500/20 border border-error-500/50 text-text-primary flex items-center gap-2 transition-transform duration-150 hover:bg-error-500/30 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-error-400"
                 title="Clear all selected bands"
               >
                 <Trash2 size={14} aria-hidden="true" />

@@ -28,7 +28,7 @@ function DirectionsButton({ band }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-bg-navy transition-colors hover:bg-accent-400 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-300"
+      className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-bg-navy transition-colors hover:bg-accent-400 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-300"
       aria-label={`Directions to ${band.venue || 'the venue'}`}
     >
       <Navigation size={15} aria-hidden="true" />
@@ -111,7 +111,7 @@ function Action({ state, onDecide }) {
       <button
         type="button"
         onClick={onDecide}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-bg-navy transition-colors hover:bg-accent-400 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-300"
+        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-bg-navy transition-colors hover:bg-accent-400 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-300"
       >
         Choose in My Route
         <ArrowRight size={15} aria-hidden="true" />

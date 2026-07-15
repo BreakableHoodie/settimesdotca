@@ -182,7 +182,7 @@ function LiveContextBar({
               aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
               aria-expanded={isFiltersOpen}
               aria-controls="live-filter-panel"
-              className="shrink-0 flex min-h-[36px] items-center gap-1 px-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+              className="shrink-0 flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 px-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
             >
               <ChevronDown
                 size={14}
@@ -272,7 +272,7 @@ function LiveContextBar({
             aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
             aria-expanded={isFiltersOpen}
             aria-controls="live-filter-panel"
-            className="ml-auto inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+            className="ml-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
           >
             <span>Filters</span>
             <ChevronDown
@@ -291,7 +291,7 @@ function LiveContextBar({
                   type="button"
                   onClick={() => onViewChange?.('all')}
                   aria-pressed={view === 'all'}
-                  className={`min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
+                  className={`min-h-[44px] rounded-full px-4 text-sm font-semibold transition-colors ${
                     view === 'all' ? 'bg-accent-500 text-bg-navy' : 'text-text-tertiary hover:text-text-primary'
                   }`}
                 >
@@ -301,7 +301,7 @@ function LiveContextBar({
                   type="button"
                   onClick={() => onViewChange?.('mine')}
                   aria-pressed={view === 'mine'}
-                  className={`relative min-h-[40px] rounded-full px-4 text-sm font-semibold transition-colors ${
+                  className={`relative min-h-[44px] rounded-full px-4 text-sm font-semibold transition-colors ${
                     view === 'mine' ? 'bg-accent-500 text-bg-navy' : 'text-text-tertiary hover:text-text-primary'
                   }`}
                 >

@@ -118,4 +118,26 @@ describe('LiveContextBar', () => {
 
     expect(screen.getAllByText('Doors 6:30 PM').length).toBeGreaterThan(0)
   })
+
+  it('shows "Tonight" instead of "0 days away" pre-doors on the event\'s own day (#596)', () => {
+    const eventWithDoors = { ...eventData, doors_json: JSON.stringify({ '2026-05-06': '18:30' }) }
+
+    render(
+      <LiveContextBar
+        eventData={eventWithDoors}
+        currentTime={new Date('2026-05-06T12:00:00')}
+        bands={bands}
+        selectedCount={0}
+        view="all"
+        onViewChange={vi.fn()}
+        venueFilter={null}
+        onVenueFilterChange={vi.fn()}
+        timeFilter="all"
+        onTimeFilterChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getAllByText('Tonight').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/0 days away/)).not.toBeInTheDocument()
+  })
 })

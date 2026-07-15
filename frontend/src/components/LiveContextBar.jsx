@@ -1,5 +1,6 @@
 import { CalendarDays, ChevronDown, Clock, DoorOpen, Route, Warehouse } from 'lucide-react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { getDaysAwayAriaLabel, getDaysAwayLabel } from '../utils/daysAway'
 import { getDoorsTimeForDate } from '../utils/doorsTime'
 import { getLifecycleLabel } from '../utils/liveLabel'
 import { formatTime } from '../utils/timeFormat'
@@ -129,7 +130,7 @@ function LiveContextBar({
     }
 
     if (daysUntil !== null) {
-      summaryItems.push(`${daysUntil} ${daysUntil === 1 ? 'day away' : 'days away'}`)
+      summaryItems.push(getDaysAwayLabel(daysUntil))
     }
 
     return summaryItems.join(' • ')
@@ -261,9 +262,7 @@ function LiveContextBar({
           </div>
           {daysUntil !== null && (
             <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-warning-400/35 bg-warning-400/10 px-3 py-2 font-semibold text-warning-400">
-              <span aria-label={`${daysUntil} ${daysUntil === 1 ? 'day' : 'days'} until the event`}>
-                {daysUntil} {daysUntil === 1 ? 'day away' : 'days away'}
-              </span>
+              <span aria-label={getDaysAwayAriaLabel(daysUntil)}>{getDaysAwayLabel(daysUntil)}</span>
             </div>
           )}
           <button

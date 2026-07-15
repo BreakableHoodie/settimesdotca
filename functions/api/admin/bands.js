@@ -10,6 +10,7 @@ import {
   safeReflectSocialLinksString,
   sanitizeBandSocialLinks,
   sanitizeOptionalHttpUrl,
+  sanitizeOptionalText,
   sanitizeString,
   validatePerformanceDate,
 } from "../../utils/validation.js";
@@ -253,6 +254,7 @@ export async function onRequestPost(context) {
       contact_email,
       is_active,
       social_links, // JSON string from frontend
+      notes,
     } = body;
 
     const resolvedName = sanitizeString(name || "");
@@ -261,10 +263,12 @@ export async function onRequestPost(context) {
     const resolvedGenre = genre !== undefined ? sanitizeString(genre) || null : null;
     let resolvedPhotoUrl;
     let resolvedWebsite;
+    let resolvedNotes;
 
     try {
       resolvedPhotoUrl = sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL");
       resolvedWebsite = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
+      resolvedNotes = sanitizeOptionalText(notes, FIELD_LIMITS.performanceNotes.max, "Notes");
     } catch (error) {
       return new Response(JSON.stringify({ error: "Validation error", message: error.message }), {
         status: 400,
@@ -481,11 +485,19 @@ export async function onRequestPost(context) {
       let perfResult;
       try {
         perfResult = await DB.prepare(
-          `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, performance_date)
-           VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO performances (event_id, venue_id, band_profile_id, start_time, end_time, performance_date, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            RETURNING id`,
         )
-          .bind(eventId, resolvedVenueId, bandProfile.id, startTime || null, endTime || null, resolvedPerformanceDate)
+          .bind(
+            eventId,
+            resolvedVenueId,
+            bandProfile.id,
+            startTime || null,
+            endTime || null,
+            resolvedPerformanceDate,
+            resolvedNotes,
+          )
           .first();
       } catch (perfError) {
         // Compensating delete: only undo profiles we just created, not pre-existing ones

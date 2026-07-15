@@ -14,7 +14,7 @@ const HELP_CONTENT = {
     items: [
       'Bulk select bands to reschedule or update venues at once.',
       'Conflict warnings appear when time slots overlap within the same venue.',
-      'Admin-only notes are never exposed to the public API.',
+      'Set notes are shown to fans on the public schedule — keep them fan-appropriate, not internal shorthand.',
     ],
   },
 }

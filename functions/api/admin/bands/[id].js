@@ -9,6 +9,7 @@ import {
   safeReflectSocialLinks,
   sanitizeBandSocialLinks,
   sanitizeOptionalHttpUrl,
+  sanitizeOptionalText,
   sanitizeString,
   validatePerformanceDate,
 } from "../../../utils/validation.js";
@@ -145,6 +146,7 @@ export async function onRequestPut(context) {
       photo_url,
       photo_alt_text,
       social_links,
+      notes,
     } = body;
 
     // Normalize venueId: treat "", 0, "0" as null (no venue assigned).
@@ -153,9 +155,12 @@ export async function onRequestPut(context) {
     const normalizedVenueId =
       venueId === undefined ? undefined : !venueId || Number(venueId) <= 0 ? null : Number(venueId);
     let resolvedPhotoUrl;
+    let resolvedNotes;
     try {
       resolvedPhotoUrl =
         photo_url !== undefined ? sanitizeOptionalHttpUrl(photo_url, FIELD_LIMITS.bandUrl.max, "Photo URL") : undefined;
+      resolvedNotes =
+        notes !== undefined ? sanitizeOptionalText(notes, FIELD_LIMITS.performanceNotes.max, "Notes") : undefined;
     } catch (error) {
       return new Response(JSON.stringify({ error: "Validation error", message: error.message }), {
         status: 400,
@@ -217,7 +222,8 @@ export async function onRequestPut(context) {
         normalizedVenueId !== undefined ||
         startTime !== undefined ||
         endTime !== undefined ||
-        performanceDate !== undefined;
+        performanceDate !== undefined ||
+        notes !== undefined;
       if (linkedEvent?.status === "archived" && editsPerformanceFields) {
         return new Response(
           JSON.stringify({
@@ -561,6 +567,10 @@ export async function onRequestPut(context) {
       if (performanceDate !== undefined) {
         updates.push("performance_date = ?");
         params.push(resolvedPerformanceDate);
+      }
+      if (notes !== undefined) {
+        updates.push("notes = ?");
+        params.push(resolvedNotes);
       }
 
       // If performance fields to update

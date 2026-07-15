@@ -15,6 +15,7 @@ const BLANK_SCHEDULE = {
   end_time: '',
   duration: '',
   performance_date: '',
+  notes: '',
 }
 
 export function buildPickerFormData(artist, eventId) {

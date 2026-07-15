@@ -83,6 +83,9 @@ export const FIELD_LIMITS = {
   socialHandle: { min: 0, max: 100 },
   bandContactEmail: { min: 0, max: 255 },
 
+  // Performance fields
+  performanceNotes: { min: 0, max: 1000 },
+
   // Event fields
   eventName: { min: 3, max: 200 },
   eventSlug: { min: 3, max: 100 },
@@ -248,7 +251,7 @@ export function sanitizeString(input) {
   return input.replace(CONTROL_CHARS_REGEX, "").trim();
 }
 
-function sanitizeOptionalText(value, maxLength, label) {
+export function sanitizeOptionalText(value, maxLength, label) {
   if (value === undefined || value === null) {
     return null;
   }

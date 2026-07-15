@@ -75,6 +75,7 @@ export async function onRequestGet(context) {
         p.start_time as startTime,
         p.end_time as endTime,
         p.performance_date as performanceDate,
+        p.notes,
         b.social_links,
         b.photo_url,
         v.name as venue,
@@ -144,6 +145,7 @@ export async function onRequestGet(context) {
         startTime: extractTime(band.startTime),
         endTime: extractTime(band.endTime),
         url: primaryUrl,
+        notes: band.notes || null,
       };
     });
 

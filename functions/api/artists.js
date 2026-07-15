@@ -6,9 +6,18 @@
 // PUBLIC_DATA_PUBLISH_ENABLED switch as the rest of the public data.
 
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
+import { sortableName } from "../utils/sortableName.js";
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 60;
+// SQLite ORDER BY can't strip a leading "The"/"A"/"An" inline (#587), so this
+// endpoint fetches every matching row (up to this generous safety cap, far
+// beyond any realistic band count for the roster), sorts by the
+// article-stripped key in JS, then paginates in JS. Re-sorting only the
+// LIMIT/OFFSET page returned by SQL would misorder results across page
+// boundaries — this is the primary public artist directory, so pagination
+// must stay globally consistent.
+const FETCH_CAP = 2000;
 
 function formatOrigin(row) {
   const parts = [row.origin_city, row.origin_region].filter(Boolean);
@@ -36,7 +45,8 @@ export async function onRequestGet(context) {
   const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
 
   try {
-    // Fetch one extra row to compute hasMore without a separate COUNT query.
+    // Coarse SQL pre-sort (COLLATE NOCASE) — the real article-stripped order
+    // is applied in JS below, across the whole match set, before pagination.
     const rows = await DB.prepare(
       `
       SELECT
@@ -60,15 +70,15 @@ export async function onRequestGet(context) {
         )
       GROUP BY bp.id
       ORDER BY bp.name COLLATE NOCASE
-      LIMIT ? OFFSET ?
+      LIMIT ?
     `,
     )
-      .bind(q, like, like, limit + 1, offset)
+      .bind(q, like, like, FETCH_CAP)
       .all();
 
-    const results = rows.results || [];
-    const hasMore = results.length > limit;
-    const artists = results.slice(0, limit).map((row) => ({
+    const allResults = (rows.results || []).sort((a, b) => sortableName(a.name).localeCompare(sortableName(b.name)));
+    const hasMore = allResults.length > offset + limit;
+    const artists = allResults.slice(offset, offset + limit).map((row) => ({
       id: row.id,
       name: row.name,
       photo_url: row.photo_url,

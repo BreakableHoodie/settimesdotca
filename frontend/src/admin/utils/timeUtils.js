@@ -1,4 +1,5 @@
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../../utils/festivalDays'
+import { compareByName } from '../../utils/sortableName'
 
 const MINUTES_PER_DAY = 24 * 60
 // Bands starting before this hour are treated as after-midnight (same night as the preceding
@@ -209,7 +210,8 @@ export const sortBandsByStart = bands => {
     const bMinutes = parseTimeToMinutes(bandB?.start_time)
 
     if (aMinutes == null && bMinutes == null) {
-      return (bandA?.name || '').localeCompare(bandB?.name || '')
+      // Article-stripped alphabetization (#587) — "The Anti-Queens" sorts under A.
+      return compareByName(bandA, bandB)
     }
 
     if (aMinutes == null) return 1
@@ -219,7 +221,7 @@ export const sortBandsByStart = bands => {
     const bAdj = adjustForMidnight(bMinutes)
 
     if (aAdj === bAdj) {
-      return (bandA?.name || '').localeCompare(bandB?.name || '')
+      return compareByName(bandA, bandB)
     }
 
     return aAdj - bAdj

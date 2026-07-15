@@ -17,6 +17,35 @@ import {
 import { buildIntervals, intervalsOverlap } from "../../utils/timeConflicts.js";
 import { parseOrigin } from "../../utils/parseOrigin.js";
 import { normalizeBandName } from "../../utils/bandName.js";
+import { sortableName } from "../../utils/sortableName.js";
+
+// SQLite `ORDER BY` can't strip a leading article inline (#587), so the SQL
+// in onRequestGet below is a coarse pre-sort (correct on start_time/event_date,
+// raw-byte on name) and the exact ordering is re-derived in JS afterward,
+// swapping the name comparison for the article-stripped `sortableName` key.
+// These mirror the NULL-ordering SQLite applies by default: ASC puts NULLs
+// first, DESC puts NULLs last.
+function compareStartTimeNullsLast(a, b) {
+  if (a.start_time == null && b.start_time == null) return 0;
+  if (a.start_time == null) return 1;
+  if (b.start_time == null) return -1;
+  return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0;
+}
+
+function compareStartTimeNullsFirst(a, b) {
+  if (a.start_time == null && b.start_time == null) return 0;
+  if (a.start_time == null) return -1;
+  if (b.start_time == null) return 1;
+  return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0;
+}
+
+function compareEventDateDescNullsLast(a, b) {
+  if (a.event_date == null && b.event_date == null) return 0;
+  if (a.event_date == null) return 1;
+  if (b.event_date == null) return -1;
+  if (a.event_date === b.event_date) return 0;
+  return a.event_date > b.event_date ? -1 : 1;
+}
 
 async function getEventStatus(DB, eventId) {
   if (!eventId) return null;
@@ -211,6 +240,22 @@ export async function onRequestGet(context) {
     }
 
     const bands = (result.results || []).map(unpackSocialLinks);
+
+    // Re-derive the exact ordering in JS with the article-stripped sort key
+    // (#587) — see the comparator helpers above. No pagination-boundary risk:
+    // the eventId branch has no LIMIT/OFFSET (one event's full lineup), and
+    // no admin UI consumer requests the "list all" branch beyond its single
+    // default page.
+    if (eventId) {
+      bands.sort((a, b) => compareStartTimeNullsLast(a, b) || sortableName(a.name).localeCompare(sortableName(b.name)));
+    } else {
+      bands.sort(
+        (a, b) =>
+          compareEventDateDescNullsLast(a, b) ||
+          compareStartTimeNullsFirst(a, b) ||
+          sortableName(a.name).localeCompare(sortableName(b.name)),
+      );
+    }
 
     return new Response(JSON.stringify({ success: true, bands }), {
       headers: { "Content-Type": "application/json" },

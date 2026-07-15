@@ -100,4 +100,25 @@ describe("Public artists directory - GET /api/artists", () => {
     const res = await getArtists(env);
     expect(res.status).toBe(503);
   });
+
+  it("orders results alphabetically ignoring a leading article (#587)", async () => {
+    const { env, rawDb } = seedEnv();
+    const venue = insertVenue(rawDb, { name: "Main" });
+    const ev = insertEvent(rawDb, { name: "Sort Fest", slug: "sort-fest" });
+    publish(rawDb, ev.id);
+
+    // Inserted out of both raw-name and article-stripped order.
+    for (const name of ["Zebras", "The Anti-Queens", "Beatles", "An Horse"]) {
+      insertBand(rawDb, { name, event_id: ev.id, venue_id: venue.id });
+    }
+
+    const res = await getArtists(env);
+    expect(res.status).toBe(200);
+    const { artists: list } = await res.json();
+    const names = list.map((a) => a.name);
+
+    // Article-stripped order: Anti-Queens, Beatles, Horse, Zebras — NOT the
+    // raw-byte order (which would put "The Anti-Queens" under T, after "Beatles").
+    expect(names).toEqual(["The Anti-Queens", "Beatles", "An Horse", "Zebras"]);
+  });
 });

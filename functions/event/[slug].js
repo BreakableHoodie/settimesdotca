@@ -4,6 +4,7 @@
 import { isPublicDataEnabled } from "../utils/publicGate.js";
 import { escapeAttr, toPlainText, serveWithInjectedMeta, WATERLOO_ADDRESS, CANONICAL_HOST } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
+import { sortableName } from "../utils/sortableName.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -58,6 +59,11 @@ export async function onRequest(context) {
     // Non-fatal: fall through with empty arrays; MusicEvent still renders.
     console.error("SSR event bands/venues lookup failed:", slug, err);
   }
+
+  // SQLite ORDER BY can't strip a leading article inline (#587); the query
+  // above is a coarse pre-sort and the JSON-LD performer list is re-sorted
+  // here by the article-stripped key so "The Anti-Queens" lists under A.
+  bands.sort((a, b) => sortableName(a.name).localeCompare(sortableName(b.name)));
 
   // Pin to the production host — preview deploys must not self-canonicalise.
   const url = `${CANONICAL_HOST}/event/${event.slug}`;

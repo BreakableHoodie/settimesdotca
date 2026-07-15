@@ -78,7 +78,7 @@ export default function PrivacyBanner() {
         <button
           type="button"
           onClick={handleDismiss}
-          className="rounded-full border border-accent-500/60 px-4 py-1 text-accent-400 transition hover:border-accent-400 hover:text-text-primary"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-accent-500/60 px-4 py-1 text-accent-400 transition hover:border-accent-400 hover:text-text-primary"
         >
           Got it
         </button>

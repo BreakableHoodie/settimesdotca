@@ -1,4 +1,4 @@
-import { Archive, Bell, CircleAlert, X } from 'lucide-react'
+import { Archive, Bell, CircleAlert, WifiOff, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -162,6 +162,7 @@ function App() {
   )
   const [loading, setLoading] = useState(!HAS_FALLBACK)
   const [error, setError] = useState(null)
+  const [isOfflineError, setIsOfflineError] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [timeFilter, setTimeFilter] = useState(() => getStoredTimeFilter(slug))
   const [venueFilter, setVenueFilter] = useState(null)
@@ -202,6 +203,7 @@ function App() {
         }
 
         setError(null)
+        setIsOfflineError(false)
         setBands(prepareBands(bandsData))
         setEventData(eventInfo)
         setLoading(false)
@@ -211,6 +213,14 @@ function App() {
         }
         console.error('Failed to load bands:', err)
         if (!HAS_FALLBACK) {
+          // A fetch that never reached the server (offline, or the service
+          // worker's network-first strategy re-throwing after a cache miss —
+          // see sw.js networkFirstStrategy) surfaces as a TypeError, never an
+          // HTTP-status Error. Combined with navigator.onLine, that's enough
+          // signal to show branded offline messaging instead of the generic
+          // error card for a route this device never cached (#595).
+          const offline = (typeof navigator !== 'undefined' && navigator.onLine === false) || err instanceof TypeError
+          setIsOfflineError(offline)
           setError(err.message || 'Failed to load schedule. Please try refreshing the page.')
         }
         setLoading(false)
@@ -592,6 +602,29 @@ function App() {
 
   if (shouldShowLoading) {
     return <ScheduleSkeleton />
+  }
+
+  if (error && isOfflineError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          <div className="text-warning-400 mb-4" aria-hidden="true">
+            <WifiOff size={64} />
+          </div>
+          <h2 className="text-text-primary text-2xl font-bold mb-2">You&apos;re offline</h2>
+          <p className="text-text-secondary mb-6">
+            This event hasn&apos;t been loaded on this device yet, so there&apos;s nothing saved to show. Reconnect and
+            try again.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-all"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (error) {

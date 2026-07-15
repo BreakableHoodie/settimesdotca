@@ -124,4 +124,30 @@ test.describe("Offline resilience (#578)", () => {
 
     await context.setOffline(false);
   });
+
+  test("navigating to an uncached event route while offline shows branded offline messaging, not the generic error card (#595)", async ({
+    page,
+    context,
+  }) => {
+    // Deliberately never seeded/visited — nothing in the API cache for this
+    // slug, so offline navigation exercises the true cache-miss path.
+    const slug = `uncached-offline-${uniqueSuffix()}`;
+
+    // Register + activate the SW and cache the shell via a normal online
+    // visit (mirrors the recipe above). The event route/API response for
+    // `slug` is never fetched online, so it stays uncached.
+    await page.goto("/");
+    await page.waitForFunction(() => navigator.serviceWorker.controller !== null, null, {
+      timeout: 20000,
+    });
+    await page.reload();
+
+    await context.setOffline(true);
+    await page.goto(`/event/${slug}`);
+
+    await expect(page.getByRole("heading", { name: "You're offline" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/oops! something went wrong/i)).not.toBeVisible();
+
+    await context.setOffline(false);
+  });
 });

@@ -326,3 +326,156 @@ describe("GET /api/feeds/ical — reveal_mode gate (real-DB)", () => {
     expect(icalData.split("BEGIN:VEVENT").length - 1).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Day-aware iCal export (#542 PR-2, real-DB).
+// Before this fix, every VEVENT was stamped with e.date (the event's overall
+// start date) regardless of which festival day a set fell on — a fan
+// importing a multi-day festival got every set on day 1. These tests exercise
+// the actual SQL (SELECT + ORDER BY) added to ical.js, not a hand-rolled mock.
+// ---------------------------------------------------------------------------
+describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
+  const day1 = "2099-03-01";
+  const day2 = "2099-03-02";
+
+  test("day-2 VEVENT's DTSTART, DTEND, and UID all carry day-2's date, not the event's start date", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const event = insertEvent(rawDb, {
+      name: "Two Day Ical Event",
+      slug: "ical-two-day",
+      date: day1,
+      end_date: day2,
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Roost" });
+
+    const day2Perf = insertBand(rawDb, {
+      name: "Day Two Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "14:00",
+      end_time: "15:00",
+    });
+    // Explicit performance_date on the day-2 row (the multi-day convention
+    // from migration 0051 — NULL rows inherit the event's single date).
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run(day2, day2Perf.id);
+
+    const request = new Request("https://example.test/api/feeds/ical");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const icalData = await response.text();
+
+    const day2Compact = day2.replace(/-/g, "");
+    const day1Compact = day1.replace(/-/g, "");
+
+    expect(icalData).toContain(`DTSTART:${day2Compact}T140000`);
+    expect(icalData).toContain(`DTEND:${day2Compact}T150000`);
+    expect(icalData).toContain(`UID:performance-${day2Perf.id}-${day2}@settimes.ca`);
+    // Must not be stamped with the event's start date — that's the bug this fixes.
+    expect(icalData).not.toContain(`DTSTART:${day1Compact}T140000`);
+  });
+
+  test("after-midnight set (01:00) keeps day-1's calendar date in DTSTART — no +1-day sort offset applied", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const event = insertEvent(rawDb, {
+      name: "After Midnight Ical Event",
+      slug: "ical-after-midnight",
+      date: day1,
+      end_date: day2,
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Prohibition Warehouse" });
+
+    const lateNightPerf = insertBand(rawDb, {
+      name: "After Midnight Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "01:00",
+      end_time: "02:00",
+    });
+    // Migration 0051's stored-day convention: a 1 AM set on the night of day 1
+    // stores day 1's calendar date (not day 2's) — the after-midnight set is
+    // "understood" via the 01:00 clock time, not a shifted date.
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run(day1, lateNightPerf.id);
+
+    const request = new Request("https://example.test/api/feeds/ical");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const icalData = await response.text();
+
+    // Wall-clock date+time pair: day-1's calendar date with the 01:00 clock
+    // time. iCal must NOT apply prepareBands' frontend-only +1-day sort
+    // offset (that offset is for display ordering only, not wall-clock time).
+    expect(icalData).toContain(`DTSTART:${day1.replace(/-/g, "")}T010000`);
+    expect(icalData).not.toContain(`DTSTART:${day2.replace(/-/g, "")}T010000`);
+  });
+
+  test("VEVENTs are ordered by festival day then by time-of-day, not interleaved by raw clock time", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const event = insertEvent(rawDb, {
+      name: "Ordering Ical Event",
+      slug: "ical-ordering",
+      date: day1,
+      end_date: day2,
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+
+    // Day-1 early set (NULL performance_date — inherits the event's date).
+    insertBand(rawDb, {
+      name: "Day1 Early Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+
+    // Day-1 late set (NULL performance_date — inherits the event's date).
+    insertBand(rawDb, {
+      name: "Day1 Late Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "22:00",
+      end_time: "23:00",
+    });
+
+    // Day-2 morning set: an earlier clock time than either day-1 set, which
+    // would sort FIRST under the old "ORDER BY e.date ASC, p.start_time ASC"
+    // query (interleaving day 2 ahead of day 1's evening lineup — the bug).
+    const morningDay2 = insertBand(rawDb, {
+      name: "Day2 Morning Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "10:00",
+      end_time: "11:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run(day2, morningDay2.id);
+
+    const request = new Request("https://example.test/api/feeds/ical");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const icalData = await response.text();
+
+    const idxEarly = icalData.indexOf("SUMMARY:Day1 Early Band");
+    const idxLate = icalData.indexOf("SUMMARY:Day1 Late Band");
+    const idxMorning = icalData.indexOf("SUMMARY:Day2 Morning Band");
+
+    expect(idxEarly).toBeGreaterThan(-1);
+    expect(idxLate).toBeGreaterThan(-1);
+    expect(idxMorning).toBeGreaterThan(-1);
+
+    // Exact VEVENT order: day 1's full lineup (by time-of-day), then day 2's —
+    // never day 2 slotted ahead of day 1 by raw clock time.
+    expect(idxEarly).toBeLessThan(idxLate);
+    expect(idxLate).toBeLessThan(idxMorning);
+  });
+});

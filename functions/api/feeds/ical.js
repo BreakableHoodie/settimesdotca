@@ -42,6 +42,7 @@ export async function onRequestGet(context) {
         p.id as performance_id,
         p.start_time,
         p.end_time,
+        p.performance_date,
         v.name as venue_name,
         v.address
       FROM events e
@@ -64,7 +65,7 @@ export async function onRequestGet(context) {
       params.push(genre);
     }
 
-    query += ` ORDER BY e.date ASC, p.start_time ASC`;
+    query += ` ORDER BY e.date ASC, COALESCE(p.performance_date, e.date) ASC, p.start_time ASC`;
 
     const { results: bands } = await env.DB.prepare(query)
       .bind(...params)
@@ -103,7 +104,10 @@ function generateICal(bands, city, genre) {
     if (!band.band_name) continue;
 
     // Parse date and time
-    const eventDate = band.date; // YYYY-MM-DD
+    // Per-set festival day: a performance carries its own performance_date
+    // when the event spans multiple days (epic #543); NULL inherits the
+    // event's single date, keeping single-day events byte-identical.
+    const eventDate = band.performance_date || band.date; // YYYY-MM-DD
     const startTime = band.start_time || "20:00"; // HH:MM
     const endTime = band.end_time || "21:00";
 

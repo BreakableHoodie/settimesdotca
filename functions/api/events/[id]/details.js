@@ -88,21 +88,38 @@ export async function onRequestGet(context) {
 
     const rows = bandsResult.results || [];
     const venuesMap = new Map();
+    // Distinct band ids across the whole event — a band playing two sets
+    // must count once in band_count even though `bands` below stays
+    // per-performance (the expanded lineup grid legitimately shows each set).
+    const distinctBandIds = new Set();
     const bands = rows.map((row) => {
-      if (row.venue_id && !venuesMap.has(row.venue_id)) {
-        venuesMap.set(row.venue_id, {
-          id: row.venue_id,
-          name: row.venue_name,
-          address: row.venue_address || formatVenueAddress(row),
-          band_count: 0,
-        });
+      if (row.band_id) {
+        distinctBandIds.add(row.band_id);
       }
+
+      // Per-venue band_count must also be distinct bands, not a per-row
+      // tally — a band playing the same venue twice (two sets) must count
+      // once. `bandIds` is stripped from the response below.
       if (row.venue_id) {
-        venuesMap.get(row.venue_id).band_count++;
+        if (!venuesMap.has(row.venue_id)) {
+          venuesMap.set(row.venue_id, {
+            id: row.venue_id,
+            name: row.venue_name,
+            address: row.venue_address || formatVenueAddress(row),
+            band_count: 0,
+            bandIds: new Set(),
+          });
+        }
+        const venue = venuesMap.get(row.venue_id);
+        if (row.band_id && !venue.bandIds.has(row.band_id)) {
+          venue.bandIds.add(row.band_id);
+          venue.band_count++;
+        }
       }
 
       return {
         id: row.band_id,
+        performance_id: row.performance_id,
         name: row.band_name,
         start_time: row.start_time,
         end_time: row.end_time,
@@ -117,8 +134,8 @@ export async function onRequestGet(context) {
       JSON.stringify({
         event,
         bands,
-        venues: Array.from(venuesMap.values()),
-        band_count: bands.length,
+        venues: Array.from(venuesMap.values()).map(({ bandIds: _bandIds, ...venue }) => venue),
+        band_count: distinctBandIds.size,
         venue_count: venuesMap.size,
       }),
       {

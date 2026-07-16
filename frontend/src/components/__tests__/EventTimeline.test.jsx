@@ -92,6 +92,123 @@ describe('EventTimeline', () => {
   })
 })
 
+// Regression: a band playing two sets at one event rendered as duplicate
+// entries wherever the frontend treated per-performance rows as per-band
+// rows. The details endpoint's `bands` array stays per-performance (each
+// set carries its own `performance_id`), so this exercises both consumers:
+// GenreDiscovery must dedupe by band id (one photo tile per act), while the
+// "All Performers" grid intentionally keeps one card per set.
+describe('EventTimeline duplicate performer chips (#605)', () => {
+  let resolveDetails
+
+  beforeEach(() => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Two-Set Event',
+          slug: 'two-set-event',
+          date: '2026-05-10',
+          status: 'published',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 2,
+          venue_count: 1,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    }
+
+    const detailsPromise = new Promise(resolve => {
+      resolveDetails = resolve
+    })
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      if (url === '/api/events/1/details') {
+        return detailsPromise
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('renders one GenreDiscovery tile but two All Performers cards for a two-set band', async () => {
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Two-Set Event')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /view details/i }))
+    expect(await screen.findByText(/loading performers and venues/i)).toBeInTheDocument()
+
+    resolveDetails(
+      jsonResponse({
+        venues: [{ id: 7, name: 'Blue Room', band_count: 2, address: '123 King St' }],
+        bands: [
+          {
+            id: 9,
+            performance_id: 101,
+            name: 'Two Set Band',
+            genre: 'Punk',
+            venue_id: 7,
+            venue_name: 'Blue Room',
+            start_time: '19:00',
+            end_time: '20:00',
+          },
+          {
+            id: 10,
+            performance_id: 102,
+            name: 'Solo Band',
+            genre: 'Rock',
+            venue_id: 7,
+            venue_name: 'Blue Room',
+            start_time: '20:30',
+            end_time: '21:30',
+          },
+          {
+            id: 9,
+            performance_id: 103,
+            name: 'Two Set Band',
+            genre: 'Punk',
+            venue_id: 7,
+            venue_name: 'Blue Room',
+            start_time: '22:00',
+            end_time: '23:00',
+          },
+        ],
+        band_count: 2,
+        venue_count: 1,
+      })
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()
+    })
+
+    // GenreDiscovery wall: one photo-tile button per ACT — the two-set band
+    // must be deduped to a single tile, not one per performance.
+    const genreTiles = await screen.findAllByRole('button', { name: /Two Set Band/i })
+    expect(genreTiles).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /Solo Band/i })).toHaveLength(1)
+
+    // All Performers grid: per-performance cards — the two-set band
+    // legitimately renders twice (once per set), each with a distinct key.
+    const performerCards = screen.getAllByRole('link', { name: /Two Set Band/i })
+    expect(performerCards).toHaveLength(2)
+  })
+})
+
 // Recap links on past editions (#555): the recap page was previously
 // unreachable except by typing the URL.
 describe('EventTimeline recap links', () => {

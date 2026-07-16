@@ -80,6 +80,72 @@ describe("GET /api/events/:id/details", () => {
   });
 });
 
+// Regression: a band playing two sets at one event was counted twice in
+// band_count (the details endpoint's expanded lineup flips the stat row from
+// "32 Bands" collapsed to 34 after expanding). `bands` stays per-performance
+// (the expanded grid legitimately shows each set with its own venue/time),
+// but band_count/venue band_count must count DISTINCT bands, and each
+// per-performance entry must carry `performance_id` so the frontend can key
+// on it instead of the duplicated band id.
+describe("GET /api/events/:id/details - duplicate performer counting (#605)", () => {
+  test("a band with two performances: bands has 3 per-performance entries, band_count is distinct (2), venue band_count is distinct", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Two-Set Details Event",
+      slug: "details-two-set-band",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    const firstSet = insertBand(rawDb, {
+      name: "Two Set Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "19:00",
+      end_time: "20:00",
+    });
+    const secondSet = insertBand(rawDb, {
+      name: "Two Set Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "22:00",
+      end_time: "23:00",
+    });
+    const soloSet = insertBand(rawDb, {
+      name: "Solo Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:30",
+      end_time: "21:30",
+    });
+
+    const request = new Request(`https://example.test/api/events/${event.id}/details`);
+    const response = await onRequestGet({
+      request,
+      env,
+      params: { id: String(event.id) },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+
+    // Per-performance: 3 sets total, one entry each.
+    expect(payload.bands).toHaveLength(3);
+    const performanceIds = payload.bands.map((b) => b.performance_id).sort((a, b) => a - b);
+    expect(performanceIds).toEqual([firstSet.id, secondSet.id, soloSet.id].sort((a, b) => a - b));
+
+    // Distinct bands: "Two Set Band" + "Solo Band" = 2.
+    expect(payload.band_count).toBe(2);
+
+    // The single venue hosts 2 distinct bands (not 3 performances).
+    expect(payload.venues).toHaveLength(1);
+    expect(payload.venues[0].band_count).toBe(2);
+    expect(payload.venues[0].bandIds).toBeUndefined();
+  });
+});
+
 describe("GET /api/events/:id/details - reveal_mode gate", () => {
   test("hides unannounced band when reveal_mode=1", async () => {
     const { env, rawDb } = createTestEnv();

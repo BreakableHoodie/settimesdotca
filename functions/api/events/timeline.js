@@ -150,8 +150,16 @@ export async function onRequestGet(context) {
 
         // Add band if it exists
         if (row.band_id) {
+          // A band playing two sets at the same event must only produce one
+          // "band" entry — rows are ordered by start_time, so checking
+          // membership BEFORE adding to the Set means the first (earliest)
+          // set's data wins and is the only one pushed to `event.bands`.
+          // Without this, a two-set band shows up as a duplicate chip on the
+          // public event card even though band_count (which already used the
+          // Set) correctly counted it once.
+          const isFirstSetForBand = !event.bandIds.has(row.band_id);
           event.bandIds.add(row.band_id);
-          if (includeBands) {
+          if (includeBands && isFirstSetForBand) {
             let url = normalizeHttpUrl(row.url);
             // Try to extract URL from social_links if url is missing. A bare
             // handle (e.g. an Instagram handle with no scheme) never worked
@@ -185,17 +193,26 @@ export async function onRequestGet(context) {
           }
 
           // Track venue (guard against NULL venue_id — a performance with no
-          // venue assigned must not be counted as a venue; see #479)
-          if (row.venue_id && !event.venues.has(row.venue_id)) {
-            event.venues.set(row.venue_id, {
-              id: row.venue_id,
-              name: row.venue_name,
-              address: row.venue_address || formatVenueAddress(row),
-              band_count: 0,
-            });
-          }
+          // venue assigned must not be counted as a venue; see #479).
+          // band_count must be a count of DISTINCT bands playing that venue,
+          // not a per-row tally — a band playing the same venue twice (two
+          // sets) must count once, so a per-venue `bandIds` Set (stripped
+          // from the final response below) gates the increment.
           if (row.venue_id) {
-            event.venues.get(row.venue_id).band_count++;
+            if (!event.venues.has(row.venue_id)) {
+              event.venues.set(row.venue_id, {
+                id: row.venue_id,
+                name: row.venue_name,
+                address: row.venue_address || formatVenueAddress(row),
+                band_count: 0,
+                bandIds: new Set(),
+              });
+            }
+            const venue = event.venues.get(row.venue_id);
+            if (!venue.bandIds.has(row.band_id)) {
+              venue.bandIds.add(row.band_id);
+              venue.band_count++;
+            }
           }
         }
       }
@@ -211,7 +228,9 @@ export async function onRequestGet(context) {
         band_count: event.bandIds.size,
         venue_count: event.venues.size,
         bands: includeBands ? event.bands : undefined,
-        venues: Array.from(event.venues.values()),
+        // Strip the internal `bandIds` Set — the public shape stays
+        // { id, name, address, band_count } as before.
+        venues: Array.from(event.venues.values()).map(({ bandIds: _bandIds, ...venue }) => venue),
       }));
     }
 

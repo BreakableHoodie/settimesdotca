@@ -580,6 +580,90 @@ describe("Timeline API - Optimized JOIN Queries", () => {
       expect(data.now[0].venues[0].band_count).toBe(2);
       expect(data.now[0].bands).toHaveLength(2);
     });
+
+    // Regression: a band playing two sets at one event produced one row per
+    // performance in `bands`, so the public event card rendered duplicate
+    // chips (KEPI GHOULIE ×2 on prod "Buddies Fest 2"). groupEventData must
+    // collapse rows sharing a band_id into a single `bands` entry (first/
+    // earliest set's data wins, since rows are ordered by start_time), while
+    // band_count (already Set-backed) stays correct.
+    it("should dedupe a band with two performances at the same event into one bands entry", async () => {
+      const results = [
+        {
+          event_id: 1,
+          event_name: "Two Set Event",
+          event_slug: "two-set-event",
+          event_date: "2025-11-05",
+          band_id: 1,
+          band_name: "Two Set Band",
+          start_time: "19:00",
+          end_time: "20:00",
+          url: null,
+          genre: "Punk",
+          origin: null,
+          photo_url: null,
+          venue_id: 1,
+          venue_name: "Same Venue",
+          venue_address: "123 St",
+        },
+        {
+          event_id: 1,
+          event_name: "Two Set Event",
+          event_slug: "two-set-event",
+          event_date: "2025-11-05",
+          band_id: 1,
+          band_name: "Two Set Band",
+          start_time: "22:00",
+          end_time: "23:00",
+          url: null,
+          genre: "Punk",
+          origin: null,
+          photo_url: null,
+          venue_id: 1,
+          venue_name: "Same Venue",
+          venue_address: "123 St",
+        },
+        {
+          event_id: 1,
+          event_name: "Two Set Event",
+          event_slug: "two-set-event",
+          event_date: "2025-11-05",
+          band_id: 2,
+          band_name: "Solo Band",
+          start_time: "20:30",
+          end_time: "21:30",
+          url: null,
+          genre: "Rock",
+          origin: null,
+          photo_url: null,
+          venue_id: 1,
+          venue_name: "Same Venue",
+          venue_address: "123 St",
+        },
+      ];
+      mockContext.env.DB = {
+        prepare: () => ({ bind: () => ({ all: async () => ({ results }) }) }),
+        batch: async (statements) => statements.map(() => ({ results })),
+      };
+
+      const response = await onRequestGet(mockContext);
+      const data = await response.json();
+
+      const event = data.now[0];
+      expect(event.band_count).toBe(2);
+      expect(event.bands).toHaveLength(2);
+      const twoSetEntries = event.bands.filter((b) => b.name === "Two Set Band");
+      expect(twoSetEntries).toHaveLength(1);
+      // First (earliest) row's data wins
+      expect(twoSetEntries[0].start_time).toBe("19:00");
+
+      // The venue's band_count counts distinct bands, not rows — the two-set
+      // band must not be double-counted even though it has two rows there.
+      expect(event.venues).toHaveLength(1);
+      expect(event.venues[0].band_count).toBe(2);
+      // Internal per-venue bandIds Set must never leak into the response shape.
+      expect(event.venues[0].bandIds).toBeUndefined();
+    });
   });
 });
 
@@ -1327,5 +1411,73 @@ describe("Timeline real-DB — end_date exposed on event objects (#542 PR-1)", (
     const found = data.past.find((e) => e.id === event.id);
     expect(found).toBeDefined();
     expect(found.end_date).toBe("2026-07-05");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real-DB regression — duplicate performer chips for a band with two sets.
+// Prod ("Buddies Fest 2") showed 34 chips for 32 bands because groupEventData
+// pushed one `bands` entry per JOIN row (= per performance) instead of per
+// band. Exercises the actual SQL JOIN (insertBand creates a new performance
+// per call, reusing the band_profile by normalized name), not just the
+// in-memory grouping mocked above.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — duplicate performer chips for a two-set band (#605)", () => {
+  test("a band with two performances appears once in bands/band_count; venue band_count is distinct bands", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // Far enough out to land in "upcoming" unambiguously — sidesteps the
+    // start-edge gate (#569) that only applies to the "now" bucket.
+    const farFuture = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    const event = insertEvent(rawDb, {
+      name: "Two-Set Event",
+      slug: "timeline-realdb-two-set-band",
+      date: farFuture,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    insertBand(rawDb, {
+      name: "Two Set Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "19:00",
+      end_time: "20:00",
+    });
+    insertBand(rawDb, {
+      name: "Two Set Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "22:00",
+      end_time: "23:00",
+    });
+    insertBand(rawDb, {
+      name: "Solo Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:30",
+      end_time: "21:30",
+    });
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.upcoming.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.band_count).toBe(2);
+    expect(found.bands).toHaveLength(2);
+    const twoSetEntries = found.bands.filter((b) => b.name === "Two Set Band");
+    expect(twoSetEntries).toHaveLength(1);
+    expect(twoSetEntries[0].start_time).toBe("19:00"); // earliest set's data wins
+
+    const venueEntry = found.venues.find((v) => v.id === venue.id);
+    expect(venueEntry).toBeDefined();
+    expect(venueEntry.band_count).toBe(2);
+    expect(venueEntry.bandIds).toBeUndefined();
   });
 });

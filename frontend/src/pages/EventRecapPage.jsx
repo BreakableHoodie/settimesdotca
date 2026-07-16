@@ -317,7 +317,10 @@ export default function EventRecapPage() {
                 <li className="text-text-tertiary text-sm py-4 text-center">No performers recorded for this event.</li>
               ) : (
                 bands.map(band => (
-                  <li key={band.id} className="bg-surface rounded-lg p-4 flex items-center justify-between gap-4">
+                  <li
+                    key={band.performance_id}
+                    className="bg-surface rounded-lg p-4 flex items-center justify-between gap-4"
+                  >
                     <div className="flex-1 min-w-0">
                       <Link
                         to={buildBandProfileHref(band.name, event.slug)}

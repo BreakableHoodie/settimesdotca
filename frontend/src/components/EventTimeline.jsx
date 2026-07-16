@@ -432,8 +432,21 @@ function GenreDiscovery({ bands, eventSlug, eventDate }) {
 
   // Group bands by genre, case-insensitive. Bands without a genre go to "Other".
   const genreGroups = useMemo(() => {
+    // `bands` here is the details endpoint's per-performance list — a band
+    // playing two sets appears as two entries sharing the same band.id. The
+    // wall shows one photo tile per ACT, not per set, and selection is keyed
+    // by band id, so dedupe (keep the first/earliest-set occurrence) before
+    // grouping. Without this a two-set act rendered two tiles and tapping
+    // either one toggled the same underlying selection.
+    const seenBandIds = new Set()
+    const dedupedBands = bands.filter(band => {
+      if (seenBandIds.has(band.id)) return false
+      seenBandIds.add(band.id)
+      return true
+    })
+
     const groups = new Map()
-    for (const band of bands) {
+    for (const band of dedupedBands) {
       const raw = (band.genre || '').trim()
       const genre = raw || 'Other'
       const key = genre.toLowerCase()
@@ -630,10 +643,15 @@ function EventCard({
                 <span className="font-bold text-text-primary">{allBandCount}</span>
                 <span className="text-text-tertiary">{allBandCount === 1 ? 'Band' : 'Bands'}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-text-primary">{allVenueCount}</span>
-                <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
-              </div>
+              {/* Historical volumes have roster-only lineups with no venue
+                  assignments — "0 Venues" reads as missing data, so omit the
+                  stat entirely rather than showing a zero. */}
+              {allVenueCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-text-primary">{allVenueCount}</span>
+                  <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -769,7 +787,7 @@ function EventCard({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {allBands.map(band => (
                   <Card
-                    key={band.id}
+                    key={band.performance_id ?? band.id}
                     as={Link}
                     to={buildBandProfileHref(band.name, event.slug)}
                     padding="sm"

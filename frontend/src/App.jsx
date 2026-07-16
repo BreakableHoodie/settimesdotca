@@ -303,8 +303,14 @@ function App() {
   }, [])
 
   useEffect(() => {
-    saveSelectedBands(slug || 'default', selectedBands, eventData?.date)
-  }, [selectedBands, slug, eventData?.date])
+    // Multi-day events: stale-detection in scheduleStorage compares this date
+    // against today (lexicographic YYYY-MM-DD). Passing only the event's
+    // START date silently marks the fan's saved schedule stale starting day
+    // 2 of a multi-day event, wiping their selections mid-festival (#542).
+    // end_date (falling back to date for single-day events) keeps the event
+    // "not stale" for its whole run.
+    saveSelectedBands(slug || 'default', selectedBands, eventData?.end_date || eventData?.date)
+  }, [selectedBands, slug, eventData?.end_date, eventData?.date])
 
   // react-helmet-async does not reliably set document.title in React 19 — set it
   // directly. Mirrors the <Helmet> <title> below. See BandProfilePage.jsx.

@@ -735,8 +735,13 @@ function EventCard({
           )}
 
           {/* Genre Discovery Wall — upcoming events only */}
+          {/* eventDate feeds saveSelectedBands' stale-detection, so it must be
+              end_date || date (#542 PR-1, see CLAUDE.md "Schedule Storage"):
+              keying staleness on the start date wipes the fan's saved
+              schedule on day 2 of a multi-day event. end_date comes from
+              /api/events/timeline (null for single-day events). */}
           {isUpcoming && allBands && allBands.length > 0 && (
-            <GenreDiscovery bands={allBands} eventSlug={event.slug} eventDate={event.date} />
+            <GenreDiscovery bands={allBands} eventSlug={event.slug} eventDate={event.end_date || event.date} />
           )}
 
           {/* Venues */}

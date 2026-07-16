@@ -113,3 +113,32 @@ describe('saveSelectedBands + hasAnySchedule round-trip', () => {
     expect(getScheduleEventSlug()).toBeNull()
   })
 })
+
+describe('multi-day event staleness (#542 PR-1 regression)', () => {
+  // Reproduces the exact production bug: a multi-day event that started
+  // yesterday and ends tomorrow must never be treated as stale mid-run.
+  // App.jsx / BandProfilePage.jsx previously called saveSelectedBands with
+  // only the event's START date (eventData.date), so isEventStale() (a
+  // straight YYYY-MM-DD string comparison against today) started marking the
+  // fan's saved schedule stale on day 2 — silently wiping their selections
+  // mid-festival. The fix passes end_date (falling back to date for
+  // single-day events) instead.
+
+  it('is NOT stale when saved with the event end_date, even though the event started yesterday', () => {
+    // Simulates the fixed call sites: callers now pass
+    // eventData.end_date || eventData.date. A multi-day event spanning
+    // yesterday -> tomorrow must keep the fan's schedule live throughout.
+    saveSelectedBands('multiday-fest', ['band-1', 'band-2'], offsetDate(1))
+    expect(hasAnySchedule()).toBe(true)
+    expect(getScheduleEventSlug()).toBe('multiday-fest')
+  })
+
+  it('documents the bug: saving with only the start date would wrongly mark a still-running multi-day event stale', () => {
+    // Pins down the pre-fix behavior for the exact date value the old
+    // call sites passed (eventData.date, the START date) — proving
+    // isEventStale() alone was never the bug; the caller's date choice was.
+    saveSelectedBands('multiday-fest-bug', ['band-1'], offsetDate(-1))
+    expect(hasAnySchedule()).toBe(false)
+    expect(getScheduleEventSlug()).toBeNull()
+  })
+})

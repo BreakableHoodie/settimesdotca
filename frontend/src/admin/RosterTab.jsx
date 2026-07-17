@@ -159,6 +159,25 @@ function SortIcon({ col, sortConfig }) {
   )
 }
 
+// The roster API now returns inactive/retired profiles alongside active ones
+// (#619) — `is_active` comes straight off the D1 row (INTEGER NOT NULL
+// DEFAULT 1), so it's always 0 or 1, but check both the number and legacy
+// boolean shape defensively rather than relying on falsiness of `is_active`.
+function isInactive(band) {
+  return band.is_active === 0 || band.is_active === false
+}
+
+// Same pill styling as the existing Status column below — reused here so an
+// inactive profile is visible right next to its name too, not just in a
+// column that can scroll out of view.
+function InactiveBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-gray-700 text-white/80">
+      Inactive
+    </span>
+  )
+}
+
 /**
  * RosterTab - Manage Global Artist Roster (Band Profiles)
  *
@@ -174,6 +193,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
   const [editingId, setEditingId] = useState(null)
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' })
   const [searchTerm, setSearchTerm] = useState('')
+  // 'all' | 'active' | 'inactive' — defaults to 'all' (#619) so a retired
+  // profile is never hidden by default; the admin roster must be able to see
+  // and edit everything it manages.
+  const [statusFilter, setStatusFilter] = useState('all')
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -250,9 +273,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
   }
 
   const filteredBands = useMemo(() => {
-    if (!searchTerm.trim()) return bands
     const query = searchTerm.trim().toLowerCase()
     return bands.filter(band => {
+      if (statusFilter === 'active' && isInactive(band)) return false
+      if (statusFilter === 'inactive' && !isInactive(band)) return false
+      if (!query) return true
       const originText = formatOrigin(band)
       return (
         band.name?.toLowerCase().includes(query) ||
@@ -261,15 +286,15 @@ export default function RosterTab({ showToast, readOnly = false }) {
         band.contact_email?.toLowerCase().includes(query)
       )
     })
-  }, [bands, searchTerm])
+  }, [bands, searchTerm, statusFilter])
 
   const sortedBands = useMemo(() => {
     if (!sortConfig.key) return filteredBands
 
     return [...filteredBands].sort((a, b) => {
       if (sortConfig.key === 'is_active') {
-        const aVal = a.is_active === 0 || a.is_active === false ? 0 : 1
-        const bVal = b.is_active === 0 || b.is_active === false ? 0 : 1
+        const aVal = isInactive(a) ? 0 : 1
+        const bVal = isInactive(b) ? 0 : 1
         return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
       }
       if (sortConfig.key === 'origin') {
@@ -565,6 +590,16 @@ export default function RosterTab({ showToast, readOnly = false }) {
             placeholder="Search name, origin, genre"
             className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-64"
           />
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            aria-label="Filter by status"
+            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
           {!showAddForm && !editingId && !readOnly && (
             <button
               onClick={() => setShowAddForm(true)}
@@ -703,26 +738,27 @@ export default function RosterTab({ showToast, readOnly = false }) {
                         </td>
                       )}
                       <td className="px-4 py-3 text-white font-medium">
-                        <a
-                          href={`/band/${band.band_profile_id || band.id?.toString().replace('profile_', '')}`}
-                          className="text-accent-400 hover:underline"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {band.name}
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`/band/${band.band_profile_id || band.id?.toString().replace('profile_', '')}`}
+                            className="text-accent-400 hover:underline"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {band.name}
+                          </a>
+                          {isInactive(band) && <InactiveBadge />}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-white/70">{formatOrigin(band) || '-'}</td>
                       <td className="px-4 py-3 text-white/70">{band.genre || '-'}</td>
                       <td className="px-4 py-3 text-white/70">
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
-                            band.is_active === 0 || band.is_active === false
-                              ? 'bg-gray-700 text-white/80'
-                              : 'bg-emerald-600/20 text-emerald-200'
+                            isInactive(band) ? 'bg-gray-700 text-white/80' : 'bg-emerald-600/20 text-emerald-200'
                           }`}
                         >
-                          {band.is_active === 0 || band.is_active === false ? 'Inactive' : 'Active'}
+                          {isInactive(band) ? 'Inactive' : 'Active'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -797,12 +833,13 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       >
                         {band.name}
                       </a>
+                      {isInactive(band) && <InactiveBadge />}
                     </label>
                   </div>
                   <div className="text-sm text-text-secondary space-y-1">
                     <div>Origin: {formatOrigin(band) || '-'}</div>
                     <div>Genre: {band.genre || '-'}</div>
-                    <div>Status: {band.is_active === 0 || band.is_active === false ? 'Inactive' : 'Active'}</div>
+                    <div>Status: {isInactive(band) ? 'Inactive' : 'Active'}</div>
                     <div className="flex items-center gap-2">
                       <span>Links:</span>
                       <SocialLinksIcons band={band} />

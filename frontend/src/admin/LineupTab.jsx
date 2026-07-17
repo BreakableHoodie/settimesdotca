@@ -126,6 +126,16 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     }
   }, [selectedEventId, showToast])
 
+  // The roster API now returns inactive/retired profiles too (#619, so
+  // RosterTab can manage them) — filter them back out here so the lineup
+  // builder never offers a retired band as a schedulable option. Origin/genre
+  // suggestion lists below intentionally keep using the unfiltered `allBands`
+  // — reusing a retired band's origin/genre value is harmless.
+  const activeBands = useMemo(
+    () => allBands.filter(band => band.is_active !== 0 && band.is_active !== false),
+    [allBands]
+  )
+
   const originCitySuggestions = useMemo(() => {
     const values = new Set()
     allBands.forEach(band => {
@@ -690,7 +700,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
 
       {viewMode === 'picker' && !readOnly && (
         <ArtistPicker
-          artists={allBands}
+          artists={activeBands}
           onSelect={handlePickerSelect}
           onBulkSelect={handleBulkSelect}
           onCancel={() => setViewMode('list')}

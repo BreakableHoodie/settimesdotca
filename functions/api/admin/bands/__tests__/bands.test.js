@@ -119,7 +119,7 @@ describe("Admin bands API - CRUD operations", () => {
     expect(row.is_active).toBe(0);
   });
 
-  it("GET without event_id excludes inactive bands from the lineup-builder picker", async () => {
+  it("GET without event_id includes inactive bands — the lineup-builder picker now filters them client-side (#619)", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
 
     rawDb
@@ -134,9 +134,13 @@ describe("Admin bands API - CRUD operations", () => {
     expect(getRes.status).toBe(200);
     const data = await getRes.json();
 
+    // This endpoint now returns every profile so the admin roster (RosterTab)
+    // can see and edit retired ones (#619). LineupTab's ArtistPicker consumes
+    // the same response, so it filters `is_active` back out client-side
+    // (LineupTab.jsx's `activeBands`) to keep retired bands unschedulable.
     const names = data.bands.map((b) => b.name);
     expect(names).toContain("Active Band");
-    expect(names).not.toContain("Inactive Band");
+    expect(names).toContain("Inactive Band");
   });
 
   it("PUT /api/admin/bands/{id} still rejects set-time edits for a performance in an archived event", async () => {
@@ -242,7 +246,7 @@ describe("Admin bands API - GET without event_id returns one row per profile (#6
     expect(matches[0].event_date).toBe("2025-12-01");
   });
 
-  it("excludes inactive profiles from the roster branch (#619 deferred — surfacing them is out of scope here)", async () => {
+  it("includes inactive profiles in the roster branch with is_active: 0 on the row (#619)", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
     rawDb
       .prepare("INSERT INTO band_profiles (name, name_normalized, is_active) VALUES (?, ?, ?)")
@@ -256,9 +260,15 @@ describe("Admin bands API - GET without event_id returns one row per profile (#6
     expect(getRes.status).toBe(200);
     const data = await getRes.json();
 
-    const names = data.bands.map((b) => b.name);
-    expect(names).toContain("Active Roster Band 618");
-    expect(names).not.toContain("Retired Roster Band 618");
+    // The admin roster manages profiles including retired ones (#619), so both
+    // rows must be present — with is_active reflecting each profile's real state
+    // so the client can badge/filter on it instead of the server hiding rows.
+    const active = data.bands.find((b) => b.name === "Active Roster Band 618");
+    const retired = data.bands.find((b) => b.name === "Retired Roster Band 618");
+    expect(active).toBeDefined();
+    expect(active.is_active).toBe(1);
+    expect(retired).toBeDefined();
+    expect(retired.is_active).toBe(0);
   });
 });
 

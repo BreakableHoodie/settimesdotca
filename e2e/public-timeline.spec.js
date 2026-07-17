@@ -1,5 +1,30 @@
 import { test, expect } from '@playwright/test';
 
+// During show hours, EventTimeline.jsx auto-expands a live event
+// (`useState(isLive)`), so its "View Details" toggle already reads "Hide
+// Details". Plain `[data-testid="event-card"]').first()` can therefore grab
+// an already-expanded card and time out waiting for a "View Details" button
+// that isn't there (#602 — CI-only, time-of-day dependent). Filtering to a
+// card that still shows the collapsed affordance keeps these specs
+// deterministic regardless of clock/live state.
+//
+// Playwright locators are lazy/live, not snapshots: a `.filter({ has: ... })`
+// locator re-runs its condition on every query. Once the returned card is
+// clicked open, its button flips to "Hide Details" and it stops matching the
+// "View Details" filter — a later `firstEvent.getByRole(...)` would silently
+// re-resolve to a *different* card. So resolve the filter once to a stable
+// DOM index and hand back an `nth()` locator, which stays pinned to that
+// card's position regardless of its later expanded/collapsed state.
+async function collapsedEventCard(page) {
+  const allCards = page.locator('[data-testid="event-card"]');
+  const collapsed = allCards.filter({ has: page.getByRole('button', { name: /view details/i }) }).first();
+  const index = await collapsed.evaluate((el, testid) =>
+    Array.from(document.querySelectorAll(`[data-testid="${testid}"]`)).indexOf(el),
+    'event-card'
+  );
+  return allCards.nth(index);
+}
+
 test.describe('Public Timeline Viewing', () => {
   test('should display upcoming events without authentication', async ({ page }) => {
     await page.goto('/');
@@ -14,7 +39,7 @@ test.describe('Public Timeline Viewing', () => {
   test('should show event details when clicked', async ({ page }) => {
     await page.goto('/');
 
-    const firstEvent = page.locator('[data-testid="event-card"]').first();
+    const firstEvent = await collapsedEventCard(page);
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
     // Verify the card expanded (button flips to Hide Details)
@@ -37,7 +62,7 @@ test.describe('Public Timeline Viewing', () => {
   test('should display event venue information', async ({ page }) => {
     await page.goto('/');
 
-    const firstEvent = page.locator('[data-testid="event-card"]').first();
+    const firstEvent = await collapsedEventCard(page);
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
     // Seed data guarantees the upcoming event has venues
@@ -48,7 +73,7 @@ test.describe('Public Timeline Viewing', () => {
   test('should show band/performer information in events', async ({ page }) => {
     await page.goto('/');
 
-    const firstEvent = page.locator('[data-testid="event-card"]').first();
+    const firstEvent = await collapsedEventCard(page);
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
     // Seed data guarantees the upcoming event has performers
@@ -59,7 +84,7 @@ test.describe('Public Timeline Viewing', () => {
   test('should navigate to band profile from event', async ({ page }) => {
     await page.goto('/');
 
-    const firstEvent = page.locator('[data-testid="event-card"]').first();
+    const firstEvent = await collapsedEventCard(page);
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
     const bandLink = firstEvent.locator('a[href*="/band/"]').first();
@@ -91,7 +116,8 @@ test.describe('Public Timeline Viewing', () => {
     const eventCards = page.locator('[data-testid="event-card"]');
     await expect(eventCards.first()).toBeVisible();
 
-    await eventCards.first().getByRole('button', { name: /view details/i }).click();
+    const mobileCard = await collapsedEventCard(page);
+    await mobileCard.getByRole('button', { name: /view details/i }).click();
     await page.waitForTimeout(500);
   });
 
@@ -115,7 +141,7 @@ test.describe('Public Timeline Viewing', () => {
   test('should display event duration and time details', async ({ page }) => {
     await page.goto('/');
 
-    const firstEvent = page.locator('[data-testid="event-card"]').first();
+    const firstEvent = await collapsedEventCard(page);
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
     const timeRange = firstEvent.locator('text=/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/');
@@ -140,7 +166,7 @@ test.describe('Public Timeline Viewing', () => {
   test('should show venue location details in event view', async ({ page }) => {
     await page.goto('/');
 
-    const firstEvent = page.locator('[data-testid="event-card"]').first();
+    const firstEvent = await collapsedEventCard(page);
     await firstEvent.getByRole('button', { name: /view details/i }).click();
 
     // Seed data guarantees the upcoming event has venues

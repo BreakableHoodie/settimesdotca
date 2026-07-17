@@ -1,43 +1,105 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, Globe, Search } from 'lucide-react'
+import {
+  AppleMusicIcon,
+  BandcampIcon,
+  FacebookIcon,
+  InstagramIcon,
+  LinktreeIcon,
+  SpotifyIcon,
+  YouTubeIcon,
+} from '../components/ui/SocialIcons'
 import Footer from '../components/Footer'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import { fetchPublicJson } from '../utils/publicApi'
-import { trackPageView } from '../utils/metrics'
+import { trackPageView, trackSocialClick } from '../utils/metrics'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
+import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
 
 const PAGE_SIZE = 24
 const PAGE_TITLE = 'Artists – SetTimes'
 
+// Priority order for the roster card icon cluster: hear the band first,
+// follow second. Only the first MAX_CARD_ICONS valid links show — overflow
+// lives on the profile page, which owns the full set with brand colours.
+const MAX_CARD_ICONS = 4
+const SOCIAL_LINK_DESCRIPTORS = [
+  { key: 'bandcamp', label: 'Bandcamp', Icon: BandcampIcon, getHref: social => safeExternalHref(social.bandcamp) },
+  { key: 'spotify', label: 'Spotify', Icon: SpotifyIcon, getHref: social => safeExternalHref(social.spotify) },
+  {
+    key: 'instagram',
+    label: 'Instagram',
+    Icon: InstagramIcon,
+    getHref: social => safeInstagramHref(social.instagram),
+  },
+  { key: 'website', label: 'Website', Icon: Globe, getHref: social => safeExternalHref(social.website) },
+  { key: 'youtube', label: 'YouTube', Icon: YouTubeIcon, getHref: social => safeExternalHref(social.youtube) },
+  { key: 'facebook', label: 'Facebook', Icon: FacebookIcon, getHref: social => safeExternalHref(social.facebook) },
+  {
+    key: 'apple_music',
+    label: 'Apple Music',
+    Icon: AppleMusicIcon,
+    getHref: social => safeExternalHref(social.apple_music),
+  },
+  { key: 'linktree', label: 'Linktree', Icon: LinktreeIcon, getHref: social => safeExternalHref(social.linktree) },
+]
+
+function getCardSocialLinks(social) {
+  if (!social) return []
+  return SOCIAL_LINK_DESCRIPTORS.map(descriptor => ({ ...descriptor, href: descriptor.getHref(social) }))
+    .filter(link => link.href !== '#')
+    .slice(0, MAX_CARD_ICONS)
+}
+
 function ArtistCard({ artist }) {
   const meta = [artist.genre, artist.origin].filter(Boolean).join(' · ')
   const shows = `${artist.performance_count} ${artist.performance_count === 1 ? 'show' : 'shows'}`
+  const socialLinks = getCardSocialLinks(artist.social)
 
   return (
-    <Link
-      to={buildBandProfileHref(artist.name)}
-      className="flex items-center gap-4 rounded-xl border border-border bg-gradient-card p-4 transition hover:scale-[1.01] hover:border-accent-400/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
-    >
-      {artist.photo_url ? (
-        <img
-          src={artist.photo_url}
-          alt=""
-          loading="lazy"
-          className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-border"
-        />
-      ) : (
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent-500/20 text-2xl font-bold text-accent-400">
-          {(artist.name || '?').charAt(0).toUpperCase()}
+    <div className="relative flex items-center gap-4 rounded-xl border border-border bg-gradient-card p-4 transition hover:border-accent-400/50">
+      <Link
+        to={buildBandProfileHref(artist.name)}
+        className="flex min-w-0 flex-1 items-center gap-4 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+      >
+        {artist.photo_url ? (
+          <img
+            src={artist.photo_url}
+            alt=""
+            loading="lazy"
+            className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-border"
+          />
+        ) : (
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent-500/20 text-2xl font-bold text-accent-400">
+            {(artist.name || '?').charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0">
+          <h2 className="truncate font-display text-lg font-bold text-text-primary">{artist.name}</h2>
+          {meta && <p className="truncate text-sm text-text-tertiary">{meta}</p>}
+          <p className="mt-0.5 text-xs text-text-tertiary">{shows}</p>
+        </div>
+      </Link>
+      {socialLinks.length > 0 && (
+        <div className="flex shrink-0 items-center gap-1">
+          {socialLinks.map(({ key, label, Icon, href }) => (
+            <a
+              key={key}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${artist.name} on ${label}`}
+              onClick={() => trackSocialClick(artist.id, key)}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+            >
+              <Icon size={16} />
+            </a>
+          ))}
         </div>
       )}
-      <div className="min-w-0">
-        <h2 className="truncate font-display text-lg font-bold text-text-primary">{artist.name}</h2>
-        {meta && <p className="truncate text-sm text-text-tertiary">{meta}</p>}
-        <p className="mt-0.5 text-xs text-text-tertiary">{shows}</p>
-      </div>
-    </Link>
+    </div>
   )
 }
 

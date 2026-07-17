@@ -6,6 +6,7 @@
 // PUBLIC_DATA_PUBLISH_ENABLED switch as the rest of the public data.
 
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
+import { safeReflectSocialLinks } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 
 const DEFAULT_LIMIT = 24;
@@ -58,6 +59,7 @@ export async function onRequestGet(context) {
         bp.origin,
         bp.origin_city,
         bp.origin_region,
+        bp.social_links,
         COUNT(DISTINCT p.id) AS performance_count
       FROM band_profiles bp
       JOIN performances p ON p.band_profile_id = bp.id
@@ -86,6 +88,12 @@ export async function onRequestGet(context) {
       genre: row.genre,
       origin: formatOrigin(row),
       performance_count: row.performance_count,
+      // Server-side sanitized like the other public band endpoints
+      // (safeReflectSocialLinks: malformed JSON → {}, each value normalized
+      // to a real http(s) URL or null); the frontend still runs
+      // safeExternalHref before rendering any href. Absent column → null so
+      // profiles with no links don't grow an empty object.
+      social: row.social_links ? safeReflectSocialLinks(row.social_links) : null,
     }));
 
     return new Response(JSON.stringify({ artists, hasMore }), {

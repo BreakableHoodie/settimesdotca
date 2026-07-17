@@ -151,10 +151,11 @@ export async function onRequestGet(context) {
   // limit/offset only apply to the no-event_id (roster) branch below — the
   // event_id branch returns a single event's full lineup, unpaginated.
   // Default is 500 (the existing cap), not 200: since #618, this branch
-  // returns one row per active band_profile, and prod already has ~220
-  // active profiles — a 200 default would silently truncate the roster
-  // again. Callers (RosterTab, LineupTab's ArtistPicker) request no limit,
-  // so they get whatever the default is.
+  // returns one row per band_profile (active and inactive, #619), and prod
+  // already has ~218 active profiles plus a handful of inactive ones — a 200
+  // default would silently truncate the roster again. Callers (RosterTab,
+  // LineupTab's ArtistPicker) request no limit, so they get whatever the
+  // default is.
   const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "500", 10);
   const requestedOffset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 500;
@@ -202,16 +203,26 @@ export async function onRequestGet(context) {
         .bind(eventId)
         .all();
     } else {
-      // List all active band PROFILES (roster view), one row per profile (#618).
-      // A profile can have zero, one, or many performances across many events;
-      // the old query LEFT JOINed to performances with no GROUP BY, so a band
-      // with N performances produced N rows. Combined with `ORDER BY e.date
-      // DESC` + `LIMIT`, any profile whose only performances were on older
-      // events could sort past the limit and vanish entirely (#618 — Adelleda,
-      // whose sole performance was a 2024 event, was missing from the roster).
-      // GROUP BY bp.id collapses that back to one row per profile, so the
-      // LIMIT now bounds roster size (~220 active profiles in prod), not
+      // List ALL band PROFILES — active and inactive (#619) — one row per
+      // profile (#618). A profile can have zero, one, or many performances
+      // across many events; the old query LEFT JOINed to performances with no
+      // GROUP BY, so a band with N performances produced N rows. Combined
+      // with `ORDER BY e.date DESC` + `LIMIT`, any profile whose only
+      // performances were on older events could sort past the limit and
+      // vanish entirely (#618 — Adelleda, whose sole performance was a 2024
+      // event, was missing from the roster). GROUP BY bp.id collapses that
+      // back to one row per profile, so the LIMIT now bounds roster size
+      // (~218 active + a handful of inactive profiles in prod), not
       // performance-row count.
+      //
+      // Deliberately no `WHERE bp.is_active = 1` here (#619): the admin
+      // roster is the tool that manages profiles, so it must be able to see
+      // and edit retired ones too — filtering them out made them completely
+      // uneditable through the UI. The row already selects bp.is_active, so
+      // the client (RosterTab) badges and filters on it instead of the
+      // server hiding rows. The public /artists archive was already correct
+      // (it never filtered on is_active); this brings the admin roster in
+      // line with it.
       //
       // The per-performance columns (event/venue name, event date, etc.) are
       // kept for a "last played" display, sourced from the band's MOST RECENT
@@ -256,7 +267,6 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON bp.id = p.band_profile_id
         LEFT JOIN venues v ON p.venue_id = v.id
         LEFT JOIN events e ON p.event_id = e.id
-        WHERE bp.is_active = 1
         GROUP BY bp.id
         ORDER BY event_date DESC, bp.name
         LIMIT ?

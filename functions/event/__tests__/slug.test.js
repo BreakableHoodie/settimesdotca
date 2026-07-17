@@ -79,3 +79,73 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD ticket_url sanitization (#504
     expect(musicEvent.offers.url).toBe("https://tickets.example.com/crawl");
   });
 });
+
+describe("SSR /event/[slug] — MusicEvent JSON-LD enrichment (#615)", () => {
+  test("emits full-URL eventStatus/eventAttendanceMode and an organizer block", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Enriched Event",
+      slug: "slug-615-enriched",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-615-enriched" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.eventStatus).toBe("https://schema.org/EventScheduled");
+    expect(musicEvent.eventAttendanceMode).toBe("https://schema.org/OfflineEventAttendanceMode");
+    expect(musicEvent.organizer).toEqual({
+      "@type": "Organization",
+      name: "SetTimes",
+      url: "https://settimes.ca",
+      sameAs: ["https://www.instagram.com/settimes.ca"],
+    });
+  });
+
+  test("offers includes validFrom (from created_at) and priceCurrency, but never price", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Ticketed Event",
+      slug: "slug-615-ticketed",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/crawl", event.id);
+
+    const seededEvent = rawDb.prepare("SELECT created_at FROM events WHERE id = ?").get(event.id);
+    const expectedValidFrom = seededEvent.created_at.slice(0, 10);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-615-ticketed" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.offers).toBeDefined();
+    expect(musicEvent.offers.priceCurrency).toBe("CAD");
+    expect(musicEvent.offers.validFrom).toBe(expectedValidFrom);
+    expect(musicEvent.offers).not.toHaveProperty("price");
+  });
+
+  test("omits offers (and therefore validFrom) entirely when ticket_url is absent", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "No Ticket Event",
+      slug: "slug-615-no-ticket",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-615-no-ticket" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.offers).toBeUndefined();
+  });
+});

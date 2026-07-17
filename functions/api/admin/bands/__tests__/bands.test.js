@@ -155,6 +155,113 @@ describe("Admin bands API - CRUD operations", () => {
   });
 });
 
+describe("Admin bands API - GET without event_id returns one row per profile (#618)", () => {
+  it("a band whose only performance is on the OLDEST event still appears when total performance rows exceed the requested limit", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const oldEvent = insertEvent(rawDb, { name: "Old Event 618", slug: "old-event-618", date: "2020-01-01" });
+    const midEvent = insertEvent(rawDb, { name: "Mid Event 618", slug: "mid-event-618", date: "2024-06-01" });
+    const newEvent = insertEvent(rawDb, { name: "New Event 618", slug: "new-event-618", date: "2026-08-01" });
+    const venue = insertVenue(rawDb, { name: "Regression Venue 618" });
+
+    // Band whose ONLY performance is on the oldest event — the #618 regression
+    // case (Adelleda: sole performance on lwbc07, a 2024 event).
+    insertBand(rawDb, {
+      name: "Adelleda Regression",
+      event_id: oldEvent.id,
+      venue_id: venue.id,
+      start_time: "18:00",
+      end_time: "19:00",
+    });
+
+    // A prolific band with many performances on newer events inflates the
+    // PERFORMANCE row count well past a small explicit limit, without
+    // inflating the PROFILE count (still just 1 profile, 5 performances).
+    for (let i = 0; i < 5; i++) {
+      insertBand(rawDb, {
+        name: "Prolific Band 618",
+        event_id: i % 2 === 0 ? midEvent.id : newEvent.id,
+        venue_id: venue.id,
+        start_time: `${18 + i}:00`,
+        end_time: `${19 + i}:00`,
+      });
+    }
+
+    // Old (buggy) query: LEFT JOIN with no GROUP BY produces 1 (Adelleda) + 5
+    // (Prolific) = 6 performance rows, `ORDER BY e.date DESC` + `LIMIT 3`
+    // returns the 3 newest-event performance rows — all Prolific Band's — so
+    // Adelleda's row never makes the page. Fixed query: GROUP BY bp.id
+    // produces exactly 2 rows (one per profile), both well under limit=3.
+    const getReq = new Request("https://example.test/api/admin/bands?limit=3", { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    expect(getRes.status).toBe(200);
+    const data = await getRes.json();
+
+    const names = data.bands.map((b) => b.name);
+    expect(names).toContain("Adelleda Regression");
+  });
+
+  it("returns exactly one row per profile even when the band has multiple performances", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev1 = insertEvent(rawDb, { name: "Dedup Event 1", slug: "dedup-event-1", date: "2025-01-01" });
+    const ev2 = insertEvent(rawDb, { name: "Dedup Event 2", slug: "dedup-event-2", date: "2025-06-01" });
+    const ev3 = insertEvent(rawDb, { name: "Dedup Event 3", slug: "dedup-event-3", date: "2025-12-01" });
+    const venue = insertVenue(rawDb, { name: "Dedup Venue" });
+
+    insertBand(rawDb, {
+      name: "Triple Booked Band",
+      event_id: ev1.id,
+      venue_id: venue.id,
+      start_time: "18:00",
+      end_time: "19:00",
+    });
+    insertBand(rawDb, {
+      name: "Triple Booked Band",
+      event_id: ev2.id,
+      venue_id: venue.id,
+      start_time: "19:00",
+      end_time: "20:00",
+    });
+    insertBand(rawDb, {
+      name: "Triple Booked Band",
+      event_id: ev3.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+
+    const getReq = new Request("https://example.test/api/admin/bands", { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    expect(getRes.status).toBe(200);
+    const data = await getRes.json();
+
+    const matches = data.bands.filter((b) => b.name === "Triple Booked Band");
+    expect(matches.length).toBe(1);
+    // "Last played" context should reflect the band's MOST RECENT event (ev3),
+    // via SQLite's bare-column-with-MAX() semantics.
+    expect(matches[0].event_name).toBe("Dedup Event 3");
+    expect(matches[0].event_date).toBe("2025-12-01");
+  });
+
+  it("excludes inactive profiles from the roster branch (#619 deferred — surfacing them is out of scope here)", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized, is_active) VALUES (?, ?, ?)")
+      .run("Active Roster Band 618", "activerosterband618", 1);
+    rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized, is_active) VALUES (?, ?, ?)")
+      .run("Retired Roster Band 618", "retiredrosterband618", 0);
+
+    const getReq = new Request("https://example.test/api/admin/bands", { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    expect(getRes.status).toBe(200);
+    const data = await getRes.json();
+
+    const names = data.bands.map((b) => b.name);
+    expect(names).toContain("Active Roster Band 618");
+    expect(names).not.toContain("Retired Roster Band 618");
+  });
+});
+
 describe("Admin bands API - Validation", () => {
   it("create rejects performances for archived events", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });

@@ -148,9 +148,16 @@ export async function onRequestGet(context) {
 
   const url = new URL(request.url);
   const eventId = url.searchParams.get("event_id");
-  const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "200", 10);
+  // limit/offset only apply to the no-event_id (roster) branch below — the
+  // event_id branch returns a single event's full lineup, unpaginated.
+  // Default is 500 (the existing cap), not 200: since #618, this branch
+  // returns one row per active band_profile, and prod already has ~220
+  // active profiles — a 200 default would silently truncate the roster
+  // again. Callers (RosterTab, LineupTab's ArtistPicker) request no limit,
+  // so they get whatever the default is.
+  const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "500", 10);
   const requestedOffset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
-  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 200;
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 500;
   const offset = Number.isFinite(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
 
   try {
@@ -195,14 +202,34 @@ export async function onRequestGet(context) {
         .bind(eventId)
         .all();
     } else {
-      // List all bands (performances AND profiles without performances)
-      // We use a LEFT JOIN starting from band_profiles to include everyone.
-      // If a profile has no performance, p.id is null.
-      // We construct a synthetic ID for profile-only rows: 'profile_' || bp.id
+      // List all active band PROFILES (roster view), one row per profile (#618).
+      // A profile can have zero, one, or many performances across many events;
+      // the old query LEFT JOINed to performances with no GROUP BY, so a band
+      // with N performances produced N rows. Combined with `ORDER BY e.date
+      // DESC` + `LIMIT`, any profile whose only performances were on older
+      // events could sort past the limit and vanish entirely (#618 — Adelleda,
+      // whose sole performance was a 2024 event, was missing from the roster).
+      // GROUP BY bp.id collapses that back to one row per profile, so the
+      // LIMIT now bounds roster size (~220 active profiles in prod), not
+      // performance-row count.
+      //
+      // The per-performance columns (event/venue name, event date, etc.) are
+      // kept for a "last played" display, sourced from the band's MOST RECENT
+      // performance: SQLite's bare-column-with-MAX() semantics say that when a
+      // query has exactly one MAX() aggregate, bare columns in the same result
+      // row are pulled from the input row that produced the max — including
+      // per GROUP BY group, not just whole-table aggregates. So MAX(e.date)
+      // plus the bare v.name/e.name/p.* columns below consistently resolve to
+      // the same (most recent) performance row, without a subquery or window
+      // function. Profiles with zero performances get NULLs throughout (LEFT
+      // JOIN), same as before.
+      // We construct a synthetic ID: 'profile_' || bp.id (unique per profile —
+      // no consumer in this branch reads `id` as a real performance id; both
+      // RosterTab and LineupTab's ArtistPicker key off `band_profile_id`).
       result = await DB.prepare(
         `
         SELECT
-          COALESCE(p.id, 'profile_' || bp.id) as id,
+          'profile_' || bp.id as id,
           p.event_id,
           p.venue_id,
           p.start_time,
@@ -224,13 +251,14 @@ export async function onRequestGet(context) {
           (SELECT COUNT(*) FROM band_follows bf WHERE bf.band_profile_id = bp.id AND bf.verified = 1) AS follower_count,
           v.name as venue_name,
           e.name as event_name,
-          e.date as event_date
+          MAX(e.date) as event_date
         FROM band_profiles bp
         LEFT JOIN performances p ON bp.id = p.band_profile_id
         LEFT JOIN venues v ON p.venue_id = v.id
         LEFT JOIN events e ON p.event_id = e.id
         WHERE bp.is_active = 1
-        ORDER BY e.date DESC, p.start_time, bp.name
+        GROUP BY bp.id
+        ORDER BY event_date DESC, bp.name
         LIMIT ?
         OFFSET ?
       `,
@@ -242,10 +270,13 @@ export async function onRequestGet(context) {
     const bands = (result.results || []).map(unpackSocialLinks);
 
     // Re-derive the exact ordering in JS with the article-stripped sort key
-    // (#587) — see the comparator helpers above. No pagination-boundary risk:
-    // the eventId branch has no LIMIT/OFFSET (one event's full lineup), and
-    // no admin UI consumer requests the "list all" branch beyond its single
-    // default page.
+    // (#587) — see the comparator helpers above. Pagination-boundary
+    // guarantee: the eventId branch has no LIMIT/OFFSET (one event's full
+    // lineup). The no-eventId branch is GROUP BY bp.id (#618) — exactly one
+    // row per active band_profile — so its row count is bounded by roster
+    // size, not by how many performances a band has; the JS re-sort below
+    // never has to worry about a truncated LIMIT window splitting a single
+    // band across pages.
     if (eventId) {
       bands.sort((a, b) => compareStartTimeNullsLast(a, b) || sortableName(a.name).localeCompare(sortableName(b.name)));
     } else {

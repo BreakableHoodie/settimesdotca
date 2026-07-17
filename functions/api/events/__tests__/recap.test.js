@@ -175,6 +175,162 @@ describe("GET /api/events/:id/recap", () => {
     expect(newBand.is_returning).toBe(false);
   });
 
+  // #613: is_returning must require a STRICTLY EARLIER event, not merely "any
+  // other" event. A band that only appears in a later edition must not be
+  // "returning" at an earlier one it hasn't played yet.
+  test("band playing an earlier and a later archived event is first-timer at the earlier, returning at the later", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const earlierEvent = insertEvent(rawDb, {
+      name: "LWBC Vol1",
+      slug: "lwbc-vol1",
+      date: "2022-05-22",
+      status: "archived",
+    });
+    const laterEvent = insertEvent(rawDb, {
+      name: "LWBC Vol3",
+      slug: "lwbc-vol3",
+      date: "2023-05-21",
+      status: "archived",
+    });
+
+    const venue = insertVenue(rawDb, { name: "Main Stage" });
+    // Same band (same name -> same band_profile_id) plays both events.
+    insertBand(rawDb, { name: "Loop Riders", event_id: earlierEvent.id, venue_id: venue.id });
+    insertBand(rawDb, { name: "Loop Riders", event_id: laterEvent.id, venue_id: venue.id });
+
+    const earlierRes = await onRequestGet({
+      request: new Request(`https://example.test/api/events/${earlierEvent.slug}/recap`),
+      env,
+      params: { id: earlierEvent.slug },
+    });
+    const earlierPayload = await earlierRes.json();
+    expect(earlierPayload.stats.first_timers).toBe(1);
+    expect(earlierPayload.stats.returning_acts).toBe(0);
+    expect(earlierPayload.bands[0].is_returning).toBe(false);
+
+    const laterRes = await onRequestGet({
+      request: new Request(`https://example.test/api/events/${laterEvent.slug}/recap`),
+      env,
+      params: { id: laterEvent.slug },
+    });
+    const laterPayload = await laterRes.json();
+    expect(laterPayload.stats.first_timers).toBe(0);
+    expect(laterPayload.stats.returning_acts).toBe(1);
+    expect(laterPayload.bands[0].is_returning).toBe(true);
+  });
+
+  test("band playing only the later event is a first-timer there", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const earlierEvent = insertEvent(rawDb, {
+      name: "LWBC Vol1",
+      slug: "lwbc-vol1-solo",
+      date: "2022-05-22",
+      status: "archived",
+    });
+    const laterEvent = insertEvent(rawDb, {
+      name: "LWBC Vol3",
+      slug: "lwbc-vol3-solo",
+      date: "2023-05-21",
+      status: "archived",
+    });
+
+    const venue = insertVenue(rawDb, { name: "Main Stage" });
+    insertBand(rawDb, { name: "Only At Vol1", event_id: earlierEvent.id, venue_id: venue.id });
+    insertBand(rawDb, { name: "Only At Vol3", event_id: laterEvent.id, venue_id: venue.id });
+
+    const laterRes = await onRequestGet({
+      request: new Request(`https://example.test/api/events/${laterEvent.slug}/recap`),
+      env,
+      params: { id: laterEvent.slug },
+    });
+    const laterPayload = await laterRes.json();
+    const onlyAtVol3 = laterPayload.bands.find((b) => b.name === "Only At Vol3");
+    expect(onlyAtVol3.is_returning).toBe(false);
+    expect(laterPayload.stats.first_timers).toBe(1);
+    expect(laterPayload.stats.returning_acts).toBe(0);
+  });
+
+  test("same-day events tie-break deterministically on id — returning only at the higher id", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const sameDate = "2024-08-03";
+    // Insertion order guarantees lowerIdEvent.id < higherIdEvent.id.
+    const lowerIdEvent = insertEvent(rawDb, {
+      name: "Same Day A",
+      slug: "same-day-a",
+      date: sameDate,
+      status: "archived",
+    });
+    const higherIdEvent = insertEvent(rawDb, {
+      name: "Same Day B",
+      slug: "same-day-b",
+      date: sameDate,
+      status: "archived",
+    });
+    expect(higherIdEvent.id).toBeGreaterThan(lowerIdEvent.id);
+
+    const venue = insertVenue(rawDb, { name: "Main Stage" });
+    insertBand(rawDb, { name: "Tie Break Band", event_id: lowerIdEvent.id, venue_id: venue.id });
+    insertBand(rawDb, { name: "Tie Break Band", event_id: higherIdEvent.id, venue_id: venue.id });
+
+    const lowerRes = await onRequestGet({
+      request: new Request(`https://example.test/api/events/${lowerIdEvent.slug}/recap`),
+      env,
+      params: { id: lowerIdEvent.slug },
+    });
+    const lowerPayload = await lowerRes.json();
+    expect(lowerPayload.bands[0].is_returning).toBe(false);
+
+    const higherRes = await onRequestGet({
+      request: new Request(`https://example.test/api/events/${higherIdEvent.slug}/recap`),
+      env,
+      params: { id: higherIdEvent.slug },
+    });
+    const higherPayload = await higherRes.json();
+    expect(higherPayload.bands[0].is_returning).toBe(true);
+  });
+
+  // #613: the earlier event only needs to be published (not yet archived) to
+  // count — a recap generated shortly after an event should still recognize
+  // acts returning from a prior, still-published (not-yet-archived) edition.
+  test("counts a prior published (not archived) event when computing is_returning", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const priorEvent = insertEvent(rawDb, {
+      name: "Still Published Vol",
+      slug: "still-published-vol",
+      date: "2023-06-01",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(priorEvent.id);
+
+    const currentEvent = insertEvent(rawDb, {
+      name: "Archived Vol",
+      slug: "archived-vol",
+      date: "2024-06-01",
+      status: "archived",
+    });
+
+    const venue = insertVenue(rawDb, { name: "Main Stage" });
+    insertBand(rawDb, { name: "Cross Edition Band", event_id: priorEvent.id, venue_id: venue.id });
+    insertBand(rawDb, { name: "Cross Edition Band", event_id: currentEvent.id, venue_id: venue.id });
+
+    const res = await onRequestGet({
+      request: new Request(`https://example.test/api/events/${currentEvent.slug}/recap`),
+      env,
+      params: { id: currentEvent.slug },
+    });
+    const payload = await res.json();
+    expect(payload.bands[0].is_returning).toBe(true);
+    expect(payload.stats.returning_acts).toBe(1);
+  });
+
   it("counts only assigned venues (null venue does not increment venue_count)", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";

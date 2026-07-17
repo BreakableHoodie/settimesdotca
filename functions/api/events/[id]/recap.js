@@ -69,7 +69,16 @@ export async function onRequestGet(context) {
           JOIN events e2 ON p2.event_id = e2.id
           WHERE p2.band_profile_id = bp.id
             AND p2.event_id != ?
-            AND e2.status = 'archived'
+            -- A recap can be generated shortly after an event goes live, before
+            -- it's archived — restricting to status='archived' would then miss
+            -- prior editions that are only published so far and wrongly call a
+            -- returning act a first-timer. published-or-archived covers both.
+            AND (e2.is_published = 1 OR e2.status = 'archived')
+            -- "Returning" means chronologically earlier, not merely "some other
+            -- event" (#613): without this, a band that only played a LATER
+            -- archived edition counted as returning at an EARLIER one. Same-day
+            -- events tie-break on id for a deterministic ordering.
+            AND (e2.date < ? OR (e2.date = ? AND e2.id < ?))
         ) THEN 1 ELSE 0 END AS is_returning
       FROM performances p
       JOIN band_profiles bp ON p.band_profile_id = bp.id
@@ -78,7 +87,7 @@ export async function onRequestGet(context) {
       ORDER BY p.start_time NULLS LAST, bp.name
       `,
     )
-      .bind(event.id, event.id)
+      .bind(event.id, event.date, event.date, event.id, event.id)
       .all();
 
     const rows = bandsResult.results || [];

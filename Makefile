@@ -79,3 +79,6 @@ e2e: e2e-setup e2e-serve ## Full local E2E: setup, serve, run, always clean up
 	status=$$?; \
 	$(MAKE) e2e-clean; \
 	exit $$status
+
+probe-links: ## Probe canonical bandcamp URLs for linkless bands (FILE=names.txt, newline-separated)
+	node scripts/probe-band-links.mjs --file $(FILE)

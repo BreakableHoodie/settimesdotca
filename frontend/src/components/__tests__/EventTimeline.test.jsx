@@ -258,3 +258,62 @@ describe('EventTimeline recap links', () => {
     expect(recapLinks[0]).toHaveAttribute('href', '/events/past-fest/recap')
   })
 })
+
+// The collapsed "Performers:" chips show names only, so they sort
+// alphabetically with the article-stripped #587 convention ("The X" under X's
+// first real word) — regardless of the set-time order the API returns.
+describe('EventTimeline collapsed performer chips ordering', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('renders chips alphabetically, ignoring leading articles', async () => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 3,
+          name: 'Chip Sort Fest',
+          slug: 'chip-sort-fest',
+          date: '2026-09-01',
+          status: 'published',
+          is_published: true,
+          venues: [],
+          // API order is set-time order — deliberately unalphabetical.
+          bands: [
+            { id: 1, name: 'Zebra Mussels' },
+            { id: 2, name: 'The Anti-Queens' },
+            { id: 3, name: 'Mango Static' },
+          ],
+          band_count: 3,
+          venue_count: 0,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    }
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Chip Sort Fest')).toBeInTheDocument()
+
+    const chips = screen
+      .getAllByRole('link')
+      .map(el => el.textContent)
+      .filter(text => ['Zebra Mussels', 'The Anti-Queens', 'Mango Static'].includes(text))
+
+    // "The Anti-Queens" files under A (article stripped), then M, then Z.
+    expect(chips).toEqual(['The Anti-Queens', 'Mango Static', 'Zebra Mussels'])
+  })
+})

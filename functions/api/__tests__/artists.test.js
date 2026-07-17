@@ -121,4 +121,83 @@ describe("Public artists directory - GET /api/artists", () => {
     // raw-byte order (which would put "The Anti-Queens" under T, after "Beatles").
     expect(names).toEqual(["The Anti-Queens", "Beatles", "An Horse", "Zebras"]);
   });
+
+  it("round-trips valid social_links JSON into a `social` object (#607)", async () => {
+    const { env, rawDb } = seedEnv();
+    const venue = insertVenue(rawDb, { name: "Main" });
+    const ev = insertEvent(rawDb, { name: "Soc", slug: "soc-evt" });
+    publish(rawDb, ev.id);
+    insertBand(rawDb, {
+      name: "Social Band",
+      event_id: ev.id,
+      venue_id: venue.id,
+      social_links: JSON.stringify({ bandcamp: "https://socialband.bandcamp.com", instagram: "socialband" }),
+    });
+
+    const res = await getArtists(env);
+    const { artists: list } = await res.json();
+    const band = list.find((a) => a.name === "Social Band");
+    expect(band.social).toEqual({ bandcamp: "https://socialband.bandcamp.com/", instagram: "socialband" });
+    expect(band).not.toHaveProperty("social_links");
+  });
+
+  it("yields social: {} for malformed social_links JSON, never throwing (safeReflectSocialLinks convention)", async () => {
+    const { env, rawDb } = seedEnv();
+    const venue = insertVenue(rawDb, { name: "Main" });
+    const ev = insertEvent(rawDb, { name: "Bad", slug: "bad-evt" });
+    publish(rawDb, ev.id);
+    insertBand(rawDb, {
+      name: "Malformed Band",
+      event_id: ev.id,
+      venue_id: venue.id,
+      social_links: "{not valid json",
+    });
+
+    const res = await getArtists(env);
+    expect(res.status).toBe(200);
+    const { artists: list } = await res.json();
+    const band = list.find((a) => a.name === "Malformed Band");
+    expect(band.social).toEqual({});
+    expect(band).not.toHaveProperty("social_links");
+  });
+
+  it("sanitizes unsafe social URLs server-side (javascript: scheme nulled)", async () => {
+    const { env, rawDb } = seedEnv();
+    const venue = insertVenue(rawDb, { name: "Main" });
+    const ev = insertEvent(rawDb, { name: "Unsafe", slug: "unsafe-evt" });
+    publish(rawDb, ev.id);
+    insertBand(rawDb, {
+      name: "Unsafe Band",
+      event_id: ev.id,
+      venue_id: venue.id,
+      social_links: JSON.stringify({
+        bandcamp: "javascript:alert(1)",
+        website: "https://unsafeband.example.com",
+      }),
+    });
+
+    const res = await getArtists(env);
+    const { artists: list } = await res.json();
+    const band = list.find((a) => a.name === "Unsafe Band");
+    expect(band.social.bandcamp).toBeNull();
+    expect(band.social.website).toBe("https://unsafeband.example.com/");
+  });
+
+  it("yields social: null when social_links is absent, and never exposes the raw column", async () => {
+    const { env, rawDb } = seedEnv();
+    const venue = insertVenue(rawDb, { name: "Main" });
+    const ev = insertEvent(rawDb, { name: "None", slug: "none-evt" });
+    publish(rawDb, ev.id);
+    insertBand(rawDb, {
+      name: "No Social Band",
+      event_id: ev.id,
+      venue_id: venue.id,
+    });
+
+    const res = await getArtists(env);
+    const { artists: list } = await res.json();
+    const band = list.find((a) => a.name === "No Social Band");
+    expect(band.social).toBeNull();
+    expect(band).not.toHaveProperty("social_links");
+  });
 });

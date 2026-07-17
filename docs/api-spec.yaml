@@ -113,6 +113,17 @@ paths:
                           nullable: true
                         performance_count:
                           type: integer
+                        social:
+                          allOf:
+                            - $ref: "#/components/schemas/GenericRecord"
+                          nullable: true
+                          description: >-
+                            Sanitized social_links map (safeReflectSocialLinks:
+                            each value a normalized http(s) URL, an Instagram
+                            handle, or null when the stored value was unsafe or
+                            invalid). {} when the stored JSON was malformed;
+                            null when no links are set. Consumers should still
+                            sanitize before rendering (defense in depth).
                   hasMore:
                     type: boolean
         "503":

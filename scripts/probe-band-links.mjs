@@ -66,6 +66,9 @@ function candidateSlugs(name) {
 const normalize = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /** Fetch a bandcamp subdomain; return null for dead/signup pages. */
+const THROTTLE_MS = 2000; // stay under bandcamp's rate limiter — a 429'd run misreads live pages as NONE
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function probe(slug) {
   const url = `https://${slug}.bandcamp.com/`;
   let res;
@@ -78,28 +81,39 @@ async function probe(slug) {
   } catch {
     return null;
   }
+  if (res.status === 429) return { rateLimited: true }; // NEVER read a 429 as "no page"
   if (!res.ok) return null;
   // Unclaimed subdomains redirect to bandcamp.com signup/discover.
   if (!new URL(res.url).hostname.startsWith(slug + ".")) return null;
-  const html = (await res.text()).slice(0, 120000);
+  // Full body — the location markup sits deep in the sidebar, far past the head.
+  const html = await res.text();
   const title = (html.match(/<title>([^<]*)<\/title>/i)?.[1] || "").trim();
   if (/^signup\b/i.test(title)) return null;
   // Band pages title as "Music | Band Name" or "Release | Band Name".
   const pageBandName = title.includes("|") ? title.split("|").pop().trim() : title;
-  // Location renders as <span class="location secondaryText">City, Region</span>
-  const location = (html.match(/class="location[^"]*"[^>]*>([^<]*)</i)?.[1] || "").trim();
+  // Location renders as <span class="location secondaryText">City, Region</span>;
+  // fall back to any og/meta description mention of a place-like "City, Region".
+  const location = (html.match(/class="location[^"]*"[^>]*>\s*([^<]+?)\s*</i)?.[1] || "").trim();
   return { url, title, pageBandName, location };
 }
 
 const ONTARIO = /ontario|,\s*on\b/i;
 
-const results = { AUTO: [], REVIEW: [], NONE: [] };
+const results = { AUTO: [], REVIEW: [], NONE: [], RETRY: [] };
 for (const name of names) {
   let hit = null;
   let hitSlug = null;
+  let sawRateLimit = false;
   for (const slug of candidateSlugs(name)) {
     // Sequential + polite: one candidate at a time, stop at the first live page.
     const page = await probe(slug);
+    await sleep(THROTTLE_MS);
+    if (page?.rateLimited) {
+      sawRateLimit = true;
+      console.error(`probed: ${name} → 429 on ${slug}, backing off 30s`);
+      await sleep(30000);
+      continue;
+    }
     if (page) {
       hit = page;
       hitSlug = slug;
@@ -107,7 +121,7 @@ for (const name of names) {
     }
   }
   if (!hit) {
-    results.NONE.push({ name });
+    results[sawRateLimit ? "RETRY" : "NONE"].push({ name });
     continue;
   }
   const nameMatches = normalize(hit.pageBandName) === normalize(name);
@@ -135,3 +149,7 @@ if (!results.REVIEW.length) console.log("(none)");
 console.log("\n## NONE — no candidate URL is a live band page\n");
 for (const r of results.NONE) console.log(`- ${r.name}`);
 if (!results.NONE.length) console.log("(none)");
+
+console.log("\n## RETRY — rate-limited mid-probe; result unknown, re-run later\n");
+for (const r of results.RETRY) console.log(`- ${r.name}`);
+if (!results.RETRY.length) console.log("(none)");

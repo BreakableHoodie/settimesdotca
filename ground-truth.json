@@ -1,0 +1,87 @@
+{
+  "_comment": "Machine-readable project canon for agents and humans. Slow-moving facts only — live data (lineups, band profiles, counts) belongs to the database, not this file. Update via PR when canon changes; bump verified_at when a human or agent re-verifies against production.",
+  "verified_at": "2026-07-17",
+  "project": {
+    "name": "SetTimes",
+    "domain": "https://settimes.ca",
+    "repo": "BreakableHoodie/settimesdotca",
+    "region": "Waterloo Region, Ontario, Canada (not Ottawa)",
+    "mission": "The best multi-venue / multi-artist event platform for Waterloo Region — fan-facing and admin tooling are equal priority",
+    "design_principles": [
+      "lean and highly performant — media weight is a cost the site refuses",
+      "clean links — no referral/tracking params ever stored",
+      "no AI-written artist prose — bios are artist/organizer-supplied verbatim",
+      "researched facts at highest confidence only — a missing field beats a wrong attribution",
+      "SEO is a priority (structured data, titles, local discovery)"
+    ],
+    "roadmap": "docs/ROADMAP.md"
+  },
+  "target_event": {
+    "name": "Long Weekend Band Crawl - Vol. 17",
+    "slug": "lwbc17",
+    "db_id": 21,
+    "date": "2026-08-02",
+    "doors": "18:30",
+    "show": "18:45",
+    "ages": "19+",
+    "band_count": 22,
+    "venue_street": "King St N, Waterloo"
+  },
+  "venues_vol17": [
+    { "db_id": 16, "name": "Blue Room (Inside Revive Karaoke)", "address": "28 King St N, Waterloo" },
+    { "db_id": 8, "name": "Princess Cafe", "address": "46 King St N, Waterloo, ON, N2J 2W8" },
+    { "db_id": 6, "name": "Prohibition Warehouse", "address": "56 King St N, Waterloo, ON, N2J 2X1" },
+    { "db_id": 7, "name": "Revive Karaoke", "address": "28 King St N, Waterloo, ON, N2J 2W7" },
+    { "db_id": 4, "name": "Room 47", "address": "47 King St N, Waterloo, ON, N2J 2W9" },
+    { "db_id": 15, "name": "Roost", "address": "85 King St N, Waterloo, ON" }
+  ],
+  "venue_notes": {
+    "blue_room": "Blue Room is inside Revive Karaoke — both are distinct venues",
+    "jane_bond": "Jane Bond (db_id 17) is Vol-16 only",
+    "historical_2022": "Vol 1/2 venues (Dive Bar 85 King N, Revive Game Bar 90 King N, Pin Up Arcade Bar 8-247 King N) have no venue rows — they live in events.venue_info JSON; 85 King N is now Roost, Revive later moved to 28"
+  },
+  "published_events": [
+    { "db_id": 35, "slug": "blr3", "name": "Bad Livin' Roadshow 3", "date": "2026-07-10", "end_date": "2026-07-12" },
+    { "db_id": 21, "slug": "lwbc17", "name": "Long Weekend Band Crawl - Vol. 17", "date": "2026-08-02" },
+    { "db_id": 36, "slug": "buddiesfest2", "name": "Buddies Fest 2", "date": "2026-08-07", "end_date": "2026-08-09" }
+  ],
+  "archived_events": [
+    { "db_id": 33, "slug": "lwbc01", "date": "2022-05-22" },
+    { "db_id": 34, "slug": "lwbc02", "date": "2022-07-31" },
+    { "db_id": 22, "slug": "lwbc03", "date": "2022-10-09" },
+    { "db_id": 23, "slug": "lwbc04", "date": "2023-05-21" },
+    { "db_id": 24, "slug": "lwbc05", "date": "2023-08-06" },
+    { "db_id": 25, "slug": "lwbc06", "date": "2023-10-08" },
+    { "db_id": 26, "slug": "lwbc07", "date": "2024-02-18" },
+    { "db_id": 27, "slug": "lwbc08", "date": "2024-05-19" },
+    { "db_id": 28, "slug": "lwbc09", "date": "2024-08-04" },
+    { "db_id": 29, "slug": "lwbc10", "date": "2024-10-13" },
+    { "db_id": 30, "slug": "lwbc11", "date": "2025-02-16" },
+    { "db_id": 31, "slug": "lwbc12", "date": "2025-05-18" },
+    { "db_id": 32, "slug": "lwbc13", "date": "2025-08-03" },
+    { "db_id": 19, "slug": "lwbc14", "date": "2025-10-12" },
+    { "db_id": 1, "slug": "lwbc15", "date": "2026-02-15" },
+    { "db_id": 20, "slug": "lwbc16", "date": "2026-05-17" }
+  ],
+  "constants": {
+    "timezone": "America/Toronto",
+    "after_midnight_threshold_hour": 6,
+    "after_midnight_rule": "sets starting before 06:00 belong to the previous evening; canonical constant in frontend/src/utils/festivalDays.js",
+    "sqlite_datetime_format": "YYYY-MM-DD HH:MM:SS (space separator, never ISO T)",
+    "lucia_sessions_expires_at": "INTEGER Unix seconds — the one exception; compare with unixepoch()",
+    "social_link_keys": ["website", "instagram", "bandcamp", "facebook", "youtube", "spotify", "apple_music", "linktree"]
+  },
+  "infrastructure": {
+    "hosting": "Cloudflare Pages + Pages Functions",
+    "database": { "product": "Cloudflare D1", "name": "settimes-production-db", "id": "c6c8b4a6-f951-47c1-a787-aab0a61ca09b" },
+    "images": { "product": "Cloudflare R2", "bucket": "settimes-band-photos", "binding": "BAND_PHOTOS" },
+    "migrations": "auto-apply on merge to main via cloudflare-pages.yml — never apply manually",
+    "e2e_port": 8788
+  },
+  "process": {
+    "merge_rule": "nothing merges unless ALL CI checks are green (required and non-required)",
+    "rebase_rule": "rebase on origin/main before every push",
+    "issue_tracking": "remaining/deferred work becomes a GitHub issue referenced from PRs",
+    "pre_commit_gate": "make gate"
+  }
+}

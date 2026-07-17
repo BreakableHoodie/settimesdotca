@@ -660,40 +660,6 @@ function App() {
     ? `View the full schedule and set times for ${eventData.name}. Browse all artists and plan your evening.`
     : null
 
-  const eventJsonLd = eventData
-    ? JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'MusicEvent',
-        name: eventData.name,
-        startDate: eventData.date,
-        endDate: eventData.end_date || eventData.date,
-        url: `https://settimes.ca/event/${slug}`,
-        description: `Full set times and schedule for ${eventData.name}.`,
-        location: {
-          '@type': 'Place',
-          ...(eventData.city
-            ? { address: { '@type': 'PostalAddress', addressLocality: eventData.city, addressCountry: 'CA' } }
-            : { name: 'Canada', address: { '@type': 'PostalAddress', addressCountry: 'CA' } }),
-        },
-        organizer: {
-          '@type': 'Organization',
-          name: 'SetTimes',
-          url: 'https://settimes.ca',
-          sameAs: ['https://www.instagram.com/settimes.ca'],
-        },
-        ...(eventData.ticket_url && {
-          offers: {
-            '@type': 'Offer',
-            url: eventData.ticket_url,
-            availability: 'https://schema.org/InStock',
-          },
-        }),
-        ...(bands?.length && {
-          performer: bands.filter(b => b.name).map(b => ({ '@type': 'MusicGroup', name: b.name })),
-        }),
-      })
-    : null
-
   return (
     <div className="min-h-screen pb-20">
       <Helmet>
@@ -708,7 +674,6 @@ function App() {
         <meta name="twitter:card" content="summary" />
         {eventData && <meta name="twitter:title" content={`${eventData.name} | SetTimes`} />}
         {eventDescription && <meta name="twitter:description" content={eventDescription} />}
-        {eventJsonLd && <script type="application/ld+json">{eventJsonLd}</script>}
       </Helmet>
       <OfflineIndicator />
       {isArchived ? (

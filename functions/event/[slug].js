@@ -17,7 +17,7 @@ export async function onRequest(context) {
   let event;
   try {
     event = await env.DB.prepare(
-      `SELECT id, name, date, end_date, slug, description, city, ticket_url
+      `SELECT id, name, date, end_date, slug, description, city, ticket_url, created_at
        FROM events
        WHERE slug = ? AND (is_published = 1 OR status = 'archived')`,
     )
@@ -112,26 +112,40 @@ export async function onRequest(context) {
   // isn't a real http(s) URL, which drops the offers block entirely below.
   const safeTicketUrl = normalizeHttpUrl(event.ticket_url);
 
+  // created_at is stored as SQLite `YYYY-MM-DD HH:MM:SS` (see CLAUDE.md); take
+  // just the date part for the Offer.validFrom date literal. Guard against a
+  // null/malformed value so the field is omitted rather than emitting garbage.
+  const validFromDate =
+    typeof event.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(event.created_at)
+      ? event.created_at.slice(0, 10)
+      : null;
+
   const musicEvent = {
     "@context": "https://schema.org",
     "@type": "MusicEvent",
     name: event.name,
     url,
-    eventStatus: "EventScheduled",
-    eventAttendanceMode: "OfflineEventAttendanceMode",
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     // Show doors at 6:30PM; set times start 6:45PM — use the show-start per spec.
     ...(event.date ? { startDate: `${event.date}T18:45:00-04:00` } : {}),
     ...(event.date ? { endDate: event.end_date || event.date } : {}),
     location,
     ...(plainDesc ? { description: plainDesc } : {}),
+    organizer: {
+      "@type": "Organization",
+      name: "SetTimes",
+      url: CANONICAL_HOST,
+      sameAs: ["https://www.instagram.com/settimes.ca"],
+    },
     ...(safeTicketUrl
       ? {
           offers: {
             "@type": "Offer",
             url: safeTicketUrl,
-            price: "0",
             priceCurrency: "CAD",
             availability: "https://schema.org/InStock",
+            ...(validFromDate ? { validFrom: validFromDate } : {}),
           },
         }
       : {}),

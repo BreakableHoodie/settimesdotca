@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, afterEach, vi } from "vitest";
 import { onRequestGet } from "../[name].js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
 
@@ -266,5 +266,132 @@ describe("GET /api/bands/stats/:name — event_end_date exposure (#542 PR-1)", (
     const payload = await response.json();
     expect(payload.past).toHaveLength(1);
     expect(payload.past[0].event_end_date).toBe("2001-03-03");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #603 — upcoming/past classification is per-performance, not per-event.
+// On a multi-day event, a set's OWN day (performance_date, falling back to
+// the event's start date for the #543 NULL convention) decides its bucket —
+// so a band's day-1 set can already be "past" while its day-3 set is still
+// "upcoming" mid-festival, instead of the whole band flipping to "past" the
+// moment the event's start date has elapsed. Archived events still force
+// every set to "past" regardless of date.
+// ---------------------------------------------------------------------------
+describe("GET /api/bands/stats/:name — per-performance classification (#603)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // 2026-07-11T12:00:00Z = 08:00 EDT → Toronto "today" is 2026-07-11,
+  // day 2 of a 2026-07-10..2026-07-12 event (same idiom as timeline.test.js
+  // "#542 PR-1" real-DB describe block).
+  const pinDayTwoClock = () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T12:00:00Z"));
+  };
+
+  test("day-1 set is past and day-3 set is upcoming on day 2 of a multi-day event", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    pinDayTwoClock();
+
+    const venue = insertVenue(rawDb, { name: "Prohibition Warehouse" });
+    const event = insertEvent(rawDb, {
+      name: "Multi-Day 603 Event",
+      slug: "stats-603-multiday",
+      date: "2026-07-10",
+      end_date: "2026-07-12",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const day1Perf = insertBand(rawDb, {
+      name: "Stats 603 Multiday Band",
+      event_id: event.id,
+      venue_id: venue.id,
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-07-10", day1Perf.id);
+
+    const day3Perf = insertBand(rawDb, {
+      name: "Stats 603 Multiday Band",
+      event_id: event.id,
+      venue_id: venue.id,
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-07-12", day3Perf.id);
+
+    const request = new Request("https://example.test/api/bands/stats/Stats%20603%20Multiday%20Band");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.past).toHaveLength(1);
+    expect(payload.past[0].id).toBe(day1Perf.id);
+    expect(payload.upcoming).toHaveLength(1);
+    expect(payload.upcoming[0].id).toBe(day3Perf.id);
+  });
+
+  test("NULL performance_date inherits the event start date and is past on day 2", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    pinDayTwoClock();
+
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+    const event = insertEvent(rawDb, {
+      name: "Multi-Day 603 Null Event",
+      slug: "stats-603-null-perf-date",
+      date: "2026-07-10",
+      end_date: "2026-07-12",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    // performance_date left NULL — the #543 convention for day-1 sets and
+    // single-day events — so it must inherit event_date (2026-07-10), which
+    // has already elapsed by the day-2 pinned clock.
+    const perf = insertBand(rawDb, {
+      name: "Stats 603 Null Perf Date Band",
+      event_id: event.id,
+      venue_id: venue.id,
+    });
+
+    const request = new Request("https://example.test/api/bands/stats/Stats%20603%20Null%20Perf%20Date%20Band");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.past).toHaveLength(1);
+    expect(payload.past[0].id).toBe(perf.id);
+    expect(payload.upcoming).toHaveLength(0);
+  });
+
+  test("archived event with a future-dated performance is still past", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    pinDayTwoClock();
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    const event = insertEvent(rawDb, {
+      name: "Archived 603 Event",
+      slug: "stats-603-archived",
+      date: "2099-01-01",
+      status: "archived",
+    });
+
+    const perf = insertBand(rawDb, {
+      name: "Stats 603 Archived Band",
+      event_id: event.id,
+      venue_id: venue.id,
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2099-01-01", perf.id);
+
+    const request = new Request("https://example.test/api/bands/stats/Stats%20603%20Archived%20Band");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.past).toHaveLength(1);
+    expect(payload.past[0].id).toBe(perf.id);
+    expect(payload.upcoming).toHaveLength(0);
   });
 });

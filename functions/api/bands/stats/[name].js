@@ -101,6 +101,7 @@ export async function onRequestGet(context) {
         p.id as performance_id,
         p.start_time,
         p.end_time,
+        p.performance_date,
         v.id as venue_id,
         v.name as venue_name,
         v.address as venue_address,
@@ -133,10 +134,18 @@ export async function onRequestGet(context) {
     // Calculate statistics
     const today = eventLocalToday();
 
-    // Separate upcoming and past performances
-    // Archived events always go to past regardless of date
-    const upcomingPerformances = allPerformances.filter((p) => p.event_date >= today && p.event_status !== "archived");
-    const pastPerformances = allPerformances.filter((p) => p.event_date < today || p.event_status === "archived");
+    // Separate upcoming and past performances — per-performance (#603), not
+    // per-event: on a multi-day event, each set's OWN day decides its bucket,
+    // so a band's day-1 set can already be "past" while its day-3 set is
+    // still "upcoming" mid-festival. NULL performance_date inherits the
+    // event's start date (the #543 convention: day-1 sets and single-day
+    // events store NULL). Archived events always go to past regardless of date.
+    const upcomingPerformances = allPerformances.filter(
+      (p) => (p.performance_date || p.event_date) >= today && p.event_status !== "archived",
+    );
+    const pastPerformances = allPerformances.filter(
+      (p) => (p.performance_date || p.event_date) < today || p.event_status === "archived",
+    );
 
     // Get unique venues
     const venueMap = new Map();

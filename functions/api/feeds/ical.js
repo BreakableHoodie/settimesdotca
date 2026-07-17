@@ -111,9 +111,18 @@ function generateICal(bands, city, genre) {
     const startTime = band.start_time || "20:00"; // HH:MM
     const endTime = band.end_time || "21:00";
 
+    // A set that straddles midnight (e.g. 23:30–00:30) ENDS on the next
+    // calendar day — stamping both ends with the same date would put DTEND
+    // before DTSTART, an invalid VEVENT some clients reject (#601). Zero-padded
+    // HH:MM compares lexicographically; this mirrors prepareBands()'s
+    // `endMs < startMs` +1-day roll in frontend/src/utils/bandUtils.js. Pure
+    // after-midnight sets (start 00:00–05:59) are unaffected: both stamps
+    // correctly share the stored date.
+    const endDate = endTime < startTime ? nextCalendarDay(eventDate) : eventDate;
+
     // Convert to iCal format (YYYYMMDDTHHMMSS)
     const dtstart = `${eventDate.replace(/-/g, "")}T${startTime.replace(/:/g, "")}00`;
-    const dtend = `${eventDate.replace(/-/g, "")}T${endTime.replace(/:/g, "")}00`;
+    const dtend = `${endDate.replace(/-/g, "")}T${endTime.replace(/:/g, "")}00`;
 
     // Generate unique ID using performance ID to ensure uniqueness per band
     const uid = `performance-${band.performance_id}-${eventDate}@settimes.ca`;
@@ -143,6 +152,16 @@ function generateICal(bands, city, genre) {
   ical.push("END:VCALENDAR");
 
   return ical.join("\r\n");
+}
+
+/**
+ * YYYY-MM-DD → the following calendar day, DST-proof via UTC math (the
+ * string is a date literal, not a moment in time).
+ */
+function nextCalendarDay(dateStr) {
+  const next = new Date(`${dateStr}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
 }
 
 function escapeIcal(text) {

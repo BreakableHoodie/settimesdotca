@@ -152,6 +152,10 @@ export default function EventRecapPage() {
   const formattedDate = eventDate
     ? eventDate.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Date TBD'
+  // Roster-only historical archives (Vols 1-14) have no venue assignments at
+  // all — "Venues: 0" reads as missing data, not a real stat. Mirrors the
+  // omit-zero-venues precedent in EventTimeline.jsx (EventCard, #608).
+  const hasVenueData = stats.venue_count > 0
 
   return (
     <>
@@ -193,9 +197,12 @@ export default function EventRecapPage() {
             </div>
           </header>
 
-          <section aria-label="Event statistics" className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-5">
+          <section
+            aria-label="Event statistics"
+            className={`mb-10 grid grid-cols-2 gap-4 ${hasVenueData ? 'sm:grid-cols-5' : 'sm:grid-cols-4'}`}
+          >
             <StatCard label="Total Sets" value={stats.total_sets ?? '—'} />
-            <StatCard label="Venues" value={stats.venue_count ?? '—'} />
+            {hasVenueData && <StatCard label="Venues" value={stats.venue_count} />}
             <StatCard label="First Timers" value={stats.first_timers ?? '—'} />
             <StatCard label="Returning Acts" value={stats.returning_acts ?? '—'} />
             <StatCard label="Saved Route" value={savedBands.length || '—'} />
@@ -275,7 +282,14 @@ export default function EventRecapPage() {
                 <article key={venue.id} className="rounded-xl border border-border bg-bg-navy/40 p-4">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-text-primary">{venue.name}</h3>
+                      {/* "Unscheduled" is accurate when it's the leftover group next to
+                          real venue assignments (partially-scheduled event). But when it's
+                          the ONLY group — the event has zero venue assignments at all,
+                          e.g. a roster-only historical archive — "Unscheduled" implies a
+                          scheduling gap that doesn't exist; "Lineup" reads correctly (#614). */}
+                      <h3 className="text-lg font-semibold text-text-primary">
+                        {venue.id === 'unscheduled' && !hasVenueData ? 'Lineup' : venue.name}
+                      </h3>
                       <p className="text-sm text-text-tertiary">
                         {venue.bands.length} {venue.bands.length === 1 ? 'set' : 'sets'} on the night
                       </p>
@@ -299,9 +313,13 @@ export default function EventRecapPage() {
                         >
                           {band.name}
                         </Link>
-                        <span className="shrink-0 text-text-tertiary">
-                          {band.start_time || 'TBD'}–{band.end_time || 'TBD'}
-                        </span>
+                        {/* Roster-only archives have neither start nor end time recorded —
+                            render nothing rather than "TBD–TBD" (#614). */}
+                        {(band.start_time || band.end_time) && (
+                          <span className="shrink-0 text-text-tertiary">
+                            {band.start_time || 'TBD'}–{band.end_time || 'TBD'}
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>

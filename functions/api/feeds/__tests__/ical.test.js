@@ -479,3 +479,72 @@ describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
     expect(idxLate).toBeLessThan(idxMorning);
   });
 });
+
+// ---------------------------------------------------------------------------
+// #601 — a set that STRADDLES midnight (23:30–00:30) must stamp DTEND with the
+// next calendar day; same-date stamps would put DTEND before DTSTART, an
+// invalid VEVENT. Distinct from pure after-midnight sets (start 00:00–05:59),
+// which correctly keep both stamps on the stored date (covered above).
+// ---------------------------------------------------------------------------
+describe("GET /api/feeds/ical — midnight-straddling DTEND rolls to the next day (#601)", () => {
+  test("23:30–00:30 set: DTSTART on the stored date, DTEND on the following day", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const event = insertEvent(rawDb, {
+      name: "Straddle Ical Event",
+      slug: "ical-straddle",
+      date: "2099-03-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+
+    insertBand(rawDb, {
+      name: "Straddle Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "23:30",
+      end_time: "00:30",
+    });
+
+    const request = new Request("https://example.test/api/feeds/ical");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const icalData = await response.text();
+
+    expect(icalData).toContain("DTSTART:20990301T233000");
+    expect(icalData).toContain("DTEND:20990302T003000");
+    expect(icalData).not.toContain("DTEND:20990301T003000");
+  });
+
+  test("month boundary: 23:00–00:15 on March 31 stamps DTEND April 1", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const event = insertEvent(rawDb, {
+      name: "Month Boundary Ical Event",
+      slug: "ical-month-boundary",
+      date: "2099-03-31",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Princess Cafe" });
+
+    insertBand(rawDb, {
+      name: "Boundary Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "23:00",
+      end_time: "00:15",
+    });
+
+    const request = new Request("https://example.test/api/feeds/ical");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const icalData = await response.text();
+
+    expect(icalData).toContain("DTSTART:20990331T230000");
+    expect(icalData).toContain("DTEND:20990401T001500");
+  });
+});

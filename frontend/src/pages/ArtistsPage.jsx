@@ -59,10 +59,10 @@ function ArtistCard({ artist }) {
   const socialLinks = getCardSocialLinks(artist.social)
 
   return (
-    <div className="relative flex items-center gap-4 rounded-xl border border-border bg-gradient-card p-4 transition hover:border-accent-400/50">
+    <div className="rounded-xl border border-border bg-gradient-card p-4 transition hover:border-accent-400/50">
       <Link
         to={buildBandProfileHref(artist.name)}
-        className="flex min-w-0 flex-1 items-center gap-4 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+        className="flex min-w-0 items-center gap-4 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
       >
         {artist.photo_url ? (
           <img
@@ -82,8 +82,12 @@ function ArtistCard({ artist }) {
           <p className="mt-0.5 text-xs text-text-tertiary">{shows}</p>
         </div>
       </Link>
+      {/* Icons live on their own row below the text so a long band name never
+          competes with them for width (the card grows vertically instead —
+          per Dre). pl-[68px] lines the icon glyphs up with the text column:
+          64px photo + 16px gap, minus the 12px inset of the 40px hit area. */}
       {socialLinks.length > 0 && (
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="mt-1 flex items-center gap-1 pl-[68px]">
           {socialLinks.map(({ key, label, Icon, href }) => (
             <a
               key={key}

@@ -171,6 +171,7 @@ describe("Public artists directory - GET /api/artists", () => {
       event_id: ev.id,
       venue_id: venue.id,
       social_links: JSON.stringify({
+        // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the safeReflectSocialLinks read-path guard
         bandcamp: "javascript:alert(1)",
         website: "https://unsafeband.example.com",
       }),

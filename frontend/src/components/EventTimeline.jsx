@@ -7,6 +7,7 @@ import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
 import { getSelectedBands, saveSelectedBands } from '../utils/scheduleStorage'
+import { sortableName } from '../utils/sortableName'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
 
@@ -575,7 +576,14 @@ function EventCard({
     })
   }
 
-  const featuredBands = event.bands || []
+  // Collapsed chips show names only (no set times), so fans scan them as a
+  // lookup — alphabetical, article-stripped (#587 convention). The expanded
+  // "All Performers" grid keeps the API's set-time order, where running
+  // order is meaningful.
+  const featuredBands = useMemo(
+    () => [...(event.bands || [])].sort((a, b) => sortableName(a.name).localeCompare(sortableName(b.name))),
+    [event.bands]
+  )
   const resolvedDetails = details
   const isLoadingDetails = expanded && detailsLoading && !resolvedDetails
   const venueList = resolvedDetails?.venues || event.venues || []

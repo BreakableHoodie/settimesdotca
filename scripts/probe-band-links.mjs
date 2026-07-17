@@ -20,6 +20,12 @@
  *   node scripts/probe-band-links.mjs --file bands.txt     # newline-separated names
  *   node scripts/probe-band-links.mjs --names "Band A,Band B"
  *   make probe-links FILE=bands.txt
+ *
+ * Web-search fallback: bands unresolved by URL-guessing get one real web
+ * search. Default engine is DuckDuckGo's keyless HTML endpoint (no setup);
+ * setting GOOGLE_CSE_KEY + GOOGLE_CSE_ID upgrades to Google Programmable
+ * Search (100 free queries/day). Search hits land in REVIEW — never AUTO;
+ * a result link can't prove identity the way a bandcamp location can.
  */
 
 import { readFileSync } from "node:fs";
@@ -99,6 +105,62 @@ async function probe(slug) {
 
 const ONTARIO = /ontario|,\s*on\b/i;
 
+const CSE_KEY = process.env.GOOGLE_CSE_KEY;
+const CSE_ID = process.env.GOOGLE_CSE_ID;
+const cseEnabled = Boolean(CSE_KEY && CSE_ID);
+
+const MUSIC_DOMAIN = /bandcamp\.com|instagram\.com|facebook\.com|open\.spotify\.com|linktr\.ee|youtube\.com/i;
+
+/** Keyless DuckDuckGo HTML search; returns top result links or null. */
+async function ddgSearch(name) {
+  const q = `"${name}" band bandcamp OR instagram OR facebook OR spotify`;
+  try {
+    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, {
+      signal: AbortSignal.timeout(12000),
+      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
+    });
+    if (!res.ok) {
+      console.error(`ddg: HTTP ${res.status} for "${name}"`);
+      return null;
+    }
+    const html = await res.text();
+    const links = [...html.matchAll(/uddg=([^&"]+)/g)]
+      .map((m) => decodeURIComponent(m[1]))
+      .filter((u) => u.startsWith("http") && !u.includes("duckduckgo.com"));
+    // Dedupe, prefer music-platform domains, keep it short.
+    const seen = new Set();
+    const unique = links.filter((u) => {
+      const key = u.replace(/[?#].*$/, "").replace(/\/$/, "");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const ranked = [...unique.filter((u) => MUSIC_DOMAIN.test(u)), ...unique.filter((u) => !MUSIC_DOMAIN.test(u))];
+    return ranked.slice(0, 5).map((link) => ({ link, title: "", snippet: "" }));
+  } catch {
+    return null;
+  }
+}
+
+/** One real-Google query for a band; returns top result links or null. */
+async function googleSearch(name) {
+  const q = `"${name}" band bandcamp OR instagram OR facebook OR spotify`;
+  const url =
+    `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(CSE_KEY)}` +
+    `&cx=${encodeURIComponent(CSE_ID)}&num=5&q=${encodeURIComponent(q)}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) {
+      console.error(`google: HTTP ${res.status} for "${name}"${res.status === 429 ? " (daily quota?)" : ""}`);
+      return null;
+    }
+    const data = await res.json();
+    return (data.items || []).map((i) => ({ title: i.title, link: i.link, snippet: (i.snippet || "").slice(0, 140) }));
+  } catch {
+    return null;
+  }
+}
+
 const results = { AUTO: [], REVIEW: [], NONE: [], RETRY: [] };
 for (const name of names) {
   let hit = null;
@@ -121,7 +183,19 @@ for (const name of names) {
     }
   }
   if (!hit) {
-    results[sawRateLimit ? "RETRY" : "NONE"].push({ name });
+    if (sawRateLimit) {
+      results.RETRY.push({ name });
+      continue;
+    }
+    const engine = cseEnabled ? "Google" : "DuckDuckGo";
+    const hits = cseEnabled ? await googleSearch(name) : await ddgSearch(name);
+    await sleep(THROTTLE_MS);
+    if (hits?.length) {
+      results.REVIEW.push({ name, google: hits, engine });
+      console.error(`probed: ${name} → REVIEW via ${engine} (${hits.length} hits)`);
+      continue;
+    }
+    results.NONE.push({ name });
     continue;
   }
   const nameMatches = normalize(hit.pageBandName) === normalize(name);
@@ -142,11 +216,17 @@ for (const r of results.AUTO) console.log(`- **${r.name}** → ${r.url} · "${r.
 if (!results.AUTO.length) console.log("(none)");
 
 console.log("\n## REVIEW — page exists, identity unproven (owner yes/no)\n");
-for (const r of results.REVIEW)
-  console.log(`- **${r.name}** → ${r.url} · page says "${r.page_band_name}" · ${r.location}`);
+for (const r of results.REVIEW) {
+  if (r.google) {
+    console.log(`- **${r.name}** — ${r.engine} hits:`);
+    for (const g of r.google) console.log(`    - ${g.link}${g.title ? " — " + g.title : ""}`);
+  } else {
+    console.log(`- **${r.name}** → ${r.url} · page says "${r.page_band_name}" · ${r.location}`);
+  }
+}
 if (!results.REVIEW.length) console.log("(none)");
 
-console.log("\n## NONE — no candidate URL is a live band page\n");
+console.log(`\n## NONE — no live band page at candidate URLs and no web-search hits\n`);
 for (const r of results.NONE) console.log(`- ${r.name}`);
 if (!results.NONE.length) console.log("(none)");
 

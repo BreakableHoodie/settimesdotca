@@ -477,6 +477,18 @@ export default function BandProfilePage() {
                 className="h-full w-full object-cover opacity-60"
               />
               <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent" />
+              {/* Page-level action lives in the header, not beside the bio —
+                  the old placement floated awkwardly above the bio on mobile
+                  and forced an empty column on desktop (Dre, 2026-07-17). */}
+              <div className="absolute right-4 top-4">
+                <ShareButton
+                  url={
+                    typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
+                  }
+                  title={profile.name}
+                  text={`${profile.name} on SetTimes`}
+                />
+              </div>
               <div className="absolute inset-x-0 bottom-0 p-6">
                 <h1 className="mb-3 text-4xl font-bold leading-tight text-white drop-shadow-lg sm:text-5xl">
                   {profile.name}
@@ -499,49 +511,52 @@ export default function BandProfilePage() {
             </div>
           ) : (
             <div className="bg-linear-to-br from-bg-purple to-bg-navy p-6 sm:p-8">
-              <h1 className="mb-3 text-4xl font-bold leading-tight text-text-primary sm:text-5xl">{profile.name}</h1>
-              <div className="flex flex-wrap gap-2.5">
-                {profile.genre && (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-bold text-bg-navy">
-                    <Guitar size={14} className="shrink-0" aria-hidden="true" />
-                    {profile.genre}
-                  </span>
-                )}
-                {profile.origin && (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border-2 border-text-primary/30 bg-bg-navy px-3.5 py-2 text-sm font-bold text-text-primary">
-                    <MapPin size={14} className="shrink-0" aria-hidden="true" />
-                    {profile.origin}
-                  </span>
-                )}
+              {/* Share sits top-right of the header on both variants — see the
+                  photo-variant comment above. */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <h1 className="mb-3 text-4xl font-bold leading-tight text-text-primary sm:text-5xl">
+                    {profile.name}
+                  </h1>
+                  <div className="flex flex-wrap gap-2.5">
+                    {profile.genre && (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-bold text-bg-navy">
+                        <Guitar size={14} className="shrink-0" aria-hidden="true" />
+                        {profile.genre}
+                      </span>
+                    )}
+                    {profile.origin && (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border-2 border-text-primary/30 bg-bg-navy px-3.5 py-2 text-sm font-bold text-text-primary">
+                        <MapPin size={14} className="shrink-0" aria-hidden="true" />
+                        {profile.origin}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <ShareButton
+                    url={
+                      typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
+                    }
+                    title={profile.name}
+                    text={`${profile.name} on SetTimes`}
+                  />
+                </div>
               </div>
             </div>
           )}
 
-          {/* Bio, Social Links, and Share */}
+          {/* Bio and Social Links — Share moved to the header (page-level
+              action); the bio keeps max-w-prose for line-length, not layout */}
           <div className="border-t border-text-primary/10 bg-bg-purple/50 p-6">
-            <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1">
-                {profile.description ? (
-                  <div
-                    className="band-bio max-w-prose text-sm leading-relaxed text-text-secondary [&_a:hover]:underline [&_a]:text-accent-500 [&_p]:my-2"
-                    dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
-                  />
-                ) : (
-                  !hasAnySocial(profile.social) && (
-                    <p className="text-sm italic text-text-tertiary">No bio added yet.</p>
-                  )
-                )}
-              </div>
-              <div className="shrink-0 self-end sm:self-auto">
-                <ShareButton
-                  url={
-                    typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
-                  }
-                  title={profile.name}
-                  text={`${profile.name} on SetTimes`}
-                />
-              </div>
-            </div>
+            {profile.description ? (
+              <div
+                className="band-bio max-w-prose text-sm leading-relaxed text-text-secondary [&_a:hover]:underline [&_a]:text-accent-500 [&_p]:my-2"
+                dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
+              />
+            ) : (
+              !hasAnySocial(profile.social) && <p className="text-sm italic text-text-tertiary">No bio added yet.</p>
+            )}
             {hasAnySocial(profile.social) ? (
               <div className="mt-5 border-t border-text-primary/10 pt-5">
                 <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-tertiary">

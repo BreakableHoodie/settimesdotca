@@ -17,7 +17,7 @@ export async function onRequest(context) {
   let event;
   try {
     event = await env.DB.prepare(
-      `SELECT id, name, date, end_date, slug, description, city, ticket_url, created_at
+      `SELECT id, name, date, end_date, slug, description, city, ticket_url, poster_url, created_at
        FROM events
        WHERE slug = ? AND (is_published = 1 OR status = 'archived')`,
     )
@@ -72,17 +72,29 @@ export async function onRequest(context) {
   const description =
     plainDesc || `${event.name} — live music in ${where} on SetTimes.${event.date ? ` ${event.date}.` : ""}`;
 
+  // Read-path sanitize (#504 convention, #616): a pre-validation legacy
+  // poster_url must never be reflected into og:image/twitter:image or the
+  // MusicEvent JSON-LD image — normalizeHttpUrl returns null for anything
+  // that isn't a real http(s) URL, which omits the image entirely below.
+  const safePosterUrl = normalizeHttpUrl(event.poster_url);
+
   const metaTags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
     `<meta property="og:title" content="${escapeAttr(event.name)}" />`,
     `<meta property="og:description" content="${escapeAttr(description)}" />`,
     `<meta property="og:type" content="website" />`,
     `<meta property="og:url" content="${escapeAttr(url)}" />`,
-    `<meta name="twitter:card" content="summary" />`,
     `<meta name="twitter:title" content="${escapeAttr(event.name)}" />`,
     `<meta name="twitter:description" content="${escapeAttr(description)}" />`,
     `<link rel="canonical" href="${escapeAttr(url)}" />`,
   ];
+  if (safePosterUrl) {
+    metaTags.push(`<meta property="og:image" content="${escapeAttr(safePosterUrl)}" />`);
+    metaTags.push(`<meta name="twitter:image" content="${escapeAttr(safePosterUrl)}" />`);
+    metaTags.push(`<meta name="twitter:card" content="summary_large_image" />`);
+  } else {
+    metaTags.push(`<meta name="twitter:card" content="summary" />`);
+  }
 
   // Build MusicEvent location: use per-venue MusicVenue entries when available,
   // otherwise fall back to a generic Place for the Waterloo Region.
@@ -132,6 +144,7 @@ export async function onRequest(context) {
     ...(event.date ? { endDate: event.end_date || event.date } : {}),
     location,
     ...(plainDesc ? { description: plainDesc } : {}),
+    ...(safePosterUrl ? { image: [safePosterUrl] } : {}),
     organizer: {
       "@type": "Organization",
       name: "SetTimes",

@@ -8,6 +8,7 @@ import { checkPermission, auditLog } from "../_middleware.js";
 import {
   FIELD_LIMITS,
   isValidURL,
+  normalizeHttpUrl,
   safeReflectSocialLinksString,
   sanitizeEventSocialLinks,
   sanitizeString,
@@ -111,6 +112,7 @@ export async function onRequestPatch(context) {
       description,
       city,
       ticket_url,
+      poster_url,
       venue_info,
       social_links,
       theme_colors,
@@ -298,6 +300,42 @@ export async function onRequestPatch(context) {
       params.push(trimmed || null);
     }
 
+    if (poster_url !== undefined) {
+      if (poster_url !== null && typeof poster_url !== "string") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Poster image must be a string",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      const trimmed = poster_url ? poster_url.trim() : "";
+      if (trimmed && !isValidURL(trimmed)) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Poster image must be a valid URL",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (trimmed.length > FIELD_LIMITS.eventPosterUrl.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Poster image must be no more than ${FIELD_LIMITS.eventPosterUrl.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      // #616: unlike ticket_url above, poster_url is normalized on write too
+      // (not just read-reflected) — the design spec calls for it explicitly,
+      // and it's cheap since normalizeHttpUrl(validURL) is a no-op reparse.
+      updates.push("poster_url = ?");
+      params.push(normalizeHttpUrl(trimmed) || null);
+    }
+
     if (venue_info !== undefined) {
       try {
         const sanitizedVenueInfo = sanitizeVenueInfo(venue_info);
@@ -420,8 +458,10 @@ export async function onRequestPatch(context) {
 
     // Read-path sanitize (#493): RETURNING * echoes the full row, so
     // social_links may reflect a pre-#483 (or otherwise legacy) value even
-    // when this request didn't touch social_links itself.
+    // when this request didn't touch social_links itself. poster_url gets
+    // the same #504-style read-reflect as ticket_url (#616).
     result.social_links = safeReflectSocialLinksString(result.social_links, ["instagram", "x", "tiktok"]);
+    result.poster_url = normalizeHttpUrl(result.poster_url);
 
     // Audit log
     await auditLog(
@@ -534,6 +574,7 @@ export async function onRequestPut(context) {
 
       // Read-path sanitize (#493): see the PATCH handler above.
       result.social_links = safeReflectSocialLinksString(result.social_links, ["instagram", "x", "tiktok"]);
+      result.poster_url = normalizeHttpUrl(result.poster_url);
 
       // Audit log
       await auditLog(

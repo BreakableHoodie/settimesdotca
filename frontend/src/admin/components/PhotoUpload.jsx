@@ -3,22 +3,101 @@ import { useState, useRef } from 'react'
 import { getAdminFormDataHeaders } from '../../utils/adminApi'
 
 /**
+ * Downscale an image client-side via canvas before upload (#616 leanness
+ * budget): longest edge clamped to maxDimension, re-encoded as JPEG at
+ * quality 0.82. GIFs are skipped — re-encoding through canvas flattens
+ * animation to a single frame, and GIF uploads are rare/small enough that
+ * the tradeoff isn't worth it. Falls back to the original file on any
+ * failure (unsupported format, canvas error) so a downscale bug can never
+ * block an upload outright.
+ *
+ * @param {File} file
+ * @param {number} maxDimension - Longest-edge cap in pixels
+ * @returns {Promise<File>} The downscaled file, or the original if no
+ *   downscale was needed/possible.
+ */
+async function downscaleImage(file, maxDimension) {
+  if (file.type === 'image/gif') {
+    return file
+  }
+
+  try {
+    // eslint-disable-next-line no-undef
+    const bitmap = await createImageBitmap(file)
+    const longestEdge = Math.max(bitmap.width, bitmap.height)
+
+    if (longestEdge <= maxDimension) {
+      bitmap.close?.()
+      return file
+    }
+
+    const scale = maxDimension / longestEdge
+    const targetWidth = Math.max(1, Math.round(bitmap.width * scale))
+    const targetHeight = Math.max(1, Math.round(bitmap.height * scale))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = targetWidth
+    canvas.height = targetHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      bitmap.close?.()
+      return file
+    }
+    ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight)
+    bitmap.close?.()
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82))
+    if (!blob) {
+      return file
+    }
+
+    const baseName = file.name.replace(/\.[^./\\]+$/, '') || 'image'
+    // eslint-disable-next-line no-undef
+    return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' })
+  } catch (err) {
+    console.error('Image downscale failed, uploading original file instead:', err)
+    return file
+  }
+}
+
+/**
  * PhotoUpload Component
  *
- * Reusable component for uploading band photos with:
+ * Reusable component for uploading images (band photos, event posters, ...) with:
  * - Drag and drop support
  * - Image preview
  * - File validation
+ * - Client-side downscale (optional, via maxDimension)
  * - Progress indication
  * - R2 bucket integration
  *
  * @param {Object} props
  * @param {string} props.currentPhoto - Current photo URL (if exists)
  * @param {Function} props.onPhotoChange - Callback when photo is uploaded/removed
- * @param {number} props.bandId - Optional band ID to associate with upload
+ * @param {number} props.bandId - Optional band ID to associate with upload (legacy/default usage)
  * @param {string} props.bandName - Optional band name for display
+ * @param {string} props.uploadUrl - Upload endpoint (default: band photos endpoint)
+ * @param {string} props.fieldName - Multipart field name for the file (default: 'photo')
+ * @param {string} props.entityIdField - Multipart field name for the associated entity id (default: 'band_id')
+ * @param {number|string} props.entityId - Value for entityIdField; falls back to bandId when unset
+ * @param {string} props.label - Field label (default: 'Band Photo')
+ * @param {string} props.helpText - Help text under the upload area
+ * @param {number} [props.maxDimension] - When set, downscale client-side so the longest edge is
+ *   at most this many pixels before upload (JPEG q0.82; GIFs are never downscaled)
  */
-export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null, bandName = '' }) {
+export default function PhotoUpload({
+  currentPhoto,
+  onPhotoChange,
+  bandId = null,
+  bandName = '',
+  uploadUrl = '/api/admin/bands/photos',
+  fieldName = 'photo',
+  entityIdField = 'band_id',
+  entityId = null,
+  label = 'Band Photo',
+  helpText = 'Recommended: Square images work best for band profile photos. Minimum 400×400px for good quality.',
+  maxDimension = null,
+}) {
   const sanitizeImageSrc = value => {
     if (!value || typeof value !== 'string') return null
     const trimmed = value.trim()
@@ -79,23 +158,28 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
     setUploading(true)
 
     try {
+      // Downscale before preview/upload so the preview reflects exactly what
+      // gets sent (leanness budget, #616). No-op when maxDimension is unset.
+      const uploadFile = maxDimension ? await downscaleImage(file, maxDimension) : file
+
       // Create preview
       // eslint-disable-next-line no-undef
       const reader = new FileReader()
       reader.onloadend = () => {
         setPreview(reader.result)
       }
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(uploadFile)
 
       // Upload to API
       // eslint-disable-next-line no-undef
       const formData = new FormData()
-      formData.append('photo', file)
-      if (bandId) {
-        formData.append('band_id', bandId.toString())
+      formData.append(fieldName, uploadFile)
+      const idValue = entityId ?? bandId
+      if (idValue) {
+        formData.append(entityIdField, idValue.toString())
       }
 
-      const response = await fetch('/api/admin/bands/photos', {
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: getAdminFormDataHeaders(),
         credentials: 'include',
@@ -171,7 +255,9 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
 
   return (
     <div className="space-y-3">
-      <label className="block text-white font-medium">Band Photo {bandName && `for ${bandName}`}</label>
+      <label className="block text-white font-medium">
+        {label} {bandName && `for ${bandName}`}
+      </label>
 
       {/* Upload area */}
       <div
@@ -266,9 +352,7 @@ export default function PhotoUpload({ currentPhoto, onPhotoChange, bandId = null
       )}
 
       {/* Help text */}
-      <p className="text-white/50 text-xs">
-        Recommended: Square images work best for band profile photos. Minimum 400×400px for good quality.
-      </p>
+      <p className="text-white/50 text-xs">{helpText}</p>
     </div>
   )
 }

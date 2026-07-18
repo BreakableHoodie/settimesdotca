@@ -177,6 +177,18 @@ export default function EventRecapPage() {
               </span>
               <span>Recap</span>
             </div>
+            {/* Poster is optional (#616) — the archive gets its art when one was
+                uploaded for this edition; omitted entirely otherwise. */}
+            {event.poster_url && (
+              <div className="mt-4 overflow-hidden rounded-xl border border-border bg-bg-navy/40">
+                <img
+                  src={event.poster_url}
+                  alt={`${event.name} poster`}
+                  loading="lazy"
+                  className="max-h-96 w-full object-contain"
+                />
+              </div>
+            )}
             <h1 className="mt-4 text-4xl font-bold text-text-primary">{event.name}</h1>
             <p className="mt-2 text-lg text-text-tertiary">{formattedDate}</p>
             <div className="mt-6 flex flex-wrap gap-3">

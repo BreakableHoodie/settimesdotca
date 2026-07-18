@@ -7,6 +7,7 @@ import {
   validateEntity,
   VALIDATION_SCHEMAS,
   validationErrorResponse,
+  normalizeHttpUrl,
   safeReflectSocialLinksString,
   sanitizeEventSocialLinks,
   sanitizeVenueInfo,
@@ -64,10 +65,12 @@ export async function onRequestGet(context) {
 
     // Read-path sanitize (#493): `e.*` pulls in the raw social_links column,
     // which may hold a pre-#483 (or otherwise legacy) value never routed
-    // through sanitizeEventSocialLinks on write.
+    // through sanitizeEventSocialLinks on write. poster_url gets the same
+    // #504-style treatment as ticket_url (#616).
     const events = (result.results || []).map((event) => ({
       ...event,
       social_links: safeReflectSocialLinksString(event.social_links, ["instagram", "x", "tiktok"]),
+      poster_url: normalizeHttpUrl(event.poster_url),
     }));
 
     return new Response(
@@ -131,6 +134,7 @@ export async function onRequestPost(context) {
       description,
       city,
       ticket_url,
+      poster_url,
       venue_info,
       social_links,
       theme_colors,
@@ -222,13 +226,14 @@ export async function onRequestPost(context) {
         description,
         city,
         ticket_url,
+        poster_url,
         venue_info,
         social_links,
         theme_colors,
         doors_json,
         created_by_user_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
@@ -242,6 +247,7 @@ export async function onRequestPost(context) {
         description,
         city,
         ticket_url,
+        normalizeHttpUrl(poster_url),
         sanitizedVenueInfo,
         sanitizedSocialLinks,
         theme_colors,
@@ -249,6 +255,10 @@ export async function onRequestPost(context) {
         currentUser.userId,
       )
       .first();
+
+    // Read-path sanitize (#504 convention): defense-in-depth alongside the
+    // write-path normalizeHttpUrl above.
+    result.poster_url = normalizeHttpUrl(result.poster_url);
 
     // Audit log
     await auditLog(

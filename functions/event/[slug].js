@@ -5,6 +5,96 @@ import { isPublicDataEnabled } from "../utils/publicGate.js";
 import { escapeAttr, toPlainText, serveWithInjectedMeta, WATERLOO_ADDRESS, CANONICAL_HOST } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
+import { torontoUtcOffset } from "../utils/eventDay.js";
+
+// Sets starting before 06:00 are after-midnight sets that belong to the
+// PREVIOUS festival day (AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention;
+// canonical definition frontend/src/utils/festivalDays.js, see CLAUDE.md).
+// Kept local rather than imported (functions/ doesn't import frontend/src) —
+// mirrors the same re-encoding in functions/api/events/timeline.js.
+const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6;
+
+/**
+ * Extracts the integer hour from a performances.start_time value ("HH:MM",
+ * "HH:MM:SS", or legacy "YYYY-MM-DD HH:MM"); null when absent/unparseable.
+ * Mirrors normalizeStartTime in functions/api/events/timeline.js.
+ */
+function startHour(startTime) {
+  if (typeof startTime !== "string") return null;
+  const timePart = startTime.includes(" ") ? startTime.split(" ")[1] : startTime;
+  const hour = Number.parseInt((timePart ?? "").slice(0, 2), 10);
+  return Number.isFinite(hour) ? hour : null;
+}
+
+/**
+ * YYYY-MM-DD -> the following calendar day, DST-proof via UTC math (the
+ * string is a date literal, not a moment in time). Mirrors nextCalendarDay in
+ * functions/api/feeds/ical.js.
+ */
+function nextCalendarDay(dateStr) {
+  const next = new Date(`${dateStr}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
+/** YYYY-MM-DD -> the preceding calendar day. See nextCalendarDay. */
+function previousCalendarDay(dateStr) {
+  const prev = new Date(`${dateStr}T00:00:00Z`);
+  prev.setUTCDate(prev.getUTCDate() - 1);
+  return prev.toISOString().slice(0, 10);
+}
+
+/**
+ * Every calendar day from startDate to endDate inclusive, ascending.
+ * Lexicographic YYYY-MM-DD comparison is safe (repo convention, see
+ * CLAUDE.md). Guarded at 366 iterations so a malformed end_date before date
+ * can't spin the loop.
+ */
+function eachCalendarDay(startDate, endDate) {
+  const days = [];
+  let cursor = startDate;
+  let guard = 0;
+  while (cursor <= endDate && guard < 366) {
+    days.push(cursor);
+    cursor = nextCalendarDay(cursor);
+    guard++;
+  }
+  return days;
+}
+
+// "Weekday, Month D" label for a subEvent's name, in the event's own
+// timezone. Same noon-probe trick as torontoUtcOffset — never ambiguous
+// around a DST transition, which always lands in the early morning.
+const DAY_LABEL_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Toronto",
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
+function festivalDayLabel(dateStr) {
+  return DAY_LABEL_FORMAT.format(new Date(`${dateStr}T12:00:00Z`));
+}
+
+/**
+ * Buckets a performance row into one of `festivalDays` (a MULTI-DAY event's
+ * full [date, end_date] span), applying the after-midnight convention: a set
+ * starting before 06:00 belongs to the PREVIOUS festival day, not the
+ * calendar day its performance_date literally names (#542 PR-4; see
+ * functions/api/events/timeline.js's isGatedBeforeStart for the same
+ * exclusion applied to the day-1 start edge). NULL performance_date inherits
+ * the event's own start date (#543 convention, ical.js/schedule.js). If the
+ * shift lands outside the event's own day span (e.g. a stray early set on
+ * literal day 1), it's clamped back to day 1 rather than silently dropped
+ * from every subEvent.
+ */
+function festivalDayForPerformance(row, event, festivalDays) {
+  let day = row.performance_date || event.date;
+  const hour = startHour(row.start_time);
+  if (hour !== null && hour < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
+    day = previousCalendarDay(day);
+  }
+  return festivalDays.includes(day) ? day : event.date;
+}
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -17,7 +107,7 @@ export async function onRequest(context) {
   let event;
   try {
     event = await env.DB.prepare(
-      `SELECT id, name, date, end_date, slug, description, city, ticket_url, poster_url, created_at
+      `SELECT id, name, date, end_date, slug, description, city, ticket_url, poster_url, created_at, reveal_mode
        FROM events
        WHERE slug = ? AND (is_published = 1 OR status = 'archived')`,
     )
@@ -29,19 +119,31 @@ export async function onRequest(context) {
   }
   if (!event) return env.ASSETS.fetch(request);
 
-  // Fetch the event's bands and distinct venues in parallel.
-  let bands = [];
+  // Fetch the event's performances (band + per-set festival day) and
+  // distinct venues in parallel. Row-level (not DISTINCT bp.id) because
+  // subEvent grouping below needs each performance's own performance_date /
+  // start_time; the flat `bands` performer list is deduped from these rows
+  // in JS instead.
+  //
+  // Reveal-mode gate (#542 PR-4, folded pre-existing bug): mirrors the
+  // `(e.reveal_mode = 0 OR p.is_announced = 1)` filter already applied in
+  // schedule.js/ical.js/timeline.js. Without it, an unannounced band on a
+  // reveal-mode event would leak into crawler-facing JSON-LD before the
+  // admin ever announces it. No reveal-mode event exists in prod today, so
+  // this was latent, not active.
+  let performanceRows = [];
   let venues = [];
   try {
-    const [bandsResult, venuesResult] = await Promise.all([
+    const [performancesResult, venuesResult] = await Promise.all([
       env.DB.prepare(
-        `SELECT DISTINCT bp.id, bp.name
+        `SELECT bp.id, bp.name, p.performance_date, p.start_time
          FROM performances p
          JOIN band_profiles bp ON p.band_profile_id = bp.id
          WHERE p.event_id = ?
+           AND (? = 0 OR p.is_announced = 1)
          ORDER BY bp.name`,
       )
-        .bind(event.id)
+        .bind(event.id, event.reveal_mode ?? 0)
         .all(),
       env.DB.prepare(
         `SELECT DISTINCT v.id, v.name, v.address_line1, v.address, v.city, v.region, v.postal_code
@@ -53,17 +155,67 @@ export async function onRequest(context) {
         .bind(event.id)
         .all(),
     ]);
-    bands = bandsResult.results ?? [];
+    performanceRows = performancesResult.results ?? [];
     venues = venuesResult.results ?? [];
   } catch (err) {
     // Non-fatal: fall through with empty arrays; MusicEvent still renders.
     console.error("SSR event bands/venues lookup failed:", slug, err);
   }
 
+  // Flat performer list: one entry per band, first-seen from the
+  // (already reveal-mode-gated) performance rows above — a band playing two
+  // sets must not appear twice.
+  const bandById = new Map();
+  for (const row of performanceRows) {
+    if (!bandById.has(row.id)) bandById.set(row.id, { id: row.id, name: row.name });
+  }
+  const bands = [...bandById.values()];
+
   // SQLite ORDER BY can't strip a leading article inline (#587); the query
   // above is a coarse pre-sort and the JSON-LD performer list is re-sorted
   // here by the article-stripped key so "The Anti-Queens" lists under A.
   bands.sort((a, b) => sortableName(a.name).localeCompare(sortableName(b.name)));
+
+  // Per-day subEvent (#542 PR-4): MULTI-DAY events only (end_date > date).
+  // One MusicEvent per festival day in the event's own span, each carrying
+  // that day's performers (bucketed via festivalDayForPerformance, which
+  // applies the after-midnight convention). Single-day events never build
+  // this — `subEvent` stays an empty array and the conditional spread below
+  // omits the key entirely, keeping their JSON-LD byte-identical to before.
+  const isMultiDay = Boolean(event.end_date && event.end_date > event.date);
+  let subEvent = [];
+  if (isMultiDay) {
+    const festivalDays = eachCalendarDay(event.date, event.end_date);
+    const performersByDay = new Map(festivalDays.map((d) => [d, new Map()]));
+
+    for (const row of performanceRows) {
+      const day = festivalDayForPerformance(row, event, festivalDays);
+      const bucket = performersByDay.get(day);
+      if (!bucket.has(row.id)) bucket.set(row.id, { id: row.id, name: row.name });
+    }
+
+    subEvent = festivalDays.map((day) => {
+      const performers = [...performersByDay.get(day).values()].sort((a, b) =>
+        sortableName(a.name).localeCompare(sortableName(b.name)),
+      );
+      return {
+        "@type": "MusicEvent",
+        name: `${event.name} — ${festivalDayLabel(day)}`,
+        // Same show-start convention as the top-level MusicEvent below.
+        startDate: `${day}T18:45:00${torontoUtcOffset(day)}`,
+        endDate: day,
+        ...(performers.length > 0
+          ? {
+              performer: performers.map((b) => ({
+                "@type": "MusicGroup",
+                name: b.name,
+                url: `${CANONICAL_HOST}/band/${b.id}`,
+              })),
+            }
+          : {}),
+      };
+    });
+  }
 
   // Pin to the production host — preview deploys must not self-canonicalise.
   const url = `${CANONICAL_HOST}/event/${event.slug}`;
@@ -139,8 +291,11 @@ export async function onRequest(context) {
     url,
     eventStatus: "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-    // Show doors at 6:30PM; set times start 6:45PM — use the show-start per spec.
-    ...(event.date ? { startDate: `${event.date}T18:45:00-04:00` } : {}),
+    // Show doors at 6:30PM; set times start 6:45PM — use the show-start per
+    // spec. torontoUtcOffset is DST-aware (#542 PR-4, folded pre-existing
+    // bug): a hardcoded -04:00 (EDT) is wrong for a winter event (e.g. a
+    // February show is EST, -05:00).
+    ...(event.date ? { startDate: `${event.date}T18:45:00${torontoUtcOffset(event.date)}` } : {}),
     ...(event.date ? { endDate: event.end_date || event.date } : {}),
     location,
     ...(plainDesc ? { description: plainDesc } : {}),
@@ -171,6 +326,7 @@ export async function onRequest(context) {
           })),
         }
       : {}),
+    ...(isMultiDay ? { subEvent } : {}),
   };
 
   const breadcrumb = {

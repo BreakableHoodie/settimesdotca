@@ -1,4 +1,5 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
+import { normalizeHttpUrl } from "../../../utils/validation.js";
 import { sortableName } from "../../../utils/sortableName.js";
 
 // SQLite `ORDER BY` can't strip a leading article inline (#587); the SQL
@@ -38,10 +39,14 @@ export async function onRequestGet(context) {
 
   try {
     const event = isNumeric
-      ? await DB.prepare(`SELECT id, name, slug, date FROM events WHERE id = ? AND status = 'archived' LIMIT 1`)
+      ? await DB.prepare(
+          `SELECT id, name, slug, date, poster_url FROM events WHERE id = ? AND status = 'archived' LIMIT 1`,
+        )
           .bind(numericId)
           .first()
-      : await DB.prepare(`SELECT id, name, slug, date FROM events WHERE slug = ? AND status = 'archived' LIMIT 1`)
+      : await DB.prepare(
+          `SELECT id, name, slug, date, poster_url FROM events WHERE slug = ? AND status = 'archived' LIMIT 1`,
+        )
           .bind(rawId)
           .first();
 
@@ -51,6 +56,10 @@ export async function onRequestGet(context) {
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    // Read-path sanitize (#504 convention, #616): never reflect a
+    // pre-validation legacy poster_url to public API consumers.
+    event.poster_url = normalizeHttpUrl(event.poster_url);
 
     const bandsResult = await DB.prepare(
       `

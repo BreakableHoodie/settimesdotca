@@ -149,3 +149,82 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD enrichment (#615)", () => {
     expect(musicEvent.offers).toBeUndefined();
   });
 });
+
+describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)", () => {
+  test("poster present: MusicEvent gets an image array and og:image/twitter:image are emitted", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Postered Event",
+      slug: "slug-616-poster",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb
+      .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
+      .run("https://band-photos.settimes.ca/event-posters/1-vol17.jpg", event.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-616-poster" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    expect(html).toContain(
+      '<meta property="og:image" content="https://band-photos.settimes.ca/event-posters/1-vol17.jpg" />',
+    );
+    expect(html).toContain(
+      '<meta name="twitter:image" content="https://band-photos.settimes.ca/event-posters/1-vol17.jpg" />',
+    );
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />');
+
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.image).toEqual(["https://band-photos.settimes.ca/event-posters/1-vol17.jpg"]);
+  });
+
+  test("poster absent: no image field, no og:image/twitter:image, twitter:card falls back to summary", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Posterless Event",
+      slug: "slug-616-no-poster",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-616-no-poster" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    expect(html).not.toContain('property="og:image"');
+    expect(html).not.toContain('name="twitter:image"');
+    expect(html).toContain('<meta name="twitter:card" content="summary" />');
+
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.image).toBeUndefined();
+  });
+
+  test("drops the image entirely for a legacy javascript: poster_url (#504-style read-path guard)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Unsafe Poster Event",
+      slug: "slug-616-unsafe-poster",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb
+      .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504-style read-path guard
+      .run("javascript:alert(1)", event.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-616-unsafe-poster" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    // eslint-disable-next-line no-script-url -- assertion text, not an executed scheme
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain('property="og:image"');
+
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.image).toBeUndefined();
+  });
+});

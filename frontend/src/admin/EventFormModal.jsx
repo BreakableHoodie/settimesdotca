@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import EventStatusBadge from './components/EventStatusBadge'
+import PhotoUpload from './components/PhotoUpload'
 import { Button } from '../components/ui'
 import { eventsApi } from '../utils/adminApi'
 import { FIELD_LIMITS } from '../utils/validation'
@@ -39,6 +40,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
     description: '',
     city: '',
     ticket_url: '',
+    poster_url: '',
     social_website: '',
     social_instagram: '',
     social_facebook: '',
@@ -98,6 +100,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         description: event.description || '',
         city: event.city || '',
         ticket_url: event.ticket_url || '',
+        poster_url: event.poster_url || '',
         social_website: socialLinks.website || '',
         social_instagram: socialLinks.instagram || '',
         social_facebook: socialLinks.facebook || '',
@@ -118,6 +121,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         description: '',
         city: '',
         ticket_url: '',
+        poster_url: '',
         social_website: '',
         social_instagram: '',
         social_facebook: '',
@@ -281,6 +285,7 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         description: formData.description,
         city: formData.city,
         ticket_url: formData.ticket_url,
+        poster_url: formData.poster_url,
         social_links: socialLinksPayload,
         doors_json: serializeDoorsForm(doorsForm, currentDays),
       }
@@ -543,6 +548,21 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
               <p className="text-xs text-white/50 mt-1">
                 {formData.ticket_url.length}/{FIELD_LIMITS.ticketLink.max}
               </p>
+            </div>
+
+            {/* Poster */}
+            <div>
+              <PhotoUpload
+                currentPhoto={formData.poster_url}
+                onPhotoChange={url => setFormData(prev => ({ ...prev, poster_url: url || '' }))}
+                uploadUrl="/api/admin/events/posters"
+                fieldName="poster"
+                entityIdField="event_id"
+                entityId={isEditing && event?.id ? event.id : null}
+                label="Event Poster"
+                helpText="Optional — used for social share cards and the event's archive recap. Large images are auto-resized for the web."
+                maxDimension={1600}
+              />
             </div>
 
             {/* Social Links */}

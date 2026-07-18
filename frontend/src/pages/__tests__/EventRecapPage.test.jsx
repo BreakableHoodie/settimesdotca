@@ -141,6 +141,44 @@ describe('EventRecapPage — fully-scheduled event', () => {
   })
 })
 
+describe('EventRecapPage — poster (#616)', () => {
+  it('renders the poster, lazy-loaded, when poster_url is present', async () => {
+    fetchPublicJson.mockReset()
+    fetchPublicJson.mockResolvedValue({
+      event: {
+        id: 4,
+        name: 'LWBC Vol16',
+        slug: 'lwbc16',
+        date: '2025-08-02',
+        poster_url: 'https://band-photos.settimes.ca/event-posters/1-vol16.jpg',
+      },
+      stats: { total_sets: 0, venue_count: 0, first_timers: 0, returning_acts: 0 },
+      bands: [],
+    })
+
+    renderPage('lwbc16')
+    expect(await screen.findByText('LWBC Vol16')).toBeInTheDocument()
+
+    const poster = screen.getByRole('img', { name: 'LWBC Vol16 poster' })
+    expect(poster).toHaveAttribute('src', 'https://band-photos.settimes.ca/event-posters/1-vol16.jpg')
+    expect(poster).toHaveAttribute('loading', 'lazy')
+  })
+
+  it('omits the poster entirely when poster_url is absent', async () => {
+    fetchPublicJson.mockReset()
+    fetchPublicJson.mockResolvedValue({
+      event: { id: 5, name: 'LWBC Vol15', slug: 'lwbc15b', date: '2024-08-03', poster_url: null },
+      stats: { total_sets: 0, venue_count: 0, first_timers: 0, returning_acts: 0 },
+      bands: [],
+    })
+
+    renderPage('lwbc15b')
+    expect(await screen.findByText('LWBC Vol15')).toBeInTheDocument()
+
+    expect(screen.queryByRole('img', { name: /poster/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('EventRecapPage — partially-scheduled event', () => {
   beforeEach(() => {
     fetchPublicJson.mockReset()

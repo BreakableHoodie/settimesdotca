@@ -90,6 +90,7 @@ export const FIELD_LIMITS = {
   eventName: { min: 3, max: 200 },
   eventSlug: { min: 3, max: 100 },
   ticketLink: { min: 0, max: 500 },
+  eventPosterUrl: { min: 0, max: 500 },
   eventDescription: { min: 0, max: 5000 },
   eventCity: { min: 0, max: 100 },
   eventVenueInfo: { min: 0, max: 5000 },
@@ -1302,6 +1303,12 @@ export const VALIDATION_SCHEMAS = {
       required: false,
       label: "Ticket link",
       max: FIELD_LIMITS.ticketLink.max,
+    },
+    poster_url: {
+      type: "url",
+      required: false,
+      label: "Poster image",
+      max: FIELD_LIMITS.eventPosterUrl.max,
     },
     venue_info: {
       type: "string",

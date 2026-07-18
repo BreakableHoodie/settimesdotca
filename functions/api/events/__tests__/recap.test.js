@@ -368,6 +368,69 @@ describe("GET /api/events/:id/recap", () => {
     expect(res.status).toBe(500);
   });
 
+  // #616: the recap event payload exposes poster_url (sanitized), so the
+  // recap page can render the poster for the archived edition.
+  test("includes a sanitized poster_url when set", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Postered Recap",
+      slug: "postered-recap",
+      date: "2024-08-03",
+      status: "archived",
+    });
+    rawDb
+      .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
+      .run("https://band-photos.settimes.ca/event-posters/1-recap.jpg", event.id);
+
+    const request = new Request(`https://example.test/api/events/${event.slug}/recap`);
+    const response = await onRequestGet({ request, env, params: { id: event.slug } });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.event.poster_url).toBe("https://band-photos.settimes.ca/event-posters/1-recap.jpg");
+  });
+
+  test("poster_url is null when unset", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Posterless Recap",
+      slug: "posterless-recap",
+      date: "2024-08-03",
+      status: "archived",
+    });
+
+    const request = new Request(`https://example.test/api/events/${event.slug}/recap`);
+    const response = await onRequestGet({ request, env, params: { id: event.slug } });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.event.poster_url).toBeNull();
+  });
+
+  test("drops a legacy javascript: poster_url (#504-style read-path guard)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Unsafe Poster Recap",
+      slug: "unsafe-poster-recap",
+      date: "2024-08-03",
+      status: "archived",
+    });
+    rawDb
+      .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504-style read-path guard
+      .run("javascript:alert(1)", event.id);
+
+    const request = new Request(`https://example.test/api/events/${event.slug}/recap`);
+    const response = await onRequestGet({ request, env, params: { id: event.slug } });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.event.poster_url).toBeNull();
+  });
+
   test("returns 503 when PUBLIC_DATA_PUBLISH_ENABLED is not set", async () => {
     const { env, rawDb } = createTestEnv();
     // Do NOT set PUBLIC_DATA_PUBLISH_ENABLED

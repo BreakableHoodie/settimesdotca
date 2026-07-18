@@ -347,6 +347,116 @@ describe("Event API - handler integration", () => {
     expect(parsed.instagram).toBe("legit_handle");
   });
 
+  // ---------------------------------------------------------------------
+  // #616 — events.poster_url create/update/list wiring, mirroring the
+  // ticket_url #504 write-and-read-reflect convention end-to-end through the
+  // admin handlers.
+  // ---------------------------------------------------------------------
+  it("onRequestPost persists a valid poster_url", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const body = {
+      name: "Poster Event",
+      slug: "poster-event",
+      date: "2099-07-10",
+      poster_url: "https://band-photos.settimes.ca/event-posters/123-poster.jpg",
+    };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.event.poster_url).toBe("https://band-photos.settimes.ca/event-posters/123-poster.jpg");
+
+    const stored = rawDb.prepare("SELECT poster_url FROM events WHERE id = ?").get(data.event.id);
+    expect(stored.poster_url).toBe("https://band-photos.settimes.ca/event-posters/123-poster.jpg");
+  });
+
+  it("onRequestPatch updates poster_url, normalized on write and read-reflected (#504 convention)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, { name: "Poster Patch Event", slug: "poster-patch-event" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ poster_url: "https://band-photos.settimes.ca/event-posters/456-poster.jpg" }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.poster_url).toBe("https://band-photos.settimes.ca/event-posters/456-poster.jpg");
+
+    const stored = rawDb.prepare("SELECT poster_url FROM events WHERE id = ?").get(ev.id);
+    expect(stored.poster_url).toBe("https://band-photos.settimes.ca/event-posters/456-poster.jpg");
+  });
+
+  it("onRequestPatch clears poster_url when sent an empty string", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, { name: "Poster Clear Event", slug: "poster-clear-event" });
+    rawDb
+      .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
+      .run("https://band-photos.settimes.ca/event-posters/1-old.jpg", ev.id);
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ poster_url: "" }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.poster_url).toBeNull();
+
+    const stored = rawDb.prepare("SELECT poster_url FROM events WHERE id = ?").get(ev.id);
+    expect(stored.poster_url).toBeNull();
+  });
+
+  it("onRequestPatch rejects a poster_url that isn't a valid URL", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, { name: "Poster Bad URL Event", slug: "poster-bad-url-event" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ poster_url: "not a url" }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(400);
+  });
+
+  it("GET /api/admin/events read-reflects a legacy javascript: poster_url across the list (#504 convention)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const ev = insertEvent(rawDb, { name: "Poster Scheme List Event", slug: "poster-scheme-list-event" });
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504-style read-path guard
+    rawDb.prepare("UPDATE events SET poster_url = ? WHERE id = ?").run("javascript:alert(1)", ev.id);
+
+    const request = new Request("https://example.test/api/admin/events", {
+      headers: { "x-test-role": "viewer" },
+    });
+    const res = await eventsHandler.onRequestGet({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    const found = data.events.find((e) => e.id === ev.id);
+    expect(found).toBeDefined();
+    expect(found.poster_url).toBeNull();
+  });
+
   it("publish endpoint requires >=1 band and publishes event", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
@@ -635,6 +745,35 @@ describe("Event API - handler integration", () => {
 
     const stored = rawDb.prepare("SELECT doors_json FROM events WHERE id = ?").get(data.event.id);
     expect(stored.doors_json).toBeNull();
+  });
+
+  it("duplicate endpoint does NOT copy poster_url to the new event (#616 — edition-specific, like doors_json)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const original = insertEvent(rawDb, { name: "Poster Source", slug: "poster-source" });
+    rawDb
+      .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
+      .run("https://band-photos.settimes.ca/event-posters/1-source.jpg", original.id);
+
+    const body = { name: "Poster Copy", date: "2100-07-09", slug: "poster-copy" };
+    const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await duplicateHandler.onRequestPost({
+      request,
+      env,
+      params: { id: String(original.id) },
+    });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.event.poster_url).toBeNull();
+
+    const stored = rawDb.prepare("SELECT poster_url FROM events WHERE id = ?").get(data.event.id);
+    expect(stored.poster_url).toBeNull();
   });
 
   it("duplicate endpoint sanitizes a legacy javascript: social_links value at the write path (#499)", async () => {

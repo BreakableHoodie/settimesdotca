@@ -1816,6 +1816,51 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/admin/events/posters:
+    post:
+      tags:
+        - Admin - Events
+      summary: Upload an event poster image
+      description: |
+        Mirrors `/api/admin/bands/photos` (#616): same magic-byte MIME
+        validation and 5MB cap, same R2 bucket under an `event-posters/` key
+        prefix. `event_id` is optional — a poster can be uploaded while
+        creating a brand-new event that has no id yet, in which case the
+        caller gets back only the public URL to include in the create
+        payload. When `event_id` is provided it must reference an existing
+        event; the event's `poster_url` is updated immediately in that case.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - poster
+              properties:
+                poster:
+                  type: string
+                  format: binary
+                event_id:
+                  type: string
+                  description: Optional event ID to attach the uploaded poster to
+      responses:
+        "200":
+          description: Poster uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoUploadResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/admin/events/{id}/reveal-mode:
     post:
       tags:

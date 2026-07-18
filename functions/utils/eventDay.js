@@ -53,3 +53,37 @@ export function eventLocalClock(now = new Date()) {
   const time = TORONTO_TIME.format(now).replace(/^24:/, "00:");
   return { date, time };
 }
+
+// Formats the America/Toronto UTC offset ("GMT-04:00" / "GMT-05:00") for a
+// given instant. `longOffset` (not `shortOffset`) is required for a
+// consistently zero-padded "±HH:MM" — some ICU builds render shortOffset
+// without the leading zero (e.g. "GMT-4").
+const TORONTO_OFFSET = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Toronto",
+  timeZoneName: "longOffset",
+});
+
+/**
+ * Returns the America/Toronto UTC offset ("-04:00" EDT or "-05:00" EST) in
+ * effect on a given YYYY-MM-DD calendar date, for embedding in a schema.org
+ * date literal (e.g. MusicEvent.startDate). A hardcoded "-04:00" is wrong for
+ * roughly five months a year (EST, e.g. a February event) — this delegates
+ * to Intl's ICU timezone tables instead of hand-rolling DST cutover math,
+ * which drifts without the platform's tz database.
+ *
+ * Probes at noon UTC on the given date (07:00–08:00 Toronto): Toronto's DST
+ * transitions land at 2 AM local, so this instant is always past the cutover
+ * and on the same calendar date being asked about — never ambiguous.
+ *
+ * @param {string} dateStr - YYYY-MM-DD
+ * @returns {string} e.g. "-04:00"; falls back to "-05:00" (EST) if dateStr
+ *   is missing/malformed rather than throwing.
+ */
+export function torontoUtcOffset(dateStr) {
+  if (typeof dateStr !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return "-05:00";
+  }
+  const probe = new Date(`${dateStr}T12:00:00Z`);
+  const gmt = TORONTO_OFFSET.formatToParts(probe).find((p) => p.type === "timeZoneName")?.value;
+  return gmt ? gmt.replace("GMT", "") : "-05:00";
+}

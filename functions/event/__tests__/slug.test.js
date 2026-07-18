@@ -9,7 +9,7 @@
  */
 import { describe, expect, test } from "vitest";
 import { onRequest } from "../[slug].js";
-import { createTestEnv, insertEvent } from "../../api/test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
 
 const STUB_HTML = `<!doctype html><html><head>
     <meta name="description" content="Homepage description" />
@@ -226,5 +226,196 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
 
     const [musicEvent] = extractJsonLd(html);
     expect(musicEvent.image).toBeUndefined();
+  });
+});
+
+describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
+  test("multi-day event: subEvent array, one per festival day, each with that day's performers + dates", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Multi-Day Fest",
+      slug: "slug-542-multiday",
+      date: "2026-08-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1, end_date=? WHERE id=?").run("2026-08-02", event.id);
+    const venue = insertVenue(rawDb, { name: "Main Stage" });
+
+    const day1Band = insertBand(rawDb, {
+      name: "Day One Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-01", day1Band.id);
+
+    const day2Band = insertBand(rawDb, {
+      name: "Day Two Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-02", day2Band.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-542-multiday" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.subEvent).toHaveLength(2);
+
+    const [subDay1, subDay2] = musicEvent.subEvent;
+    expect(subDay1["@type"]).toBe("MusicEvent");
+    expect(subDay1.name).toBe(musicEvent.name + " — Saturday, August 1");
+    expect(subDay1.startDate).toBe("2026-08-01T18:45:00-04:00");
+    expect(subDay1.endDate).toBe("2026-08-01");
+    // location is a Google-required Event property on every node, subEvents
+    // included — it must match the top-level MusicEvent's location (#542 PR-4).
+    expect(subDay1.location).toEqual(musicEvent.location);
+    expect(subDay1.eventStatus).toBe("https://schema.org/EventScheduled");
+    expect(subDay1.performer).toEqual([
+      { "@type": "MusicGroup", name: "Day One Band", url: expect.stringContaining("/band/") },
+    ]);
+
+    expect(subDay2.startDate).toBe("2026-08-02T18:45:00-04:00");
+    expect(subDay2.endDate).toBe("2026-08-02");
+    expect(subDay2.performer).toEqual([
+      { "@type": "MusicGroup", name: "Day Two Band", url: expect.stringContaining("/band/") },
+    ]);
+
+    // Existing top-level performer list is unchanged — still both bands, not
+    // just one day's worth (subEvent is additive, not a replacement).
+    expect(musicEvent.performer).toHaveLength(2);
+  });
+
+  test("single-day event: no subEvent key at all (regression guard — output unchanged from #616/#617)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Single Night Show",
+      slug: "slug-542-singleday",
+      date: "2026-08-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Solo Venue" });
+    insertBand(rawDb, { name: "Only Band", event_id: event.id, venue_id: venue.id });
+
+    const response = await onRequest(makeContext({ env, slug: "slug-542-singleday" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.subEvent).toBeUndefined();
+    expect(musicEvent.performer).toHaveLength(1);
+  });
+
+  test("an end_date equal to date (not actually multi-day) also gets no subEvent", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Same-Date Show",
+      slug: "slug-542-same-date",
+      date: "2026-08-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1, end_date=? WHERE id=?").run("2026-08-01", event.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-542-same-date" }));
+    const html = await response.text();
+    const [musicEvent] = extractJsonLd(html);
+    expect(musicEvent.subEvent).toBeUndefined();
+  });
+
+  test("reveal-mode multi-day event: unannounced bands absent from both top-level performer AND every subEvent", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Reveal Mode Fest",
+      slug: "slug-542-reveal",
+      date: "2026-08-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1, end_date=?, reveal_mode=1 WHERE id=?").run("2026-08-02", event.id);
+    const venue = insertVenue(rawDb, { name: "Reveal Stage" });
+
+    const announced = insertBand(rawDb, { name: "Announced Band", event_id: event.id, venue_id: venue.id });
+    rawDb
+      .prepare("UPDATE performances SET is_announced=1, performance_date=? WHERE id=?")
+      .run("2026-08-01", announced.id);
+
+    const hidden = insertBand(rawDb, { name: "Hidden Band", event_id: event.id, venue_id: venue.id });
+    rawDb.prepare("UPDATE performances SET is_announced=0, performance_date=? WHERE id=?").run("2026-08-01", hidden.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-542-reveal" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    const [musicEvent] = extractJsonLd(html);
+
+    expect(musicEvent.performer).toHaveLength(1);
+    expect(musicEvent.performer[0].name).toBe("Announced Band");
+    expect(html).not.toContain("Hidden Band");
+
+    const day1 = musicEvent.subEvent.find((d) => d.endDate === "2026-08-01");
+    expect(day1.performer).toHaveLength(1);
+    expect(day1.performer[0].name).toBe("Announced Band");
+
+    // Day 2 has no announced performances at all — performer key is omitted
+    // entirely (mirrors the top-level bands.length > 0 convention).
+    const day2 = musicEvent.subEvent.find((d) => d.endDate === "2026-08-02");
+    expect(day2.performer).toBeUndefined();
+  });
+
+  test("after-midnight set (start before 06:00) buckets into the PREVIOUS festival day's subEvent, not its own performance_date", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Late Night Fest",
+      slug: "slug-542-after-midnight",
+      date: "2026-08-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1, end_date=? WHERE id=?").run("2026-08-02", event.id);
+    const venue = insertVenue(rawDb, { name: "Late Stage" });
+
+    // Stored with performance_date = the literal calendar date the 1 AM set
+    // falls on (Aug 2) — but per the after-midnight convention (CLAUDE.md,
+    // AFTER_MIDNIGHT_THRESHOLD_HOUR = 6) it's really part of Aug 1 evening's
+    // lineup and must bucket into Day 1's subEvent, not Day 2's.
+    const lateBand = insertBand(rawDb, {
+      name: "After Midnight Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "01:00",
+      end_time: "02:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-02", lateBand.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-542-after-midnight" }));
+    const html = await response.text();
+    const [musicEvent] = extractJsonLd(html);
+
+    const day1 = musicEvent.subEvent.find((d) => d.endDate === "2026-08-01");
+    const day2 = musicEvent.subEvent.find((d) => d.endDate === "2026-08-02");
+    expect(day1.performer?.map((p) => p.name)).toEqual(["After Midnight Band"]);
+    expect(day2.performer).toBeUndefined();
+  });
+
+  test("startDate uses the correct America/Toronto offset: -04:00 (EDT) in summer, -05:00 (EST) in winter (#542 PR-4, folded pre-existing bug)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const summerEvent = insertEvent(rawDb, { name: "Summer Show", slug: "slug-542-summer", date: "2026-08-02" });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(summerEvent.id);
+
+    // lwbc15 precedent (CLAUDE.md #542): a February event is EST, not EDT.
+    const winterEvent = insertEvent(rawDb, { name: "Winter Show", slug: "slug-542-winter", date: "2026-02-14" });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(winterEvent.id);
+
+    const summerRes = await onRequest(makeContext({ env, slug: "slug-542-summer" }));
+    const [summerMusicEvent] = extractJsonLd(await summerRes.text());
+    expect(summerMusicEvent.startDate).toBe("2026-08-02T18:45:00-04:00");
+
+    const winterRes = await onRequest(makeContext({ env, slug: "slug-542-winter" }));
+    const [winterMusicEvent] = extractJsonLd(await winterRes.text());
+    expect(winterMusicEvent.startDate).toBe("2026-02-14T18:45:00-05:00");
   });
 });

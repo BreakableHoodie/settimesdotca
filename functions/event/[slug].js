@@ -176,6 +176,32 @@ export async function onRequest(context) {
   // here by the article-stripped key so "The Anti-Queens" lists under A.
   bands.sort((a, b) => sortableName(a.name).localeCompare(sortableName(b.name)));
 
+  // Build MusicEvent location: use per-venue MusicVenue entries when available,
+  // otherwise fall back to a generic Place for the Waterloo Region. Computed
+  // here (before subEvent) because each subEvent carries the same location —
+  // `location` is a Google-required Event property, and the Rich Results Test
+  // validates each nested subEvent node too, so omitting it there is a
+  // "Missing field 'location'" failure (Vera, #542 PR-4).
+  const location =
+    venues.length > 0
+      ? venues.map((v) => ({
+          "@type": "MusicVenue",
+          name: v.name,
+          address: {
+            "@type": "PostalAddress",
+            ...(v.address_line1 || v.address ? { streetAddress: v.address_line1 || v.address } : {}),
+            addressLocality: v.city || "Waterloo",
+            addressRegion: v.region || "ON",
+            ...(v.postal_code ? { postalCode: v.postal_code } : {}),
+            addressCountry: "CA",
+          },
+        }))
+      : {
+          "@type": "Place",
+          name: event.city || "Waterloo Region, ON",
+          address: WATERLOO_ADDRESS,
+        };
+
   // Per-day subEvent (#542 PR-4): MULTI-DAY events only (end_date > date).
   // One MusicEvent per festival day in the event's own span, each carrying
   // that day's performers (bucketed via festivalDayForPerformance, which
@@ -204,6 +230,10 @@ export async function onRequest(context) {
         // Same show-start convention as the top-level MusicEvent below.
         startDate: `${day}T18:45:00${torontoUtcOffset(day)}`,
         endDate: day,
+        eventStatus: "https://schema.org/EventScheduled",
+        eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+        // Google requires `location` on every Event node, subEvents included.
+        location,
         ...(performers.length > 0
           ? {
               performer: performers.map((b) => ({
@@ -247,28 +277,6 @@ export async function onRequest(context) {
   } else {
     metaTags.push(`<meta name="twitter:card" content="summary" />`);
   }
-
-  // Build MusicEvent location: use per-venue MusicVenue entries when available,
-  // otherwise fall back to a generic Place for the Waterloo Region.
-  const location =
-    venues.length > 0
-      ? venues.map((v) => ({
-          "@type": "MusicVenue",
-          name: v.name,
-          address: {
-            "@type": "PostalAddress",
-            ...(v.address_line1 || v.address ? { streetAddress: v.address_line1 || v.address } : {}),
-            addressLocality: v.city || "Waterloo",
-            addressRegion: v.region || "ON",
-            ...(v.postal_code ? { postalCode: v.postal_code } : {}),
-            addressCountry: "CA",
-          },
-        }))
-      : {
-          "@type": "Place",
-          name: event.city || "Waterloo Region, ON",
-          address: WATERLOO_ADDRESS,
-        };
 
   // Read-path sanitize (#504): a pre-validation legacy ticket_url (e.g. a
   // javascript: scheme) must never be reflected into the Offer.url of the

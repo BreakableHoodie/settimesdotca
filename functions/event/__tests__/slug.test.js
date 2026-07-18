@@ -268,8 +268,13 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
 
     const [subDay1, subDay2] = musicEvent.subEvent;
     expect(subDay1["@type"]).toBe("MusicEvent");
+    expect(subDay1.name).toBe(musicEvent.name + " — Saturday, August 1");
     expect(subDay1.startDate).toBe("2026-08-01T18:45:00-04:00");
     expect(subDay1.endDate).toBe("2026-08-01");
+    // location is a Google-required Event property on every node, subEvents
+    // included — it must match the top-level MusicEvent's location (#542 PR-4).
+    expect(subDay1.location).toEqual(musicEvent.location);
+    expect(subDay1.eventStatus).toBe("https://schema.org/EventScheduled");
     expect(subDay1.performer).toEqual([
       { "@type": "MusicGroup", name: "Day One Band", url: expect.stringContaining("/band/") },
     ]);

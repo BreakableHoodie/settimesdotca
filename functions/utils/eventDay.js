@@ -71,9 +71,9 @@ const TORONTO_OFFSET = new Intl.DateTimeFormat("en-US", {
  * to Intl's ICU timezone tables instead of hand-rolling DST cutover math,
  * which drifts without the platform's tz database.
  *
- * Probes at local noon on the given date (not midnight): Toronto's DST
- * transitions land at 2 AM local, so noon is never on the wrong side of a
- * transition for the calendar date being asked about.
+ * Probes at noon UTC on the given date (07:00–08:00 Toronto): Toronto's DST
+ * transitions land at 2 AM local, so this instant is always past the cutover
+ * and on the same calendar date being asked about — never ambiguous.
  *
  * @param {string} dateStr - YYYY-MM-DD
  * @returns {string} e.g. "-04:00"; falls back to "-05:00" (EST) if dateStr

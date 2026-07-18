@@ -1,8 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
-/* global navigator -- referenced inside a page.waitForFunction browser callback */
-
 // Re-establish the admin session in THIS context. The shared storageState
 // session (from auth.setup) is invalidated whenever another spec logs in —
 // lucia.invalidateUserSessions() kills all other sessions on re-auth — so

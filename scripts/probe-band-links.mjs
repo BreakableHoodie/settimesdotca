@@ -66,7 +66,12 @@ function candidateSlugs(name) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return [...new Set([concat, noThe, hyphen])].filter((s) => s.length >= 3);
+  // Common bandcamp subdomain suffixes when the plain slug is taken or the
+  // artist brands with one (Avalon Stone → avalonstonemusic; many use
+  // "band"/"music"). Canonical forms are tried first so exact matches still
+  // win and suffix variants only fire when the plain slug isn't a live page.
+  const suffixed = [concat, noThe].flatMap((base) => [`${base}music`, `${base}band`]);
+  return [...new Set([concat, noThe, hyphen, ...suffixed])].filter((s) => s.length >= 3);
 }
 
 const normalize = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");

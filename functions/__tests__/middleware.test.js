@@ -18,9 +18,10 @@
 // limit outright.
 //
 // #495 fix: multipart is no longer exempt from the guard, only allowed a
-// higher ceiling (MULTIPART_MAX_BODY_BYTES), and only on the one route that
-// legitimately needs it (/api/admin/bands/photos, which enforces its own
-// precise 5MB-per-file limit downstream).
+// higher ceiling (MULTIPART_MAX_BODY_BYTES), and only on the routes that
+// legitimately need it (/api/admin/bands/photos, and /api/admin/events/posters
+// added in #616), each of which enforces its own precise 5MB-per-file limit
+// downstream.
 //
 // COUPLING NOTE: /api/metrics is now routed through the D1-backed fail-closed
 // rate limiter (#482/#494, already merged to main). Every request here sets
@@ -431,6 +432,73 @@ describe("body-size guard (#481, #495)", () => {
       `--${boundary}--\r\n`;
 
     const request = new Request("https://example.test/api/admin/bands/photos", {
+      method: "POST",
+      headers: {
+        ...LOOPBACK_HEADERS,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        "Content-Length": String(body.length),
+      },
+      body,
+    });
+    expect(Number(request.headers.get("Content-Length"))).toBeGreaterThan(6_000_000);
+
+    const response = await onRequest({
+      request,
+      env: minimalEnv(),
+      data: {},
+      next: neverCalledNext(),
+    });
+
+    expect(response.status).toBe(413);
+    const payload = await response.json();
+    expect(payload.error).toBe("Payload too large");
+  });
+
+  test("multipart POST to /api/admin/events/posters with Content-Length between 1MB and 6MB passes through (#616)", async () => {
+    // #616: the event poster upload route gets the same raised ceiling as
+    // band photos — 5MB is above the standard 1MB guard but under the 6MB
+    // coarse DoS ceiling, so this must reach next(), leaving the precise
+    // 5MB-per-file business rule to posters.js itself.
+    const boundary = "----test-boundary";
+    const fiveMbField = "x".repeat(5 * 1024 * 1024);
+    const body =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="poster"; filename="event.jpg"\r\n\r\n` +
+      `${fiveMbField}\r\n` +
+      `--${boundary}--\r\n`;
+
+    const request = new Request("https://example.test/api/admin/events/posters", {
+      method: "POST",
+      headers: {
+        ...LOOPBACK_HEADERS,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        "Content-Length": String(body.length),
+      },
+      body,
+    });
+    expect(Number(request.headers.get("Content-Length"))).toBeGreaterThan(1_000_000);
+    expect(Number(request.headers.get("Content-Length"))).toBeLessThan(6_000_000);
+
+    const response = await onRequest({
+      request,
+      env: minimalEnv(),
+      data: {},
+      next: okNext(),
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  test("multipart POST to /api/admin/events/posters with Content-Length >6MB is rejected with 413 (#616)", async () => {
+    const boundary = "----test-boundary";
+    const sevenMbField = "x".repeat(7 * 1024 * 1024);
+    const body =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="poster"; filename="event.jpg"\r\n\r\n` +
+      `${sevenMbField}\r\n` +
+      `--${boundary}--\r\n`;
+
+    const request = new Request("https://example.test/api/admin/events/posters", {
       method: "POST",
       headers: {
         ...LOOPBACK_HEADERS,

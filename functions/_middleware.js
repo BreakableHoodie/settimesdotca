@@ -80,25 +80,27 @@ export async function onRequest(context) {
   // blanket multipart exemption solely off the client-supplied Content-Type,
   // so any client could set `Content-Type: multipart/form-data` on e.g.
   // /api/metrics and skip the 1MB limit entirely. Multipart now gets a raised
-  // ceiling instead of a bypass, and only on the one route that legitimately
-  // needs it.
+  // ceiling instead of a bypass, and only on the routes that legitimately
+  // need it (#616 added the event poster upload alongside band photos).
   if (["POST", "PUT", "PATCH"].includes(request.method)) {
     const contentType = request.headers.get("Content-Type") || "";
     const isMultipart = contentType.includes("multipart/form-data");
 
-    // The band photo upload (functions/api/admin/bands/photos.js) is the ONLY
-    // route that legitimately accepts multipart bodies, and it already
+    // The band photo (functions/api/admin/bands/photos.js) and event poster
+    // (functions/api/admin/events/posters.js, #616) uploads are the ONLY
+    // routes that legitimately accept multipart bodies, and each already
     // enforces its own precise 5MB-per-file limit after parsing formData.
-    // Pin the raised ceiling to that exact pathname — Cloudflare Pages
+    // Pin the raised ceiling to these exact pathnames — Cloudflare Pages
     // Functions match routes exactly, so this can't be satisfied by a
     // sub-path or a different handler.
-    const isPhotoUpload = isMultipart && url.pathname === "/api/admin/bands/photos";
+    const RAISED_LIMIT_UPLOAD_ROUTES = new Set(["/api/admin/bands/photos", "/api/admin/events/posters"]);
+    const isPhotoUpload = isMultipart && RAISED_LIMIT_UPLOAD_ROUTES.has(url.pathname);
 
     const MAX_BODY_BYTES = 1_000_000;
     // Coarse DoS ceiling, not the business rule: 5MB file + multipart
     // boundary/header overhead + other form fields. The precise 5MB-per-file
-    // limit stays enforced in photos.js; this guard only needs to reject
-    // bodies wildly larger than any real upload could be.
+    // limit stays enforced in photos.js/posters.js; this guard only needs to
+    // reject bodies wildly larger than any real upload could be.
     const MULTIPART_MAX_BODY_BYTES = 6_000_000;
     const maxBodyBytes = isPhotoUpload ? MULTIPART_MAX_BODY_BYTES : MAX_BODY_BYTES;
 

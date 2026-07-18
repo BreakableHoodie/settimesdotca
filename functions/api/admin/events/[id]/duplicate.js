@@ -69,8 +69,10 @@ export async function onRequestPost(context) {
     // NOT in this column list: the new event has a different date (and
     // possibly no end_date at all), so the source's date-keyed doors times
     // would no longer fall within the new event's festival-day span and
-    // would fail validateDoorsJson on the next edit anyway (#569). Leaving it
-    // out of INSERT defaults the column to NULL — start clean.
+    // would fail validateDoorsJson on the next edit anyway (#569). poster_url
+    // is excluded for the same "edition-specific" reasoning (#616) — a new
+    // edition gets its own poster, not the source event's. Leaving both out
+    // of INSERT defaults the columns to NULL — start clean.
     const newEvent = await DB.prepare(
       `INSERT INTO events (
          name, date, slug, status, is_published, description, city,
@@ -107,6 +109,9 @@ export async function onRequestPost(context) {
     // through this response.
     newEvent.social_links = safeReflectSocialLinksString(newEvent.social_links, ["instagram", "x", "tiktok"]);
     newEvent.ticket_url = normalizeHttpUrl(newEvent.ticket_url);
+    // Always NULL here (poster_url is excluded from INSERT above, #616) —
+    // sanitized anyway for consistency with every other admin read path.
+    newEvent.poster_url = normalizeHttpUrl(newEvent.poster_url);
 
     // Copy performances. If the copy fails, compensate by deleting the new event
     // so we never leave an empty orphan draft behind (D1 has no BEGIN/COMMIT).

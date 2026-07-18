@@ -104,6 +104,7 @@ export function createTestDB() {
       description TEXT,
       city TEXT,
       ticket_url TEXT,
+      poster_url TEXT,
       venue_info TEXT,
       social_links TEXT,
       theme_colors TEXT,

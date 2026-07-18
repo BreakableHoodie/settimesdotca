@@ -2,11 +2,12 @@ import { Check, Copy, Music } from 'lucide-react'
 import { Fragment, memo, useMemo, useState } from 'react'
 import { copyToClipboard } from '../utils/clipboard'
 import { compareByName } from '../utils/sortableName'
-import { dayNumberByDate, isMultiDay } from '../utils/festivalDays'
+import { dayNumberByDate, orderedFestivalDays } from '../utils/festivalDays'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
+import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
-import { DayDivider } from './ui'
+import { DayDivider, DayTabs } from './ui'
 
 const UNSCHEDULED = Symbol('unscheduled')
 const UNSCHEDULED_FILTER_VALUE = '__unscheduled__'
@@ -53,6 +54,8 @@ function ScheduleView({
   showVenueFilter = true,
   eventSlug,
   doorsJson = null,
+  eventStartDate = null,
+  eventEndDate = null,
 }) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Visible Schedule')
   const [isCopyingAll, setIsCopyingAll] = useState(false)
@@ -69,14 +72,40 @@ function ScheduleView({
   // `bands` set (not the filtered/split subsets below) so day numbers stay
   // consistent across the Upcoming and Past sections and across filter changes.
   const dayNumberByDateMap = useMemo(() => dayNumberByDate(bands), [bands])
-  const multiDayEvent = useMemo(() => isMultiDay(bands), [bands])
+  const festivalDays = useMemo(() => orderedFestivalDays(bands), [bands])
 
-  const uniqueVenues = useMemo(() => [...new Set(bands.map(b => b.venue).filter(Boolean))].sort(), [bands])
-  const hasUnscheduled = useMemo(() => bands.some(b => !b.venue), [bands])
-  const uniqueGenres = useMemo(() => [...new Set(bands.filter(b => b.genre).map(b => b.genre))].sort(), [bands])
+  // Day-tab filter (#542 PR-3): a hard FILTER, not a scroll-anchor — exactly
+  // one festival day's performances render at a time once an event spans
+  // more than one day. `hasDayTabs`/`activeDate` derive from the full
+  // `bands` (same array as the divider numbering above) so both stay in
+  // sync as the day-tab selection changes.
+  const {
+    isMultiDay: hasDayTabs,
+    activeDayNumber,
+    activeDate,
+    setActiveDayNumber,
+  } = useFestivalDayFilter(festivalDays, { currentTime, startDate: eventStartDate, endDate: eventEndDate })
+
+  const dayFilteredBands = useMemo(
+    () => (hasDayTabs && activeDate ? bands.filter(band => band.date === activeDate) : bands),
+    [bands, hasDayTabs, activeDate]
+  )
+
+  const uniqueVenues = useMemo(
+    () => [...new Set(dayFilteredBands.map(b => b.venue).filter(Boolean))].sort(),
+    [dayFilteredBands]
+  )
+  const hasUnscheduled = useMemo(() => dayFilteredBands.some(b => !b.venue), [dayFilteredBands])
+  const uniqueGenres = useMemo(
+    () => [...new Set(dayFilteredBands.filter(b => b.genre).map(b => b.genre))].sort(),
+    [dayFilteredBands]
+  )
 
   // Apply time filter first, then venue/genre filter (before showPast so finishedCount is accurate)
-  const timeFilteredBands = useMemo(() => filterPerformancesByTime(bands, timeFilter), [bands, timeFilter])
+  const timeFilteredBands = useMemo(
+    () => filterPerformancesByTime(dayFilteredBands, timeFilter),
+    [dayFilteredBands, timeFilter]
+  )
 
   const venueGenreFilteredBands = useMemo(
     () =>
@@ -311,6 +340,16 @@ function ScheduleView({
         </div>
       </div>
 
+      {/* Day-tab filter (#542 PR-3): a hard FILTER — selecting a day renders
+          ONLY that day's performances, never "all days" merged. Gated on
+          hasDayTabs so single-day events render nothing here (repo
+          invariant: no lone "Day 1" control). */}
+      {hasDayTabs && (
+        <div className="flex justify-center sm:justify-start">
+          <DayTabs days={festivalDays} activeDayNumber={activeDayNumber} onSelectDay={setActiveDayNumber} />
+        </div>
+      )}
+
       {/* Filter pills */}
       {(showVenueFilter || uniqueGenres.length > 0) &&
         (uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
@@ -502,7 +541,7 @@ function ScheduleView({
               </div>
               {upcomingByTime.map(({ time, date, bands: timeBands }, idx) => {
                 const previousDate = idx > 0 ? upcomingByTime[idx - 1].date : undefined
-                const showDayDivider = multiDayEvent && date !== previousDate
+                const showDayDivider = hasDayTabs && date !== previousDate
                 return (
                   <Fragment key={`${date ?? ''}-${time}`}>
                     {showDayDivider && (
@@ -548,7 +587,7 @@ function ScheduleView({
               </div>
               {pastByTime.map(({ time, date, bands: timeBands }, idx) => {
                 const previousDate = idx > 0 ? pastByTime[idx - 1].date : undefined
-                const showDayDivider = multiDayEvent && date !== previousDate
+                const showDayDivider = hasDayTabs && date !== previousDate
                 return (
                   <Fragment key={`${date ?? ''}-${time}`}>
                     {showDayDivider && (

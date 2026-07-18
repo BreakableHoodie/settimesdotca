@@ -39,9 +39,9 @@ const defaultProps = {
   timeFilter: 'all',
 }
 
-const renderView = props =>
+const renderView = (props, { route = '/' } = {}) =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[route]}>
       <ScheduleView {...defaultProps} {...props} />
     </MemoryRouter>
   )
@@ -270,7 +270,7 @@ describe('ScheduleView — P2: copy action respects visible filters', () => {
   })
 })
 
-describe('ScheduleView — #541: multi-day day dividers', () => {
+describe('ScheduleView — #541: day dividers', () => {
   it('renders no day dividers for a single-day lineup', () => {
     const bands = [
       makeBand({
@@ -296,36 +296,9 @@ describe('ScheduleView — #541: multi-day day dividers', () => {
     expect(screen.queryByText(/^Day 1/)).not.toBeInTheDocument()
   })
 
-  it('renders one day-divider per festival day, in ascending order, for a multi-day lineup', () => {
-    const bands = [
-      makeBand({
-        id: '1',
-        name: 'Alpha',
-        date: '2024-06-01',
-        startTime: '21:00',
-        startMs: Date.parse('2024-06-01T21:00:00'),
-        endMs: Date.parse('2024-06-01T22:00:00'),
-      }),
-      makeBand({
-        id: '2',
-        name: 'Beta',
-        date: '2024-06-02',
-        startTime: '21:00',
-        startMs: Date.parse('2024-06-02T21:00:00'),
-        endMs: Date.parse('2024-06-02T22:00:00'),
-      }),
-    ]
-    renderView({ bands, currentTime: new Date('2024-05-31T12:00:00') })
-
-    const dividers = screen.getAllByRole('separator')
-    expect(dividers).toHaveLength(2)
-    expect(dividers[0]).toHaveTextContent('Day 1')
-    expect(dividers[0]).toHaveTextContent('Saturday, June 1')
-    expect(dividers[1]).toHaveTextContent('Day 2')
-    expect(dividers[1]).toHaveTextContent('Sunday, June 2')
-  })
-
-  it('renders a divider once per day even with multiple time slots on the same day', () => {
+  it('renders exactly one divider for the active day, labeled with its true day number, even with multiple time slots that day', () => {
+    // Deep-links straight to Day 2 (?day=2) so the divider's numbering can be
+    // checked without depending on the smart-default resolution tested below.
     const bands = [
       makeBand({
         id: '1',
@@ -338,23 +311,110 @@ describe('ScheduleView — #541: multi-day day dividers', () => {
       makeBand({
         id: '2',
         name: 'Beta',
-        date: '2024-06-01',
-        startTime: '21:30',
-        startMs: Date.parse('2024-06-01T21:30:00'),
-        endMs: Date.parse('2024-06-01T22:30:00'),
-      }),
-      makeBand({
-        id: '3',
-        name: 'Gamma',
         date: '2024-06-02',
         startTime: '20:00',
         startMs: Date.parse('2024-06-02T20:00:00'),
         endMs: Date.parse('2024-06-02T21:00:00'),
       }),
+      makeBand({
+        id: '3',
+        name: 'Gamma',
+        date: '2024-06-02',
+        startTime: '21:30',
+        startMs: Date.parse('2024-06-02T21:30:00'),
+        endMs: Date.parse('2024-06-02T22:30:00'),
+      }),
     ]
-    renderView({ bands, currentTime: new Date('2024-05-31T12:00:00') })
+    renderView({ bands, currentTime: new Date('2024-05-31T12:00:00') }, { route: '/?day=2' })
 
-    expect(screen.getAllByRole('separator')).toHaveLength(2)
+    const dividers = screen.getAllByRole('separator')
+    expect(dividers).toHaveLength(1)
+    expect(dividers[0]).toHaveTextContent('Day 2')
+    expect(dividers[0]).toHaveTextContent('Sunday, June 2')
+  })
+})
+
+describe('ScheduleView — #542 PR-3: day-tab filter', () => {
+  const twoDayBands = [
+    makeBand({
+      id: '1',
+      name: 'Alpha',
+      date: '2024-06-01',
+      startTime: '21:00',
+      startMs: Date.parse('2024-06-01T21:00:00'),
+      endMs: Date.parse('2024-06-01T22:00:00'),
+    }),
+    makeBand({
+      id: '2',
+      name: 'Beta',
+      date: '2024-06-02',
+      startTime: '21:00',
+      startMs: Date.parse('2024-06-02T21:00:00'),
+      endMs: Date.parse('2024-06-02T22:00:00'),
+    }),
+  ]
+
+  it('renders one tab per festival day and filters the list to the selected day', () => {
+    renderView({ bands: twoDayBands, currentTime: new Date('2024-05-31T12:00:00') })
+
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs).toHaveLength(2)
+
+    // No ?day= and the event hasn't started (currentTime is before Day 1) — defaults to Day 1.
+    expect(screen.getByText('Alpha')).toBeInTheDocument()
+    expect(screen.queryByText('Beta')).not.toBeInTheDocument()
+  })
+
+  it('renders NO tabs for a single-day event (repo invariant: never a lone "Day 1" control)', () => {
+    const bands = [makeBand({ id: '1', name: 'Alpha' }), makeBand({ id: '2', name: 'Beta' })]
+    renderView({ bands })
+
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+    // Both bands (same day) render unfiltered.
+    expect(screen.getByText('Alpha')).toBeInTheDocument()
+    expect(screen.getByText('Beta')).toBeInTheDocument()
+  })
+
+  it('?day=2 activates day 2 on load', () => {
+    renderView({ bands: twoDayBands, currentTime: new Date('2024-05-31T12:00:00') }, { route: '/?day=2' })
+
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
+    expect(screen.getByText('Beta')).toBeInTheDocument()
+
+    const activeTab = screen.getAllByRole('tab').find(tab => tab.getAttribute('aria-selected') === 'true')
+    expect(activeTab).toHaveTextContent('Sun Jun 2')
+  })
+
+  it('an out-of-range ?day= falls back to the default day instead of blanking the view', () => {
+    renderView({ bands: twoDayBands, currentTime: new Date('2024-05-31T12:00:00') }, { route: '/?day=99' })
+
+    expect(screen.getByText('Alpha')).toBeInTheDocument()
+    expect(screen.queryByText('Beta')).not.toBeInTheDocument()
+  })
+
+  it('switching tabs updates the rendered list', () => {
+    renderView({ bands: twoDayBands, currentTime: new Date('2024-05-31T12:00:00') })
+
+    expect(screen.getByText('Alpha')).toBeInTheDocument()
+    expect(screen.queryByText('Beta')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Sun Jun 2' }))
+
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
+    expect(screen.getByText('Beta')).toBeInTheDocument()
+  })
+
+  it('defaults to today’s festival day when the event is in progress', () => {
+    renderView({
+      bands: twoDayBands,
+      currentTime: new Date('2024-06-02T12:00:00'),
+      eventStartDate: '2024-06-01',
+      eventEndDate: '2024-06-02',
+    })
+
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
+    expect(screen.getByText('Beta')).toBeInTheDocument()
   })
 })
 

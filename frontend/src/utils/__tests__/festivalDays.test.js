@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { dayNumberByDate, formatFestivalDate, isMultiDay, orderedFestivalDays } from '../festivalDays'
+import {
+  dayNumberByDate,
+  dayNumberMapFromDays,
+  formatFestivalDate,
+  isMultiDay,
+  orderedFestivalDays,
+  resolveActiveFestivalDay,
+} from '../festivalDays'
 
 describe('formatFestivalDate', () => {
   it('formats the short style as "Sun Aug 2" (no comma)', () => {
@@ -81,6 +88,114 @@ describe('dayNumberByDate', () => {
     const map = dayNumberByDate(items)
     expect(map.size).toBe(1)
     expect(map.get('2026-08-02')).toBe(1)
+  })
+})
+
+describe('dayNumberMapFromDays', () => {
+  it('assigns 1..N in the given order, trusting the caller-supplied list', () => {
+    const map = dayNumberMapFromDays(['2026-08-02', '2026-08-03', '2026-08-04'])
+    expect(map.get('2026-08-02')).toBe(1)
+    expect(map.get('2026-08-03')).toBe(2)
+    expect(map.get('2026-08-04')).toBe(3)
+  })
+
+  it('numbers a date correctly even when it is the only one present in a caller-supplied subset day list', () => {
+    // Simulates MySchedule deriving from a fan's Day-2-only selection while
+    // still being told the full event's days start on 2026-08-02 (#542 PR-3).
+    const map = dayNumberMapFromDays(['2026-08-02', '2026-08-03'])
+    expect(map.get('2026-08-03')).toBe(2)
+  })
+
+  it('returns an empty map for an empty list', () => {
+    expect(dayNumberMapFromDays([]).size).toBe(0)
+  })
+})
+
+describe('resolveActiveFestivalDay', () => {
+  const days = ['2026-08-07', '2026-08-08', '2026-08-09']
+
+  it('returns null when there are no festival days', () => {
+    expect(resolveActiveFestivalDay({ days: [], dayParam: '1', todayStr: '2026-08-07' })).toBeNull()
+  })
+
+  it('honors a valid ?day=N param over the smart default', () => {
+    expect(resolveActiveFestivalDay({ days, dayParam: '3', todayStr: '2026-08-07' })).toBe(3)
+  })
+
+  it('falls back to the smart default for a non-numeric dayParam', () => {
+    expect(resolveActiveFestivalDay({ days, dayParam: 'abc', todayStr: '2026-08-09' })).toBe(3)
+  })
+
+  it('falls back to the smart default for a dayParam of 0', () => {
+    expect(resolveActiveFestivalDay({ days, dayParam: '0', todayStr: '2026-08-07' })).toBe(1)
+  })
+
+  it('falls back to the smart default for a dayParam beyond the day count', () => {
+    expect(resolveActiveFestivalDay({ days, dayParam: '99', todayStr: '2026-08-07' })).toBe(1)
+  })
+
+  it('falls back to the smart default for a dayParam with trailing garbage', () => {
+    expect(resolveActiveFestivalDay({ days, dayParam: '2abc', todayStr: '2026-08-07' })).toBe(1)
+  })
+
+  it('falls back to the smart default when dayParam is missing', () => {
+    expect(resolveActiveFestivalDay({ days, dayParam: null, todayStr: '2026-08-07' })).toBe(1)
+  })
+
+  it('defaults to today’s festival day when in progress (within [startDate, endDate])', () => {
+    expect(
+      resolveActiveFestivalDay({
+        days,
+        dayParam: null,
+        todayStr: '2026-08-08',
+        startDate: '2026-08-07',
+        endDate: '2026-08-09',
+      })
+    ).toBe(2)
+  })
+
+  it('defaults to day 1 when today is before the event start, even if bounds are given', () => {
+    expect(
+      resolveActiveFestivalDay({
+        days,
+        dayParam: null,
+        todayStr: '2026-08-01',
+        startDate: '2026-08-07',
+        endDate: '2026-08-09',
+      })
+    ).toBe(1)
+  })
+
+  it('defaults to day 1 when today is after the event ends', () => {
+    expect(
+      resolveActiveFestivalDay({
+        days,
+        dayParam: null,
+        todayStr: '2026-08-15',
+        startDate: '2026-08-07',
+        endDate: '2026-08-09',
+      })
+    ).toBe(1)
+  })
+
+  it('defaults to day 1 when today is in progress but is not itself a festival day (dark day)', () => {
+    expect(
+      resolveActiveFestivalDay({
+        days: ['2026-08-07', '2026-08-09'],
+        dayParam: null,
+        todayStr: '2026-08-08',
+        startDate: '2026-08-07',
+        endDate: '2026-08-09',
+      })
+    ).toBe(1)
+  })
+
+  it('without startDate/endDate, approximates "in progress" as direct membership in days', () => {
+    expect(resolveActiveFestivalDay({ days, dayParam: null, todayStr: '2026-08-09' })).toBe(3)
+  })
+
+  it('without startDate/endDate, defaults to day 1 when today matches no festival day', () => {
+    expect(resolveActiveFestivalDay({ days, dayParam: null, todayStr: '2026-05-01' })).toBe(1)
   })
 })
 

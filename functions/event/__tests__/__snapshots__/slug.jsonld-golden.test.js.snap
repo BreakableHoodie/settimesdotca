@@ -1,0 +1,97 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`JSON-LD golden snapshot — /event/[slug] > MusicEvent + BreadcrumbList match the pinned golden shape 1`] = `
+{
+  "@context": "https://schema.org",
+  "@type": "MusicEvent",
+  "description": "Six venues, one legendary night of live music in Waterloo Region.",
+  "endDate": "2026-08-02",
+  "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+  "eventStatus": "https://schema.org/EventScheduled",
+  "image": [
+    "https://band-photos.settimes.ca/event-posters/17-vol17.jpg",
+  ],
+  "location": [
+    {
+      "@type": "MusicVenue",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CA",
+        "addressLocality": "Waterloo",
+        "addressRegion": "ON",
+        "postalCode": "N2J 2W7",
+        "streetAddress": "28 King St N",
+      },
+      "name": "Blue Room (Inside Revive Karaoke)",
+    },
+    {
+      "@type": "MusicVenue",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CA",
+        "addressLocality": "Waterloo",
+        "addressRegion": "ON",
+        "postalCode": "N2J 2W9",
+        "streetAddress": "47 King St N",
+      },
+      "name": "Room 47",
+    },
+  ],
+  "name": "Long Weekend Band Crawl - Vol. 17",
+  "offers": {
+    "@type": "Offer",
+    "availability": "https://schema.org/InStock",
+    "priceCurrency": "CAD",
+    "url": "https://tickets.example.com/vol-17",
+    "validFrom": "2026-07-01",
+  },
+  "organizer": {
+    "@type": "Organization",
+    "name": "SetTimes",
+    "sameAs": [
+      "https://www.instagram.com/settimes.ca",
+    ],
+    "url": "https://settimes.ca",
+  },
+  "performer": [
+    {
+      "@type": "MusicGroup",
+      "name": "The Anti-Queens",
+      "url": "https://settimes.ca/band/2",
+    },
+    {
+      "@type": "MusicGroup",
+      "name": "Midtown Static",
+      "url": "https://settimes.ca/band/1",
+    },
+    {
+      "@type": "MusicGroup",
+      "name": "Zebra Sound",
+      "url": "https://settimes.ca/band/3",
+    },
+  ],
+  "startDate": "2026-08-02T18:45:00-04:00",
+  "url": "https://settimes.ca/event/golden-lwbc17",
+}
+`;
+
+exports[`JSON-LD golden snapshot — /event/[slug] > MusicEvent + BreadcrumbList match the pinned golden shape 2`] = `
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "item": "https://settimes.ca/",
+      "name": "Events",
+      "position": 1,
+    },
+    {
+      "@type": "ListItem",
+      "item": "https://settimes.ca/event/golden-lwbc17",
+      "name": "Long Weekend Band Crawl - Vol. 17",
+      "position": 2,
+    },
+  ],
+}
+`;

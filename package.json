@@ -16,9 +16,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "format": "prettier --write \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\"",
-    "format:check": "prettier --check \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\"",
-    "lint": "eslint functions/ scripts/"
+    "format": "prettier --write \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\" \"e2e/**/*.{js,mjs}\"",
+    "format:check": "prettier --check \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\" \"e2e/**/*.{js,mjs}\"",
+    "lint": "eslint functions/ scripts/ e2e/"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",

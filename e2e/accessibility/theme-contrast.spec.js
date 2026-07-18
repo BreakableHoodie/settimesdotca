@@ -13,13 +13,13 @@
  * instead of shipping as a mobile-screenshot bug report (this was at least the
  * third instance of the bug class).
  */
-import { test, expect } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
+import { test, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 // Mirrors frontend/src/components/ThemeProvider.jsx exactly — THEME_KEY and
 // VALID_THEMES. Do not let these drift from that file without updating both.
-const THEME_STORAGE_KEY = 'settimes-theme';
-const THEMES = ['midnight-ember', 'arctic-night', 'daybreak', 'silver-lining'];
+const THEME_STORAGE_KEY = "settimes-theme";
+const THEMES = ["midnight-ember", "arctic-night", "daybreak", "silver-lining"];
 
 /**
  * Seeds localStorage with the target theme before any page script runs, via
@@ -38,7 +38,7 @@ async function primeTheme(page, theme) {
         // default theme (midnight-ember), which is exercised by that run anyway.
       }
     },
-    { key: THEME_STORAGE_KEY, value: theme }
+    { key: THEME_STORAGE_KEY, value: theme },
   );
 }
 
@@ -46,29 +46,28 @@ async function primeTheme(page, theme) {
  * into a readable block for the assertion message, so a CI failure names the
  * offending element instead of just "1 violation". */
 function formatViolations(violations) {
-  if (violations.length === 0) return '';
+  if (violations.length === 0) return "";
   return violations
-    .map(violation =>
+    .map((violation) =>
       violation.nodes
-        .map(node => {
-          const check = node.any?.find(c => c.id === 'color-contrast') || node.any?.[0];
+        .map((node) => {
+          const check = node.any?.find((c) => c.id === "color-contrast") || node.any?.[0];
           const data = check?.data;
           const detail = data
             ? `fg=${data.fgColor} bg=${data.bgColor} ratio=${data.contrastRatio} (needs ${data.expectedContrastRatio})`
-            : node.failureSummary || check?.message || 'no contrast data available';
-          return `  [${violation.id}] ${node.target.join(' ')} — ${detail}`;
+            : node.failureSummary || check?.message || "no contrast data available";
+          return `  [${violation.id}] ${node.target.join(" ")} — ${detail}`;
         })
-        .join('\n')
+        .join("\n"),
     )
-    .join('\n');
+    .join("\n");
 }
 
 async function assertNoColorContrastViolations(page, label) {
-  const results = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
-  expect(
-    results.violations,
-    `Color-contrast violations on ${label}:\n${formatViolations(results.violations)}`
-  ).toEqual([]);
+  const results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+  expect(results.violations, `Color-contrast violations on ${label}:\n${formatViolations(results.violations)}`).toEqual(
+    [],
+  );
 }
 
 /**
@@ -83,17 +82,17 @@ async function assertNoColorContrastViolations(page, label) {
  * page's primary content wait on any page that renders PrivacyBanner.
  */
 async function waitForPrivacyBannerSettled(page) {
-  await expect(page.getByRole('button', { name: 'Got it' })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("button", { name: "Got it" })).toBeVisible({ timeout: 10000 });
 }
 
 /** Resolves the seeded upcoming event's slug from the homepage event card —
  * the same [data-testid="event-card"] locator public-timeline.spec.js uses. */
 async function resolveEventSlug(page) {
-  await page.goto('/');
+  await page.goto("/");
   const card = page.locator('[data-testid="event-card"]').first();
   await expect(card).toBeVisible();
-  const href = await card.locator('h3 a').first().getAttribute('href');
-  return href ? href.replace(/^\/event\//, '') : null;
+  const href = await card.locator("h3 a").first().getAttribute("href");
+  return href ? href.replace(/^\/event\//, "") : null;
 }
 
 /** Resolves a seeded band profile link from the homepage's collapsed
@@ -101,12 +100,12 @@ async function resolveEventSlug(page) {
  * band-profile-viewing.spec.js uses. Returns null if the seed provides none,
  * so the caller can skip gracefully instead of failing. */
 async function resolveBandProfileHref(page) {
-  await page.goto('/');
+  await page.goto("/");
   await expect(page.locator('[data-testid="event-card"]').first()).toBeVisible();
   const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
   const visible = await bandLink.isVisible().catch(() => false);
   if (!visible) return null;
-  return bandLink.getAttribute('href');
+  return bandLink.getAttribute("href");
 }
 
 for (const theme of THEMES) {
@@ -115,48 +114,48 @@ for (const theme of THEMES) {
       await primeTheme(page, theme);
     });
 
-    test('events list (/)', async ({ page }) => {
-      await page.goto('/');
+    test("events list (/)", async ({ page }) => {
+      await page.goto("/");
       // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2.
-      await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
       await expect(page.locator('[data-testid="event-card"]').first()).toBeVisible();
       await waitForPrivacyBannerSettled(page);
 
       await assertNoColorContrastViolations(page, `${theme} — events list (/)`);
     });
 
-    test('event schedule page', async ({ page }) => {
+    test("event schedule page", async ({ page }) => {
       const slug = await resolveEventSlug(page);
-      test.skip(!slug, 'No seeded event slug found on the homepage event card');
+      test.skip(!slug, "No seeded event slug found on the homepage event card");
 
       await page.goto(`/event/${slug}`);
       // "Full Lineup" is ScheduleView's unconditional heading — waiting for it
       // guarantees the schedule has rendered past the loading skeleton.
-      await expect(page.getByRole('heading', { name: 'Full Lineup' })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole("heading", { name: "Full Lineup" })).toBeVisible({ timeout: 15000 });
       await waitForPrivacyBannerSettled(page);
 
       await assertNoColorContrastViolations(page, `${theme} — event schedule (/event/${slug})`);
     });
 
-    test('subscribe page (/subscribe)', async ({ page }) => {
-      await page.goto('/subscribe');
-      await expect(page.getByRole('heading', { name: 'Never Miss a Show' })).toBeVisible();
+    test("subscribe page (/subscribe)", async ({ page }) => {
+      await page.goto("/subscribe");
+      await expect(page.getByRole("heading", { name: "Never Miss a Show" })).toBeVisible();
 
       await assertNoColorContrastViolations(page, `${theme} — subscribe (/subscribe)`);
     });
 
-    test('band profile page', async ({ page }) => {
+    test("band profile page", async ({ page }) => {
       const href = await resolveBandProfileHref(page);
-      test.skip(!href, 'Seed data provides no band profile link on the homepage');
+      test.skip(!href, "Seed data provides no band profile link on the homepage");
 
       await page.goto(href);
-      await expect(page.locator('main h1')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator("main h1")).toBeVisible({ timeout: 15000 });
 
       const notFound = await page
-        .getByRole('heading', { name: /band not found/i })
+        .getByRole("heading", { name: /band not found/i })
         .isVisible()
         .catch(() => false);
-      test.skip(notFound, 'Resolved band link led to a not-found page');
+      test.skip(notFound, "Resolved band link led to a not-found page");
 
       await waitForPrivacyBannerSettled(page);
       await assertNoColorContrastViolations(page, `${theme} — band profile (${href})`);

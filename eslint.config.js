@@ -101,6 +101,38 @@ export default [
     },
   },
 
+  // --- E2E tests (Playwright, e2e/) ---
+  {
+    files: ["e2e/**/*.js", "e2e/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: {
+        // Specs run under Node (Playwright test runner: process, Buffer for
+        // multipart fixtures), but also embed browser-context callbacks
+        // (page.evaluate/waitForFunction) that reference DOM/window globals
+        // like navigator/document directly — both sets are needed for no-undef.
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+    rules: {
+      "no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+      "no-console": "off",
+
+      // Playwright's `async ({}, testInfo) => {}` idiom deliberately destructures
+      // no fixtures (only testInfo is needed) — not a mistake to flag.
+      "no-empty-pattern": "off",
+    },
+  },
+
   // --- Test files: add Vitest + Node globals on top of the above ---
   {
     files: [

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -28,22 +28,22 @@ const createComponentPage = async (page, componentHtml) => {
   `);
 };
 
-test.describe('Visual Regression', () => {
+test.describe("Visual Regression", () => {
   test.beforeEach(async ({}, testInfo) => {
     testInfo.skip(
-      process.env.PLAYWRIGHT_SKIP_A11Y_VISUAL === 'true',
-      'Visual regression tests skipped in main e2e workflow'
+      process.env.PLAYWRIGHT_SKIP_A11Y_VISUAL === "true",
+      "Visual regression tests skipped in main e2e workflow",
     );
   });
 
-  test('admin login page', async ({ page }) => {
-    await page.goto('/admin/login');
-    await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible();
+  test("admin login page", async ({ page }) => {
+    await page.goto("/admin/login");
+    await expect(page.getByRole("heading", { name: "Admin Login" })).toBeVisible();
     await waitForFonts(page);
-    await expect(page).toHaveScreenshot('admin-login.png', { fullPage: true });
+    await expect(page).toHaveScreenshot("admin-login.png", { fullPage: true });
   });
 
-  test('design system snapshot', async ({ page }) => {
+  test("design system snapshot", async ({ page }) => {
     await createComponentPage(
       page,
       `
@@ -56,10 +56,10 @@ test.describe('Visual Regression', () => {
           <p class="text-sm text-gray-300">Stable snapshot content for visual regression.</p>
         </div>
       </div>
-      `
+      `,
     );
 
     await waitForFonts(page);
-    await expect(page).toHaveScreenshot('design-system.png', { fullPage: true });
+    await expect(page).toHaveScreenshot("design-system.png", { fullPage: true });
   });
 });

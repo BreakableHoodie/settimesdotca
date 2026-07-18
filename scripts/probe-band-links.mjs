@@ -124,9 +124,22 @@ async function ddgSearch(name) {
       return null;
     }
     const html = await res.text();
+    // Parse each result URL and filter on the real hostname — a substring
+    // check (`u.includes("duckduckgo.com")`) is defeated by hosts like
+    // `duckduckgo.com.evil.test` or `evil.test/?x=duckduckgo.com` (CodeQL
+    // js/incomplete-url-substring-sanitization). Bad URLs are dropped.
     const links = [...html.matchAll(/uddg=([^&"]+)/g)]
-      .map((m) => decodeURIComponent(m[1]))
-      .filter((u) => u.startsWith("http") && !u.includes("duckduckgo.com"));
+      .map((m) => {
+        try {
+          return new URL(decodeURIComponent(m[1]));
+        } catch {
+          return null;
+        }
+      })
+      .filter(
+        (parsed) => parsed && parsed.hostname !== "duckduckgo.com" && !parsed.hostname.endsWith(".duckduckgo.com"),
+      )
+      .map((parsed) => parsed.href);
     // Dedupe, prefer music-platform domains, keep it short.
     const seen = new Set();
     const unique = links.filter((u) => {

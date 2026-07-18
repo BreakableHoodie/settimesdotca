@@ -17,6 +17,7 @@ export { default as Loading } from './Loading'
 export { default as Tooltip } from './Tooltip'
 export { default as ConfirmDialog } from './ConfirmDialog'
 export { default as DayDivider } from './DayDivider'
+export { default as DayTabs } from './DayTabs'
 export {
   BandCardSkeleton,
   BandCardSkeletonGrid,

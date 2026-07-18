@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import MySchedule from '../components/MySchedule'
@@ -29,6 +29,13 @@ const defaultProps = {
   onToggleShowPast: vi.fn(),
   nowOverride: null,
 }
+
+const renderSchedule = (props, { route = '/' } = {}) =>
+  render(
+    <MemoryRouter initialEntries={[route]}>
+      <MySchedule {...defaultProps} {...props} />
+    </MemoryRouter>
+  )
 
 describe('MySchedule — conflict vs overlap severity', () => {
   it('shows red warning for two bands at the exact same start time', () => {
@@ -155,62 +162,113 @@ describe('MySchedule — conflict vs overlap severity', () => {
   })
 })
 
-describe('MySchedule — #541: multi-day day dividers', () => {
+describe('MySchedule — #541: day dividers', () => {
   it('renders no day dividers for a single-day schedule', () => {
     const bands = [
       makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30'),
       makeBand(2, 'Band Beta', 'Stage B', '21:00', '21:30'),
     ]
-    render(
-      <MemoryRouter>
-        <MySchedule {...defaultProps} bands={bands} />
-      </MemoryRouter>
-    )
+    renderSchedule({ bands })
 
     expect(screen.queryByRole('separator')).not.toBeInTheDocument()
   })
 
-  it('inserts a day-divider before Day 1 and again before the first Day 2 band, none for the second Day 1 band', () => {
-    const bands = [
-      makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30', '2026-05-17'),
-      makeBand(2, 'Band Beta', 'Stage B', '21:00', '21:30', '2026-05-17'),
-      makeBand(3, 'Band Gamma', 'Stage A', '20:00', '20:30', '2026-05-18'),
-    ]
-    const { container } = render(
-      <MemoryRouter>
-        <MySchedule {...defaultProps} bands={bands} />
-      </MemoryRouter>
-    )
-
-    // One divider before the very first band (Day 1) and one before the first
-    // Day 2 band (Gamma); Band Beta (2nd Day 1 band) gets none since its date
-    // matches the previous rendered band's date.
-    const dividers = screen.getAllByRole('separator')
-    expect(dividers).toHaveLength(2)
-    expect(dividers[0]).toHaveTextContent('Day 1')
-    expect(dividers[1]).toHaveTextContent('Day 2')
-
-    // The Day 2 divider must appear before Band Gamma (the first Day 2 band) in DOM order.
-    const text = container.textContent
-    expect(text.indexOf('Day 2')).toBeLessThan(text.indexOf('Band Gamma'))
-  })
-
-  it('inserts a divider for each subsequent day change across a 3-day schedule', () => {
+  it('renders exactly one divider for the active day, labeled with its true day number, across a 3-day route', () => {
     const bands = [
       makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30', '2026-05-17'),
       makeBand(2, 'Band Beta', 'Stage A', '20:00', '20:30', '2026-05-18'),
       makeBand(3, 'Band Gamma', 'Stage A', '20:00', '20:30', '2026-05-19'),
     ]
-    render(
-      <MemoryRouter>
-        <MySchedule {...defaultProps} bands={bands} />
-      </MemoryRouter>
-    )
+    // Deep-links to Day 3 (?day=3) so the divider's numbering can be checked
+    // independent of the smart-default resolution (covered separately below).
+    renderSchedule({ bands }, { route: '/?day=3' })
 
     const dividers = screen.getAllByRole('separator')
-    expect(dividers).toHaveLength(3)
-    expect(dividers[0]).toHaveTextContent('Day 1')
-    expect(dividers[1]).toHaveTextContent('Day 2')
-    expect(dividers[2]).toHaveTextContent('Day 3')
+    expect(dividers).toHaveLength(1)
+    expect(dividers[0]).toHaveTextContent('Day 3')
+    expect(screen.getByText('Band Gamma')).toBeInTheDocument()
+    expect(screen.queryByText('Band Alpha')).not.toBeInTheDocument()
+    expect(screen.queryByText('Band Beta')).not.toBeInTheDocument()
+  })
+})
+
+describe('MySchedule — #542 PR-3: day-tab filter', () => {
+  const twoDayBands = [
+    makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30', '2026-05-17'),
+    makeBand(2, 'Band Beta', 'Stage A', '20:00', '20:30', '2026-05-18'),
+  ]
+
+  it('renders one tab per festival day and filters the route to the selected day (default Day 1)', () => {
+    renderSchedule({ bands: twoDayBands })
+
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    expect(screen.getByText('Band Alpha')).toBeInTheDocument()
+    expect(screen.queryByText('Band Beta')).not.toBeInTheDocument()
+  })
+
+  it('renders NO tabs for a single-day route (repo invariant)', () => {
+    const bands = [
+      makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30'),
+      makeBand(2, 'Band Beta', 'Stage B', '21:00', '21:30'),
+    ]
+    renderSchedule({ bands })
+
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.getByText('Band Alpha')).toBeInTheDocument()
+    expect(screen.getByText('Band Beta')).toBeInTheDocument()
+  })
+
+  it('?day=2 activates day 2 on load', () => {
+    renderSchedule({ bands: twoDayBands }, { route: '/?day=2' })
+
+    expect(screen.queryByText('Band Alpha')).not.toBeInTheDocument()
+    expect(screen.getByText('Band Beta')).toBeInTheDocument()
+  })
+
+  it('switching tabs updates the rendered route', () => {
+    renderSchedule({ bands: twoDayBands })
+
+    expect(screen.getByText('Band Alpha')).toBeInTheDocument()
+    expect(screen.queryByText('Band Beta')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('tab')[1])
+
+    expect(screen.queryByText('Band Alpha')).not.toBeInTheDocument()
+    expect(screen.getByText('Band Beta')).toBeInTheDocument()
+  })
+
+  it('defaults to today’s festival day when the event is in progress', () => {
+    renderSchedule({
+      bands: twoDayBands,
+      nowOverride: '2026-05-18T12:00:00',
+      eventStartDate: '2026-05-17',
+      eventEndDate: '2026-05-18',
+    })
+
+    expect(screen.queryByText('Band Alpha')).not.toBeInTheDocument()
+    expect(screen.getByText('Band Beta')).toBeInTheDocument()
+  })
+
+  it('shows a Day-2 tab and correctly labels a Day-2-only selection when the full event days are supplied', () => {
+    // The fan has only picked Day 2 bands so far. Without the authoritative
+    // `festivalDays` prop, deriving days from `bands` alone would see just
+    // one date and mislabel it "Day 1" — this is the exact bug the prop
+    // fixes (see MySchedule.jsx's `festivalDays` prop comment).
+    const day2OnlyBands = [makeBand(1, 'Band Gamma', 'Stage A', '20:00', '20:30', '2026-05-18')]
+
+    renderSchedule({
+      bands: day2OnlyBands,
+      festivalDays: ['2026-05-17', '2026-05-18'],
+    })
+
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    // ?day= isn't set and the route isn't "in progress" (no nowOverride
+    // matching), so it defaults to Day 1 — which has zero of the fan's picks.
+    expect(screen.getByText(/No bands in your route for/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('tab')[1])
+
+    expect(screen.getByText('Band Gamma')).toBeInTheDocument()
+    expect(screen.getByRole('separator')).toHaveTextContent('Day 2')
   })
 })

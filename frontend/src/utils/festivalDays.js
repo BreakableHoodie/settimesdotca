@@ -86,14 +86,65 @@ export const orderedFestivalDays = items => {
 }
 
 /**
+ * Maps each entry in an already-ordered `days` array (e.g. the output of
+ * `orderedFestivalDays`) to its 1-based day number. Split out from
+ * `dayNumberByDate` so a caller holding the *authoritative* full-event day
+ * list doesn't have to round-trip back through a possibly-partial `items`
+ * array to get the same numbering (see MySchedule's `festivalDays` prop,
+ * #542 PR-3 — a fan's selected-bands subset can span fewer days than the
+ * event itself, e.g. Day-2-only selections, which would otherwise mislabel
+ * Day 2 as "Day 1").
+ */
+export const dayNumberMapFromDays = days => new Map(days.map((date, index) => [date, index + 1]))
+
+/**
  * Maps each distinct festival date to its 1-based day number (earliest = Day 1).
  */
-export const dayNumberByDate = items => {
-  const days = orderedFestivalDays(items)
-  return new Map(days.map((date, index) => [date, index + 1]))
-}
+export const dayNumberByDate = items => dayNumberMapFromDays(orderedFestivalDays(items))
 
 /**
  * True when `items` span more than one distinct festival day.
  */
 export const isMultiDay = items => orderedFestivalDays(items).length > 1
+
+/**
+ * Resolves which 1-based festival day should be active for the day-tab
+ * filter (#542 PR-3). Day tabs are a hard FILTER — exactly one day's
+ * performances render at a time, there is no "all days" tab — so this is
+ * the single source of truth both `ScheduleView` and `MySchedule` call
+ * through `useFestivalDayFilter` to agree on the same day.
+ *
+ * Precedence:
+ *  1. `dayParam` (the `?day=N` URL value, 1-indexed) when it parses as a
+ *     plain positive integer within `[1, days.length]`. Anything else
+ *     (missing, non-numeric, out-of-range, a stale link after the lineup
+ *     shrank) falls through to the default — an invalid `?day=` must never
+ *     blank the view.
+ *  2. Smart default: if `todayStr` (YYYY-MM-DD, Toronto-local per CLAUDE.md)
+ *     falls within `[startDate, endDate]` (the event's official run) AND
+ *     matches one of the festival `days` exactly, default to that day.
+ *     `startDate`/`endDate` are optional — surfaces without the event
+ *     record (e.g. the embed view) omit them and "in progress" degrades to
+ *     direct membership in `days`.
+ *  3. Otherwise day 1.
+ *
+ * Pure and synchronous — unit-testable without mounting a component or a
+ * Router.
+ */
+export function resolveActiveFestivalDay({ days, dayParam, todayStr, startDate = null, endDate = null }) {
+  if (!days || days.length === 0) return null
+
+  const trimmed = typeof dayParam === 'string' ? dayParam.trim() : ''
+  if (/^\d+$/.test(trimmed)) {
+    const parsed = Number(trimmed)
+    if (parsed >= 1 && parsed <= days.length) return parsed
+  }
+
+  const inProgress = startDate && endDate ? todayStr >= startDate && todayStr <= endDate : days.includes(todayStr)
+  if (inProgress) {
+    const idx = days.indexOf(todayStr)
+    if (idx >= 0) return idx + 1
+  }
+
+  return 1
+}

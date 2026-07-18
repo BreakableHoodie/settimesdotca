@@ -18,6 +18,7 @@ import { getTimeFilterOptions } from './utils/timeFilter'
 import { computeNextMove } from './utils/nextMove'
 import { validateBandsData } from './utils/validation'
 import { prepareBands } from './utils/bandUtils'
+import { orderedFestivalDays } from './utils/festivalDays'
 import { saveSelectedBands } from './utils/scheduleStorage'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
@@ -589,6 +590,12 @@ function App() {
   const isArchived = Boolean(eventData?.is_archived)
   const myBands = bands.filter(band => selectedBands.includes(band.id))
   const selectedVenues = useMemo(() => [...new Set(myBands.map(b => b.venue).filter(Boolean))], [myBands])
+  // The FULL event's festival-day list (#542 PR-3), not derived from `myBands`
+  // — MySchedule needs this so a fan whose selections only touch Day 1 of a
+  // multi-day event still sees a Day 2 tab (see the `festivalDays` prop
+  // comment in MySchedule.jsx for why deriving it from a selected-bands
+  // subset would be wrong).
+  const eventFestivalDays = useMemo(() => orderedFestivalDays(bands), [bands])
   const sharedBandsAlreadySelectedCount = pendingSharedBands.filter(id => selectedBands.includes(id)).length
   const sharedBandsNewCount = pendingSharedBands.length - sharedBandsAlreadySelectedCount
   const toggleShowPast = () => setShowPast(prev => !prev)
@@ -836,6 +843,8 @@ function App() {
             showVenueFilter={false}
             eventSlug={slug || eventData?.slug}
             doorsJson={eventData?.doors_json}
+            eventStartDate={eventData?.date}
+            eventEndDate={eventData?.end_date}
           />
         ) : (
           <Suspense
@@ -856,6 +865,9 @@ function App() {
               eventSlug={slug || eventData?.slug}
               eventId={eventData?.id}
               doorsJson={eventData?.doors_json}
+              festivalDays={eventFestivalDays}
+              eventStartDate={eventData?.date}
+              eventEndDate={eventData?.end_date}
             />
           </Suspense>
         )}

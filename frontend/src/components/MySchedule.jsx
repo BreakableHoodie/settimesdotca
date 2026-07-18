@@ -22,11 +22,12 @@ import {
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx'
 import { copyToClipboard } from '../utils/clipboard'
-import { dayNumberByDate, isMultiDay } from '../utils/festivalDays'
+import { dayNumberMapFromDays, formatFestivalDate, orderedFestivalDays } from '../utils/festivalDays'
 import { formatTimeRange } from '../utils/timeFormat'
+import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
 import LockInLineupPanel from './LockInLineupPanel'
-import { DayDivider } from './ui'
+import { DayDivider, DayTabs } from './ui'
 import { walkMinutesBetween } from '../utils/walkTime'
 
 // Label a break between two sets at the same venue.
@@ -97,6 +98,9 @@ function MySchedule({
   eventSlug,
   eventId,
   doorsJson = null,
+  festivalDays: festivalDaysProp = null,
+  eventStartDate = null,
+  eventEndDate = null,
 }) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
   const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
@@ -120,11 +124,46 @@ function MySchedule({
   const effectiveNow = useMemo(() => {
     return nowOverride ? new Date(nowOverride) : currentTime
   }, [currentTime, nowOverride])
+
+  // Day-tab filter (#542 PR-3): `festivalDays` is normally supplied by the
+  // parent from the FULL event lineup, not derived from `bands` (the fan's
+  // currently *selected* bands) — a selection that only touches Day 1 of a
+  // 2-day event must still show a Day 2 tab, and label Day-2 picks "Day 2"
+  // rather than mislabeling them "Day 1" because that's the only date the
+  // subset happens to contain. Falls back to deriving from `bands` when the
+  // prop is omitted (e.g. a standalone/test render) so the component stays
+  // self-sufficient.
+  const ownFestivalDays = useMemo(() => orderedFestivalDays(bands), [bands])
+  const festivalDays = useMemo(
+    () => (festivalDaysProp && festivalDaysProp.length > 0 ? festivalDaysProp : ownFestivalDays),
+    [festivalDaysProp, ownFestivalDays]
+  )
+  const dayNumberByDateMap = useMemo(() => dayNumberMapFromDays(festivalDays), [festivalDays])
+  const hasDayTabs = festivalDays.length > 1
+
+  const { activeDayNumber, activeDate, setActiveDayNumber } = useFestivalDayFilter(festivalDays, {
+    currentTime: effectiveNow,
+    startDate: eventStartDate,
+    endDate: eventEndDate,
+  })
+
+  // Filter (not scroll-anchor, locked product decision): once a day tab is
+  // active, everything below — conflict/overlap detection, the countdown
+  // list, the "longest break" reminder — operates on just that day's
+  // selections. Share Schedule / Lock-In deliberately read the RAW `bands`
+  // prop instead (see handleShareSchedule/performanceIds below), not this
+  // filtered set, so sharing/locking in always covers the fan's whole
+  // multi-day route regardless of which day tab they're looking at.
+  const dayFilteredBands = useMemo(
+    () => (hasDayTabs && activeDate ? bands.filter(band => band.date === activeDate) : bands),
+    [bands, hasDayTabs, activeDate]
+  )
+
   const highlightedBandIds = useMemo(() => new Set(HIGHLIGHTED_BANDS), [])
   const normalizedBands = useMemo(() => {
     const oneDayMs = 24 * 60 * 60 * 1000
 
-    return bands.map(band => {
+    return dayFilteredBands.map(band => {
       const parsedStartMs = Date.parse(`${band.date}T${band.startTime}:00`)
       const parsedEndMs = Date.parse(`${band.date}T${band.endTime}:00`)
       const startMs =
@@ -147,7 +186,7 @@ function MySchedule({
         endMs,
       }
     })
-  }, [bands])
+  }, [dayFilteredBands])
 
   // Calculate time until/since a band
   const getTimeStatus = band => {
@@ -228,12 +267,9 @@ function MySchedule({
 
   // Day-divider support (#541): a flat time-sorted list, so day boundaries are
   // detected by comparing each rendered band's `.date` to the previous one
-  // (see the render loop below). Numbering + the multi-day gate use the full
-  // `sortedBands` (not the `showPast`-filtered `visibleBands`) so a day's number
-  // never shifts when past sets are hidden — keeping it consistent with
-  // ScheduleView. Single-day schedules render zero dividers, byte-identical.
-  const dayNumberByDateMap = useMemo(() => dayNumberByDate(sortedBands), [sortedBands])
-  const multiDayEvent = useMemo(() => isMultiDay(sortedBands), [sortedBands])
+  // (see the render loop below). `dayNumberByDateMap`/`hasDayTabs` are
+  // computed above from the authoritative `festivalDays` (#542 PR-3), not
+  // re-derived from `sortedBands` here — see the comment there for why.
 
   // Find first highlighted band ID (only show reminder for the first one)
   const firstHighlightedBandId = useMemo(() => {
@@ -288,7 +324,15 @@ function MySchedule({
     return { conflicts, overlaps, overlapCount }
   }, [visibleBands])
 
-  if (sortedBands.length === 0) {
+  // Rendered whenever tabs are showing so a fan can switch days from any of
+  // the empty-state branches below, not just the main return.
+  const dayTabsControl = hasDayTabs ? (
+    <div className="max-w-5xl mx-auto mb-4 flex justify-center">
+      <DayTabs days={festivalDays} activeDayNumber={activeDayNumber} onSelectDay={setActiveDayNumber} />
+    </div>
+  ) : null
+
+  if (bands.length === 0) {
     return (
       <div className="py-16 text-center space-y-4">
         <div className="text-text-disabled mb-2">
@@ -308,9 +352,36 @@ function MySchedule({
     )
   }
 
+  // The fan has a route, but nothing on the currently active day tab (e.g.
+  // they've only picked Day 1 bands so far and switched to the Day 2 tab).
+  // Distinct from the "no bands selected yet" state above — the CTA here is
+  // "switch days or add more", not "get started".
+  if (hasDayTabs && sortedBands.length === 0) {
+    const activeDayLabel = activeDate ? formatFestivalDate(activeDate, 'short') : 'this day'
+    return (
+      <div className="py-16 text-center space-y-4">
+        {dayTabsControl}
+        <div className="text-text-disabled mb-2">
+          <CalendarPlus size={60} aria-hidden="true" />
+        </div>
+        <p className="text-text-primary text-xl font-semibold">No bands in your route for {activeDayLabel}</p>
+        <p className="text-accent-400 text-sm">Switch days above, or browse the lineup to add more.</p>
+        {onBrowseAll && (
+          <button
+            onClick={onBrowseAll}
+            className="mt-2 px-6 py-3 min-h-[44px] rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 font-semibold hover:bg-accent-500/30 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
+          >
+            Browse Lineup
+          </button>
+        )}
+      </div>
+    )
+  }
+
   if (!showPast && visibleBands.length === 0 && hiddenFinishedCount > 0) {
     return (
       <div className="py-12 text-center">
+        {dayTabsControl}
         <p className="text-text-primary text-xl mb-2">All your selected bands have wrapped up</p>
         <p className="text-accent-400">Tap &ldquo;Show finished sets&rdquo; to revisit what you already caught.</p>
         <div className="mt-4">
@@ -461,6 +532,9 @@ function MySchedule({
             </p>
           </div>
         </div>
+
+        {dayTabsControl}
+
         {sortedBands.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-3 sm:gap-4 mt-3">
             {hasFinishedBands && (
@@ -576,7 +650,7 @@ function MySchedule({
           // Day-divider: render above this band when its festival day differs
           // from the previously-rendered band's day (#541).
           const previousDate = idx > 0 ? visibleBands[idx - 1].date : undefined
-          const showDayDivider = multiDayEvent && band.date !== previousDate
+          const showDayDivider = hasDayTabs && band.date !== previousDate
 
           // Walk + buffer from the previous set — the crawl's "can I make it?" math.
           let transition = null

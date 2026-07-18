@@ -61,11 +61,25 @@ e2e-setup: build ## Init + seed an isolated local D1 for E2E (safe to re-run)
 	SEED_SQL=$$(node scripts/seed-e2e-admin.mjs --email "$(E2E_ADMIN_EMAIL)" --password "$(E2E_ADMIN_PASSWORD)"); \
 	$(WRANGLER) d1 execute settimes-production-db --local --persist-to $(E2E_STATE) --command="$$SEED_SQL"
 
-e2e-serve: ## Start wrangler for E2E in the background (writes pidfile)
-	$(WRANGLER) pages dev frontend/dist --port 8788 --persist-to $(E2E_STATE) > $(E2E_STATE)/wrangler.log 2>&1 & \
-	echo $$! > $(E2E_PID); \
-	i=0; until curl -s -o /dev/null http://localhost:8788/ || [ $$i -ge 45 ]; do i=$$((i+1)); sleep 2; done; \
-	curl -s -o /dev/null http://localhost:8788/ || { echo "wrangler failed to start; log:"; tail -20 $(E2E_STATE)/wrangler.log; exit 1; }
+e2e-serve: ## Start wrangler for E2E in the background (writes pidfile); retries boot once, never test failures (mirrors e2e-env action.yml, #625)
+	try_boot() { \
+		$(WRANGLER) pages dev frontend/dist --port 8788 --persist-to $(E2E_STATE) > $(E2E_STATE)/wrangler.log 2>&1 & \
+		echo $$! > $(E2E_PID); \
+		i=1; \
+		while [ $$i -le 90 ]; do \
+			kill -0 "$$(cat $(E2E_PID))" 2>/dev/null || { echo "wrangler process exited unexpectedly (attempt $$1)"; tail -20 $(E2E_STATE)/wrangler.log; return 1; }; \
+			curl -s -o /dev/null http://localhost:8788/ && { echo "server ready on port 8788 (attempt $$1, $$((i*2))s)"; return 0; }; \
+			[ $$((i % 10)) -eq 0 ] && { echo "--- wrangler log so far (attempt $$1, iteration $$i) ---"; tail -20 $(E2E_STATE)/wrangler.log; }; \
+			i=$$((i+1)); sleep 2; \
+		done; \
+		echo "wrangler failed to start after 180s (attempt $$1)"; tail -20 $(E2E_STATE)/wrangler.log; return 1; \
+	}; \
+	try_boot 1 && exit 0; \
+	kill "$$(cat $(E2E_PID))" 2>/dev/null || true; \
+	for pid in $$(lsof -ti:8788 2>/dev/null); do kill -9 "$$pid" 2>/dev/null || true; done; \
+	sleep 2; \
+	try_boot 2 && exit 0; \
+	echo "wrangler failed to start after 2 attempts"; exit 1
 
 e2e-run: ## Run Playwright (server must be up; credentials required even for --list)
 	ADMIN_EMAIL="$(E2E_ADMIN_EMAIL)" ADMIN_PASSWORD="$(E2E_ADMIN_PASSWORD)" npx playwright test $(SPEC) --reporter=list

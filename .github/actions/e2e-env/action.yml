@@ -87,34 +87,76 @@ runs:
               echo "✓ Database initialization complete"
 
         - name: Start Pages Functions server
+          # Retries the SERVER BOOT ONLY, once, on a fresh process — never on test
+          # failures (those are a separate step). A dead process or an unmet 180s
+          # budget on attempt 1 kills any leftover wrangler/workerd/esbuild holding
+          # :8788 and relaunches once before failing the job for real. See #625:
+          # no observed CI failure has actually been a slow boot (worst seen was a
+          # few seconds), so the budget is left at 180s rather than padded on
+          # speculation — the retry covers one-off boot hiccups a longer wait
+          # wouldn't fix anyway (e.g. a stuck port from a prior process).
           shell: bash
           run: |
-              ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state > /tmp/wrangler.log 2>&1 &
-              WRANGLER_PID=$!
+              MAX_ITER=90    # 90 * 2s = 180s budget per attempt
+              LOG_EVERY=10   # surface wrangler.log every 10 iterations (20s) instead of 40s
 
-              echo "Waiting for server to start..."
-              i=1
-              while [ $i -le 90 ]; do
-                  if ! kill -0 $WRANGLER_PID 2>/dev/null; then
-                      echo "✗ Wrangler process exited unexpectedly"
-                      echo "Wrangler logs:"
-                      cat /tmp/wrangler.log
-                      exit 1
-                  fi
-                  if curl -s http://localhost:8788/ > /dev/null 2>&1; then
-                      echo "✓ Server is ready on port 8788!"
-                      exit 0
-                  fi
-                  if [ $((i % 20)) -eq 0 ]; then
-                      echo "--- Wrangler log (iteration $i) ---"
-                      tail -20 /tmp/wrangler.log 2>/dev/null
-                      echo "---"
-                  fi
-                  echo "Waiting for server... ($i/90)"
-                  sleep 2
-                  i=$((i + 1))
-              done
-              echo "✗ Server failed to start after 180 seconds"
-              echo "Wrangler logs:"
-              cat /tmp/wrangler.log
+              start_wrangler() {
+                  ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state > /tmp/wrangler.log 2>&1 &
+                  WRANGLER_PID=$!
+              }
+
+              kill_wrangler() {
+                  kill "$WRANGLER_PID" 2>/dev/null || true
+                  # wrangler forks esbuild + workerd children that don't die with the
+                  # parent; free the port explicitly so the retry doesn't fail to bind.
+                  for pid in $(lsof -ti:8788 2>/dev/null); do
+                      kill -9 "$pid" 2>/dev/null || true
+                  done
+              }
+
+              wait_for_server() {
+                  attempt=$1
+                  echo "Waiting for server to start (attempt $attempt/2)..."
+                  i=1
+                  while [ $i -le $MAX_ITER ]; do
+                      if ! kill -0 $WRANGLER_PID 2>/dev/null; then
+                          echo "✗ Wrangler process exited unexpectedly (attempt $attempt)"
+                          echo "Wrangler logs:"
+                          cat /tmp/wrangler.log
+                          return 1
+                      fi
+                      if curl -s http://localhost:8788/ > /dev/null 2>&1; then
+                          echo "✓ Server is ready on port 8788! (attempt $attempt, $((i * 2))s)"
+                          return 0
+                      fi
+                      if [ $((i % LOG_EVERY)) -eq 0 ]; then
+                          echo "--- Wrangler log so far (attempt $attempt, iteration $i) ---"
+                          tail -20 /tmp/wrangler.log 2>/dev/null
+                          echo "---"
+                      fi
+                      echo "Waiting for server... ($i/$MAX_ITER, attempt $attempt)"
+                      sleep 2
+                      i=$((i + 1))
+                  done
+                  echo "✗ Server failed to start after $((MAX_ITER * 2)) seconds (attempt $attempt)"
+                  echo "Wrangler logs:"
+                  cat /tmp/wrangler.log
+                  return 1
+              }
+
+              start_wrangler
+              if wait_for_server 1; then
+                  exit 0
+              fi
+
+              echo "Startup attempt 1 failed — killing any leftover process and retrying boot once..."
+              kill_wrangler
+              sleep 2
+
+              start_wrangler
+              if wait_for_server 2; then
+                  exit 0
+              fi
+
+              echo "✗ Server failed to start after 2 attempts — genuine startup failure, not transient boot slowness"
               exit 1

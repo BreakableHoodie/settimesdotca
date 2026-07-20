@@ -98,6 +98,39 @@ describe('PhotoUpload', () => {
     expect(formData.get('event_id')).toBe('7')
   })
 
+  it('large original over the 5MB cap is downscaled under it and uploaded, not rejected up front (#643)', async () => {
+    global.createImageBitmap = vi.fn().mockResolvedValue({ width: 5184, height: 3456, close: vi.fn() })
+    // eslint-disable-next-line no-undef
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() })
+    // eslint-disable-next-line no-undef
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (callback) {
+      // eslint-disable-next-line no-undef
+      callback(new Blob(['tiny-downscaled-bytes'], { type: 'image/jpeg' }))
+    })
+
+    // 6MB original — over the 5MB cap; must reach the downscaler, not be blocked.
+    const bigBytes = new Uint8Array(6 * 1024 * 1024)
+    bigBytes.set([0xff, 0xd8, 0xff, 0xe0])
+    // eslint-disable-next-line no-undef
+    const bigFile = new File([bigBytes], 'huge-original.jpg', { type: 'image/jpeg' })
+
+    render(
+      <PhotoUpload
+        currentPhoto={null}
+        onPhotoChange={vi.fn()}
+        bandId={9}
+        bandName="Big Photo Band"
+        maxDimension={1600}
+      />
+    )
+    selectFile(bigFile)
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText(/too large/i)).not.toBeInTheDocument()
+    const uploaded = fetchMock.mock.calls[0][1].body.get('photo')
+    expect(uploaded.type).toBe('image/jpeg')
+  })
+
   it('skips downscaling for GIFs even when maxDimension is set', async () => {
     global.createImageBitmap = vi.fn().mockResolvedValue({ width: 3200, height: 2400, close: vi.fn() })
     // eslint-disable-next-line no-undef

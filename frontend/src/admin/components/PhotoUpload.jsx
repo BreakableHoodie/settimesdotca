@@ -130,13 +130,12 @@ export default function PhotoUpload({
   const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
   const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
 
-  const validateFile = file => {
+  // Type is validated on the ORIGINAL (before downscaling); size is validated
+  // on the downscaled RESULT (see handleFileUpload) — a large phone original
+  // that shrinks under the cap must not be rejected up front (#643).
+  const validateType = file => {
     if (!file) {
       return 'No file selected'
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      return `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`
     }
 
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -149,7 +148,7 @@ export default function PhotoUpload({
   const handleFileUpload = async file => {
     setError(null)
 
-    const validationError = validateFile(file)
+    const validationError = validateType(file)
     if (validationError) {
       setError(validationError)
       return
@@ -161,6 +160,16 @@ export default function PhotoUpload({
       // Downscale before preview/upload so the preview reflects exactly what
       // gets sent (leanness budget, #616). No-op when maxDimension is unset.
       const uploadFile = maxDimension ? await downscaleImage(file, maxDimension) : file
+
+      // Enforce the 5MB cap on the file actually uploaded, AFTER downscaling.
+      // Validating the original here would reject the large originals this
+      // path exists to shrink (a 16MB photo → ~1MB after downscale must pass);
+      // only reject when even the downscaled result exceeds the cap (Codex
+      // review on #643). Without maxDimension, uploadFile is the original, so
+      // this is the same guard as before.
+      if (uploadFile.size > MAX_FILE_SIZE) {
+        throw new Error(`File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`)
+      }
 
       // Create preview
       // eslint-disable-next-line no-undef

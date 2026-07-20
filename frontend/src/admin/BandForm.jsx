@@ -230,6 +230,7 @@ export default function BandForm({
                 }}
                 bandId={mode === 'edit' && formData.id ? formData.id : null}
                 bandName={formData.name}
+                maxDimension={1600}
               />
             </div>
 

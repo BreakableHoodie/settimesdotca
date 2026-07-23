@@ -266,7 +266,8 @@ export async function onRequest(context) {
   // Read-path sanitize (#504 convention, #616): a pre-validation legacy
   // poster_url must never be reflected into og:image/twitter:image or the
   // MusicEvent JSON-LD image — normalizeHttpUrl returns null for anything
-  // that isn't a real http(s) URL, which omits the image entirely below.
+  // that isn't a real http(s) URL, which drops the JSON-LD image and falls
+  // the og:image/twitter:image back to the branded default below (#644).
   const safePosterUrl = normalizeHttpUrl(event.poster_url);
 
   const metaTags = [

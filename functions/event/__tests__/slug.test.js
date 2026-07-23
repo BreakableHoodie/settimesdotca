@@ -419,3 +419,38 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
     expect(winterMusicEvent.startDate).toBe("2026-02-14T18:45:00-05:00");
   });
 });
+
+describe("SSR /event/[slug] — MusicEvent JSON-LD venue reveal_mode gate (#635)", () => {
+  test("reveal-mode event: a venue whose ONLY performance is unannounced is absent from JSON-LD location", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Reveal Mode Venue Fest",
+      slug: "slug-635-reveal-venue",
+      date: "2026-08-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+
+    const visibleVenue = insertVenue(rawDb, { name: "Visible Venue" });
+    const hiddenVenue = insertVenue(rawDb, { name: "Hidden Venue" });
+
+    const announced = insertBand(rawDb, { name: "Announced Band", event_id: event.id, venue_id: visibleVenue.id });
+    rawDb.prepare("UPDATE performances SET is_announced=1 WHERE id=?").run(announced.id);
+
+    // Hidden Venue's ONLY performance is unannounced — the venue itself must
+    // not leak into JSON-LD location, mirroring the bands-query gate (#634).
+    const hidden = insertBand(rawDb, { name: "Hidden Band", event_id: event.id, venue_id: hiddenVenue.id });
+    rawDb.prepare("UPDATE performances SET is_announced=0 WHERE id=?").run(hidden.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-635-reveal-venue" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    const [musicEvent] = extractJsonLd(html);
+
+    expect(Array.isArray(musicEvent.location)).toBe(true);
+    const venueNames = musicEvent.location.map((v) => v.name);
+    expect(venueNames).toContain("Visible Venue");
+    expect(venueNames).not.toContain("Hidden Venue");
+    expect(html).not.toContain("Hidden Venue");
+  });
+});

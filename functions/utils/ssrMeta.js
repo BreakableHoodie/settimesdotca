@@ -12,6 +12,11 @@
 // (*.pages.dev) must NOT emit their own host as the canonical — pin to prod.
 export const CANONICAL_HOST = "https://settimes.ca";
 
+// Branded 1200x630 fallback for event/band/venue pages that have no photo or
+// poster of their own — otherwise those pages emit no og:image at all and
+// social shares render with no preview image (#644).
+export const DEFAULT_OG_IMAGE = `${CANONICAL_HOST}/og-default.png`;
+
 export function escapeAttr(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")

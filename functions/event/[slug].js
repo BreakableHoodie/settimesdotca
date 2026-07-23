@@ -2,7 +2,14 @@
 // JSON-LD for crawlers. See functions/utils/ssrMeta.js for rationale + fallback.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import { escapeAttr, toPlainText, serveWithInjectedMeta, WATERLOO_ADDRESS, CANONICAL_HOST } from "../utils/ssrMeta.js";
+import {
+  escapeAttr,
+  toPlainText,
+  serveWithInjectedMeta,
+  WATERLOO_ADDRESS,
+  CANONICAL_HOST,
+  DEFAULT_OG_IMAGE,
+} from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 import { torontoUtcOffset } from "../utils/eventDay.js";
@@ -272,13 +279,10 @@ export async function onRequest(context) {
     `<meta name="twitter:description" content="${escapeAttr(description)}" />`,
     `<link rel="canonical" href="${escapeAttr(url)}" />`,
   ];
-  if (safePosterUrl) {
-    metaTags.push(`<meta property="og:image" content="${escapeAttr(safePosterUrl)}" />`);
-    metaTags.push(`<meta name="twitter:image" content="${escapeAttr(safePosterUrl)}" />`);
-    metaTags.push(`<meta name="twitter:card" content="summary_large_image" />`);
-  } else {
-    metaTags.push(`<meta name="twitter:card" content="summary" />`);
-  }
+  const ogImageUrl = safePosterUrl || DEFAULT_OG_IMAGE;
+  metaTags.push(`<meta property="og:image" content="${escapeAttr(ogImageUrl)}" />`);
+  metaTags.push(`<meta name="twitter:image" content="${escapeAttr(ogImageUrl)}" />`);
+  metaTags.push(`<meta name="twitter:card" content="summary_large_image" />`);
 
   // Read-path sanitize (#504): a pre-validation legacy ticket_url (e.g. a
   // javascript: scheme) must never be reflected into the Offer.url of the

@@ -10,6 +10,7 @@
 import { describe, expect, test } from "vitest";
 import { onRequest } from "../[slug].js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
+import { DEFAULT_OG_IMAGE } from "../../utils/ssrMeta.js";
 
 const STUB_HTML = `<!doctype html><html><head>
     <meta name="description" content="Homepage description" />
@@ -180,7 +181,7 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
     expect(musicEvent.image).toEqual(["https://band-photos.settimes.ca/event-posters/1-vol17.jpg"]);
   });
 
-  test("poster absent: no image field, no og:image/twitter:image, twitter:card falls back to summary", async () => {
+  test("poster absent: MusicEvent gets no image field, but og:image/twitter:image fall back to the branded default (#644)", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const event = insertEvent(rawDb, {
@@ -194,9 +195,9 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
     expect(response.status).toBe(200);
     const html = await response.text();
 
-    expect(html).not.toContain('property="og:image"');
-    expect(html).not.toContain('name="twitter:image"');
-    expect(html).toContain('<meta name="twitter:card" content="summary" />');
+    expect(html).toContain(`<meta property="og:image" content="${DEFAULT_OG_IMAGE}" />`);
+    expect(html).toContain(`<meta name="twitter:image" content="${DEFAULT_OG_IMAGE}" />`);
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />');
 
     const [musicEvent] = extractJsonLd(html);
     expect(musicEvent.image).toBeUndefined();
@@ -222,7 +223,9 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
 
     // eslint-disable-next-line no-script-url -- assertion text, not an executed scheme
     expect(html).not.toContain("javascript:");
-    expect(html).not.toContain('property="og:image"');
+    // The unsafe poster_url must never reach og:image — it falls back to the
+    // branded default (#644) rather than being omitted.
+    expect(html).toContain(`<meta property="og:image" content="${DEFAULT_OG_IMAGE}" />`);
 
     const [musicEvent] = extractJsonLd(html);
     expect(musicEvent.image).toBeUndefined();

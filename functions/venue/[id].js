@@ -2,7 +2,7 @@
 // JSON-LD for crawlers. See functions/utils/ssrMeta.js for rationale + fallback.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST } from "../utils/ssrMeta.js";
+import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../utils/ssrMeta.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -40,9 +40,11 @@ export async function onRequest(context) {
     `<meta property="og:description" content="${escapeAttr(description)}" />`,
     `<meta property="og:type" content="website" />`,
     `<meta property="og:url" content="${escapeAttr(url)}" />`,
-    `<meta name="twitter:card" content="summary" />`,
+    `<meta property="og:image" content="${escapeAttr(DEFAULT_OG_IMAGE)}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${escapeAttr(venue.name)}" />`,
     `<meta name="twitter:description" content="${escapeAttr(description)}" />`,
+    `<meta name="twitter:image" content="${escapeAttr(DEFAULT_OG_IMAGE)}" />`,
     `<link rel="canonical" href="${escapeAttr(url)}" />`,
   ];
 

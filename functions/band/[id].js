@@ -2,7 +2,7 @@
 // for crawlers. See functions/utils/ssrMeta.js for the rationale + fallback contract.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST } from "../utils/ssrMeta.js";
+import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../utils/ssrMeta.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -44,13 +44,10 @@ export async function onRequest(context) {
     `<meta name="twitter:description" content="${escapeAttr(description)}" />`,
     `<link rel="canonical" href="${escapeAttr(url)}" />`,
   ];
-  if (band.photo_url) {
-    metaTags.push(`<meta property="og:image" content="${escapeAttr(band.photo_url)}" />`);
-    metaTags.push(`<meta name="twitter:image" content="${escapeAttr(band.photo_url)}" />`);
-    metaTags.push(`<meta name="twitter:card" content="summary_large_image" />`);
-  } else {
-    metaTags.push(`<meta name="twitter:card" content="summary" />`);
-  }
+  const ogImageUrl = band.photo_url || DEFAULT_OG_IMAGE;
+  metaTags.push(`<meta property="og:image" content="${escapeAttr(ogImageUrl)}" />`);
+  metaTags.push(`<meta name="twitter:image" content="${escapeAttr(ogImageUrl)}" />`);
+  metaTags.push(`<meta name="twitter:card" content="summary_large_image" />`);
 
   // Extract full URLs from social_links JSON for sameAs (handles like "@band" are excluded).
   let sameAs = [];

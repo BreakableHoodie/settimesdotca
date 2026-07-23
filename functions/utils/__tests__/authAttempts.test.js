@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDBEnv, createTestDB } from "../../api/test-utils.js";
-import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../authAttempts.js";
+import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, toSqliteDateTime, writeAuthAttempt } from "../authAttempts.js";
 
 describe("authAttempts", () => {
   let rawDb;
@@ -159,5 +159,20 @@ describe("authAttempts", () => {
     });
 
     expect(rateCheck.allowed).toBe(true);
+  });
+});
+
+describe("toSqliteDateTime", () => {
+  it("formats a Date as SQLite's space-separated YYYY-MM-DD HH:MM:SS", () => {
+    const result = toSqliteDateTime(new Date("2026-07-23T14:30:05.123Z"));
+
+    expect(result).toBe("2026-07-23 14:30:05");
+  });
+
+  it("never produces the ISO 8601 T-separator or Z suffix that breaks D1 string comparisons", () => {
+    const result = toSqliteDateTime(new Date("2026-07-23T14:30:05.123Z"));
+
+    expect(result).not.toContain("T");
+    expect(result).not.toContain("Z");
   });
 });

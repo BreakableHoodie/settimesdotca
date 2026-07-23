@@ -57,4 +57,24 @@ describe("SSR /band/[id] — default og:image fallback (#644)", () => {
     expect(html).toContain('<meta property="og:image" content="https://r2.settimes.ca/bands/photo-band.jpg" />');
     expect(html).not.toContain(DEFAULT_OG_IMAGE);
   });
+
+  test("falls back to the branded default for a legacy javascript: photo_url (read-path sanitize)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const info = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized, photo_url) VALUES (?, ?, ?)")
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #644-review read-path guard
+      .run("Unsafe Photo Band", "unsafephotoband", "javascript:alert(1)");
+
+    const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
+    const html = await response.text();
+
+    // eslint-disable-next-line no-script-url -- assertion text, not an executed scheme
+    expect(html).not.toContain("javascript:");
+    expect(html).toContain(`<meta property="og:image" content="${DEFAULT_OG_IMAGE}" />`);
+
+    const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    const musicGroup = JSON.parse(jsonLdMatch[1]);
+    expect(musicGroup.image).toBeUndefined();
+  });
 });

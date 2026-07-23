@@ -3,6 +3,7 @@
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
 import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../utils/ssrMeta.js";
+import { normalizeHttpUrl } from "../utils/validation.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -29,6 +30,12 @@ export async function onRequest(context) {
 
   // Pin to the production host — preview deploys must not self-canonicalise.
   const url = `${CANONICAL_HOST}/band/${id}`;
+  // Read-path sanitize (#504/#616 convention, mirrors event/[slug].js): a
+  // pre-validation legacy photo_url must never be reflected into
+  // og:image/twitter:image or the MusicGroup JSON-LD image — normalizeHttpUrl
+  // returns null for anything that isn't a real http(s) URL, which falls the
+  // og:image/twitter:image back to the branded default (#644 review, CodeRabbit).
+  const safePhotoUrl = normalizeHttpUrl(band.photo_url);
   const plainDesc = toPlainText(band.description, 200);
   const tagline = [band.genre, band.origin].filter(Boolean).join(" · ");
   const description =
@@ -44,7 +51,7 @@ export async function onRequest(context) {
     `<meta name="twitter:description" content="${escapeAttr(description)}" />`,
     `<link rel="canonical" href="${escapeAttr(url)}" />`,
   ];
-  const ogImageUrl = band.photo_url || DEFAULT_OG_IMAGE;
+  const ogImageUrl = safePhotoUrl || DEFAULT_OG_IMAGE;
   metaTags.push(`<meta property="og:image" content="${escapeAttr(ogImageUrl)}" />`);
   metaTags.push(`<meta name="twitter:image" content="${escapeAttr(ogImageUrl)}" />`);
   metaTags.push(`<meta name="twitter:card" content="summary_large_image" />`);
@@ -89,7 +96,7 @@ export async function onRequest(context) {
     ...(foundingLocation ? { foundingLocation } : {}),
     ...(sameAs.length > 0 ? { sameAs } : {}),
     ...(plainDesc ? { description: plainDesc } : {}),
-    ...(band.photo_url ? { image: band.photo_url } : {}),
+    ...(safePhotoUrl ? { image: safePhotoUrl } : {}),
   };
 
   const breadcrumb = {

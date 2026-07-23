@@ -223,9 +223,10 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
 
     // eslint-disable-next-line no-script-url -- assertion text, not an executed scheme
     expect(html).not.toContain("javascript:");
-    // The unsafe poster_url must never reach og:image — it falls back to the
-    // branded default (#644) rather than being omitted.
+    // The unsafe poster_url must never reach og:image/twitter:image — both
+    // fall back to the branded default (#644) rather than being omitted.
     expect(html).toContain(`<meta property="og:image" content="${DEFAULT_OG_IMAGE}" />`);
+    expect(html).toContain(`<meta name="twitter:image" content="${DEFAULT_OG_IMAGE}" />`);
 
     const [musicEvent] = extractJsonLd(html);
     expect(musicEvent.image).toBeUndefined();

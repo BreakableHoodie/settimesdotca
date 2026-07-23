@@ -52,7 +52,7 @@ function getRateLimitQuery(scope) {
   throw new Error(`Unsupported auth rate-limit scope: ${scope}`);
 }
 
-function toSqliteDateTime(date) {
+export function toSqliteDateTime(date) {
   return date.toISOString().replace("T", " ").slice(0, 19);
 }
 

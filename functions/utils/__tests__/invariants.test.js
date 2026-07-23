@@ -5,13 +5,12 @@
 import { describe, expect, it } from "vitest";
 import { checkAuthRateLimit } from "../authAttempts.js";
 
-// toSqliteDateTime() is NOT exported from authAttempts.js — it's a private
-// helper only reachable through checkAuthRateLimit's `windowStart` binding.
-// Rather than exporting it solely for this test (a production-code change
-// outside this task's scope) or reimplementing its logic in the test (which
-// would test the copy, not the real code), this stub captures the exact
-// value the real, unexported toSqliteDateTime() produces when
-// checkAuthRateLimit binds it into the rate-limit query.
+// toSqliteDateTime() is exported from authAttempts.js and has its own direct
+// unit tests in authAttempts.test.js (format + no-T/Z assertions). This stub
+// exists for a different purpose: it captures the exact value the real
+// toSqliteDateTime() produces when checkAuthRateLimit binds it into the
+// rate-limit query, proving the *binding path* itself is wired correctly —
+// not just that the helper's output format is right in isolation.
 function createCapturingDB(queryResult = { count: 0, earliest_attempt: null }) {
   let boundArgs = null;
   const DB = {

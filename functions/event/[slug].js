@@ -125,12 +125,13 @@ export async function onRequest(context) {
   // start_time; the flat `bands` performer list is deduped from these rows
   // in JS instead.
   //
-  // Reveal-mode gate (#542 PR-4, folded pre-existing bug): mirrors the
-  // `(e.reveal_mode = 0 OR p.is_announced = 1)` filter already applied in
-  // schedule.js/ical.js/timeline.js. Without it, an unannounced band on a
-  // reveal-mode event would leak into crawler-facing JSON-LD before the
-  // admin ever announces it. No reveal-mode event exists in prod today, so
-  // this was latent, not active.
+  // Reveal-mode gate (#542 PR-4, folded pre-existing bug; extended to venues
+  // in #635): mirrors the `(e.reveal_mode = 0 OR p.is_announced = 1)` filter
+  // already applied in schedule.js/ical.js/timeline.js. Both queries below
+  // apply it independently — a venue whose ONLY performance is unannounced
+  // must not leak into crawler-facing JSON-LD `location` any more than an
+  // unannounced band leaks into `performer`. No reveal-mode event exists in
+  // prod today, so this was latent, not active.
   let performanceRows = [];
   let venues = [];
   try {
@@ -150,9 +151,10 @@ export async function onRequest(context) {
          FROM performances p
          JOIN venues v ON p.venue_id = v.id
          WHERE p.event_id = ?
+           AND (? = 0 OR p.is_announced = 1)
          ORDER BY v.name`,
       )
-        .bind(event.id)
+        .bind(event.id, event.reveal_mode ?? 0)
         .all(),
     ]);
     performanceRows = performancesResult.results ?? [];

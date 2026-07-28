@@ -615,13 +615,30 @@ function EventCard({
           <div className="flex flex-1 gap-4 min-w-0">
             {/* Poster thumbnail (#658) — decorative on the listing: the card's
                 Link/title already names the event, and the full-size lightbox
-                lives on the event page (#656), not here. Fixed-size container
-                + object-contain so varying poster aspect ratios (roughly 3:4
-                to 4:5 in production) never distort the card or its text
-                alignment; omitted entirely (no placeholder box) when absent. */}
+                lives on the event page (#656), not here. Renders in all three
+                timeline sections (now/upcoming/past) since this same EventCard
+                is reused for each. Fixed-size container + object-contain so
+                varying poster aspect ratios (roughly 3:4 to 4:5 in production)
+                never distort the card or its text alignment, and reserve
+                layout space up front to avoid CLS when the image loads;
+                omitted entirely (no placeholder box) when absent.
+                Performance (17 past-event posters, 240KB-663KB originals):
+                loading="lazy" defers the fetch until near-viewport, and
+                decoding="async" keeps decode off the main thread. The past
+                section itself is conditionally rendered on showPast further
+                down — these poster img elements are not in the DOM at all
+                until "Show History" is clicked, so collapsed history costs
+                nothing. No CDN/resize transform yet; a proper thumbnail
+                pipeline is tracked as a follow-up (see PR description). */}
             {event.poster_url && (
               <div className="w-20 sm:w-24 aspect-[3/4] shrink-0 overflow-hidden rounded-lg border border-border bg-surface">
-                <img src={event.poster_url} alt="" loading="lazy" className="h-full w-full object-contain" />
+                <img
+                  src={event.poster_url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-contain"
+                />
               </div>
             )}
             <div className="flex-1 min-w-0">

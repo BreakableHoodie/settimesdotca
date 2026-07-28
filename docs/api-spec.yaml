@@ -3145,6 +3145,12 @@ components:
         ticket_url:
           type: string
           nullable: true
+        poster_url:
+          type: string
+          nullable: true
+          description: >-
+            Event poster image URL, sanitized via normalizeHttpUrl on read
+            (#655). Absent/null when no poster was uploaded for this event.
         is_archived:
           type: boolean
         theme_colors:

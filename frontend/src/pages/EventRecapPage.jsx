@@ -2,7 +2,7 @@ import { Archive, ArrowLeft, CalendarDays, MapPin, Route } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams } from 'react-router-dom'
-import { Alert, Loading } from '../components/ui'
+import { Alert, ImageLightbox, Loading } from '../components/ui'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { fetchPublicJson } from '../utils/publicApi'
 import { parseLocalDate } from '../utils/timeFormat'
@@ -89,6 +89,7 @@ export default function EventRecapPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const event = data?.event || null
   const stats = data?.stats || null
   const bands = Array.isArray(data?.bands) ? data.bands : []
@@ -178,15 +179,24 @@ export default function EventRecapPage() {
               <span>Recap</span>
             </div>
             {/* Poster is optional (#616) — the archive gets its art when one was
-                uploaded for this edition; omitted entirely otherwise. */}
+                uploaded for this edition; omitted entirely otherwise. Clicking
+                it opens the same click-to-enlarge lightbox as the live event
+                page (#655). */}
             {event.poster_url && (
               <div className="mt-4 overflow-hidden rounded-xl border border-border bg-bg-navy/40">
-                <img
-                  src={event.poster_url}
-                  alt={`${event.name} poster`}
-                  loading="lazy"
-                  className="max-h-96 w-full object-contain"
-                />
+                <button
+                  type="button"
+                  onClick={() => setPosterLightboxOpen(true)}
+                  aria-label={`View ${event.name} poster`}
+                  className="block w-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-400"
+                >
+                  <img
+                    src={event.poster_url}
+                    alt={`${event.name} poster`}
+                    loading="lazy"
+                    className="max-h-96 w-full object-contain"
+                  />
+                </button>
               </div>
             )}
             <h1 className="mt-4 text-4xl font-bold text-text-primary">{event.name}</h1>
@@ -401,6 +411,12 @@ export default function EventRecapPage() {
           </section>
         </div>
       </main>
+      <ImageLightbox
+        src={event.poster_url}
+        alt={`${event.name} poster`}
+        isOpen={posterLightboxOpen}
+        onClose={() => setPosterLightboxOpen(false)}
+      />
     </>
   )
 }

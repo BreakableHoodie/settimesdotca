@@ -1,0 +1,50 @@
+import { fireEvent, render, screen } from '@testing-library/react'
+import '@testing-library/jest-dom'
+import { describe, expect, it, vi } from 'vitest'
+import EventPosterThumbnail from '../EventPosterThumbnail'
+
+// #655: the poster thumbnail on the live event page must render nothing when
+// poster_url is absent (the common case — most events have no poster yet).
+describe('EventPosterThumbnail', () => {
+  it('renders nothing when posterUrl is null', () => {
+    const { container } = render(<EventPosterThumbnail posterUrl={null} eventName="Buddies Fest 2" onOpen={vi.fn()} />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders nothing when posterUrl is undefined', () => {
+    const { container } = render(<EventPosterThumbnail eventName="Buddies Fest 2" onOpen={vi.fn()} />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders a real button with a lazy-loaded image and correct alt text when posterUrl is present', () => {
+    render(
+      <EventPosterThumbnail
+        posterUrl="https://band-photos.settimes.ca/event-posters/36-buddiesfest2.jpg"
+        eventName="Buddies Fest 2"
+        onOpen={vi.fn()}
+      />
+    )
+
+    const button = screen.getByRole('button', { name: 'View Buddies Fest 2 poster' })
+    expect(button.tagName).toBe('BUTTON')
+
+    const image = screen.getByRole('img', { name: 'Buddies Fest 2 poster' })
+    expect(image).toHaveAttribute('src', 'https://band-photos.settimes.ca/event-posters/36-buddiesfest2.jpg')
+    expect(image).toHaveAttribute('loading', 'lazy')
+  })
+
+  it('calls onOpen when clicked', () => {
+    const onOpen = vi.fn()
+    render(
+      <EventPosterThumbnail posterUrl="https://example.test/poster.jpg" eventName="Buddies Fest 2" onOpen={onOpen} />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'View Buddies Fest 2 poster' }))
+    expect(onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to a generic label when eventName is absent', () => {
+    render(<EventPosterThumbnail posterUrl="https://example.test/poster.jpg" onOpen={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'View Event poster' })).toBeInTheDocument()
+  })
+})

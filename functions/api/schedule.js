@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
       // sets that span past midnight (e.g. 11:30pm-12:30am)
       event = await DB.prepare(
         `
-        SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
+        SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
         FROM events
         WHERE is_published = 1
           AND COALESCE(end_date, date) >= date('now', '-6 hours')
@@ -39,7 +39,7 @@ export async function onRequestGet(context) {
       // Get event by slug — includes archived events for read-only history browsing
       event = await DB.prepare(
         `
-        SELECT id, name, date, end_date, city, slug, status, ticket_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
+        SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
         FROM events
         WHERE slug = ? AND (is_published = 1 OR status = 'archived')
       `,
@@ -158,6 +158,10 @@ export async function onRequestGet(context) {
       city: event.city ?? null,
       slug: event.slug,
       ticket_url: normalizeHttpUrl(event.ticket_url),
+      // Read-path sanitization is mandatory, not optional: pre-#616 rows were
+      // never write-validated, and a javascript: URL must never reach an
+      // <img src> (#655, matches the ticket_url precedent above).
+      poster_url: normalizeHttpUrl(event.poster_url),
       is_archived: event.status === "archived",
       theme_colors: event.theme_colors,
       venue_info: event.venue_info,

@@ -103,5 +103,6 @@ nav:
       - PBKDF2 Password Hashing: adr/0005-pbkdf2-password-hashing.md
       - D1 Batch Atomicity: adr/0006-d1-batch-atomicity.md
       - After-Midnight Sort Threshold: adr/0007-after-midnight-sort-threshold.md
+      - CodeRabbit Review Configuration: adr/0008-coderabbit-review-configuration.md
       - Browse all ADRs (GitHub): https://github.com/BreakableHoodie/settimesdotca/tree/main/docs/adr
   - Roadmap: ROADMAP.md

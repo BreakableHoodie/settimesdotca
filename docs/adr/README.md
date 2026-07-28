@@ -6,7 +6,7 @@ This directory holds settimes.ca's Architecture Decision Records (ADRs) — shor
 
 ADRs form a single sequence, `ADR-0001` … `ADR-NNNN`. Each record's `title:` number matches its filename number.
 
-> **Note on filenames:** the first three records use an `adr-000N-…` prefix; records from 0004 on use the plainer `000N-…` form. Both are valid historical filenames — do **not** rename them (other docs and the docs-site nav reference them by path). New ADRs should use `NNNN-kebab-title.md` (no `adr-` prefix), continuing from `0008`.
+> **Note on filenames:** the first three records use an `adr-000N-…` prefix; records from 0004 on use the plainer `000N-…` form. Both are valid historical filenames — do **not** rename them (other docs and the docs-site nav reference them by path). New ADRs should use `NNNN-kebab-title.md` (no `adr-` prefix), continuing from `0009`.
 
 ## Index
 
@@ -19,6 +19,7 @@ ADRs form a single sequence, `ADR-0001` … `ADR-NNNN`. Each record's `title:` n
 | [0005](./0005-pbkdf2-password-hashing.md)            | Use PBKDF2-SHA256 via Web Crypto instead of bcrypt for password hashing   | Accepted                                                |
 | [0006](./0006-d1-batch-atomicity.md)                 | Use `DB.batch()` for atomic multi-statement mutations; no BEGIN/COMMIT    | Accepted                                                |
 | [0007](./0007-after-midnight-sort-threshold.md)      | Offset band sort times by +24h for performances starting before 6 AM      | Accepted                                                |
+| [0008](./0008-coderabbit-review-configuration.md)    | Encode repository invariants as CodeRabbit path instructions              | Accepted                                                |
 
 ADR-0001 and ADR-0005 both cover PBKDF2 password hashing: 0001 is the original record, superseded by the fuller 0005 (which points at the canonical implementation, `functions/utils/crypto.js`).
 

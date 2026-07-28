@@ -1,0 +1,239 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+
+# CodeRabbit configuration for settimes.ca (Cloudflare Pages Functions + D1 +
+# React 19 + Tailwind v4). This file encodes review guidance derived from the
+# repo's non-obvious invariants and gotchas. CLAUDE.md is the canonical source
+# of truth for those invariants — when the two disagree, or when an invariant
+# changes, update CLAUDE.md first and mirror the change here.
+
+language: en-CA
+
+tone_instructions: >-
+  Be direct and technical; no flattery or praise-only comments. Cite the
+  specific invariant or file (e.g. CLAUDE.md, functions/utils/eventDay.js)
+  when flagging an issue rather than describing it in the abstract.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    # `dev` is listed to match .github/workflows/quality.yml's `branches: [main, dev]`
+    # trigger and is forward-compatible; it does not exist as a remote branch
+    # today, and a base branch that doesn't exist simply never matches.
+    base_branches:
+      - main
+      - dev
+    ignore_usernames:
+      - "dependabot[bot]"
+
+  path_filters:
+    - "!**/package-lock.json"
+    - "!e2e/**-snapshots/**"
+    - "!frontend/dist/**"
+    - "!**/*.png"
+
+  auto_apply_labels: false
+  suggested_labels: true
+
+  # Path-specific review guidance. Each block names the invariant it protects;
+  # the underlying rule lives in CLAUDE.md and should not be re-derived here
+  # from first principles — CLAUDE.md is authoritative.
+  path_instructions:
+    # Invariant: SQLite datetime format, D1 atomic batches, params.id
+    # validation, event-local "today" (CLAUDE.md "Critical Invariants").
+    - path: "functions/**/*.js"
+      instructions: |
+        - SQLite datetime columns are stored as "YYYY-MM-DD HH:MM:SS" (space separator), never ISO-8601 with a "T". Flag any `toISOString()` written to a datetime column without `.replace("T", " ").slice(0, 19)`.
+        - Prefer the existing `toSqliteDateTime()` helper (functions/utils/authAttempts.js) over ad hoc date formatting.
+        - D1 has no BEGIN/COMMIT. Multi-statement mutations must use `env.DB.batch([...])` (atomic) or an explicit compensating-delete rollback. Flag sequential awaited writes that assume all-or-nothing semantics without either mechanism.
+        - Every `params.id` from a Pages Functions route must pass `validateId()` (functions/utils/validation.js) before use in a query. Flag raw `params.id` used directly in SQL or bound unchecked.
+        - Server-side "today"/"now" classification (timeline now/upcoming/past, "is it today?") must use `eventLocalToday()` / `eventLocalClock()` from functions/utils/eventDay.js. Flag `new Date().toISOString().slice(0, 10)` or other UTC-slicing used for event-day logic — it flips to tomorrow at 8 PM Eastern.
+        - Test files (**/__tests__/** and functions/api/test-utils.js) are exempt from the datetime-format and direct-insert rules — they construct fixtures deliberately, including raw lucia_sessions.expires_at inserts. Do not flag them.
+
+    # Invariant: lucia_sessions.expires_at is INTEGER Unix seconds (not TEXT),
+    # PBKDF2-only hashing, hand-rolled TOTP, session/CSRF rotation on
+    # re-authentication (CLAUDE.md "Critical Invariants" + "Security Notes").
+    # Glob covers all three createSession() call sites — login.js, mfa/verify.js,
+    # and sessions/revoke-all.js — plus sessions.js, a sibling FILE of the
+    # sessions/ directory, not a member of it. The prior glob
+    # (functions/{utils/auth.js,api/auth/**,api/admin/sessions/**}) matched only
+    # revoke-all.js, so the invalidation/CSRF-rotation rules silently skipped
+    # login and MFA verification.
+    - path: "functions/{utils/auth.js,utils/crypto.js,utils/totp.js,api/auth/**,api/admin/auth/**,api/admin/sessions.js,api/admin/sessions/**}"
+      instructions: |
+        - `lucia_sessions.expires_at` is INTEGER Unix seconds, unlike every other `expires_at` column (TEXT). SQL comparisons must use `expires_at > unixepoch()`; JS comparisons must use `row.expires_at * 1000 < Date.now()`. Flag any `datetime('now')` comparison against this column.
+        - Password hashing is PBKDF2-SHA256 via Web Crypto (functions/utils/crypto.js), format `pbkdf2$iterations$salt$hash`. Flag any introduction of bcrypt (it requires a native binary that cannot run on Workers).
+        - MFA TOTP is hand-rolled via `crypto.subtle` in functions/utils/totp.js. Flag any reintroduction of `otplib` or `@noble` for MFA.
+        - On re-authentication (login, MFA verify), `invalidateUserSessions(userId)` must be called BEFORE `createSession()`. Flag a `createSession()` call not preceded by session invalidation on a re-auth path.
+        - The CSRF cookie must be regenerated whenever a new session is created. Flag a `createSession()` call with no matching CSRF cookie rotation.
+
+    # Invariant: RBAC gate on every mutating admin endpoint, dual
+    # session+CSRF requirement (CLAUDE.md "RBAC Roles" + "Security Notes").
+    - path: "functions/api/admin/**"
+      instructions: |
+        - Every mutating endpoint must call `checkPermission(context, "viewer"|"editor"|"admin")` before touching the database. Flag a POST/PUT/PATCH/DELETE handler with no `checkPermission()` call.
+        - EXCEPTIONS that must not be flagged: pre-auth routes under functions/api/admin/auth/** (login, logout, signup, mfa/verify) are excluded by the middleware itself (see its onRequest early-return for the /api/admin/auth/* prefix), and self-service routes that act on the middleware-supplied context.data.user rather than on another user's data (functions/api/admin/sessions.js, functions/api/admin/sessions/revoke-all.js, functions/api/admin/trusted-devices.js) have no role tier to gate.
+        - Roles ascend strictly `viewer` -> `editor` -> `admin`. Flag a permission check using the wrong tier for the operation's sensitivity (e.g. user management gated at `editor`).
+        - Session validation and CSRF are enforced CENTRALLY in functions/api/admin/_middleware.js for all /api/admin/* routes. Do NOT flag an individual endpoint for lacking its own session or CSRF check — that is the intended architecture. Flag only if the middleware itself stops validating, or if a mutating admin route is added outside its reach.
+
+    # Invariant: double opt-in band follows, verified-only announcements,
+    # per-follower delivery tracking, Turnstile on public email input
+    # (CLAUDE.md "Band Announcements").
+    - path: "functions/api/bands/**"
+      instructions: |
+        - Band follows are double opt-in: inserts must be created with `verified = 0` plus a `verification_token`. Flag any insert that sets `verified = 1` directly — it reopens the email-bombing vector this design closed.
+        - Announcement emails must filter `WHERE verified = 1`. Flag any announcement/resend query that omits this filter.
+        - Per-follower delivery tracking lives in `band_follow_notifications` (performance_id, band_follow_id). Flag any fire-once latch (e.g. a single `is_announced`-style flag) that gates sending without a per-follower row — it silently drops fans whose first send failed.
+        - Public email-input endpoints (follow, subscribe) must go through `verifyTurnstile()` (functions/utils/turnstile.js). Flag a new public email-input endpoint that skips it.
+
+    # Invariant: semantic theme tokens only on public surfaces, no hardcoded
+    # white, React 19 document.title workaround (CLAUDE.md "Theming" +
+    # "React 19 Known Issues").
+    - path: "frontend/src/**/*.{js,jsx}"
+      instructions: |
+        - SCOPE: this rule does NOT apply to frontend/src/admin/**, which is dark-pinned and exempt (see the admin block below). If the file under review is under frontend/src/admin/, ignore every token rule in this block.
+        - Public/theme-following surfaces must use semantic tokens, not hardcoded white. Flag `text-white`, `bg-white`, `border-white/N`, `ring-white/N`.
+        - Correct replacements: text -> `text-text-primary` / `-secondary` / `-tertiary` / `-disabled`; surfaces -> `bg-surface`, `bg-surface-hover`; borders -> `border-border`, `ring-border`.
+        - Opacity mapping when converting: `text-white/90-70` -> secondary, `/60-40` -> tertiary, `/30-20` -> disabled.
+        - White is correct and should NOT be flagged on fixed-colour/gradient/brand buttons or over a dark photo scrim — check the surrounding context before flagging.
+        - React 19: `react-helmet-async`'s `<Helmet>` does not reliably set `document.title`. Page components must assign `document.title` directly in a `useEffect`. Do not suggest replacing that direct assignment with `<Helmet>`.
+
+    # Exemption: admin is dark-pinned, theme-token rule does not apply
+    # (CLAUDE.md "Theming").
+    - path: "frontend/src/admin/**"
+      instructions: |
+        - This surface is exempt from the semantic-theme-token rule. `AdminApp.jsx` wraps the admin UI in `<div data-theme="midnight-ember">`, pinning it to one dark theme.
+        - Hardcoded `text-white` (and similar) here is correct and intentional. Do NOT flag it and do NOT suggest migrating it to semantic tokens.
+
+    # Invariant: after-midnight +1-day offset, prepareBands() as the single
+    # source of ordered times, schedule-storage date/string rules
+    # (CLAUDE.md "Critical Invariants" + "Schedule Storage").
+    - path: "frontend/src/utils/**"
+      instructions: |
+        - Performances starting before `AFTER_MIDNIGHT_THRESHOLD_HOUR` (6, canonically defined in frontend/src/utils/festivalDays.js) belong to the previous evening and get `+MS_PER_DAY` on `startMs`/`endMs`. Never lower this threshold.
+        - Any sort, filter, or conflict detection over performance times must consume values from `prepareBands()`. Flag direct `Date.parse(band.date + 'T' + band.startTime)` (or equivalent) used in a comparator instead.
+        - `saveSelectedBands`'s date argument must be the event's `end_date || date`, never the start date alone — passing a multi-day event's start date wipes saved selections on day 2.
+        - Compare `YYYY-MM-DD` strings lexicographically for staleness checks. Flag `new Date('YYYY-MM-DD')` used for this — it parses as UTC midnight and breaks in UTC-negative timezones.
+        - All localStorage access for schedule selections goes through frontend/src/utils/scheduleStorage.js. Flag direct reads/writes of the `selectedBandsByEvent` key elsewhere.
+
+    # Invariant: no ALTER COLUMN, PRAGMA foreign_keys guard on table
+    # recreation, setup-complete.sql is generated (CLAUDE.md "D1
+    # transactions" + "PRAGMA foreign_keys").
+    - path: "migrations/**/*.sql"
+      instructions: |
+        - Migrations are numbered `NNNN_description.sql`. Flag a new migration file that breaks the numbering sequence or reuses a number.
+        - SQLite has no ALTER COLUMN. Any table-recreation block must be wrapped in `PRAGMA foreign_keys = OFF` / `PRAGMA foreign_keys = ON` (see migration 0032) or D1 rejects the DROP.
+        - `database/setup-complete.sql`'s schema section is GENERATED by scripts/regenerate-setup-complete.mjs. Flag any hand-edit to that file's schema section.
+        - Any migration change requires regenerating database/setup-complete.sql (and running the schema-drift check) or CI fails. Flag a migration-only PR with no corresponding database/setup-complete.sql update.
+
+    # Invariant: this is the browser-enforced CSP, not functions/_middleware.js;
+    # Turnstile + COEP + theme-flash hash constraints (CLAUDE.md
+    # "Content-Security-Policy").
+    - path: "frontend/public/_headers"
+      instructions: |
+        - This file — not functions/_middleware.js — is the CSP the browser enforces on document responses (HTML pages, Turnstile, the service worker, inline scripts).
+        - Turnstile requires `https://challenges.cloudflare.com` in both `script-src` and `frame-src`.
+        - `Cross-Origin-Embedder-Policy: require-corp` must NOT be set — it blocks the Turnstile iframe (Safari does not support `credentialless`).
+        - The inline theme-flash `<script>` in frontend/index.html is allowed by a `sha256-` hash in `script-src` here. If that script's body changes, the hash must be regenerated or the theme flash silently returns with no test coverage.
+
+    # Invariant: third-party Actions must be SHA-pinned (repo convention;
+    # supply-chain hardening).
+    - path: ".github/{workflows,actions}/**"
+      instructions: |
+        - Third-party actions must stay pinned to a full commit SHA with a version comment (e.g. `uses: owner/action@<sha> # vX.Y.Z`), per existing repo convention.
+        - Flag any `uses:` referencing a tag (e.g. `@v4`) or a branch ref instead of a full commit SHA.
+        - Local composite-action references (`uses: ./.github/actions/...`) are repo-internal and exempt from SHA pinning — do not flag them.
+
+  labeling_instructions:
+    - label: bug
+      instructions: Apply when the PR fixes incorrect behavior in shipped code rather than adding new capability.
+    - label: enhancement
+      instructions: Apply when the PR adds new user-facing or admin-facing capability rather than fixing a defect.
+    - label: ci
+      instructions: Apply when the PR changes .github/workflows/**, CI configuration, or the release/build pipeline.
+    - label: documentation
+      instructions: Apply when the PR only changes docs, CLAUDE.md, README, or code comments with no behavior change.
+    - label: chore
+      instructions: Apply to maintenance, dependency bumps, tooling, or repo hygiene with no user-facing effect.
+    - label: security
+      instructions: Apply when the PR touches auth, crypto, sessions, RBAC, CSRF, or fixes a security vulnerability.
+    - label: accessibility
+      instructions: Apply when the PR affects screen-reader support, keyboard navigation, ARIA, contrast, or other assistive-technology concerns.
+    - label: ux
+      instructions: Apply when the PR changes user-facing interaction flow, copy, or usability without being purely visual.
+    - label: mobile
+      instructions: Apply when the PR changes mobile-specific layout, touch interaction, or responsive behavior.
+    - label: admin
+      instructions: Apply when the PR changes frontend/src/admin/** or functions/api/admin/** admin tooling.
+    - label: priority:p1
+      instructions: Apply when the PR blocks Long Weekend Band Crawl Vol. 17 (Aug 2, 2026) or fixes a production-breaking bug.
+    - label: priority:p2
+      instructions: Apply to important work that is not blocking Vol. 17 or production.
+    - label: priority:p3
+      instructions: Apply to lower-priority polish, nice-to-haves, or deferred cleanup.
+
+  pre_merge_checks:
+    docstrings:
+      # Quoted deliberately: bare `off` is a boolean in YAML 1.1 (PyYAML,
+      # go-yaml v2) but a string in YAML 1.2 (js-yaml). The schema wants the
+      # string "off"; quoting removes the parser dependency. Disabled because
+      # this is plain JS with no JSDoc convention — a docstring threshold
+      # would warn on essentially every PR.
+      mode: "off"
+    title:
+      mode: warning
+      requirements: >-
+        Title must start with a conventional-commit prefix (feat/fix/perf/chore/docs/ci/deps/refactor/test)
+        followed by a specific, concrete description of the change. `Closes #N` belongs on its own line in
+        the PR body, not in the title.
+    description:
+      mode: warning
+    issue_assessment:
+      mode: warning
+    custom_checks:
+      - name: Schema drift
+        mode: warning
+        instructions: >-
+          If any file under migrations/ changed in this PR, database/setup-complete.sql must also be
+          updated — it is generated by scripts/regenerate-setup-complete.mjs and is not meant to be
+          hand-edited. Flag a migrations change with no corresponding database/setup-complete.sql change.
+      - name: CSP hash drift
+        mode: warning
+        instructions: >-
+          If the inline theme-flash <script> in frontend/index.html changed, the corresponding sha256-
+          hash in frontend/public/_headers script-src must also change. No automated test covers this;
+          a stale hash silently disables the script and reintroduces the theme flash.
+
+  tools:
+    eslint:
+      enabled: true
+    actionlint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    yamllint:
+      enabled: true
+    # Disabled pending config: sqlfluff has no .sqlfluff in the repo, so no
+    # dialect is declared and it falls back to ANSI — 20 of the migrations use
+    # SQLite-only syntax (PRAGMA, AUTOINCREMENT, INSERT OR IGNORE) that parses
+    # as errors under that default. markdownlint has no config and its default
+    # MD013 80-column rule would flag most docs in this repo. Re-enable both
+    # once .sqlfluff (dialect = sqlite) and a markdownlint config land.
+    markdownlint:
+      enabled: false
+    semgrep:
+      enabled: true
+    sqlfluff:
+      enabled: false
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - ".github/instructions/**/*.md"
+  learnings:
+    scope: local

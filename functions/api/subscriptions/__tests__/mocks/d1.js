@@ -219,7 +219,16 @@ export class MockD1Database {
     // Returning it unconditionally would let a test assert on poster_url and
     // still pass after someone drops `e.poster_url` from the query — the
     // assertion would be reading this mock, not the projection (#658).
-    const projectsPosterUrl = queryLower.includes("poster_url");
+    //
+    // Scoped to the projection list so a mention in WHERE/ORDER BY doesn't
+    // count as selecting the column. Slicing to the first FROM is deliberately
+    // naive: no query routed here puts a subquery in its projection, and a
+    // real SQL parser inside a test mock would be more fragile than the bug
+    // it prevents. Wildcards (* / e.*) project everything, so they count;
+    // COUNT(*) does not, since the trailing ")" fails the boundary check.
+    const fromIndex = queryLower.indexOf(" from ");
+    const selectList = fromIndex === -1 ? queryLower : queryLower.slice(0, fromIndex);
+    const projectsPosterUrl = /\bposter_url\b/.test(selectList) || /(^|[\s,])(\*|[a-z_]+\.\*)(\s|,|$)/.test(selectList);
 
     // This is a complex query with JOINs - return aggregated data
     let results = this.data.events.map((event) => {

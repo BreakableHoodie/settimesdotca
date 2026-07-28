@@ -5,7 +5,7 @@ import { getCookie } from "../../utils/cookies.js";
 import { generateCSRFToken, setCSRFCookie, validateCSRFMiddleware } from "../../utils/csrf.js";
 import { getClientIP } from "../../utils/request.js";
 import { initializeLucia, SESSION_CONFIG } from "../../utils/auth.js";
-import { createRequestLogger } from "../../utils/logger.js";
+import { createRequestLogger, logger } from "../../utils/logger.js";
 
 function parseSessionDate(value) {
   if (!value) return null;
@@ -205,10 +205,11 @@ export async function auditLog(env, userId, action, resourceType, resourceId, de
       )
       .run();
   } catch (error) {
-    // Log error but don't fail the request if audit logging fails
-    if (log) {
-      log.warn("Audit log write failed", { action, resourceType, resourceId, error });
-    }
+    // Log error but don't fail the request if audit logging fails.
+    // #671: all 38 call sites omit `log`, so fall back to the module logger
+    // rather than swallowing the failure silently.
+    const l = log ?? logger;
+    l.warn("Audit log write failed", { action, resourceType, resourceId, error });
   }
 }
 

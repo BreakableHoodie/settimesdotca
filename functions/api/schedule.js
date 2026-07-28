@@ -4,6 +4,7 @@
 
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
 import { normalizeHttpUrl, safeReflectSocialLinks } from "../utils/validation.js";
+import { logger } from "../utils/logger.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -125,8 +126,10 @@ export async function onRequestGet(context) {
             normalizeHttpUrl(links.spotify) ||
             null;
         }
-      } catch (_) {
-        // Ignore JSON parse errors
+      } catch (err) {
+        // Malformed JSON — skip primaryUrl rather than surface an error to the
+        // user, but log it so the bad row is observable (no silent failures).
+        logger.error("schedule: malformed social_links JSON for band", { bandId: band.band_id, error: err });
       }
 
       return {

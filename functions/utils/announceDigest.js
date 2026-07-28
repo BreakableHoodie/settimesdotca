@@ -141,7 +141,15 @@ export async function flushAnnounceDigest(env, DB) {
 
   for (let i = 0; i < sendTasks.length; i += SEND_CONCURRENCY) {
     const chunk = sendTasks.slice(i, i + SEND_CONCURRENCY);
-    await Promise.allSettled(chunk.map(sendOne));
+    const results = await Promise.allSettled(chunk.map(sendOne));
+    // #672: a thrown sendOne (e.g. the claim-releasing DB.batch above) was
+    // discarded entirely by allSettled — make it observable. Counts/behaviour
+    // are unchanged; this is additive logging only.
+    for (const result of results) {
+      if (result.status === "rejected") {
+        logger.error("announce digest sendOne rejected (claim release may not have run)", { error: result.reason });
+      }
+    }
   }
 
   if (failed > 0) {

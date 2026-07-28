@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
 import { flushAnnounceDigest } from "../../../../utils/announceDigest.js";
 import { getPublicBaseUrl } from "../../../../utils/publicUrl.js";
+import { logger } from "../../../../utils/logger.js";
 
 vi.mock("../../../../utils/email.js", () => ({
   sendEmail: vi.fn(() => Promise.resolve({ delivered: true })),
@@ -367,5 +368,47 @@ describe("flushAnnounceDigest", () => {
     expect(rawDb.prepare("SELECT * FROM band_follow_notifications").all()).toHaveLength(0);
     // Queue entries consumed regardless of send outcome
     expect(rawDb.prepare("SELECT * FROM band_announce_queue").all()).toHaveLength(0);
+  });
+
+  // #672 (observability half): a thrown sendOne was previously discarded
+  // entirely by Promise.allSettled with zero trace. This only asserts the
+  // new log line exists — it deliberately does NOT assert on sent/failed
+  // counts, since the correct behaviour for a thrown claim-release is an
+  // open design question tracked in #672 and out of scope here.
+  it("logs a rejected sendOne instead of discarding it silently", async () => {
+    const { env, rawDb } = createTestEnv();
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    sendEmail.mockRejectedValueOnce(new Error("boom"));
+
+    try {
+      const ev = insertEvent(rawDb, { name: "Fest", slug: "fest-throw" });
+      const venue = insertVenue(rawDb, { name: "Room" });
+      const perf = insertBand(rawDb, {
+        name: "Band Throw",
+        event_id: ev.id,
+        venue_id: venue.id,
+      });
+
+      const followId = rawDb
+        .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+        .run("throw@example.com", perf.band_profile_id, "tok-throw").lastInsertRowid;
+
+      rawDb
+        .prepare(
+          `INSERT INTO band_announce_queue
+         (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(followId, perf.id, ev.id, "Band Throw", "Fest", "fest-throw", perf.band_profile_id);
+
+      await flushAnnounceDigest(env, env.DB);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("sendOne rejected"),
+        expect.objectContaining({ error: expect.anything() }),
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

@@ -3,6 +3,7 @@ import '@testing-library/jest-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import EventTimeline from '../EventTimeline'
+import { POSTER_IMAGE_HOST } from '../../utils/posterImage'
 
 function jsonResponse(data) {
   return {
@@ -327,7 +328,14 @@ describe('EventTimeline poster thumbnails (#658)', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders a decorative poster image when poster_url is present', async () => {
+  // #659: the listing thumbnail renders through PosterImage, which requests
+  // a Cloudflare image-transform derivative (width=200,format=auto, plus a
+  // 200/400 1x/2x srcset) rather than the full-size original — the poster
+  // URL here deliberately uses the real poster host so the transform
+  // actually applies; a foreign host would silently pass through unchanged
+  // and this test would stop proving anything.
+  it('renders a decorative, transformed poster image when poster_url is present', async () => {
+    const originalUrl = `https://${POSTER_IMAGE_HOST}/event-posters/1-poster-fest.jpg`
     const timelineData = {
       now: [],
       upcoming: [
@@ -343,7 +351,7 @@ describe('EventTimeline poster thumbnails (#658)', () => {
           band_count: 0,
           venue_count: 0,
           ticket_url: null,
-          poster_url: 'https://cdn.example.com/posters/poster-fest.jpg',
+          poster_url: originalUrl,
         },
       ],
       past: [],
@@ -364,8 +372,14 @@ describe('EventTimeline poster thumbnails (#658)', () => {
 
     expect(await screen.findByText('Poster Fest')).toBeInTheDocument()
 
-    const posterImg = container.querySelector('img[src="https://cdn.example.com/posters/poster-fest.jpg"]')
+    const transformedSrc = `https://${POSTER_IMAGE_HOST}/cdn-cgi/image/width=200,format=auto/event-posters/1-poster-fest.jpg`
+    const posterImg = container.querySelector(`img[src="${transformedSrc}"]`)
     expect(posterImg).toBeInTheDocument()
+    expect(posterImg).toHaveAttribute(
+      'srcset',
+      `https://${POSTER_IMAGE_HOST}/cdn-cgi/image/width=200,format=auto/event-posters/1-poster-fest.jpg 1x, ` +
+        `https://${POSTER_IMAGE_HOST}/cdn-cgi/image/width=400,format=auto/event-posters/1-poster-fest.jpg 2x`
+    )
     expect(posterImg).toHaveAttribute('alt', '')
     expect(posterImg).toHaveAttribute('loading', 'lazy')
     expect(posterImg).toHaveAttribute('decoding', 'async')

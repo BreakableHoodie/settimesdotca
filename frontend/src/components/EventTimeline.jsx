@@ -10,6 +10,7 @@ import { getSelectedBands, saveSelectedBands } from '../utils/scheduleStorage'
 import { sortableName } from '../utils/sortableName'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
+import PosterImage from './PosterImage'
 
 /**
  * EventTimeline - Main timeline showing Now, Upcoming, and Past events
@@ -617,17 +618,29 @@ function EventCard({
                 the event. Do not make this open a lightbox — that would nest
                 a <button> inside the card's <a>, which is invalid and breaks
                 keyboard nav; the full-size view lives on the event page.
-                The fixed-size container is load-bearing, not styling: poster
-                aspect ratios vary, so it prevents card distortion and reserves
-                layout space against CLS. */}
+                `self-start` stops the flex row's default align-items:stretch
+                from stretching this box to the height of the text column
+                beside it — without it, the box was taller than the poster's
+                real aspect ratio and the image (object-contain) letterboxed
+                inside the extra space, reading as "artificially and doubly
+                constrained" (#659 follow-up). No fixed aspect ratio either:
+                production posters range ~0.75-0.80 (3:4 to 4:5), so any
+                single ratio letterboxes most of them — `h-auto` lets the
+                image set its own height and letterboxes none. Trade-off:
+                this gives up the reserved layout space that guarded against
+                CLS; accepted because the image is loading="lazy" and the
+                past-section cards are additionally gated behind a collapsed
+                "Show History" toggle, so neither mounts until near-viewport
+                or explicitly expanded. */}
             {event.poster_url && (
-              <div className="w-20 sm:w-24 aspect-[3/4] shrink-0 overflow-hidden rounded-lg border border-border bg-surface">
-                <img
+              <div className="w-28 sm:w-36 shrink-0 self-start overflow-hidden rounded-lg border border-border">
+                <PosterImage
                   src={event.poster_url}
+                  width={200}
                   alt=""
                   loading="lazy"
                   decoding="async"
-                  className="h-full w-full object-contain"
+                  className="h-auto w-full"
                 />
               </div>
             )}

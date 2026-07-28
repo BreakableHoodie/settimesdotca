@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams } from 'react-router-dom'
 import { Alert, ImageLightbox, Loading } from '../components/ui'
+import PosterImage from '../components/PosterImage'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { fetchPublicJson } from '../utils/publicApi'
 import { parseLocalDate } from '../utils/timeFormat'
@@ -190,8 +191,9 @@ export default function EventRecapPage() {
                   aria-label={`View ${event.name} poster`}
                   className="block w-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-400"
                 >
-                  <img
+                  <PosterImage
                     src={event.poster_url}
+                    width={800}
                     alt={`${event.name} poster`}
                     loading="lazy"
                     className="max-h-96 w-full object-contain"

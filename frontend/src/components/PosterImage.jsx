@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { posterImageUrl, posterImageSrcSet } from '../utils/posterImage'
 
@@ -26,16 +26,35 @@ export default function PosterImage({
   className,
   loading = 'lazy',
   decoding = 'async',
+  onError,
   ...rest
 }) {
   const [fellBack, setFellBack] = useState(false)
   const fellBackRef = useRef(false)
 
-  const handleError = useCallback(() => {
-    if (fellBackRef.current) return
-    fellBackRef.current = true
-    setFellBack(true)
-  }, [])
+  // A fallback belongs to the URL that failed, not to the component instance.
+  // Without this reset, a PosterImage reused for a different poster (the same
+  // element re-rendered with a new src rather than remounted) would stay
+  // pinned to untransformed originals for the rest of its life because of one
+  // earlier failure.
+  useEffect(() => {
+    fellBackRef.current = false
+    setFellBack(false)
+  }, [src])
+
+  const handleError = useCallback(
+    event => {
+      // Compose rather than replace: a caller's own onError must still fire.
+      // This runs first so the caller sees the error even if its handler
+      // throws, and the ref guard below only suppresses OUR fallback
+      // transition, never the caller's callback.
+      onError?.(event)
+      if (fellBackRef.current) return
+      fellBackRef.current = true
+      setFellBack(true)
+    },
+    [onError]
+  )
 
   const resolvedSrc = fellBack ? src : posterImageUrl(src, width)
   const resolvedSrcSet = fellBack ? undefined : posterImageSrcSet(src, width)
@@ -63,4 +82,6 @@ PosterImage.propTypes = {
   className: PropTypes.string,
   loading: PropTypes.string,
   decoding: PropTypes.string,
+  /** Optional caller error handler. Composed with the internal fallback, not replaced by it. */
+  onError: PropTypes.func,
 }

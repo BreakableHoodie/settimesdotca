@@ -37,7 +37,11 @@ function isRewritable(parsed, width) {
   if (!parsed) return false
   if (parsed.hostname !== POSTER_IMAGE_HOST) return false
   if (parsed.pathname.includes(TRANSFORM_MARKER)) return false
-  return Number.isFinite(width) && width > 0
+  // Guard on the ROUNDED width, not the raw one: a positive sub-unit width
+  // like 0.1 passes `> 0` but rounds to 0, which would emit `width=0` — a
+  // meaningless transform. Rounding first keeps the guard and the emitted
+  // value in agreement.
+  return Number.isFinite(width) && Math.round(width) >= 1
 }
 
 /**

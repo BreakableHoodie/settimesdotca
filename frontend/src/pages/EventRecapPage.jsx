@@ -196,7 +196,13 @@ export default function EventRecapPage() {
                     width={800}
                     alt={`${event.name} poster`}
                     loading="lazy"
-                    className="max-h-96 w-full object-contain"
+                    /* Two-value aspect-ratio (#659 review): reserves a 3:4 box
+                       while the lazy image has no intrinsic dimensions, then
+                       yields to the real ratio on load. object-contain stays
+                       harmless — once `auto` resolves to the intrinsic ratio
+                       the box matches the image, so there is nothing left to
+                       letterbox. */
+                    className="aspect-[auto_3/4] max-h-96 w-full object-contain"
                   />
                 </button>
               </div>

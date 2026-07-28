@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import PosterImage from '../PosterImage'
 import { POSTER_IMAGE_HOST } from '../../utils/posterImage'
 
@@ -63,5 +63,53 @@ describe('PosterImage', () => {
     render(<PosterImage src={POSTER_URL} alt="poster" width={200} className="max-h-96 w-full" />)
     const img = screen.getByRole('img', { name: 'poster' })
     expect(img).toHaveClass('max-h-96', 'w-full')
+  })
+
+  // The fallback belongs to the URL that failed, not to the component
+  // instance. A PosterImage re-rendered with a new src (rather than
+  // remounted) must start that URL fresh on the optimized path.
+  it('resets the fallback when src changes, so a new poster retries the transform', () => {
+    const OTHER_URL = `https://${POSTER_IMAGE_HOST}/event-posters/2-vol16.jpg`
+    const { rerender } = render(<PosterImage src={POSTER_URL} alt="poster" width={200} />)
+
+    const img = screen.getByRole('img', { name: 'poster' })
+    fireEvent.error(img)
+    expect(img).toHaveAttribute('src', POSTER_URL)
+    expect(img).not.toHaveAttribute('srcset')
+
+    rerender(<PosterImage src={OTHER_URL} alt="poster" width={200} />)
+
+    const next = screen.getByRole('img', { name: 'poster' })
+    expect(next).toHaveAttribute(
+      'src',
+      `https://${POSTER_IMAGE_HOST}/cdn-cgi/image/width=200,format=auto/event-posters/2-vol16.jpg`
+    )
+    expect(next).toHaveAttribute('srcset')
+  })
+
+  it("invokes a caller's onError as well as falling back", () => {
+    const onError = vi.fn()
+    render(<PosterImage src={POSTER_URL} alt="poster" width={200} onError={onError} />)
+
+    const img = screen.getByRole('img', { name: 'poster' })
+    fireEvent.error(img)
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    // The caller's handler must not suppress the fallback, nor vice versa.
+    expect(img).toHaveAttribute('src', POSTER_URL)
+    expect(img).not.toHaveAttribute('srcset')
+  })
+
+  it("keeps calling the caller's onError after the fallback guard has tripped", () => {
+    const onError = vi.fn()
+    render(<PosterImage src={POSTER_URL} alt="poster" width={200} onError={onError} />)
+
+    const img = screen.getByRole('img', { name: 'poster' })
+    fireEvent.error(img)
+    fireEvent.error(img)
+
+    // The ref guard suppresses only the duplicate fallback transition — the
+    // caller still hears about every failure.
+    expect(onError).toHaveBeenCalledTimes(2)
   })
 })

@@ -73,3 +73,27 @@ describe('posterImageSrcSet', () => {
     expect(posterImageSrcSet(url, 800)).toBeUndefined()
   })
 })
+
+// A positive width below 0.5 satisfies `width > 0` but rounds to 0, which
+// would emit `width=0,format=auto` — a meaningless transform. The guard runs
+// on the rounded value so the check and the emitted URL agree.
+describe('sub-unit widths', () => {
+  const url = `https://${POSTER_IMAGE_HOST}/event-posters/poster.jpg`
+
+  it.each([0.1, 0.49, 0.0001])('passes through unchanged for width %p', width => {
+    expect(posterImageUrl(url, width)).toBe(url)
+    expect(posterImageSrcSet(url, width)).toBeUndefined()
+  })
+
+  it('still rewrites at the 0.5 rounding boundary, where width becomes 1', () => {
+    expect(posterImageUrl(url, 0.5)).toBe(
+      `https://${POSTER_IMAGE_HOST}/cdn-cgi/image/width=1,format=auto/event-posters/poster.jpg`
+    )
+  })
+
+  it('never emits width=0', () => {
+    for (const width of [0, 0.1, 0.4, -5, Number.NaN]) {
+      expect(posterImageUrl(url, width)).not.toContain('width=0')
+    }
+  })
+})

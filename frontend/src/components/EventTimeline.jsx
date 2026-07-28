@@ -640,7 +640,15 @@ function EventCard({
                   alt=""
                   loading="lazy"
                   decoding="async"
-                  className="h-auto w-full"
+                  /* aspect-[auto_3/4] is the TWO-VALUE aspect-ratio syntax:
+                     reserve a 3:4 box while the lazy image has no intrinsic
+                     dimensions, then let the real ratio take over once it
+                     loads. This is NOT the fixed-ratio box that caused
+                     letterboxing — that was a stretched container plus
+                     object-contain, which pinned the wrong ratio permanently.
+                     Nothing letterboxes after load here, and the reserved box
+                     stops expanding History from cascading layout shifts. */
+                  className="aspect-[auto_3/4] h-auto w-full"
                 />
               </div>
             )}

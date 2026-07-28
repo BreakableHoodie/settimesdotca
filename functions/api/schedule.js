@@ -127,8 +127,7 @@ export async function onRequestGet(context) {
             null;
         }
       } catch (err) {
-        // Malformed JSON — skip primaryUrl rather than surface an error to the
-        // user, but log it so the bad row is observable (no silent failures).
+        // Persisted rows may contain malformed JSON.
         logger.error("schedule: malformed social_links JSON for band", { bandId: band.band_id, error: err });
       }
 

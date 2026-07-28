@@ -51,10 +51,7 @@ describe("auditLog (#671)", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     try {
-      // user_id 99999 doesn't exist in the test DB's users table, so the
-      // FK-constrained INSERT throws and the catch block in auditLog runs.
-      // `log` is deliberately omitted (undefined -> defaults to null) to
-      // mirror all 38 real call sites, which never pass a logger.
+      // user_id 99999 doesn't exist, so the FK-constrained INSERT throws.
       await auditLog(env, 99999, "test.action", "test_resource", 1, null, "127.0.0.1");
 
       expect(warnSpy).toHaveBeenCalledWith(

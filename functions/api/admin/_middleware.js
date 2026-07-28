@@ -205,9 +205,7 @@ export async function auditLog(env, userId, action, resourceType, resourceId, de
       )
       .run();
   } catch (error) {
-    // Log error but don't fail the request if audit logging fails.
-    // #671: all 38 call sites omit `log`, so fall back to the module logger
-    // rather than swallowing the failure silently.
+    // Never throws: audit logging must not fail the request it records.
     const l = log ?? logger;
     l.warn("Audit log write failed", { action, resourceType, resourceId, error });
   }

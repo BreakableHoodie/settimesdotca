@@ -44,11 +44,11 @@ export async function verifyTurnstile(request, env, token) {
       body: formData,
     });
 
+    // #673: a non-2xx siteverify response must log a diagnostic and fail
+    // closed; only a 2xx body may be trusted to grant success.
     if (!response.ok) {
-      // #673: a siteverify outage (5xx) previously fell through to an empty
-      // `{}` body with zero log lines — every follow/subscribe would silently
-      // reject with no way to diagnose why. Still fails closed below.
       logger.warn("[Turnstile] siteverify responded with non-2xx status", { status: response.status });
+      return false;
     }
 
     const result = await response.json().catch(() => ({}));

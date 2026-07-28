@@ -370,11 +370,7 @@ describe("flushAnnounceDigest", () => {
     expect(rawDb.prepare("SELECT * FROM band_announce_queue").all()).toHaveLength(0);
   });
 
-  // #672 (observability half): a thrown sendOne was previously discarded
-  // entirely by Promise.allSettled with zero trace. This only asserts the
-  // new log line exists — it deliberately does NOT assert on sent/failed
-  // counts, since the correct behaviour for a thrown claim-release is an
-  // open design question tracked in #672 and out of scope here.
+  // Asserts the log line only; the count/recovery contract is unresolved (#672).
   it("logs a rejected sendOne instead of discarding it silently", async () => {
     const { env, rawDb } = createTestEnv();
     const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
@@ -405,7 +401,7 @@ describe("flushAnnounceDigest", () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining("sendOne rejected"),
-        expect.objectContaining({ error: expect.anything() }),
+        expect.objectContaining({ error: expect.any(Error) }),
       );
     } finally {
       errorSpy.mockRestore();

@@ -613,23 +613,13 @@ function EventCard({
       <div className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
           <div className="flex flex-1 gap-4 min-w-0">
-            {/* Poster thumbnail (#658) — decorative on the listing: the card's
-                Link/title already names the event, and the full-size lightbox
-                lives on the event page (#656), not here. Renders in all three
-                timeline sections (now/upcoming/past) since this same EventCard
-                is reused for each. Fixed-size container + object-contain so
-                varying poster aspect ratios (roughly 3:4 to 4:5 in production)
-                never distort the card or its text alignment, and reserve
-                layout space up front to avoid CLS when the image loads;
-                omitted entirely (no placeholder box) when absent.
-                Performance (17 past-event posters, 240KB-663KB originals):
-                loading="lazy" defers the fetch until near-viewport, and
-                decoding="async" keeps decode off the main thread. The past
-                section itself is conditionally rendered on showPast further
-                down — these poster img elements are not in the DOM at all
-                until "Show History" is clicked, so collapsed history costs
-                nothing. No CDN/resize transform yet; a proper thumbnail
-                pipeline is tracked as a follow-up (see PR description). */}
+            {/* Decorative: alt="" because the card's link text already names
+                the event. Do not make this open a lightbox — that would nest
+                a <button> inside the card's <a>, which is invalid and breaks
+                keyboard nav; the full-size view lives on the event page.
+                The fixed-size container is load-bearing, not styling: poster
+                aspect ratios vary, so it prevents card distortion and reserves
+                layout space against CLS. */}
             {event.poster_url && (
               <div className="w-20 sm:w-24 aspect-[3/4] shrink-0 overflow-hidden rounded-lg border border-border bg-surface">
                 <img

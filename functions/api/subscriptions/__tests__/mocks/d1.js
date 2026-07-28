@@ -215,6 +215,12 @@ export class MockD1Database {
   }
 
   _handleEventsQuery(queryLower, params) {
+    // Honor the SELECT projection for poster_url the way the real DB would.
+    // Returning it unconditionally would let a test assert on poster_url and
+    // still pass after someone drops `e.poster_url` from the query — the
+    // assertion would be reading this mock, not the projection (#658).
+    const projectsPosterUrl = queryLower.includes("poster_url");
+
     // This is a complex query with JOINs - return aggregated data
     let results = this.data.events.map((event) => {
       const eventPerformances = this.data.performances.filter((p) => p.event_id === event.id);
@@ -230,7 +236,7 @@ export class MockD1Database {
         description: event.description,
         city: event.city,
         ticket_url: event.ticket_url,
-        poster_url: event.poster_url ?? null,
+        ...(projectsPosterUrl ? { poster_url: event.poster_url ?? null } : {}),
         band_count: uniqueBandIds.size,
         venue_count: uniqueVenueIds.size,
         is_published: event.is_published,

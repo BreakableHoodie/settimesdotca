@@ -85,12 +85,17 @@ function LiveContextBar({
   // collapsed well before `scrollY` reaches the ~600px this was measured at.
   const scrollProgress = useScrollCollapse(48, 240)
   const identityFadeProgress = Math.min(1, scrollProgress * 1.75)
+  // Past this point the identity block is visually gone. `pointerEvents: none`
+  // alone would still leave its focusable children (the status badge) in the
+  // tab order, so a keyboard user could focus an invisible zero-height
+  // control; `inert` removes them from focus and the a11y tree too.
+  const isIdentityCollapsed = scrollProgress > 0.7
   const identityCollapseStyle = {
     opacity: 1 - identityFadeProgress,
     transform: `translateY(${scrollProgress * -6}px)`,
     maxHeight: `${Math.round(200 * (1 - scrollProgress))}px`,
     overflow: 'hidden',
-    pointerEvents: scrollProgress > 0.7 ? 'none' : 'auto',
+    pointerEvents: isIdentityCollapsed ? 'none' : 'auto',
   }
   const tapCountRef = useRef(0)
   const firstTapTimeRef = useRef(0)
@@ -177,7 +182,7 @@ function LiveContextBar({
               a fan needs once they're scrolling the lineup (Tabs, filter
               toggle) lives in the always-visible block below, outside this
               wrapper. */}
-          <div style={identityCollapseStyle}>
+          <div style={identityCollapseStyle} inert={isIdentityCollapsed}>
             <div className="flex items-center justify-between gap-3">
               <span
                 role="button"

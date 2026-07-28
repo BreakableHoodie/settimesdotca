@@ -11,9 +11,13 @@ function setScrollY(y) {
   Object.defineProperty(window, 'scrollY', { writable: true, configurable: true, value: y })
 }
 
-function fireScroll() {
-  act(() => {
+// The hook batches its measurement into a requestAnimationFrame, so dispatching
+// the event synchronously is not enough — the frame has to be flushed before the
+// committed progress can be asserted.
+async function fireScroll() {
+  await act(async () => {
     window.dispatchEvent(new Event('scroll'))
+    await new Promise(resolve => requestAnimationFrame(resolve))
   })
 }
 
@@ -28,24 +32,34 @@ describe('useScrollCollapse', () => {
     expect(screen.getByTestId('progress')).toHaveTextContent('0')
   })
 
-  it('clamps to 0 below the start threshold', () => {
+  it('clamps to 0 below the start threshold', async () => {
     setScrollY(20)
     render(<Harness start={40} end={140} />)
-    fireScroll()
+    await fireScroll()
     expect(screen.getByTestId('progress')).toHaveTextContent('0')
   })
 
-  it('ramps linearly between start and end', () => {
-    setScrollY(90) // halfway between 40 and 140
+  // These two mount at scrollY 0 and only then scroll, so the asserted value
+  // can ONLY have come from the scroll listener — mounting with the target
+  // scrollY already set would pass on the mount-time update alone and prove
+  // nothing about the listener.
+  it('ramps linearly between start and end', async () => {
+    setScrollY(0)
     render(<Harness start={40} end={140} />)
-    fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('0')
+
+    setScrollY(90) // halfway between 40 and 140
+    await fireScroll()
     expect(screen.getByTestId('progress')).toHaveTextContent('0.5')
   })
 
-  it('clamps to 1 at and beyond the end threshold', () => {
-    setScrollY(500)
+  it('clamps to 1 at and beyond the end threshold', async () => {
+    setScrollY(0)
     render(<Harness start={40} end={140} />)
-    fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('0')
+
+    setScrollY(500)
+    await fireScroll()
     expect(screen.getByTestId('progress')).toHaveTextContent('1')
   })
 

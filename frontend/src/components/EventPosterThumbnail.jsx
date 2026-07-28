@@ -65,7 +65,10 @@ function EventPosterThumbnail({ posterUrl, eventName, onOpen, variant = 'standal
           src={posterUrl}
           alt={label}
           width={isInline ? 80 : 200}
-          loading="lazy"
+          // The inline variant renders in the sticky bar, above the fold — lazy
+          // loading it would delay LCP and pop in. Standalone stays lazy.
+          loading={isInline ? 'eager' : 'lazy'}
+          fetchPriority={isInline ? 'high' : undefined}
           className={
             isInline ? 'h-[100px] w-auto object-contain' : 'h-[140px] w-auto object-contain sm:h-[160px] md:h-[180px]'
           }

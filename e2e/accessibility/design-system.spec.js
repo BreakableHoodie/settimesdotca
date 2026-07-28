@@ -524,7 +524,6 @@ test.describe("Modal Component - Accessibility", () => {
       });
     });
 
-    const confirmBtn = page.locator("#confirm-btn");
     const closeBtn = page.locator("#close-btn");
 
     // Focus should start on first focusable element

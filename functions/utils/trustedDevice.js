@@ -158,25 +158,10 @@ export async function validateTrustedDevice(DB, token, ipAddress, userAgent) {
 }
 
 /**
- * Remove a trusted device by token
- */
-export async function revokeTrustedDevice(DB, token) {
-  const tokenHash = await hashTrustedDeviceToken(token);
-  await DB.prepare(`DELETE FROM trusted_devices WHERE token = ?`).bind(tokenHash).run();
-}
-
-/**
  * Remove all trusted devices for a user (e.g., on password change)
  */
 export async function revokeAllTrustedDevices(DB, userId) {
   await DB.prepare(`DELETE FROM trusted_devices WHERE user_id = ?`).bind(userId).run();
-}
-
-/**
- * Clean up expired trusted devices
- */
-export async function cleanupExpiredDevices(DB) {
-  await DB.prepare(`DELETE FROM trusted_devices WHERE expires_at <= datetime('now')`).run();
 }
 
 /**
@@ -195,17 +180,6 @@ export function createTrustedDeviceCookie(token, request, env) {
   }
 
   return parts.join("; ");
-}
-
-/**
- * Create a cookie to clear the trusted device.
- */
-export function deleteTrustedDeviceCookie(request, env) {
-  const isDev = isDevRequest(request, env);
-  const cookieName = isDev ? TRUSTED_DEVICE_COOKIE_NAME_DEV : TRUSTED_DEVICE_COOKIE_NAME_SECURE;
-  const secure = isDev ? "" : "Secure; ";
-
-  return `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=Strict; HttpOnly`;
 }
 
 /**

@@ -39,7 +39,7 @@ settimes.ca is evolving into the best multi-venue/multi-artist event platform fo
 
 - **Focus:** Waterloo Region only (not Ottawa — do not reference Ottawa in new code/docs)
 - **Brand:** settimes.ca — no rebranding
-- **Target event:** Vol. 17, ~6 weeks out (Aug 2, 2026). Urgency applies to all work.
+- **Target event:** Vol. 17, August 2, 2026. Urgency applies to all work.
 - **Venues (6, King St N, Waterloo):** Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost
 - **Bands:** 22, doors 6:30PM / show 6:45PM, ages 19+
 - **Both fan-facing and admin tooling are equal priority**
@@ -63,7 +63,7 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Storage**: Cloudflare R2 (band photos)
 - **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
-- **CI/CD**: GitHub Actions (10 workflows), CodeQL, Dependabot
+- **CI/CD**: GitHub Actions (12 workflows), CodeQL, Dependabot
 
 ---
 
@@ -121,6 +121,8 @@ The Cloudflare Workers D1 binding does not support explicit `BEGIN`/`COMMIT` tra
 For mutations that cannot be expressed as a single batch (e.g., the event-duplication pattern in `functions/api/admin/events/[id].js`), use compensating deletes: if step N fails, manually undo steps 1…N-1.
 
 The bulk band import (`functions/api/admin/bands/import.js`) follows this pattern and is **all-or-nothing**: it validates every row first (an invalid row aborts the whole import with per-row errors, writing nothing), then find-or-creates profiles and inserts performances, rolling back everything it created if any write fails. A lineup is never left half-imported.
+
+`functions/api/admin/bands/bulk.js` is the larger sibling (599 lines vs. `import.js`'s 174): it handles bulk `DELETE`/`POST`/`PATCH` across bands, following the same `DB.batch()`/compensating-delete discipline.
 
 ### PRAGMA `foreign_keys = ON` is enforced in production
 
@@ -210,7 +212,7 @@ Bot protection on the public email-input endpoints (follow, subscribe) goes thro
 ```
 npm test         # from repo root
 ```
-**Cannot run locally** if `better-sqlite3` native binary fails to load (DLOPEN error on Apple Silicon). Run in CI or use a Linux environment.
+Runs fine locally, including on Apple Silicon (`better-sqlite3` loads natively on arm64) — the full suite completes in a few seconds. Prefer running it locally over waiting on CI.
 
 ### Frontend unit tests
 ```
@@ -224,6 +226,8 @@ npx playwright test
 Requires a running wrangler dev server or uses it automatically via `playwright.config.js`. Run `npm run build --prefix frontend` first.
 
 ### Before every commit — required checklist
+
+**Canonical entry point: `make gate`** — runs format → format:check → lint → test → build for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
 
 Run all steps that apply. Do not commit if any step fails.
 
@@ -241,8 +245,8 @@ npm run build                                        # catch import/compile erro
 npm run format              # prettier --write on functions/ + scripts/ (fix first)
 npm run format:check        # verify formatting is clean
 npm run lint                # ESLint on functions/ + scripts/ (must be 0 errors)
-npm run validate:openapi    # if openapi.yaml changed
-npm test                    # from repo root (may fail on Apple Silicon — run in CI)
+npm run validate:openapi    # if docs/api-spec.yaml changed
+npm test                    # from repo root — runs fine locally, including Apple Silicon
 ```
 
 **Why `--write` before `--check`:** `format:check` (what CI runs) only reports errors — it never fixes them. Always run `--write` first so the commit is already clean.

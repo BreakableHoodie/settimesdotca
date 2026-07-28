@@ -175,4 +175,21 @@ describe('ImageLightbox', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(trigger).toHaveFocus()
   })
+
+  // React omits the attribute entirely when alt is undefined, and assistive
+  // tech then falls back to announcing the image URL. Guarantee an alt is
+  // always present, even though both current callers pass one.
+  it('always renders an alt attribute, falling back when alt is omitted', () => {
+    render(<ImageLightbox src="https://example.test/poster.jpg" isOpen={true} onClose={vi.fn()} />)
+
+    expect(screen.getByRole('img')).toHaveAttribute('alt', 'Enlarged image')
+  })
+
+  it('prefers the supplied alt over the fallback', () => {
+    render(
+      <ImageLightbox src="https://example.test/poster.jpg" alt="Test Event poster" isOpen={true} onClose={vi.fn()} />
+    )
+
+    expect(screen.getByRole('img')).toHaveAttribute('alt', 'Test Event poster')
+  })
 })

@@ -137,16 +137,30 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }) {
             click on the image bubbles up to the backdrop's onClick, but its
             e.target === e.currentTarget check only matches a click on the
             backdrop itself, so a click on this nested image never closes it. */}
-        <img src={src} alt={alt} className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" />
+        {/* The alt fallback mirrors the dialog's aria-label above. It is
+            deliberately a real description rather than alt="" (decorative):
+            the image IS the dialog's content, so someone navigating inside
+            the dialog must be able to find it. That does mean the name is
+            announced twice — once for the dialog, once for the image — which
+            is the accepted trade for a lightbox; silence is the worse
+            failure. Never let this render with no alt attribute at all:
+            React omits the attribute entirely for `undefined`, and AT then
+            falls back to announcing the URL. */}
+        <img
+          src={src}
+          alt={alt || 'Enlarged image'}
+          className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+        />
       </div>
     </div>
   )
 }
 
 ImageLightbox.propTypes = {
-  /** Image URL to display enlarged. */
-  src: PropTypes.string,
-  /** Alt text — also used as the dialog's accessible name. */
+  /** Image URL to display enlarged. Required — there is nothing to show without it. */
+  src: PropTypes.string.isRequired,
+  /** Alt text — also used as the dialog's accessible name. Optional: both the
+      dialog label and the <img> alt fall back to a generic description. */
   alt: PropTypes.string,
   /** Whether the lightbox is open. */
   isOpen: PropTypes.bool.isRequired,

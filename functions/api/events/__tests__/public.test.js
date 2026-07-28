@@ -358,4 +358,58 @@ describe("GET /api/events/public", () => {
       expect(data.events[0].ticket_url).toBe("https://tickets.example.com/summer-fest");
     });
   });
+
+  describe("poster_url (#658)", () => {
+    it("returns poster_url when present", async () => {
+      const event = createMockEvent({ poster_url: "https://cdn.example.com/posters/summer-fest.jpg" });
+      const venue = createMockVenue();
+      const band = createMockBand();
+
+      seedMockData(mockDB, [event], [venue], [band]);
+
+      const request = new Request("http://localhost/api/events/public");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.events[0].poster_url).toBe("https://cdn.example.com/posters/summer-fest.jpg");
+    });
+
+    it("returns null when poster_url is absent", async () => {
+      const event = createMockEvent();
+      const venue = createMockVenue();
+      const band = createMockBand();
+
+      seedMockData(mockDB, [event], [venue], [band]);
+
+      const request = new Request("http://localhost/api/events/public");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.events[0].poster_url).toBeNull();
+    });
+
+    it("nulls out a legacy javascript: poster_url value", async () => {
+      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #658 read-path guard
+      const event = createMockEvent({ poster_url: "javascript:alert(1)" });
+      const venue = createMockVenue();
+      const band = createMockBand();
+
+      seedMockData(mockDB, [event], [venue], [band]);
+
+      const request = new Request("http://localhost/api/events/public");
+      const context = { request, env: mockEnv };
+
+      const response = await onRequestGet(context);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.events[0].poster_url).toBeNull();
+    });
+  });
 });

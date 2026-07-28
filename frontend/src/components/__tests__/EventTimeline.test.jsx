@@ -317,3 +317,166 @@ describe('EventTimeline collapsed performer chips ordering', () => {
     expect(chips).toEqual(['The Anti-Queens', 'Mango Static', 'Zebra Mussels'])
   })
 })
+
+// Poster thumbnails on the listing (#658): the card is decorative-only (no
+// lightbox — that lives on the event page, #656) and must render nothing
+// when poster_url is absent, which is still the common case for events that
+// haven't had a poster uploaded yet.
+describe('EventTimeline poster thumbnails (#658)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('renders a decorative poster image when poster_url is present', async () => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Poster Fest',
+          slug: 'poster-fest',
+          date: '2026-08-02',
+          status: 'published',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: 'https://cdn.example.com/posters/poster-fest.jpg',
+        },
+      ],
+      past: [],
+    }
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Poster Fest')).toBeInTheDocument()
+
+    const posterImg = container.querySelector('img[src="https://cdn.example.com/posters/poster-fest.jpg"]')
+    expect(posterImg).toBeInTheDocument()
+    expect(posterImg).toHaveAttribute('alt', '')
+    expect(posterImg).toHaveAttribute('loading', 'lazy')
+    expect(posterImg).toHaveAttribute('decoding', 'async')
+    // Decorative only — must not be wrapped in a button/lightbox trigger.
+    expect(posterImg.closest('button')).toBeNull()
+  })
+
+  it('renders no poster element when poster_url is null', async () => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 2,
+          name: 'No Poster Fest',
+          slug: 'no-poster-fest',
+          date: '2026-08-07',
+          status: 'published',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: null,
+        },
+      ],
+      past: [],
+    }
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('No Poster Fest')).toBeInTheDocument()
+    expect(container.querySelector('img')).toBeNull()
+  })
+})
+
+// Past-section poster performance (#658 follow-up): every past event now has
+// a poster (240KB-663KB originals). Rendering all of them unconditionally
+// would ship multiple megabytes on every homepage load even though the past
+// list starts collapsed. The past cards — and therefore their <img> tags —
+// must be conditionally rendered (not just CSS-hidden), so the browser never
+// fetches a single past poster until "Show History" is clicked.
+describe('EventTimeline past-section poster lazy mounting (#658)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('does not mount past poster <img> elements until History is expanded, then mounts them all', async () => {
+    const pastEvent = (id, name) => ({
+      id,
+      name,
+      slug: name.toLowerCase().replace(/\s+/g, '-'),
+      date: '2020-05-10',
+      status: 'archived',
+      is_published: true,
+      venues: [],
+      bands: [],
+      band_count: 0,
+      venue_count: 0,
+      ticket_url: null,
+      poster_url: `https://cdn.example.com/posters/${id}.jpg`,
+    })
+
+    const timelineData = {
+      now: [],
+      upcoming: [],
+      past: [pastEvent(1, 'Past Fest One'), pastEvent(2, 'Past Fest Two'), pastEvent(3, 'Past Fest Three')],
+    }
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    const toggle = await screen.findByRole('button', { name: /show history/i })
+
+    // Collapsed: none of the past posters are in the DOM at all — a
+    // display:none/hidden approach would still leave <img> tags present
+    // (and the browser would still fetch them), so this asserts the
+    // stronger conditional-render requirement.
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.queryByText('Past Fest One')).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    expect(await screen.findByText('Past Fest One')).toBeInTheDocument()
+    const posterImgs = container.querySelectorAll('img')
+    expect(posterImgs).toHaveLength(3)
+    posterImgs.forEach(img => {
+      expect(img).toHaveAttribute('loading', 'lazy')
+      expect(img).toHaveAttribute('decoding', 'async')
+      expect(img).toHaveAttribute('alt', '')
+    })
+  })
+})

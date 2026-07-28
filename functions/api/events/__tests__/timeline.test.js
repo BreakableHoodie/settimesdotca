@@ -963,6 +963,97 @@ describe("Timeline real-DB — event ticket_url is scheme-validated (#504)", () 
 });
 
 // ---------------------------------------------------------------------------
+// Real-DB regression — the event-level `poster_url` reflection must never
+// carry an unsafe scheme, and must be present when set (#658: the main-page
+// listing — powered by THIS endpoint via EventTimeline.jsx, not
+// functions/api/events/public.js — never selected or returned poster_url, so
+// event cards had no poster to render). Seeded via a direct SQL UPDATE
+// (bypassing write-path validation) to simulate a pre-#616 legacy row, same
+// pattern as the #504 ticket_url tests above.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — event poster_url is present and scheme-validated (#658)", () => {
+  test("an event with a normal https poster_url passes through unchanged", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const today = eventLocalToday();
+
+    const event = insertEvent(rawDb, {
+      name: "Poster Event",
+      slug: "timeline-realdb-658-safe",
+      date: today,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb
+      .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
+      .run("https://cdn.example.com/posters/poster-event.jpg", event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.poster_url).toBe("https://cdn.example.com/posters/poster-event.jpg");
+  });
+
+  test("an event with no poster_url resolves to null", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const today = eventLocalToday();
+
+    const event = insertEvent(rawDb, {
+      name: "No Poster Event",
+      slug: "timeline-realdb-658-absent",
+      date: today,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.poster_url).toBeNull();
+  });
+
+  test("an event with a javascript: poster_url resolves to poster_url: null", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const today = eventLocalToday();
+
+    const event = insertEvent(rawDb, {
+      name: "Unsafe Poster Event",
+      slug: "timeline-realdb-658-unsafe",
+      date: today,
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #658 read-path guard
+    rawDb.prepare("UPDATE events SET poster_url = ? WHERE id = ?").run("javascript:alert(1)", event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.poster_url).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Real-DB — start-edge gate (#569). An event's FIRST day isn't "Happening
 // Now" at local midnight; it's held in "upcoming" (moved to the front) until
 // its start edge, which is in precedence order: that day's doors/gates time →

@@ -46,4 +46,30 @@ describe('after-midnight threshold invariant (#550, CLAUDE.md "After-midnight ba
     // defeat the import assertion above while still "importing" the name.
     expect(source).not.toMatch(/(?:const|let|var)\s+AFTER_MIDNIGHT_THRESHOLD_HOUR\s*=\s*6\b/)
   })
+
+  it('EventsTab.jsx imports the threshold from festivalDays.js rather than re-encoding a literal 6 (#669)', () => {
+    // #669: EventsTab.jsx had re-encoded the canonical threshold as its own
+    // `EARLY_MORNING_CUTOFF_HOUR = 6` local constant instead of importing
+    // AFTER_MIDNIGHT_THRESHOLD_HOUR from festivalDays.js — exactly the drift
+    // this guard exists to catch, and it didn't (no guard covered this file
+    // before this test). Same source-read technique as the bandUtils.js
+    // check above, extended to this file.
+    const currentFile = fileURLToPath(import.meta.url)
+    const eventsTabPath = path.join(path.dirname(currentFile), '../../admin/EventsTab.jsx')
+    const source = readFileSync(eventsTabPath, 'utf8')
+
+    expect(source).toMatch(/import\s*{[^}]*AFTER_MIDNIGHT_THRESHOLD_HOUR[^}]*}\s*from\s*['"][^'"]*festivalDays['"]/)
+    // Guards against a locally re-encoded cutoff constant under any name
+    // (e.g. the original `EARLY_MORNING_CUTOFF_HOUR = 6`) reappearing
+    // alongside or instead of the import.
+    expect(source).not.toMatch(/(?:const|let|var)\s+\w*CUTOFF\w*\s*=\s*6\b/i)
+    expect(source).not.toMatch(/(?:const|let|var)\s+AFTER_MIDNIGHT_THRESHOLD_HOUR\s*=\s*6\b/)
+    // A re-encoding needn't be named *CUTOFF* — `EARLY_MORNING_HOUR = 6` is the
+    // same drift under a name the guard above misses.
+    expect(source).not.toMatch(/(?:const|let|var)\s+\w*HOUR\w*\s*=\s*6\b/i)
+    // Nor need it be a named constant at all: inlining the threshold directly
+    // into the comparison (`hours < 6`) defeats every declaration guard above
+    // while re-encoding the exact value the invariant protects.
+    expect(source).not.toMatch(/\b\w*hours?\w*\s*[<>]=?\s*6\b/i)
+  })
 })

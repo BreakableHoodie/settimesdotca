@@ -40,7 +40,7 @@ Add `.coderabbit.yaml` at the repository root, configured along four axes.
 
 **Background context.** `knowledge_base.code_guidelines.filePatterns` points at `CLAUDE.md` and `.github/instructions/**/*.md`, making the existing invariant documentation available to CodeRabbit without duplicating it. `knowledge_base.learnings.scope` is set to `local` so accumulated learnings stay scoped to this repository rather than propagating across the `BreakableHoodie` organisation.
 
-**Targeted directives.** Ten `path_instructions` blocks bind invariants to the globs where they apply:
+**Targeted directives.** Eleven `path_instructions` blocks bind invariants to the globs where they apply:
 
 | Glob | Invariant protected |
 | ---- | ------------------- |
@@ -52,6 +52,7 @@ Add `.coderabbit.yaml` at the repository root, configured along four axes.
 | `frontend/src/admin/**` | **Exemption** — dark-pinned surface, `text-white` is correct here |
 | `frontend/src/utils/**` | After-midnight threshold; `prepareBands()` delegation; schedule-storage date semantics |
 | `migrations/**/*.sql` | `PRAGMA foreign_keys` around table recreation; `database/setup-complete.sql` is generated |
+| `database/setup-complete.sql` | The generated artifact itself — hand-edits to its schema section, and schema changes with no originating migration |
 | `frontend/public/_headers` | Document CSP source; COEP must stay unset; theme-flash script hash |
 | `.github/{workflows,actions}/**` | Third-party actions pinned to full commit SHAs; local `./` composite references exempt |
 
@@ -80,7 +81,7 @@ Add `.coderabbit.yaml` at the repository root, configured along four axes.
 - **NEG-001**: `.coderabbit.yaml` restates invariants that also live in `CLAUDE.md`. The two can drift. Mitigation: `CLAUDE.md` remains the single source of truth and is listed in `code_guidelines.filePatterns`; the path instructions are phrased as review checks rather than as authoritative statements of the rule.
 - **NEG-002**: Path instructions are advisory input to a language model, not deterministic linting. A violation may still pass review. They supplement — and do not replace — the ESLint, schema-drift, and coverage gates in `quality.yml`.
 - **NEG-003**: The `frontend/src/admin/**` exemption is correct only while the admin surface stays dark-pinned. Should `AdminApp.jsx` ever adopt the user-selectable themes, this block becomes actively harmful and must be removed in the same change.
-- **NEG-004**: Ten path-instruction blocks is a maintenance surface. A directory rename that invalidates a glob fails silently — CodeRabbit simply stops applying that block, with no error.
+- **NEG-004**: Eleven path-instruction blocks is a maintenance surface. A directory rename that invalidates a glob fails silently — CodeRabbit simply stops applying that block, with no error.
 - **NEG-005**: Advisory `warning` pre-merge checks can be ignored indefinitely. They inform; they do not enforce.
 
 ## Alternatives Considered

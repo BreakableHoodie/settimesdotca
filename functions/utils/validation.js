@@ -188,32 +188,6 @@ export function validateRequiredFields(data, requiredFields) {
 }
 
 /**
- * Validate string length
- * @param {string} value - String to validate
- * @param {Object} options - Validation options
- * @param {number} options.min - Minimum length
- * @param {number} options.max - Maximum length
- * @returns {Object} { valid: boolean, error: string|null }
- */
-export function validateLength(value, options = {}) {
-  const { min, max } = options;
-
-  if (typeof value !== "string") {
-    return { valid: false, error: "Value must be a string" };
-  }
-
-  if (min !== undefined && value.length < min) {
-    return { valid: false, error: `Must be at least ${min} characters` };
-  }
-
-  if (max !== undefined && value.length > max) {
-    return { valid: false, error: `Must be no more than ${max} characters` };
-  }
-
-  return { valid: true, error: null };
-}
-
-/**
  * Validate UUID format
  * @param {string} uuid - UUID to validate
  * @returns {boolean} True if valid UUID format
@@ -660,30 +634,6 @@ export function isValidTime(time) {
   }
 
   return { valid: true, error: null };
-}
-
-/**
- * Validate slug format (URL-friendly)
- * @param {string} slug - Slug to validate
- * @returns {boolean} True if valid slug format
- */
-export function isValidSlug(slug) {
-  if (!slug || typeof slug !== "string") {
-    return false;
-  }
-  return /^[a-z0-9-]+$/.test(slug);
-}
-
-/**
- * Validate event status
- * @param {string} status - Status to validate
- * @returns {boolean} True if valid status
- */
-export function isValidEventStatus(status) {
-  if (!status || typeof status !== "string") {
-    return false;
-  }
-  return VALID_EVENT_STATUSES.includes(status);
 }
 
 /**

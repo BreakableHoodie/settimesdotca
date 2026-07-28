@@ -37,7 +37,7 @@ lint: ## ESLint, both stacks
 	npm run lint
 	cd frontend && npm run lint
 
-test-backend: ## Backend unit tests (better-sqlite3; may DLOPEN-fail on some Apple Silicon — CI covers it)
+test-backend: ## Backend unit tests (better-sqlite3; runs fine on Apple Silicon, a few seconds)
 	npm test
 
 test-frontend: ## Frontend unit tests

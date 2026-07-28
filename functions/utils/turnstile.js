@@ -10,6 +10,7 @@
 // utils/csrf.js). NOTE: this means TURNSTILE_SECRET_KEY MUST be configured in
 // the production Pages project, or these endpoints will reject every request.
 import { isDevRequest } from "./auth.js";
+import { logger } from "./logger.js";
 
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
@@ -43,9 +44,17 @@ export async function verifyTurnstile(request, env, token) {
       body: formData,
     });
 
+    // #673: a non-2xx siteverify response must log a diagnostic and fail
+    // closed; only a 2xx body may be trusted to grant success.
+    if (!response.ok) {
+      logger.warn("[Turnstile] siteverify responded with non-2xx status", { status: response.status });
+      return false;
+    }
+
     const result = await response.json().catch(() => ({}));
     return Boolean(result?.success);
-  } catch (_error) {
+  } catch (error) {
+    logger.warn("[Turnstile] siteverify request failed", { error });
     return false;
   }
 }

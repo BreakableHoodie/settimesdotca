@@ -1,7 +1,8 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
-import { onRequest } from "../_middleware.js";
+import { onRequest, auditLog } from "../_middleware.js";
 import { createTestEnv } from "../../test-utils.js";
+import { logger } from "../../../utils/logger.js";
 
 const BASE_URL = "https://example.test/api/admin/me";
 
@@ -41,5 +42,24 @@ describe("admin auth middleware", () => {
     expect(timeRemaining).toBe(idleRemaining);
     expect(absoluteRemaining).toBeGreaterThan(6 * 60 * 60);
     expect(response.headers.get("X-Session-Warning")).toBe("true");
+  });
+});
+
+describe("auditLog (#671)", () => {
+  test("logs via the module logger when the write fails and no caller-supplied logger is passed", async () => {
+    const { env } = createTestEnv({ role: "admin" });
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    try {
+      // user_id 99999 doesn't exist, so the FK-constrained INSERT throws.
+      await auditLog(env, 99999, "test.action", "test_resource", 1, null, "127.0.0.1");
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Audit log write failed",
+        expect.objectContaining({ action: "test.action", resourceType: "test_resource", resourceId: 1 }),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

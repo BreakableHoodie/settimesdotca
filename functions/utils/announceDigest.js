@@ -141,7 +141,14 @@ export async function flushAnnounceDigest(env, DB) {
 
   for (let i = 0; i < sendTasks.length; i += SEND_CONCURRENCY) {
     const chunk = sendTasks.slice(i, i + SEND_CONCURRENCY);
-    await Promise.allSettled(chunk.map(sendOne));
+    const results = await Promise.allSettled(chunk.map(sendOne));
+    // #672: rejected tasks are logged; send counts and claim-recovery
+    // semantics are unchanged.
+    for (const result of results) {
+      if (result.status === "rejected") {
+        logger.error("announce digest sendOne rejected (claim release may not have run)", { error: result.reason });
+      }
+    }
   }
 
   if (failed > 0) {

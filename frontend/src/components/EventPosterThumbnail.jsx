@@ -17,11 +17,11 @@ import PosterImage from './PosterImage'
  * push it down. Renders nothing when posterUrl is absent/null, which is the
  * common case (most events have no poster yet).
  *
- * Uses PosterImage (#664) rather than a raw <img> so this thumbnail requests
- * a right-sized Cloudflare transform derivative instead of the full-size
- * original — a 180px-tall render has no business downloading a 1440x1800
- * poster. `width={200}` covers the tallest breakpoint's ~150px-wide render
- * at 1x, with PosterImage's 2x srcset candidate covering retina.
+ * Must request a right-sized Cloudflare derivative, never the full-size
+ * original. `width={200}` is tied to the `md:h-[180px]` cap below: a 3:4
+ * portrait poster renders ~150px wide there, so the 200-wide 1x derivative
+ * covers it and PosterImage's 400-wide 2x candidate covers retina. Resize the
+ * thumbnail and this width has to move with it.
  */
 function EventPosterThumbnail({ posterUrl, eventName, onOpen }) {
   if (!posterUrl) return null

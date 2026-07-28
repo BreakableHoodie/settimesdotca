@@ -29,10 +29,8 @@ describe('EventPosterThumbnail', () => {
     expect(image).toHaveAttribute('loading', 'lazy')
   })
 
-  // #664: the thumbnail must request a right-sized Cloudflare transform
-  // derivative (200-wide 1x, 400-wide 2x) instead of the full-size poster
-  // original — this is the whole point of routing through PosterImage rather
-  // than a raw <img src={posterUrl}>.
+  // #664: the thumbnail must request a right-sized Cloudflare derivative —
+  // a 200-wide 1x src and a 400-wide 2x srcset candidate.
   it('requests a Cloudflare image-transform derivative rather than the full-size original', () => {
     render(<EventPosterThumbnail posterUrl={POSTER_URL} eventName="Buddies Fest 2" onOpen={vi.fn()} />)
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { X } from 'lucide-react'
+import PosterImage from '../PosterImage'
 
 /**
  * ImageLightbox — full-viewport click-to-enlarge image viewer (#655).
@@ -22,8 +23,17 @@ import { X } from 'lucide-react'
  * The close button uses `text-white` deliberately — it sits over a fixed
  * dark scrim (bg-black/90), one of the documented theme-token exceptions
  * (CLAUDE.md "Theming"), not a public-surface violation.
+ *
+ * The image renders through `PosterImage` (#659) rather than a bare `<img>`,
+ * so a full-viewport view requests a right-sized Cloudflare image-transform
+ * derivative instead of the full-size original — `width` defaults to 1600,
+ * chosen so a poster stays readable when someone opens it specifically to
+ * read the lineup. Both current callers (the live event page and the
+ * archived recap page) pass a poster URL on the same R2-backed host, so
+ * baking the transform in here (rather than at each call site) keeps them
+ * simple and automatically covers any future caller of this component.
  */
-export default function ImageLightbox({ src, alt, isOpen, onClose }) {
+export default function ImageLightbox({ src, alt, isOpen, onClose, width = 1600 }) {
   const dialogRef = useRef(null)
   const previousActiveElement = useRef(null)
 
@@ -146,9 +156,11 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }) {
             failure. Never let this render with no alt attribute at all:
             React omits the attribute entirely for `undefined`, and AT then
             falls back to announcing the URL. */}
-        <img
+        <PosterImage
           src={src}
+          width={width}
           alt={alt || 'Enlarged image'}
+          loading="eager"
           className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
         />
       </div>
@@ -166,4 +178,6 @@ ImageLightbox.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   /** Callback when the lightbox should close. */
   onClose: PropTypes.func.isRequired,
+  /** Target render width in CSS pixels for the Cloudflare image transform (#659). Defaults to 1600 — full-viewport, so the poster stays readable. */
+  width: PropTypes.number,
 }

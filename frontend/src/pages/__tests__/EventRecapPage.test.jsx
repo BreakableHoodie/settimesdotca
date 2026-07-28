@@ -160,7 +160,20 @@ describe('EventRecapPage — poster (#616)', () => {
     expect(await screen.findByText('LWBC Vol16')).toBeInTheDocument()
 
     const poster = screen.getByRole('img', { name: 'LWBC Vol16 poster' })
-    expect(poster).toHaveAttribute('src', 'https://band-photos.settimes.ca/event-posters/1-vol16.jpg')
+    // #659: the recap poster renders through a Cloudflare image transform at
+    // the width it actually displays (max-h-96), not the full-size original.
+    // Asserting the concrete transformed URL — rather than loosening this to a
+    // substring match — is what would catch the width silently reverting or the
+    // rewrite being dropped entirely.
+    expect(poster).toHaveAttribute(
+      'src',
+      'https://band-photos.settimes.ca/cdn-cgi/image/width=800,format=auto/event-posters/1-vol16.jpg'
+    )
+    expect(poster).toHaveAttribute(
+      'srcset',
+      'https://band-photos.settimes.ca/cdn-cgi/image/width=800,format=auto/event-posters/1-vol16.jpg 1x, ' +
+        'https://band-photos.settimes.ca/cdn-cgi/image/width=1600,format=auto/event-posters/1-vol16.jpg 2x'
+    )
     expect(poster).toHaveAttribute('loading', 'lazy')
   })
 

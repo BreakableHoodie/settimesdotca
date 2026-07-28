@@ -64,5 +64,12 @@ describe('after-midnight threshold invariant (#550, CLAUDE.md "After-midnight ba
     // alongside or instead of the import.
     expect(source).not.toMatch(/(?:const|let|var)\s+\w*CUTOFF\w*\s*=\s*6\b/i)
     expect(source).not.toMatch(/(?:const|let|var)\s+AFTER_MIDNIGHT_THRESHOLD_HOUR\s*=\s*6\b/)
+    // A re-encoding needn't be named *CUTOFF* — `EARLY_MORNING_HOUR = 6` is the
+    // same drift under a name the guard above misses.
+    expect(source).not.toMatch(/(?:const|let|var)\s+\w*HOUR\w*\s*=\s*6\b/i)
+    // Nor need it be a named constant at all: inlining the threshold directly
+    // into the comparison (`hours < 6`) defeats every declaration guard above
+    // while re-encoding the exact value the invariant protects.
+    expect(source).not.toMatch(/\b\w*hours?\w*\s*[<>]=?\s*6\b/i)
   })
 })

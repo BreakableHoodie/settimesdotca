@@ -1,9 +1,11 @@
 import { CalendarDays, ChevronDown, Clock, DoorOpen, Route, Warehouse } from 'lucide-react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { useScrollCollapse } from '../hooks/useScrollCollapse.js'
 import { getDaysAwayAriaLabel, getDaysAwayLabel } from '../utils/daysAway'
 import { getDoorsTimeForDate } from '../utils/doorsTime'
 import { getLifecycleLabel } from '../utils/liveLabel'
 import { formatTime } from '../utils/timeFormat'
+import EventPosterThumbnail from './EventPosterThumbnail'
 import EventSocialLinks from './EventSocialLinks'
 import GhostEasterEgg from './GhostEasterEgg'
 import TimeFilter from './TimeFilter'
@@ -38,6 +40,8 @@ function LiveContextBar({
   onVenueFilterChange,
   timeFilter = 'all',
   onTimeFilterChange,
+  posterUrl = null,
+  onPosterOpen,
 }) {
   const venueOptions = useMemo(() => [...new Set(bands.map(band => band.venue).filter(Boolean))].sort(), [bands])
   const hasVenueFilter = venueOptions.length > 1
@@ -62,8 +66,37 @@ function LiveContextBar({
     () => getDoorsTimeForDate(eventData?.doors_json, eventData?.date),
     [eventData?.doors_json, eventData?.date]
   )
-  const [isFiltersOpen, setIsFiltersOpen] = useState(true)
+  // Filters (venue/time selects) default OPEN on tablet/desktop, where the
+  // extra vertical space costs nothing, and default CLOSED on phone-width
+  // viewports (#665) — expanded-by-default was the single biggest
+  // contributor to this bar's mobile height, since it renders before the fan
+  // has scrolled (or even interacted) at all. Computed once at mount against
+  // the `sm` breakpoint (640px) rather than tracked on resize — a phone
+  // doesn't get wider mid-session. The Tabs below stay reachable regardless
+  // of this state; only the venue/time selects are gated by it.
+  const [isFiltersOpen, setIsFiltersOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
   const [showGhost, setShowGhost] = useState(false)
+
+  // Collapses the mobile-only identity block (status badge, clock, title,
+  // poster, stats line) once the fan scrolls past it — #665. The Tabs and
+  // filter toggle below are NOT part of this collapse; they render in their
+  // own always-visible block further down. Thresholds are wider than the
+  // site header's (20-140) because this block starts taller: fully
+  // collapsed well before `scrollY` reaches the ~600px this was measured at.
+  const scrollProgress = useScrollCollapse(48, 240)
+  const identityFadeProgress = Math.min(1, scrollProgress * 1.75)
+  // Past this point the identity block is visually gone. `pointerEvents: none`
+  // alone would still leave its focusable children (the status badge) in the
+  // tab order, so a keyboard user could focus an invisible zero-height
+  // control; `inert` removes them from focus and the a11y tree too.
+  const isIdentityCollapsed = scrollProgress > 0.7
+  const identityCollapseStyle = {
+    opacity: 1 - identityFadeProgress,
+    transform: `translateY(${scrollProgress * -6}px)`,
+    maxHeight: `${Math.round(200 * (1 - scrollProgress))}px`,
+    overflow: 'hidden',
+    pointerEvents: isIdentityCollapsed ? 'none' : 'auto',
+  }
   const tapCountRef = useRef(0)
   const firstTapTimeRef = useRef(0)
 
@@ -144,53 +177,65 @@ function LiveContextBar({
     <section className="sticky top-[57px] z-40 border-b border-border bg-bg-navy/92 backdrop-blur-xs">
       <div className="container mx-auto px-4 max-w-(--breakpoint-2xl) py-2.5 sm:py-3">
         <div className="sm:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <span
-              role="button"
-              tabIndex={0}
-              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
-              aria-label={`Event status: ${lifecycle.label}`}
-              onClick={handleLifecycleTap}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  handleLifecycleTap()
-                }
-              }}
-            >
-              {lifecycle.label}
-            </span>
+          {/* Identity block: status badge, clock, poster, title, stats.
+              Collapses on scroll (#665, style computed above) — everything
+              a fan needs once they're scrolling the lineup (Tabs, filter
+              toggle) lives in the always-visible block below, outside this
+              wrapper. */}
+          <div style={identityCollapseStyle} inert={isIdentityCollapsed}>
+            <div className="flex items-center justify-between gap-3">
+              <span
+                role="button"
+                tabIndex={0}
+                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+                aria-label={`Event status: ${lifecycle.label}`}
+                onClick={handleLifecycleTap}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleLifecycleTap()
+                  }
+                }}
+              >
+                {lifecycle.label}
+              </span>
 
-            <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary">
-              <Clock size={14} aria-hidden="true" className="text-accent-400" />
-              <span className="tabular-nums">{formatCurrentTime(currentTime)}</span>
+              <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary">
+                <Clock size={14} aria-hidden="true" className="text-accent-400" />
+                <span className="tabular-nums">{formatCurrentTime(currentTime)}</span>
+              </div>
             </div>
-          </div>
 
-          <h2
-            className="mt-2 overflow-hidden text-base font-semibold leading-snug text-text-primary"
-            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
-          >
-            {eventData.name}
-          </h2>
-          <EventSocialLinks socialLinks={eventData.social_links} eventName={eventData.name} className="-ml-2 mt-0.5" />
-
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <p className="truncate text-xs text-text-tertiary">{mobileSummary}</p>
-            <button
-              type="button"
-              onClick={() => setIsFiltersOpen(v => !v)}
-              aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
-              aria-expanded={isFiltersOpen}
-              aria-controls="live-filter-panel"
-              className="shrink-0 flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 px-2 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
-            >
-              <ChevronDown
-                size={14}
-                aria-hidden="true"
-                className={`transition-transform duration-200 ${isFiltersOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
+            {/* Poster beside the title/stats rather than stacked above them
+                (#666) — reclaims the dead width a poster-alone row left
+                empty and drops a whole ~142px row from the mobile vertical
+                budget. Absent posterUrl (the common case) just leaves this
+                column at full width; nothing here depends on the poster
+                being present. */}
+            <div className="mt-2 flex gap-3">
+              {posterUrl && (
+                <EventPosterThumbnail
+                  posterUrl={posterUrl}
+                  eventName={eventData.name}
+                  onOpen={onPosterOpen}
+                  variant="inline"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <h2
+                  className="overflow-hidden text-base font-semibold leading-snug text-text-primary"
+                  style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+                >
+                  {eventData.name}
+                </h2>
+                <EventSocialLinks
+                  socialLinks={eventData.social_links}
+                  eventName={eventData.name}
+                  className="-ml-2 mt-0.5"
+                />
+                <p className="mt-1 truncate text-xs text-text-tertiary">{mobileSummary}</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -282,9 +327,14 @@ function LiveContextBar({
           </button>
         </div>
 
-        {isFiltersOpen && (
-          <div id="live-filter-panel" className="mt-3 border-t border-border pt-3">
-            <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
+        {/* Tabs (Live Lineup / My Route) and the mobile filters toggle are
+            deliberately OUTSIDE the `isFiltersOpen` gate below (#665) — they
+            are the functional navigation controls and must stay reachable
+            at all times, unlike the venue/time selects, which are genuinely
+            optional filtering and are fine to default-collapse on mobile. */}
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <div className="flex items-center gap-2">
               <div className="grid grid-cols-2 items-center rounded-full border border-border bg-surface p-1">
                 <button
                   type="button"
@@ -313,7 +363,30 @@ function LiveContextBar({
                 </button>
               </div>
 
+              {/* Desktop already has its own "Filters" toggle in the stat
+                  chip row above (`ml-auto` button, unaffected by this
+                  change); this compact mobile-only twin keeps the toggle
+                  reachable next to the Tabs once the identity block above
+                  has scroll-collapsed away. */}
+              <button
+                type="button"
+                onClick={() => setIsFiltersOpen(v => !v)}
+                aria-label={isFiltersOpen ? 'Hide filters' : 'Show filters'}
+                aria-expanded={isFiltersOpen}
+                aria-controls="live-filter-panel"
+                className="ml-auto flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1 px-2 text-xs text-text-tertiary transition-colors hover:text-text-secondary sm:hidden"
+              >
+                <ChevronDown
+                  size={14}
+                  aria-hidden="true"
+                  className={`transition-transform duration-200 ${isFiltersOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+            </div>
+
+            {isFiltersOpen && (
               <div
+                id="live-filter-panel"
                 className={`grid gap-2 ${hasVenueFilter ? 'grid-cols-2' : 'grid-cols-1'} sm:flex sm:flex-wrap sm:items-center`}
               >
                 {hasVenueFilter && (
@@ -348,9 +421,9 @@ function LiveContextBar({
                   className="min-w-0 sm:min-w-[180px]"
                 />
               </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
       {showGhost && <GhostEasterEgg onDismiss={() => setShowGhost(false)} />}
     </section>

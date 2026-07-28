@@ -330,7 +330,7 @@ describe('ScheduleView — #541: day dividers', () => {
     const dividers = screen.getAllByRole('separator')
     expect(dividers).toHaveLength(1)
     expect(dividers[0]).toHaveTextContent('Day 2')
-    expect(dividers[0]).toHaveTextContent('Sunday, June 2')
+    expect(dividers[0]).toHaveTextContent('June 2')
   })
 })
 
@@ -383,7 +383,7 @@ describe('ScheduleView — #542 PR-3: day-tab filter', () => {
     expect(screen.getByText('Beta')).toBeInTheDocument()
 
     const activeTab = screen.getAllByRole('tab').find(tab => tab.getAttribute('aria-selected') === 'true')
-    expect(activeTab).toHaveTextContent('Sun Jun 2')
+    expect(activeTab).toHaveTextContent('Jun 2')
   })
 
   it('an out-of-range ?day= falls back to the default day instead of blanking the view', () => {
@@ -399,7 +399,7 @@ describe('ScheduleView — #542 PR-3: day-tab filter', () => {
     expect(screen.getByText('Alpha')).toBeInTheDocument()
     expect(screen.queryByText('Beta')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Sun Jun 2' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Jun 2' }))
 
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
     expect(screen.getByText('Beta')).toBeInTheDocument()

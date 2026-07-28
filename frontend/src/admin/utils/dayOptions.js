@@ -58,7 +58,11 @@ export const enumerateFestivalDays = (startDate, endDate) => {
 
 /**
  * Builds <select> options for an event's festival days:
- * [{ value: 'YYYY-MM-DD', label: 'Day 1 (Sat Aug 2)' }, ...]
+ * [{ value: 'YYYY-MM-DD', label: 'Day 1 (Aug 2)' }, ...]
+ *
+ * No weekday in the label (#681) — `formatFestivalDate`'s docblock explains
+ * why (an after-midnight set's calendar weekday can mismatch the festival
+ * day it belongs to).
  */
 export const buildDayOptions = (startDate, endDate) =>
   enumerateFestivalDays(startDate, endDate).map((value, index) => ({

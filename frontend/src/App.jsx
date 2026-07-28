@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import Breadcrumbs from './components/Breadcrumbs'
 import ComingUp from './components/ComingUp'
+import EventPosterThumbnail from './components/EventPosterThumbnail'
 import NextMove from './components/NextMove'
 import Footer from './components/Footer'
 import Header from './components/Header'
@@ -12,7 +13,7 @@ import PrivacyBanner from './components/PrivacyBanner'
 import LiveContextBar from './components/LiveContextBar'
 import ScheduleView from './components/ScheduleView'
 import ScheduleSkeleton from './components/ScheduleSkeleton'
-import { ConfirmDialog, Modal } from './components/ui'
+import { ConfirmDialog, ImageLightbox, Modal } from './components/ui'
 import { trackEventView, trackPageView } from './utils/metrics'
 import { getTimeFilterOptions } from './utils/timeFilter'
 import { computeNextMove } from './utils/nextMove'
@@ -175,6 +176,7 @@ function App() {
   const [pendingSharedBandNames, setPendingSharedBandNames] = useState([])
   const [lastClearedBands, setLastClearedBands] = useState([])
   const [scheduleToast, setScheduleToast] = useState(null)
+  const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const scheduleToastTimeoutRef = useRef(null)
 
   useEffect(() => {
@@ -731,6 +733,11 @@ function App() {
         <div className="hidden sm:block">
           <Breadcrumbs items={breadcrumbs} />
         </div>
+        <EventPosterThumbnail
+          posterUrl={eventData?.poster_url}
+          eventName={eventData?.name}
+          onOpen={() => setPosterLightboxOpen(true)}
+        />
 
         {/* Archived event banner */}
         {isArchived && (
@@ -962,6 +969,12 @@ function App() {
         confirmText="Clear"
         onConfirm={doActualClear}
         onCancel={() => setClearConfirmOpen(false)}
+      />
+      <ImageLightbox
+        src={eventData?.poster_url}
+        alt={eventData?.name ? `${eventData.name} poster` : 'Event poster'}
+        isOpen={posterLightboxOpen}
+        onClose={() => setPosterLightboxOpen(false)}
       />
       {scheduleToast && (
         <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">

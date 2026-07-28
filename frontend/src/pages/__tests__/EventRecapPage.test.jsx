@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -162,6 +162,35 @@ describe('EventRecapPage — poster (#616)', () => {
     const poster = screen.getByRole('img', { name: 'LWBC Vol16 poster' })
     expect(poster).toHaveAttribute('src', 'https://band-photos.settimes.ca/event-posters/1-vol16.jpg')
     expect(poster).toHaveAttribute('loading', 'lazy')
+  })
+
+  // #655: the poster is now click-to-enlarge via a shared ImageLightbox.
+  it('opens the lightbox when the poster is clicked', async () => {
+    fetchPublicJson.mockReset()
+    fetchPublicJson.mockResolvedValue({
+      event: {
+        id: 4,
+        name: 'LWBC Vol16',
+        slug: 'lwbc16',
+        date: '2025-08-02',
+        poster_url: 'https://band-photos.settimes.ca/event-posters/1-vol16.jpg',
+      },
+      stats: { total_sets: 0, venue_count: 0, first_timers: 0, returning_acts: 0 },
+      bands: [],
+    })
+
+    renderPage('lwbc16')
+    expect(await screen.findByText('LWBC Vol16')).toBeInTheDocument()
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'View LWBC Vol16 poster' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'LWBC Vol16 poster' })
+    expect(dialog).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close poster' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('omits the poster entirely when poster_url is absent', async () => {

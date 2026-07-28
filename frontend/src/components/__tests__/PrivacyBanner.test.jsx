@@ -84,8 +84,15 @@ describe('Privacy banner layout coordination', () => {
 
     render(<OfflineIndicator />)
 
-    expect(screen.getByText(/you're offline/i).parentElement).toHaveStyle({
-      bottom: 'calc(1rem + var(--privacy-banner-height, 0px))',
-    })
+    // Assert the inline style the component declares, not the computed one.
+    // toHaveStyle() routes through getComputedStyle, and jsdom 30's rewritten
+    // CSS engine throws on this value ("object null is not iterable") because
+    // it tries to resolve the 1rem inside a calc() whose var() is unresolved.
+    // Reading .style.bottom skips the CSS engine and is the more precise
+    // assertion anyway — it checks what the component sets, not what jsdom
+    // derives from it.
+    expect(screen.getByText(/you're offline/i).parentElement.style.bottom).toBe(
+      'calc(1rem + var(--privacy-banner-height, 0px))'
+    )
   })
 })

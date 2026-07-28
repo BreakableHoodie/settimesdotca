@@ -43,8 +43,18 @@ const parseDateParts = dateStr => {
 /**
  * Formats a YYYY-MM-DD string for display.
  *
- * `style: 'short'` -> "Sat Aug 2"
- * `style: 'long'`  -> "Saturday, August 2"
+ * `style: 'short'` -> "Aug 2"
+ * `style: 'long'`  -> "August 2"
+ *
+ * No weekday (#681): a festival day runs 6 AM -> 6 AM
+ * (`AFTER_MIDNIGHT_THRESHOLD_HOUR`), so an after-midnight set belongs to the
+ * *previous evening's* lineup even though its calendar weekday has already
+ * ticked over. A fan at a venue at 1 AM would see their phone say Monday
+ * while a weekday label here said Sunday — both correct, but the mismatch
+ * reads as the app being wrong. Month/day carries the same information
+ * without that ambiguity, and is redundant with the day-number label on
+ * single-day events regardless (see CLAUDE.md "Single-day events: never
+ * show 'Day 1'").
  *
  * Uses the local-timezone numeric `new Date(year, month - 1, day)`
  * constructor (parsed by splitting on `-`) — NEVER `new Date('YYYY-MM-DD')`,
@@ -57,16 +67,13 @@ export const formatFestivalDate = (dateValue, style = 'long') => {
   const date = new Date(year, month - 1, day)
 
   if (style === 'short') {
-    const label = date.toLocaleDateString('en-US', {
-      weekday: 'short',
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     })
-    return label.replace(',', '')
   }
 
   return date.toLocaleDateString('en-US', {
-    weekday: 'long',
     month: 'long',
     day: 'numeric',
   })

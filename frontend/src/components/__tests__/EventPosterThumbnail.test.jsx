@@ -60,4 +60,45 @@ describe('EventPosterThumbnail', () => {
     render(<EventPosterThumbnail posterUrl="https://example.test/poster.jpg" onOpen={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'View Event poster' })).toBeInTheDocument()
   })
+
+  // #666: `variant="inline"` is the mobile, beside-the-title-and-stats
+  // layout used inside LiveContextBar — a smaller derivative than the
+  // desktop `standalone` row, and no outer `flex justify-start` wrapper
+  // since its parent flex row now supplies the layout.
+  describe('variant="inline"', () => {
+    it('renders nothing when posterUrl is null', () => {
+      const { container } = render(
+        <EventPosterThumbnail posterUrl={null} eventName="Buddies Fest 2" onOpen={vi.fn()} variant="inline" />
+      )
+      expect(container).toBeEmptyDOMElement()
+    })
+
+    it('requests a smaller derivative than the standalone variant', () => {
+      render(
+        <EventPosterThumbnail posterUrl={POSTER_URL} eventName="Buddies Fest 2" onOpen={vi.fn()} variant="inline" />
+      )
+
+      const image = screen.getByRole('img', { name: 'Buddies Fest 2 poster' })
+      expect(image).toHaveAttribute(
+        'src',
+        `https://${POSTER_IMAGE_HOST}/cdn-cgi/image/width=80,format=auto/event-posters/36-buddiesfest2.jpg`
+      )
+      expect(image).toHaveAttribute(
+        'srcset',
+        `https://${POSTER_IMAGE_HOST}/cdn-cgi/image/width=80,format=auto/event-posters/36-buddiesfest2.jpg 1x, ` +
+          `https://${POSTER_IMAGE_HOST}/cdn-cgi/image/width=160,format=auto/event-posters/36-buddiesfest2.jpg 2x`
+      )
+    })
+
+    it('still opens the lightbox and keeps a real button tap target', () => {
+      const onOpen = vi.fn()
+      render(
+        <EventPosterThumbnail posterUrl={POSTER_URL} eventName="Buddies Fest 2" onOpen={onOpen} variant="inline" />
+      )
+
+      const button = screen.getByRole('button', { name: 'View Buddies Fest 2 poster' })
+      fireEvent.click(button)
+      expect(onOpen).toHaveBeenCalledTimes(1)
+    })
+  })
 })

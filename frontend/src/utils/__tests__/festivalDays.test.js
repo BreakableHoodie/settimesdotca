@@ -9,27 +9,27 @@ import {
 } from '../festivalDays'
 
 describe('formatFestivalDate', () => {
-  it('formats the short style as "Sun Aug 2" (no comma)', () => {
-    expect(formatFestivalDate('2026-08-02', 'short')).toBe('Sun Aug 2')
+  it('formats the short style as "Aug 2" (no weekday, #681)', () => {
+    expect(formatFestivalDate('2026-08-02', 'short')).toBe('Aug 2')
   })
 
-  it('formats the long style as "Sunday, August 2"', () => {
-    expect(formatFestivalDate('2026-08-02', 'long')).toBe('Sunday, August 2')
+  it('formats the long style as "August 2" (no weekday, #681)', () => {
+    expect(formatFestivalDate('2026-08-02', 'long')).toBe('August 2')
   })
 
   it('defaults to the long style when no style is passed', () => {
-    expect(formatFestivalDate('2026-08-02')).toBe('Sunday, August 2')
+    expect(formatFestivalDate('2026-08-02')).toBe('August 2')
   })
 
   it('does not drift a day near a month boundary (short style)', () => {
     // July 31 2026 is a Friday; a UTC-parsing bug (`new Date('2026-07-31')`) would
-    // render as "Thu Jul 30" or "Fri Jul 31" depending on timezone offset direction —
+    // render as "Jul 30" or "Jul 31" depending on timezone offset direction —
     // the local-timezone numeric constructor must keep this pinned to Jul 31.
-    expect(formatFestivalDate('2026-07-31', 'short')).toBe('Fri Jul 31')
+    expect(formatFestivalDate('2026-07-31', 'short')).toBe('Jul 31')
   })
 
   it('does not drift a day near a month boundary (long style)', () => {
-    expect(formatFestivalDate('2026-08-01', 'long')).toBe('Saturday, August 1')
+    expect(formatFestivalDate('2026-08-01', 'long')).toBe('August 1')
   })
 
   it('returns an empty string for a missing/empty date', () => {

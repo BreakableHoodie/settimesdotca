@@ -720,6 +720,8 @@ function App() {
           onVenueFilterChange={setVenueFilter}
           timeFilter={timeFilter}
           onTimeFilterChange={setTimeFilter}
+          posterUrl={eventData?.poster_url}
+          onPosterOpen={() => setPosterLightboxOpen(true)}
         />
       )}
       <main
@@ -733,11 +735,20 @@ function App() {
         <div className="hidden sm:block">
           <Breadcrumbs items={breadcrumbs} />
         </div>
-        <EventPosterThumbnail
-          posterUrl={eventData?.poster_url}
-          eventName={eventData?.name}
-          onOpen={() => setPosterLightboxOpen(true)}
-        />
+        {/* Archived events skip LiveContextBar entirely (no sticky bar, no
+            Tabs) so this stays the ONLY poster placement and must render at
+            every width. Live (non-archived) events hide it below `sm:` —
+            LiveContextBar renders the poster itself there
+            (`variant="inline"`, beside the title/stats, #666) as part of
+            its mobile identity block, so showing it here too would
+            duplicate it. */}
+        <div className={isArchived ? undefined : 'hidden sm:block'}>
+          <EventPosterThumbnail
+            posterUrl={eventData?.poster_url}
+            eventName={eventData?.name}
+            onOpen={() => setPosterLightboxOpen(true)}
+          />
+        </div>
 
         {/* Archived event banner */}
         {isArchived && (

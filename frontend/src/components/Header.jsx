@@ -1,39 +1,21 @@
-import { memo, useEffect, useState } from 'react'
+import { memo } from 'react'
 import { Link } from 'react-router-dom'
+import { useScrollCollapse } from '../hooks/useScrollCollapse.js'
 import ThemeToggle from './ThemeToggle.jsx'
 import VenueStrip from './VenueStrip.jsx'
 
 function Header({ eventName, eventDate, selectedVenues }) {
+  // No `weekday` (#681): a festival day runs 6 AM -> 6 AM, so an
+  // after-midnight set's calendar weekday can mismatch the festival day a
+  // fan is standing in — the month/day alone carries the same information
+  // without that ambiguity.
   const formattedDate = eventDate
     ? new Date(`${eventDate}T12:00:00`).toLocaleDateString('en-US', {
-        weekday: 'long',
         month: 'long',
         day: 'numeric',
       })
     : null
-  const [scrollProgress, setScrollProgress] = useState(0)
-
-  useEffect(() => {
-    let frame = null
-    const update = () => {
-      frame = null
-      const y = window.scrollY || 0
-      const start = 20
-      const end = 140
-      const next = Math.min(Math.max((y - start) / (end - start), 0), 1)
-      setScrollProgress(prev => (Math.abs(prev - next) < 0.01 ? prev : next))
-    }
-    const onScroll = () => {
-      if (frame) return
-      frame = requestAnimationFrame(update)
-    }
-    update()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      if (frame) cancelAnimationFrame(frame)
-    }
-  }, [])
+  const scrollProgress = useScrollCollapse(20, 140)
 
   const headerPadding = Math.round(12 - 4 * scrollProgress)
   const headerStyle = {

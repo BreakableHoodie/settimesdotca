@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import LiveContextBar from '../LiveContextBar'
 
 const eventData = {
@@ -11,6 +11,10 @@ const bands = [
   { id: '1', venue: 'Stage A' },
   { id: '2', venue: 'Stage B' },
 ]
+
+function setViewportWidth(width) {
+  Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: width })
+}
 
 describe('LiveContextBar', () => {
   it('surfaces route, venue, and time controls in the sticky bar', () => {
@@ -139,5 +143,151 @@ describe('LiveContextBar', () => {
 
     expect(screen.getAllByText('Tonight').length).toBeGreaterThan(0)
     expect(screen.queryByText(/0 days away/)).not.toBeInTheDocument()
+  })
+
+  // #665: Tabs and the filters toggle are the functional controls and must
+  // stay reachable regardless of the venue/time filter panel's open state —
+  // previously they were rendered INSIDE the same `isFiltersOpen` gate as
+  // the selects, so closing filters also hid the Live Lineup/My Route tabs.
+  describe('Tabs stay reachable independent of the filter panel (#665)', () => {
+    afterEach(() => {
+      setViewportWidth(1024)
+    })
+
+    it('keeps the Tabs visible after collapsing the venue/time filters', () => {
+      render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      const toggles = screen.getAllByRole('button', { name: /hide filters/i })
+      fireEvent.click(toggles[0])
+
+      expect(screen.queryByLabelText(/Time filter/i)).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Live Lineup/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /My Route/i })).toBeInTheDocument()
+      // The toggle itself must also stay reachable once collapsed.
+      expect(screen.getAllByRole('button', { name: /show filters/i }).length).toBeGreaterThan(0)
+    })
+
+    it('defaults the filter panel open on a desktop-width viewport', () => {
+      setViewportWidth(1024)
+      render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      expect(screen.getByLabelText(/Time filter/i)).toBeInTheDocument()
+    })
+
+    it('defaults the filter panel collapsed on a phone-width viewport, Tabs still present', () => {
+      setViewportWidth(375)
+      render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      expect(screen.queryByLabelText(/Time filter/i)).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Live Lineup/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /My Route/i })).toBeInTheDocument()
+    })
+  })
+
+  // #666: the poster is rendered inline (beside the title/stats) inside
+  // LiveContextBar's mobile identity block rather than as its own row.
+  describe('inline poster (#666)', () => {
+    it('renders the poster button when posterUrl is provided', () => {
+      render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+          posterUrl="https://band-photos.settimes.ca/event-posters/1-test.jpg"
+          onPosterOpen={vi.fn()}
+        />
+      )
+
+      expect(screen.getByRole('button', { name: /View .*poster/i })).toBeInTheDocument()
+    })
+
+    it('renders no poster button when posterUrl is absent — the meta column stays unaffected', () => {
+      render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      expect(screen.queryByRole('button', { name: /View .*poster/i })).not.toBeInTheDocument()
+      expect(screen.getAllByText(eventData.name).length).toBeGreaterThan(0)
+    })
+
+    it('calls onPosterOpen when the inline poster is clicked', () => {
+      const onPosterOpen = vi.fn()
+      render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+          posterUrl="https://band-photos.settimes.ca/event-posters/1-test.jpg"
+          onPosterOpen={onPosterOpen}
+        />
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: /View .*poster/i }))
+      expect(onPosterOpen).toHaveBeenCalledTimes(1)
+    })
   })
 })

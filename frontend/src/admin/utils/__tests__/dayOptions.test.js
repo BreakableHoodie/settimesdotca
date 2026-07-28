@@ -47,26 +47,26 @@ describe('enumerateFestivalDays', () => {
 })
 
 describe('buildDayOptions', () => {
-  it('produces correct labels/values for a 2-day span', () => {
+  it('produces correct labels/values for a 2-day span (no weekday, #681)', () => {
     const options = buildDayOptions('2026-08-02', '2026-08-03')
     expect(options).toEqual([
-      { value: '2026-08-02', label: 'Day 1 (Sun Aug 2)' },
-      { value: '2026-08-03', label: 'Day 2 (Mon Aug 3)' },
+      { value: '2026-08-02', label: 'Day 1 (Aug 2)' },
+      { value: '2026-08-03', label: 'Day 2 (Aug 3)' },
     ])
   })
 
-  it('produces correct labels/values for a 3-day span', () => {
+  it('produces correct labels/values for a 3-day span (no weekday, #681)', () => {
     const options = buildDayOptions('2026-08-02', '2026-08-04')
     expect(options).toEqual([
-      { value: '2026-08-02', label: 'Day 1 (Sun Aug 2)' },
-      { value: '2026-08-03', label: 'Day 2 (Mon Aug 3)' },
-      { value: '2026-08-04', label: 'Day 3 (Tue Aug 4)' },
+      { value: '2026-08-02', label: 'Day 1 (Aug 2)' },
+      { value: '2026-08-03', label: 'Day 2 (Aug 3)' },
+      { value: '2026-08-04', label: 'Day 3 (Aug 4)' },
     ])
   })
 
   it('produces a single Day 1 option for a single-day event', () => {
     const options = buildDayOptions('2026-08-02', null)
-    expect(options).toEqual([{ value: '2026-08-02', label: 'Day 1 (Sun Aug 2)' }])
+    expect(options).toEqual([{ value: '2026-08-02', label: 'Day 1 (Aug 2)' }])
   })
 
   it('option values round-trip through enumerateFestivalDays', () => {

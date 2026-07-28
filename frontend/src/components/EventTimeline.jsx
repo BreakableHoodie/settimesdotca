@@ -567,10 +567,13 @@ function EventCard({
   const [expanded, setExpanded] = useState(isLive) // Auto-expand live events
   const ticketHref = safeExternalHref(event.ticket_url)
 
+  // No `weekday` (#681): a festival day runs 6 AM -> 6 AM, so an
+  // after-midnight set's calendar weekday can mismatch the festival day a
+  // fan actually experienced — month/day/year carries the same information
+  // without that ambiguity.
   const formatDate = dateStr => {
     const date = parseLocalDate(dateStr) || new Date(dateStr)
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',

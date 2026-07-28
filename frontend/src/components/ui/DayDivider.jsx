@@ -9,7 +9,8 @@ import { formatTime } from '../../utils/timeFormat'
  * DayDivider - Design System v1.0
  *
  * Festival-day header shown between sets on different days of a multi-day
- * event (#541): "DAY N · Saturday, August 2". Public / theme-following
+ * event (#541): "DAY N · August 2" (no weekday, #681 — see
+ * `formatFestivalDate`'s docblock for why). Public / theme-following
  * surface — semantic tokens only, never hardcoded white.
  *
  * When `doorsJson` (the event's `doors_json`) has a time for this day's

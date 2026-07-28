@@ -3,6 +3,7 @@
 // Privacy-first: no PII, aggregated only
 
 import { logger } from "../utils/logger.js";
+import { eventLocalToday } from "../utils/eventDay.js";
 
 const MAX_BATCH_STATEMENTS = 20;
 
@@ -83,7 +84,11 @@ export async function onRequestPost(context) {
     }
 
     if (env.DB) {
-      const today = new Date().toISOString().split("T")[0];
+      // Toronto-local, not UTC-sliced: new Date().toISOString() flips to the
+      // next day at 8 PM Eastern, which misattributed evening traffic to
+      // tomorrow's date key (CLAUDE.md "Server-side 'today'/'now' is
+      // Toronto-local", #668).
+      const today = eventLocalToday();
       const bandViewCounts = new Map();
       const socialClickCounts = new Map();
       const pageCounts = new Map(); // page path → count

@@ -17,6 +17,7 @@ import {
   confirmArchivedEventDelete,
 } from '../utils/eventLifecycle'
 import { safeExternalHref } from '../utils/urlSafety'
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
 
 const isEventLockedAsArchived = event => event?.status === 'archived' || isEventArchived(event?.date)
 const getAdminEventState = event => (event?.status === 'archived' ? 'archived' : getEventState(event?.date))
@@ -28,7 +29,6 @@ const inputFocusClass =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple'
 
 const MINUTES_IN_DAY = 24 * 60
-const EARLY_MORNING_CUTOFF_HOUR = 6
 const EVENING_START_HOUR = 18
 
 const parseTimeToMinutes = time => {
@@ -42,7 +42,7 @@ const getSortableTimeMinutes = time => {
   const totalMinutes = parseTimeToMinutes(time)
   if (totalMinutes === null) return Number.POSITIVE_INFINITY
   const hours = Math.floor(totalMinutes / 60)
-  return hours < EARLY_MORNING_CUTOFF_HOUR ? totalMinutes + MINUTES_IN_DAY : totalMinutes
+  return hours < AFTER_MIDNIGHT_THRESHOLD_HOUR ? totalMinutes + MINUTES_IN_DAY : totalMinutes
 }
 
 const getDurationMinutes = (startTime, endTime) => {
@@ -73,7 +73,7 @@ const calculateEventTotals = eventBands => {
     if (startMinutes === null) return
     const hour = Math.floor(startMinutes / 60)
     if (hour >= EVENING_START_HOUR) hasEveningShows = true
-    if (hour < EARLY_MORNING_CUTOFF_HOUR) hasEarlyMorningShows = true
+    if (hour < AFTER_MIDNIGHT_THRESHOLD_HOUR) hasEarlyMorningShows = true
   })
 
   const isMidnightCrossing = hasEveningShows && hasEarlyMorningShows
@@ -94,10 +94,10 @@ const calculateEventTotals = eventBands => {
     if (isMidnightCrossing) {
       const startHour = Math.floor(startMinutes / 60)
       const endHour = Math.floor(endMinutes / 60)
-      if (startHour < EARLY_MORNING_CUTOFF_HOUR) {
+      if (startHour < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
         adjustedStart += MINUTES_IN_DAY
       }
-      if (endHour < EARLY_MORNING_CUTOFF_HOUR) {
+      if (endHour < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
         adjustedEnd += MINUTES_IN_DAY
       }
     } else if (endMinutes < startMinutes) {

@@ -3202,6 +3202,9 @@ components:
         ticket_url:
           type: string
           nullable: true
+        poster_url:
+          type: string
+          nullable: true
         is_upcoming:
           type: integer
         band_count:
@@ -3258,6 +3261,9 @@ components:
           type: string
           nullable: true
         ticket_url:
+          type: string
+          nullable: true
+        poster_url:
           type: string
           nullable: true
         band_count:

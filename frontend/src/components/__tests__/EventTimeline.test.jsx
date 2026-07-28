@@ -317,3 +317,97 @@ describe('EventTimeline collapsed performer chips ordering', () => {
     expect(chips).toEqual(['The Anti-Queens', 'Mango Static', 'Zebra Mussels'])
   })
 })
+
+// Poster thumbnails on the listing (#658): the card is decorative-only (no
+// lightbox — that lives on the event page, #656) and must render nothing
+// when poster_url is absent, which is still the common case for events that
+// haven't had a poster uploaded yet.
+describe('EventTimeline poster thumbnails (#658)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('renders a decorative poster image when poster_url is present', async () => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Poster Fest',
+          slug: 'poster-fest',
+          date: '2026-08-02',
+          status: 'published',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: 'https://cdn.example.com/posters/poster-fest.jpg',
+        },
+      ],
+      past: [],
+    }
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Poster Fest')).toBeInTheDocument()
+
+    const posterImg = container.querySelector('img[src="https://cdn.example.com/posters/poster-fest.jpg"]')
+    expect(posterImg).toBeInTheDocument()
+    expect(posterImg).toHaveAttribute('alt', '')
+    expect(posterImg).toHaveAttribute('loading', 'lazy')
+    // Decorative only — must not be wrapped in a button/lightbox trigger.
+    expect(posterImg.closest('button')).toBeNull()
+  })
+
+  it('renders no poster element when poster_url is null', async () => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 2,
+          name: 'No Poster Fest',
+          slug: 'no-poster-fest',
+          date: '2026-08-07',
+          status: 'published',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: null,
+        },
+      ],
+      past: [],
+    }
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('No Poster Fest')).toBeInTheDocument()
+    expect(container.querySelector('img')).toBeNull()
+  })
+})

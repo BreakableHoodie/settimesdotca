@@ -612,54 +612,67 @@ function EventCard({
       {/* Event Header */}
       <div className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <div className="flex flex-wrap items-start gap-2 mb-2">
-              {event.slug ? (
-                <h3 className="text-2xl font-bold text-accent-500 flex-1">
-                  <Link
-                    to={`/event/${event.slug}`}
-                    className="hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500/70 rounded-xs"
-                  >
-                    {event.name}
-                  </Link>
-                </h3>
-              ) : (
-                <h3 className="text-2xl font-bold text-accent-500 flex-1">{event.name}</h3>
-              )}
-              {isLive && (
-                <Badge variant="error" size="md">
-                  LIVE NOW
-                </Badge>
-              )}
-              {event.status === 'archived' && (
-                <Badge variant="default" size="md">
-                  <Archive size={12} className="mr-1" aria-hidden="true" />
-                  Archived
-                </Badge>
-              )}
-              {event.is_published === false && <Badge variant="warning">Draft</Badge>}
-            </div>
-
-            <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
-              <CalendarDays size={12} />
-              {formatDate(event.date)}
-            </p>
-
-            {/* Event Stats */}
-            <div className="flex flex-wrap gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-text-primary">{allBandCount}</span>
-                <span className="text-text-tertiary">{allBandCount === 1 ? 'Band' : 'Bands'}</span>
+          <div className="flex flex-1 gap-4 min-w-0">
+            {/* Poster thumbnail (#658) — decorative on the listing: the card's
+                Link/title already names the event, and the full-size lightbox
+                lives on the event page (#656), not here. Fixed-size container
+                + object-contain so varying poster aspect ratios (roughly 3:4
+                to 4:5 in production) never distort the card or its text
+                alignment; omitted entirely (no placeholder box) when absent. */}
+            {event.poster_url && (
+              <div className="w-20 sm:w-24 aspect-[3/4] shrink-0 overflow-hidden rounded-lg border border-border bg-surface">
+                <img src={event.poster_url} alt="" loading="lazy" className="h-full w-full object-contain" />
               </div>
-              {/* Historical volumes have roster-only lineups with no venue
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-start gap-2 mb-2">
+                {event.slug ? (
+                  <h3 className="text-2xl font-bold text-accent-500 flex-1">
+                    <Link
+                      to={`/event/${event.slug}`}
+                      className="hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500/70 rounded-xs"
+                    >
+                      {event.name}
+                    </Link>
+                  </h3>
+                ) : (
+                  <h3 className="text-2xl font-bold text-accent-500 flex-1">{event.name}</h3>
+                )}
+                {isLive && (
+                  <Badge variant="error" size="md">
+                    LIVE NOW
+                  </Badge>
+                )}
+                {event.status === 'archived' && (
+                  <Badge variant="default" size="md">
+                    <Archive size={12} className="mr-1" aria-hidden="true" />
+                    Archived
+                  </Badge>
+                )}
+                {event.is_published === false && <Badge variant="warning">Draft</Badge>}
+              </div>
+
+              <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
+                <CalendarDays size={12} />
+                {formatDate(event.date)}
+              </p>
+
+              {/* Event Stats */}
+              <div className="flex flex-wrap gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-text-primary">{allBandCount}</span>
+                  <span className="text-text-tertiary">{allBandCount === 1 ? 'Band' : 'Bands'}</span>
+                </div>
+                {/* Historical volumes have roster-only lineups with no venue
                   assignments — "0 Venues" reads as missing data, so omit the
                   stat entirely rather than showing a zero. */}
-              {allVenueCount > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-text-primary">{allVenueCount}</span>
-                  <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
-                </div>
-              )}
+                {allVenueCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-text-primary">{allVenueCount}</span>
+                    <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

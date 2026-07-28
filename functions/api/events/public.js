@@ -32,6 +32,7 @@ export async function onRequestGet(context) {
         e.description,
         e.city,
         e.ticket_url,
+        e.poster_url,
         CASE WHEN COALESCE(e.end_date, e.date) >= date('now', '-6 hours') THEN 1 ELSE 0 END as is_upcoming,
         COUNT(DISTINCT p.band_profile_id) as band_count,
         COUNT(DISTINCT p.venue_id) as venue_count
@@ -84,9 +85,13 @@ export async function onRequestGet(context) {
     // javascript: scheme) must not be reflected to this public, unauthenticated
     // endpoint — normalizeHttpUrl returns null for anything that isn't a real
     // http(s) URL.
+    // poster_url gets the same treatment (#658, matches the ticket_url
+    // precedent above): pre-#616 rows were never write-validated, so a legacy
+    // unsafe scheme must never reach this response.
     const sanitizedEvents = filteredEvents.map((event) => ({
       ...event,
       ticket_url: normalizeHttpUrl(event.ticket_url),
+      poster_url: normalizeHttpUrl(event.poster_url),
     }));
 
     // Return JSON

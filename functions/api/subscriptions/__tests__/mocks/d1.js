@@ -230,6 +230,7 @@ export class MockD1Database {
         description: event.description,
         city: event.city,
         ticket_url: event.ticket_url,
+        poster_url: event.poster_url ?? null,
         band_count: uniqueBandIds.size,
         venue_count: uniqueVenueIds.size,
         is_published: event.is_published,

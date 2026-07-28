@@ -140,6 +140,12 @@ export async function onRequestGet(context) {
             end_date: row.event_end_date || null,
             status: row.event_status || null,
             ticket_url: normalizeHttpUrl(row.ticket_url),
+            // Read-path sanitize (#658, matches the ticket_url precedent
+            // above): a pre-#616 legacy poster_url (e.g. a javascript:
+            // scheme) must never be reflected to this public, unauthenticated
+            // endpoint. Functionally dependent on event_id (one value per
+            // event), so any row carries the same value.
+            poster_url: normalizeHttpUrl(row.poster_url),
             bands: includeBands ? [] : null,
             bandIds: new Set(),
             venues: new Map(),
@@ -225,6 +231,7 @@ export async function onRequestGet(context) {
         end_date: event.end_date,
         status: event.status,
         ticket_url: normalizeHttpUrl(event.ticket_url),
+        poster_url: normalizeHttpUrl(event.poster_url),
         band_count: event.bandIds.size,
         venue_count: event.venues.size,
         bands: includeBands ? event.bands : undefined,
@@ -258,6 +265,7 @@ export async function onRequestGet(context) {
           e.end_date as event_end_date,
           e.doors_json as doors_json,
           e.ticket_url as ticket_url,
+          e.poster_url as poster_url,
           p.band_profile_id as band_id,
           b.name as band_name,
           p.start_time,
@@ -308,6 +316,7 @@ export async function onRequestGet(context) {
           e.date as event_date,
           e.end_date as event_end_date,
           e.ticket_url as ticket_url,
+          e.poster_url as poster_url,
           p.band_profile_id as band_id,
           b.name as band_name,
           p.start_time,
@@ -363,6 +372,7 @@ export async function onRequestGet(context) {
           e.end_date as event_end_date,
           e.status as event_status,
           e.ticket_url as ticket_url,
+          e.poster_url as poster_url,
           p.band_profile_id as band_id,
           b.name as band_name,
           p.start_time,

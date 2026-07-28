@@ -227,7 +227,7 @@ Requires a running wrangler dev server or uses it automatically via `playwright.
 
 ### Before every commit — required checklist
 
-**Canonical entry point: `make gate`** — runs format → format:check → lint → test → build for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
+**Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
 
 Run all steps that apply. Do not commit if any step fails.
 

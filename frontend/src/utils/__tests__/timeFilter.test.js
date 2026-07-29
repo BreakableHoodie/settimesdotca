@@ -7,6 +7,7 @@ import {
   getEndOfWeek,
   isHappeningToday,
   isHappeningThisWeek,
+  getTimeDescription,
 } from '../timeFilter.js'
 
 const NOW = 1000000000000 // fixed timestamp, 2001-09-08T21:46:40Z
@@ -185,5 +186,45 @@ describe('week boundary at the 1 AM Monday edge (#542, #550 festival-day convent
     globalThis.__debugScheduleTime = new Date(2026, 7, 3, 1, 0, 0)
     const mondayEveningSet = { startMs: new Date(2026, 7, 3, 20, 0, 0).getTime() } // Mon 8 PM
     expect(isHappeningThisWeek(mondayEveningSet)).toBe(false)
+  })
+})
+
+describe('getTimeDescription never names a weekday (#681)', () => {
+  // #681: formatFestivalDate already dropped weekday names for day
+  // dividers/headers because an after-midnight set's real (offset) timestamp
+  // has already rolled over to the next calendar day — a fan sees their
+  // phone say "Monday" for a set that belongs to Sunday night's lineup. PR
+  // #684 fixed formatFestivalDate but missed this function, which every set
+  // card's time label goes through (BandCard.jsx). Same bug, same fix: no
+  // weekday name, ever, in the "this week"/"next week" branches.
+  afterEach(() => {
+    delete globalThis.__debugScheduleTime
+  })
+
+  it('does not name a weekday for a this-week, after-midnight set (the exact #681 reproduction)', () => {
+    // Sunday Aug 2's after-midnight tail — real timestamp is Monday Aug 3,
+    // 12:15 AM (prepareBands' +1-day offset). Checked from earlier in the
+    // same festival week (Wed Jul 29), well before "today"/"now" apply, so
+    // this exercises the isHappeningThisWeek branch — the one that renders
+    // in production for the days leading up to the event.
+    globalThis.__debugScheduleTime = new Date(2026, 6, 29, 14, 0, 0) // Wed Jul 29, 2 PM
+    const start = new Date(2026, 7, 3, 0, 15, 0) // "Mon" 12:15 AM
+    const afterMidnightSundayNightSet = { startMs: start.getTime() }
+    // Exact equality, not a weekday-negative regex: the this-week branch is the
+    // ONLY one returning a bare time, so this pins the branch as well as the
+    // absence of a weekday. A negative regex would also pass on "Today at
+    // 12:15 AM" — i.e. on the wrong branch having run. The expected time is
+    // derived with the same options the implementation uses, so the assertion
+    // stays locale- and timezone-independent in CI.
+    const expectedTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+    expect(getTimeDescription(afterMidnightSundayNightSet)).toBe(expectedTime)
+  })
+
+  it('does not name a weekday for a next-week performance', () => {
+    globalThis.__debugScheduleTime = new Date(2026, 6, 29, 14, 0, 0) // Wed Jul 29, 2 PM
+    const start = new Date(2026, 7, 5, 20, 0, 0) // Wed Aug 5, 8 PM
+    const nextWeekSet = { startMs: start.getTime() }
+    const expectedTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+    expect(getTimeDescription(nextWeekSet)).toBe(`Next week at ${expectedTime}`)
   })
 })

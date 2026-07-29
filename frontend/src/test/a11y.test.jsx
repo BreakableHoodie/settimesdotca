@@ -8,25 +8,53 @@ import { ThemeProvider } from '../components/ThemeProvider.jsx'
 
 expect.extend(toHaveNoViolations)
 
-// Mock bands data
+// Mock schedule data, shaped like the real GET /api/schedule response
+// (functions/api/schedule.js): `{ bands: [...], event: {...} }`, not a bare
+// array. App.jsx (`data.bands` / `data.event`) reads the `event` key to
+// populate eventData — a bare-array mock leaves eventData permanently null,
+// which silently skips the Header event chrome, EventPosterThumbnail, and
+// LiveContextBar (it returns null without `eventData?.name`, see
+// LiveContextBar.jsx) from ever being axe-scanned (#674).
+const mockEvent = {
+  id: 1,
+  name: 'Test Band Crawl',
+  date: '2025-10-12',
+  end_date: null,
+  city: 'Waterloo',
+  slug: 'test-event',
+  ticket_url: 'https://example.com/tickets',
+  poster_url: 'https://example.com/poster.jpg',
+  is_archived: false,
+  theme_colors: null,
+  venue_info: null,
+  social_links: null,
+  doors_json: null,
+  reveal_mode: 0,
+}
+
 const mockBands = [
   {
-    id: 'test-band',
+    id: 'test-band-1',
+    performance_id: 1,
+    band_profile_id: 1,
     name: 'Test Band',
+    photo_url: 'https://example.com/band.jpg',
     venue: 'Test Venue',
+    venue_lat: 43.4643,
+    venue_lng: -80.5204,
     date: '2025-10-12',
     startTime: '20:00',
     endTime: '20:30',
-    startMs: new Date('2025-10-12T20:00:00').getTime(),
-    endMs: new Date('2025-10-12T20:30:00').getTime(),
+    url: 'https://example.com/test-band',
+    notes: null,
   },
 ]
 
-// Mock fetch for bands.json
+// Mock fetch for /api/schedule
 global.fetch = vi.fn(() =>
   Promise.resolve({
     ok: true,
-    json: () => Promise.resolve(mockBands),
+    json: () => Promise.resolve({ event: mockEvent, bands: mockBands }),
   })
 )
 
@@ -72,6 +100,10 @@ describe('Accessibility Tests', () => {
     await waitForAppToSettle()
 
     const images = container.querySelectorAll('img')
+    // A `forEach` over an empty NodeList runs zero assertions and still
+    // passes (#674) — assert the mock actually rendered images (the event
+    // poster, at minimum) before checking each one has an alt attribute.
+    expect(images.length).toBeGreaterThan(0)
     images.forEach(img => {
       expect(img).toHaveAttribute('alt')
     })
@@ -82,6 +114,8 @@ describe('Accessibility Tests', () => {
     await waitForAppToSettle()
 
     const buttons = container.querySelectorAll('button')
+    // Same vacuous-pass guard as the images test above (#674).
+    expect(buttons.length).toBeGreaterThan(0)
     buttons.forEach(button => {
       const hasText = button.textContent.trim().length > 0
       const hasAriaLabel = button.hasAttribute('aria-label')

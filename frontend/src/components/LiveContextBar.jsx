@@ -29,6 +29,51 @@ function formatCurrentTime(value) {
   })
 }
 
+/**
+ * Pure style computation for the mobile identity block's scroll-collapse
+ * (#665, revisited in #690). Extracted so the monotonicity property can be
+ * asserted directly in a unit test: as `scrollProgress` increases 0->1,
+ * `maxHeight` must never increase.
+ *
+ * `overflowAnchor: 'none'` is the actual fix for #690's bounce. Root cause,
+ * confirmed with a scripted probe against production (see PR body): this is
+ * NOT the text-rewrap theory #690 opened with -- the block's unclamped
+ * `scrollHeight` measured constant across every sampled scroll position, so
+ * nothing inside it was reflowing. The real cause is one layer up. Chrome's
+ * scroll-anchoring heuristic can select this block (or a sibling in the same
+ * sticky region) as an anchor node; because `maxHeight` genuinely shrinks
+ * page layout height while the user is mid-scroll over it, the browser
+ * compensates by silently adjusting `window.scrollY` to hold the anchor
+ * node's viewport position steady. That adjustment perturbs the very
+ * `scrollY` this collapse is driven from, so the collapse regrows, which
+ * changes the layout height again, which triggers another anchor
+ * compensation -- a real feedback loop, just occurring in the browser's
+ * scroll-position math rather than in this component's own state.
+ * `useScrollCollapse`'s docblock is correct that reading only `scrollY`
+ * stops the *hook's* calculation from feeding back into itself; that
+ * guarantee never covered the browser adjusting `scrollY` out from under it
+ * for an unrelated reason. `overflow-anchor: none` opts this subtree out of
+ * anchor-candidacy, which removes the compensation and restores real
+ * monotonicity. Verified empirically: with the default `overflow-anchor:
+ * auto`, a scripted `scrollTo` to monotonically increasing targets produced
+ * a non-monotonic actual `window.scrollY` once this block was mid-collapse;
+ * with `overflow-anchor: none` on the block, `scrollY` tracked the targets
+ * (sub-pixel rounding aside).
+ */
+export function computeIdentityCollapseStyle(scrollProgress) {
+  const identityFadeProgress = Math.min(1, scrollProgress * 1.75)
+  return {
+    opacity: 1 - identityFadeProgress,
+    transform: `translateY(${scrollProgress * -6}px)`,
+    maxHeight: `${Math.round(200 * (1 - scrollProgress))}px`,
+    overflow: 'hidden',
+    // Opts this block out of being a scroll-anchor candidate -- see the
+    // function docblock above. This is the fix for #690.
+    overflowAnchor: 'none',
+    pointerEvents: scrollProgress > 0.7 ? 'none' : 'auto',
+  }
+}
+
 function LiveContextBar({
   eventData,
   currentTime,
@@ -84,19 +129,12 @@ function LiveContextBar({
   // site header's (20-140) because this block starts taller: fully
   // collapsed well before `scrollY` reaches the ~600px this was measured at.
   const scrollProgress = useScrollCollapse(48, 240)
-  const identityFadeProgress = Math.min(1, scrollProgress * 1.75)
   // Past this point the identity block is visually gone. `pointerEvents: none`
   // alone would still leave its focusable children (the status badge) in the
   // tab order, so a keyboard user could focus an invisible zero-height
   // control; `inert` removes them from focus and the a11y tree too.
   const isIdentityCollapsed = scrollProgress > 0.7
-  const identityCollapseStyle = {
-    opacity: 1 - identityFadeProgress,
-    transform: `translateY(${scrollProgress * -6}px)`,
-    maxHeight: `${Math.round(200 * (1 - scrollProgress))}px`,
-    overflow: 'hidden',
-    pointerEvents: isIdentityCollapsed ? 'none' : 'auto',
-  }
+  const identityCollapseStyle = computeIdentityCollapseStyle(scrollProgress)
   const tapCountRef = useRef(0)
   const firstTapTimeRef = useRef(0)
 

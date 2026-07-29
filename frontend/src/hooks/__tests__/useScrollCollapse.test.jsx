@@ -53,6 +53,43 @@ describe('useScrollCollapse', () => {
     expect(screen.getByTestId('progress')).toHaveTextContent('0.5')
   })
 
+  it('does not re-expand when scroll drifts back up mid-page', async () => {
+    // The iOS flicker: the URL bar shows/hides while scrolling, moving scrollY
+    // ~60px, and momentum/rubber-band add smaller jitter. Measured on WebKit at
+    // an iPhone viewport, a 62px jump swung the block's opacity by 0.565 and
+    // its height between 194px and 251px. Progress must ratchet — perturbation
+    // below the current high-water mark is ignored.
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+
+    setScrollY(140) // fully collapsed
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+
+    setScrollY(90) // URL-bar-sized jump back up, still mid-page
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+
+    setScrollY(78) // small drift
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+  })
+
+  it('releases the ratchet once the user is back at the top', async () => {
+    // Ratcheting must not be permanent — returning to the top region restores
+    // the full identity block, which is the whole point of showing it there.
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+
+    setScrollY(140)
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+
+    setScrollY(40) // at the start threshold — release
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('0')
+  })
+
   it('clamps to 1 at and beyond the end threshold', async () => {
     setScrollY(0)
     render(<Harness start={40} end={140} />)

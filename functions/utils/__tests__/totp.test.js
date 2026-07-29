@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   generateTotpSecret,
   generateTotpCode,
@@ -44,10 +44,7 @@ describe("totp utilities", () => {
     expect(result.remaining).toHaveLength(1);
   });
 
-  // #673: negative cases. The RFC vectors above prove correctness on a valid
-  // code; without these, an implementation that returns `true`
-  // unconditionally would pass nearly this whole file.
-  describe("negative cases (#673)", () => {
+  describe("negative cases", () => {
     it("verifyTotp returns false for a wrong code", async () => {
       const secret = generateTotpSecret();
       const correctCode = await generateTotpCode(secret);
@@ -60,13 +57,40 @@ describe("totp utilities", () => {
     });
 
     it("verifyTotp returns false for a code outside the time window", async () => {
-      const secret = generateTotpSecret();
-      // 10 minutes away from "now" is well outside the default ±1 step
-      // (±30s) window, so this code must not validate against the current
-      // time that verifyTotp checks internally.
-      const farFutureCode = await generateTotpCode(secret, Date.now() + 10 * 60 * 1000);
+      const TOTP_STEP_MS = 30 * 1000;
+      const FROZEN_NOW = Date.UTC(2024, 0, 1, 0, 0, 0);
+      vi.useFakeTimers();
+      vi.setSystemTime(FROZEN_NOW);
+      try {
+        const secret = generateTotpSecret();
 
-      expect(await verifyTotp(secret, farFutureCode)).toBe(false);
+        // Codes verifyTotp's default ±1-step window would accept at
+        // FROZEN_NOW (the clock is frozen, so this is exactly what
+        // verifyTotp sees when it reads Date.now() internally).
+        const acceptedCodes = new Set(
+          await Promise.all(
+            [-1, 0, 1].map((stepOffset) => generateTotpCode(secret, FROZEN_NOW + stepOffset * TOTP_STEP_MS)),
+          ),
+        );
+
+        // Start 10 minutes out (well beyond the ±30s window) and step
+        // forward a whole period at a time until landing on a code that is
+        // provably absent from the accepted set — guarantees no flake even
+        // in the ~1-in-10^6 case where a future code coincides with one
+        // in-window.
+        let farFutureCode;
+        for (let stepsOut = 20; ; stepsOut += 1) {
+          const candidate = await generateTotpCode(secret, FROZEN_NOW + stepsOut * TOTP_STEP_MS);
+          if (!acceptedCodes.has(candidate)) {
+            farFutureCode = candidate;
+            break;
+          }
+        }
+
+        expect(await verifyTotp(secret, farFutureCode)).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("verifyTotp returns false for an empty/missing code", async () => {

@@ -1,9 +1,6 @@
-// Tests for the PRAGMA foreign_keys allowlist in functions/_middleware.js
-// (#673). CLAUDE.md's "PRAGMA foreign_keys = ON is enforced in production"
-// section says the guard is "a strict read-only allowlist... never widen it
-// to skip writes" — this file is the executable guard for that invariant:
-// nothing previously asserted the PRAGMA actually fires for every mutating
-// method, or that GET/HEAD are (deliberately) skipped.
+// Executable guard for the "PRAGMA foreign_keys = ON is enforced in
+// production" invariant in CLAUDE.md: a strict read-only allowlist (only
+// GET/HEAD skip the PRAGMA) that must never be widened to skip writes.
 import { describe, expect, test } from "vitest";
 import { onRequest } from "../_middleware.js";
 
@@ -19,6 +16,11 @@ const PRAGMA = "PRAGMA foreign_keys = ON";
  * that it ran — a regression that prepared the PRAGMA and never called `run()`
  * would leave FK enforcement off while still passing. `_middleware.js` calls
  * `.prepare(...).run()`, so `run()` is the only point that proves execution.
+ *
+ * The push happens after an `await`, not synchronously at invocation — this
+ * distinguishes "run() was called" from "run() completed", so the ordering
+ * assertion below proves the PRAGMA finished before `next()`, not merely that
+ * it started.
  */
 function dbWithPragmaSpy() {
   const executed = [];
@@ -26,6 +28,7 @@ function dbWithPragmaSpy() {
     prepare(sql) {
       return {
         async run() {
+          await Promise.resolve();
           executed.push(sql);
           return { success: true, meta: { changes: 0 } };
         },
@@ -117,8 +120,9 @@ describe("_middleware.js — PRAGMA foreign_keys allowlist (#673)", () => {
     const seen = {};
     const request = new Request(NEUTRAL_URL, { method: "OPTIONS", headers: LOOPBACK_HEADERS });
 
-    await onRequest({ request, env: { DB }, data: {}, next: okNext(executed, seen) });
+    const response = await onRequest({ request, env: { DB }, data: {}, next: okNext(executed, seen) });
 
+    expect(response.status).toBe(204);
     expect(executed).not.toContain(PRAGMA);
     // Short-circuited: the downstream handler is never invoked.
     expect(seen.called).toBeUndefined();

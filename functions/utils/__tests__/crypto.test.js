@@ -1,15 +1,10 @@
-// Direct tests for the PBKDF2 password hashing utility (#673). Previously
-// only exercised transitively via login.test.js/mfa.test.js — this pins the
-// on-disk hash format, the roundtrip, salt uniqueness, and the iteration
-// count CLAUDE.md documents ("PBKDF2, not bcrypt": format is
-// pbkdf2$iterations$salt$hash) so a future refactor can't silently weaken it.
+// Direct tests for the PBKDF2 password hashing utility: pins the on-disk
+// hash format (pbkdf2$iterations$salt$hash), the roundtrip, salt uniqueness,
+// and the iteration count.
 import { describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword } from "../crypto.js";
 
-// Mirrors crypto.js's DEFAULT_ITERATIONS (not exported) and the value CLAUDE.md
-// documents under "PBKDF2, not bcrypt". If this module's iteration count ever
-// changes, this constant — and the security review that should accompany a
-// deliberate change — must be updated together.
+// Mirrors crypto.js's DEFAULT_ITERATIONS (not exported).
 const EXPECTED_ITERATIONS = 600000;
 
 describe("crypto.js — PBKDF2 password hashing", () => {
@@ -58,6 +53,32 @@ describe("crypto.js — PBKDF2 password hashing", () => {
     // Both must still independently verify — different salts, same password.
     expect(await verifyPassword(password, hashA)).toBe(true);
     expect(await verifyPassword(password, hashB)).toBe(true);
+  });
+
+  it("still verifies a legacy pbkdf2$ hash produced at 100,000 iterations (pre-bump default)", async () => {
+    // Simulates a password hashed by an older build of this module, before
+    // DEFAULT_ITERATIONS was raised from 100,000 to 600,000. verifyPassword
+    // must read the iteration count from the hash string itself, not assume
+    // the current default, so previously-issued hashes keep verifying
+    // without a rehash migration.
+    const password = "CorrectHorseBatteryStaple1!";
+    const LEGACY_HASH_ITERATIONS = 100000;
+
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, [
+      "deriveBits",
+    ]);
+    const derived = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations: LEGACY_HASH_ITERATIONS, hash: "SHA-256" },
+      keyMaterial,
+      32 * 8,
+    );
+    const saltBase64 = btoa(String.fromCharCode(...salt));
+    const hashBase64 = btoa(String.fromCharCode(...new Uint8Array(derived)));
+    const legacyHash = `pbkdf2$${LEGACY_HASH_ITERATIONS}$${saltBase64}$${hashBase64}`;
+
+    expect(await verifyPassword(password, legacyHash)).toBe(true);
+    expect(await verifyPassword("WrongPassword1!", legacyHash)).toBe(false);
   });
 
   // verifyPassword is a try/catch-wrapped security boundary that must never

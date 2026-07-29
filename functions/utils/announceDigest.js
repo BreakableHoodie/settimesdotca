@@ -116,25 +116,59 @@ export async function flushAnnounceDigest(env, DB) {
   let sent = 0;
   let failed = 0;
 
+  // Logs every claimed id so a stranded row can be found and cleared by hand.
+  function logStrandedClaims(task, message, error) {
+    for (const item of task.claimed) {
+      logger.error(message, {
+        performance_id: item.performance_id,
+        band_follow_id: item.band_follow_id,
+        error,
+      });
+    }
+  }
+
   async function sendOne(task) {
-    const result = await sendEmail(env, {
-      to: task.email,
-      subject: task.subject,
-      text: task.text,
-      html: task.html,
-    });
+    let result;
+    try {
+      result = await sendEmail(env, {
+        to: task.email,
+        subject: task.subject,
+        text: task.text,
+        html: task.html,
+      });
+    } catch (sendError) {
+      // A throw from sendEmail is a delivery failure like any other and must
+      // take the same claim-release path. Left unguarded it skipped the release
+      // entirely, so the notification row survived and resend-announcement
+      // would never recover this fan (#672).
+      logStrandedClaims(task, "announce digest sendEmail threw; releasing claims", sendError);
+      result = { delivered: false };
+    }
     if (result?.delivered) {
       sent++;
     } else {
-      // Release claims so resend-announcement can recover this fan.
-      await DB.batch(
-        task.claimed.map((item) =>
-          DB.prepare("DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?").bind(
-            item.performance_id,
-            item.band_follow_id,
+      // Release claims so resend-announcement can recover this fan. If the
+      // release itself fails, the band_follow_notifications row(s) survive,
+      // which means resend-announcement (which only recovers followers
+      // WITHOUT a notification row) will permanently skip this fan unless
+      // someone manually deletes the row. We deliberately do not retry the
+      // DELETE here: D1 failures inside a Worker are rarely transient, and a
+      // retry adds its own failure mode. Instead we count the fan as failed
+      // (so the returned counts stay accurate and the `failed > 0` warning
+      // below still fires) and log every claimed id so the row can be found
+      // and cleared by hand (#672).
+      try {
+        await DB.batch(
+          task.claimed.map((item) =>
+            DB.prepare("DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?").bind(
+              item.performance_id,
+              item.band_follow_id,
+            ),
           ),
-        ),
-      );
+        );
+      } catch (releaseError) {
+        logStrandedClaims(task, "announce digest claim release failed; fan requires manual recovery", releaseError);
+      }
       failed++;
     }
   }
@@ -142,13 +176,15 @@ export async function flushAnnounceDigest(env, DB) {
   for (let i = 0; i < sendTasks.length; i += SEND_CONCURRENCY) {
     const chunk = sendTasks.slice(i, i + SEND_CONCURRENCY);
     const results = await Promise.allSettled(chunk.map(sendOne));
-    // #672: rejected tasks are logged; send counts and claim-recovery
-    // semantics are unchanged.
-    for (const result of results) {
+    // Backstop for anything sendOne did not catch. The index maps back to the
+    // originating task, so a rejection still logs which fan was stranded —
+    // without that the count is right but nobody can find the surviving rows.
+    results.forEach((result, i) => {
       if (result.status === "rejected") {
-        logger.error("announce digest sendOne rejected (claim release may not have run)", { error: result.reason });
+        logStrandedClaims(chunk[i], "announce digest sendOne rejected; claim release may not have run", result.reason);
+        failed++;
       }
-    }
+    });
   }
 
   if (failed > 0) {

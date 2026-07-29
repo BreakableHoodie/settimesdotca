@@ -126,15 +126,34 @@ export async function flushAnnounceDigest(env, DB) {
     if (result?.delivered) {
       sent++;
     } else {
-      // Release claims so resend-announcement can recover this fan.
-      await DB.batch(
-        task.claimed.map((item) =>
-          DB.prepare("DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?").bind(
-            item.performance_id,
-            item.band_follow_id,
+      // Release claims so resend-announcement can recover this fan. If the
+      // release itself fails, the band_follow_notifications row(s) survive,
+      // which means resend-announcement (which only recovers followers
+      // WITHOUT a notification row) will permanently skip this fan unless
+      // someone manually deletes the row. We deliberately do not retry the
+      // DELETE here: D1 failures inside a Worker are rarely transient, and a
+      // retry adds its own failure mode. Instead we count the fan as failed
+      // (so the returned counts stay accurate and the `failed > 0` warning
+      // below still fires) and log every claimed id so the row can be found
+      // and cleared by hand (#672).
+      try {
+        await DB.batch(
+          task.claimed.map((item) =>
+            DB.prepare("DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?").bind(
+              item.performance_id,
+              item.band_follow_id,
+            ),
           ),
-        ),
-      );
+        );
+      } catch (releaseError) {
+        for (const item of task.claimed) {
+          logger.error("announce digest claim release failed; fan requires manual recovery", {
+            performance_id: item.performance_id,
+            band_follow_id: item.band_follow_id,
+            error: releaseError,
+          });
+        }
+      }
       failed++;
     }
   }
@@ -142,11 +161,14 @@ export async function flushAnnounceDigest(env, DB) {
   for (let i = 0; i < sendTasks.length; i += SEND_CONCURRENCY) {
     const chunk = sendTasks.slice(i, i + SEND_CONCURRENCY);
     const results = await Promise.allSettled(chunk.map(sendOne));
-    // #672: rejected tasks are logged; send counts and claim-recovery
-    // semantics are unchanged.
+    // #672: sendOne no longer lets the claim-release failure escape uncaught,
+    // so a rejection here should be impossible. Keep this as a backstop
+    // (and count it as failed) so a future refactor that reintroduces a
+    // throw in sendOne can't silently drop a fan from the counts again.
     for (const result of results) {
       if (result.status === "rejected") {
         logger.error("announce digest sendOne rejected (claim release may not have run)", { error: result.reason });
+        failed++;
       }
     }
   }

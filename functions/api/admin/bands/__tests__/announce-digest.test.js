@@ -370,8 +370,14 @@ describe("flushAnnounceDigest", () => {
     expect(rawDb.prepare("SELECT * FROM band_announce_queue").all()).toHaveLength(0);
   });
 
-  // Asserts the log line only; the count/recovery contract is unresolved (#672).
-  it("logs a rejected sendOne instead of discarding it silently", async () => {
+  // #672: sendOne no longer lets an internal throw escape uncaught (the
+  // claim-release failure path is now caught and counted inside sendOne
+  // itself — see the dedicated tests below). This test exercises the
+  // Promise.allSettled backstop for the case sendOne rejects anyway (here,
+  // because sendEmail itself throws) — it must still log AND count the fan
+  // as failed, so a future refactor that reintroduces a throw can't quietly
+  // drop a fan from the returned counts.
+  it("logs a rejected sendOne instead of discarding it silently, and still counts it as failed", async () => {
     const { env, rawDb } = createTestEnv();
     const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     sendEmail.mockRejectedValueOnce(new Error("boom"));
@@ -397,14 +403,163 @@ describe("flushAnnounceDigest", () => {
         )
         .run(followId, perf.id, ev.id, "Band Throw", "Fest", "fest-throw", perf.band_profile_id);
 
-      await flushAnnounceDigest(env, env.DB);
+      const stats = await flushAnnounceDigest(env, env.DB);
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining("sendOne rejected"),
         expect.objectContaining({ error: expect.any(Error) }),
       );
+      // The backstop must count the rejection as failed — otherwise the fan
+      // is invisible in the returned counts even though it was logged.
+      expect(stats.failed).toBe(1);
+      expect(stats.sent).toBe(0);
     } finally {
       errorSpy.mockRestore();
     }
+  });
+
+  describe("#672: claim-release failure inside sendOne", () => {
+    // Stubs DB.batch so the FIRST call (the phase-A band_announce_queue
+    // cleanup, which always runs per group) succeeds normally via the real
+    // implementation, and every subsequent call (the phase-B claim-release
+    // DB.batch on delivery failure) throws — simulating a D1 failure
+    // specific to the release path described in #672.
+    function stubBatchToFailAfterFirstCall(env) {
+      const originalBatch = env.DB.batch.bind(env.DB);
+      let calls = 0;
+      return vi.spyOn(env.DB, "batch").mockImplementation(async (statements) => {
+        calls++;
+        if (calls === 1) return originalBatch(statements);
+        throw new Error("simulated D1 batch failure");
+      });
+    }
+
+    it("counts a claim-release failure as failed and logs the ids for manual recovery", async () => {
+      const { env, rawDb } = createTestEnv();
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      const ev = insertEvent(rawDb, { name: "Fest", slug: "fest-release-fail" });
+      const venue = insertVenue(rawDb, { name: "Room" });
+      const perf = insertBand(rawDb, {
+        name: "Band Fail",
+        event_id: ev.id,
+        venue_id: venue.id,
+      });
+
+      const followId = rawDb
+        .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+        .run("release-fail@example.com", perf.band_profile_id, "tok-release-fail").lastInsertRowid;
+
+      rawDb
+        .prepare(
+          `INSERT INTO band_announce_queue
+         (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(followId, perf.id, ev.id, "Band Fail", "Fest", "fest-release-fail", perf.band_profile_id);
+
+      // Delivery fails, which is what triggers the claim-release DB.batch.
+      sendEmail.mockResolvedValueOnce({ delivered: false, reason: "provider_error" });
+      const batchSpy = stubBatchToFailAfterFirstCall(env);
+
+      try {
+        const stats = await flushAnnounceDigest(env, env.DB);
+
+        // The fan must be visible in the counts, not silently dropped.
+        expect(stats.sent).toBe(0);
+        expect(stats.failed).toBe(1);
+        expect(stats.skipped).toBe(0);
+
+        // Identifying ids are logged so the row can be found and cleared
+        // by hand — no email address is logged (this module never logs
+        // addresses; see functions/utils/logger.js SENSITIVE_KEYS).
+        expect(errorSpy).toHaveBeenCalledWith(
+          "announce digest claim release failed; fan requires manual recovery",
+          expect.objectContaining({
+            performance_id: perf.id,
+            band_follow_id: Number(followId),
+            error: expect.any(Error),
+          }),
+        );
+
+        // The existing failed > 0 warning must still fire.
+        expect(warnSpy).toHaveBeenCalledWith(
+          "announce digest partially failed",
+          expect.objectContaining({ sent: 0, failed: 1, skipped: 0 }),
+        );
+      } finally {
+        batchSpy.mockRestore();
+        errorSpy.mockRestore();
+        warnSpy.mockRestore();
+      }
+    });
+
+    // This is the important residual-limitation check: a claim-release
+    // failure is deliberately NOT retried (see the comment in
+    // announceDigest.js), so the band_follow_notifications row survives.
+    // resend-announcement.js only recovers followers WITHOUT a notification
+    // row, so this fan is NOT automatically recoverable — only identifiable
+    // via the logged ids above for manual (human) recovery.
+    it("leaves the fan unrecoverable via resend-announcement's query after a claim-release failure", async () => {
+      const { env, rawDb } = createTestEnv();
+      vi.spyOn(logger, "error").mockImplementation(() => {});
+      vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      const ev = insertEvent(rawDb, { name: "Fest", slug: "fest-recovery-check" });
+      const venue = insertVenue(rawDb, { name: "Room" });
+      const perf = insertBand(rawDb, {
+        name: "Band Stranded",
+        event_id: ev.id,
+        venue_id: venue.id,
+      });
+
+      const followId = rawDb
+        .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+        .run("stranded@example.com", perf.band_profile_id, "tok-stranded").lastInsertRowid;
+
+      rawDb
+        .prepare(
+          `INSERT INTO band_announce_queue
+         (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(followId, perf.id, ev.id, "Band Stranded", "Fest", "fest-recovery-check", perf.band_profile_id);
+
+      sendEmail.mockResolvedValueOnce({ delivered: false, reason: "provider_error" });
+      const batchSpy = stubBatchToFailAfterFirstCall(env);
+
+      try {
+        const stats = await flushAnnounceDigest(env, env.DB);
+        expect(stats.failed).toBe(1);
+
+        // The claim row survives the failed release.
+        const notif = rawDb
+          .prepare("SELECT * FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
+          .get(perf.id, followId);
+        expect(notif).toBeDefined();
+
+        // This mirrors the exact SELECT resend-announcement.js uses
+        // (functions/api/admin/bands/[id]/resend-announcement.js) to find
+        // followers still owed an announcement for this performance.
+        const recoverable = rawDb
+          .prepare(
+            `SELECT bf.id, bf.email, bf.unsubscribe_token
+             FROM band_follows bf
+             LEFT JOIN band_follow_notifications bfn
+               ON bfn.band_follow_id = bf.id AND bfn.performance_id = ?
+             WHERE bf.band_profile_id = ? AND bf.verified = 1 AND bfn.id IS NULL`,
+          )
+          .all(perf.id, perf.band_profile_id);
+
+        // Because the notification row survived, the LEFT JOIN matches it
+        // and `bfn.id IS NULL` excludes this follower — resend-announcement
+        // will NOT pick this fan up. Documented residual limitation.
+        expect(recoverable.find((f) => Number(f.id) === Number(followId))).toBeUndefined();
+      } finally {
+        batchSpy.mockRestore();
+        vi.restoreAllMocks();
+      }
+    });
   });
 });

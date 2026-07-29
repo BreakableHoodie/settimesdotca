@@ -73,6 +73,21 @@ describe('EventPosterThumbnail', () => {
       expect(container).toBeEmptyDOMElement()
     })
 
+    // The inline variant renders above the fold in the sticky bar — lazy
+    // loading it would delay LCP and cause a visible pop-in. Unrelated to
+    // #690's scroll-collapse transition fix, but that fix touches the same
+    // identity block this poster lives inside, so this regression guard
+    // keeps the two changes from silently interacting.
+    it('renders eagerly with high fetch priority, unlike the standalone variant', () => {
+      render(
+        <EventPosterThumbnail posterUrl={POSTER_URL} eventName="Buddies Fest 2" onOpen={vi.fn()} variant="inline" />
+      )
+
+      const image = screen.getByRole('img', { name: 'Buddies Fest 2 poster' })
+      expect(image).toHaveAttribute('loading', 'eager')
+      expect(image).toHaveAttribute('fetchpriority', 'high')
+    })
+
     it('requests a smaller derivative than the standalone variant', () => {
       render(
         <EventPosterThumbnail posterUrl={POSTER_URL} eventName="Buddies Fest 2" onOpen={vi.fn()} variant="inline" />

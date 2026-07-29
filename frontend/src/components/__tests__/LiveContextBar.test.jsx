@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import LiveContextBar, { computeIdentityCollapseStyle } from '../LiveContextBar'
+import LiveContextBar, { computeIdentityCollapseStyle, IDENTITY_COLLAPSE_TRANSITION_CLASS } from '../LiveContextBar'
 
 describe('computeIdentityCollapseStyle (#690 scroll-collapse bounce)', () => {
   const px = style => parseFloat(style.maxHeight)
@@ -55,6 +55,38 @@ describe('computeIdentityCollapseStyle (#690 scroll-collapse bounce)', () => {
       }
     }
   })
+
+  // #690 residual jank fix: scrollProgress only advances once per animation
+  // frame, and iOS momentum scrolling delivers `scroll` events irregularly,
+  // so without smoothing the rendered values snap in uneven steps rather
+  // than tracking continuously. `willChange` hints the compositor-friendly
+  // properties onto their own layer; `maxHeight` is deliberately excluded —
+  // it's a layout property (the whole point of #665 is reclaiming real
+  // vertical space), so promoting it buys nothing and costs memory.
+  it('hints only the compositor-friendly properties via willChange, never maxHeight', () => {
+    const style = computeIdentityCollapseStyle(0.5)
+    expect(style.willChange).toContain('opacity')
+    expect(style.willChange).toContain('transform')
+    expect(style.willChange).not.toContain('max-height')
+    expect(style.willChange).not.toContain('height')
+  })
+})
+
+// #690 residual jank fix: a short CSS transition smooths the discrete,
+// scroll-event-sized steps described above. Safe only because the #693
+// ratchet makes scrollProgress monotonic while scrolling down — a
+// transition on a value that could still decrease mid-scroll would ease a
+// visible bounce instead of smoothing a one-directional collapse.
+describe('IDENTITY_COLLAPSE_TRANSITION_CLASS (#690 residual jank)', () => {
+  it('transitions exactly the properties the collapse animates, not maxHeight alone or "all"', () => {
+    // A bare "transition-all" would also animate hover/focus states this
+    // block doesn't have, and "duration-0" or a missing duration class would
+    // silently regress to no smoothing at all.
+    expect(IDENTITY_COLLAPSE_TRANSITION_CLASS).toMatch(/transition-\[.*max-height.*opacity.*transform.*\]/)
+    // [1-9]\d* (not \d+): "duration-0" is exactly the silent-no-smoothing
+    // regression this guards against and must NOT satisfy the pattern.
+    expect(IDENTITY_COLLAPSE_TRANSITION_CLASS).toMatch(/duration-[1-9]\d*/)
+  })
 })
 
 const eventData = {
@@ -69,6 +101,20 @@ const bands = [
 
 function setViewportWidth(width) {
   Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: width })
+}
+
+function setScrollY(y) {
+  Object.defineProperty(window, 'scrollY', { writable: true, configurable: true, value: y })
+}
+
+// useScrollCollapse batches its measurement into a requestAnimationFrame, so
+// the frame has to be flushed before the committed progress reaches the
+// rendered style/attributes.
+async function fireScroll() {
+  await act(async () => {
+    window.dispatchEvent(new Event('scroll'))
+    await new Promise(resolve => requestAnimationFrame(resolve))
+  })
 }
 
 describe('LiveContextBar', () => {
@@ -343,6 +389,77 @@ describe('LiveContextBar', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /View .*poster/i }))
       expect(onPosterOpen).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // #690 residual jank fix, at the rendered-component level (the tests above
+  // exercise the pure functions in isolation).
+  describe('scroll-driven identity block (#690)', () => {
+    afterEach(() => {
+      setScrollY(0)
+      setViewportWidth(1024)
+    })
+
+    it('carries the collapse transition class on the identity block, mount included', () => {
+      setViewportWidth(375)
+      const { container } = render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      const identityBlock = container.querySelector('.sm\\:hidden > div')
+      expect(identityBlock).toHaveClass('transition-[max-height,opacity,transform]')
+      expect(identityBlock).toHaveClass('duration-150')
+    })
+
+    // `inert`/`pointerEvents` flip on the committed scrollProgress value the
+    // instant it crosses IDENTITY_GONE_PROGRESS — they are NOT driven by the
+    // CSS transition, which now animates the visual opacity/maxHeight toward
+    // that state over ~150ms. So for a brief window the block can be
+    // slightly visible-but-already-inert (safe: fading out) or briefly
+    // non-zero-opacity-but-not-yet-inert only on the way IN (also safe: it's
+    // interactive exactly while it's visible). What must never happen, and
+    // what this test actually guards, is the old bug: fully invisible
+    // (opacity 0) while still interactive/focusable.
+    it('flips inert the instant scrollProgress crosses the gone threshold, in step with pointerEvents', async () => {
+      setViewportWidth(375)
+      setScrollY(0)
+      const { container } = render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+      const identityBlock = () => container.querySelector('.sm\\:hidden > div')
+
+      // Fully open: interactive, not inert.
+      expect(identityBlock()).not.toHaveAttribute('inert')
+      expect(identityBlock()).toHaveStyle({ pointerEvents: 'auto' })
+
+      // scrollProgress thresholds are useScrollCollapse(48, 240); 0.6 * (240-48) + 48 = ~163,
+      // comfortably past IDENTITY_GONE_PROGRESS (~0.571) where the block goes invisible.
+      setScrollY(163)
+      await fireScroll()
+      expect(identityBlock()).toHaveAttribute('inert')
+      expect(identityBlock()).toHaveStyle({ pointerEvents: 'none' })
     })
   })
 })

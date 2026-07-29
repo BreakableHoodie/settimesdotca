@@ -208,15 +208,23 @@ describe('getTimeDescription never names a weekday (#681)', () => {
     // this exercises the isHappeningThisWeek branch — the one that renders
     // in production for the days leading up to the event.
     globalThis.__debugScheduleTime = new Date(2026, 6, 29, 14, 0, 0) // Wed Jul 29, 2 PM
-    const afterMidnightSundayNightSet = { startMs: new Date(2026, 7, 3, 0, 15, 0).getTime() } // "Mon" 12:15 AM
-    const description = getTimeDescription(afterMidnightSundayNightSet)
-    expect(description).not.toMatch(/Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday/)
+    const start = new Date(2026, 7, 3, 0, 15, 0) // "Mon" 12:15 AM
+    const afterMidnightSundayNightSet = { startMs: start.getTime() }
+    // Exact equality, not a weekday-negative regex: the this-week branch is the
+    // ONLY one returning a bare time, so this pins the branch as well as the
+    // absence of a weekday. A negative regex would also pass on "Today at
+    // 12:15 AM" — i.e. on the wrong branch having run. The expected time is
+    // derived with the same options the implementation uses, so the assertion
+    // stays locale- and timezone-independent in CI.
+    const expectedTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+    expect(getTimeDescription(afterMidnightSundayNightSet)).toBe(expectedTime)
   })
 
   it('does not name a weekday for a next-week performance', () => {
     globalThis.__debugScheduleTime = new Date(2026, 6, 29, 14, 0, 0) // Wed Jul 29, 2 PM
-    const nextWeekSet = { startMs: new Date(2026, 7, 5, 20, 0, 0).getTime() } // Wed Aug 5, 8 PM
-    const description = getTimeDescription(nextWeekSet)
-    expect(description).not.toMatch(/Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday/)
+    const start = new Date(2026, 7, 5, 20, 0, 0) // Wed Aug 5, 8 PM
+    const nextWeekSet = { startMs: start.getTime() }
+    const expectedTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+    expect(getTimeDescription(nextWeekSet)).toBe(`Next week at ${expectedTime}`)
   })
 })

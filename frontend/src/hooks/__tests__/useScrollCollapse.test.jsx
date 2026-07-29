@@ -106,8 +106,7 @@ describe('useScrollCollapse', () => {
       setScrollY(y)
       await fireScroll()
     }
-    // y is now 76, so raw = (76-40)/100 = 0.36. Assert that exact value: `< 1`
-    // would also pass if a regression snapped progress straight to 0.
+    // y is now 76, so raw = (76 - 40) / 100 = 0.36.
     expect(Number(screen.getByTestId('progress').textContent)).toBeCloseTo(0.36, 2)
   })
 

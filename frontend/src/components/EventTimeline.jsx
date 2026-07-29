@@ -10,6 +10,34 @@ import { getSelectedBands, saveSelectedBands } from '../utils/scheduleStorage'
 import { sortableName } from '../utils/sortableName'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
+
+const POSTER_BOX_CLASS = 'w-28 sm:w-36 shrink-0 self-start overflow-hidden rounded-lg border border-border'
+
+/**
+ * Wraps a listing poster so it links to the event, like the title does (#697).
+ *
+ * `aria-hidden` + `tabIndex={-1}` are deliberate, not an oversight: the poster is
+ * `alt=""` because the adjacent title already carries the event name, and a
+ * focusable link wrapping a decorative image is an UNLABELLED link plus a second
+ * tab stop to a destination the title covers. Mouse/touch affordance only — the
+ * title remains the single keyboard and screen-reader path.
+ *
+ * Renders a plain div when there is no slug, mirroring the title's own
+ * `event.slug` guard; otherwise this would link to `/event/undefined`.
+ */
+function PosterBox({ slug, children }) {
+  if (!slug) return <div className={POSTER_BOX_CLASS}>{children}</div>
+  return (
+    <Link
+      to={`/event/${slug}`}
+      aria-hidden="true"
+      tabIndex={-1}
+      className={`${POSTER_BOX_CLASS} block transition-opacity hover:opacity-90`}
+    >
+      {children}
+    </Link>
+  )
+}
 import PosterImage from './PosterImage'
 
 /**
@@ -636,7 +664,7 @@ function EventCard({
                 "Show History" toggle, so neither mounts until near-viewport
                 or explicitly expanded. */}
             {event.poster_url && (
-              <div className="w-28 sm:w-36 shrink-0 self-start overflow-hidden rounded-lg border border-border">
+              <PosterBox slug={event.slug}>
                 <PosterImage
                   src={event.poster_url}
                   width={200}
@@ -653,7 +681,7 @@ function EventCard({
                      stops expanding History from cascading layout shifts. */
                   className="aspect-[auto_3/4] h-auto w-full"
                 />
-              </div>
+              </PosterBox>
             )}
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-start gap-2 mb-2">

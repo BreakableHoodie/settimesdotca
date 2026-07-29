@@ -492,5 +492,58 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       expect(img).toHaveAttribute('decoding', 'async')
       expect(img).toHaveAttribute('alt', '')
     })
+
+    // #697: each poster links to its event, like the title does — but must NOT
+    // add a tab stop or an unlabelled link, since the image is alt="".
+    posterImgs.forEach((img, i) => {
+      const link = img.closest('a')
+      expect(link).not.toBeNull()
+      expect(link).toHaveAttribute('href', `/event/past-fest-${['one', 'two', 'three'][i]}`)
+      expect(link).toHaveAttribute('aria-hidden', 'true')
+      expect(link).toHaveAttribute('tabindex', '-1')
+    })
+  })
+
+  it('renders the poster unlinked when the event has no slug', async () => {
+    // Mirrors the title's own slug guard — otherwise this links to
+    // /event/undefined.
+    const timelineData = {
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 9,
+          name: 'Slugless Fest',
+          slug: null,
+          date: '2020-05-10',
+          status: 'archived',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: 'https://cdn.example.com/posters/9.jpg',
+        },
+      ],
+    }
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /show history/i }))
+    const img = container.querySelector('img')
+    expect(img).not.toBeNull()
+    expect(img.closest('a')).toBeNull()
   })
 })

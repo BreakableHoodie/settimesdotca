@@ -50,7 +50,11 @@ export async function onRequestPost(context) {
       );
     }
 
-    if (user.activation_token_expires_at && fromSqliteDateTime(user.activation_token_expires_at) < new Date()) {
+    // Fail closed on an unparseable expiry: fromSqliteDateTime returns null
+    // rather than an Invalid Date, and a stored value we cannot interpret is
+    // treated as expired instead of silently passing the check.
+    const expiresAt = fromSqliteDateTime(user.activation_token_expires_at);
+    if (user.activation_token_expires_at && (!expiresAt || expiresAt < new Date())) {
       return new Response(
         JSON.stringify({
           error: "Activation link expired",
@@ -85,7 +89,13 @@ export async function onRequestPost(context) {
           activation_token_expires_at = NULL
       WHERE activation_token = ?
         AND is_active = 0
-        AND (activation_token_expires_at IS NULL OR activation_token_expires_at >= datetime('now'))
+        -- datetime() normalises BOTH storage formats before comparing. A raw
+        -- text compare is wrong for legacy ISO-'T' rows written before the
+        -- SEC-F1 write-side fix: 'T' (0x54) sorts above ' ' (0x20), so on the
+        -- expiry date itself an already-expired legacy token compares as still
+        -- valid. datetime() also yields NULL for an unparseable value, so a
+        -- malformed expiry fails closed instead of matching.
+        AND (activation_token_expires_at IS NULL OR datetime(activation_token_expires_at) >= datetime('now'))
     `,
     )
       .bind(token)

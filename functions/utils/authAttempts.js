@@ -66,9 +66,14 @@ export function toSqliteDateTime(date) {
 // against a toSqliteDateTime()-written column must go through this, not a
 // raw `new Date(value)` (#670 follow-up — activate.js's real-time guard hit
 // exactly this after the SEC-F1 write-side fix removed the 'Z' suffix).
+// Returns null — never an Invalid Date — for absent or unparseable input.
+// `Invalid Date < new Date()` evaluates to FALSE, so handing an Invalid Date to
+// an "is this expired?" check silently reports "not expired" and fails OPEN.
+// Callers must treat null as "cannot determine" and reject, not accept.
 export function fromSqliteDateTime(value) {
   if (!value) return null;
-  return new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  const parsed = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function getRateLimitBindings(scope, { email, ipAddress, userId, attemptType, windowStart }) {

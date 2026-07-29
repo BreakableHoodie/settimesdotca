@@ -23,6 +23,45 @@ function activateRequest(token) {
   });
 }
 
+describe("POST /api/auth/activate — expiry guards fail closed", () => {
+  it("rejects a malformed activation_token_expires_at instead of failing open", async () => {
+    // Before the fix BOTH layers failed open on this input:
+    //   JS  — `new Date("not-a-date") < new Date()` is FALSE ("not expired")
+    //   SQL — a raw text compare of 'not-a-date' >= datetime('now') is TRUE,
+    //         since 'n' (0x6E) sorts above '2' (0x32)
+    // so a garbage expiry produced a permanently valid activation token.
+    // fromSqliteDateTime() now returns null for unparseable input and the
+    // caller treats null as expired; datetime() yields NULL in SQL so the
+    // UPDATE matches no row.
+    const { env, rawDb } = createTestEnv();
+    insertPendingUser(rawDb, { expiresAt: "not-a-date" });
+
+    const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
+
+    expect(response.status).toBe(400);
+    const user = rawDb.prepare("SELECT is_active FROM users WHERE email = ?").get("pending@example.com");
+    expect(user.is_active).toBe(0);
+  });
+
+  it("the atomic SQL guard normalises legacy ISO-'T' expiries (raw text compare is wrong on the expiry date)", () => {
+    // The handler's JS check catches this first, so it is not observable
+    // end-to-end — but the SQL predicate is the atomic race guard behind that
+    // check, and it was independently broken for rows written before the
+    // SEC-F1 write-side fix. On the expiry DATE itself, 'T' (0x54) sorts above
+    // ' ' (0x20), so an already-expired legacy row compared as still valid.
+    // This asserts the predicate directly.
+    const { rawDb } = createTestEnv();
+    const expiredLegacy = "2026-07-29T10:00:00.000Z"; // expired at 10:00
+    const laterSameDay = "2026-07-29 23:00:00"; // now: 23:00, same day
+
+    const raw = rawDb.prepare("SELECT ? >= ? AS pass").get(expiredLegacy, laterSameDay);
+    const normalised = rawDb.prepare("SELECT datetime(?) >= datetime(?) AS pass").get(expiredLegacy, laterSameDay);
+
+    expect(raw.pass).toBe(1); // the bug: expired token would pass
+    expect(normalised.pass).toBe(0); // the fix: correctly rejected
+  });
+});
+
 describe("POST /api/auth/activate", () => {
   it("activates a pending user with a valid, non-expired (SQLite-format) token", async () => {
     const { env, rawDb } = createTestEnv();

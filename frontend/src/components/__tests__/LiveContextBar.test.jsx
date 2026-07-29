@@ -32,9 +32,28 @@ describe('computeIdentityCollapseStyle (#690 scroll-collapse bounce)', () => {
     expect(px(computeIdentityCollapseStyle(1))).toBe(0)
   })
 
-  it('disables pointer events only once the block is visually gone', () => {
+  it('disables pointer events the moment the block becomes invisible, not later', () => {
+    // The fade multiplier (1.75) drives opacity to 0 at progress ~0.571, but
+    // pointerEvents was separately hardcoded to flip at 0.7 — leaving a window
+    // where the block was fully transparent yet still clickable and focusable.
+    // 0.6 sits inside that old window and is the regression guard.
     expect(computeIdentityCollapseStyle(0.5).pointerEvents).toBe('auto')
+    expect(computeIdentityCollapseStyle(0.5).opacity).toBeGreaterThan(0)
+
+    expect(computeIdentityCollapseStyle(0.6).opacity).toBe(0)
+    expect(computeIdentityCollapseStyle(0.6).pointerEvents).toBe('none')
     expect(computeIdentityCollapseStyle(0.8).pointerEvents).toBe('none')
+  })
+
+  it('never leaves the block invisible while still interactive', () => {
+    // The general property behind the case above: opacity 0 implies
+    // non-interactive, at every progress value.
+    for (let p = 0; p <= 1.0001; p += 0.01) {
+      const style = computeIdentityCollapseStyle(Math.min(p, 1))
+      if (style.opacity === 0) {
+        expect(style.pointerEvents).toBe('none')
+      }
+    }
   })
 })
 

@@ -21,6 +21,13 @@ async function fireScroll() {
   })
 }
 
+async function fireResize() {
+  await act(async () => {
+    window.dispatchEvent(new Event('resize'))
+    await new Promise(resolve => requestAnimationFrame(resolve))
+  })
+}
+
 describe('useScrollCollapse', () => {
   afterEach(() => {
     setScrollY(0)
@@ -54,11 +61,6 @@ describe('useScrollCollapse', () => {
   })
 
   it('does not re-expand when scroll drifts back up mid-page', async () => {
-    // The iOS flicker: the URL bar shows/hides while scrolling, moving scrollY
-    // ~60px, and momentum/rubber-band add smaller jitter. Measured on WebKit at
-    // an iPhone viewport, a 62px jump swung the block's opacity by 0.565 and
-    // its height between 194px and 251px. Progress must ratchet — perturbation
-    // below the current high-water mark is ignored.
     setScrollY(0)
     render(<Harness start={40} end={140} />)
 
@@ -75,9 +77,19 @@ describe('useScrollCollapse', () => {
     expect(screen.getByTestId('progress')).toHaveTextContent('1')
   })
 
+  it('recomputes on resize alone, without any scroll event', async () => {
+    // iOS fires resize when the URL bar collapses. Dispatch ONLY resize, so
+    // this fails if the listener is dropped even while scroll still works.
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+    expect(screen.getByTestId('progress')).toHaveTextContent('0')
+
+    setScrollY(140)
+    await fireResize()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+  })
+
   it('releases the ratchet once the user is back at the top', async () => {
-    // Ratcheting must not be permanent — returning to the top region restores
-    // the full identity block, which is the whole point of showing it there.
     setScrollY(0)
     render(<Harness start={40} end={140} />)
 

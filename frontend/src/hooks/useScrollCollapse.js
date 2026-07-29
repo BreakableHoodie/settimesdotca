@@ -31,20 +31,9 @@ export function useScrollCollapse(start, end) {
 
   useEffect(() => {
     let frame = null
-    // Ratchet: progress only ever increases until the user returns to the top
-    // region (scrollY <= start), where it resets and tracks scroll again.
-    //
-    // Without this the collapse is a direct function of raw scrollY, so ANY
-    // perturbation of scrollY re-expands the block mid-scroll. On iOS that is
-    // constant: the URL bar shows/hides while scrolling, moving the scroll
-    // position ~60px, and momentum and rubber-band overscroll add smaller
-    // jitter. Measured on WebKit at an iPhone viewport: a 62px jump swung the
-    // block's opacity by 0.565 and its height between 194px and 251px; drift of
-    // 6-10px swung opacity by 0.119. That reads as a jarring flicker.
-    //
-    // Smoothing (a CSS transition or a per-frame rate limit) would only ease
-    // the snap — the block would still pulse. It must simply not re-expand
-    // while the reader is working down the page.
+    // Invariant: collapse is monotonic until scrollY <= start. Scroll position
+    // is perturbed constantly on iOS (URL bar, momentum, rubber-band), and
+    // tracking it directly re-expands the block mid-scroll (#690).
     let ratchet = 0
     const update = () => {
       frame = null

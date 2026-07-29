@@ -27,6 +27,7 @@ Use the Makefile — it exists so every agent runs the same gates with real exit
 - `make test` / `make test-backend` / `make test-frontend`
 - `make build` — frontend production build
 - `make e2e` — full local E2E: builds, seeds an isolated D1, serves wrangler on :8788, runs Playwright, cleans up
+- `make review` — **AI code review before opening a PR** (CodeRabbit CLI; `make review-wip` for uncommitted changes). Run it *before* the PR — the same review runs on the PR anyway, so findings after opening cost a fix plus a force-push. Not part of `make gate`: `gate` stays fast and offline, `review` needs the network.
 - `make schema-check` — after touching `migrations/`: regenerates `setup-complete.sql` and checks drift (its schema section is generated — never hand-edit)
 - `make validate-openapi` — if `docs/api-spec.yaml` changed
 

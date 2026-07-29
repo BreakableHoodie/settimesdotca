@@ -492,5 +492,105 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       expect(img).toHaveAttribute('decoding', 'async')
       expect(img).toHaveAttribute('alt', '')
     })
+
+    // #697: each poster links to its event, like the title does. The link must
+    // carry its own accessible name — never be aria-hidden, which would be an
+    // interactive element removed from the accessibility tree — and must stay
+    // out of the tab order so keyboard users get one stop per card, not two.
+    const names = ['Past Fest One', 'Past Fest Two', 'Past Fest Three']
+    posterImgs.forEach((img, i) => {
+      const link = img.closest('a')
+      expect(link).not.toBeNull()
+      expect(link).toHaveAttribute('href', `/event/past-fest-${['one', 'two', 'three'][i]}`)
+      expect(link).not.toHaveAttribute('aria-hidden')
+      expect(link).toHaveAttribute('aria-label', names[i])
+      expect(link).toHaveAttribute('tabindex', '-1')
+    })
+  })
+
+  it('raises no axe violation for the labelled poster link', async () => {
+    // Guards the accessibility contract: a labelled, unfocusable link. Catches
+    // both a regression to aria-hidden-on-interactive and an unlabelled link.
+    const { axe, toHaveNoViolations } = await import('jest-axe')
+    expect.extend(toHaveNoViolations)
+
+    const timelineData = {
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name: 'Axe Fest',
+          slug: 'axe-fest',
+          date: '2020-05-10',
+          status: 'archived',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: 'https://cdn.example.com/posters/1.jpg',
+        },
+      ],
+    }
+    global.fetch = vi.fn(url =>
+      url.startsWith('/api/events/timeline')
+        ? Promise.resolve(jsonResponse(timelineData))
+        : Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    )
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+    fireEvent.click(await screen.findByRole('button', { name: /show history/i }))
+    await screen.findByText('Axe Fest')
+
+    expect(await axe(container)).toHaveNoViolations()
+  }, 20000)
+
+  it('renders the poster unlinked when the event has no slug', async () => {
+    // Mirrors the title's own slug guard — otherwise this links to
+    // /event/undefined.
+    const timelineData = {
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 9,
+          name: 'Slugless Fest',
+          slug: null,
+          date: '2020-05-10',
+          status: 'archived',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: 'https://cdn.example.com/posters/9.jpg',
+        },
+      ],
+    }
+
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /show history/i }))
+    const img = container.querySelector('img')
+    expect(img).not.toBeNull()
+    expect(img.closest('a')).toBeNull()
   })
 })

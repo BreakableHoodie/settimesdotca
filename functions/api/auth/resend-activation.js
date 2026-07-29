@@ -2,6 +2,7 @@ import { isValidEmail } from "../../utils/validation.js";
 import { isEmailConfigured, sendEmail } from "../../utils/email.js";
 import { buildActivationEmail } from "../../utils/emailTemplates.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
+import { toSqliteDateTime } from "../../utils/authAttempts.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -72,7 +73,9 @@ export async function onRequestPost(context) {
     }
 
     const activationToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
-    const activationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    // SEC-F1 class (#670): must be space-separated to compare correctly
+    // against D1's datetime('now') in activate.js's SQL expiry guard.
+    const activationExpires = toSqliteDateTime(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
     try {
       await DB.prepare(

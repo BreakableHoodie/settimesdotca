@@ -56,6 +56,26 @@ export function toSqliteDateTime(date) {
   return date.toISOString().replace("T", " ").slice(0, 19);
 }
 
+// Inverse of toSqliteDateTime(): parses either a space-separated SQLite
+// datetime ("YYYY-MM-DD HH:MM:SS", implicitly UTC — no D1 value carries a
+// timezone) or a legacy ISO-'T' value (which already carries its own 'Z'/
+// offset) back into a real Date. A bare `new Date("YYYY-MM-DD HH:MM:SS")` is
+// NOT valid ISO-8601 — JS engines fall back to LOCAL-time parsing for it,
+// which is silently wrong on any non-UTC host (verified: a 4-hour drift on
+// America/Toronto). Every "is this stored value already expired?" JS check
+// against a toSqliteDateTime()-written column must go through this, not a
+// raw `new Date(value)` (#670 follow-up — activate.js's real-time guard hit
+// exactly this after the SEC-F1 write-side fix removed the 'Z' suffix).
+// Returns null — never an Invalid Date — for absent or unparseable input.
+// `Invalid Date < new Date()` evaluates to FALSE, so handing an Invalid Date to
+// an "is this expired?" check silently reports "not expired" and fails OPEN.
+// Callers must treat null as "cannot determine" and reject, not accept.
+export function fromSqliteDateTime(value) {
+  if (!value) return null;
+  const parsed = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function getRateLimitBindings(scope, { email, ipAddress, userId, attemptType, windowStart }) {
   if (scope === "ip") {
     return [ipAddress, attemptType, windowStart];

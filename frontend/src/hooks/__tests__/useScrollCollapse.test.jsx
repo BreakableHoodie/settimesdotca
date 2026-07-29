@@ -106,9 +106,9 @@ describe('useScrollCollapse', () => {
       setScrollY(y)
       await fireScroll()
     }
-    // y is now 76; raw = (76-40)/100 = 0.36. Released, so progress follows it
-    // rather than staying pinned at 1.
-    expect(Number(screen.getByTestId('progress').textContent)).toBeLessThan(1)
+    // y is now 76, so raw = (76-40)/100 = 0.36. Assert that exact value: `< 1`
+    // would also pass if a regression snapped progress straight to 0.
+    expect(Number(screen.getByTestId('progress').textContent)).toBeCloseTo(0.36, 2)
   })
 
   it('a single URL-bar-sized upward jump never releases it', async () => {
@@ -120,17 +120,14 @@ describe('useScrollCollapse', () => {
     setScrollY(140)
     await fireScroll()
 
-    // Two things this test has to get right, both of which it got wrong first:
-    //   1. The jump must EXCEED the 64px release threshold, or it passes merely
-    //      because the distance was short and never exercises the per-step cap.
-    //   2. The assertion must come IMMEDIATELY after the upward jump. Asserting
-    //      after scrolling back down passes regardless, because the downward
-    //      move re-ratchets to 1 and hides any mid-loop release.
+    // The jump must exceed the 64px release threshold, or the per-step cap is
+    // never exercised. Assert before scrolling back down: downward movement
+    // re-ratchets to 1 and would mask a mid-loop release.
     for (let i = 0; i < 5; i++) {
-      setScrollY(60) // 80px up in a single step — over the threshold
+      setScrollY(60) // 80px up in a single step
       await fireScroll()
       expect(screen.getByTestId('progress')).toHaveTextContent('1')
-      setScrollY(140) // back down for the next iteration
+      setScrollY(140)
       await fireScroll()
     }
   })

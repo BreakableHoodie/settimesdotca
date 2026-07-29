@@ -1,3 +1,5 @@
+import { fromSqliteDateTime } from "../../utils/authAttempts.js";
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
@@ -48,7 +50,7 @@ export async function onRequestPost(context) {
       );
     }
 
-    if (user.activation_token_expires_at && new Date(user.activation_token_expires_at) < new Date()) {
+    if (user.activation_token_expires_at && fromSqliteDateTime(user.activation_token_expires_at) < new Date()) {
       return new Response(
         JSON.stringify({
           error: "Activation link expired",

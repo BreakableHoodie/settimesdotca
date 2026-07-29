@@ -3,7 +3,12 @@ import { isValidEmail, validatePassword, FIELD_LIMITS } from "../../../utils/val
 import { getClientIP } from "../../../utils/request.js";
 import { isEmailConfigured, sendEmail } from "../../../utils/email.js";
 import { buildActivationEmail } from "../../../utils/emailTemplates.js";
-import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import {
+  AUTH_ATTEMPT_TYPES,
+  checkAuthRateLimit,
+  toSqliteDateTime,
+  writeAuthAttempt,
+} from "../../../utils/authAttempts.js";
 import { logger } from "../../../utils/logger.js";
 import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 
@@ -215,7 +220,9 @@ export async function onRequestPost(context) {
     const passwordHash = await hashPassword(password);
 
     const activationToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
-    const activationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    // SEC-F1 class (#670): must be space-separated to compare correctly
+    // against D1's datetime('now') in activate.js's SQL expiry guard.
+    const activationExpires = toSqliteDateTime(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
     // Create user (inactive until activation)
     const user = await DB.prepare(

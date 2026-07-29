@@ -108,7 +108,7 @@ Every other `expires_at` column in the schema is `TEXT` (ISO-8601 / space-separa
 
 ### PBKDF2, not bcrypt
 
-Password hashing uses PBKDF2-SHA256 via the Web Crypto API (`functions/utils/crypto.js`). Hash format: `pbkdf2$iterations$salt$hash`.
+Password hashing uses PBKDF2-SHA256 via the Web Crypto API (`functions/utils/crypto.js`). Hash format: `pbkdf2$iterations$salt$hash`, current default 600,000 iterations (`DEFAULT_ITERATIONS` in `crypto.js`; legacy hashes at 100,000 iterations still verify via the iteration count embedded in the hash itself).
 
 bcrypt requires a native binary (`better-sqlite3` style) that cannot run on Cloudflare Workers. Do not introduce bcrypt anywhere in `functions/`.
 

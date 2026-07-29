@@ -43,4 +43,63 @@ describe("totp utilities", () => {
     expect(result.valid).toBe(true);
     expect(result.remaining).toHaveLength(1);
   });
+
+  // #673: negative cases. The RFC vectors above prove correctness on a valid
+  // code; without these, an implementation that returns `true`
+  // unconditionally would pass nearly this whole file.
+  describe("negative cases (#673)", () => {
+    it("verifyTotp returns false for a wrong code", async () => {
+      const secret = generateTotpSecret();
+      const correctCode = await generateTotpCode(secret);
+      // Flip the first digit so the wrong code is guaranteed to differ from
+      // the real one (avoids a 1-in-10 flake from picking an arbitrary digit).
+      const firstDigit = Number(correctCode[0]);
+      const wrongCode = `${(firstDigit + 1) % 10}${correctCode.slice(1)}`;
+
+      expect(await verifyTotp(secret, wrongCode)).toBe(false);
+    });
+
+    it("verifyTotp returns false for a code outside the time window", async () => {
+      const secret = generateTotpSecret();
+      // 10 minutes away from "now" is well outside the default ±1 step
+      // (±30s) window, so this code must not validate against the current
+      // time that verifyTotp checks internally.
+      const farFutureCode = await generateTotpCode(secret, Date.now() + 10 * 60 * 1000);
+
+      expect(await verifyTotp(secret, farFutureCode)).toBe(false);
+    });
+
+    it("verifyTotp returns false for an empty/missing code", async () => {
+      const secret = generateTotpSecret();
+
+      expect(await verifyTotp(secret, "")).toBe(false);
+      expect(await verifyTotp(secret, null)).toBe(false);
+    });
+
+    it("verifyBackupCode returns false for an invalid code", async () => {
+      const codes = generateBackupCodes(2);
+      const hashed = await Promise.all(codes.map((code) => hashBackupCode(code)));
+
+      const result = await verifyBackupCode("0000-0000", hashed);
+
+      expect(result.valid).toBe(false);
+      // An invalid attempt must not consume anything from the set.
+      expect(result.remaining).toHaveLength(2);
+    });
+
+    it("verifyBackupCode returns false for an already-consumed code", async () => {
+      const codes = generateBackupCodes(2);
+      const hashed = await Promise.all(codes.map((code) => hashBackupCode(code)));
+
+      // First use succeeds and the caller persists the trimmed `remaining`
+      // list back to storage (the real usage pattern — see mfa verify flows).
+      const firstAttempt = await verifyBackupCode(codes[0], hashed);
+      expect(firstAttempt.valid).toBe(true);
+
+      // Re-using the same code against the now-trimmed list must fail: the
+      // code has already been consumed and removed from the persisted set.
+      const secondAttempt = await verifyBackupCode(codes[0], firstAttempt.remaining);
+      expect(secondAttempt.valid).toBe(false);
+    });
+  });
 });

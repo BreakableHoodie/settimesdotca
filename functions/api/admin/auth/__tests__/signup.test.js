@@ -106,6 +106,45 @@ describe("admin signup", () => {
     expect([400, 403]).toContain(response.status);
   });
 
+  it("stores activation_token_expires_at with a space separator, no ISO 'T' (SEC-F1 class, #670)", async () => {
+    // CLAUDE.md "SQLite datetime format": D1's datetime('now') returns
+    // `YYYY-MM-DD HH:MM:SS`. A stored value with a `T` (from a raw
+    // .toISOString()) silently breaks `activation_token_expires_at >=
+    // datetime('now')` in activate.js's SQL expiry guard — the exact SEC-F1
+    // bug shape. Reading the column back off the real (better-sqlite3-backed)
+    // test DB after signup.js's actual INSERT proves the write site itself
+    // calls toSqliteDateTime() and binds its output — not just that the
+    // helper produces the right format in isolation.
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+
+    const inviteCode = "INVITE-SEC-F1-TEST";
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", expiresAt, 1);
+
+    const request = new Request("https://example.test/api/admin/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "secf1@example.com",
+        password: "StrongPass1!",
+        name: "SecF1 User",
+        inviteCode,
+      }),
+    });
+
+    const response = await signupHandler.onRequestPost({ request, env });
+    expect(response.status).toBe(201);
+
+    const createdUser = rawDb
+      .prepare("SELECT activation_token_expires_at FROM users WHERE email = ?")
+      .get("secf1@example.com");
+    expect(createdUser.activation_token_expires_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(createdUser.activation_token_expires_at).not.toContain("T");
+  });
+
   it("response does not expose raw email provider result (P2-S6)", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     env.ALLOW_ADMIN_SIGNUP = "true";

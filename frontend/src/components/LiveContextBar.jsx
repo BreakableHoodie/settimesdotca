@@ -55,9 +55,21 @@ export function isIdentityVisuallyGone(scrollProgress) {
  * `scrollProgress` goes 0 -> 1, `maxHeight` must never increase. jsdom does no
  * real layout, so the test targets this function rather than rendered geometry.
  *
+ * `scrollProgress` itself only advances once per `requestAnimationFrame`
+ * (`useScrollCollapse`), and iOS momentum scrolling delivers `scroll` events
+ * irregularly — so without smoothing, these values would visibly *step*
+ * between commits rather than track continuously (#690 residual jank, after
+ * the bounce itself was fixed by the ratchet in #693). The
+ * `IDENTITY_COLLAPSE_TRANSITION_CLASS` Tailwind class applied alongside this
+ * style (not baked in here, to match the `Header.jsx` collapse precedent)
+ * interpolates between those discrete commits. That is only safe *because*
+ * the ratchet makes `scrollProgress` monotonic while scrolling down — a CSS
+ * transition on a value that can also decrease mid-scroll would ease a
+ * visible bounce instead of smoothing a one-directional collapse.
+ *
  * @param {number} scrollProgress - 0 (fully open) to 1 (fully collapsed).
  * @returns {object} React style: `opacity`, `transform`, `maxHeight`,
- *   `overflow`, `overflowAnchor`, `pointerEvents`.
+ *   `overflow`, `overflowAnchor`, `pointerEvents`, `willChange`.
  */
 export function computeIdentityCollapseStyle(scrollProgress) {
   const identityFadeProgress = Math.min(1, scrollProgress * IDENTITY_FADE_MULTIPLIER)
@@ -73,8 +85,29 @@ export function computeIdentityCollapseStyle(scrollProgress) {
     // bounces.
     overflowAnchor: 'none',
     pointerEvents: isIdentityVisuallyGone(scrollProgress) ? 'none' : 'auto',
+    // Hints the compositor-friendly properties onto their own layer, so at
+    // least the opacity/transform portion of the transition (below) can run
+    // off the main thread. `maxHeight` is deliberately excluded from this
+    // hint — it's a layout property (the entire point of #665 — collapsing
+    // it reclaims real vertical space) and stays in the transition's
+    // property list regardless, so the block below it still gets a
+    // layout+repaint every frame either way; promoting it here would just
+    // cost memory for no benefit.
+    willChange: 'opacity, transform',
   }
 }
+
+/**
+ * Tailwind transition applied to the identity block in JSX, not baked into
+ * `computeIdentityCollapseStyle` above — mirrors how `Header.jsx` pairs its
+ * own scroll-collapse inline style with a static transition class. Duration
+ * matches the codebase's dominant micro-interaction speed (`duration-150`,
+ * used throughout for hover/press transitions). The sitewide
+ * `prefers-reduced-motion` rule (`index.css`) clamps all transition
+ * durations to ~0 with `!important`, so this class collapses instantly for
+ * users who request less motion without any extra handling here.
+ */
+export const IDENTITY_COLLAPSE_TRANSITION_CLASS = 'transition-[max-height,opacity,transform] duration-150 ease-out'
 
 function LiveContextBar({
   eventData,
@@ -223,7 +256,7 @@ function LiveContextBar({
               a fan needs once they're scrolling the lineup (Tabs, filter
               toggle) lives in the always-visible block below, outside this
               wrapper. */}
-          <div style={identityCollapseStyle} inert={isIdentityCollapsed}>
+          <div className={IDENTITY_COLLAPSE_TRANSITION_CLASS} style={identityCollapseStyle} inert={isIdentityCollapsed}>
             <div className="flex items-center justify-between gap-3">
               <span
                 role="button"

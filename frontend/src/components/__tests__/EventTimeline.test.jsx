@@ -493,22 +493,24 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       expect(img).toHaveAttribute('alt', '')
     })
 
-    // #697: each poster links to its event, like the title does — but must NOT
-    // add a tab stop or an unlabelled link, since the image is alt="".
+    // #697: each poster links to its event, like the title does. The link must
+    // carry its own accessible name — never be aria-hidden, which would be an
+    // interactive element removed from the accessibility tree — and must stay
+    // out of the tab order so keyboard users get one stop per card, not two.
+    const names = ['Past Fest One', 'Past Fest Two', 'Past Fest Three']
     posterImgs.forEach((img, i) => {
       const link = img.closest('a')
       expect(link).not.toBeNull()
       expect(link).toHaveAttribute('href', `/event/past-fest-${['one', 'two', 'three'][i]}`)
-      expect(link).toHaveAttribute('aria-hidden', 'true')
+      expect(link).not.toHaveAttribute('aria-hidden')
+      expect(link).toHaveAttribute('aria-label', names[i])
       expect(link).toHaveAttribute('tabindex', '-1')
     })
   })
 
-  it('raises no axe violation for the aria-hidden poster link', async () => {
-    // The poster link is aria-hidden with tabIndex={-1}. axe's
-    // `aria-hidden-focus` rule fires when an aria-hidden subtree contains
-    // FOCUSABLE content; tabIndex={-1} removes it from the tab order, so the
-    // contract is valid. This asserts that rather than assuming it.
+  it('raises no axe violation for the labelled poster link', async () => {
+    // Guards the accessibility contract: a labelled, unfocusable link. Catches
+    // both a regression to aria-hidden-on-interactive and an unlabelled link.
     const { axe, toHaveNoViolations } = await import('jest-axe')
     expect.extend(toHaveNoViolations)
 

@@ -16,21 +16,23 @@ const POSTER_BOX_CLASS = 'w-28 sm:w-36 shrink-0 self-start overflow-hidden round
 /**
  * Wraps a listing poster so it links to the event, like the title does (#697).
  *
- * `aria-hidden` + `tabIndex={-1}` are deliberate, not an oversight: the poster is
- * `alt=""` because the adjacent title already carries the event name, and a
- * focusable link wrapping a decorative image is an UNLABELLED link plus a second
- * tab stop to a destination the title covers. Mouse/touch affordance only — the
- * title remains the single keyboard and screen-reader path.
+ * The link carries its own accessible name rather than being `aria-hidden`: an
+ * interactive element removed from the accessibility tree is an invalid contract,
+ * even when it is unfocusable. The image itself stays `alt=""` (decorative — the
+ * name lives on the link).
+ *
+ * `tabIndex={-1}` keeps it out of the tab order, so keyboard users get one stop
+ * per card via the title rather than two to the same destination.
  *
  * Renders a plain div when there is no slug, mirroring the title's own
  * `event.slug` guard; otherwise this would link to `/event/undefined`.
  */
-function PosterBox({ slug, children }) {
+function PosterBox({ slug, name, children }) {
   if (!slug) return <div className={POSTER_BOX_CLASS}>{children}</div>
   return (
     <Link
       to={`/event/${slug}`}
-      aria-hidden="true"
+      aria-label={name}
       tabIndex={-1}
       className={`${POSTER_BOX_CLASS} block transition-opacity hover:opacity-90`}
     >
@@ -664,7 +666,7 @@ function EventCard({
                 "Show History" toggle, so neither mounts until near-viewport
                 or explicitly expanded. */}
             {event.poster_url && (
-              <PosterBox slug={event.slug}>
+              <PosterBox slug={event.slug} name={event.name}>
                 <PosterImage
                   src={event.poster_url}
                   width={200}

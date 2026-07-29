@@ -89,6 +89,66 @@ describe('useScrollCollapse', () => {
     expect(screen.getByTestId('progress')).toHaveTextContent('1')
   })
 
+  it('releases on a deliberate upward drag and then expands gradually', async () => {
+    // A pure ratchet left scrolling up dead until scrollY reached `start`, then
+    // snapped open. Small successive upward steps are a finger drag and must
+    // release it, after which progress tracks scroll again.
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+    setScrollY(140)
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+
+    // Drag up in drag-sized increments: 8px x 8 = 64px, reaching the threshold.
+    let y = 140
+    for (let i = 0; i < 8; i++) {
+      y -= 8
+      setScrollY(y)
+      await fireScroll()
+    }
+    // y is now 76, so raw = (76 - 40) / 100 = 0.36.
+    expect(Number(screen.getByTestId('progress').textContent)).toBeCloseTo(0.36, 2)
+  })
+
+  it('a single URL-bar-sized upward jump never releases it', async () => {
+    // ~60px arriving as ONE discontinuity is a viewport shift, not a drag. It
+    // exceeds the per-step cap and must contribute nothing, however often it
+    // repeats — this is the #690 flicker.
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+    setScrollY(140)
+    await fireScroll()
+
+    // The jump must exceed the 64px release threshold, or the per-step cap is
+    // never exercised. Assert before scrolling back down: downward movement
+    // re-ratchets to 1 and would mask a mid-loop release.
+    for (let i = 0; i < 5; i++) {
+      setScrollY(60) // 80px up in a single step
+      await fireScroll()
+      expect(screen.getByTestId('progress')).toHaveTextContent('1')
+      setScrollY(140)
+      await fireScroll()
+    }
+  })
+
+  it('downward movement resets the upward accumulator', async () => {
+    // Otherwise upward jitter would accumulate across an entire long scroll and
+    // eventually release the ratchet for no deliberate reason.
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+    setScrollY(140)
+    await fireScroll()
+
+    // Alternate up 8 / down 8: never a sustained upward drag.
+    for (let i = 0; i < 12; i++) {
+      setScrollY(132)
+      await fireScroll()
+      setScrollY(140)
+      await fireScroll()
+    }
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+  })
+
   it('releases the ratchet once the user is back at the top', async () => {
     setScrollY(0)
     render(<Harness start={40} end={140} />)

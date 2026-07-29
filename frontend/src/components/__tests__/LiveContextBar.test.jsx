@@ -1,6 +1,61 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import LiveContextBar from '../LiveContextBar'
+import LiveContextBar, { computeIdentityCollapseStyle } from '../LiveContextBar'
+
+describe('computeIdentityCollapseStyle (#690 scroll-collapse bounce)', () => {
+  const px = style => parseFloat(style.maxHeight)
+
+  it('never grows maxHeight as scrollProgress increases', () => {
+    // The #690 bug was a NON-MONOTONIC collapse: while scrolling down, the
+    // block shrank then grew back ~18px, producing a visible flicker and
+    // CLS 0.2875 in production. Height must be a non-increasing function of
+    // progress across the whole range, not merely smaller at the endpoints.
+    let previous = Infinity
+    for (let p = 0; p <= 1.0001; p += 0.01) {
+      const current = px(computeIdentityCollapseStyle(Math.min(p, 1)))
+      expect(current).toBeLessThanOrEqual(previous)
+      previous = current
+    }
+  })
+
+  it('opts out of scroll anchoring, the actual cause of the bounce', () => {
+    // Chrome's scroll-anchoring compensates for the shrinking block by
+    // adjusting window.scrollY — the very value the collapse is driven from.
+    // That feedback loop is what produced the non-monotonic scrollY.
+    // Removing this opts the subtree back into anchor candidacy and the
+    // bounce returns, so it is asserted rather than left as a bare style.
+    expect(computeIdentityCollapseStyle(0.5).overflowAnchor).toBe('none')
+  })
+
+  it('is fully collapsed at progress 1 and fully open at 0', () => {
+    expect(px(computeIdentityCollapseStyle(0))).toBeGreaterThan(0)
+    expect(px(computeIdentityCollapseStyle(1))).toBe(0)
+  })
+
+  it('disables pointer events the moment the block becomes invisible, not later', () => {
+    // The fade multiplier (1.75) drives opacity to 0 at progress ~0.571, but
+    // pointerEvents was separately hardcoded to flip at 0.7 — leaving a window
+    // where the block was fully transparent yet still clickable and focusable.
+    // 0.6 sits inside that old window and is the regression guard.
+    expect(computeIdentityCollapseStyle(0.5).pointerEvents).toBe('auto')
+    expect(computeIdentityCollapseStyle(0.5).opacity).toBeGreaterThan(0)
+
+    expect(computeIdentityCollapseStyle(0.6).opacity).toBe(0)
+    expect(computeIdentityCollapseStyle(0.6).pointerEvents).toBe('none')
+    expect(computeIdentityCollapseStyle(0.8).pointerEvents).toBe('none')
+  })
+
+  it('never leaves the block invisible while still interactive', () => {
+    // The general property behind the case above: opacity 0 implies
+    // non-interactive, at every progress value.
+    for (let p = 0; p <= 1.0001; p += 0.01) {
+      const style = computeIdentityCollapseStyle(Math.min(p, 1))
+      if (style.opacity === 0) {
+        expect(style.pointerEvents).toBe('none')
+      }
+    }
+  })
+})
 
 const eventData = {
   name: 'Long Weekend Band Crawl',

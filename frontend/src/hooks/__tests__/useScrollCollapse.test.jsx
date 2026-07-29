@@ -21,6 +21,13 @@ async function fireScroll() {
   })
 }
 
+async function fireResize() {
+  await act(async () => {
+    window.dispatchEvent(new Event('resize'))
+    await new Promise(resolve => requestAnimationFrame(resolve))
+  })
+}
+
 describe('useScrollCollapse', () => {
   afterEach(() => {
     setScrollY(0)
@@ -51,6 +58,48 @@ describe('useScrollCollapse', () => {
     setScrollY(90) // halfway between 40 and 140
     await fireScroll()
     expect(screen.getByTestId('progress')).toHaveTextContent('0.5')
+  })
+
+  it('does not re-expand when scroll drifts back up mid-page', async () => {
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+
+    setScrollY(140) // fully collapsed
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+
+    setScrollY(90) // URL-bar-sized jump back up, still mid-page
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+
+    setScrollY(78) // small drift
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+  })
+
+  it('recomputes on resize alone, without any scroll event', async () => {
+    // iOS fires resize when the URL bar collapses. Dispatch ONLY resize, so
+    // this fails if the listener is dropped even while scroll still works.
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+    expect(screen.getByTestId('progress')).toHaveTextContent('0')
+
+    setScrollY(140)
+    await fireResize()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+  })
+
+  it('releases the ratchet once the user is back at the top', async () => {
+    setScrollY(0)
+    render(<Harness start={40} end={140} />)
+
+    setScrollY(140)
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('1')
+
+    setScrollY(40) // at the start threshold — release
+    await fireScroll()
+    expect(screen.getByTestId('progress')).toHaveTextContent('0')
   })
 
   it('clamps to 1 at and beyond the end threshold', async () => {

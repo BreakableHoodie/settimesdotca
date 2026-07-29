@@ -31,11 +31,17 @@ export function useScrollCollapse(start, end) {
 
   useEffect(() => {
     let frame = null
+    // Invariant: collapse is monotonic until scrollY <= start. Scroll position
+    // is perturbed constantly on iOS (URL bar, momentum, rubber-band), and
+    // tracking it directly re-expands the block mid-scroll (#690).
+    let ratchet = 0
     const update = () => {
       frame = null
       const y = window.scrollY || 0
-      const next = Math.min(Math.max((y - start) / (end - start), 0), 1)
-      setProgress(prev => (Math.abs(prev - next) < 0.01 ? prev : next))
+      const raw = Math.min(Math.max((y - start) / (end - start), 0), 1)
+      // Back at the top: release the ratchet so the block can expand again.
+      ratchet = y <= start ? 0 : Math.max(ratchet, raw)
+      setProgress(prev => (Math.abs(prev - ratchet) < 0.01 ? prev : ratchet))
     }
     const onScroll = () => {
       if (frame) return
@@ -43,8 +49,12 @@ export function useScrollCollapse(start, end) {
     }
     update()
     window.addEventListener('scroll', onScroll, { passive: true })
+    // iOS fires resize when the URL bar collapses; without this the block can
+    // sit mid-collapse until the next scroll event.
+    window.addEventListener('resize', onScroll)
     return () => {
       window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
       if (frame) cancelAnimationFrame(frame)
     }
   }, [start, end])

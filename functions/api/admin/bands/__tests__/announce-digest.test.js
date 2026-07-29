@@ -377,7 +377,7 @@ describe("flushAnnounceDigest", () => {
   // because sendEmail itself throws) — it must still log AND count the fan
   // as failed, so a future refactor that reintroduces a throw can't quietly
   // drop a fan from the returned counts.
-  it("logs a rejected sendOne instead of discarding it silently, and still counts it as failed", async () => {
+  it("treats a thrown sendEmail as a delivery failure: releases claims, logs ids, counts it failed", async () => {
     const { env, rawDb } = createTestEnv();
     const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     sendEmail.mockRejectedValueOnce(new Error("boom"));
@@ -405,14 +405,25 @@ describe("flushAnnounceDigest", () => {
 
       const stats = await flushAnnounceDigest(env, env.DB);
 
+      // A throw must take the SAME path as `{ delivered: false }`. Previously
+      // sendEmail was unguarded, so a throw skipped the claim release entirely
+      // and the fan was stranded with a surviving notification row.
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("sendOne rejected"),
-        expect.objectContaining({ error: expect.any(Error) }),
+        expect.stringContaining("sendEmail threw"),
+        expect.objectContaining({
+          performance_id: perf.id,
+          band_follow_id: Number(followId),
+          error: expect.any(Error),
+        }),
       );
-      // The backstop must count the rejection as failed — otherwise the fan
-      // is invisible in the returned counts even though it was logged.
       expect(stats.failed).toBe(1);
       expect(stats.sent).toBe(0);
+
+      // The claim must be released, so resend-announcement can recover the fan.
+      const claims = rawDb
+        .prepare("SELECT * FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
+        .all(perf.id, Number(followId));
+      expect(claims).toHaveLength(0);
     } finally {
       errorSpy.mockRestore();
     }

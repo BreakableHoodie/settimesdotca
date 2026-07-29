@@ -504,6 +504,51 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
     })
   })
 
+  it('raises no axe violation for the aria-hidden poster link', async () => {
+    // The poster link is aria-hidden with tabIndex={-1}. axe's
+    // `aria-hidden-focus` rule fires when an aria-hidden subtree contains
+    // FOCUSABLE content; tabIndex={-1} removes it from the tab order, so the
+    // contract is valid. This asserts that rather than assuming it.
+    const { axe, toHaveNoViolations } = await import('jest-axe')
+    expect.extend(toHaveNoViolations)
+
+    const timelineData = {
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name: 'Axe Fest',
+          slug: 'axe-fest',
+          date: '2020-05-10',
+          status: 'archived',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: 'https://cdn.example.com/posters/1.jpg',
+        },
+      ],
+    }
+    global.fetch = vi.fn(url =>
+      url.startsWith('/api/events/timeline')
+        ? Promise.resolve(jsonResponse(timelineData))
+        : Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    )
+
+    const { container } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+    fireEvent.click(await screen.findByRole('button', { name: /show history/i }))
+    await screen.findByText('Axe Fest')
+
+    expect(await axe(container)).toHaveNoViolations()
+  }, 20000)
+
   it('renders the poster unlinked when the event has no slug', async () => {
     // Mirrors the title's own slug guard — otherwise this links to
     // /event/undefined.

@@ -10,7 +10,17 @@ E2E_ADMIN_EMAIL ?= e2e-admin@test.local
 E2E_ADMIN_PASSWORD ?= e2e-test-password-Xk9
 
 .PHONY: help install build dev format format-check lint test test-backend test-frontend \
-	gate validate-openapi schema-check e2e e2e-setup e2e-serve e2e-run e2e-clean
+	gate review review-wip validate-openapi schema-check e2e e2e-setup e2e-serve e2e-run e2e-clean
+
+# CodeRabbit emits PostHog telemetry errors when egress is blocked. They are
+# noise, not review failures — the review still exits 0. They appear on BOTH
+# stdout and stderr, so redirecting one stream is not enough.
+#
+# Every pattern here is anchored or names posthog/the CLI's own bundle path, so
+# none can match review prose. Do NOT loosen these to bare tokens like `code:`
+# or `path:` — a finding whose text contains one would be silently swallowed,
+# and a filter that eats findings is worse than the noise it removes.
+CR_NOISE := ^Error while flushing PostHog |^ *path: "https://us\.i\.posthog\.com/|\$$bunfs/root/cli\.js|^error: Unable to connect\.|^ *errno: 0,$$|^ *code: "ConnectionRefused"$$
 
 help: ## List targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -46,6 +56,25 @@ test-frontend: ## Frontend unit tests
 test: test-backend test-frontend ## All unit tests
 
 gate: format format-check lint test build ## FULL pre-commit gate — run before every commit
+
+review: ## AI code review of this branch vs origin/main — run BEFORE opening a PR
+	@command -v coderabbit >/dev/null 2>&1 || { \
+		echo "coderabbit CLI not found. Install: brew install --cask coderabbit"; exit 1; }
+	@coderabbit auth status >/dev/null 2>&1 || { \
+		echo "Not signed in. Run: coderabbit auth login"; exit 1; }
+	@# Refresh the remote ref first: the CLI compares against origin/main when
+	@# local main has drifted, so a stale origin/main yields the wrong diff.
+	@git fetch origin --quiet
+	@out=$$(mktemp); coderabbit review --base main >"$$out" 2>&1; status=$$?; \
+		grep -aivE '$(CR_NOISE)' "$$out" || true; rm -f "$$out"; exit $$status
+
+review-wip: ## AI code review of uncommitted changes — run before committing
+	@command -v coderabbit >/dev/null 2>&1 || { \
+		echo "coderabbit CLI not found. Install: brew install --cask coderabbit"; exit 1; }
+	@coderabbit auth status >/dev/null 2>&1 || { \
+		echo "Not signed in. Run: coderabbit auth login"; exit 1; }
+	@out=$$(mktemp); coderabbit review --type uncommitted >"$$out" 2>&1; status=$$?; \
+		grep -aivE '$(CR_NOISE)' "$$out" || true; rm -f "$$out"; exit $$status
 
 validate-openapi: ## Required when docs/api-spec.yaml changed
 	npm run validate:openapi

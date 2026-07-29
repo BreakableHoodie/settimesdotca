@@ -255,6 +255,19 @@ npm test                    # from repo root — runs fine locally, including Ap
 
 **E2E tests** require a live wrangler dev server and are slow — run them only when changing routes, auth flows, or anything the E2E suite targets. The build check above catches most issues.
 
+### Before opening a PR — AI review gate
+
+```bash
+make review        # CodeRabbit review of this branch vs origin/main
+make review-wip    # same, but for uncommitted working-tree changes
+```
+
+Requires the CodeRabbit CLI (`brew install --cask coderabbit`, then `coderabbit auth login`); both targets fail with an install/auth hint if it is missing.
+
+**Run this before opening the PR, not after.** The same review runs automatically on the PR, so anything it finds post-open costs a fix plus a force-push round trip. Findings it has caught that the local gates did not: assertions that pass on the wrong branch's output, a spy recording statement *preparation* rather than *execution*, and a SQL guard that stayed inert for legacy rows after a write-side fix.
+
+`make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
+
 ### Before every push (including follow-up commits during PR review)
 
 ```bash

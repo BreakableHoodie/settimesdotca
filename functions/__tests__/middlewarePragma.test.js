@@ -10,69 +10,118 @@ import { onRequest } from "../_middleware.js";
 const NEUTRAL_URL = "https://example.test/api/venues"; // neutral path, not /api/metrics
 const LOOPBACK_HEADERS = { "CF-Connecting-IP": "127.0.0.1" };
 
-/** A minimal D1-shaped env.DB that records every PRAGMA/SQL statement it's asked to run. */
+const PRAGMA = "PRAGMA foreign_keys = ON";
+
+/**
+ * A minimal D1-shaped env.DB that records statements at EXECUTION time.
+ *
+ * Recording in `prepare()` would prove only that the statement was built, not
+ * that it ran — a regression that prepared the PRAGMA and never called `run()`
+ * would leave FK enforcement off while still passing. `_middleware.js` calls
+ * `.prepare(...).run()`, so `run()` is the only point that proves execution.
+ */
 function dbWithPragmaSpy() {
-  const preparedStatements = [];
+  const executed = [];
   const DB = {
     prepare(sql) {
-      preparedStatements.push(sql);
       return {
         async run() {
+          executed.push(sql);
           return { success: true, meta: { changes: 0 } };
         },
       };
     },
   };
-  return { DB, preparedStatements };
+  return { DB, executed };
 }
 
-function okNext() {
-  return async () =>
-    new Response(JSON.stringify({ ok: true }), {
+/**
+ * `next()` stub that snapshots whether the PRAGMA had already executed at the
+ * moment the handler was invoked. Order matters: the PRAGMA must be ON *before*
+ * the handler writes, so asserting only that it ran at some point would still
+ * pass if it were moved after `context.next()` — which would leave every
+ * handler write unprotected.
+ */
+function okNext(executed = [], seen = {}) {
+  return async () => {
+    seen.pragmaRanBeforeNext = executed.includes(PRAGMA);
+    seen.called = true;
+    return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
+  };
 }
 
 describe("_middleware.js — PRAGMA foreign_keys allowlist (#673)", () => {
   test.each(["POST", "PUT", "PATCH", "DELETE"])(
     "%s enables PRAGMA foreign_keys = ON before the handler runs",
     async (method) => {
-      const { DB, preparedStatements } = dbWithPragmaSpy();
+      const { DB, executed } = dbWithPragmaSpy();
+      const seen = {};
       const request = new Request(NEUTRAL_URL, { method, headers: LOOPBACK_HEADERS });
 
-      const response = await onRequest({ request, env: { DB }, data: {}, next: okNext() });
+      const response = await onRequest({ request, env: { DB }, data: {}, next: okNext(executed, seen) });
 
       expect(response.status).toBe(200);
-      expect(preparedStatements).toContain("PRAGMA foreign_keys = ON");
+      expect(executed).toContain(PRAGMA);
+      // Ordering is the point: ON *before* the handler runs, not merely at some
+      // point during the request.
+      expect(seen.pragmaRanBeforeNext).toBe(true);
     },
   );
 
   test.each(["GET", "HEAD"])(
-    "%s does NOT run the PRAGMA — read-only requests can't violate FK constraints",
+    "%s reaches the method guard and is skipped by it (read-only allowlist)",
     async (method) => {
-      const { DB, preparedStatements } = dbWithPragmaSpy();
+      // This asserts the guard's POLICY, not a property of HTTP: the middleware
+      // treats GET/HEAD as read-only and skips the PRAGMA round-trip to keep hot
+      // read paths fast. A handler could in principle still write on a GET — the
+      // allowlist is a deliberate performance trade-off, not a guarantee that
+      // these methods cannot mutate.
+      const { DB, executed } = dbWithPragmaSpy();
       const request = new Request(NEUTRAL_URL, { method, headers: LOOPBACK_HEADERS });
 
-      const response = await onRequest({ request, env: { DB }, data: {}, next: okNext() });
+      const response = await onRequest({ request, env: { DB }, data: {}, next: okNext(executed) });
 
       expect(response.status).toBe(200);
-      expect(preparedStatements).not.toContain("PRAGMA foreign_keys = ON");
-      expect(preparedStatements).toHaveLength(0);
+      expect(executed).not.toContain(PRAGMA);
+      expect(executed).toHaveLength(0);
     },
   );
 
-  test("an unrecognized/custom method still gets the PRAGMA (allowlist, not a denylist)", async () => {
-    // The guard is `isReadOnlyMethod = GET || HEAD`; everything else — including
-    // a method neither explicitly listed as read-only nor as a known mutator —
-    // must still get FK enforcement. Regressing this to a denylist (skip only
-    // known-safe mutators) would silently disable FK checks for anything new.
-    const { DB, preparedStatements } = dbWithPragmaSpy();
+  test("an unrecognized/custom method that reaches the guard still gets the PRAGMA", async () => {
+    // Of the methods that REACH the guard, it is an allowlist: only GET/HEAD are
+    // skipped, so anything else — including a method that is neither a known
+    // mutator nor explicitly listed — gets FK enforcement. Regressing this to a
+    // denylist (skip all but known mutators) would silently disable FK checks for
+    // any new method. Note this scope is "reaches the guard": OPTIONS is handled
+    // earlier and never gets here — see the OPTIONS test below.
+    const { DB, executed } = dbWithPragmaSpy();
+    const seen = {};
     const request = new Request(NEUTRAL_URL, { method: "REPORT", headers: LOOPBACK_HEADERS });
 
-    await onRequest({ request, env: { DB }, data: {}, next: okNext() });
+    await onRequest({ request, env: { DB }, data: {}, next: okNext(executed, seen) });
 
-    expect(preparedStatements).toContain("PRAGMA foreign_keys = ON");
+    expect(executed).toContain(PRAGMA);
+    expect(seen.pragmaRanBeforeNext).toBe(true);
+  });
+
+  test("OPTIONS short-circuits as a CORS preflight before reaching the guard, so no PRAGMA", async () => {
+    // `_middleware.js` returns the preflight response early (the `request.method
+    // === "OPTIONS"` branch) well before the PRAGMA guard. That is intentional: a
+    // preflight never touches the database, so there is nothing to protect. This
+    // documents the one non-GET/HEAD method that legitimately runs no PRAGMA, so
+    // the allowlist test above is not read as an absolute rule.
+    const { DB, executed } = dbWithPragmaSpy();
+    const seen = {};
+    const request = new Request(NEUTRAL_URL, { method: "OPTIONS", headers: LOOPBACK_HEADERS });
+
+    await onRequest({ request, env: { DB }, data: {}, next: okNext(executed, seen) });
+
+    expect(executed).not.toContain(PRAGMA);
+    // Short-circuited: the downstream handler is never invoked.
+    expect(seen.called).toBeUndefined();
   });
 
   test("no env.DB (e.g. a binding-less test env) does not throw for a mutating method", async () => {

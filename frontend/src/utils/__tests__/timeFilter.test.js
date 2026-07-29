@@ -7,6 +7,7 @@ import {
   getEndOfWeek,
   isHappeningToday,
   isHappeningThisWeek,
+  getTimeDescription,
 } from '../timeFilter.js'
 
 const NOW = 1000000000000 // fixed timestamp, 2001-09-08T21:46:40Z
@@ -185,5 +186,37 @@ describe('week boundary at the 1 AM Monday edge (#542, #550 festival-day convent
     globalThis.__debugScheduleTime = new Date(2026, 7, 3, 1, 0, 0)
     const mondayEveningSet = { startMs: new Date(2026, 7, 3, 20, 0, 0).getTime() } // Mon 8 PM
     expect(isHappeningThisWeek(mondayEveningSet)).toBe(false)
+  })
+})
+
+describe('getTimeDescription never names a weekday (#681)', () => {
+  // #681: formatFestivalDate already dropped weekday names for day
+  // dividers/headers because an after-midnight set's real (offset) timestamp
+  // has already rolled over to the next calendar day — a fan sees their
+  // phone say "Monday" for a set that belongs to Sunday night's lineup. PR
+  // #684 fixed formatFestivalDate but missed this function, which every set
+  // card's time label goes through (BandCard.jsx). Same bug, same fix: no
+  // weekday name, ever, in the "this week"/"next week" branches.
+  afterEach(() => {
+    delete globalThis.__debugScheduleTime
+  })
+
+  it('does not name a weekday for a this-week, after-midnight set (the exact #681 reproduction)', () => {
+    // Sunday Aug 2's after-midnight tail — real timestamp is Monday Aug 3,
+    // 12:15 AM (prepareBands' +1-day offset). Checked from earlier in the
+    // same festival week (Wed Jul 29), well before "today"/"now" apply, so
+    // this exercises the isHappeningThisWeek branch — the one that renders
+    // in production for the days leading up to the event.
+    globalThis.__debugScheduleTime = new Date(2026, 6, 29, 14, 0, 0) // Wed Jul 29, 2 PM
+    const afterMidnightSundayNightSet = { startMs: new Date(2026, 7, 3, 0, 15, 0).getTime() } // "Mon" 12:15 AM
+    const description = getTimeDescription(afterMidnightSundayNightSet)
+    expect(description).not.toMatch(/Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday/)
+  })
+
+  it('does not name a weekday for a next-week performance', () => {
+    globalThis.__debugScheduleTime = new Date(2026, 6, 29, 14, 0, 0) // Wed Jul 29, 2 PM
+    const nextWeekSet = { startMs: new Date(2026, 7, 5, 20, 0, 0).getTime() } // Wed Aug 5, 8 PM
+    const description = getTimeDescription(nextWeekSet)
+    expect(description).not.toMatch(/Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday/)
   })
 })

@@ -295,15 +295,22 @@ export function getTimeDescription(performance) {
   }
 
   // If performance is this week
+  //
+  // No weekday name (#681): an after-midnight set's real startMs is already
+  // offset +1 calendar day by prepareBands() (bandUtils.js), so the raw
+  // Date's weekday is one day ahead of the festival day the set actually
+  // belongs to — e.g. a Sunday-night set reads "Monday" here. Same root
+  // cause and same fix as formatFestivalDate() (festivalDays.js): drop the
+  // ambiguous day label rather than show one that's sometimes wrong.
   if (isHappeningThisWeek(performance)) {
     const startDate = new Date(startTime)
-    return `${startDate.toLocaleDateString([], { weekday: 'long' })} ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
+    return `${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
-  // If performance is next week
+  // If performance is next week — same no-weekday rationale as above.
   if (isHappeningNextWeek(performance)) {
     const startDate = new Date(startTime)
-    return `Next ${startDate.toLocaleDateString([], { weekday: 'long' })} at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
+    return `Next week at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
   }
 
   // Default to formatted date and time

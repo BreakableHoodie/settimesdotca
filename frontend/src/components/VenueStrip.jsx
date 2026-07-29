@@ -21,7 +21,7 @@ function VenueStrip({ activeVenues = [] }) {
   const R_ACTIVE = 8
 
   return (
-    <div className="w-full overflow-x-auto" aria-label="Venue route along King St N">
+    <div className="w-full overflow-x-auto" role="img" aria-label="Venue route along King St N">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="xMidYMid meet"

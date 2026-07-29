@@ -20,7 +20,7 @@ E2E_ADMIN_PASSWORD ?= e2e-test-password-Xk9
 # none can match review prose. Do NOT loosen these to bare tokens like `code:`
 # or `path:` — a finding whose text contains one would be silently swallowed,
 # and a filter that eats findings is worse than the noise it removes.
-CR_NOISE := posthog|\$$bunfs/root/cli\.js|^error: Unable to connect\.|^ *errno: 0,$$|^ *code: "ConnectionRefused"$$
+CR_NOISE := ^Error while flushing PostHog |^ *path: "https://us\.i\.posthog\.com/|\$$bunfs/root/cli\.js|^error: Unable to connect\.|^ *errno: 0,$$|^ *code: "ConnectionRefused"$$
 
 help: ## List targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'

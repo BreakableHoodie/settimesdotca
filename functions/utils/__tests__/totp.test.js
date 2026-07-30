@@ -44,6 +44,67 @@ describe("totp utilities", () => {
     expect(result.remaining).toHaveLength(1);
   });
 
+  describe("backup code entropy + salt (#675)", () => {
+    it("generates 10-character codes from the expected charset", () => {
+      const codes = generateBackupCodes(5);
+      expect(codes).toHaveLength(5);
+      for (const code of codes) {
+        const stripped = code.replace("-", "");
+        expect(stripped).toHaveLength(10);
+        expect(stripped).toMatch(/^[0-9A-Z]{10}$/);
+      }
+    });
+
+    it("salts each hash independently — hashing the same code twice yields different output", async () => {
+      const [code] = generateBackupCodes(1);
+      const hashA = await hashBackupCode(code);
+      const hashB = await hashBackupCode(code);
+
+      expect(hashA).not.toBe(hashB);
+      // Different salts, but both must still verify the same plaintext code.
+      expect((await verifyBackupCode(code, [hashA])).valid).toBe(true);
+      expect((await verifyBackupCode(code, [hashB])).valid).toBe(true);
+    });
+
+    it("accepts a lowercase-entered code (case-insensitivity)", async () => {
+      const [code] = generateBackupCodes(1);
+      const hashed = [await hashBackupCode(code)];
+
+      const result = await verifyBackupCode(code.toLowerCase(), hashed);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it("never verifies a legacy unsalted SHA-256 hash — pre-#675 codes are invalidated by construction", async () => {
+      const [code] = generateBackupCodes(1);
+      // Reproduce the pre-#675 hashBackupCode format exactly: a bare base64
+      // SHA-256 digest of the normalized code, no salt, no "$" delimiter.
+      const normalized = code.replace("-", "").toUpperCase();
+      const legacyDigest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normalized)));
+      const legacyHash = btoa(String.fromCharCode(...legacyDigest));
+
+      const result = await verifyBackupCode(code, [legacyHash]);
+
+      // The migration (see migrations/) also nulls out every stored
+      // backup_codes row, so this legacy shape shouldn't reach production —
+      // but the hash function must fail closed on it regardless, rather than
+      // relying on the migration alone.
+      expect(result.valid).toBe(false);
+      expect(result.remaining).toHaveLength(1);
+    });
+
+    it("verifyTotp still matches numeric codes after the normalizeCode uppercase change", async () => {
+      const secret = generateTotpSecret();
+      const code = await generateTotpCode(secret);
+
+      // TOTP codes are pure digits, so normalizeCode's added .toUpperCase()
+      // must be a no-op for them — assert the invariant directly, then
+      // confirm the real verify path is unaffected.
+      expect(code.toUpperCase()).toBe(code);
+      expect(await verifyTotp(secret, code)).toBe(true);
+    });
+  });
+
   describe("negative cases", () => {
     it("verifyTotp returns false for a wrong code", async () => {
       const secret = generateTotpSecret();

@@ -104,6 +104,37 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     expect(body.metrics.uniqueVisitors).toBe(3);
   });
 
+  describe("telemetry-derived totals (#706)", () => {
+    test("sums event_daily_stats across dates into totalEventViews/totalTicketClicks", async () => {
+      const { env, rawDb } = createTestEnv();
+      const event = insertEvent(rawDb, { name: "Telemetry Fest", slug: "telemetry-fest" });
+
+      rawDb
+        .prepare(`INSERT INTO event_daily_stats (event_id, date, event_views, ticket_clicks) VALUES (?, ?, ?, ?)`)
+        .run(event.id, "2026-08-01", 10, 2);
+      rawDb
+        .prepare(`INSERT INTO event_daily_stats (event_id, date, event_views, ticket_clicks) VALUES (?, ?, ?, ?)`)
+        .run(event.id, "2026-08-02", 15, 5);
+
+      const res = await call(env, event.id);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.metrics.totalEventViews).toBe(25);
+      expect(body.metrics.totalTicketClicks).toBe(7);
+    });
+
+    test("event with no telemetry rows returns zeroed totals, not errors", async () => {
+      const { env, rawDb } = createTestEnv();
+      const event = insertEvent(rawDb, { name: "Quiet Telemetry Fest", slug: "quiet-telemetry-fest" });
+
+      const res = await call(env, event.id);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.metrics.totalEventViews).toBe(0);
+      expect(body.metrics.totalTicketClicks).toBe(0);
+    });
+  });
+
   describe("announcementPlanning (#556)", () => {
     // Seeds: Alpha (unannounced) with 3 verified follows (2 in the last 7 days,
     // 1 older), 1 unverified follow, and one verified follower already notified

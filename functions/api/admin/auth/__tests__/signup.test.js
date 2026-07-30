@@ -1,6 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import * as signupHandler from "../signup.js";
+import { toSqliteDateTime } from "../../../../utils/authAttempts.js";
+
+// Production writes invite_codes.expires_at via toSqliteDateTime() (space
+// separator, no 'T') and compares it with `expires_at > datetime('now')`
+// (signup.js). A fixture seeded with a raw .toISOString() ('T'-separated)
+// value no longer resembles that write path and can mask the exact SEC-F1
+// string-comparison bug class this helper exists to prevent (#687).
+function daysFromNow(days) {
+  return toSqliteDateTime(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
+}
+
+// An expiry at or before the current SQLite second that stays on the SAME
+// UTC calendar day as "now". A full-day-ago (or earlier) expiry passes the
+// "rejects an expired invite code" test even with a broken 'T'-separated
+// fixture, because the DATE portion already diverges before the comparison
+// ever reaches the 'T' (0x54) vs ' ' (0x20) byte — see #687. Forcing same-day
+// makes the test exercise the actual time comparison instead of a lucky
+// date-prefix mismatch. Capped well under 24h and halved from
+// elapsed-since-midnight so the offset can never itself cross back over the
+// UTC midnight boundary — including right at 00:00:00.000 UTC, where halving
+// yields exactly 0 rather than forcing a negative (prior-day) offset.
+// toSqliteDateTime() truncates to whole seconds, so an offset of 0 still
+// yields an expiry the real datetime('now') comparison in signup.js treats
+// as expired (not strictly greater) by the time the query actually runs.
+function sameDayPastExpiry(maxOffsetMs = 3 * 60 * 60 * 1000) {
+  const now = new Date();
+  const msSinceMidnight = now.getTime() - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const offsetMs = Math.min(maxOffsetMs, Math.floor(msSinceMidnight / 2));
+  return toSqliteDateTime(new Date(now.getTime() - offsetMs));
+}
 
 describe("admin signup", () => {
   it("creates an inactive user and requires activation", async () => {
@@ -9,7 +39,7 @@ describe("admin signup", () => {
 
     // Create a valid invite code for the test
     const inviteCode = "TEST-INVITE-CODE-123";
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = daysFromNow(7);
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
       .run(inviteCode, "editor", expiresAt, 1);
@@ -55,10 +85,10 @@ describe("admin signup", () => {
     env.ALLOW_ADMIN_SIGNUP = "true";
 
     const expiredCode = "EXPIRED-CODE-123";
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = sameDayPastExpiry();
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(expiredCode, "editor", yesterday, 1);
+      .run(expiredCode, "editor", expiresAt, 1);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",
@@ -81,7 +111,7 @@ describe("admin signup", () => {
     env.ALLOW_ADMIN_SIGNUP = "true";
 
     const usedCode = "USED-CODE-456";
-    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const futureDate = daysFromNow(7);
     // Insert existing user to reference as used_by_user_id
     rawDb
       .prepare("INSERT INTO users (email, password_hash, name, role, is_active) VALUES (?, ?, ?, ?, ?)")
@@ -119,7 +149,7 @@ describe("admin signup", () => {
     env.ALLOW_ADMIN_SIGNUP = "true";
 
     const inviteCode = "INVITE-SEC-F1-TEST";
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = daysFromNow(7);
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
       .run(inviteCode, "editor", expiresAt, 1);
@@ -150,7 +180,7 @@ describe("admin signup", () => {
     env.ALLOW_ADMIN_SIGNUP = "true";
 
     const inviteCode = "INVITE-S6-TEST";
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = daysFromNow(7);
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
       .run(inviteCode, "editor", expiresAt, 1);

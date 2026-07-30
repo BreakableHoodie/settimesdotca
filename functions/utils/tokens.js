@@ -1,5 +1,7 @@
 // Secure token generation for subscriptions, password resets, and sessions
 
+import { toSqliteDateTime } from "./authAttempts.js";
+
 /**
  * Generate a hex-encoded random token
  * @param {number} length - Byte length of token (default 32)
@@ -22,6 +24,6 @@ export function generatePasswordResetToken(userId, createdBy) {
     token: crypto.randomUUID(),
     userId,
     createdBy,
-    expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19),
+    expiresAt: toSqliteDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)),
   };
 }

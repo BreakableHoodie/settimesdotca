@@ -1,5 +1,6 @@
 // Trusted Device utilities for "Remember this device" MFA feature
 import { isDevRequest } from "./auth.js";
+import { toSqliteDateTime } from "./authAttempts.js";
 import { logger } from "./logger.js";
 
 // __Host- prefix enforces Secure + Path=/ + no Domain, preventing subdomain injection.
@@ -70,10 +71,7 @@ export async function createTrustedDevice(DB, userId, ipAddress, userAgent) {
   // TEXT comparisons against datetime('now') are lexicographically correct.
   // ISO 8601 with 'T' compares greater than space-separated format at the
   // same instant, which would allow expired devices to pass validation.
-  const expiresAt = new Date(Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .replace("T", " ")
-    .slice(0, 19);
+  const expiresAt = toSqliteDateTime(new Date(Date.now() + TRUSTED_DEVICE_EXPIRY_DAYS * 24 * 60 * 60 * 1000));
 
   await DB.prepare(
     `INSERT INTO trusted_devices (user_id, token, device_fingerprint, ua_hash, ip_address, user_agent, expires_at)

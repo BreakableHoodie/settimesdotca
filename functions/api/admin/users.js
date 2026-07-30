@@ -8,6 +8,7 @@ import { getClientIP } from "../../utils/request.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { buildInviteEmail } from "../../utils/emailTemplates.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
+import { toSqliteDateTime } from "../../utils/authAttempts.js";
 
 // GET - List all users (admin only)
 export async function onRequestGet(context) {
@@ -116,10 +117,7 @@ export async function onRequestPost(context) {
 
     const inviteCode = crypto.randomUUID();
     const expiresInDays = 7;
-    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .replace("T", " ")
-      .slice(0, 19);
+    const expiresAt = toSqliteDateTime(new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000));
 
     // Create invite code
     const invite = await DB.prepare(

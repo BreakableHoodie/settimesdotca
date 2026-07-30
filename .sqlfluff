@@ -1,0 +1,30 @@
+[sqlfluff]
+# D1 is SQLite-compatible. Without this, sqlfluff falls back to the ANSI
+# dialect and throws parse errors on SQLite-only syntax used throughout
+# migrations/ (PRAGMA foreign_keys, AUTOINCREMENT, INSERT OR IGNORE).
+dialect = sqlite
+templater = raw
+
+# Restrict to the "core" rule group (sqlfluff's own curated baseline) rather
+# than "all". The wider "all" group adds query-shape opinions (join-order
+# preference, "else null" redundancy, keyword-as-identifier warnings) that
+# fire on legitimate SQL in this repo's data-backfill migrations without
+# indicating a mistake.
+rules = core
+
+# Every rule below fired on a large share of the existing 53 migrations under
+# the default settings — reformatting them all is not the goal here (see
+# #663 / ADR-0008 IMP-008). Each is a formatting/style preference, not a
+# correctness check for SQLite or D1:
+#   LT01 - inappropriate spacing (e.g. no space before an opening paren)
+#   LT02 - indentation width (repo convention is 2 spaces; sqlfluff wants 4)
+#   LT05 - line length (many migrations use long inline `--` comments)
+#   LT08 - blank line expected after a CTE's closing bracket
+#   LT12 - single trailing newline at EOF
+#   AL03 - column expressions should carry an explicit AS alias
+#   AL08 - column alias reused within the same clause
+#   CP02 - unquoted identifier casing consistency
+#   CP03 - function name casing consistency
+# Verified: `sqlfluff lint migrations/` is clean (0 violations) across all
+# 53 existing files with this configuration.
+exclude_rules = LT01,LT02,LT05,LT08,LT12,AL03,AL08,CP02,CP03

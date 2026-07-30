@@ -7,6 +7,8 @@
 // never logged by Cloudflare access logs, stored in browser history, or
 // leaked via the Referer header.
 
+import { fromSqliteDateTime } from "../../../utils/authAttempts.js";
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
@@ -49,11 +51,7 @@ export async function onRequestPost(context) {
       });
     }
 
-    if (
-      new Date(
-        resetToken.expires_at.includes("T") ? resetToken.expires_at : resetToken.expires_at.replace(" ", "T") + "Z",
-      ) < new Date()
-    ) {
+    if (fromSqliteDateTime(resetToken.expires_at) < new Date()) {
       return new Response(JSON.stringify({ error: "Reset token has expired", code: "TOKEN_EXPIRED" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },

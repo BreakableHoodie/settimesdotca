@@ -32,7 +32,7 @@ Use PBKDF2-SHA256 via `crypto.subtle.deriveBits()` with 100,000 iterations for a
 
 Hash storage format:
 
-```
+```text
 pbkdf2$<iterations>$<base64url-salt>$<base64url-hash>
 ```
 

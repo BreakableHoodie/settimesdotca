@@ -214,7 +214,11 @@ describe("POST /api/metrics — event_view and ticket_click write to event_daily
   });
 
   test("returns 200 and logs a warning when event_daily_stats batch fails", async () => {
-    const { env } = createTestEnv();
+    const { env, rawDb } = createTestEnv();
+    // The event must exist: unknown ids are filtered out before any statement
+    // is built, so a bogus id would produce an empty batch and never reach the
+    // failure path this test is exercising.
+    const event = insertEvent(rawDb, { name: "Warn Fest", slug: "warn-fest" });
 
     // A lone ticket_click event produces no artist_daily_stats or
     // page_views_daily statements, so this is the only batch() call made —
@@ -226,7 +230,7 @@ describe("POST /api/metrics — event_view and ticket_click write to event_daily
 
     const warnSpy = vi.spyOn(loggerModule.logger, "warn");
 
-    const events = [{ event: "ticket_click", props: { event_id: 1 } }];
+    const events = [{ event: "ticket_click", props: { event_id: event.id } }];
     const res = await onRequestPost({ request: makeRequest(events), env });
 
     // Best-effort: must still return 200
@@ -301,5 +305,41 @@ describe("POST /api/metrics — date key is Toronto-local, not UTC (#668)", () =
     expect(row.date).toBe("2026-08-02");
     expect(row.event_views).toBe(1);
     expect(row.ticket_clicks).toBe(1);
+  });
+
+  test("an unknown event_id is dropped without taking the valid rows down with it", async () => {
+    // event_id is client-supplied and only integer-validated. event_daily_stats
+    // has an FK to events and D1's batch() is ATOMIC, so an unresolvable id
+    // would fail the whole chunk and roll back the real metrics alongside it.
+    //
+    // Asserts the statement COUNT reaching batch(), not the resulting rows:
+    // better-sqlite3 does not replicate D1's atomicity, so a row-level
+    // assertion would pass with or without the guard and prove nothing.
+    const { env, rawDb } = createTestEnv();
+    const known = insertEvent(rawDb, { name: "Real Fest", slug: "real-fest" });
+
+    const batched = [];
+    const realBatch = env.DB.batch.bind(env.DB);
+    env.DB.batch = async (stmts) => {
+      batched.push(stmts.length);
+      return realBatch(stmts);
+    };
+
+    const res = await onRequestPost({
+      request: makeRequest([
+        { event: "ticket_click", props: { event_id: known.id } },
+        { event: "ticket_click", props: { event_id: 999999 } },
+        { event: "event_view", props: { event_id: known.id } },
+      ]),
+      env,
+    });
+    expect(res.status).toBe(200);
+
+    // One statement — the known event. The unknown id must never be built.
+    expect(batched).toEqual([1]);
+
+    const kept = rawDb.prepare("SELECT * FROM event_daily_stats WHERE event_id = ?").get(known.id);
+    expect(kept.ticket_clicks).toBe(1);
+    expect(kept.event_views).toBe(1);
   });
 });

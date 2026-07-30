@@ -172,7 +172,6 @@ export function createTestDB() {
     );
 
     CREATE INDEX idx_event_daily_stats_date ON event_daily_stats(date);
-    CREATE INDEX idx_event_daily_stats_event ON event_daily_stats(event_id);
 
     CREATE TABLE performances (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

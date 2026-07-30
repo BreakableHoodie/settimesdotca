@@ -92,8 +92,14 @@ export async function onRequestPost(context) {
       const bandViewCounts = new Map();
       const socialClickCounts = new Map();
       const pageCounts = new Map(); // page path → count
-      const eventViewCounts = new Map(); // event_id → count
-      const ticketClickCounts = new Map(); // event_id → count
+      // `share_event` and `filter_use` are allowlisted but deliberately have no
+      // consumer. A share CREATE is a share_links row and a share VIEW
+      // increments share_links.view_count, so persisting share_event here would
+      // double-count it — CLAUDE.md "Metrics & Analytics" forbids wiring it up.
+      // `filter_use` has no decision attached to it yet; it stays allowlisted so
+      // clients already emitting it are not rejected. Tracked in #706.
+      const eventViewCounts = new Map();
+      const ticketClickCounts = new Map();
 
       for (const event of validEvents) {
         if (event.event === "artist_profile_view") {
@@ -190,7 +196,26 @@ export async function onRequestPost(context) {
       // Isolated in its own batch/try-catch so a missing table or write error
       // can't break the artist/page-view writes above (best-effort,
       // fire-and-forget — CLAUDE.md "Metrics & Analytics").
-      const allEventIds = new Set([...eventViewCounts.keys(), ...ticketClickCounts.keys()]);
+      // FK guard. event_daily_stats has FOREIGN KEY (event_id) REFERENCES
+      // events(id), and _middleware.js sets PRAGMA foreign_keys = ON for every
+      // mutating request. DB.batch() is atomic, so a SINGLE unknown event_id
+      // fails the whole chunk and rolls back every valid row alongside it.
+      // event_id is client-supplied and only integer-validated, so a stale
+      // client or a crafted payload could otherwise wipe real metrics. Resolve
+      // against events first and keep only ids that exist.
+      const candidateIds = [...new Set([...eventViewCounts.keys(), ...ticketClickCounts.keys()])];
+      let allEventIds = [];
+      if (candidateIds.length > 0) {
+        try {
+          const placeholders = candidateIds.map(() => "?").join(",");
+          const { results } = await env.DB.prepare(`SELECT id FROM events WHERE id IN (${placeholders})`)
+            .bind(...candidateIds)
+            .all();
+          allEventIds = (results || []).map((row) => row.id);
+        } catch (err) {
+          logger.warn("event_daily_stats id resolution failed; skipping event stats for this batch", { error: err });
+        }
+      }
 
       const eventStmts = [];
       for (const eventId of allEventIds) {

@@ -27,4 +27,3 @@ CREATE TABLE IF NOT EXISTS event_daily_stats (
 );
 
 CREATE INDEX IF NOT EXISTS idx_event_daily_stats_date ON event_daily_stats(date);
-CREATE INDEX IF NOT EXISTS idx_event_daily_stats_event ON event_daily_stats(event_id);

@@ -8,12 +8,23 @@
 const DEFAULT_TOTP_STEP_SECONDS = 30;
 const DEFAULT_TOTP_DIGITS = 6;
 const DEFAULT_BACKUP_CODE_COUNT = 10;
+// #675: 6 chars over a 36-symbol alphabet was ~2^31 (GPU-crackable offline in
+// seconds from a DB leak). 10 chars is ~2^51 — see the accepted decision on
+// the issue for why entropy (not PBKDF2) is the fix here.
+const BACKUP_CODE_LENGTH = 10;
+const BACKUP_CODE_SALT_LENGTH = 16;
+// Self-describing hash format: "sha256$<saltB64>$<hashB64>". The legacy
+// unsalted hash (a bare base64 digest, no "$") can never match this shape, so
+// codes issued before #675 are invalidated by construction rather than by
+// convention — see verifyBackupCode.
+const BACKUP_CODE_HASH_PREFIX = "sha256";
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; // RFC 4648, no padding
 
 function normalizeCode(code) {
   return String(code || "")
     .trim()
-    .replace(/[\s-]/g, "");
+    .replace(/[\s-]/g, "")
+    .toUpperCase();
 }
 
 export function base32Encode(bytes) {
@@ -138,26 +149,48 @@ export function generateBackupCodes(count = DEFAULT_BACKUP_CODE_COUNT) {
 
   for (let i = 0; i < count; i += 1) {
     const chars = [];
-    while (chars.length < 6) {
-      const bytes = new Uint8Array(6);
+    while (chars.length < BACKUP_CODE_LENGTH) {
+      const bytes = new Uint8Array(BACKUP_CODE_LENGTH);
       crypto.getRandomValues(bytes);
       for (const byte of bytes) {
-        if (byte < UNBIASED_LIMIT && chars.length < 6) {
+        if (byte < UNBIASED_LIMIT && chars.length < BACKUP_CODE_LENGTH) {
           chars.push((byte % CHARSET_SIZE).toString(36));
         }
       }
     }
     const code = chars.join("").toUpperCase();
-    codes.push(`${code.slice(0, 4)}-${code.slice(4)}`);
+    codes.push(`${code.slice(0, 5)}-${code.slice(5)}`);
   }
   return codes;
 }
 
+function bytesToBase64(bytes) {
+  return btoa(String.fromCharCode(...bytes));
+}
+
+function base64ToBytes(base64) {
+  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+}
+
+// SHA-256 over salt || normalizedCode. A single fast round is deliberate here
+// (not PBKDF2): verifyBackupCode must hash the candidate against every stored
+// code without short-circuiting (see comment there), and at password-strength
+// iteration counts that would multiply into millions of iterations per MFA
+// attempt on a CPU-metered Worker. The 10-char code length (~2^51) is what
+// makes a single SHA-256 round acceptable — see the decision on #675.
+async function digestBackupCode(normalizedCode, salt) {
+  const codeBytes = new TextEncoder().encode(normalizedCode);
+  const data = new Uint8Array(salt.length + codeBytes.length);
+  data.set(salt, 0);
+  data.set(codeBytes, salt.length);
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+}
+
 export async function hashBackupCode(code) {
   const normalized = normalizeCode(code);
-  const data = new TextEncoder().encode(normalized);
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", data));
-  return btoa(String.fromCharCode(...digest));
+  const salt = crypto.getRandomValues(new Uint8Array(BACKUP_CODE_SALT_LENGTH));
+  const digest = await digestBackupCode(normalized, salt);
+  return `${BACKUP_CODE_HASH_PREFIX}$${bytesToBase64(salt)}$${bytesToBase64(digest)}`;
 }
 
 export async function verifyBackupCode(code, hashedCodes = []) {
@@ -165,12 +198,34 @@ export async function verifyBackupCode(code, hashedCodes = []) {
     return { valid: false, remaining: hashedCodes };
   }
 
-  const hashed = await hashBackupCode(code);
+  const normalized = normalizeCode(code);
   let index = -1;
 
-  // Iterate all codes without early exit to prevent position-based timing leaks.
+  // Iterate all codes without early exit to prevent position-based timing
+  // leaks. Every entry — salted, legacy, or malformed — runs through the same
+  // parse-salt-digest-compare shape (falling back to a same-length dummy salt
+  // when the stored value isn't in the current "sha256$salt$hash" format) so
+  // a legacy/malformed row costs the same as a real one and can't be
+  // distinguished by timing.
   for (let i = 0; i < hashedCodes.length; i += 1) {
-    if (constantTimeEqual(hashed, String(hashedCodes[i] || ""))) {
+    const stored = String(hashedCodes[i] || "");
+    const parts = stored.split("$");
+    const isSalted = parts.length === 3 && parts[0] === BACKUP_CODE_HASH_PREFIX;
+
+    let salt;
+    try {
+      salt = isSalted ? base64ToBytes(parts[1]) : new Uint8Array(BACKUP_CODE_SALT_LENGTH);
+    } catch {
+      salt = new Uint8Array(BACKUP_CODE_SALT_LENGTH);
+    }
+
+    const digest = await digestBackupCode(normalized, salt);
+    const candidateHash = bytesToBase64(digest);
+    // Non-salted (legacy/malformed) entries compare against "", which a real
+    // base64 digest can never equal — they always fail, deliberately.
+    const storedHash = isSalted ? parts[2] : "";
+
+    if (constantTimeEqual(candidateHash, storedHash)) {
       index = i;
     }
   }

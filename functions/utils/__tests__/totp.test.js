@@ -45,13 +45,14 @@ describe("totp utilities", () => {
   });
 
   describe("backup code entropy + salt (#675)", () => {
-    it("generates 10-character codes from the expected charset", () => {
+    it("generates 10-character codes from the expected charset in 5-5 format", () => {
       const codes = generateBackupCodes(5);
       expect(codes).toHaveLength(5);
       for (const code of codes) {
-        const stripped = code.replace("-", "");
-        expect(stripped).toHaveLength(10);
-        expect(stripped).toMatch(/^[0-9A-Z]{10}$/);
+        // Assert the full "XXXXX-XXXXX" shape directly rather than just the
+        // stripped length, so a malformed/misplaced separator (e.g.
+        // "ABCDEFGHIJ" or "-ABCDEFGHIJ") would fail this test.
+        expect(code).toMatch(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/);
       }
     });
 
@@ -73,6 +74,21 @@ describe("totp utilities", () => {
       const result = await verifyBackupCode(code.toLowerCase(), hashed);
 
       expect(result.valid).toBe(true);
+    });
+
+    it("matches a code stored anywhere in the array, not just the first entry", async () => {
+      // verifyBackupCode iterates every stored hash without early-exit (by
+      // design, to avoid a position-based timing leak). Put the real match
+      // second so a hypothetical short-circuit or off-by-one would surface
+      // as a failure here, unlike the other tests which always match index 0.
+      const codes = generateBackupCodes(3);
+      const hashed = await Promise.all(codes.map((code) => hashBackupCode(code)));
+
+      const result = await verifyBackupCode(codes[1], hashed);
+
+      expect(result.valid).toBe(true);
+      expect(result.remaining).toHaveLength(2);
+      expect(result.remaining).toEqual([hashed[0], hashed[2]]);
     });
 
     it("never verifies a legacy unsalted SHA-256 hash — pre-#675 codes are invalidated by construction", async () => {

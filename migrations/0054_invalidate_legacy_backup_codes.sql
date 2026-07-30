@@ -15,9 +15,18 @@
 -- Settings -> MFA -> Regenerate Backup Codes (POST /api/admin/mfa/backup-codes),
 -- which only requires a live TOTP code and returns a fresh salted 10-char set.
 --
+-- The WHERE clause deliberately matches only the legacy shape (a JSON array of
+-- bare base64 digests, none of which contain the "sha256$" marker) rather than
+-- blanket-nulling every non-null row. Cloudflare Pages deploys the new
+-- function code and applies migrations as separate steps, so there is a
+-- window where an admin could already regenerate codes in the new salted
+-- format before this migration runs; matching only the legacy shape means a
+-- freshly-regenerated valid set is never collaterally deleted.
+--
 -- Apply locally:  npm run migrate:local
 -- Apply to prod:  npx wrangler d1 migrations apply settimes-production-db --remote
 
 UPDATE users
 SET backup_codes = NULL
-WHERE backup_codes IS NOT NULL;
+WHERE backup_codes IS NOT NULL
+  AND backup_codes NOT LIKE '%sha256$%';

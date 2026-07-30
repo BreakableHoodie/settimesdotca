@@ -430,18 +430,27 @@ describe("flushAnnounceDigest", () => {
   });
 
   describe("#672: claim-release failure inside sendOne", () => {
-    // Stubs DB.batch so the FIRST call (the phase-A band_announce_queue
-    // cleanup, which always runs per group) succeeds normally via the real
-    // implementation, and every subsequent call (the phase-B claim-release
-    // DB.batch on delivery failure) throws — simulating a D1 failure
-    // specific to the release path described in #672.
-    function stubBatchToFailAfterFirstCall(env) {
+    // Stubs DB.batch to throw ONLY for the phase-B claim-release batch (the
+    // `DELETE FROM band_follow_notifications` statements announceDigest.js
+    // issues on delivery failure), simulating a D1 failure specific to the
+    // release path described in #672. Every other batch call — including the
+    // phase-A band_announce_queue cleanup that runs per group — passes
+    // through to the real implementation unchanged.
+    //
+    // Identifies the release batch by inspecting each statement's SQL text
+    // (exposed by test-utils.js's DB shim as `.sql`) rather than counting
+    // calls: a call-counter stub silently fails the WRONG statement if
+    // another DB.batch() call is ever added ahead of the release (e.g. more
+    // phase-A cleanup), and the release path stops being exercised without
+    // any test going red (#695).
+    function stubBatchToFailOnClaimRelease(env) {
       const originalBatch = env.DB.batch.bind(env.DB);
-      let calls = 0;
       return vi.spyOn(env.DB, "batch").mockImplementation(async (statements) => {
-        calls++;
-        if (calls === 1) return originalBatch(statements);
-        throw new Error("simulated D1 batch failure");
+        const isClaimRelease = statements.some((stmt) => stmt.sql?.includes("DELETE FROM band_follow_notifications"));
+        if (isClaimRelease) {
+          throw new Error("simulated D1 batch failure");
+        }
+        return originalBatch(statements);
       });
     }
 
@@ -472,7 +481,7 @@ describe("flushAnnounceDigest", () => {
 
       // Delivery fails, which is what triggers the claim-release DB.batch.
       sendEmail.mockResolvedValueOnce({ delivered: false, reason: "provider_error" });
-      const batchSpy = stubBatchToFailAfterFirstCall(env);
+      const batchSpy = stubBatchToFailOnClaimRelease(env);
 
       try {
         const stats = await flushAnnounceDigest(env, env.DB);
@@ -538,7 +547,7 @@ describe("flushAnnounceDigest", () => {
         .run(followId, perf.id, ev.id, "Band Stranded", "Fest", "fest-recovery-check", perf.band_profile_id);
 
       sendEmail.mockResolvedValueOnce({ delivered: false, reason: "provider_error" });
-      const batchSpy = stubBatchToFailAfterFirstCall(env);
+      const batchSpy = stubBatchToFailOnClaimRelease(env);
 
       try {
         const stats = await flushAnnounceDigest(env, env.DB);

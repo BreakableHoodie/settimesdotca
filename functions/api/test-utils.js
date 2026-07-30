@@ -518,6 +518,11 @@ export function createDBEnv(db) {
     prepare(sql) {
       const stmt = db.prepare(sql);
       const wrapper = {
+        // Exposes the original SQL text so tests can identify a statement by
+        // its content (e.g. a batch-failure stub matching on the query shape)
+        // rather than by call order — see announce-digest.test.js's
+        // stubBatchToFailOnClaimRelease.
+        sql,
         first() {
           return stmt.get();
         },
@@ -538,6 +543,7 @@ export function createDBEnv(db) {
         bind(...params) {
           const bound = params;
           return {
+            sql,
             first() {
               return stmt.get(...bound);
             },

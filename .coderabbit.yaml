@@ -226,18 +226,15 @@ reviews:
       enabled: true
     yamllint:
       enabled: true
-    # Disabled pending config: sqlfluff has no .sqlfluff in the repo, so no
-    # dialect is declared and it falls back to ANSI — 20 of the migrations use
-    # SQLite-only syntax (PRAGMA, AUTOINCREMENT, INSERT OR IGNORE) that parses
-    # as errors under that default. markdownlint has no config and its default
-    # MD013 80-column rule would flag most docs in this repo. Re-enable both
-    # once .sqlfluff (dialect = sqlite) and a markdownlint config land.
+    # .sqlfluff (dialect = sqlite, core rules only) and .markdownlint.json
+    # (permissive ruleset tuned against the existing docs corpus) landed in
+    # #663 — both tools are clean across the full repo. See ADR-0008 IMP-008.
     markdownlint:
-      enabled: false
+      enabled: true
     semgrep:
       enabled: true
     sqlfluff:
-      enabled: false
+      enabled: true
 
 knowledge_base:
   code_guidelines:

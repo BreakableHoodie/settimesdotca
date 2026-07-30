@@ -12,18 +12,23 @@ function daysFromNow(days) {
   return toSqliteDateTime(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
 }
 
-// A past expiry that stays on the SAME UTC calendar day as "now", at least
-// 1ms in the past. A full-day-ago (or earlier) expiry passes the "rejects an
-// expired invite code" test even with a broken 'T'-separated fixture, because
-// the DATE portion already diverges before the comparison ever reaches the
-// 'T' (0x54) vs ' ' (0x20) byte — see #687. Forcing same-day makes the test
-// exercise the actual time comparison instead of a lucky date-prefix mismatch.
-// Capped well under 24h and halved from elapsed-since-midnight so the offset
-// can never itself cross back over the UTC midnight boundary.
+// An expiry at or before the current SQLite second that stays on the SAME
+// UTC calendar day as "now". A full-day-ago (or earlier) expiry passes the
+// "rejects an expired invite code" test even with a broken 'T'-separated
+// fixture, because the DATE portion already diverges before the comparison
+// ever reaches the 'T' (0x54) vs ' ' (0x20) byte — see #687. Forcing same-day
+// makes the test exercise the actual time comparison instead of a lucky
+// date-prefix mismatch. Capped well under 24h and halved from
+// elapsed-since-midnight so the offset can never itself cross back over the
+// UTC midnight boundary — including right at 00:00:00.000 UTC, where halving
+// yields exactly 0 rather than forcing a negative (prior-day) offset.
+// toSqliteDateTime() truncates to whole seconds, so an offset of 0 still
+// yields an expiry the real datetime('now') comparison in signup.js treats
+// as expired (not strictly greater) by the time the query actually runs.
 function sameDayPastExpiry(maxOffsetMs = 3 * 60 * 60 * 1000) {
   const now = new Date();
   const msSinceMidnight = now.getTime() - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const offsetMs = Math.min(maxOffsetMs, Math.max(1, Math.floor(msSinceMidnight / 2)));
+  const offsetMs = Math.min(maxOffsetMs, Math.floor(msSinceMidnight / 2));
   return toSqliteDateTime(new Date(now.getTime() - offsetMs));
 }
 

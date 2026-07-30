@@ -81,7 +81,29 @@ async function enforceSession(request, env) {
   }
 
   const now = new Date();
-  const createdAt = fromSqliteDateTime(sessionMeta?.created_at) || now;
+  const createdAt = fromSqliteDateTime(sessionMeta?.created_at);
+
+  // lucia_sessions.created_at has been NOT NULL since the table's creation
+  // (migration 0024) — there is no legacy row missing it. A null here means
+  // either sessionMeta itself came back empty (the row vanished between
+  // validateSession and this SELECT) or the stored value is corrupted.
+  // Either way, its age cannot be verified: fail closed and invalidate rather
+  // than falling back to "now", which would silently reset both the idle and
+  // absolute-expiry clocks and grant a session with unverifiable metadata an
+  // indefinite extension instead of catching the corruption.
+  if (!createdAt) {
+    await lucia.invalidateSession(sessionId);
+    const headers = new Headers({ "Content-Type": "application/json" });
+    headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
+    return {
+      response: new Response(JSON.stringify({ error: "Session expired", reason: "invalid_metadata" }), {
+        status: 401,
+        headers,
+      }),
+      result,
+    };
+  }
+
   const lastActivityAt = fromSqliteDateTime(sessionMeta?.last_activity_at) || createdAt;
 
   const idleTimeout = user.role === "admin" ? SESSION_CONFIG.adminIdleTimeout : SESSION_CONFIG.idleTimeout;

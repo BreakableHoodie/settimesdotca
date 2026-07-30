@@ -446,7 +446,13 @@ describe("flushAnnounceDigest", () => {
     function stubBatchToFailOnClaimRelease(env) {
       const originalBatch = env.DB.batch.bind(env.DB);
       return vi.spyOn(env.DB, "batch").mockImplementation(async (statements) => {
-        const isClaimRelease = statements.some((stmt) => stmt.sql?.includes("DELETE FROM band_follow_notifications"));
+        // Normalise whitespace/case before matching: a harmless SQL reflow or
+        // casing change in announceDigest.js would otherwise make the
+        // release batch silently forward to originalBatch(), leaving the
+        // release path unexercised while the tests stayed green.
+        const isClaimRelease = statements.some((stmt) =>
+          stmt.sql?.replace(/\s+/g, " ").toUpperCase().includes("DELETE FROM BAND_FOLLOW_NOTIFICATIONS"),
+        );
         if (isClaimRelease) {
           throw new Error("simulated D1 batch failure");
         }

@@ -18,7 +18,7 @@ Music festival schedules routinely run past midnight. A band starting at 1:30 AM
 
 A naive sort by `date + startTime` places all after-midnight acts at the top of the next calendar day's list, producing a schedule that reads:
 
-```
+```text
 Saturday
   01:30 AM — Late Night Act      ← looks wrong: this is the Friday night closer
   ...

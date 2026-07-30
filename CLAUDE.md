@@ -209,18 +209,18 @@ Bot protection on the public email-input endpoints (follow, subscribe) goes thro
 ## Testing
 
 ### Backend unit tests
-```
+```bash
 npm test         # from repo root
 ```
 Runs fine locally, including on Apple Silicon (`better-sqlite3` loads natively on arm64) — the full suite completes in a few seconds. Prefer running it locally over waiting on CI.
 
 ### Frontend unit tests
-```
+```bash
 cd frontend && npm test
 ```
 
 ### E2E tests
-```
+```bash
 npx playwright test
 ```
 Requires a running wrangler dev server or uses it automatically via `playwright.config.js`. Run `npm run build --prefix frontend` first.

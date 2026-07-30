@@ -28,7 +28,7 @@ Two incompatible datetime string formats are in play:
 
 The ASCII value of `T` (84) is greater than the ASCII value of space (32). This means that at any given instant, the T-separated ISO 8601 representation of a datetime sorts lexicographically _higher_ than the equivalent space-separated SQLite representation of the same instant:
 
-```
+```text
 "2026-05-14 12:00:00"  <  "2026-05-14T12:00:00Z"
 ```
 

@@ -160,6 +160,20 @@ export function createTestDB() {
 
     CREATE INDEX idx_page_views_date ON page_views_daily(date);
 
+    CREATE TABLE event_daily_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      event_views INTEGER DEFAULT 0,
+      ticket_clicks INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(event_id, date),
+      FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX idx_event_daily_stats_date ON event_daily_stats(date);
+    CREATE INDEX idx_event_daily_stats_event ON event_daily_stats(event_id);
+
     CREATE TABLE performances (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,

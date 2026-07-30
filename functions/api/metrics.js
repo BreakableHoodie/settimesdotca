@@ -92,6 +92,8 @@ export async function onRequestPost(context) {
       const bandViewCounts = new Map();
       const socialClickCounts = new Map();
       const pageCounts = new Map(); // page path → count
+      const eventViewCounts = new Map(); // event_id → count
+      const ticketClickCounts = new Map(); // event_id → count
 
       for (const event of validEvents) {
         if (event.event === "artist_profile_view") {
@@ -111,6 +113,20 @@ export async function onRequestPost(context) {
         if (event.event === "page_view") {
           const page = String(event.props?.page || "/").slice(0, 255);
           pageCounts.set(page, (pageCounts.get(page) || 0) + 1);
+        }
+
+        if (event.event === "event_view") {
+          const eventId = parseInteger(event.props?.event_id);
+          if (eventId) {
+            eventViewCounts.set(eventId, (eventViewCounts.get(eventId) || 0) + 1);
+          }
+        }
+
+        if (event.event === "ticket_click") {
+          const eventId = parseInteger(event.props?.event_id);
+          if (eventId) {
+            ticketClickCounts.set(eventId, (ticketClickCounts.get(eventId) || 0) + 1);
+          }
         }
       }
 
@@ -138,10 +154,12 @@ export async function onRequestPost(context) {
 
       // Store page views in a separate batch so a missing
       // page_views_daily table doesn't break artist_daily_stats writes.
-      // Only real path keys (page_view events) are written here — event_view and
-      // ticket_click synthetic keys (event:N / ticket:N) are intentionally not
-      // stored: the page_view for the same page already captures the visit, and
-      // the synthetic rows caused double-counting under two key formats (#445).
+      // Only real path keys (page_view events) are written here — event_view
+      // and ticket_click are keyed by event_id, not path, and are written to
+      // their own event_daily_stats table below (#706). Mixing event_id-keyed
+      // synthetic keys into this path-keyed table previously double-counted
+      // the same view under two key formats (#445) — keep the two tables
+      // separate.
       const pvStmts = [];
       for (const [page, count] of pageCounts) {
         pvStmts.push(
@@ -161,6 +179,41 @@ export async function onRequestPost(context) {
           logger.warn("page_views_daily upsert failed (table may be missing or write error)", {
             error: err,
             statementCount: pvStmts.length,
+          });
+        }
+      }
+
+      // event_view (event-page traffic) and ticket_click (the site's
+      // highest-value conversion signal) both attribute per event_id via
+      // event_daily_stats (#706). Previously allowlisted, validated, and
+      // rate-limited but never consumed — every one was silently dropped.
+      // Isolated in its own batch/try-catch so a missing table or write error
+      // can't break the artist/page-view writes above (best-effort,
+      // fire-and-forget — CLAUDE.md "Metrics & Analytics").
+      const allEventIds = new Set([...eventViewCounts.keys(), ...ticketClickCounts.keys()]);
+
+      const eventStmts = [];
+      for (const eventId of allEventIds) {
+        const views = eventViewCounts.get(eventId) || 0;
+        const clicks = ticketClickCounts.get(eventId) || 0;
+
+        eventStmts.push(
+          env.DB.prepare(
+            `INSERT INTO event_daily_stats (event_id, date, event_views, ticket_clicks)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT (event_id, date)
+             DO UPDATE SET event_views = event_views + ?, ticket_clicks = ticket_clicks + ?`,
+          ).bind(eventId, today, views, clicks, views, clicks),
+        );
+      }
+
+      if (eventStmts.length > 0) {
+        try {
+          await executeInChunks(env.DB, eventStmts);
+        } catch (err) {
+          logger.warn("event_daily_stats upsert failed (table may be missing or write error)", {
+            error: err,
+            statementCount: eventStmts.length,
           });
         }
       }

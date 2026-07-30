@@ -485,6 +485,21 @@ CREATE INDEX IF NOT EXISTS idx_auth_audit_timestamp ON auth_audit(timestamp);
 
 CREATE INDEX IF NOT EXISTS idx_auth_audit_ip ON auth_audit(ip_address);
 
+CREATE TABLE IF NOT EXISTS event_daily_stats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  event_views INTEGER DEFAULT 0,
+  ticket_clicks INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(event_id, date),
+  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_daily_stats_date ON event_daily_stats(date);
+
+CREATE INDEX IF NOT EXISTS idx_event_daily_stats_event ON event_daily_stats(event_id);
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

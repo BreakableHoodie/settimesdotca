@@ -7,6 +7,7 @@ import { hashPassword, verifyPassword } from "../../utils/crypto.js";
 import { validatePassword, FIELD_LIMITS } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../utils/trustedDevice.js";
+import { fromSqliteDateTime } from "../../utils/authAttempts.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -108,11 +109,7 @@ export async function onRequestPost(context) {
     }
 
     // Check if token is expired
-    if (
-      new Date(
-        resetToken.expires_at.includes("T") ? resetToken.expires_at : resetToken.expires_at.replace(" ", "T") + "Z",
-      ) < new Date()
-    ) {
+    if (fromSqliteDateTime(resetToken.expires_at) < new Date()) {
       logDebug("token_expired", { expiresAt: resetToken.expires_at });
       await logFailure("TOKEN_EXPIRED", { expiresAt: resetToken.expires_at });
       return new Response(JSON.stringify(withDebug({ error: "Reset token has expired", code: "TOKEN_EXPIRED" })), {

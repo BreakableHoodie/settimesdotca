@@ -6,6 +6,7 @@
 import { checkPermission, auditLog } from "./_middleware.js";
 import { isValidEmail, isValidRole, validationErrorResponse, FIELD_LIMITS } from "../../utils/validation.js";
 import { getClientIP } from "../../utils/request.js";
+import { toSqliteDateTime } from "../../utils/authAttempts.js";
 
 // GET - List all invite codes
 export async function onRequestGet(context) {
@@ -116,10 +117,7 @@ export async function onRequestPost(context) {
     const inviteCode = crypto.randomUUID();
 
     // Calculate expiration
-    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .replace("T", " ")
-      .slice(0, 19);
+    const expiresAt = toSqliteDateTime(new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000));
 
     // Insert invite code
     const result = await DB.prepare(

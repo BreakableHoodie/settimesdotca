@@ -7,7 +7,12 @@ import { verifyPassword, hashPassword } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
-import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import {
+  AUTH_ATTEMPT_TYPES,
+  checkAuthRateLimit,
+  toSqliteDateTime,
+  writeAuthAttempt,
+} from "../../../utils/authAttempts.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getTrustedDeviceToken, validateTrustedDevice } from "../../../utils/trustedDevice.js";
 import { logger } from "../../../utils/logger.js";
@@ -287,7 +292,7 @@ export async function onRequestPost(context) {
       // against datetime('now') are lexicographically correct. ISO 8601 with 'T'
       // sorts greater than the space-separated SQLite format at the same instant,
       // which would allow expired challenges to pass the verify query.
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+      const expiresAt = toSqliteDateTime(new Date(Date.now() + 5 * 60 * 1000));
 
       await DB.prepare(
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at, used, used_at)

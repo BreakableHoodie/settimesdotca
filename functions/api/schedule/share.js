@@ -2,6 +2,8 @@
 // POST /api/schedule/share
 // Body: { event_id, event_slug, performance_ids[], band_names[] }
 
+import { toSqliteDateTime } from "../../utils/authAttempts.js";
+
 const MAX_PERFORMANCE_IDS = 50;
 const MAX_BAND_NAME_LENGTH = 100;
 const SLUG_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -63,10 +65,7 @@ export async function onRequestPost(context) {
       return json({ error: "Event not found" }, 404);
     }
 
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .replace("T", " ")
-      .replace(/\.\d+Z$/, "");
+    const expiresAt = toSqliteDateTime(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
 
     for (let attempt = 0; attempt < 2; attempt++) {
       const slug = generateSlug();

@@ -5,14 +5,8 @@ import { getCookie } from "../../utils/cookies.js";
 import { generateCSRFToken, setCSRFCookie, validateCSRFMiddleware } from "../../utils/csrf.js";
 import { getClientIP } from "../../utils/request.js";
 import { initializeLucia, SESSION_CONFIG } from "../../utils/auth.js";
+import { fromSqliteDateTime } from "../../utils/authAttempts.js";
 import { createRequestLogger, logger } from "../../utils/logger.js";
-
-function parseSessionDate(value) {
-  if (!value) return null;
-  if (value.includes("T")) return new Date(value);
-  // SQLite datetime('now') format: "YYYY-MM-DD HH:MM:SS"
-  return new Date(value.replace(" ", "T") + "Z");
-}
 
 function normalizeUser(user) {
   if (!user) return null;
@@ -87,8 +81,8 @@ async function enforceSession(request, env) {
   }
 
   const now = new Date();
-  const createdAt = parseSessionDate(sessionMeta?.created_at) || now;
-  const lastActivityAt = parseSessionDate(sessionMeta?.last_activity_at) || createdAt;
+  const createdAt = fromSqliteDateTime(sessionMeta?.created_at) || now;
+  const lastActivityAt = fromSqliteDateTime(sessionMeta?.last_activity_at) || createdAt;
 
   const idleTimeout = user.role === "admin" ? SESSION_CONFIG.adminIdleTimeout : SESSION_CONFIG.idleTimeout;
   const absoluteTimeout = user.role === "admin" ? SESSION_CONFIG.adminAbsoluteTimeout : SESSION_CONFIG.absoluteTimeout;

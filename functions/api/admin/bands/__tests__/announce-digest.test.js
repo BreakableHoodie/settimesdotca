@@ -450,9 +450,14 @@ describe("flushAnnounceDigest", () => {
         // casing change in announceDigest.js would otherwise make the
         // release batch silently forward to originalBatch(), leaving the
         // release path unexercised while the tests stayed green.
-        const isClaimRelease = statements.some((stmt) =>
-          stmt.sql?.replace(/\s+/g, " ").toUpperCase().includes("DELETE FROM BAND_FOLLOW_NOTIFICATIONS"),
-        );
+        // Match the FULL predicate, not just the table: another batch deleting
+        // from band_follow_notifications would otherwise trip the simulated
+        // failure before the claim-release runs, leaving that path unexercised
+        // while this test still passed.
+        const isClaimRelease = statements.some((stmt) => {
+          const sql = typeof stmt.sql === "string" ? stmt.sql.replace(/\s+/g, " ").trim().toUpperCase() : "";
+          return sql.includes("DELETE FROM BAND_FOLLOW_NOTIFICATIONS WHERE PERFORMANCE_ID = ? AND BAND_FOLLOW_ID = ?");
+        });
         if (isClaimRelease) {
           throw new Error("simulated D1 batch failure");
         }

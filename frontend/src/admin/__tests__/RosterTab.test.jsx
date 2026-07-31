@@ -45,7 +45,7 @@ const ACTIVE_BAND = {
 }
 
 describe('RosterTab — inactive profile visibility (#619)', () => {
-  it('shows an inactive profile with an Inactive badge, included by default (status filter = All)', async () => {
+  it('shows an inactive profile with an Inactive badge, included by default (no Status filter)', async () => {
     bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, INACTIVE_BAND] })
     render(<RosterTab showToast={vi.fn()} />)
 
@@ -56,23 +56,32 @@ describe('RosterTab — inactive profile visibility (#619)', () => {
     expect(screen.getAllByText('Inactive').length).toBeGreaterThan(0)
   })
 
-  it('the Active filter hides inactive profiles', async () => {
+  // Status used to be a standalone <select> (aria-label "Filter by status");
+  // it is now the is_active column's FilterFunnel + ColumnFilter dropdown,
+  // reusing the same generic values-checklist every other column gets.
+  it('the Status column filter, checked to Active, hides inactive profiles', async () => {
     bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, INACTIVE_BAND] })
     render(<RosterTab showToast={vi.fn()} />)
     await screen.findAllByText('Active Aardvarks')
 
-    fireEvent.change(screen.getByLabelText('Filter by status'), { target: { value: 'active' } })
+    fireEvent.click(screen.getByLabelText('Filter by Status'))
+    // Exact aria-label, not a `/^Active/` regex: the mobile card list wraps
+    // each row's own "select this artist" checkbox AND the band name in one
+    // `<label>`, so a checkbox for "Active Aardvarks" has an *accessible
+    // name* of "Active Aardvarks" too -- a prefix regex collides with it.
+    fireEvent.click(screen.getByLabelText('Active — 1'))
 
     expect(screen.queryAllByText('The Essential Letdowns')).toHaveLength(0)
     expect(screen.getAllByText('Active Aardvarks').length).toBeGreaterThan(0)
   })
 
-  it('the Inactive filter shows only inactive profiles', async () => {
+  it('the Status column filter, checked to Inactive, shows only inactive profiles', async () => {
     bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, INACTIVE_BAND] })
     render(<RosterTab showToast={vi.fn()} />)
     await screen.findAllByText('Active Aardvarks')
 
-    fireEvent.change(screen.getByLabelText('Filter by status'), { target: { value: 'inactive' } })
+    fireEvent.click(screen.getByLabelText('Filter by Status'))
+    fireEvent.click(screen.getByLabelText('Inactive — 1'))
 
     expect(screen.queryAllByText('Active Aardvarks')).toHaveLength(0)
     expect(screen.getAllByText('The Essential Letdowns').length).toBeGreaterThan(0)
@@ -112,46 +121,49 @@ const ZERO_LINKS_BAND = {
   social_links: '{}',
 }
 
-describe('RosterTab — data-gap filtering', () => {
+// The DataGapFilter popover is gone; its behaviour lives on the Links
+// column's FilterFunnel + LinksColumnFilter now.
+describe('RosterTab — Links column filtering (formerly the Data-gaps popover)', () => {
   it('filters to artists missing Instagram and restores on chip removal', async () => {
     bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, BAND_WITH_IG] })
     render(<RosterTab showToast={vi.fn()} />)
     await screen.findAllByText('Active Aardvarks')
 
-    fireEvent.click(screen.getByRole('button', { name: /data gaps/i }))
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
     fireEvent.click(screen.getByLabelText('Instagram — 1 missing'))
 
     // ACTIVE_BAND has social_links '{}' -> missing Instagram -> kept.
     expect(screen.getAllByText('Active Aardvarks').length).toBeGreaterThan(0)
     expect(screen.queryAllByText('Instagrammed Iguanas')).toHaveLength(0)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Missing: Instagram' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: Missing Instagram' }))
     expect(screen.getAllByText('Instagrammed Iguanas').length).toBeGreaterThan(0)
   })
 
-  it('counts stay stable after a gap filter is applied', async () => {
+  it('counts stay stable after a Links filter is applied', async () => {
     bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, BAND_WITH_IG] })
     render(<RosterTab showToast={vi.fn()} />)
     await screen.findAllByText('Active Aardvarks')
 
-    fireEvent.click(screen.getByRole('button', { name: /data gaps/i }))
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
     fireEvent.click(screen.getByLabelText('Instagram — 1 missing'))
 
-    // Spotify's count is still measured against the search/status-filtered
-    // roster (both bands), not the Instagram-filtered subset.
+    // Spotify's count is still measured against the search-filtered roster
+    // (both bands), not the Instagram-filtered subset -- linkCountsFor
+    // excludes only the link_count column's own filter.
     expect(screen.getByLabelText('Spotify — 2 missing')).toBeInTheDocument()
   })
 
-  it('mode "has" narrows to artists that HAVE the checked field, with a "Has:" chip', async () => {
+  it('mode "has" narrows to artists that HAVE the checked field, with a "Has" chip', async () => {
     bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, BAND_WITH_IG] })
     render(<RosterTab showToast={vi.fn()} />)
     await screen.findAllByText('Active Aardvarks')
 
-    fireEvent.click(screen.getByRole('button', { name: /data gaps/i }))
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
     // Switch the mode radio from the default "missing" to "has" first --
     // this flips the accessible name of the field checkboxes below (see
-    // DataGapFilter's GapCheckbox: "has" mode spells out what the checkbox
-    // does rather than reusing the missing-count label).
+    // LinksColumnFilter's LinkCheckbox: "has" mode spells out what the
+    // checkbox does rather than reusing the missing-count label).
     fireEvent.click(screen.getByLabelText('Has'))
     fireEvent.click(screen.getByLabelText('Instagram — filter to artists with Instagram (1 missing)'))
 
@@ -160,10 +172,10 @@ describe('RosterTab — data-gap filtering', () => {
     expect(screen.getAllByText('Instagrammed Iguanas').length).toBeGreaterThan(0)
     expect(screen.queryAllByText('Active Aardvarks')).toHaveLength(0)
 
-    // The chip must read "Has: Instagram", not "Missing: Instagram" -- this
-    // is the separate matchesGapFilter branch and chip-label branch this
-    // test exists to cover.
-    expect(screen.getByRole('button', { name: 'Remove filter: Has: Instagram' })).toBeInTheDocument()
+    // The chip must read "Links: Has Instagram", not "Links: Missing
+    // Instagram" -- this is the separate matchesGapFilter branch and
+    // chip-label branch this test exists to cover.
+    expect(screen.getByRole('button', { name: 'Remove filter: Links: Has Instagram' })).toBeInTheDocument()
   })
 
   it('the "No links at all" preset narrows to link-less artists and restores on chip removal', async () => {
@@ -171,7 +183,7 @@ describe('RosterTab — data-gap filtering', () => {
     render(<RosterTab showToast={vi.fn()} />)
     await screen.findAllByText('Instagrammed Iguanas')
 
-    fireEvent.click(screen.getByRole('button', { name: /data gaps/i }))
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
     fireEvent.click(screen.getByLabelText('No links at all — 1 artists'))
 
     // ZERO_LINKS_BAND's social_links is '{}' (no links at all) -> kept.
@@ -179,7 +191,7 @@ describe('RosterTab — data-gap filtering', () => {
     expect(screen.getAllByText('Zeroed Zebras').length).toBeGreaterThan(0)
     expect(screen.queryAllByText('Instagrammed Iguanas')).toHaveLength(0)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: No links at all' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: No links at all' }))
     expect(screen.getAllByText('Instagrammed Iguanas').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Zeroed Zebras').length).toBeGreaterThan(0)
   })
@@ -233,5 +245,105 @@ describe('RosterTab — data-gap filtering', () => {
     expect(rows[0]).toHaveTextContent('Zeroed Zebras')
     expect(rows[1]).toHaveTextContent('Instagrammed Iguanas')
     expect(linksHeader).toHaveAttribute('aria-sort', 'ascending')
+  })
+})
+
+// Fixture set for the cross-column tests below:
+// Alpha — Active,   genre "punk"
+// Beta  — Active,   genre "metal"
+// Gamma — Inactive, genre "punk"
+const ALPHA = {
+  id: 'profile_10',
+  band_profile_id: 10,
+  name: 'Alpha',
+  genre: 'punk',
+  origin_city: 'Waterloo',
+  origin_region: 'ON',
+  is_active: 1,
+  follower_count: 0,
+  social_links: '{}',
+}
+const BETA = {
+  id: 'profile_11',
+  band_profile_id: 11,
+  name: 'Beta',
+  genre: 'metal',
+  origin_city: 'Waterloo',
+  origin_region: 'ON',
+  is_active: 1,
+  follower_count: 0,
+  social_links: '{}',
+}
+const GAMMA = {
+  id: 'profile_12',
+  band_profile_id: 12,
+  name: 'Gamma',
+  genre: 'punk',
+  origin_city: 'Waterloo',
+  origin_region: 'ON',
+  is_active: 0,
+  follower_count: 0,
+  social_links: '{}',
+}
+
+describe('RosterTab — per-column filters combine (AND) and clear independently', () => {
+  it('ANDs a Status filter and a Genre filter across two different columns', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ALPHA, BETA, GAMMA] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Alpha')
+
+    fireEvent.click(screen.getByLabelText('Filter by Status'))
+    fireEvent.click(screen.getByLabelText('Active — 2'))
+
+    fireEvent.click(screen.getByLabelText('Filter by Genre'))
+    fireEvent.click(screen.getByLabelText('punk — 1'))
+
+    // Alpha (Active, punk) matches both. Beta is Active but "metal" —
+    // excluded by Genre. Gamma is "punk" but Inactive — excluded by Status.
+    expect(screen.getAllByText('Alpha').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Beta')).toHaveLength(0)
+    expect(screen.queryAllByText('Gamma')).toHaveLength(0)
+  })
+
+  it('dismissing one column chip clears only that column, leaving the other filter active', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ALPHA, BETA, GAMMA] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Alpha')
+
+    fireEvent.click(screen.getByLabelText('Filter by Status'))
+    fireEvent.click(screen.getByLabelText('Active — 2'))
+    fireEvent.click(screen.getByLabelText('Filter by Genre'))
+    fireEvent.click(screen.getByLabelText('punk — 1'))
+
+    // Both filters active: only Alpha shows.
+    expect(screen.queryAllByText('Beta')).toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Genre: punk' }))
+
+    // Genre filter cleared -> Beta (Active, metal) reappears. Status filter
+    // (Active) is untouched -> Gamma (Inactive) stays hidden.
+    expect(screen.getAllByText('Alpha').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Beta').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Gamma')).toHaveLength(0)
+  })
+
+  it("the Genre dropdown's counts reflect an active Status filter but not Genre's own filter", async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ALPHA, BETA, GAMMA] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Alpha')
+
+    fireEvent.click(screen.getByLabelText('Filter by Status'))
+    fireEvent.click(screen.getByLabelText('Active — 2'))
+    fireEvent.click(screen.getByLabelText('Filter by Genre'))
+
+    // Status=Active is honoured: "punk" only counts Alpha (Active), not
+    // Gamma (Inactive, punk) -- so 1, not 2.
+    expect(screen.getByLabelText('punk — 1')).toBeInTheDocument()
+
+    // Checking "punk" applies Genre's own filter, but the dropdown's own
+    // counts must NOT shrink in response -- valueCountsFor excludes the
+    // column's own selection (Excel behaviour).
+    fireEvent.click(screen.getByLabelText('punk — 1'))
+    expect(screen.getByLabelText('punk — 1')).toBeInTheDocument()
   })
 })

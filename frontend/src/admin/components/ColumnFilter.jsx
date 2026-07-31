@@ -42,13 +42,20 @@ function sortValues(column, values) {
 export default function ColumnFilter({
   column,
   counts,
-  value = [],
+  value: valueProp = [],
   onChange,
   onClear,
   onClose = () => {},
   triggerRef,
   panelId,
 }) {
+  // The `= []` default only fires when the prop is `undefined`; a caller
+  // passing `value: null` (e.g. a filter shape mismatch) would otherwise
+  // reach `toggleValue`'s `value.filter(...)` and throw. Same guard pattern
+  // as `Array.isArray(keys) ? keys : []` in bandFields.js. Memoized (rather
+  // than a plain ternary) so the `checkedSet` useMemo below doesn't get an
+  // unstable dependency every render.
+  const value = useMemo(() => (Array.isArray(valueProp) ? valueProp : []), [valueProp])
   const [search, setSearch] = useState('')
   const panelRef = useRef(null)
   const selectAllRef = useRef(null)

@@ -171,6 +171,13 @@ describe('ColumnFilter', () => {
     expect(screen.getByRole('button', { name: 'trigger' })).toHaveFocus()
   })
 
+  it('treats a null value prop as no selection instead of throwing', () => {
+    // The `= []` default parameter only fires on `undefined`; a caller
+    // passing `value={null}` must not reach `toggleValue`'s `value.filter(...)`.
+    setup({ value: null })
+    expect(() => fireEvent.click(screen.getByLabelText('punk — 12'))).not.toThrow()
+  })
+
   it('closes on an outside mousedown', () => {
     const { onClose } = setup()
     fireEvent.mouseDown(document.body)

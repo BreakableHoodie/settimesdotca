@@ -5,17 +5,46 @@ import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { parseOrigin } from '../utils/parseOrigin'
 import { sortableName } from '../utils/sortableName'
 import SocialLinksIcons from './components/SocialLinksIcons'
-import DataGapFilter from './components/DataGapFilter'
+import FilterFunnel from './components/FilterFunnel'
+import ColumnFilter from './components/ColumnFilter'
+import LinksColumnFilter from './components/LinksColumnFilter'
+import { EMPTY_GAP_FILTER, LINK_FIELDS, countLinks, formatOrigin } from './utils/bandFields'
 import {
-  EMPTY_GAP_FILTER,
-  GAP_FIELDS,
-  NO_LINKS_KEY,
-  countGaps,
-  countLinks,
-  formatOrigin,
-  isGapFilterActive,
-  matchesGapFilter,
-} from './utils/bandFields'
+  FILTERABLE_COLUMNS,
+  isColumnFiltered,
+  isInactive,
+  linkCountsFor,
+  matchesColumnFilters,
+  valueCountsFor,
+} from './utils/rosterColumns'
+
+const COLUMN_BY_KEY = new Map(FILTERABLE_COLUMNS.map(column => [column.key, column]))
+
+const MAX_CHIP_VALUES = 2
+
+function summarizeValues(values) {
+  if (values.length <= MAX_CHIP_VALUES) return values.join(', ')
+  return `${values.slice(0, MAX_CHIP_VALUES).join(', ')} +${values.length - MAX_CHIP_VALUES}`
+}
+
+// Links is the one column whose filter value isn't a flat `values` array (see
+// EMPTY_GAP_FILTER's `{ mode, keys, noLinks }` shape) so its chip text is
+// built separately: "Missing"/"Has" once, then the selected platform labels
+// (falling back to the raw key if a field somehow isn't in LINK_FIELDS),
+// with "No links at all" appended as its own item when that preset is set.
+function summarizeColumnFilter(column, filter) {
+  if (column.key === 'link_count') {
+    const { mode = 'missing', keys, noLinks = false } = filter || {}
+    const keyList = Array.isArray(keys) ? keys : []
+    const modeLabel = mode === 'missing' ? 'Missing' : 'Has'
+    const keyLabels = keyList.map(key => LINK_FIELDS.find(field => field.key === key)?.label ?? key)
+    const parts = keyLabels.length > 0 ? [`${modeLabel} ${summarizeValues(keyLabels)}`] : []
+    if (noLinks) parts.push('No links at all')
+    return parts.join(', ') || modeLabel
+  }
+  const values = Array.isArray(filter?.values) ? filter.values : []
+  return summarizeValues(values)
+}
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -33,14 +62,6 @@ function SortIcon({ col, sortConfig }) {
 function ariaSortFor(sortConfig, key) {
   if (sortConfig.key !== key) return 'none'
   return sortConfig.direction === 'asc' ? 'ascending' : 'descending'
-}
-
-// The roster API now returns inactive/retired profiles alongside active ones
-// (#619) — `is_active` comes straight off the D1 row (INTEGER NOT NULL
-// DEFAULT 1), so it's always 0 or 1, but check both the number and legacy
-// boolean shape defensively rather than relying on falsiness of `is_active`.
-function isInactive(band) {
-  return band.is_active === 0 || band.is_active === false
 }
 
 // Same pill styling as the existing Status column below — reused here so an
@@ -69,17 +90,34 @@ export default function RosterTab({ showToast, readOnly = false }) {
   const [editingId, setEditingId] = useState(null)
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' })
   const [searchTerm, setSearchTerm] = useState('')
-  // 'all' | 'active' | 'inactive' — defaults to 'all' (#619) so a retired
-  // profile is never hidden by default; the admin roster must be able to see
-  // and edit everything it manages.
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [gapFilter, setGapFilter] = useState(EMPTY_GAP_FILTER)
+  // Excel-style per-column filters, keyed by FILTERABLE_COLUMNS `key`. A
+  // column with no entry (or an empty `values` array) is unfiltered — this
+  // defaults to `{}` so no column is filtered and, per #619, a retired
+  // profile is never hidden by default.
+  const [columnFilters, setColumnFilters] = useState({})
+  // Which single column's filter dropdown is open, or null. Only one panel
+  // is ever mounted at a time -- ColumnFilter/LinksColumnFilter register their
+  // outside-mousedown/Escape listeners unconditionally on mount with no
+  // internal `open` gate, so they must only be mounted while actually open.
+  const [openFilterKey, setOpenFilterKey] = useState(null)
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkAction, setBulkAction] = useState(null)
 
   const editFormRef = useRef(null)
+
+  // One ref per filterable column, shared between that column's FilterFunnel
+  // trigger and the panel it opens -- the panel uses it to treat a mousedown
+  // on the trigger as "inside" (no close-then-reopen flicker) and to return
+  // focus there on Escape.
+  const nameFilterRef = useRef(null)
+  const originFilterRef = useRef(null)
+  const genreFilterRef = useRef(null)
+  const statusFilterRef = useRef(null)
+  const linksFilterRef = useRef(null)
+  const contactFilterRef = useRef(null)
+  const followersFilterRef = useRef(null)
 
   // Form state - minimized for Profile only
   const [formData, setFormData] = useState({
@@ -144,17 +182,16 @@ export default function RosterTab({ showToast, readOnly = false }) {
   }, [loadBands])
 
   // Sorting
-  // Split in two on purpose. The popover's counts are computed from
-  // `searchAndStatusFiltered`, i.e. everything EXCEPT the gap filter itself --
-  // otherwise checking "Instagram" would collapse every other count to reflect
-  // that selection and the panel would stop being a gap dashboard the moment
-  // you used it.
-  const searchAndStatusFiltered = useMemo(() => {
+  // Split in two on purpose. Every column-filter dropdown's counts are
+  // computed from `searchFiltered` (search box only) excluding just that
+  // column's own filter -- see valueCountsFor/linkCountsFor in
+  // rosterColumns.js -- otherwise checking a value would collapse every
+  // other count to reflect that selection and the dropdown would stop being
+  // a useful picker the moment you used it.
+  const searchFiltered = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
+    if (!query) return bands
     return bands.filter(band => {
-      if (statusFilter === 'active' && isInactive(band)) return false
-      if (statusFilter === 'inactive' && !isInactive(band)) return false
-      if (!query) return true
       const originText = formatOrigin(band)
       return (
         band.name?.toLowerCase().includes(query) ||
@@ -163,13 +200,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
         band.contact_email?.toLowerCase().includes(query)
       )
     })
-  }, [bands, searchTerm, statusFilter])
-
-  const gapCounts = useMemo(() => countGaps(searchAndStatusFiltered), [searchAndStatusFiltered])
+  }, [bands, searchTerm])
 
   const filteredBands = useMemo(
-    () => searchAndStatusFiltered.filter(band => matchesGapFilter(band, gapFilter)),
-    [searchAndStatusFiltered, gapFilter]
+    () => searchFiltered.filter(band => matchesColumnFilters(band, columnFilters)),
+    [searchFiltered, columnFilters]
   )
 
   const sortedBands = useMemo(() => {
@@ -464,24 +499,56 @@ export default function RosterTab({ showToast, readOnly = false }) {
     }
   }
 
-  const gapChips = [
-    ...gapFilter.keys.map(key => ({
-      key,
-      label: `${gapFilter.mode === 'missing' ? 'Missing' : 'Has'}: ${
-        GAP_FIELDS.find(field => field.key === key)?.label ?? key
-      }`,
-      remove: () => setGapFilter(prev => ({ ...prev, keys: prev.keys.filter(k => k !== key) })),
-    })),
-    ...(gapFilter.noLinks
-      ? [
-          {
-            key: NO_LINKS_KEY,
-            label: 'No links at all',
-            remove: () => setGapFilter(prev => ({ ...prev, noLinks: false })),
-          },
-        ]
-      : []),
-  ]
+  const updateColumnFilter = (key, value) => setColumnFilters(prev => ({ ...prev, [key]: value }))
+
+  const clearColumnFilter = key =>
+    setColumnFilters(prev => {
+      if (!(key in prev)) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+
+  const toggleFilterPanel = key => setOpenFilterKey(prev => (prev === key ? null : key))
+
+  // Renders the ColumnFilter/LinksColumnFilter panel for `key`, or nothing --
+  // this is the conditional MOUNT that keeps the panels' unconditional
+  // mousedown/keydown listeners from staying registered forever. Only ever
+  // one of these returns non-null at a time, since they all key off the
+  // single `openFilterKey` state.
+  const renderColumnFilterPanel = (key, triggerRef) => {
+    if (openFilterKey !== key) return null
+    const panelId = `roster-filter-panel-${key}`
+    const shared = { onClose: () => setOpenFilterKey(null), triggerRef, panelId }
+    return (
+      <div className="absolute right-0 z-30 mt-2">
+        {key === 'link_count' ? (
+          <LinksColumnFilter
+            value={columnFilters.link_count ?? EMPTY_GAP_FILTER}
+            counts={linkCountsFor(searchFiltered, columnFilters)}
+            onChange={value => updateColumnFilter('link_count', value)}
+            onClear={() => clearColumnFilter('link_count')}
+            {...shared}
+          />
+        ) : (
+          <ColumnFilter
+            column={COLUMN_BY_KEY.get(key)}
+            counts={valueCountsFor(key, searchFiltered, columnFilters)}
+            value={columnFilters[key]?.values}
+            onChange={values => updateColumnFilter(key, { values })}
+            onClear={() => clearColumnFilter(key)}
+            {...shared}
+          />
+        )}
+      </div>
+    )
+  }
+
+  const columnChips = FILTERABLE_COLUMNS.filter(column => isColumnFiltered(columnFilters, column.key)).map(column => ({
+    key: column.key,
+    label: `${column.label}: ${summarizeColumnFilter(column, columnFilters[column.key])}`,
+    remove: () => clearColumnFilter(column.key),
+  }))
 
   return (
     <div className="space-y-6">
@@ -498,17 +565,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
             placeholder="Search name, origin, genre"
             className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-64"
           />
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            aria-label="Filter by status"
-            className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
-          >
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <DataGapFilter value={gapFilter} counts={gapCounts} onChange={setGapFilter} />
           {!showAddForm && !editingId && !readOnly && (
             <button
               onClick={() => setShowAddForm(true)}
@@ -520,9 +576,9 @@ export default function RosterTab({ showToast, readOnly = false }) {
         </div>
       </div>
 
-      {isGapFilterActive(gapFilter) && (
+      {columnChips.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          {gapChips.map(chip => (
+          {columnChips.map(chip => (
             <button
               key={chip.key}
               type="button"
@@ -612,87 +668,164 @@ export default function RosterTab({ showToast, readOnly = false }) {
                     )}
                     <th
                       aria-sort={ariaSortFor(sortConfig, 'name')}
-                      className="px-4 py-3 text-left text-white font-semibold"
+                      className="relative px-4 py-3 text-left text-white font-semibold"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSort('name')}
-                        className="cursor-pointer hover:text-accent-400"
-                      >
-                        Name <SortIcon col="name" sortConfig={sortConfig} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('name')}
+                          className="cursor-pointer hover:text-accent-400"
+                        >
+                          Name <SortIcon col="name" sortConfig={sortConfig} />
+                        </button>
+                        <FilterFunnel
+                          label="Name"
+                          active={isColumnFiltered(columnFilters, 'name')}
+                          open={openFilterKey === 'name'}
+                          panelId="roster-filter-panel-name"
+                          triggerRef={nameFilterRef}
+                          onClick={() => toggleFilterPanel('name')}
+                        />
+                      </div>
+                      {renderColumnFilterPanel('name', nameFilterRef)}
                     </th>
                     <th
                       aria-sort={ariaSortFor(sortConfig, 'origin')}
-                      className="px-4 py-3 text-left text-white font-semibold"
+                      className="relative px-4 py-3 text-left text-white font-semibold"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSort('origin')}
-                        className="cursor-pointer hover:text-accent-400"
-                      >
-                        Origin <SortIcon col="origin" sortConfig={sortConfig} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('origin')}
+                          className="cursor-pointer hover:text-accent-400"
+                        >
+                          Origin <SortIcon col="origin" sortConfig={sortConfig} />
+                        </button>
+                        <FilterFunnel
+                          label="Origin"
+                          active={isColumnFiltered(columnFilters, 'origin')}
+                          open={openFilterKey === 'origin'}
+                          panelId="roster-filter-panel-origin"
+                          triggerRef={originFilterRef}
+                          onClick={() => toggleFilterPanel('origin')}
+                        />
+                      </div>
+                      {renderColumnFilterPanel('origin', originFilterRef)}
                     </th>
                     <th
                       aria-sort={ariaSortFor(sortConfig, 'genre')}
-                      className="px-4 py-3 text-left text-white font-semibold"
+                      className="relative px-4 py-3 text-left text-white font-semibold"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSort('genre')}
-                        className="cursor-pointer hover:text-accent-400"
-                      >
-                        Genre <SortIcon col="genre" sortConfig={sortConfig} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('genre')}
+                          className="cursor-pointer hover:text-accent-400"
+                        >
+                          Genre <SortIcon col="genre" sortConfig={sortConfig} />
+                        </button>
+                        <FilterFunnel
+                          label="Genre"
+                          active={isColumnFiltered(columnFilters, 'genre')}
+                          open={openFilterKey === 'genre'}
+                          panelId="roster-filter-panel-genre"
+                          triggerRef={genreFilterRef}
+                          onClick={() => toggleFilterPanel('genre')}
+                        />
+                      </div>
+                      {renderColumnFilterPanel('genre', genreFilterRef)}
                     </th>
                     <th
                       aria-sort={ariaSortFor(sortConfig, 'is_active')}
-                      className="px-4 py-3 text-left text-white font-semibold"
+                      className="relative px-4 py-3 text-left text-white font-semibold"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSort('is_active')}
-                        className="cursor-pointer hover:text-accent-400"
-                      >
-                        Status <SortIcon col="is_active" sortConfig={sortConfig} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('is_active')}
+                          className="cursor-pointer hover:text-accent-400"
+                        >
+                          Status <SortIcon col="is_active" sortConfig={sortConfig} />
+                        </button>
+                        <FilterFunnel
+                          label="Status"
+                          active={isColumnFiltered(columnFilters, 'is_active')}
+                          open={openFilterKey === 'is_active'}
+                          panelId="roster-filter-panel-is_active"
+                          triggerRef={statusFilterRef}
+                          onClick={() => toggleFilterPanel('is_active')}
+                        />
+                      </div>
+                      {renderColumnFilterPanel('is_active', statusFilterRef)}
                     </th>
                     <th
                       aria-sort={ariaSortFor(sortConfig, 'link_count')}
-                      className="px-4 py-3 text-left text-white font-semibold"
+                      className="relative px-4 py-3 text-left text-white font-semibold"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSort('link_count')}
-                        className="cursor-pointer hover:text-accent-400"
-                      >
-                        Links <SortIcon col="link_count" sortConfig={sortConfig} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('link_count')}
+                          className="cursor-pointer hover:text-accent-400"
+                        >
+                          Links <SortIcon col="link_count" sortConfig={sortConfig} />
+                        </button>
+                        <FilterFunnel
+                          label="Links"
+                          active={isColumnFiltered(columnFilters, 'link_count')}
+                          open={openFilterKey === 'link_count'}
+                          panelId="roster-filter-panel-link_count"
+                          triggerRef={linksFilterRef}
+                          onClick={() => toggleFilterPanel('link_count')}
+                        />
+                      </div>
+                      {renderColumnFilterPanel('link_count', linksFilterRef)}
                     </th>
                     <th
                       aria-sort={ariaSortFor(sortConfig, 'contact_email')}
-                      className="px-4 py-3 text-left text-white font-semibold"
+                      className="relative px-4 py-3 text-left text-white font-semibold"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSort('contact_email')}
-                        className="cursor-pointer hover:text-accent-400"
-                      >
-                        Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('contact_email')}
+                          className="cursor-pointer hover:text-accent-400"
+                        >
+                          Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
+                        </button>
+                        <FilterFunnel
+                          label="Contact"
+                          active={isColumnFiltered(columnFilters, 'contact_email')}
+                          open={openFilterKey === 'contact_email'}
+                          panelId="roster-filter-panel-contact_email"
+                          triggerRef={contactFilterRef}
+                          onClick={() => toggleFilterPanel('contact_email')}
+                        />
+                      </div>
+                      {renderColumnFilterPanel('contact_email', contactFilterRef)}
                     </th>
                     <th
                       aria-sort={ariaSortFor(sortConfig, 'follower_count')}
-                      className="px-4 py-3 text-right text-white font-semibold"
+                      className="relative px-4 py-3 text-right text-white font-semibold"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSort('follower_count')}
-                        className="cursor-pointer hover:text-accent-400"
-                      >
-                        Followers <SortIcon col="follower_count" sortConfig={sortConfig} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('follower_count')}
+                          className="cursor-pointer hover:text-accent-400"
+                        >
+                          Followers <SortIcon col="follower_count" sortConfig={sortConfig} />
+                        </button>
+                        <FilterFunnel
+                          label="Followers"
+                          active={isColumnFiltered(columnFilters, 'follower_count')}
+                          open={openFilterKey === 'follower_count'}
+                          panelId="roster-filter-panel-follower_count"
+                          triggerRef={followersFilterRef}
+                          onClick={() => toggleFilterPanel('follower_count')}
+                        />
+                      </div>
+                      {renderColumnFilterPanel('follower_count', followersFilterRef)}
                     </th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>

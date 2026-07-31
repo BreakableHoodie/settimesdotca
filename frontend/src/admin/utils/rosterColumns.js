@@ -50,6 +50,7 @@ function columnPasses(band, column, filter) {
 }
 
 export function matchesColumnFilters(band, columnFilters) {
+  if (!band) return false // fail-safe: a null/undefined row matches nothing rather than throwing
   const filters = columnFilters || {}
   return FILTERABLE_COLUMNS.every(column => columnPasses(band, column, filters[column.key]))
 }

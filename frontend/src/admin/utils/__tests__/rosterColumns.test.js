@@ -118,6 +118,12 @@ describe('getValues — follower_count column', () => {
   it('defaults undefined to "0"', () => {
     expect(getValuesFor('follower_count', band({ follower_count: undefined }))).toEqual(['0'])
   })
+
+  // D1 returns NULL, not undefined, for an unset INTEGER column -- the `??`
+  // in getValues handles both, but only `undefined` had coverage above.
+  it('defaults null (as D1 returns for an unset column) to "0"', () => {
+    expect(getValuesFor('follower_count', band({ follower_count: null }))).toEqual(['0'])
+  })
 })
 
 describe('matchesColumnFilters', () => {
@@ -298,5 +304,17 @@ describe('activeFilterCount', () => {
 describe('matchesColumnFilters — guards', () => {
   it('handles an undefined columnFilters argument', () => {
     expect(matchesColumnFilters(band(), undefined)).toBe(true)
+  })
+
+  // A `values` filter calls column.getValues(band), e.g. `single(band.name)`,
+  // which dereferences the band directly -- a null/undefined row would throw
+  // there instead of just failing to match. Bands should never actually be
+  // null/undefined in the roster array, but the guard keeps a stray hole from
+  // crashing the whole filter pass instead of just excluding that one row.
+  it('excludes (rather than throws on) a null/undefined band when a values filter is active', () => {
+    const filter = { name: { values: ['Alpha'] } }
+    expect(() => matchesColumnFilters(null, filter)).not.toThrow()
+    expect(matchesColumnFilters(null, filter)).toBe(false)
+    expect(matchesColumnFilters(undefined, filter)).toBe(false)
   })
 })

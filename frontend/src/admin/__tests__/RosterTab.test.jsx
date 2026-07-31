@@ -466,30 +466,80 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
       .find(r => r.textContent.includes('Band B'))
       ?.querySelector('input[type="checkbox"]')
     expect(bCheckboxAfter).toBeChecked() // B should still be selected
+
+    // Verify deleted ids are gone: bulk bar shows exactly "1 selected" with no "hidden" text
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/1 selected/)
+    expect(bulkBar.textContent).not.toContain('hidden')
   })
 
-  it('Finding 3: select-all preserves hidden selections (union vs replace)', async () => {
+  it('Finding 1 case 1: select-all under filter adds visible rows to hidden selections (union not replace)', async () => {
     bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
     const showToast = vi.fn()
     render(<RosterTab showToast={showToast} />)
     await screen.findAllByText('Band A')
 
-    // Select all 3
+    // Select Band B only (the one WITH Instagram link)
+    const rows = screen.getAllByRole('row')
+    const bCheckbox = rows.find(r => r.textContent.includes('Band B'))?.querySelector('input[type="checkbox"]')
+    fireEvent.click(bCheckbox)
+    expect(screen.getByText(/1 selected/)).toBeInTheDocument()
+
+    // Apply "No links" filter → hides Band B, shows A and C
+    // selectedIds = {B}, visible = {A, C}, hidden = {B}
+    // Bulk bar disappears (no visible rows selected)
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
+    fireEvent.click(screen.getByLabelText('No links at all — 2 artists'))
+    // Bulk bar is hidden now because effectiveSelectedIds.size = 0
+    expect(screen.queryByText(/selected/)).toBeNull()
+
+    // Click select-all checkbox while filter is active
+    // Should add visible ids (A, C) to existing selection (B) → {A, B, C}
+    // Bulk bar reappears with "2 selected · 1 hidden"
+    const headerRow = screen.getAllByRole('row')[0]
+    const selectAllCheckbox = headerRow.querySelector('input[type="checkbox"]')
+    fireEvent.click(selectAllCheckbox)
+    expect(screen.getByText(/2 selected/)).toBeInTheDocument()
+    expect(screen.getByText(/1 hidden/)).toBeInTheDocument()
+
+    // Clear the filter to verify all 3 are truly selected
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: No links at all' }))
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/3 selected/)
+    expect(bulkBar.textContent).not.toContain('hidden')
+  })
+
+  it('Finding 1 case 2: deselect-all under filter removes only visible rows from selection', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select all 3 initially
     const headerRow = screen.getAllByRole('row')[0]
     const selectAllCheckbox = headerRow.querySelector('input[type="checkbox"]')
     fireEvent.click(selectAllCheckbox)
     expect(screen.getAllByText(/3 selected/)).toBeDefined()
 
-    // Apply filter: "No links" → A and C visible, B hidden (but still selected)
+    // Apply "No links" filter → hides Band B (has Instagram), shows A and C
+    // Now: selectedIds = {A, B, C}, visible = {A, C}, hidden = {B}
     fireEvent.click(screen.getByLabelText('Filter by Links'))
     fireEvent.click(screen.getByLabelText('No links at all — 2 artists'))
-    const bulkBarBefore = screen.getByText(/2 selected/)
-    expect(bulkBarBefore.textContent).toContain('1 hidden')
+    expect(screen.getByText(/2 selected/)).toBeInTheDocument()
+    expect(screen.getByText(/1 hidden/)).toBeInTheDocument()
 
-    // This test verifies the fix: when a filter is applied with some selections hidden,
-    // the hidden selections are preserved in selectedIds (not wiped out by a buggy replace)
-    // If the bug existed (replace instead of union), B would be lost when select-all is clicked
-    // The test passes because the bulk bar STILL shows "1 hidden" after filtering
+    // Click select-all (which acts as deselect-all when all visible are selected)
+    // Should remove visible ids (A, C) from selection, leaving only hidden {B}
+    // After this, effectiveSelectedIds = {} (no visible selected), so bulk bar disappears
+    fireEvent.click(selectAllCheckbox)
+    // Bulk bar is now gone because no visible rows are selected (only hidden B)
+    expect(screen.queryByText(/selected/)).toBeNull()
+
+    // Clear the filter to verify only B remains selected
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: No links at all' }))
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/1 selected/)
+    expect(bulkBar.textContent).not.toContain('hidden')
   })
 
   it('select-all, then apply filter that hides some rows → bulk delete operates on visible rows only', async () => {

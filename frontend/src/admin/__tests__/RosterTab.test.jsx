@@ -120,4 +120,19 @@ describe('RosterTab — data-gap filtering', () => {
     // roster (both bands), not the Instagram-filtered subset.
     expect(screen.getByLabelText('Spotify — 2 missing')).toBeInTheDocument()
   })
+
+  it('sorts by link count, sparsest first', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_WITH_IG, ACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    // Mobile card view also renders a "Links:" label (not a column header),
+    // so scope to the columnheader role to avoid a duplicate match.
+    fireEvent.click(screen.getByRole('columnheader', { name: /^Links/ }))
+
+    // ACTIVE_BAND has zero links, BAND_WITH_IG has one -> ascending puts the
+    // empty profile first. Row 0 is the header row.
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Active Aardvarks')
+  })
 })

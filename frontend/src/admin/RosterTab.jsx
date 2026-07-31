@@ -11,6 +11,7 @@ import {
   GAP_FIELDS,
   NO_LINKS_KEY,
   countGaps,
+  countLinks,
   formatOrigin,
   isGapFilterActive,
   matchesGapFilter,
@@ -178,6 +179,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
       if (sortConfig.key === 'follower_count') {
         const aVal = a.follower_count ?? 0
         const bVal = b.follower_count ?? 0
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
+      }
+      if (sortConfig.key === 'link_count') {
+        const aVal = countLinks(a)
+        const bVal = countLinks(b)
         return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
       }
       if (sortConfig.key === 'name') {
@@ -618,7 +624,12 @@ export default function RosterTab({ showToast, readOnly = false }) {
                     >
                       Status <SortIcon col="is_active" sortConfig={sortConfig} />
                     </th>
-                    <th className="px-4 py-3 text-left text-white font-semibold">Links</th>
+                    <th
+                      onClick={() => handleSort('link_count')}
+                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                    >
+                      Links <SortIcon col="link_count" sortConfig={sortConfig} />
+                    </th>
                     <th
                       onClick={() => handleSort('contact_email')}
                       className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"

@@ -240,7 +240,14 @@ describe('RosterTab — Links column filtering (formerly the Data-gaps popover)'
     linksButton.focus()
     expect(linksButton).toHaveFocus()
 
+    // Native <button> Enter/Space activation is a browser behaviour jsdom does
+    // not fully simulate. fireEvent.click() directly exercises the DOM event
+    // that a real keyboard activation would trigger (not the full browser
+    // keystroke handling), which is sufficient to verify the handler is
+    // reachable and works. The focus() check above ensures the element can
+    // receive keyboard focus as required for keyboard-only users.
     fireEvent.click(linksButton)
+
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows[0]).toHaveTextContent('Zeroed Zebras')
     expect(rows[1]).toHaveTextContent('Instagrammed Iguanas')
@@ -439,14 +446,38 @@ describe('RosterTab — mobile Filters button', () => {
     render(<RosterTab showToast={vi.fn()} />)
     await screen.findAllByText('Active Aardvarks')
 
-    // Apply a filter that matches nothing: genre "nonexistent" (via search)
-    fireEvent.click(screen.getByLabelText('Filter by Genre'))
-    const genreSearch = screen.getByLabelText('Search Genre')
-    fireEvent.change(genreSearch, { target: { value: 'nonexistent-genre-xyz' } })
+    // Produce a genuinely empty roster by searching for a name that matches
+    // no bands. The search box (above the table) filters by name, origin, or
+    // genre and produces an empty roster if nothing matches.
+    const searchInput = screen.getByPlaceholderText('Search name, origin, genre')
+    fireEvent.change(searchInput, { target: { value: 'nonexistent-band-xyz-999' } })
+
+    // Assert the artist rows are gone
+    expect(screen.queryAllByText('Active Aardvarks')).toHaveLength(0)
+    expect(screen.queryAllByText('The Essential Letdowns')).toHaveLength(0)
 
     // Verify the mobile Filters button is still present and clickable
     const filterButtons = screen.queryAllByRole('button', { name: /Filters/ })
     expect(filterButtons.length).toBeGreaterThan(0)
-    expect(filterButtons[filterButtons.length - 1]).toBeInTheDocument()
+    const mobileButton = filterButtons[filterButtons.length - 1]
+    expect(mobileButton).toBeInTheDocument()
+    fireEvent.click(mobileButton)
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+  })
+
+  it('mobile filter panel ids are distinct (section vs panel, no duplicates)', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, INACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    fireEvent.click(screen.getByRole('button', { name: /Filters/ }))
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+
+    // Collect all ids in the mobile filter sheet
+    const allElements = document.querySelectorAll('[id]')
+    const ids = Array.from(allElements).map(el => el.id)
+
+    // Assert no duplicates: Set size must equal array length
+    expect(ids.length).toBe(new Set(ids).size)
   })
 })

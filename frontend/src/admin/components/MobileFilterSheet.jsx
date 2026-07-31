@@ -42,7 +42,7 @@ export default function MobileFilterSheet({ isOpen, onClose, columnFilters, setC
               onClick={() => toggleSection(column.key)}
               className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
               aria-expanded={expandedSections[column.key]}
-              aria-controls={`filter-panel-${column.key}`}
+              aria-controls={`roster-mobile-filter-section-${column.key}`}
             >
               <span className="font-medium text-white">{column.label}</span>
               <ChevronDown
@@ -54,7 +54,7 @@ export default function MobileFilterSheet({ isOpen, onClose, columnFilters, setC
             {/* Conditionally mount the filter panel */}
             {expandedSections[column.key] && (
               <div
-                id={`roster-mobile-filter-panel-${column.key}`}
+                id={`roster-mobile-filter-section-${column.key}`}
                 className="border-t border-white/10 px-4 py-3 bg-bg-navy"
               >
                 {column.key === 'link_count' ? (

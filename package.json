@@ -38,5 +38,8 @@
   "dependencies": {
     "csrf-csrf": "^4.0.3",
     "email-validator": "^2.0.4"
+  },
+  "overrides": {
+    "js-yaml": "4.3.0"
   }
 }

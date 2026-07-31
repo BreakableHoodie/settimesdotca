@@ -5,6 +5,16 @@ import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { parseOrigin } from '../utils/parseOrigin'
 import { sortableName } from '../utils/sortableName'
 import SocialLinksIcons from './components/SocialLinksIcons'
+import DataGapFilter from './components/DataGapFilter'
+import {
+  EMPTY_GAP_FILTER,
+  GAP_FIELDS,
+  NO_LINKS_KEY,
+  countGaps,
+  formatOrigin,
+  isGapFilterActive,
+  matchesGapFilter,
+} from './utils/bandFields'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -52,6 +62,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
   // profile is never hidden by default; the admin roster must be able to see
   // and edit everything it manages.
   const [statusFilter, setStatusFilter] = useState('all')
+  const [gapFilter, setGapFilter] = useState(EMPTY_GAP_FILTER)
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -122,12 +133,12 @@ export default function RosterTab({ showToast, readOnly = false }) {
   }, [loadBands])
 
   // Sorting
-  const formatOrigin = band => {
-    if (!band) return ''
-    return [band.origin_city, band.origin_region].filter(Boolean).join(', ') || band.origin || ''
-  }
-
-  const filteredBands = useMemo(() => {
+  // Split in two on purpose. The popover's counts are computed from
+  // `searchAndStatusFiltered`, i.e. everything EXCEPT the gap filter itself --
+  // otherwise checking "Instagram" would collapse every other count to reflect
+  // that selection and the panel would stop being a gap dashboard the moment
+  // you used it.
+  const searchAndStatusFiltered = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
     return bands.filter(band => {
       if (statusFilter === 'active' && isInactive(band)) return false
@@ -142,6 +153,13 @@ export default function RosterTab({ showToast, readOnly = false }) {
       )
     })
   }, [bands, searchTerm, statusFilter])
+
+  const gapCounts = useMemo(() => countGaps(searchAndStatusFiltered), [searchAndStatusFiltered])
+
+  const filteredBands = useMemo(
+    () => searchAndStatusFiltered.filter(band => matchesGapFilter(band, gapFilter)),
+    [searchAndStatusFiltered, gapFilter]
+  )
 
   const sortedBands = useMemo(() => {
     if (!sortConfig.key) return filteredBands
@@ -430,6 +448,25 @@ export default function RosterTab({ showToast, readOnly = false }) {
     }
   }
 
+  const gapChips = [
+    ...gapFilter.keys.map(key => ({
+      key,
+      label: `${gapFilter.mode === 'missing' ? 'Missing' : 'Has'}: ${
+        GAP_FIELDS.find(field => field.key === key)?.label ?? key
+      }`,
+      remove: () => setGapFilter(prev => ({ ...prev, keys: prev.keys.filter(k => k !== key) })),
+    })),
+    ...(gapFilter.noLinks
+      ? [
+          {
+            key: NO_LINKS_KEY,
+            label: 'No links at all',
+            remove: () => setGapFilter(prev => ({ ...prev, noLinks: false })),
+          },
+        ]
+      : []),
+  ]
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -455,6 +492,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
+          <DataGapFilter value={gapFilter} counts={gapCounts} onChange={setGapFilter} />
           {!showAddForm && !editingId && !readOnly && (
             <button
               onClick={() => setShowAddForm(true)}
@@ -465,6 +503,26 @@ export default function RosterTab({ showToast, readOnly = false }) {
           )}
         </div>
       </div>
+
+      {isGapFilterActive(gapFilter) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {gapChips.map(chip => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={chip.remove}
+              className="inline-flex items-center gap-2 rounded-full bg-accent-500/15 px-3 py-1 text-sm text-accent-300 hover:bg-accent-500/25"
+              aria-label={`Remove filter: ${chip.label}`}
+            >
+              <span>{chip.label}</span>
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+          <span className="text-sm text-white/50">
+            {filteredBands.length} {filteredBands.length === 1 ? 'artist' : 'artists'}
+          </span>
+        </div>
+      )}
 
       {/* Bulk Actions */}
       {!readOnly && selectedIds.size > 0 && (

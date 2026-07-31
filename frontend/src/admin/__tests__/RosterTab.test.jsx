@@ -78,3 +78,46 @@ describe('RosterTab — inactive profile visibility (#619)', () => {
     expect(screen.getAllByText('The Essential Letdowns').length).toBeGreaterThan(0)
   })
 })
+
+const BAND_WITH_IG = {
+  id: 'profile_2',
+  band_profile_id: 2,
+  name: 'Instagrammed Iguanas',
+  genre: 'rock',
+  origin_city: 'Waterloo',
+  origin_region: 'ON',
+  is_active: 1,
+  follower_count: 0,
+  social_links: JSON.stringify({ instagram: '@iguanas' }),
+}
+
+describe('RosterTab — data-gap filtering', () => {
+  it('filters to artists missing Instagram and restores on chip removal', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, BAND_WITH_IG] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    fireEvent.click(screen.getByRole('button', { name: /data gaps/i }))
+    fireEvent.click(screen.getByLabelText('Instagram — 1 missing'))
+
+    // ACTIVE_BAND has social_links '{}' -> missing Instagram -> kept.
+    expect(screen.getAllByText('Active Aardvarks').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Instagrammed Iguanas')).toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Missing: Instagram' }))
+    expect(screen.getAllByText('Instagrammed Iguanas').length).toBeGreaterThan(0)
+  })
+
+  it('counts stay stable after a gap filter is applied', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, BAND_WITH_IG] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    fireEvent.click(screen.getByRole('button', { name: /data gaps/i }))
+    fireEvent.click(screen.getByLabelText('Instagram — 1 missing'))
+
+    // Spotify's count is still measured against the search/status-filtered
+    // roster (both bands), not the Instagram-filtered subset.
+    expect(screen.getByLabelText('Spotify — 2 missing')).toBeInTheDocument()
+  })
+})

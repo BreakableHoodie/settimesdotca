@@ -31,36 +31,38 @@ export default function MobileFilterSheet({ isOpen, onClose, columnFilters, setC
     })
   }
 
+  const collapseSection = key => {
+    setExpandedSections(prev => ({ ...prev, [key]: false }))
+  }
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Filters" size="sm" className="md:hidden">
       <div className="space-y-2">
         {FILTERABLE_COLUMNS.map(column => (
-          <div key={column.key} className="border border-border rounded-lg overflow-hidden">
+          <div key={column.key} className="border border-white/10 rounded-lg overflow-hidden">
             <button
               onClick={() => toggleSection(column.key)}
-              className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-hover transition-colors"
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
               aria-expanded={expandedSections[column.key]}
               aria-controls={`filter-panel-${column.key}`}
             >
-              <span className="font-medium text-text-primary">{column.label}</span>
+              <span className="font-medium text-white">{column.label}</span>
               <ChevronDown
                 size={20}
-                className={`text-text-secondary transition-transform ${
-                  expandedSections[column.key] ? 'rotate-180' : ''
-                }`}
+                className={`text-white/70 transition-transform ${expandedSections[column.key] ? 'rotate-180' : ''}`}
               />
             </button>
 
             {/* Conditionally mount the filter panel */}
             {expandedSections[column.key] && (
-              <div id={`filter-panel-${column.key}`} className="border-t border-border px-4 py-3 bg-surface">
+              <div id={`filter-panel-${column.key}`} className="border-t border-white/10 px-4 py-3 bg-bg-navy">
                 {column.key === 'link_count' ? (
                   <LinksColumnFilter
                     value={columnFilters.link_count ?? EMPTY_GAP_FILTER}
                     counts={linkCountsFor(searchFiltered, columnFilters)}
                     onChange={value => updateColumnFilter('link_count', value)}
                     onClear={() => clearColumnFilter('link_count')}
-                    onClose={onClose}
+                    onClose={() => collapseSection('link_count')}
                     triggerRef={null}
                     panelId={`roster-filter-panel-link_count`}
                   />
@@ -71,7 +73,7 @@ export default function MobileFilterSheet({ isOpen, onClose, columnFilters, setC
                     value={columnFilters[column.key]?.values}
                     onChange={values => updateColumnFilter(column.key, { values })}
                     onClear={() => clearColumnFilter(column.key)}
-                    onClose={onClose}
+                    onClose={() => collapseSection(column.key)}
                     triggerRef={null}
                     panelId={`roster-filter-panel-${column.key}`}
                   />

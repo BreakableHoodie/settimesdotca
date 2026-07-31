@@ -394,4 +394,39 @@ describe('RosterTab — mobile Filters button', () => {
     expect(screen.queryAllByText('The Essential Letdowns')).toHaveLength(0)
     expect(screen.getAllByText('Active Aardvarks').length).toBeGreaterThan(0)
   })
+
+  it('regression: clicking a different section header collapses the first section without closing the sheet', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    // Open the mobile Filters sheet
+    const filterButtons = screen.getAllByRole('button', { name: /^Filters/ })
+    const mobileFilterButton = filterButtons[filterButtons.length - 1]
+    fireEvent.click(mobileFilterButton)
+
+    // The Filters dialog should be open
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+
+    // Expand the Status section
+    const statusHeaders = screen.getAllByText('Status')
+    const statusButton = statusHeaders[statusHeaders.length - 1].closest('button')
+    fireEvent.click(statusButton)
+    expect(statusButton).toHaveAttribute('aria-expanded', 'true')
+
+    // Expand the Genre section
+    const genreHeaders = screen.getAllByText('Genre')
+    const genreButton = genreHeaders[genreHeaders.length - 1].closest('button')
+    fireEvent.click(genreButton)
+    expect(genreButton).toHaveAttribute('aria-expanded', 'true')
+
+    // Simulate a mousedown on the Genre header, which should collapse it
+    // without closing the sheet. This mimics clicking another section header.
+    const genreHeaderElement = genreHeaders[genreHeaders.length - 1]
+    fireEvent.mouseDown(genreHeaderElement)
+
+    // The Filters sheet must still be open (this is the critical assertion
+    // that would fail before the fix — the sheet would close)
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+  })
 })

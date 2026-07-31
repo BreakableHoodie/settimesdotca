@@ -367,6 +367,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
     try {
       await bandsApi.delete(id)
       showToast('Artist deleted', 'success')
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
       loadBands()
     } catch (err) {
       showToast(err.message, 'error')

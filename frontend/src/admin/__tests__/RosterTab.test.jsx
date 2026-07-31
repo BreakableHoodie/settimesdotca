@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import RosterTab from '../RosterTab'
 
@@ -451,6 +451,11 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
     confirmSpy.mockRestore()
 
+    // Wait for the delete API call to complete (signaled by the success toast)
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('Deleted 2 artists', 'success')
+    })
+
     // Clear the filter to reveal all bands again
     fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: No links at all' }))
 
@@ -526,6 +531,51 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
 
     // bulkDelete was called with only the visible ids (A and C), not B
     expect(bandsApi.bulkDelete).toHaveBeenCalledWith(['profile_20', 'profile_22'])
+  })
+
+  it('single-row delete removes the id from selectedIds, not leaving a ghost', async () => {
+    // This test verifies Finding 1: when a single row is deleted via Delete button,
+    // the deleted id is removed from selectedIds, preventing "hidden by filters" ghost counts.
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select all 3 bands: selectedIds = {A, B, C}
+    const headerRow = screen.getAllByRole('row')[0]
+    const selectAllCheckbox = headerRow.querySelector('input[type="checkbox"]')
+    fireEvent.click(selectAllCheckbox)
+    expect(screen.getAllByText(/3 selected/)).toBeDefined()
+
+    // Use search to hide Bands B and C, leaving only A visible
+    const searchInput = screen.getByPlaceholderText('Search name, origin, genre')
+    fireEvent.change(searchInput, { target: { value: 'Band A' } })
+    await screen.findAllByText('Band A')
+
+    // Now: selectedIds = {A, B, C}, visible = {A}, hidden = {B, C}
+    expect(screen.getByText(/2 hidden/)).toBeInTheDocument()
+
+    // Delete the visible Band A
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const aRow = screen.getAllByRole('row').find(r => r.textContent.includes('Band A'))
+    const deleteBtn = aRow?.querySelector('button:last-child')
+    fireEvent.click(deleteBtn)
+    confirmSpy.mockRestore()
+
+    // Wait for delete to complete
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('Artist deleted', 'success')
+    })
+
+    // Clear search to reveal remaining bands
+    fireEvent.change(searchInput, { target: { value: '' } })
+    await screen.findAllByText('Band B')
+
+    // With the fix: selectedIds should now be {B, C} (A removed), showing "2 selected, 0 hidden"
+    // Without the fix: selectedIds would still be {A, B, C}, showing "2 selected, 1 hidden"
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).not.toContain('hidden')
+    expect(bulkBar.textContent).toMatch(/2 selected/)
   })
 
   it('bulk bar shows "hidden by filters" text when some selections are filtered out', async () => {

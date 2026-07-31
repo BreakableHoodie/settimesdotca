@@ -18,9 +18,8 @@ import {
   matchesColumnFilters,
   valueCountsFor,
   activeFilterCount,
+  columnByKey,
 } from './utils/rosterColumns'
-
-const COLUMN_BY_KEY = new Map(FILTERABLE_COLUMNS.map(column => [column.key, column]))
 
 const MAX_CHIP_VALUES = 2
 
@@ -535,7 +534,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
           />
         ) : (
           <ColumnFilter
-            column={COLUMN_BY_KEY.get(key)}
+            column={columnByKey(key)}
             counts={valueCountsFor(key, searchFiltered, columnFilters)}
             value={columnFilters[key]?.values}
             onChange={values => updateColumnFilter(key, { values })}

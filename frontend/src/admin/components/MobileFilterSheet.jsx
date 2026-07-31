@@ -7,8 +7,6 @@ import LinksColumnFilter from './LinksColumnFilter'
 import { EMPTY_GAP_FILTER } from '../utils/bandFields'
 import { FILTERABLE_COLUMNS, valueCountsFor, linkCountsFor } from '../utils/rosterColumns'
 
-const COLUMN_BY_KEY = new Map(FILTERABLE_COLUMNS.map(column => [column.key, column]))
-
 export default function MobileFilterSheet({ isOpen, onClose, columnFilters, setColumnFilters, searchFiltered }) {
   const [expandedSections, setExpandedSections] = useState({})
 

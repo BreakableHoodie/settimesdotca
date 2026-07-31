@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import RosterTab from '../RosterTab'
 
@@ -359,6 +359,329 @@ describe('RosterTab — per-column filters combine (AND) and clear independently
     fireEvent.click(screen.getByLabelText('punk — 1'))
     expect(screen.getByLabelText('punk — 1')).toBeChecked()
     expect(screen.getByLabelText('metal — 1')).toBeInTheDocument()
+  })
+})
+
+describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
+  const BAND_A = {
+    id: 'profile_20',
+    band_profile_id: 20,
+    name: 'Band A',
+    genre: 'rock',
+    origin_city: 'Waterloo',
+    origin_region: 'ON',
+    is_active: 1,
+    follower_count: 0,
+    social_links: '{}', // no links
+  }
+  const BAND_B = {
+    id: 'profile_21',
+    band_profile_id: 21,
+    name: 'Band B',
+    genre: 'rock',
+    origin_city: 'Waterloo',
+    origin_region: 'ON',
+    is_active: 1,
+    follower_count: 0,
+    social_links: JSON.stringify({ instagram: '@bandB' }),
+  }
+  const BAND_C = {
+    id: 'profile_22',
+    band_profile_id: 22,
+    name: 'Band C',
+    genre: 'rock',
+    origin_city: 'Waterloo',
+    origin_region: 'ON',
+    is_active: 1,
+    follower_count: 0,
+    social_links: '{}', // no links
+  }
+
+  it('Finding 1: bulk bar NOT visible when effectiveSelectedIds is empty (search hides all)', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select Band A only
+    const headerRow = screen.getAllByRole('row')[0]
+    const selectAllCheckbox = headerRow.querySelector('input[type="checkbox"]')
+    fireEvent.click(selectAllCheckbox) // Select all
+    fireEvent.click(selectAllCheckbox) // Deselect all
+    // Now manually select just A
+    const rows = screen.getAllByRole('row')
+    const aCheckbox = rows.find(r => r.textContent.includes('Band A'))?.querySelector('input[type="checkbox"]')
+    fireEvent.click(aCheckbox)
+    expect(screen.getAllByText(/1 selected/)).toBeDefined()
+
+    // Now search for "Band B" which will hide Band A
+    // effectiveSelectedIds = {A} ∩ {B} = {} (empty!)
+    const searchInput = screen.getByPlaceholderText('Search name, origin, genre')
+    fireEvent.change(searchInput, { target: { value: 'Band B' } })
+
+    // The bulk bar should NOT be visible because effectiveSelectedIds.size === 0
+    const bulkBar = screen.queryByText(/selected/)
+    expect(bulkBar).toBeNull()
+  })
+
+  it('Finding 2: post-delete cleanup preserves non-deleted selections (only remove deleted ids)', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    bandsApi.bulkDelete.mockResolvedValue({ success: true })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select all 3 bands
+    const headerRow = screen.getAllByRole('row')[0]
+    const selectAllCheckbox = headerRow.querySelector('input[type="checkbox"]')
+    fireEvent.click(selectAllCheckbox)
+    expect(screen.getAllByText(/3 selected/)).toBeDefined()
+
+    // Filter to "No links at all" → keeps A and C visible, hides B
+    // Now: 2 selected visible (A, C), 1 selected hidden (B)
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
+    fireEvent.click(screen.getByLabelText('No links at all — 2 artists'))
+    expect(screen.getByText(/2 selected/)).toBeInTheDocument()
+    expect(screen.getByText(/1 hidden/)).toBeInTheDocument()
+
+    // Delete the 2 visible (A and C)
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const selectEl = screen.getByRole('combobox')
+    fireEvent.change(selectEl, { target: { value: 'delete' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    confirmSpy.mockRestore()
+
+    // Wait for the delete API call to complete (signaled by the success toast)
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('Deleted 2 artists', 'success')
+    })
+
+    // Clear the filter to reveal all bands again
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: No links at all' }))
+
+    // With the correct fix: B (the hidden one when we deleted) should still be selected
+    // With the bug: nothing is selected (setSelectedIds(new Set()) wipes everything)
+    const bCheckboxAfter = screen
+      .getAllByRole('row')
+      .find(r => r.textContent.includes('Band B'))
+      ?.querySelector('input[type="checkbox"]')
+    expect(bCheckboxAfter).toBeChecked() // B should still be selected
+
+    // Verify deleted ids are gone: bulk bar shows exactly "1 selected" with no "hidden" text
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/1 selected/)
+    expect(bulkBar.textContent).not.toContain('hidden')
+  })
+
+  it('Finding 1 case 1: select-all under filter adds visible rows to hidden selections (union not replace)', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select Band B only (the one WITH Instagram link)
+    const rows = screen.getAllByRole('row')
+    const bCheckbox = rows.find(r => r.textContent.includes('Band B'))?.querySelector('input[type="checkbox"]')
+    fireEvent.click(bCheckbox)
+    expect(screen.getByText(/1 selected/)).toBeInTheDocument()
+
+    // Apply "No links" filter → hides Band B, shows A and C
+    // selectedIds = {B}, visible = {A, C}, hidden = {B}
+    // Bulk bar disappears (no visible rows selected)
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
+    fireEvent.click(screen.getByLabelText('No links at all — 2 artists'))
+    // Bulk bar is hidden now because effectiveSelectedIds.size = 0
+    expect(screen.queryByText(/selected/)).toBeNull()
+
+    // Click select-all checkbox while filter is active
+    // Should add visible ids (A, C) to existing selection (B) → {A, B, C}
+    // Bulk bar reappears with "2 selected · 1 hidden"
+    const headerRow = screen.getAllByRole('row')[0]
+    const selectAllCheckbox = headerRow.querySelector('input[type="checkbox"]')
+    fireEvent.click(selectAllCheckbox)
+    expect(screen.getByText(/2 selected/)).toBeInTheDocument()
+    expect(screen.getByText(/1 hidden/)).toBeInTheDocument()
+
+    // Clear the filter to verify all 3 are truly selected
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: No links at all' }))
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/3 selected/)
+    expect(bulkBar.textContent).not.toContain('hidden')
+  })
+
+  it('Finding 1 case 2: deselect-all under filter removes only visible rows from selection', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select all 3 initially
+    const headerRow = screen.getAllByRole('row')[0]
+    const selectAllCheckbox = headerRow.querySelector('input[type="checkbox"]')
+    fireEvent.click(selectAllCheckbox)
+    expect(screen.getAllByText(/3 selected/)).toBeDefined()
+
+    // Apply "No links" filter → hides Band B (has Instagram), shows A and C
+    // Now: selectedIds = {A, B, C}, visible = {A, C}, hidden = {B}
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
+    fireEvent.click(screen.getByLabelText('No links at all — 2 artists'))
+    expect(screen.getByText(/2 selected/)).toBeInTheDocument()
+    expect(screen.getByText(/1 hidden/)).toBeInTheDocument()
+
+    // Click select-all (which acts as deselect-all when all visible are selected)
+    // Should remove visible ids (A, C) from selection, leaving only hidden {B}
+    // After this, effectiveSelectedIds = {} (no visible selected), so bulk bar disappears
+    fireEvent.click(selectAllCheckbox)
+    // Bulk bar is now gone because no visible rows are selected (only hidden B)
+    expect(screen.queryByText(/selected/)).toBeNull()
+
+    // Clear the filter to verify only B remains selected
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: No links at all' }))
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/1 selected/)
+    expect(bulkBar.textContent).not.toContain('hidden')
+  })
+
+  it('select-all, then apply filter that hides some rows → bulk delete operates on visible rows only', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    bandsApi.bulkDelete.mockResolvedValue({ success: true })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select all 3 bands (no filter)
+    const selectAllCheckbox = screen
+      .getAllByRole('checkbox')
+      .find(cb => cb.parentElement.parentElement === screen.getAllByRole('row')[0])
+    fireEvent.click(selectAllCheckbox)
+    expect(screen.getAllByText(/3 selected/)).toBeDefined()
+
+    // Apply Links filter: "No links at all" → hides BAND_B (has Instagram)
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
+    fireEvent.click(screen.getByLabelText('No links at all — 2 artists'))
+
+    // Table narrows to Band A and Band C
+    expect(screen.getAllByText('Band A').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Band C').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Band B')).toHaveLength(0)
+
+    // Spy on window.confirm FIRST, before triggering the action
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    // Select Delete action from the dropdown
+    const selectEl = screen.getByRole('combobox')
+    fireEvent.change(selectEl, { target: { value: 'delete' } })
+
+    // Click Apply button
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    // Confirm was called with visible count (2), not total (3)
+    expect(confirmSpy).toHaveBeenCalledWith('Delete 2 artists?')
+    confirmSpy.mockRestore()
+
+    // bulkDelete was called with only the visible ids (A and C), not B
+    expect(bandsApi.bulkDelete).toHaveBeenCalledWith(['profile_20', 'profile_22'])
+  })
+
+  it('single-row delete removes the id from selectedIds, not leaving a ghost', async () => {
+    // This test verifies Finding 1: when a single row is deleted via Delete button,
+    // the deleted id is removed from selectedIds, preventing "hidden by filters" ghost counts.
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select all 3 bands: selectedIds = {A, B, C}
+    const headerRow = screen.getAllByRole('row')[0]
+    const selectAllCheckbox = headerRow.querySelector('input[type="checkbox"]')
+    fireEvent.click(selectAllCheckbox)
+    expect(screen.getAllByText(/3 selected/)).toBeDefined()
+
+    // Use search to hide Bands B and C, leaving only A visible
+    const searchInput = screen.getByPlaceholderText('Search name, origin, genre')
+    fireEvent.change(searchInput, { target: { value: 'Band A' } })
+    await screen.findAllByText('Band A')
+
+    // Now: selectedIds = {A, B, C}, visible = {A}, hidden = {B, C}
+    expect(screen.getByText(/2 hidden/)).toBeInTheDocument()
+
+    // Delete the visible Band A
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const aRow = screen.getAllByRole('row').find(r => r.textContent.includes('Band A'))
+    const deleteBtn = aRow?.querySelector('button:last-child')
+    fireEvent.click(deleteBtn)
+    confirmSpy.mockRestore()
+
+    // Wait for delete to complete
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('Artist deleted', 'success')
+    })
+
+    // Clear search to reveal remaining bands
+    fireEvent.change(searchInput, { target: { value: '' } })
+    await screen.findAllByText('Band B')
+
+    // With the fix: selectedIds should now be {B, C} (A removed), showing "2 selected, 0 hidden"
+    // Without the fix: selectedIds would still be {A, B, C}, showing "2 selected, 1 hidden"
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).not.toContain('hidden')
+    expect(bulkBar.textContent).toMatch(/2 selected/)
+  })
+
+  it('bulk bar shows "hidden by filters" text when some selections are filtered out', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select all 3
+    const selectAllCheckbox = screen
+      .getAllByRole('checkbox')
+      .find(cb => cb.parentElement.parentElement === screen.getAllByRole('row')[0])
+    fireEvent.click(selectAllCheckbox)
+
+    // Apply filter that hides 1 row
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
+    fireEvent.click(screen.getByLabelText('No links at all — 2 artists'))
+
+    // Bulk bar should show "2 selected · 1 hidden by filters"
+    // or at least indicate that some are hidden
+    const bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/2/)
+    expect(bulkBar.textContent).toMatch(/hidden/)
+  })
+
+  it('clearing a filter restores the full selection', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_A, BAND_B, BAND_C] })
+    const showToast = vi.fn()
+    render(<RosterTab showToast={showToast} />)
+    await screen.findAllByText('Band A')
+
+    // Select all 3
+    const selectAllCheckbox = screen
+      .getAllByRole('checkbox')
+      .find(cb => cb.parentElement.parentElement === screen.getAllByRole('row')[0])
+    fireEvent.click(selectAllCheckbox)
+
+    // Apply filter
+    fireEvent.click(screen.getByLabelText('Filter by Links'))
+    fireEvent.click(screen.getByLabelText('No links at all — 2 artists'))
+
+    // Bulk bar shows 2 selected (visible)
+    let bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/2/)
+
+    // Clear the filter by clicking the chip
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Links: No links at all' }))
+
+    // All 3 bands reappear
+    expect(screen.getAllByText('Band A').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Band B').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Band C').length).toBeGreaterThan(0)
+
+    // Bulk bar now shows 3 selected
+    bulkBar = screen.getByText(/selected/)
+    expect(bulkBar.textContent).toMatch(/3/)
   })
 })
 

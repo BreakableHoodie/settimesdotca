@@ -248,6 +248,18 @@ export default function RosterTab({ showToast, readOnly = false }) {
     })
   }, [filteredBands, sortConfig])
 
+  // Compute effective selection: intersection of selectedIds and visible band ids.
+  // This scopes bulk actions to only visible rows when filters hide some selected items.
+  // Do NOT prune selectedIds when filters change — that would destroy the user's selection
+  // the moment they type in the search box. Instead, derive the effective set here.
+  const effectiveSelectedIds = useMemo(() => {
+    if (selectedIds.size === 0) return new Set()
+    const visibleIds = new Set(filteredBands.map(b => b.id))
+    return new Set(Array.from(selectedIds).filter(id => visibleIds.has(id)))
+  }, [selectedIds, filteredBands])
+
+  const hiddenSelectedCount = selectedIds.size - effectiveSelectedIds.size
+
   const handleSort = key => {
     setSortConfig(prev => ({
       key,
@@ -355,6 +367,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
     try {
       await bandsApi.delete(id)
       showToast('Artist deleted', 'success')
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
       loadBands()
     } catch (err) {
       showToast(err.message, 'error')
@@ -478,19 +495,22 @@ export default function RosterTab({ showToast, readOnly = false }) {
   }
 
   const handleSelectAll = checked => {
-    setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
+    const visibleIds = new Set(filteredBands.map(b => b.id))
+    setSelectedIds(prev =>
+      checked ? new Set([...prev, ...visibleIds]) : new Set([...prev].filter(id => !visibleIds.has(id)))
+    )
   }
 
   const handleBulkSubmit = async () => {
     // Basic implementation for bulk delete only for now in Roster
     if (bulkAction === 'delete') {
-      if (!window.confirm(`Delete ${selectedIds.size} artists?`)) return
+      if (!window.confirm(`Delete ${effectiveSelectedIds.size} artists?`)) return
       // Reuse logic from BandsTab bulk delete
       try {
-        const res = await bandsApi.bulkDelete(Array.from(selectedIds))
+        const res = await bandsApi.bulkDelete(Array.from(effectiveSelectedIds))
         if (res.success) {
-          showToast(`Deleted ${selectedIds.size} artists`, 'success')
-          setSelectedIds(new Set())
+          showToast(`Deleted ${effectiveSelectedIds.size} artists`, 'success')
+          setSelectedIds(prev => new Set([...prev].filter(id => !effectiveSelectedIds.has(id))))
           loadBands()
         } else {
           showToast(res.error, 'error')
@@ -599,9 +619,14 @@ export default function RosterTab({ showToast, readOnly = false }) {
       )}
 
       {/* Bulk Actions */}
-      {!readOnly && selectedIds.size > 0 && (
+      {!readOnly && effectiveSelectedIds.size > 0 && (
         <div className="bg-bg-navy/80 p-4 rounded border border-accent-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky top-20 z-10 backdrop-blur-md">
-          <span className="text-white font-medium">{selectedIds.size} selected</span>
+          <span className="text-white font-medium">
+            {effectiveSelectedIds.size} selected
+            {hiddenSelectedCount > 0 && (
+              <span className="ml-2 text-white/60">· {hiddenSelectedCount} hidden by filters</span>
+            )}
+          </span>
           <div className="flex flex-col sm:flex-row gap-2">
             <select
               className="bg-black/30 border border-white/20 rounded px-3 py-2 min-h-[44px] text-white"
@@ -664,7 +689,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                           type="checkbox"
                           className="cursor-pointer h-5 w-5 align-middle"
                           onChange={e => handleSelectAll(e.target.checked)}
-                          checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
+                          checked={effectiveSelectedIds.size === filteredBands.length && filteredBands.length > 0}
                         />
                       </th>
                     )}
@@ -914,7 +939,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       type="checkbox"
                       className="h-5 w-5 cursor-pointer"
                       onChange={e => handleSelectAll(e.target.checked)}
-                      checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
+                      checked={effectiveSelectedIds.size === filteredBands.length && filteredBands.length > 0}
                     />
                     <span>Select all</span>
                   </label>

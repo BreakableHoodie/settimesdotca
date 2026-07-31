@@ -346,12 +346,19 @@ describe('RosterTab — per-column filters combine (AND) and clear independently
     // Status=Active is honoured: "punk" only counts Alpha (Active), not
     // Gamma (Inactive, punk) -- so 1, not 2.
     expect(screen.getByLabelText('punk — 1')).toBeInTheDocument()
+    expect(screen.getByLabelText('metal — 1')).toBeInTheDocument()
 
     // Checking "punk" applies Genre's own filter, but the dropdown's own
     // counts must NOT shrink in response -- valueCountsFor excludes the
     // column's own selection (Excel behaviour).
+    //
+    // `metal` is the assertion that discriminates: a correct implementation
+    // leaves it listed, while one that folded Genre's own filter into the
+    // count would scope to {Alpha} and drop it entirely. `punk` survives
+    // either way, so asserting on it alone cannot tell the two apart.
     fireEvent.click(screen.getByLabelText('punk — 1'))
-    expect(screen.getByLabelText('punk — 1')).toBeInTheDocument()
+    expect(screen.getByLabelText('punk — 1')).toBeChecked()
+    expect(screen.getByLabelText('metal — 1')).toBeInTheDocument()
   })
 })
 

@@ -143,3 +143,6 @@ database/exports/
 .superpowers/
 /docs/superpowers/
 docs/SEO_IMPROVEMENTS.md
+
+# GitGuardian local scan cache
+.cache_ggshield

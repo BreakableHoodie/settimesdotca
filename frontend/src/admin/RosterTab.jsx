@@ -25,6 +25,16 @@ function SortIcon({ col, sortConfig }) {
   )
 }
 
+// `<th>` is not natively interactive -- a keyboard user cannot activate an
+// onClick attached directly to it. Every sortable header instead puts the
+// handler on a real <button> inside the <th>, and the <th> carries aria-sort
+// reflecting the current state so assistive tech announces which column (and
+// direction) the table is sorted by.
+function ariaSortFor(sortConfig, key) {
+  if (sortConfig.key !== key) return 'none'
+  return sortConfig.direction === 'asc' ? 'ascending' : 'descending'
+}
+
 // The roster API now returns inactive/retired profiles alongside active ones
 // (#619) — `is_active` comes straight off the D1 row (INTEGER NOT NULL
 // DEFAULT 1), so it's always 0 or 1, but check both the number and legacy
@@ -601,46 +611,88 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       </th>
                     )}
                     <th
-                      onClick={() => handleSort('name')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'name')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Name <SortIcon col="name" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('name')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Name <SortIcon col="name" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('origin')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'origin')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Origin <SortIcon col="origin" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('origin')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Origin <SortIcon col="origin" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('genre')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'genre')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Genre <SortIcon col="genre" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('genre')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Genre <SortIcon col="genre" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('is_active')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'is_active')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Status <SortIcon col="is_active" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('is_active')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Status <SortIcon col="is_active" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('link_count')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'link_count')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Links <SortIcon col="link_count" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('link_count')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Links <SortIcon col="link_count" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('contact_email')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'contact_email')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('contact_email')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('follower_count')}
-                      className="px-4 py-3 text-right text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'follower_count')}
+                      className="px-4 py-3 text-right text-white font-semibold"
                     >
-                      Followers <SortIcon col="follower_count" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('follower_count')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Followers <SortIcon col="follower_count" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>

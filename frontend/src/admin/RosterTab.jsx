@@ -8,6 +8,7 @@ import SocialLinksIcons from './components/SocialLinksIcons'
 import FilterFunnel from './components/FilterFunnel'
 import ColumnFilter from './components/ColumnFilter'
 import LinksColumnFilter from './components/LinksColumnFilter'
+import MobileFilterSheet from './components/MobileFilterSheet'
 import { EMPTY_GAP_FILTER, LINK_FIELDS, countLinks, formatOrigin } from './utils/bandFields'
 import {
   FILTERABLE_COLUMNS,
@@ -16,6 +17,7 @@ import {
   linkCountsFor,
   matchesColumnFilters,
   valueCountsFor,
+  activeFilterCount,
 } from './utils/rosterColumns'
 
 const COLUMN_BY_KEY = new Map(FILTERABLE_COLUMNS.map(column => [column.key, column]))
@@ -100,6 +102,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
   // outside-mousedown/Escape listeners unconditionally on mount with no
   // internal `open` gate, so they must only be mounted while actually open.
   const [openFilterKey, setOpenFilterKey] = useState(null)
+  const [mobileFilterSheetOpen, setMobileFilterSheetOpen] = useState(false)
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -919,6 +922,17 @@ export default function RosterTab({ showToast, readOnly = false }) {
                   <span className="text-xs text-text-tertiary">{filteredBands.length} artists</span>
                 </div>
               )}
+              <button
+                onClick={() => setMobileFilterSheetOpen(true)}
+                className="w-full px-4 py-3 flex items-center justify-center gap-2 text-white bg-bg-navy hover:bg-bg-purple transition-colors min-h-[44px] font-medium"
+              >
+                Filters
+                {activeFilterCount(columnFilters) > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-accent-500 text-bg-navy text-xs font-bold">
+                    {activeFilterCount(columnFilters)}
+                  </span>
+                )}
+              </button>
               {sortedBands.map(band => (
                 <div
                   key={band.id}
@@ -977,6 +991,14 @@ export default function RosterTab({ showToast, readOnly = false }) {
             </div>
           </>
         )}
+
+        <MobileFilterSheet
+          isOpen={mobileFilterSheetOpen}
+          onClose={() => setMobileFilterSheetOpen(false)}
+          columnFilters={columnFilters}
+          setColumnFilters={setColumnFilters}
+          searchFiltered={searchFiltered}
+        />
       </div>
     </div>
   )

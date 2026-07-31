@@ -347,3 +347,51 @@ describe('RosterTab — per-column filters combine (AND) and clear independently
     expect(screen.getByLabelText('punk — 1')).toBeInTheDocument()
   })
 })
+
+describe('RosterTab — mobile Filters button', () => {
+  it('on mobile, the Filters button shows the active filter count when > 0', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, INACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    // Initially, Filters button should not show a badge
+    const filterButtons = screen.getAllByRole('button', { name: /^Filters$/ })
+    expect(filterButtons.length).toBeGreaterThan(0)
+
+    // Open Status filter and select Active
+    fireEvent.click(screen.getByLabelText('Filter by Status'))
+    fireEvent.click(screen.getByLabelText('Active — 1'))
+
+    // Now the mobile Filters button should show a badge with count "1"
+    const mobileFilterButton = filterButtons[filterButtons.length - 1]
+    expect(mobileFilterButton.textContent).toMatch(/Filters\s*1/)
+  })
+
+  it('on mobile, opening the Filters sheet and selecting a Status value narrows the card list', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, INACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    // Both bands should be visible initially (in mobile view)
+    expect(screen.queryAllByText('Active Aardvarks').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('The Essential Letdowns').length).toBeGreaterThan(0)
+
+    // Click the Filters button (mobile view)
+    const filterButtons = screen.getAllByRole('button', { name: /^Filters/ })
+    const mobileFilterButton = filterButtons[filterButtons.length - 1]
+    fireEvent.click(mobileFilterButton)
+
+    // The mobile filter sheet should open and show Status section
+    // Click the Status section to expand it
+    const statusHeaders = screen.getAllByText('Status')
+    const statusHeader = statusHeaders[statusHeaders.length - 1]
+    fireEvent.click(statusHeader.closest('button'))
+
+    // Now check the Active checkbox in the mobile filter sheet
+    fireEvent.click(screen.getByLabelText('Active — 1'))
+
+    // The inactive band should now be hidden from the mobile card list
+    expect(screen.queryAllByText('The Essential Letdowns')).toHaveLength(0)
+    expect(screen.getAllByText('Active Aardvarks').length).toBeGreaterThan(0)
+  })
+})

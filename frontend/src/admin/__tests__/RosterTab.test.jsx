@@ -91,6 +91,27 @@ const BAND_WITH_IG = {
   social_links: JSON.stringify({ instagram: '@iguanas' }),
 }
 
+// Zero links, but named to sort LAST alphabetically -- the opposite end of
+// the name-ascending default sort from BAND_WITH_IG. This deliberately
+// breaks the coincidence that made the old sort test vacuous: with
+// ACTIVE_BAND ("Active Aardvarks", 0 links) name-ascending and
+// link-count-ascending happened to produce the same order, so the assertion
+// passed even after the Links header's onClick was deleted entirely. Here
+// name-ascending gives [Instagrammed Iguanas, Zeroed Zebras] while
+// link-count-ascending must give the reverse: [Zeroed Zebras, Instagrammed
+// Iguanas].
+const ZERO_LINKS_BAND = {
+  id: 'profile_3',
+  band_profile_id: 3,
+  name: 'Zeroed Zebras',
+  genre: 'rock',
+  origin_city: 'Waterloo',
+  origin_region: 'ON',
+  is_active: 1,
+  follower_count: 0,
+  social_links: '{}',
+}
+
 describe('RosterTab — data-gap filtering', () => {
   it('filters to artists missing Instagram and restores on chip removal', async () => {
     bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, BAND_WITH_IG] })
@@ -121,18 +142,28 @@ describe('RosterTab — data-gap filtering', () => {
     expect(screen.getByLabelText('Spotify — 2 missing')).toBeInTheDocument()
   })
 
-  it('sorts by link count, sparsest first', async () => {
-    bandsApi.getAll.mockResolvedValue({ bands: [BAND_WITH_IG, ACTIVE_BAND] })
+  it('sorts by link count, sparsest first, and reverses on a second click', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_WITH_IG, ZERO_LINKS_BAND] })
     render(<RosterTab showToast={vi.fn()} />)
-    await screen.findAllByText('Active Aardvarks')
+    await screen.findAllByText('Instagrammed Iguanas')
 
     // Mobile card view also renders a "Links:" label (not a column header),
     // so scope to the columnheader role to avoid a duplicate match.
-    fireEvent.click(screen.getByRole('columnheader', { name: /^Links/ }))
+    const linksHeader = screen.getByRole('columnheader', { name: /^Links/ })
 
-    // ACTIVE_BAND has zero links, BAND_WITH_IG has one -> ascending puts the
-    // empty profile first. Row 0 is the header row.
-    const rows = screen.getAllByRole('row').slice(1)
-    expect(rows[0]).toHaveTextContent('Active Aardvarks')
+    // Name-ascending (the default sort) would order these as
+    // [Instagrammed Iguanas, Zeroed Zebras] -- the opposite of what
+    // link-count-ascending must produce. Row 0 is the header row.
+    fireEvent.click(linksHeader)
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Zeroed Zebras')
+    expect(rows[1]).toHaveTextContent('Instagrammed Iguanas')
+
+    // Second click reverses to descending -- most links first. This
+    // direction previously had no test coverage at all.
+    fireEvent.click(linksHeader)
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Instagrammed Iguanas')
+    expect(rows[1]).toHaveTextContent('Zeroed Zebras')
   })
 })

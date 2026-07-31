@@ -9,8 +9,20 @@ const CONTROL_CLASS =
 const ROW_CLASS =
   'flex items-center justify-between gap-3 px-3 py-2 min-h-[44px] cursor-pointer hover:bg-white/5 rounded'
 
-function GapCheckbox({ field, counts, checked, onToggle }) {
+// The visible count is ALWAYS a missing-count, by design (it's measured
+// against the search/status-filtered roster regardless of mode -- see the
+// gapCounts comment in RosterTab.jsx). In `has` mode, checking the box
+// selects artists that HAVE the field, which the plain
+// "${label} — ${count} missing" label would misreport to a screen reader as
+// selecting the artists lacking it. The `has`-mode phrasing spells out what
+// the checkbox actually does and keeps the (still-missing) count as
+// parenthetical context rather than pretending it's a "has" count.
+function GapCheckbox({ field, counts, checked, onToggle, mode }) {
   const count = counts[field.key] ?? 0
+  const ariaLabel =
+    mode === 'has'
+      ? `${field.label} — filter to artists with ${field.label} (${count} missing)`
+      : `${field.label} — ${count} missing`
   return (
     <label className={ROW_CLASS}>
       <span className="flex items-center gap-3">
@@ -20,7 +32,7 @@ function GapCheckbox({ field, counts, checked, onToggle }) {
           className="h-5 w-5 cursor-pointer"
           checked={checked}
           onChange={() => onToggle(field.key)}
-          aria-label={`${field.label} — ${count} missing`}
+          aria-label={ariaLabel}
         />
         <span className="text-white text-sm">{field.label}</span>
       </span>
@@ -34,6 +46,7 @@ GapCheckbox.propTypes = {
   counts: PropTypes.object.isRequired,
   checked: PropTypes.bool.isRequired,
   onToggle: PropTypes.func.isRequired,
+  mode: PropTypes.oneOf(['missing', 'has']).isRequired,
 }
 
 export default function DataGapFilter({ value, counts, onChange }) {
@@ -124,6 +137,7 @@ export default function DataGapFilter({ value, counts, onChange }) {
                 counts={counts}
                 checked={value.keys.includes(field.key)}
                 onToggle={toggleKey}
+                mode={value.mode}
               />
             ))}
           </div>
@@ -136,6 +150,7 @@ export default function DataGapFilter({ value, counts, onChange }) {
                 counts={counts}
                 checked={value.keys.includes(field.key)}
                 onToggle={toggleKey}
+                mode={value.mode}
               />
             ))}
           </div>

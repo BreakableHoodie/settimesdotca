@@ -43,6 +43,17 @@ describe('DataGapFilter', () => {
     expect(screen.getByLabelText('Photo — 196 missing')).toBeInTheDocument()
   })
 
+  it('rephrases the aria-label in "has" mode so it describes what the checkbox selects, not a raw missing-count', () => {
+    // The visible count is always a missing-count by design (unchanged here).
+    // But in "has" mode the checkbox selects artists that HAVE the field, so
+    // the plain "Instagram — 94 missing" label from "missing" mode would
+    // read backwards to a screen reader user.
+    setup({ mode: 'has', keys: [], noLinks: false })
+    openPanel()
+    expect(screen.getByLabelText('Instagram — filter to artists with Instagram (94 missing)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Instagram — 94 missing')).toBeNull()
+  })
+
   it('emits the checked key on toggle', () => {
     const { onChange } = setup()
     openPanel()

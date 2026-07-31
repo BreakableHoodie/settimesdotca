@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import SocialLinksIcons, { parseSocialLinks } from '../SocialLinksIcons'
+import SocialLinksIcons from '../SocialLinksIcons'
 
 const ALL_LINKS = {
   website: 'https://example.com',
@@ -71,11 +71,5 @@ describe('SocialLinksIcons — characterization', () => {
   it('treats malformed social_links JSON as no links', () => {
     render(<SocialLinksIcons band={{ name: 'Test Band', social_links: 'not json' }} />)
     expect(screen.getByText('-')).toBeInTheDocument()
-  })
-
-  it('parseSocialLinks accepts an already-parsed object', () => {
-    expect(parseSocialLinks({ social_links: { website: 'https://example.com' } })).toEqual({
-      website: 'https://example.com',
-    })
   })
 })

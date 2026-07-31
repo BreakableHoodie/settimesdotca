@@ -922,17 +922,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
                   <span className="text-xs text-text-tertiary">{filteredBands.length} artists</span>
                 </div>
               )}
-              <button
-                onClick={() => setMobileFilterSheetOpen(true)}
-                className="w-full px-4 py-3 flex items-center justify-center gap-2 text-white bg-bg-navy hover:bg-bg-purple transition-colors min-h-[44px] font-medium"
-              >
-                Filters
-                {activeFilterCount(columnFilters) > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-accent-500 text-bg-navy text-xs font-bold">
-                    {activeFilterCount(columnFilters)}
-                  </span>
-                )}
-              </button>
               {sortedBands.map(band => (
                 <div
                   key={band.id}
@@ -991,6 +980,18 @@ export default function RosterTab({ showToast, readOnly = false }) {
             </div>
           </>
         )}
+
+        <button
+          onClick={() => setMobileFilterSheetOpen(true)}
+          className="md:hidden w-full px-4 py-3 flex items-center justify-center gap-2 text-white bg-bg-navy hover:bg-bg-purple transition-colors min-h-[44px] font-medium border-t border-accent-500/10"
+        >
+          Filters
+          {activeFilterCount(columnFilters) > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-accent-500 text-bg-navy text-xs font-bold">
+              {activeFilterCount(columnFilters)}
+            </span>
+          )}
+        </button>
 
         <MobileFilterSheet
           isOpen={mobileFilterSheetOpen}

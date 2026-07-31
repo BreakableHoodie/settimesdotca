@@ -357,6 +357,7 @@ describe('RosterTab — mobile Filters button', () => {
     // Initially, Filters button should not show a badge
     const filterButtons = screen.getAllByRole('button', { name: /^Filters$/ })
     expect(filterButtons.length).toBeGreaterThan(0)
+    expect(filterButtons[filterButtons.length - 1].textContent).not.toMatch(/\d/)
 
     // Open Status filter and select Active
     fireEvent.click(screen.getByLabelText('Filter by Status'))
@@ -425,8 +426,27 @@ describe('RosterTab — mobile Filters button', () => {
     const genreHeaderElement = genreHeaders[genreHeaders.length - 1]
     fireEvent.mouseDown(genreHeaderElement)
 
+    // The Genre button should collapse (aria-expanded = false)
+    expect(genreButton).toHaveAttribute('aria-expanded', 'false')
+
     // The Filters sheet must still be open (this is the critical assertion
     // that would fail before the fix — the sheet would close)
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+  })
+
+  it('mobile Filters button remains visible even when no bands match the filter', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, INACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    // Apply a filter that matches nothing: genre "nonexistent" (via search)
+    fireEvent.click(screen.getByLabelText('Filter by Genre'))
+    const genreSearch = screen.getByLabelText('Search Genre')
+    fireEvent.change(genreSearch, { target: { value: 'nonexistent-genre-xyz' } })
+
+    // Verify the mobile Filters button is still present and clickable
+    const filterButtons = screen.queryAllByRole('button', { name: /Filters/ })
+    expect(filterButtons.length).toBeGreaterThan(0)
+    expect(filterButtons[filterButtons.length - 1]).toBeInTheDocument()
   })
 })

@@ -55,7 +55,10 @@ export default function MobileFilterSheet({ isOpen, onClose, columnFilters, setC
 
             {/* Conditionally mount the filter panel */}
             {expandedSections[column.key] && (
-              <div id={`filter-panel-${column.key}`} className="border-t border-white/10 px-4 py-3 bg-bg-navy">
+              <div
+                id={`roster-mobile-filter-panel-${column.key}`}
+                className="border-t border-white/10 px-4 py-3 bg-bg-navy"
+              >
                 {column.key === 'link_count' ? (
                   <LinksColumnFilter
                     value={columnFilters.link_count ?? EMPTY_GAP_FILTER}
@@ -64,18 +67,20 @@ export default function MobileFilterSheet({ isOpen, onClose, columnFilters, setC
                     onClear={() => clearColumnFilter('link_count')}
                     onClose={() => collapseSection('link_count')}
                     triggerRef={null}
-                    panelId={`roster-filter-panel-link_count`}
+                    panelId={`roster-mobile-filter-panel-link_count`}
+                    closeOnEscape={false}
                   />
                 ) : (
                   <ColumnFilter
-                    column={COLUMN_BY_KEY.get(column.key)}
+                    column={column}
                     counts={valueCountsFor(column.key, searchFiltered, columnFilters)}
                     value={columnFilters[column.key]?.values}
                     onChange={values => updateColumnFilter(column.key, { values })}
                     onClear={() => clearColumnFilter(column.key)}
                     onClose={() => collapseSection(column.key)}
                     triggerRef={null}
-                    panelId={`roster-filter-panel-${column.key}`}
+                    panelId={`roster-mobile-filter-panel-${column.key}`}
+                    closeOnEscape={false}
                   />
                 )}
               </div>

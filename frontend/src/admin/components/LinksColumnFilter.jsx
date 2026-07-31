@@ -64,6 +64,7 @@ export default function LinksColumnFilter({
   onClose = () => {},
   triggerRef,
   panelId,
+  closeOnEscape = true,
 }) {
   const panelRef = useRef(null)
 
@@ -75,6 +76,7 @@ export default function LinksColumnFilter({
     }
     const handleKeyDown = event => {
       if (event.key !== 'Escape') return
+      if (!closeOnEscape) return
       onClose()
       triggerRef?.current?.focus()
     }
@@ -85,7 +87,7 @@ export default function LinksColumnFilter({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [onClose, triggerRef])
+  }, [onClose, triggerRef, closeOnEscape])
 
   const toggleKey = key => {
     const keys = value.keys.includes(key) ? value.keys.filter(k => k !== key) : [...value.keys, key]
@@ -104,7 +106,7 @@ export default function LinksColumnFilter({
           <label key={mode} className="flex items-center gap-2 text-sm text-white cursor-pointer">
             <input
               type="radio"
-              name="links-filter-mode"
+              name={`${panelId}-mode`}
               className="h-4 w-4 cursor-pointer"
               checked={value.mode === mode}
               onChange={() => onChange({ ...value, mode })}
@@ -171,4 +173,5 @@ LinksColumnFilter.propTypes = {
   onClose: PropTypes.func,
   triggerRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
   panelId: PropTypes.string,
+  closeOnEscape: PropTypes.bool,
 }

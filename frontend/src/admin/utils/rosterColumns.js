@@ -38,6 +38,8 @@ export const FILTERABLE_COLUMNS = [
 
 const COLUMN_BY_KEY = new Map(FILTERABLE_COLUMNS.map(column => [column.key, column]))
 
+export const columnByKey = key => COLUMN_BY_KEY.get(key)
+
 // A `values` filter with an empty/absent array is NOT a filter — it shows
 // everything. Unchecking the last value therefore clears the column rather
 // than emptying the table.

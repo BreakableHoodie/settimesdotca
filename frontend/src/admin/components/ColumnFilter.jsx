@@ -48,13 +48,10 @@ export default function ColumnFilter({
   onClose = () => {},
   triggerRef,
   panelId,
+  closeOnEscape = true,
 }) {
-  // The `= []` default only fires when the prop is `undefined`; a caller
-  // passing `value: null` (e.g. a filter shape mismatch) would otherwise
-  // reach `toggleValue`'s `value.filter(...)` and throw. Same guard pattern
-  // as `Array.isArray(keys) ? keys : []` in bandFields.js. Memoized (rather
-  // than a plain ternary) so the `checkedSet` useMemo below doesn't get an
-  // unstable dependency every render.
+  // `value` may arrive as `null` due to a filter shape mismatch; the `= []`
+  // default only fires on `undefined`. Same guard pattern as `Array.isArray(keys) ? keys : []`.
   const value = useMemo(() => (Array.isArray(valueProp) ? valueProp : []), [valueProp])
   const [search, setSearch] = useState('')
   const panelRef = useRef(null)
@@ -68,6 +65,7 @@ export default function ColumnFilter({
     }
     const handleKeyDown = event => {
       if (event.key !== 'Escape') return
+      if (!closeOnEscape) return
       onClose()
       triggerRef?.current?.focus()
     }
@@ -78,7 +76,7 @@ export default function ColumnFilter({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [onClose, triggerRef])
+  }, [onClose, triggerRef, closeOnEscape])
 
   const allValues = useMemo(() => sortValues(column, Array.from(counts.keys())), [column, counts])
 

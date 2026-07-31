@@ -21,7 +21,8 @@ export default function SocialLinksIcons({ band }) {
             title={label}
             aria-label={`Open ${ariaNoun} for ${band.name}`}
           >
-            <Icon size={14} />
+            {/* Decorative: the anchor already carries the accessible name. */}
+            <Icon size={14} aria-hidden="true" />
           </a>
         )
       })}

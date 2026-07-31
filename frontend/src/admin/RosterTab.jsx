@@ -2,154 +2,20 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { bandsApi } from '../utils/adminApi'
 import BandForm from './BandForm'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
-import { safeExternalHref, safeHttpsFallbackHref, safeInstagramHref } from '../utils/urlSafety'
-import { Globe } from 'lucide-react'
 import { parseOrigin } from '../utils/parseOrigin'
 import { sortableName } from '../utils/sortableName'
+import SocialLinksIcons from './components/SocialLinksIcons'
+import DataGapFilter from './components/DataGapFilter'
 import {
-  AppleMusicIcon,
-  BandcampIcon,
-  FacebookIcon,
-  InstagramIcon,
-  LinktreeIcon,
-  SpotifyIcon,
-  YouTubeIcon,
-} from '../components/ui/SocialIcons'
-
-function parseSocialLinks(band) {
-  let links = {}
-  try {
-    links = typeof band.social_links === 'string' ? JSON.parse(band.social_links) : band.social_links || {}
-  } catch (_e) {
-    /* ignore */
-  }
-  return links
-}
-
-function SocialLinksIcons({ band }) {
-  const links = parseSocialLinks(band)
-  const websiteHref = safeExternalHref(links.website)
-  const instagramHref = safeInstagramHref(links.instagram)
-  const bandcampHref = safeHttpsFallbackHref(links.bandcamp)
-  const facebookHref = safeExternalHref(links.facebook)
-  const youtubeHref = safeExternalHref(links.youtube)
-  const spotifyHref = safeExternalHref(links.spotify)
-  const appleMusicHref = safeExternalHref(links.apple_music)
-  const linktreeHref = safeExternalHref(links.linktree)
-  const hasAnyLink = [
-    websiteHref,
-    instagramHref,
-    bandcampHref,
-    facebookHref,
-    youtubeHref,
-    spotifyHref,
-    appleMusicHref,
-    linktreeHref,
-  ].some(href => href !== '#')
-
-  if (!hasAnyLink) return <span className="text-white/30">-</span>
-
-  return (
-    <div className="flex gap-2 flex-wrap">
-      {websiteHref !== '#' && (
-        <a
-          href={websiteHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/70 hover:text-accent-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
-          title="Website"
-          aria-label={`Open website for ${band.name}`}
-        >
-          <Globe size={14} />
-        </a>
-      )}
-      {instagramHref !== '#' && (
-        <a
-          href={instagramHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/70 hover:text-pink-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-400"
-          title="Instagram"
-          aria-label={`Open Instagram for ${band.name}`}
-        >
-          <InstagramIcon size={14} />
-        </a>
-      )}
-      {bandcampHref !== '#' && (
-        <a
-          href={bandcampHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/70 hover:text-teal-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
-          title="Bandcamp"
-          aria-label={`Open Bandcamp for ${band.name}`}
-        >
-          <BandcampIcon size={14} />
-        </a>
-      )}
-      {facebookHref !== '#' && (
-        <a
-          href={facebookHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/70 hover:text-blue-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
-          title="Facebook"
-          aria-label={`Open Facebook for ${band.name}`}
-        >
-          <FacebookIcon size={14} />
-        </a>
-      )}
-      {youtubeHref !== '#' && (
-        <a
-          href={youtubeHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/70 hover:text-red-500 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
-          title="YouTube"
-          aria-label={`Open YouTube for ${band.name}`}
-        >
-          <YouTubeIcon size={14} />
-        </a>
-      )}
-      {spotifyHref !== '#' && (
-        <a
-          href={spotifyHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/70 hover:text-green-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-400"
-          title="Spotify"
-          aria-label={`Open Spotify for ${band.name}`}
-        >
-          <SpotifyIcon size={14} />
-        </a>
-      )}
-      {appleMusicHref !== '#' && (
-        <a
-          href={appleMusicHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/70 hover:text-rose-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
-          title="Apple Music"
-          aria-label={`Open Apple Music for ${band.name}`}
-        >
-          <AppleMusicIcon size={14} />
-        </a>
-      )}
-      {linktreeHref !== '#' && (
-        <a
-          href={linktreeHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/70 hover:text-lime-400 transition-colors focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-400"
-          title="Linktree"
-          aria-label={`Open Linktree for ${band.name}`}
-        >
-          <LinktreeIcon size={14} />
-        </a>
-      )}
-    </div>
-  )
-}
+  EMPTY_GAP_FILTER,
+  GAP_FIELDS,
+  NO_LINKS_KEY,
+  countGaps,
+  countLinks,
+  formatOrigin,
+  isGapFilterActive,
+  matchesGapFilter,
+} from './utils/bandFields'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -157,6 +23,16 @@ function SortIcon({ col, sortConfig }) {
       {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
     </span>
   )
+}
+
+// `<th>` is not natively interactive -- a keyboard user cannot activate an
+// onClick attached directly to it. Every sortable header instead puts the
+// handler on a real <button> inside the <th>, and the <th> carries aria-sort
+// reflecting the current state so assistive tech announces which column (and
+// direction) the table is sorted by.
+function ariaSortFor(sortConfig, key) {
+  if (sortConfig.key !== key) return 'none'
+  return sortConfig.direction === 'asc' ? 'ascending' : 'descending'
 }
 
 // The roster API now returns inactive/retired profiles alongside active ones
@@ -197,6 +73,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
   // profile is never hidden by default; the admin roster must be able to see
   // and edit everything it manages.
   const [statusFilter, setStatusFilter] = useState('all')
+  const [gapFilter, setGapFilter] = useState(EMPTY_GAP_FILTER)
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -267,12 +144,12 @@ export default function RosterTab({ showToast, readOnly = false }) {
   }, [loadBands])
 
   // Sorting
-  const formatOrigin = band => {
-    if (!band) return ''
-    return [band.origin_city, band.origin_region].filter(Boolean).join(', ') || band.origin || ''
-  }
-
-  const filteredBands = useMemo(() => {
+  // Split in two on purpose. The popover's counts are computed from
+  // `searchAndStatusFiltered`, i.e. everything EXCEPT the gap filter itself --
+  // otherwise checking "Instagram" would collapse every other count to reflect
+  // that selection and the panel would stop being a gap dashboard the moment
+  // you used it.
+  const searchAndStatusFiltered = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
     return bands.filter(band => {
       if (statusFilter === 'active' && isInactive(band)) return false
@@ -287,6 +164,13 @@ export default function RosterTab({ showToast, readOnly = false }) {
       )
     })
   }, [bands, searchTerm, statusFilter])
+
+  const gapCounts = useMemo(() => countGaps(searchAndStatusFiltered), [searchAndStatusFiltered])
+
+  const filteredBands = useMemo(
+    () => searchAndStatusFiltered.filter(band => matchesGapFilter(band, gapFilter)),
+    [searchAndStatusFiltered, gapFilter]
+  )
 
   const sortedBands = useMemo(() => {
     if (!sortConfig.key) return filteredBands
@@ -305,6 +189,11 @@ export default function RosterTab({ showToast, readOnly = false }) {
       if (sortConfig.key === 'follower_count') {
         const aVal = a.follower_count ?? 0
         const bVal = b.follower_count ?? 0
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
+      }
+      if (sortConfig.key === 'link_count') {
+        const aVal = countLinks(a)
+        const bVal = countLinks(b)
         return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
       }
       if (sortConfig.key === 'name') {
@@ -575,6 +464,25 @@ export default function RosterTab({ showToast, readOnly = false }) {
     }
   }
 
+  const gapChips = [
+    ...gapFilter.keys.map(key => ({
+      key,
+      label: `${gapFilter.mode === 'missing' ? 'Missing' : 'Has'}: ${
+        GAP_FIELDS.find(field => field.key === key)?.label ?? key
+      }`,
+      remove: () => setGapFilter(prev => ({ ...prev, keys: prev.keys.filter(k => k !== key) })),
+    })),
+    ...(gapFilter.noLinks
+      ? [
+          {
+            key: NO_LINKS_KEY,
+            label: 'No links at all',
+            remove: () => setGapFilter(prev => ({ ...prev, noLinks: false })),
+          },
+        ]
+      : []),
+  ]
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -600,6 +508,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
+          <DataGapFilter value={gapFilter} counts={gapCounts} onChange={setGapFilter} />
           {!showAddForm && !editingId && !readOnly && (
             <button
               onClick={() => setShowAddForm(true)}
@@ -610,6 +519,26 @@ export default function RosterTab({ showToast, readOnly = false }) {
           )}
         </div>
       </div>
+
+      {isGapFilterActive(gapFilter) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {gapChips.map(chip => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={chip.remove}
+              className="inline-flex items-center gap-2 rounded-full bg-accent-500/15 px-3 py-1 text-sm text-accent-300 hover:bg-accent-500/25"
+              aria-label={`Remove filter: ${chip.label}`}
+            >
+              <span>{chip.label}</span>
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+          <span className="text-sm text-white/50">
+            {filteredBands.length} {filteredBands.length === 1 ? 'artist' : 'artists'}
+          </span>
+        </div>
+      )}
 
       {/* Bulk Actions */}
       {!readOnly && selectedIds.size > 0 && (
@@ -682,41 +611,88 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       </th>
                     )}
                     <th
-                      onClick={() => handleSort('name')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'name')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Name <SortIcon col="name" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('name')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Name <SortIcon col="name" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('origin')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'origin')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Origin <SortIcon col="origin" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('origin')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Origin <SortIcon col="origin" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('genre')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'genre')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Genre <SortIcon col="genre" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('genre')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Genre <SortIcon col="genre" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('is_active')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'is_active')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Status <SortIcon col="is_active" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('is_active')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Status <SortIcon col="is_active" sortConfig={sortConfig} />
+                      </button>
                     </th>
-                    <th className="px-4 py-3 text-left text-white font-semibold">Links</th>
                     <th
-                      onClick={() => handleSort('contact_email')}
-                      className="px-4 py-3 text-left text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'link_count')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('link_count')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Links <SortIcon col="link_count" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     <th
-                      onClick={() => handleSort('follower_count')}
-                      className="px-4 py-3 text-right text-white font-semibold cursor-pointer hover:text-accent-400"
+                      aria-sort={ariaSortFor(sortConfig, 'contact_email')}
+                      className="px-4 py-3 text-left text-white font-semibold"
                     >
-                      Followers <SortIcon col="follower_count" sortConfig={sortConfig} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort('contact_email')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
+                      </button>
+                    </th>
+                    <th
+                      aria-sort={ariaSortFor(sortConfig, 'follower_count')}
+                      className="px-4 py-3 text-right text-white font-semibold"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSort('follower_count')}
+                        className="cursor-pointer hover:text-accent-400"
+                      >
+                        Followers <SortIcon col="follower_count" sortConfig={sortConfig} />
+                      </button>
                     </th>
                     {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
                   </tr>

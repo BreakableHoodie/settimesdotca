@@ -25,8 +25,11 @@ export const LINK_BASE_CLASS =
 //
 // `accent` MUST stay a complete literal string. Tailwind v4 scans source text
 // for whole class names and never evaluates template expressions, so building
-// these as `hover:text-${colour}` would generate no CSS at all and silently
-// drop every hover and focus style in the column.
+// these via a template literal with an interpolated colour segment would
+// generate no CSS at all and silently drop every hover and focus style in
+// the column. (A source-text scan in bandFields.test.js enforces this --
+// deliberately not spelling out the forbidden template syntax verbatim here,
+// so this very sentence can't trip that scan.)
 //
 // `ariaNoun` is separate from `label` for one reason: "website" is a common
 // noun and reads correctly lowercase mid-sentence ("Open website for X"),
@@ -115,7 +118,11 @@ export const GAP_FIELDS = [...LINK_FIELDS, ...PROFILE_FIELDS]
 // "missing ALL eight links", which the ANY-semantics of `keys` cannot express.
 export const NO_LINKS_KEY = '__noLinks__'
 
-export const EMPTY_GAP_FILTER = { mode: 'missing', keys: [], noLinks: false }
+// Frozen: this object is handed directly into React state as the default
+// filter value, and is shared by every consumer that resets to "no filter".
+// Freezing prevents an accidental in-place mutation (e.g. `filter.keys.push(...)`)
+// from leaking across components that all point at the same reference.
+export const EMPTY_GAP_FILTER = Object.freeze({ mode: 'missing', keys: Object.freeze([]), noLinks: false })
 
 const LINK_FIELD_BY_KEY = new Map(LINK_FIELDS.map(field => [field.key, field]))
 
@@ -133,7 +140,14 @@ export function parseSocialLinks(band) {
 
 export function formatOrigin(band) {
   if (!band) return ''
-  return [band.origin_city, band.origin_region].filter(Boolean).join(', ') || band.origin || ''
+  // Trim every source so a whitespace-only value (e.g. origin_city: '   ')
+  // is treated as absent, consistent with the profile-field branch of
+  // hasField below (which trims genre/description the same way) rather than
+  // reading as present because the raw string was non-empty.
+  const city = String(band.origin_city ?? '').trim()
+  const region = String(band.origin_region ?? '').trim()
+  const legacy = String(band.origin ?? '').trim()
+  return [city, region].filter(Boolean).join(', ') || legacy
 }
 
 // Presence means "renders as a real link", not "non-empty in the DB": a value
@@ -158,11 +172,16 @@ export function hasAnyLink(band) {
 }
 
 // Returns MISSING counts, which is what the filter popover displays.
+// `bands` is guarded against non-array input (e.g. a still-loading `undefined`
+// from the roster fetch) the same way `keys` is guarded below: destructuring
+// defaults only fire on `undefined`, and a bare `for...of` over `null` or a
+// non-iterable throws instead of returning zero counts.
 export function countGaps(bands) {
   const counts = { [NO_LINKS_KEY]: 0 }
   for (const field of GAP_FIELDS) counts[field.key] = 0
 
-  for (const band of bands) {
+  const bandList = Array.isArray(bands) ? bands : []
+  for (const band of bandList) {
     for (const field of GAP_FIELDS) {
       if (!hasField(band, field.key)) counts[field.key] += 1
     }
@@ -174,13 +193,18 @@ export function countGaps(bands) {
 // Checked fields combine as ANY (a union worklist: one pass fills them all),
 // with the noLinks preset ANDed on top.
 export function matchesGapFilter(band, gapFilter) {
-  const { mode = 'missing', keys = [], noLinks = false } = gapFilter || {}
+  const { mode = 'missing', keys, noLinks = false } = gapFilter || {}
+  // Destructuring defaults only fire on `undefined`, so a caller passing
+  // `keys: null` (or any non-array) would otherwise throw on `.length`/`.some`
+  // below instead of degrading to "no keys selected".
+  const keyList = Array.isArray(keys) ? keys : []
   if (noLinks && hasAnyLink(band)) return false
-  if (keys.length === 0) return true
-  return keys.some(key => (mode === 'missing' ? !hasField(band, key) : hasField(band, key)))
+  if (keyList.length === 0) return true
+  return keyList.some(key => (mode === 'missing' ? !hasField(band, key) : hasField(band, key)))
 }
 
 export function isGapFilterActive(gapFilter) {
-  const { keys = [], noLinks = false } = gapFilter || {}
-  return keys.length > 0 || noLinks
+  const { keys, noLinks = false } = gapFilter || {}
+  const keyList = Array.isArray(keys) ? keys : []
+  return keyList.length > 0 || noLinks
 }

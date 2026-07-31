@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   GAP_FIELDS,
@@ -111,6 +114,11 @@ describe('formatOrigin', () => {
   it('returns an empty string for a missing band', () => {
     expect(formatOrigin(undefined)).toBe('')
   })
+
+  it('treats a whitespace-only city/region as absent, consistent with the genre/description trim', () => {
+    expect(formatOrigin({ origin_city: '   ', origin_region: null })).toBe('')
+    expect(formatOrigin({ origin_city: '   ', origin_region: null, origin: '  Kitchener, ON  ' })).toBe('Kitchener, ON')
+  })
 })
 
 describe('hasAnyLink / countLinks', () => {
@@ -164,8 +172,30 @@ describe('matchesGapFilter', () => {
     expect(matchesGapFilter(band({}), filter)).toBe(true)
   })
 
+  it('the "no links at all" preset alone (no keys checked) matches a bandless band and rejects one with a link', () => {
+    // This is the headline preset -- the single most-used filter in the
+    // feature -- exercised with an EMPTY keys array, which is the shape the
+    // UI actually sends when only the "No links at all" checkbox is on. Every
+    // other noLinks test in this file also sets `keys: ['instagram']`, which
+    // means the `keys.length === 0` early return was never reached with
+    // noLinks true. Hoisting the early return above the noLinks guard would
+    // make this preset silently match the entire roster with every other
+    // test in the file still green.
+    const filter = { mode: 'missing', keys: [], noLinks: true }
+    expect(matchesGapFilter(band({}), filter)).toBe(true)
+    expect(matchesGapFilter(band({ instagram: '@testband' }), filter)).toBe(false)
+  })
+
   it('tolerates an undefined filter', () => {
     expect(matchesGapFilter(withIg, undefined)).toBe(true)
+  })
+
+  it('tolerates a non-array keys value instead of throwing', () => {
+    // Destructuring defaults only fire on `undefined`; `keys: null` (or any
+    // other non-array) must degrade to "no keys selected" rather than throw
+    // on `.length`/`.some`.
+    expect(matchesGapFilter(withIg, { mode: 'missing', keys: null, noLinks: false })).toBe(true)
+    expect(matchesGapFilter(withIg, { mode: 'missing', keys: 'instagram', noLinks: false })).toBe(true)
   })
 })
 
@@ -178,6 +208,12 @@ describe('countGaps', () => {
 
   it('returns a zero for every known field even on an empty roster', () => {
     const counts = countGaps([])
+    for (const field of GAP_FIELDS) expect(counts[field.key]).toBe(0)
+    expect(counts[NO_LINKS_KEY]).toBe(0)
+  })
+
+  it('tolerates a non-array argument instead of throwing on for...of', () => {
+    const counts = countGaps(undefined)
     for (const field of GAP_FIELDS) expect(counts[field.key]).toBe(0)
     expect(counts[NO_LINKS_KEY]).toBe(0)
   })
@@ -194,6 +230,11 @@ describe('isGapFilterActive', () => {
 
   it('is true when only the preset is on', () => {
     expect(isGapFilterActive({ mode: 'missing', keys: [], noLinks: true })).toBe(true)
+  })
+
+  it('tolerates a non-array keys value instead of throwing', () => {
+    expect(isGapFilterActive({ mode: 'missing', keys: null, noLinks: false })).toBe(false)
+    expect(isGapFilterActive({ mode: 'missing', keys: null, noLinks: true })).toBe(true)
   })
 })
 
@@ -216,7 +257,26 @@ describe('registry shape', () => {
       expect(typeof field.resolveHref).toBe('function')
       expect(field.Icon).toBeTruthy()
       expect(field.accent).toMatch(/^hover:text-\S+ focus-visible:outline-\S+$/)
-      expect(field.accent).not.toContain('${')
     }
+  })
+
+  it('never builds an `accent` class via template-literal interpolation', () => {
+    // A runtime check on `field.accent` (e.g. `not.toContain('${')`) cannot
+    // catch this: template literals are evaluated at module load, long
+    // before the test observes the resulting string, so
+    // `` `hover:text-${colour}-400 focus-visible:outline-${colour}-400` ``
+    // would still pass a value-level assertion while generating zero CSS —
+    // Tailwind v4 scans source TEXT for complete class names and never
+    // evaluates template expressions. The only way to enforce this is to
+    // scan the source file itself for the interpolation syntax.
+    // Resolved via node:path rather than `new URL(relative, import.meta.url)`:
+    // jsdom's test environment overrides the global `URL` with its own WHATWG
+    // implementation, which `readFileSync`/`fileURLToPath` reject.
+    const currentFile = fileURLToPath(import.meta.url)
+    const bandFieldsPath = path.join(path.dirname(currentFile), '../bandFields.js')
+    const source = readFileSync(bandFieldsPath, 'utf8')
+
+    expect(source).not.toContain('`hover:text-${')
+    expect(source).not.toContain('`focus-visible:outline-${')
   })
 })

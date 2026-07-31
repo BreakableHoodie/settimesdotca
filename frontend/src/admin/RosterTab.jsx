@@ -490,7 +490,10 @@ export default function RosterTab({ showToast, readOnly = false }) {
   }
 
   const handleSelectAll = checked => {
-    setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
+    const visibleIds = new Set(filteredBands.map(b => b.id))
+    setSelectedIds(prev =>
+      checked ? new Set([...prev, ...visibleIds]) : new Set([...prev].filter(id => !visibleIds.has(id)))
+    )
   }
 
   const handleBulkSubmit = async () => {
@@ -502,7 +505,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
         const res = await bandsApi.bulkDelete(Array.from(effectiveSelectedIds))
         if (res.success) {
           showToast(`Deleted ${effectiveSelectedIds.size} artists`, 'success')
-          setSelectedIds(new Set())
+          setSelectedIds(prev => new Set([...prev].filter(id => !effectiveSelectedIds.has(id))))
           loadBands()
         } else {
           showToast(res.error, 'error')
@@ -611,7 +614,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
       )}
 
       {/* Bulk Actions */}
-      {!readOnly && selectedIds.size > 0 && (
+      {!readOnly && effectiveSelectedIds.size > 0 && (
         <div className="bg-bg-navy/80 p-4 rounded border border-accent-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky top-20 z-10 backdrop-blur-md">
           <span className="text-white font-medium">
             {effectiveSelectedIds.size} selected

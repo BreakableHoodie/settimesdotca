@@ -125,7 +125,7 @@ export default function AdminLogin({ onLoginSuccess }) {
 
   return (
     <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-4">
-      <div className="bg-gradient-card backdrop-blur-xs p-8 rounded-xl shadow-xl max-w-md w-full border border-white/10">
+      <div className="bg-gradient-card backdrop-blur-xs p-8 rounded-lg shadow-xl max-w-md w-full border border-white/10">
         <h1 className="text-2xl font-bold font-display mb-6 text-center">
           <span className="text-accent-500">Set</span>
           <span className="text-white">Times</span>

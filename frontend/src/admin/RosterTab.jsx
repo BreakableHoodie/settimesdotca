@@ -1007,7 +1007,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
 
         <button
           onClick={() => setMobileFilterSheetOpen(true)}
-          className="md:hidden w-full px-4 py-3 flex items-center justify-center gap-2 text-white bg-bg-navy hover:bg-bg-purple transition-colors min-h-[44px] font-medium border-t border-accent-500/10"
+          className="md:hidden w-full px-4 py-3 flex items-center justify-center gap-2 text-white bg-bg-navy hover:bg-bg-purple transition-colors min-h-[44px] font-medium border-t border-accent-500/10 rounded"
         >
           Filters
           {activeFilterCount(columnFilters) > 0 && (

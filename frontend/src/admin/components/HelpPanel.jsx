@@ -53,7 +53,7 @@ export default function HelpPanel({ topic = 'events', isOpen, onClose }) {
           ))}
         </ul>
 
-        <div className="bg-white/5 rounded-xl border border-white/10 p-3 text-sm text-white/70">
+        <div className="bg-white/5 rounded-lg border border-white/10 p-3 text-sm text-white/70">
           Need more help? Review `/docs/admin/README.md` or contact a site administrator.
         </div>
 

@@ -265,7 +265,12 @@ export default function EventTimeline() {
       <div className="mb-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-text-primary mb-2">Events</h1>
+            {/* Secondary heading for the events list. EventsPage.jsx already owns
+                the page's primary <h1> (SetTimes brand), so this demotes to <h2> to
+                keep one h1 per document and avoid confusing screen-reader users
+                navigating by heading level. Visual size is unchanged. See App.jsx
+                line 731-734 for the same pattern on the event schedule page. */}
+            <h2 className="text-4xl font-bold text-text-primary mb-2">Events</h2>
             <p className="text-text-secondary">Discover upcoming band crawls and music events</p>
           </div>
 

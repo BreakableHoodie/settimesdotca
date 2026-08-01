@@ -156,6 +156,25 @@ function LiveContextBar({
   // of this state; only the venue/time selects are gated by it.
   const [isFiltersOpen, setIsFiltersOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
   const [showGhost, setShowGhost] = useState(false)
+  const [lifecycleAnnouncement, setLifecycleAnnouncement] = useState('')
+  const prevLifecycleLabelRef = useRef(lifecycle.label)
+
+  // Announce lifecycle transitions (Upcoming → Live Now → Ended) to screen
+  // readers. On transition, set the announcement text in a hidden live region.
+  // Do not announce on every render — only when the label actually changes.
+  useEffect(() => {
+    if (lifecycle.label !== prevLifecycleLabelRef.current) {
+      prevLifecycleLabelRef.current = lifecycle.label
+      if (lifecycle.label === 'Live Now' || lifecycle.label === 'Happening Now') {
+        setLifecycleAnnouncement(`${eventData?.name || 'Event'} is now live`)
+      } else if (lifecycle.label === 'Ended') {
+        setLifecycleAnnouncement(`${eventData?.name || 'Event'} has ended`)
+      }
+      // Clear the announcement after a short delay so it's not re-announced
+      const timer = setTimeout(() => setLifecycleAnnouncement(''), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [lifecycle.label, eventData?.name])
 
   // Collapses the mobile-only identity block (status badge, clock, title,
   // poster, stats line) once the fan scrolls past it — #665. The Tabs and
@@ -249,6 +268,9 @@ function LiveContextBar({
 
   return (
     <section className="sticky top-[57px] z-40 border-b border-border bg-bg-navy/92 backdrop-blur-xs">
+      <div role="status" aria-live="polite" className="sr-only">
+        {lifecycleAnnouncement}
+      </div>
       <div className="container mx-auto px-4 max-w-(--breakpoint-2xl) py-2.5 sm:py-3">
         <div className="sm:hidden">
           {/* Identity block: status badge, clock, poster, title, stats.

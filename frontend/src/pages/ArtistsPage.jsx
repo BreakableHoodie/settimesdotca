@@ -97,7 +97,7 @@ function ArtistCard({ artist }) {
               aria-label={`${artist.name} on ${label}`}
               title={label}
               onClick={() => trackSocialClick(artist.id, key)}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
             >
               <Icon size={16} />
             </a>

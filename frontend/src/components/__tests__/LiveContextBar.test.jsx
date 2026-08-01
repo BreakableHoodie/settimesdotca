@@ -484,6 +484,93 @@ describe('LiveContextBar', () => {
       vi.useRealTimers()
     })
 
+    // MINOR finding on #720: a Live Tonight → Upcoming transition matches
+    // neither `if` branch, so the old code never called setLifecycleAnnouncement
+    // at all — the stale "is now live" text from the PRIOR transition was left
+    // sitting in the live region (a fresh 5s timer did eventually clear it, but
+    // only by accident, and a screen reader polling in that window would read
+    // status that no longer matches reality). The fix clears the region
+    // immediately on any transition that isn't itself announceable.
+    it('clears a stale "is now live" announcement when transitioning back from "Live Tonight" to "Upcoming" (#720)', () => {
+      vi.useFakeTimers()
+
+      const bandsWithTimes = [
+        {
+          id: '1',
+          venue: 'Stage A',
+          startMs: new Date('2026-05-06T19:00:00').getTime(),
+          endMs: new Date('2026-05-06T19:45:00').getTime(),
+        },
+        {
+          id: '2',
+          venue: 'Stage B',
+          startMs: new Date('2026-05-06T20:00:00').getTime(),
+          endMs: new Date('2026-05-06T20:45:00').getTime(),
+        },
+      ]
+
+      const { rerender } = render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T18:30:00')} // Upcoming, before first set
+          bands={bandsWithTimes}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      const liveRegion = screen.getByRole('status')
+      expect(liveRegion.textContent).toBe('')
+
+      // Upcoming -> Live Tonight: announces "is now live".
+      act(() => {
+        rerender(
+          <LiveContextBar
+            eventData={eventData}
+            currentTime={new Date('2026-05-06T19:15:00')} // Live Tonight
+            bands={bandsWithTimes}
+            selectedCount={0}
+            view="all"
+            onViewChange={vi.fn()}
+            venueFilter={null}
+            onVenueFilterChange={vi.fn()}
+            timeFilter="all"
+            onTimeFilterChange={vi.fn()}
+          />
+        )
+      })
+      expect(liveRegion.textContent).toContain('is now live')
+
+      // Live Tonight -> Upcoming: neither announceable branch matches, but the
+      // stale "is now live" text must not be left behind — assert this BEFORE
+      // advancing any timers, since the old bug only cleared it "by accident"
+      // after a further 5s delay.
+      act(() => {
+        rerender(
+          <LiveContextBar
+            eventData={eventData}
+            currentTime={new Date('2026-05-06T18:45:00')} // back to Upcoming
+            bands={bandsWithTimes}
+            selectedCount={0}
+            view="all"
+            onViewChange={vi.fn()}
+            venueFilter={null}
+            onVenueFilterChange={vi.fn()}
+            timeFilter="all"
+            onTimeFilterChange={vi.fn()}
+          />
+        )
+      })
+      expect(liveRegion.textContent).toBe('')
+
+      vi.useRealTimers()
+    })
+
     it('does not announce when transitioning within or back to "Upcoming"', () => {
       vi.useFakeTimers()
 

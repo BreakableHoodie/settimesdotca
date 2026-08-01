@@ -39,6 +39,13 @@
   --color-warning-500: #f59e0b;
   --color-warning-600: #d97706;
 
+  /* .soon-pill's text sits on a `color-mix(… warning-400 15%, transparent)`
+     tint, not a raw paper background — warning-400 alone only clears 4.5:1
+     against the latter. Root/dark-theme default equals warning-400 itself
+     (already sufficient there); daybreak/silver-lining override below. See
+     the `.soon-pill` rule for the composited-contrast math (#720). */
+  --color-warning-pill-text: #fbbf24;
+
   --color-error-400: #f87171;
   --color-error-500: #ef4444;
   --color-error-600: #dc2626;
@@ -295,6 +302,10 @@
   --color-warning-400: #b45309;
   --color-warning-500: #d97706;
   --color-warning-600: #92400e;
+  /* Overrides the @theme default (see that declaration for why): warning-400
+     itself only clears ~3.9:1 against the composited .soon-pill background on
+     this theme, so the pill text uses the darker warning-600 value instead. */
+  --color-warning-pill-text: #92400e;
   --color-error-400: #b91c1c;
   --color-error-500: #dc2626;
   --color-error-600: #991b1b;
@@ -372,6 +383,10 @@
   --color-warning-400: #b45309;
   --color-warning-500: #d97706;
   --color-warning-600: #92400e;
+  /* Overrides the @theme default (see that declaration for why): warning-400
+     itself only clears ~3.9:1 against the composited .soon-pill background on
+     this theme, so the pill text uses the darker warning-600 value instead. */
+  --color-warning-pill-text: #92400e;
   --color-error-400: #b91c1c;
   --color-error-500: #dc2626;
   --color-error-600: #991b1b;
@@ -586,10 +601,21 @@ body {
   /* Tokenized (was a hardcoded #fbbf24/rgba(251,191,36,…) triplet that
      computed ~1.5:1 on light themes, illegible on bg-gradient-card). warning-400
      is tuned to clear 4.5:1 on paper backgrounds — see index.css's own comment
-     near the daybreak status-ramp block (#617). */
+     near the daybreak status-ramp block (#617). BUT the text below doesn't sit
+     on a paper background — it sits on THIS rule's own 15%-warning-400 tint,
+     which pulls the effective background toward warning-400's hue and erodes
+     that contrast back down to ~3.9:1 on daybreak/silver-lining (still fails
+     AA). color-mix(in srgb, C P%, transparent) over an opaque backdrop B
+     alpha-blends to `result = (P/100)*C + (1 - P/100)*B` per channel, so the
+     text token has to be measured against that blended result, not against B
+     directly — see themeTokens.test.js's composited-background assertion.
+     --color-warning-pill-text carries the fix: it equals warning-400 on the
+     dark themes (already ~8:1 there, untouched) and the darker warning-600
+     value on daybreak/silver-lining (~5.5:1 against the composited tint,
+     #720). */
   background: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-warning-400) 45%, transparent);
-  color: var(--color-warning-400);
+  color: var(--color-warning-pill-text);
   border-radius: 9999px;
   padding: 2px 10px;
   font-size: 0.7rem;

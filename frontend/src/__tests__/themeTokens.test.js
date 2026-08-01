@@ -121,6 +121,49 @@ function expectMinContrast(theme, tokenLabel, fgHex, bgHex) {
   ).toBeGreaterThanOrEqual(MIN_CONTRAST)
 }
 
+// `color-mix(in srgb, C P%, transparent)` painted over an opaque backdrop B
+// alpha-blends to `result = (P/100)*C + (1 - P/100)*B` per channel — this is
+// what a translucent-tint background (e.g. .soon-pill's) actually renders
+// as. Text-vs-raw-token contrast checks (like the ones above) are blind to
+// this: they measure against an opaque background that never appears
+// on-screen for a tinted element.
+function blend(fgHex, bgHex, alphaPercent) {
+  const [fr, fg, fb] = hexToRgb(fgHex)
+  const [br, bg, bb] = hexToRgb(bgHex)
+  const alpha = alphaPercent / 100
+  const mixChannel = (f, b) => Math.round(alpha * f + (1 - alpha) * b)
+  return `#${[mixChannel(fr, br), mixChannel(fg, bg), mixChannel(fb, bb)]
+    .map(c => c.toString(16).padStart(2, '0'))
+    .join('')}`
+}
+
+// Pulls the `.soon-pill` rule's actual `background: color-mix(...)` and
+// `color: var(...)` declarations out of index.css, instead of hardcoding a
+// copy of the tint token/percent/text-token here — so this guard tracks the
+// real CSS and can't silently drift from it.
+function resolvePillTintSpec() {
+  const soonPillBlock = extractBlock(css, /\.soon-pill\s*\{/)
+  if (!soonPillBlock) {
+    throw new Error("themeTokens.test.js could not locate the '.soon-pill' rule in index.css")
+  }
+  const backgroundRaw = getRawVar(soonPillBlock, 'background')
+  const colorRaw = getRawVar(soonPillBlock, 'color')
+  if (!backgroundRaw || !colorRaw) {
+    throw new Error("themeTokens.test.js: '.soon-pill' is missing a background or color declaration")
+  }
+  const tintMatch = /color-mix\(in srgb,\s*var\((--[\w-]+)\)\s+(\d+(?:\.\d+)?)%,\s*transparent\)/.exec(backgroundRaw)
+  if (!tintMatch) {
+    throw new Error(`themeTokens.test.js: could not parse '.soon-pill' background color-mix(): ${backgroundRaw}`)
+  }
+  const textMatch = /var\((--[\w-]+)\)/.exec(colorRaw)
+  if (!textMatch) {
+    throw new Error(`themeTokens.test.js: could not parse '.soon-pill' color token: ${colorRaw}`)
+  }
+  return { tintToken: tintMatch[1], tintPercent: Number(tintMatch[2]), textToken: textMatch[1] }
+}
+
+const pillSpec = resolvePillTintSpec()
+
 describe('theme token contrast (WCAG AA, 4.5:1)', () => {
   describe.each(THEMES)('%s', theme => {
     const bgNavy = resolveHex('--color-bg-navy', theme)
@@ -140,10 +183,41 @@ describe('theme token contrast (WCAG AA, 4.5:1)', () => {
       expectMinContrast(theme, '--background-image-gradient-accent end stop', gradientEnd, bgNavy)
     })
 
-    // warning-400 backs the "Starts in Xm" .soon-pill text and other
-    // warning-toned copy directly on paper/card backgrounds.
+    // Bonus guard for the raw design-system value itself (mirrors accent-500
+    // below) — not a claim that any consumer renders warning-400 text on a
+    // bare paper background. In practice every current UI consumer (e.g.
+    // .soon-pill) pairs warning-400 with a same-hue translucent tint, which
+    // is exactly what the composited assertion right below this one covers.
     it('warning-400 clears 4.5:1 against bg-navy', () => {
       expectMinContrast(theme, '--color-warning-400', warning400, bgNavy)
+    })
+
+    // Root-cause regression guard for the MAJOR finding on #720: the raw
+    // warning-400-vs-bg-navy check above passes (~4.77:1) but that pairing
+    // never renders — .soon-pill's text sits on its OWN
+    // `color-mix(in srgb, warning-400 15%, transparent)` tint, which
+    // (per `blend()` above) pulls the effective background toward
+    // warning-400's hue and erodes the real on-screen contrast to ~3.9:1 on
+    // daybreak/silver-lining, failing AA. This composites the tint the same
+    // way the browser does and checks the pill's actual text token
+    // (--color-warning-pill-text) against that composited result. bg-navy is
+    // used as the compositing backdrop (rather than parsing BandCard's
+    // gradient-card, which this file doesn't otherwise resolve) because
+    // gradient-card's stops are near-identical to bg-navy/bg-purple on every
+    // theme, and bg-navy is what every other assertion in this file already
+    // anchors to.
+    it('soon-pill text clears 4.5:1 against its composited (color-mix) pill background', () => {
+      const tintColor = resolveHex(pillSpec.tintToken, theme)
+      const textColor = resolveHex(pillSpec.textToken, theme)
+      const compositedPillBg = blend(tintColor, bgNavy, pillSpec.tintPercent)
+      const ratio = contrastRatio(textColor, compositedPillBg)
+      expect(
+        ratio,
+        `[${theme}] .soon-pill text (${pillSpec.textToken}=${textColor}) against its composited pill ` +
+          `background (${pillSpec.tintPercent}% ${pillSpec.tintToken}=${tintColor} color-mixed over ` +
+          `--color-bg-navy=${bgNavy} => ${compositedPillBg}) computes to ${ratio.toFixed(2)}:1, below the ` +
+          `${MIN_CONTRAST}:1 WCAG AA floor`
+      ).toBeGreaterThanOrEqual(MIN_CONTRAST)
     })
 
     // Bonus guard: accent-500 is the token gradient-accent's stops are meant

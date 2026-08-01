@@ -22,7 +22,7 @@ export default function OfflineIndicator() {
 
   return (
     <div
-      className="fixed left-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-warning-500 px-4 py-3 text-bg-navy shadow-lg"
+      className="fixed left-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-warning-500/50 bg-warning-500/20 px-4 py-3 text-text-primary shadow-lg"
       style={{ bottom: PRIVACY_BANNER_OFFSET }}
     >
       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">

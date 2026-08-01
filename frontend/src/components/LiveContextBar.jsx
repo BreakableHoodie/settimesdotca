@@ -156,6 +156,38 @@ function LiveContextBar({
   // of this state; only the venue/time selects are gated by it.
   const [isFiltersOpen, setIsFiltersOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
   const [showGhost, setShowGhost] = useState(false)
+  const [lifecycleAnnouncement, setLifecycleAnnouncement] = useState('')
+  const prevLifecycleLabelRef = useRef(lifecycle.label)
+
+  // Announce lifecycle transitions (Upcoming → Live Tonight → Recap → Archive)
+  // to screen readers. On transition, set the announcement text in a hidden
+  // live region. Do not announce on every render — only when the label actually
+  // changes. Announce only on meaningful transitions (to Live Tonight / Recap),
+  // not on initial render (Upcoming) or cycle-back transitions. A transition
+  // into a non-announced label (e.g. Live Tonight → Upcoming) must still clear
+  // whatever announcement is currently sitting in the live region — otherwise
+  // it's stale text that no longer matches reality, left behind by the
+  // previous transition's now-cleaned-up timer.
+  useEffect(() => {
+    if (lifecycle.label !== prevLifecycleLabelRef.current) {
+      prevLifecycleLabelRef.current = lifecycle.label
+      let announcement = ''
+      if (lifecycle.label === 'Live Tonight') {
+        announcement = `${eventData?.name || 'Event'} is now live`
+      } else if (lifecycle.label === 'Recap' || lifecycle.label === 'Archive') {
+        announcement = `${eventData?.name || 'Event'} has ended`
+      }
+      if (!announcement) {
+        setLifecycleAnnouncement('')
+        return
+      }
+      setLifecycleAnnouncement(announcement)
+      // Clear after 5s so assistive tech has time to poll and read it.
+      // Shorter delays risk the announcement never being announced at all.
+      const timer = setTimeout(() => setLifecycleAnnouncement(''), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [lifecycle.label, eventData?.name])
 
   // Collapses the mobile-only identity block (status badge, clock, title,
   // poster, stats line) once the fan scrolls past it — #665. The Tabs and
@@ -249,6 +281,9 @@ function LiveContextBar({
 
   return (
     <section className="sticky top-[57px] z-40 border-b border-border bg-bg-navy/92 backdrop-blur-xs">
+      <div role="status" aria-live="polite" className="sr-only">
+        {lifecycleAnnouncement}
+      </div>
       <div className="container mx-auto px-4 max-w-(--breakpoint-2xl) py-2.5 sm:py-3">
         <div className="sm:hidden">
           {/* Identity block: status badge, clock, poster, title, stats.

@@ -84,10 +84,11 @@ function ArtistCard({ artist }) {
       </Link>
       {/* Icons live on their own row below the text so a long band name never
           competes with them for width (the card grows vertically instead —
-          per Dre). pl-[68px] lines the icon glyphs up with the text column:
-          64px photo + 16px gap, minus the 12px inset of the 40px hit area. */}
+          per Dre). pl-[66px] lines the icon glyphs up with the text column:
+          64px photo + 16px gap, minus the 14px inset of the 44px hit area
+          (44px hit area - 16px glyph, halved). */}
       {socialLinks.length > 0 && (
-        <div className="mt-1 flex items-center gap-1 pl-[68px]">
+        <div className="mt-1 flex items-center gap-1 pl-[66px]">
           {socialLinks.map(({ key, label, Icon, href }) => (
             <a
               key={key}
@@ -97,7 +98,7 @@ function ArtistCard({ artist }) {
               aria-label={`${artist.name} on ${label}`}
               title={label}
               onClick={() => trackSocialClick(artist.id, key)}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
             >
               <Icon size={16} />
             </a>

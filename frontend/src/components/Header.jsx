@@ -22,7 +22,10 @@ function Header({ eventName, eventDate, selectedVenues }) {
     paddingTop: `${headerPadding}px`,
     paddingBottom: `${headerPadding}px`,
     boxShadow: `0 8px 24px rgba(4, 8, 16, ${0.14 * scrollProgress})`,
-    backgroundColor: `rgba(8, 16, 32, ${0.65 + 0.25 * scrollProgress})`,
+    // Driven from --color-bg-navy (was a hardcoded rgba(8,16,32,…) near-black
+    // triplet) so the sticky header composites correctly on light themes too —
+    // the hardcoded value put the title at ~2.6:1 on daybreak/silver-lining (#617).
+    backgroundColor: `color-mix(in srgb, var(--color-bg-navy) ${Math.round((0.65 + 0.25 * scrollProgress) * 100)}%, transparent)`,
   }
   const titleScale = 1 - 0.12 * scrollProgress
   const fadeProgress = Math.min(1, scrollProgress * 1.75)

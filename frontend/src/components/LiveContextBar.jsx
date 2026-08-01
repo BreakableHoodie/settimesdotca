@@ -159,19 +159,22 @@ function LiveContextBar({
   const [lifecycleAnnouncement, setLifecycleAnnouncement] = useState('')
   const prevLifecycleLabelRef = useRef(lifecycle.label)
 
-  // Announce lifecycle transitions (Upcoming → Live Now → Ended) to screen
-  // readers. On transition, set the announcement text in a hidden live region.
-  // Do not announce on every render — only when the label actually changes.
+  // Announce lifecycle transitions (Upcoming → Live Tonight → Recap → Archive)
+  // to screen readers. On transition, set the announcement text in a hidden
+  // live region. Do not announce on every render — only when the label actually
+  // changes. Announce only on meaningful transitions (to Live Tonight / Recap),
+  // not on initial render (Upcoming) or cycle-back transitions.
   useEffect(() => {
     if (lifecycle.label !== prevLifecycleLabelRef.current) {
       prevLifecycleLabelRef.current = lifecycle.label
-      if (lifecycle.label === 'Live Now' || lifecycle.label === 'Happening Now') {
+      if (lifecycle.label === 'Live Tonight') {
         setLifecycleAnnouncement(`${eventData?.name || 'Event'} is now live`)
-      } else if (lifecycle.label === 'Ended') {
+      } else if (lifecycle.label === 'Recap' || lifecycle.label === 'Archive') {
         setLifecycleAnnouncement(`${eventData?.name || 'Event'} has ended`)
       }
-      // Clear the announcement after a short delay so it's not re-announced
-      const timer = setTimeout(() => setLifecycleAnnouncement(''), 100)
+      // Clear after 5s to allow assistive tech time to read the announcement.
+      // Shorter delays risk the announcement never being polled by the browser.
+      const timer = setTimeout(() => setLifecycleAnnouncement(''), 5000)
       return () => clearTimeout(timer)
     }
   }, [lifecycle.label, eventData?.name])

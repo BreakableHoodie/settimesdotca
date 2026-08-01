@@ -392,7 +392,7 @@ describe('LiveContextBar', () => {
     })
   })
 
-  // Live region for lifecycle transitions (Upcoming → Live Now → Ended),
+  // Live region for lifecycle transitions (Upcoming → Live Tonight → Recap → Archive),
   // announced to screen readers when the event status changes.
   describe('lifecycle status announcements', () => {
     it('renders a hidden live region with role="status" aria-live="polite"', () => {
@@ -415,29 +415,30 @@ describe('LiveContextBar', () => {
       expect(liveRegion).toBeInTheDocument()
     })
 
-    it('announces on lifecycle transitions and clears after announcing', () => {
+    it('announces and clears when transitioning to "Live Tonight"', () => {
       vi.useFakeTimers()
+
+      // Bands with startMs/endMs set to put event in "Upcoming" state before 19:00
+      const bandsWithTimes = [
+        {
+          id: '1',
+          venue: 'Stage A',
+          startMs: new Date('2026-05-06T19:00:00').getTime(),
+          endMs: new Date('2026-05-06T19:45:00').getTime(),
+        },
+        {
+          id: '2',
+          venue: 'Stage B',
+          startMs: new Date('2026-05-06T20:00:00').getTime(),
+          endMs: new Date('2026-05-06T20:45:00').getTime(),
+        },
+      ]
+
       const { rerender } = render(
         <LiveContextBar
           eventData={eventData}
-          currentTime={new Date('2026-05-06T12:00:00')} // Before event
-          bands={bands}
-          selectedCount={0}
-          view="all"
-          onViewChange={vi.fn()}
-          venueFilter={null}
-          onVenueFilterChange={vi.fn()}
-          timeFilter="all"
-          onTimeFilterChange={vi.fn()}
-        />
-      )
-
-      // Lifecycle should be "Upcoming" initially. Now move time to event start.
-      rerender(
-        <LiveContextBar
-          eventData={eventData}
-          currentTime={new Date('2026-05-06T19:30:00')} // Event is live
-          bands={bands}
+          currentTime={new Date('2026-05-06T18:30:00')} // Before first set starts
+          bands={bandsWithTimes}
           selectedCount={0}
           view="all"
           onViewChange={vi.fn()}
@@ -449,13 +450,88 @@ describe('LiveContextBar', () => {
       )
 
       const liveRegion = screen.getByRole('status')
-      // Announcement is set before the 100ms timeout clears it
-      // (timing depends on the actual lifecycle transition, which may not
-      // occur with these times, so we verify the mechanism exists)
-      expect(liveRegion).toHaveAttribute('aria-live', 'polite')
+      // Initially Upcoming — no announcement
+      expect(liveRegion.textContent).toBe('')
 
-      // Advance past the 100ms timeout
-      vi.advanceTimersByTime(150)
+      // Move time past first set start — transitions to "Live Tonight"
+      act(() => {
+        rerender(
+          <LiveContextBar
+            eventData={eventData}
+            currentTime={new Date('2026-05-06T19:15:00')} // Event is live
+            bands={bandsWithTimes}
+            selectedCount={0}
+            view="all"
+            onViewChange={vi.fn()}
+            venueFilter={null}
+            onVenueFilterChange={vi.fn()}
+            timeFilter="all"
+            onTimeFilterChange={vi.fn()}
+          />
+        )
+      })
+
+      // Announcement is set before the 5s timeout clears it
+      expect(liveRegion.textContent).toContain('Long Weekend Band Crawl')
+      expect(liveRegion.textContent).toContain('is now live')
+
+      // Advance past the 5s (5000ms) timeout
+      act(() => {
+        vi.advanceTimersByTime(5100)
+      })
+      expect(liveRegion.textContent).toBe('')
+
+      vi.useRealTimers()
+    })
+
+    it('does not announce when transitioning within or back to "Upcoming"', () => {
+      vi.useFakeTimers()
+
+      const bandsWithTimes = [
+        {
+          id: '1',
+          venue: 'Stage A',
+          startMs: new Date('2026-05-06T19:00:00').getTime(),
+          endMs: new Date('2026-05-06T19:45:00').getTime(),
+        },
+      ]
+
+      const { rerender } = render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T18:00:00')} // Before event
+          bands={bandsWithTimes}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      const liveRegion = screen.getByRole('status')
+      expect(liveRegion.textContent).toBe('')
+
+      // Transition to a different "Upcoming" time — no announcement
+      act(() => {
+        rerender(
+          <LiveContextBar
+            eventData={eventData}
+            currentTime={new Date('2026-05-06T18:30:00')}
+            bands={bandsWithTimes}
+            selectedCount={0}
+            view="all"
+            onViewChange={vi.fn()}
+            venueFilter={null}
+            onVenueFilterChange={vi.fn()}
+            timeFilter="all"
+            onTimeFilterChange={vi.fn()}
+          />
+        )
+      })
+
       expect(liveRegion.textContent).toBe('')
 
       vi.useRealTimers()

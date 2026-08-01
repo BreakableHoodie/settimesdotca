@@ -30,7 +30,15 @@ function VenueStrip({ activeVenues = [] }) {
         aria-hidden="true"
       >
         {/* Track line — full span */}
-        <line x1={PAD_X} y1={CY} x2={W - PAD_X} y2={CY} stroke="rgba(249,115,22,0.25)" strokeWidth="2" />
+        <line
+          x1={PAD_X}
+          y1={CY}
+          x2={W - PAD_X}
+          y2={CY}
+          stroke="var(--color-accent-500)"
+          strokeOpacity="0.25"
+          strokeWidth="2"
+        />
 
         {/* Highlighted segments between consecutive active stops */}
         {KING_ST_VENUES.map((v, i) => {
@@ -44,7 +52,7 @@ function VenueStrip({ activeVenues = [] }) {
               y1={CY}
               x2={PAD_X + (i + 1) * STEP}
               y2={CY}
-              stroke="rgb(249,115,22)"
+              stroke="var(--color-accent-500)"
               strokeWidth="3"
               filter="url(#glow)"
             />
@@ -79,7 +87,8 @@ function VenueStrip({ activeVenues = [] }) {
                   cy={CY}
                   r={r + 5}
                   fill="none"
-                  stroke="rgba(249,115,22,0.35)"
+                  stroke="var(--color-accent-500)"
+                  strokeOpacity="0.35"
                   strokeWidth="2"
                   filter="url(#glow)"
                 />
@@ -89,8 +98,9 @@ function VenueStrip({ activeVenues = [] }) {
                 cx={cx}
                 cy={CY}
                 r={r}
-                fill={isActive ? 'rgb(249,115,22)' : 'rgb(30,38,60)'}
-                stroke={isActive ? 'rgb(249,115,22)' : 'rgba(249,115,22,0.4)'}
+                fill={isActive ? 'var(--color-accent-500)' : 'var(--color-bg-purple)'}
+                stroke="var(--color-accent-500)"
+                strokeOpacity={isActive ? 1 : 0.4}
                 strokeWidth="2"
                 filter={isActive ? 'url(#glow)' : undefined}
               />
@@ -102,7 +112,8 @@ function VenueStrip({ activeVenues = [] }) {
                 fontSize="9"
                 fontFamily="'SF Mono', monospace"
                 letterSpacing="0.03em"
-                fill={isActive ? 'rgba(249,115,22,0.9)' : 'rgba(255,255,255,0.35)'}
+                fill={isActive ? 'var(--color-accent-500)' : 'var(--color-text-tertiary)'}
+                fillOpacity={isActive ? 0.9 : 1}
               >
                 {label.toUpperCase()}
               </text>
@@ -117,7 +128,8 @@ function VenueStrip({ activeVenues = [] }) {
           fontSize="8"
           fontFamily="'SF Mono', monospace"
           letterSpacing="0.05em"
-          fill="rgba(255,255,255,0.2)"
+          fill="var(--color-text-tertiary)"
+          fillOpacity={0.4}
         >
           N
         </text>

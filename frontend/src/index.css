@@ -263,7 +263,10 @@
   --color-band-orange: #c2410c;
 
   --background-image-gradient-primary: linear-gradient(135deg, #fb7185 0%, #be123c 100%);
-  --background-image-gradient-accent: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+  /* Start stop matched to --color-accent-500's darkness (was #f97316, the
+     bright default-theme orange) so text-bg-navy consumers (e.g. BandCard's
+     selected/"Live Now" state) clear 4.5:1 instead of ~2.3-2.9:1 (#617). */
+  --background-image-gradient-accent: linear-gradient(135deg, #7c2d12 0%, #5f2410 100%);
   --background-image-gradient-dark: linear-gradient(180deg, #f3dfca 0%, #fff8f1 100%);
   --background-image-gradient-card: linear-gradient(
     145deg,
@@ -340,7 +343,9 @@
   --color-band-orange: #3b82f6;
 
   --background-image-gradient-primary: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  --background-image-gradient-accent: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  /* Start stop matched to --color-accent-500's darkness (was #60a5fa, a light
+     blue) so text-bg-navy consumers clear 4.5:1 instead of ~2.4-3.5:1 (#617). */
+  --background-image-gradient-accent: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
   --background-image-gradient-dark: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 100%);
   --background-image-gradient-card: linear-gradient(
     145deg,
@@ -578,9 +583,13 @@ body {
 
 .soon-pill {
   display: inline-block;
-  background: rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.45);
-  color: #fbbf24;
+  /* Tokenized (was a hardcoded #fbbf24/rgba(251,191,36,…) triplet that
+     computed ~1.5:1 on light themes, illegible on bg-gradient-card). warning-400
+     is tuned to clear 4.5:1 on paper backgrounds — see index.css's own comment
+     near the daybreak status-ramp block (#617). */
+  background: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning-400) 45%, transparent);
+  color: var(--color-warning-400);
   border-radius: 9999px;
   padding: 2px 10px;
   font-size: 0.7rem;

@@ -5,6 +5,33 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import LockInLineupPanel from '../components/LockInLineupPanel'
 import { Alert, BandCardSkeleton } from '../components/ui'
 import { fetchPublicJson } from '../utils/publicApi'
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
+
+/**
+ * Sort key in minutes, applying the festival-day convention: a set starting
+ * before AFTER_MIDNIGHT_THRESHOLD_HOUR belongs to the PREVIOUS evening and must
+ * sort after the whole evening lineup, not at the top of it. Without this,
+ * Cross Dog (00:15) and Dregs (01:10) lead the shared route.
+ * The threshold has one canonical home (utils/festivalDays.js) — never re-encode it.
+ */
+function sortKey(band) {
+  if (!band.start_time) return Number.MAX_SAFE_INTEGER
+  const [h, m] = band.start_time.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return Number.MAX_SAFE_INTEGER
+  const minutes = h * 60 + m
+  return h < AFTER_MIDNIGHT_THRESHOLD_HOUR ? minutes + 24 * 60 : minutes
+}
+
+function formatSetTime(band) {
+  if (!band.start_time) return null
+  const to12h = t => {
+    const [h, m] = t.split(':').map(Number)
+    const period = h >= 12 ? 'PM' : 'AM'
+    const hour = h % 12 === 0 ? 12 : h % 12
+    return `${hour}:${String(m).padStart(2, '0')} ${period}`
+  }
+  return band.end_time ? `${to12h(band.start_time)} – ${to12h(band.end_time)}` : to12h(band.start_time)
+}
 
 export default function SharePreviewPage() {
   const { slug } = useParams()
@@ -124,9 +151,19 @@ export default function SharePreviewPage() {
         </div>
 
         <ul aria-label="Bands in this route" className="mb-8 list-none space-y-3 p-0">
-          {shareData.band_names.map((name, i) => (
-            <li key={i} className="rounded-xl border border-border bg-surface px-4 py-3">
-              <p className="font-semibold text-text-primary">{name}</p>
+          {(shareData.bands?.length
+            ? [...shareData.bands].sort((a, b) => sortKey(a) - sortKey(b))
+            : shareData.band_names.map(name => ({ name }))
+          ).map((band, i) => (
+            <li key={band.performance_id ?? i} className="rounded-xl border border-border bg-surface px-4 py-3">
+              <p className="font-semibold text-text-primary">{band.name}</p>
+              {(formatSetTime(band) || band.venue) && (
+                <p className="mt-1 text-sm text-text-secondary">
+                  {formatSetTime(band)}
+                  {formatSetTime(band) && band.venue ? ' · ' : ''}
+                  {band.venue}
+                </p>
+              )}
             </li>
           ))}
         </ul>
@@ -134,7 +171,7 @@ export default function SharePreviewPage() {
         <button
           type="button"
           onClick={handleImport}
-          className="w-full min-h-[48px] rounded-xl bg-accent-500 px-6 py-3 font-semibold text-bg-navy transition-colors hover:brightness-110"
+          className="mb-6 w-full min-h-[48px] rounded-xl bg-accent-500 px-6 py-3 font-semibold text-bg-navy transition-colors hover:brightness-110"
         >
           Add {shareData.band_names.length} stop{shareData.band_names.length !== 1 ? 's' : ''} to my route for{' '}
           {shareData.event_name}

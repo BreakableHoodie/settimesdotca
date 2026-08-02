@@ -120,6 +120,15 @@ function BandCard({
             </h3>
           )}
         </div>
+        {band.genre && (
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full border leading-normal ${
+              onAmber ? 'bg-bg-navy/15 border-bg-navy/20 text-bg-navy' : 'bg-surface border-border text-text-secondary'
+            }`}
+          >
+            {band.genre}
+          </span>
+        )}
         {band.notes && (
           <p
             className={`text-xs italic text-center leading-snug line-clamp-2 ${onAmber ? 'text-bg-navy/80' : 'text-text-tertiary'}`}

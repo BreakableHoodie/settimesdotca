@@ -272,3 +272,35 @@ describe('MySchedule — #542 PR-3: day-tab filter', () => {
     expect(screen.getByRole('separator')).toHaveTextContent('Day 2')
   })
 })
+
+describe('MySchedule — genre chip on the route-list card', () => {
+  it('shows the genre chip for a band with a genre set', () => {
+    const bands = [{ ...makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30'), genre: 'Punk' }]
+    renderSchedule({ bands })
+
+    expect(screen.getByText('Punk')).toBeInTheDocument()
+  })
+
+  it('shows no genre chip when the band has no genre (fixture default)', () => {
+    const bands = [makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30')]
+    const { container } = renderSchedule({ bands })
+
+    // Every card in this route list renders with isSelected={true} (BandCard's
+    // amber state), so the toggle button is also `rounded-full` — scope to
+    // `span.rounded-full` so only a genre chip (not the button) would match.
+    expect(container.querySelector('span.rounded-full')).not.toBeInTheDocument()
+  })
+
+  // Route-list cards always render BandCard with isSelected={true} (every
+  // band shown is, by definition, in the fan's route) — pinning the
+  // amber-safe pairing here, not just in BandCard's own isolated tests,
+  // guards the actual composed usage against the #720 bug class.
+  it('renders the chip with the amber-safe (not normal-card) pairing, since route cards are always selected', () => {
+    const bands = [{ ...makeBand(1, 'Band Alpha', 'Stage A', '20:00', '20:30'), genre: 'Punk' }]
+    renderSchedule({ bands })
+
+    const chip = screen.getByText('Punk')
+    expect(chip.className).toMatch(/bg-bg-navy\/15/)
+    expect(chip.className).toMatch(/text-bg-navy/)
+  })
+})

@@ -7,13 +7,6 @@ import { Alert, BandCardSkeleton } from '../components/ui'
 import { fetchPublicJson } from '../utils/publicApi'
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
 
-/**
- * Sort key in minutes, applying the festival-day convention: a set starting
- * before AFTER_MIDNIGHT_THRESHOLD_HOUR belongs to the PREVIOUS evening and must
- * sort after the whole evening lineup, not at the top of it. Without this,
- * Cross Dog (00:15) and Dregs (01:10) lead the shared route.
- * The threshold has one canonical home (utils/festivalDays.js) — never re-encode it.
- */
 /** Sentinel for an unresolvable date — sorts last, and never counts as a festival day. */
 const UNKNOWN_DAY = Number.MAX_SAFE_INTEGER
 
@@ -34,6 +27,14 @@ function parseTime(value) {
   return { hour, minute }
 }
 
+/**
+ * Sort key applying the festival-day convention: a set starting before
+ * AFTER_MIDNIGHT_THRESHOLD_HOUR belongs to the PREVIOUS evening and must sort
+ * after the whole evening lineup, not at the top of it. Without this,
+ * Cross Dog (00:15) and Dregs (01:10) lead the shared route.
+ * The threshold has one canonical home (utils/festivalDays.js) — never re-encode it.
+ * Returns `{ day, minutes }`; compare with compareBands, not by subtraction.
+ */
 function sortKey(band) {
   const time = parseTime(band.start_time)
   if (!time) return { day: UNKNOWN_DAY, minutes: Number.MAX_SAFE_INTEGER }

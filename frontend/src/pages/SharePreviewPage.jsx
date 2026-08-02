@@ -17,10 +17,27 @@ import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
 /** Sentinel for an unresolvable date — sorts last, and never counts as a festival day. */
 const UNKNOWN_DAY = Number.MAX_SAFE_INTEGER
 
+/**
+ * Parse an `HH:MM` clock value, rejecting anything out of range.
+ * A NaN check alone is not enough: "25:99" parses to two perfectly good
+ * numbers and would sort as 1599 minutes and render as "1:99 PM".
+ * Shared by the sort and the formatter so they can never disagree on what
+ * counts as a valid time.
+ */
+function parseTime(value) {
+  if (typeof value !== 'string') return null
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (hour > 23 || minute > 59) return null
+  return { hour, minute }
+}
+
 function sortKey(band) {
-  if (!band.start_time) return { day: UNKNOWN_DAY, minutes: Number.MAX_SAFE_INTEGER }
-  const [h, m] = band.start_time.split(':').map(Number)
-  if (Number.isNaN(h) || Number.isNaN(m)) return { day: UNKNOWN_DAY, minutes: Number.MAX_SAFE_INTEGER }
+  const time = parseTime(band.start_time)
+  if (!time) return { day: UNKNOWN_DAY, minutes: Number.MAX_SAFE_INTEGER }
+  const { hour: h, minute: m } = time
 
   const afterMidnight = h < AFTER_MIDNIGHT_THRESHOLD_HOUR
   const minutes = h * 60 + m + (afterMidnight ? 24 * 60 : 0)
@@ -58,14 +75,17 @@ function festivalDayLabel(band) {
 }
 
 function formatSetTime(band) {
-  if (!band.start_time) return null
-  const to12h = t => {
-    const [h, m] = t.split(':').map(Number)
-    const period = h >= 12 ? 'PM' : 'AM'
-    const hour = h % 12 === 0 ? 12 : h % 12
-    return `${hour}:${String(m).padStart(2, '0')} ${period}`
+  const start = parseTime(band.start_time)
+  if (!start) return null
+  // A bad end_time drops the range rather than rendering "8:00 PM – NaN:NaN AM";
+  // the start on its own is still useful to a fan.
+  const end = parseTime(band.end_time)
+  const to12h = ({ hour, minute }) => {
+    const period = hour >= 12 ? 'PM' : 'AM'
+    const h12 = hour % 12 === 0 ? 12 : hour % 12
+    return `${h12}:${String(minute).padStart(2, '0')} ${period}`
   }
-  return band.end_time ? `${to12h(band.start_time)} – ${to12h(band.end_time)}` : to12h(band.start_time)
+  return end ? `${to12h(start)} – ${to12h(end)}` : to12h(start)
 }
 
 export default function SharePreviewPage() {

@@ -63,6 +63,14 @@ describe('BandCard — genre chip', () => {
   })
 })
 
+// These document the CURRENT interaction model; they do not endorse it.
+// When `clickable`, the container is a focusable div with no role and no
+// accessible name (BandCard.jsx:66-67) wrapping a real <button> (add/remove)
+// and an <a> (profile link). That nesting is why it cannot simply become a
+// <button> — and why adding role="button" would be worse, not better: it would
+// announce as a control while containing focusable children.
+// Replacing it with a distinct native toggle is tracked in #726; update these
+// tests as part of that change rather than treating them as the spec.
 describe('BandCard — click/keyboard toggle (pre-existing behaviour)', () => {
   it('is focusable via tabIndex=0 when clickable', () => {
     const { container } = renderCard({ clickable: true })

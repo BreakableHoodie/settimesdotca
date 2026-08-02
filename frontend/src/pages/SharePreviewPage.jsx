@@ -14,12 +14,36 @@ import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
  * Cross Dog (00:15) and Dregs (01:10) lead the shared route.
  * The threshold has one canonical home (utils/festivalDays.js) — never re-encode it.
  */
+const DAY_MS = 24 * 60 * 60 * 1000
+
 function sortKey(band) {
-  if (!band.start_time) return Number.MAX_SAFE_INTEGER
+  if (!band.start_time) return { day: Number.MAX_SAFE_INTEGER, minutes: Number.MAX_SAFE_INTEGER }
   const [h, m] = band.start_time.split(':').map(Number)
-  if (Number.isNaN(h) || Number.isNaN(m)) return Number.MAX_SAFE_INTEGER
-  const minutes = h * 60 + m
-  return h < AFTER_MIDNIGHT_THRESHOLD_HOUR ? minutes + 24 * 60 : minutes
+  if (Number.isNaN(h) || Number.isNaN(m)) return { day: Number.MAX_SAFE_INTEGER, minutes: Number.MAX_SAFE_INTEGER }
+
+  const afterMidnight = h < AFTER_MIDNIGHT_THRESHOLD_HOUR
+  const minutes = h * 60 + m + (afterMidnight ? 24 * 60 : 0)
+
+  // A 00:15 set stored on Aug 3 belongs to Aug 2's evening, so its FESTIVAL day
+  // is one calendar day earlier. Sorting on the raw date would split an evening
+  // across two groups on a multi-day event; sorting on clock time alone (the
+  // previous version) would interleave days that share a start time.
+  let day = band.performance_date ? Date.parse(`${band.performance_date}T00:00:00`) : NaN
+  if (!Number.isNaN(day) && afterMidnight) day -= DAY_MS
+  return { day: Number.isNaN(day) ? Number.MAX_SAFE_INTEGER : day, minutes }
+}
+
+function compareBands(a, b) {
+  const ka = sortKey(a)
+  const kb = sortKey(b)
+  return ka.day - kb.day || ka.minutes - kb.minutes
+}
+
+/** Festival day label, shown only when a route spans more than one. */
+function festivalDayLabel(band) {
+  const key = sortKey(band).day
+  if (key === Number.MAX_SAFE_INTEGER) return null
+  return new Date(key).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
 function formatSetTime(band) {
@@ -152,18 +176,20 @@ export default function SharePreviewPage() {
 
         <ul aria-label="Bands in this route" className="mb-8 list-none space-y-3 p-0">
           {(shareData.bands?.length
-            ? [...shareData.bands].sort((a, b) => sortKey(a) - sortKey(b))
+            ? [...shareData.bands].sort(compareBands)
             : shareData.band_names.map(name => ({ name }))
-          ).map((band, i) => (
+          ).map((band, i, list) => (
             <li key={band.performance_id ?? i} className="rounded-xl border border-border bg-surface px-4 py-3">
               <p className="font-semibold text-text-primary">{band.name}</p>
-              {(formatSetTime(band) || band.venue) && (
-                <p className="mt-1 text-sm text-text-secondary">
-                  {formatSetTime(band)}
-                  {formatSetTime(band) && band.venue ? ' · ' : ''}
-                  {band.venue}
-                </p>
-              )}
+              {(formatSetTime(band) || band.venue) &&
+                (() => {
+                  // Only surface the day on a multi-day route — on a single-night
+                  // crawl it is noise on every row.
+                  const multiDay = new Set(list.map(b => sortKey(b).day)).size > 1
+                  const dayLabel = multiDay ? festivalDayLabel(band) : null
+                  const parts = [dayLabel, formatSetTime(band), band.venue].filter(Boolean)
+                  return <p className="mt-1 text-sm text-text-secondary">{parts.join(' · ')}</p>
+                })()}
             </li>
           ))}
         </ul>

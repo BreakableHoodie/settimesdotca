@@ -47,6 +47,10 @@ describe("GET /api/schedule/share/[slug] — bands detail", () => {
       end_time: "20:30",
       venue: "Blue Room",
     });
+    // performance_date drives the preview's festival-day sort on multi-day
+    // events, so it has to be asserted, not just present in the shape.
+    expect(body.bands[0]).toHaveProperty("performance_date");
+    expect(body.bands[0].performance_date).toBe(perf.performance_date ?? null);
   });
 
   test("keeps performance_ids and band_names unchanged so the ?import=1 apply flow still works", async () => {

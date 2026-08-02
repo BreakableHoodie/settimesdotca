@@ -14,12 +14,13 @@ import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
  * Cross Dog (00:15) and Dregs (01:10) lead the shared route.
  * The threshold has one canonical home (utils/festivalDays.js) — never re-encode it.
  */
-const DAY_MS = 24 * 60 * 60 * 1000
+/** Sentinel for an unresolvable date — sorts last, and never counts as a festival day. */
+const UNKNOWN_DAY = Number.MAX_SAFE_INTEGER
 
 function sortKey(band) {
-  if (!band.start_time) return { day: Number.MAX_SAFE_INTEGER, minutes: Number.MAX_SAFE_INTEGER }
+  if (!band.start_time) return { day: UNKNOWN_DAY, minutes: Number.MAX_SAFE_INTEGER }
   const [h, m] = band.start_time.split(':').map(Number)
-  if (Number.isNaN(h) || Number.isNaN(m)) return { day: Number.MAX_SAFE_INTEGER, minutes: Number.MAX_SAFE_INTEGER }
+  if (Number.isNaN(h) || Number.isNaN(m)) return { day: UNKNOWN_DAY, minutes: Number.MAX_SAFE_INTEGER }
 
   const afterMidnight = h < AFTER_MIDNIGHT_THRESHOLD_HOUR
   const minutes = h * 60 + m + (afterMidnight ? 24 * 60 : 0)
@@ -28,9 +29,19 @@ function sortKey(band) {
   // is one calendar day earlier. Sorting on the raw date would split an evening
   // across two groups on a multi-day event; sorting on clock time alone (the
   // previous version) would interleave days that share a start time.
-  let day = band.performance_date ? Date.parse(`${band.performance_date}T00:00:00`) : NaN
-  if (!Number.isNaN(day) && afterMidnight) day -= DAY_MS
-  return { day: Number.isNaN(day) ? Number.MAX_SAFE_INTEGER : day, minutes }
+  //
+  // Step back a CALENDAR day, not a fixed 24h: on a DST boundary a local day is
+  // 23 or 25 hours long, so subtracting 86_400_000ms lands on the wrong date.
+  // setDate() goes through the calendar and stays correct across the transition.
+  let day = UNKNOWN_DAY
+  if (band.performance_date) {
+    const parsed = new Date(`${band.performance_date}T00:00:00`)
+    if (!Number.isNaN(parsed.getTime())) {
+      if (afterMidnight) parsed.setDate(parsed.getDate() - 1)
+      day = parsed.getTime()
+    }
+  }
+  return { day, minutes }
 }
 
 function compareBands(a, b) {
@@ -42,7 +53,7 @@ function compareBands(a, b) {
 /** Festival day label, shown only when a route spans more than one. */
 function festivalDayLabel(band) {
   const key = sortKey(band).day
-  if (key === Number.MAX_SAFE_INTEGER) return null
+  if (key === UNKNOWN_DAY) return null
   return new Date(key).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
@@ -185,7 +196,11 @@ export default function SharePreviewPage() {
                 (() => {
                   // Only surface the day on a multi-day route — on a single-night
                   // crawl it is noise on every row.
-                  const multiDay = new Set(list.map(b => sortKey(b).day)).size > 1
+                  // Count only KNOWN days. A band deleted since sharing has a
+                  // null performance_date, and letting that sentinel count would
+                  // stamp a date on every row of a single-night route.
+                  const knownDays = new Set(list.map(b => sortKey(b).day).filter(d => d !== UNKNOWN_DAY))
+                  const multiDay = knownDays.size > 1
                   const dayLabel = multiDay ? festivalDayLabel(band) : null
                   const parts = [dayLabel, formatSetTime(band), band.venue].filter(Boolean)
                   return <p className="mt-1 text-sm text-text-secondary">{parts.join(' · ')}</p>

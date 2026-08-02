@@ -83,7 +83,7 @@ function BandCard({
         </button>
       )}
 
-      <div className={`flex flex-col items-center gap-2 ${showToggleButton ? 'pr-10' : ''}`}>
+      <div className={`flex flex-col items-center gap-2 ${showToggleButton ? 'px-10' : ''}`}>
         {band.photo_url && (
           <img
             src={band.photo_url}

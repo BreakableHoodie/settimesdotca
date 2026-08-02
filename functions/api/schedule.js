@@ -79,6 +79,7 @@ export async function onRequestGet(context) {
         p.notes,
         b.social_links,
         b.photo_url,
+        b.genre,
         v.name as venue,
         v.latitude as venue_lat,
         v.longitude as venue_lng
@@ -136,6 +137,7 @@ export async function onRequestGet(context) {
         performance_id: band.performance_id,
         band_profile_id: band.band_id,
         name: band.name,
+        genre: band.genre || null,
         photo_url: band.photo_url ?? null,
         venue: band.venue ?? null,
         venue_lat: typeof band.venue_lat === "number" ? band.venue_lat : null,

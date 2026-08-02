@@ -358,9 +358,11 @@ describe("Timeline API - Optimized JOIN Queries", () => {
       // verified against eventLocalClock()'s actual Toronto conversion below.
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-08-03T00:30:00Z"));
-      const pinnedClock = eventLocalClock();
-      expect(pinnedClock.date).toBe("2026-08-02");
-      expect(pinnedClock.time >= "20:00" && pinnedClock.time < "21:00").toBe(true);
+      // Assert the exact resolved clock rather than a range: eventLocalClock()
+      // is deterministic under a pinned system time, and a boolean range check
+      // collapses a wrong conversion into "expected true, got false" — which
+      // says nothing about what the clock actually resolved to.
+      expect(eventLocalClock()).toEqual({ date: "2026-08-02", time: "20:30" });
 
       mockContext.env.DB = {
         prepare: () => ({

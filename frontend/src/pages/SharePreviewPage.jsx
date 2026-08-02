@@ -5,6 +5,89 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import LockInLineupPanel from '../components/LockInLineupPanel'
 import { Alert, BandCardSkeleton } from '../components/ui'
 import { fetchPublicJson } from '../utils/publicApi'
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
+
+/** Sentinel for an unresolvable date — sorts last, and never counts as a festival day. */
+const UNKNOWN_DAY = Number.MAX_SAFE_INTEGER
+
+/**
+ * Parse an `HH:MM` clock value, rejecting anything out of range.
+ * A NaN check alone is not enough: "25:99" parses to two perfectly good
+ * numbers and would sort as 1599 minutes and render as "1:99 PM".
+ * Shared by the sort and the formatter so they can never disagree on what
+ * counts as a valid time.
+ */
+function parseTime(value) {
+  if (typeof value !== 'string') return null
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (hour > 23 || minute > 59) return null
+  return { hour, minute }
+}
+
+/**
+ * Sort key applying the festival-day convention: a set starting before
+ * AFTER_MIDNIGHT_THRESHOLD_HOUR belongs to the PREVIOUS evening and must sort
+ * after the whole evening lineup, not at the top of it. Without this,
+ * Cross Dog (00:15) and Dregs (01:10) lead the shared route.
+ * The threshold has one canonical home (utils/festivalDays.js) — never re-encode it.
+ * Returns `{ day, minutes }`; compare with compareBands, not by subtraction.
+ */
+function sortKey(band) {
+  const time = parseTime(band.start_time)
+  if (!time) return { day: UNKNOWN_DAY, minutes: Number.MAX_SAFE_INTEGER }
+  const { hour: h, minute: m } = time
+
+  const afterMidnight = h < AFTER_MIDNIGHT_THRESHOLD_HOUR
+  const minutes = h * 60 + m + (afterMidnight ? 24 * 60 : 0)
+
+  // A 00:15 set stored on Aug 3 belongs to Aug 2's evening, so its FESTIVAL day
+  // is one calendar day earlier. Sorting on the raw date would split an evening
+  // across two groups on a multi-day event; sorting on clock time alone (the
+  // previous version) would interleave days that share a start time.
+  //
+  // Step back a CALENDAR day, not a fixed 24h: on a DST boundary a local day is
+  // 23 or 25 hours long, so subtracting 86_400_000ms lands on the wrong date.
+  // setDate() goes through the calendar and stays correct across the transition.
+  let day = UNKNOWN_DAY
+  if (band.performance_date) {
+    const parsed = new Date(`${band.performance_date}T00:00:00`)
+    if (!Number.isNaN(parsed.getTime())) {
+      if (afterMidnight) parsed.setDate(parsed.getDate() - 1)
+      day = parsed.getTime()
+    }
+  }
+  return { day, minutes }
+}
+
+function compareBands(a, b) {
+  const ka = sortKey(a)
+  const kb = sortKey(b)
+  return ka.day - kb.day || ka.minutes - kb.minutes
+}
+
+/** Festival day label, shown only when a route spans more than one. */
+function festivalDayLabel(band) {
+  const key = sortKey(band).day
+  if (key === UNKNOWN_DAY) return null
+  return new Date(key).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function formatSetTime(band) {
+  const start = parseTime(band.start_time)
+  if (!start) return null
+  // A bad end_time drops the range rather than rendering "8:00 PM – NaN:NaN AM";
+  // the start on its own is still useful to a fan.
+  const end = parseTime(band.end_time)
+  const to12h = ({ hour, minute }) => {
+    const period = hour >= 12 ? 'PM' : 'AM'
+    const h12 = hour % 12 === 0 ? 12 : hour % 12
+    return `${h12}:${String(minute).padStart(2, '0')} ${period}`
+  }
+  return end ? `${to12h(start)} – ${to12h(end)}` : to12h(start)
+}
 
 export default function SharePreviewPage() {
   const { slug } = useParams()
@@ -124,9 +207,25 @@ export default function SharePreviewPage() {
         </div>
 
         <ul aria-label="Bands in this route" className="mb-8 list-none space-y-3 p-0">
-          {shareData.band_names.map((name, i) => (
-            <li key={i} className="rounded-xl border border-border bg-surface px-4 py-3">
-              <p className="font-semibold text-text-primary">{name}</p>
+          {(shareData.bands?.length
+            ? [...shareData.bands].sort(compareBands)
+            : shareData.band_names.map(name => ({ name }))
+          ).map((band, i, list) => (
+            <li key={band.performance_id ?? i} className="rounded-xl border border-border bg-surface px-4 py-3">
+              <p className="font-semibold text-text-primary">{band.name}</p>
+              {(formatSetTime(band) || band.venue) &&
+                (() => {
+                  // Only surface the day on a multi-day route — on a single-night
+                  // crawl it is noise on every row.
+                  // Count only KNOWN days. A band deleted since sharing has a
+                  // null performance_date, and letting that sentinel count would
+                  // stamp a date on every row of a single-night route.
+                  const knownDays = new Set(list.map(b => sortKey(b).day).filter(d => d !== UNKNOWN_DAY))
+                  const multiDay = knownDays.size > 1
+                  const dayLabel = multiDay ? festivalDayLabel(band) : null
+                  const parts = [dayLabel, formatSetTime(band), band.venue].filter(Boolean)
+                  return <p className="mt-1 text-sm text-text-secondary">{parts.join(' · ')}</p>
+                })()}
             </li>
           ))}
         </ul>
@@ -134,7 +233,7 @@ export default function SharePreviewPage() {
         <button
           type="button"
           onClick={handleImport}
-          className="w-full min-h-[48px] rounded-xl bg-accent-500 px-6 py-3 font-semibold text-bg-navy transition-colors hover:brightness-110"
+          className="mb-6 w-full min-h-[48px] rounded-xl bg-accent-500 px-6 py-3 font-semibold text-bg-navy transition-colors hover:brightness-110"
         >
           Add {shareData.band_names.length} stop{shareData.band_names.length !== 1 ? 's' : ''} to my route for{' '}
           {shareData.event_name}

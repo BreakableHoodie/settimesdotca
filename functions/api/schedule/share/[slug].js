@@ -56,12 +56,61 @@ export async function onRequestGet(context) {
       return json({ error: "Share link data is corrupted" }, 500);
     }
 
+    // Resolve set times and venues for the shared performances. `performance_ids`
+    // is the snapshot taken when the link was created, so everything the preview
+    // needs is recoverable without storing it twice.
+    //
+    // `performance_ids` and `band_names` are deliberately returned unchanged:
+    // App.jsx re-fetches this endpoint with `?import=1` to APPLY a shared route
+    // and reads those two fields. `bands` is purely additive.
+    let bands = band_names.map((name, i) => ({
+      performance_id: performance_ids[i] ?? null,
+      name,
+      start_time: null,
+      end_time: null,
+      venue: null,
+      performance_date: null,
+    }));
+
+    if (performance_ids.length > 0) {
+      // Bind ids as placeholders — never interpolate them into SQL. The array is
+      // length-capped on the write path (MAX_PERFORMANCE_IDS in ../share.js).
+      const placeholders = performance_ids.map(() => "?").join(",");
+      const detail = await DB.prepare(
+        `SELECT p.id AS performance_id, bp.name AS name, p.start_time, p.end_time,
+                p.performance_date, v.name AS venue
+         FROM performances p
+         JOIN band_profiles bp ON bp.id = p.band_profile_id
+         LEFT JOIN venues v ON v.id = p.venue_id
+         WHERE p.id IN (${placeholders})`,
+      )
+        .bind(...performance_ids)
+        .all();
+
+      const byId = new Map((detail.results || []).map((r) => [r.performance_id, r]));
+      // Fall back to the stored name when a performance has been removed from the
+      // lineup since the link was shared — dropping it would make the list
+      // disagree with the "N-stop route" count the page renders.
+      bands = performance_ids.map((id, i) => {
+        const found = byId.get(id);
+        return {
+          performance_id: id,
+          name: found?.name ?? band_names[i] ?? "Unknown artist",
+          start_time: found?.start_time ?? null,
+          end_time: found?.end_time ?? null,
+          venue: found?.venue ?? null,
+          performance_date: found?.performance_date ?? null,
+        };
+      });
+    }
+
     return json({
       slug: row.slug,
       event_slug: row.event_slug,
       event_name: row.event_name,
       performance_ids,
       band_names,
+      bands,
     });
   } catch (err) {
     console.error("Share link fetch error:", err);

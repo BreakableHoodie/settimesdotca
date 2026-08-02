@@ -3119,8 +3119,12 @@ components:
           type: integer
         name:
           type: string
+        genre:
+          type: string
+          nullable: true
         venue:
           type: string
+          nullable: true
         date:
           type: string
         startTime:

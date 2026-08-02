@@ -8,7 +8,7 @@
 import { describe, it, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestGet as timelineHandler } from "../timeline.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
-import { eventLocalToday } from "../../../utils/eventDay.js";
+import { eventLocalToday, eventLocalClock } from "../../../utils/eventDay.js";
 
 // Returns the mock result set for a query string, keyed off the distinctive
 // WHERE clause for each period (now / upcoming / past). The "now" and "past"
@@ -333,10 +333,37 @@ describe("Timeline API - Optimized JOIN Queries", () => {
   });
 
   describe("reveal_mode gate - JOIN condition (not WHERE)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("hides unannounced bands when reveal_mode=1", async () => {
       // When the DB applies the JOIN gate, unannounced rows are NULL-expanded;
       // band_id will be null so groupEventData skips them. The mock here
       // simulates what the DB returns after the JOIN filter is applied.
+      //
+      // The fixture below hardcodes event_date: "2026-08-02" with a band
+      // playing 20:00-21:00. timeline.js's start-edge gate (#569) reads the
+      // REAL clock via eventLocalClock() and, on the event's own date, holds
+      // it out of "now" until the earliest of doors_json / first-set start —
+      // here, the 20:00 set start (no doors_json in this fixture). Once
+      // 2026-08-02 arrived, this test failed for every CI run before 20:00
+      // Toronto time and would only pass by coincidence between 20:00-21:00
+      // (#722). Pin the clock to an instant inside that window so the
+      // assertion is deterministic instead of dependent on when CI happens
+      // to run.
+      //
+      // 2026-08-03T00:30:00Z = 20:30 EDT on 2026-08-02 (America/Toronto is
+      // UTC-4 in August, i.e. DST/EDT) — squarely inside the 20:00-21:00 set,
+      // verified against eventLocalClock()'s actual Toronto conversion below.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-03T00:30:00Z"));
+      // Assert the exact resolved clock rather than a range: eventLocalClock()
+      // is deterministic under a pinned system time, and a boolean range check
+      // collapses a wrong conversion into "expected true, got false" — which
+      // says nothing about what the clock actually resolved to.
+      expect(eventLocalClock()).toEqual({ date: "2026-08-02", time: "20:30" });
+
       mockContext.env.DB = {
         prepare: () => ({
           bind: () => ({ query: "e.date = ?" }),

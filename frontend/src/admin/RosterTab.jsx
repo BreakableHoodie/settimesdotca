@@ -5,7 +5,7 @@ import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { parseOrigin } from '../utils/parseOrigin'
 import { sortableName } from '../utils/sortableName'
 import SocialLinksIcons from './components/SocialLinksIcons'
-import FilterFunnel from './components/FilterFunnel'
+import FilterableHeader from './components/FilterableHeader'
 import ColumnFilter from './components/ColumnFilter'
 import LinksColumnFilter from './components/LinksColumnFilter'
 import MobileFilterSheet from './components/MobileFilterSheet'
@@ -45,24 +45,6 @@ function summarizeColumnFilter(column, filter) {
   }
   const values = Array.isArray(filter?.values) ? filter.values : []
   return summarizeValues(values)
-}
-
-function SortIcon({ col, sortConfig }) {
-  return (
-    <span className="ml-1 inline-block w-4">
-      {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-    </span>
-  )
-}
-
-// `<th>` is not natively interactive -- a keyboard user cannot activate an
-// onClick attached directly to it. Every sortable header instead puts the
-// handler on a real <button> inside the <th>, and the <th> carries aria-sort
-// reflecting the current state so assistive tech announces which column (and
-// direction) the table is sorted by.
-function ariaSortFor(sortConfig, key) {
-  if (sortConfig.key !== key) return 'none'
-  return sortConfig.direction === 'asc' ? 'ascending' : 'descending'
 }
 
 // Same pill styling as the existing Status column below — reused here so an
@@ -109,17 +91,19 @@ export default function RosterTab({ showToast, readOnly = false }) {
 
   const editFormRef = useRef(null)
 
-  // One ref per filterable column, shared between that column's FilterFunnel
-  // trigger and the panel it opens -- the panel uses it to treat a mousedown
-  // on the trigger as "inside" (no close-then-reopen flicker) and to return
-  // focus there on Escape.
-  const nameFilterRef = useRef(null)
-  const originFilterRef = useRef(null)
-  const genreFilterRef = useRef(null)
-  const statusFilterRef = useRef(null)
-  const linksFilterRef = useRef(null)
-  const contactFilterRef = useRef(null)
-  const followersFilterRef = useRef(null)
+  // Single ref map, one entry per filterable column, shared between that
+  // column's FilterFunnel trigger and the panel it opens -- the panel uses it
+  // to treat a mousedown on the trigger as "inside" (no close-then-reopen
+  // flicker) and to return focus there on Escape. Built once via useMemo
+  // (stable identity for the component's lifetime, same as the seven
+  // individual useRefs this replaces) rather than a lazily-populated
+  // useRef(), which eslint-plugin-react-hooks' ref-safety rule only allows
+  // for the single-ref `if (ref.current == null)` shape -- not a `.current`
+  // that holds a keyed map read during render.
+  const filterRefs = useMemo(
+    () => Object.fromEntries(FILTERABLE_COLUMNS.map(column => [column.key, { current: null }])),
+    []
+  )
 
   // Form state - minimized for Profile only
   const [formData, setFormData] = useState({
@@ -693,168 +677,89 @@ export default function RosterTab({ showToast, readOnly = false }) {
                         />
                       </th>
                     )}
-                    <th
-                      aria-sort={ariaSortFor(sortConfig, 'name')}
-                      className="relative px-4 py-3 text-left text-white font-semibold"
-                    >
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleSort('name')}
-                          className="cursor-pointer hover:text-accent-400"
-                        >
-                          Name <SortIcon col="name" sortConfig={sortConfig} />
-                        </button>
-                        <FilterFunnel
-                          label="Name"
-                          active={isColumnFiltered(columnFilters, 'name')}
-                          open={openFilterKey === 'name'}
-                          panelId="roster-filter-panel-name"
-                          triggerRef={nameFilterRef}
-                          onClick={() => toggleFilterPanel('name')}
-                        />
-                      </div>
-                      {renderColumnFilterPanel('name', nameFilterRef)}
-                    </th>
-                    <th
-                      aria-sort={ariaSortFor(sortConfig, 'origin')}
-                      className="relative px-4 py-3 text-left text-white font-semibold"
-                    >
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleSort('origin')}
-                          className="cursor-pointer hover:text-accent-400"
-                        >
-                          Origin <SortIcon col="origin" sortConfig={sortConfig} />
-                        </button>
-                        <FilterFunnel
-                          label="Origin"
-                          active={isColumnFiltered(columnFilters, 'origin')}
-                          open={openFilterKey === 'origin'}
-                          panelId="roster-filter-panel-origin"
-                          triggerRef={originFilterRef}
-                          onClick={() => toggleFilterPanel('origin')}
-                        />
-                      </div>
-                      {renderColumnFilterPanel('origin', originFilterRef)}
-                    </th>
-                    <th
-                      aria-sort={ariaSortFor(sortConfig, 'genre')}
-                      className="relative px-4 py-3 text-left text-white font-semibold"
-                    >
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleSort('genre')}
-                          className="cursor-pointer hover:text-accent-400"
-                        >
-                          Genre <SortIcon col="genre" sortConfig={sortConfig} />
-                        </button>
-                        <FilterFunnel
-                          label="Genre"
-                          active={isColumnFiltered(columnFilters, 'genre')}
-                          open={openFilterKey === 'genre'}
-                          panelId="roster-filter-panel-genre"
-                          triggerRef={genreFilterRef}
-                          onClick={() => toggleFilterPanel('genre')}
-                        />
-                      </div>
-                      {renderColumnFilterPanel('genre', genreFilterRef)}
-                    </th>
-                    <th
-                      aria-sort={ariaSortFor(sortConfig, 'is_active')}
-                      className="relative px-4 py-3 text-left text-white font-semibold"
-                    >
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleSort('is_active')}
-                          className="cursor-pointer hover:text-accent-400"
-                        >
-                          Status <SortIcon col="is_active" sortConfig={sortConfig} />
-                        </button>
-                        <FilterFunnel
-                          label="Status"
-                          active={isColumnFiltered(columnFilters, 'is_active')}
-                          open={openFilterKey === 'is_active'}
-                          panelId="roster-filter-panel-is_active"
-                          triggerRef={statusFilterRef}
-                          onClick={() => toggleFilterPanel('is_active')}
-                        />
-                      </div>
-                      {renderColumnFilterPanel('is_active', statusFilterRef)}
-                    </th>
-                    <th
-                      aria-sort={ariaSortFor(sortConfig, 'link_count')}
-                      className="relative px-4 py-3 text-left text-white font-semibold"
-                    >
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleSort('link_count')}
-                          className="cursor-pointer hover:text-accent-400"
-                        >
-                          Links <SortIcon col="link_count" sortConfig={sortConfig} />
-                        </button>
-                        <FilterFunnel
-                          label="Links"
-                          active={isColumnFiltered(columnFilters, 'link_count')}
-                          open={openFilterKey === 'link_count'}
-                          panelId="roster-filter-panel-link_count"
-                          triggerRef={linksFilterRef}
-                          onClick={() => toggleFilterPanel('link_count')}
-                        />
-                      </div>
-                      {renderColumnFilterPanel('link_count', linksFilterRef)}
-                    </th>
-                    <th
-                      aria-sort={ariaSortFor(sortConfig, 'contact_email')}
-                      className="relative px-4 py-3 text-left text-white font-semibold"
-                    >
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleSort('contact_email')}
-                          className="cursor-pointer hover:text-accent-400"
-                        >
-                          Contact <SortIcon col="contact_email" sortConfig={sortConfig} />
-                        </button>
-                        <FilterFunnel
-                          label="Contact"
-                          active={isColumnFiltered(columnFilters, 'contact_email')}
-                          open={openFilterKey === 'contact_email'}
-                          panelId="roster-filter-panel-contact_email"
-                          triggerRef={contactFilterRef}
-                          onClick={() => toggleFilterPanel('contact_email')}
-                        />
-                      </div>
-                      {renderColumnFilterPanel('contact_email', contactFilterRef)}
-                    </th>
-                    <th
-                      aria-sort={ariaSortFor(sortConfig, 'follower_count')}
-                      className="relative px-4 py-3 text-right text-white font-semibold"
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleSort('follower_count')}
-                          className="cursor-pointer hover:text-accent-400"
-                        >
-                          Followers <SortIcon col="follower_count" sortConfig={sortConfig} />
-                        </button>
-                        <FilterFunnel
-                          label="Followers"
-                          active={isColumnFiltered(columnFilters, 'follower_count')}
-                          open={openFilterKey === 'follower_count'}
-                          panelId="roster-filter-panel-follower_count"
-                          triggerRef={followersFilterRef}
-                          onClick={() => toggleFilterPanel('follower_count')}
-                        />
-                      </div>
-                      {renderColumnFilterPanel('follower_count', followersFilterRef)}
-                    </th>
-                    {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
+                    <FilterableHeader
+                      sortKey="name"
+                      label="Name"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.name}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    <FilterableHeader
+                      sortKey="origin"
+                      label="Origin"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.origin}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    <FilterableHeader
+                      sortKey="genre"
+                      label="Genre"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.genre}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    <FilterableHeader
+                      sortKey="is_active"
+                      label="Status"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.is_active}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    <FilterableHeader
+                      sortKey="link_count"
+                      label="Links"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.link_count}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    <FilterableHeader
+                      sortKey="contact_email"
+                      label="Contact"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.contact_email}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    <FilterableHeader
+                      sortKey="follower_count"
+                      label="Followers"
+                      align="right"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.follower_count}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    {!readOnly && (
+                      <th className="px-4 py-3 text-right text-white font-semibold whitespace-nowrap align-middle">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-accent-500/10">

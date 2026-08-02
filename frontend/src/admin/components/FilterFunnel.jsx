@@ -6,7 +6,7 @@ import { ListFilter } from 'lucide-react'
 // literal with an interpolated segment (e.g. a colour variable) would
 // generate no CSS at all and silently drop the accent state.
 const INACTIVE_CLASS =
-  'inline-flex items-center justify-center h-6 w-6 rounded cursor-pointer text-white/50 hover:text-white hover:bg-white/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500'
+  'inline-flex items-center justify-center h-6 w-6 rounded cursor-pointer text-white/70 hover:text-white hover:bg-white/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500'
 
 const ACTIVE_CLASS =
   'inline-flex items-center justify-center h-6 w-6 rounded cursor-pointer text-accent-400 bg-accent-500/20 hover:bg-accent-500/30 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500'
@@ -28,7 +28,7 @@ export default function FilterFunnel({ label, active = false, open = false, pane
       aria-label={`Filter by ${label}`}
       className={active ? ACTIVE_CLASS : INACTIVE_CLASS}
     >
-      <ListFilter size={14} aria-hidden="true" />
+      <ListFilter size={16} aria-hidden="true" />
     </button>
   )
 }

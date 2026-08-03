@@ -43,6 +43,7 @@ export async function onRequestGet(context) {
         p.start_time,
         p.end_time,
         p.performance_date,
+        p.is_cancelled,
         v.name as venue_name,
         v.address
       FROM events e
@@ -144,7 +145,9 @@ function generateICal(bands, city, genre) {
       `SUMMARY:${escapeIcal(band.band_name)}`,
       `LOCATION:${escapeIcal(location)}`,
       `DESCRIPTION:${escapeIcal(description)}`,
-      "STATUS:CONFIRMED",
+      // RFC 5545 STATUS:CANCELLED -- Google and Apple Calendar render the entry
+      // as cancelled natively, so no custom handling is needed on the client.
+      ...(band.is_cancelled ? ["STATUS:CANCELLED"] : ["STATUS:CONFIRMED"]),
       "END:VEVENT",
     );
   }

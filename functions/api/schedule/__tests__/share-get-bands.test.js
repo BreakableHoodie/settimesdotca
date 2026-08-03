@@ -80,17 +80,30 @@ describe("GET /api/schedule/share/[slug] — bands detail", () => {
     expect(body.band_names).toEqual(["Suplex"]);
   });
 
-  test("falls back to the stored name when a performance was deleted after sharing", async () => {
+  // #733: a performance that no longer resolves is HARD-DELETED (a set added
+  // in error, an event cleaned up). The pre-#733 behaviour above emitted the
+  // stored name with a null time and venue -- an orphan that read as a
+  // rendering bug, starkly so since #731 added times and venues to every
+  // other row. `bands` now omits it instead; `performance_ids`/`band_names`
+  // stay untouched so the ?import=1 apply path (App.jsx) is unaffected.
+  function seedShareWithThreeSets() {
     const { env, rawDb, event, venue } = seed();
     const kept = insertBand(rawDb, {
       name: "Kept Band",
       event_id: event.id,
       venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "20:30",
+    });
+    const cancelled = insertBand(rawDb, {
+      name: "Cancelled Band",
+      event_id: event.id,
+      venue_id: venue.id,
       start_time: "21:00",
       end_time: "21:30",
     });
-    const removed = insertBand(rawDb, {
-      name: "Removed Band",
+    const deleted = insertBand(rawDb, {
+      name: "Deleted Band",
       event_id: event.id,
       venue_id: venue.id,
       start_time: "22:00",
@@ -98,28 +111,60 @@ describe("GET /api/schedule/share/[slug] — bands detail", () => {
     });
 
     insertShareLink(rawDb, {
-      slug: "deleted01",
+      slug: "threesets",
       event_id: event.id,
       event_slug: "vol17",
-      performance_ids: [kept.id, removed.id],
-      band_names: ["Kept Band", "Removed Band"],
+      performance_ids: [kept.id, cancelled.id, deleted.id],
+      band_names: ["Kept Band", "Cancelled Band", "Deleted Band"],
     });
 
-    // Simulate the band being pulled from the lineup after the link was shared.
-    rawDb.prepare("DELETE FROM performances WHERE id = ?").run(removed.id);
+    const fetchShare = async () => {
+      const res = await onRequestGet({
+        request: makeRequest("threesets"),
+        params: { slug: "threesets" },
+        env,
+      });
+      return res.json();
+    };
 
-    const res = await onRequestGet({ request: makeRequest("deleted01"), params: { slug: "deleted01" }, env });
-    const body = await res.json();
+    return { db: rawDb, keptId: kept.id, cancelledId: cancelled.id, deletedId: deleted.id, fetchShare };
+  }
 
-    // Dropping it would make the list disagree with the "N-stop route" heading
-    // and the "Add N stops" button, both of which count band_names.
-    expect(body.bands).toHaveLength(2);
-    expect(body.bands[1]).toMatchObject({
-      performance_id: removed.id,
-      name: "Removed Band",
-      start_time: null,
-      venue: null,
-    });
-    expect(body.bands[0].start_time).toBe("21:00");
+  test("omits a hard-deleted performance instead of emitting a nameless orphan", async () => {
+    const { db, deletedId, fetchShare } = seedShareWithThreeSets();
+
+    const before = await fetchShare();
+    expect(before.bands).toHaveLength(3);
+
+    db.prepare("DELETE FROM performances WHERE id = ?").run(deletedId);
+
+    const after = await fetchShare();
+    expect(after.bands).toHaveLength(2);
+    // The orphan signature: a row carrying a name but no time and no venue.
+    expect(after.bands.some((b) => b.start_time === null && b.venue === null)).toBe(false);
+  });
+
+  test("returns performance_ids and band_names unchanged so ?import=1 stays index-aligned", async () => {
+    const { db, deletedId, fetchShare } = seedShareWithThreeSets();
+    const before = await fetchShare();
+
+    db.prepare("DELETE FROM performances WHERE id = ?").run(deletedId);
+    const after = await fetchShare();
+
+    expect(after.performance_ids).toEqual(before.performance_ids);
+    expect(after.band_names).toEqual(before.band_names);
+  });
+
+  test("KEEPS a cancelled performance with its real time and venue", async () => {
+    const { db, cancelledId, fetchShare } = seedShareWithThreeSets();
+
+    db.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(cancelledId);
+
+    const after = await fetchShare();
+    const entry = after.bands.find((b) => b.performance_id === cancelledId);
+    expect(entry).toBeDefined();
+    expect(entry.is_cancelled).toBe(1);
+    expect(entry.start_time).not.toBeNull();
+    expect(entry.venue).not.toBeNull();
   });
 });

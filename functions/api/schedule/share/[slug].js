@@ -78,7 +78,7 @@ export async function onRequestGet(context) {
       const placeholders = performance_ids.map(() => "?").join(",");
       const detail = await DB.prepare(
         `SELECT p.id AS performance_id, bp.name AS name, p.start_time, p.end_time,
-                p.performance_date, v.name AS venue
+                p.performance_date, p.is_cancelled, v.name AS venue
          FROM performances p
          JOIN band_profiles bp ON bp.id = p.band_profile_id
          LEFT JOIN venues v ON v.id = p.venue_id
@@ -88,20 +88,30 @@ export async function onRequestGet(context) {
         .all();
 
       const byId = new Map((detail.results || []).map((r) => [r.performance_id, r]));
-      // Fall back to the stored name when a performance has been removed from the
-      // lineup since the link was shared — dropping it would make the list
-      // disagree with the "N-stop route" count the page renders.
-      bands = performance_ids.map((id, i) => {
-        const found = byId.get(id);
-        return {
-          performance_id: id,
-          name: found?.name ?? band_names[i] ?? "Unknown artist",
-          start_time: found?.start_time ?? null,
-          end_time: found?.end_time ?? null,
-          venue: found?.venue ?? null,
-          performance_date: found?.performance_date ?? null,
-        };
-      });
+      // A performance that no longer resolves was HARD-DELETED. Emitting the
+      // stored name with a null time and venue produces an orphan that reads
+      // as a rendering bug (#733) -- starkly so since #731 added times and
+      // venues to every other row. Drop it instead.
+      //
+      // A CANCELLED set still resolves, so it keeps its real time and venue
+      // and renders struck through -- the ordinary path now, and strictly
+      // better than either the orphan or a silent disappearance.
+      //
+      // `performance_ids` and `band_names` are returned UNCHANGED below:
+      // App.jsx re-fetches with ?import=1 and reads those two index-aligned
+      // arrays to apply a shared route. Only the additive `bands` is filtered.
+      bands = performance_ids
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((found) => ({
+          performance_id: found.performance_id,
+          name: found.name,
+          start_time: found.start_time,
+          end_time: found.end_time,
+          venue: found.venue,
+          performance_date: found.performance_date,
+          is_cancelled: found.is_cancelled,
+        }));
     }
 
     return json({

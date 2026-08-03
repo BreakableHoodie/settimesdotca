@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -186,6 +186,12 @@ export default function SharePreviewPage() {
     )
   }
 
+  // `bands` is the canonical render list -- it excludes performances that have
+  // been hard-deleted since the link was shared (#733). `band_names` is the
+  // untouched snapshot kept for the ?import=1 apply path, so counting it here
+  // would render N-1 rows under an "N-stop route" heading.
+  const stopCount = shareData.bands?.length ?? shareData.band_names.length
+
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
       <Helmet>
@@ -202,7 +208,7 @@ export default function SharePreviewPage() {
         </Link>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-text-primary">{shareData.band_names.length}-stop route</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{stopCount}-stop route</h1>
           <p className="mt-1 text-text-secondary">{shareData.event_name}</p>
         </div>
 
@@ -212,7 +218,15 @@ export default function SharePreviewPage() {
             : shareData.band_names.map(name => ({ name }))
           ).map((band, i, list) => (
             <li key={band.performance_id ?? i} className="rounded-xl border border-border bg-surface px-4 py-3">
-              <p className="font-semibold text-text-primary">{band.name}</p>
+              <p className="font-semibold text-text-primary">
+                {band.is_cancelled ? <s className="text-text-secondary">{band.name}</s> : band.name}
+              </p>
+              {band.is_cancelled === 1 && (
+                <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+                  <TriangleAlert size={14} aria-hidden="true" />
+                  Cancelled
+                </span>
+              )}
               {(formatSetTime(band) || band.venue) &&
                 (() => {
                   // Only surface the day on a multi-day route — on a single-night
@@ -235,11 +249,10 @@ export default function SharePreviewPage() {
           onClick={handleImport}
           className="mb-6 w-full min-h-[48px] rounded-xl bg-accent-500 px-6 py-3 font-semibold text-bg-navy transition-colors hover:brightness-110"
         >
-          Add {shareData.band_names.length} stop{shareData.band_names.length !== 1 ? 's' : ''} to my route for{' '}
-          {shareData.event_name}
+          Add {stopCount} stop{stopCount !== 1 ? 's' : ''} to my route for {shareData.event_name}
         </button>
 
-        <LockInLineupPanel performanceIds={shareData.performance_ids} bandCount={shareData.band_names.length} />
+        <LockInLineupPanel performanceIds={shareData.performance_ids} bandCount={stopCount} />
       </div>
     </div>
   )

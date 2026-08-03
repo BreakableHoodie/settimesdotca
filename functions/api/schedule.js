@@ -77,6 +77,7 @@ export async function onRequestGet(context) {
         p.end_time as endTime,
         p.performance_date as performanceDate,
         p.notes,
+        p.is_cancelled,
         b.social_links,
         b.photo_url,
         b.genre,
@@ -150,6 +151,7 @@ export async function onRequestGet(context) {
         endTime: extractTime(band.endTime),
         url: primaryUrl,
         notes: band.notes || null,
+        is_cancelled: band.is_cancelled ?? 0,
       };
     });
 

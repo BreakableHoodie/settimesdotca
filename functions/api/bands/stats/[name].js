@@ -94,11 +94,12 @@ export async function onRequestGet(context) {
       });
     }
 
-    // Get all performances for this band profile. A cancelled set is excluded
-    // unconditionally (unlike bands/[name].js's history endpoint, which keeps
-    // a cancelled set visible until its event is past) -- a set that never
-    // happened must never inflate total_performances, unique_venues, or the
-    // debut/latest date range (#732).
+    // Get all performances for this band profile. Cancellation is NOT part of
+    // the SQL gate -- see the two derived lists just below -- because this
+    // endpoint has to satisfy two different rules for the SAME cancelled row
+    // at once (#732): it must still appear in upcoming/past (struck through,
+    // is_cancelled: 1) while its event is current, but must never contribute
+    // to the aggregate stats math regardless of currency.
     const performances = await DB.prepare(
       `
       SELECT
@@ -107,6 +108,7 @@ export async function onRequestGet(context) {
         p.end_time,
         p.performance_date,
         p.notes,
+        p.is_cancelled,
         v.id as venue_id,
         v.name as venue_name,
         v.address as venue_address,
@@ -128,7 +130,6 @@ export async function onRequestGet(context) {
       WHERE p.band_profile_id = ?
         AND e.status IN ('published', 'archived')
         AND (e.reveal_mode = 0 OR p.is_announced = 1)
-        AND p.is_cancelled = 0
       ORDER BY e.date DESC, COALESCE(p.performance_date, e.date) ASC, p.start_time
     `,
     )
@@ -140,22 +141,39 @@ export async function onRequestGet(context) {
     // Calculate statistics
     const today = eventLocalToday();
 
+    // A cancelled set stays visible on this band's page while its EVENT is
+    // still current -- fans need to know the set is off -- and drops out of
+    // both upcoming and past entirely once the event has passed, mirroring
+    // the identical rule at bands/[name].js:148-149 (#732). This is keyed on
+    // the EVENT's own end date, not the per-performance date used for the
+    // upcoming/past SPLIT below (#603): a cancelled day-1 set of an ongoing
+    // multi-day event still belongs on the page while day 2/3 are still to
+    // come, so it stays in the "past" bucket (its own day has elapsed) rather
+    // than disappearing.
+    const isEventPast = (p) => (p.event_end_date || p.event_date) < today || p.event_status === "archived";
+    const visiblePerformances = allPerformances.filter((p) => !p.is_cancelled || !isEventPast(p));
+
+    // A cancelled set must never inflate the stats block, regardless of
+    // whether its event is current -- this endpoint's one cancellation job is
+    // to not count a set that never happened (#732).
+    const statsPerformances = allPerformances.filter((p) => !p.is_cancelled);
+
     // Separate upcoming and past performances — per-performance (#603), not
     // per-event: on a multi-day event, each set's OWN day decides its bucket,
     // so a band's day-1 set can already be "past" while its day-3 set is
     // still "upcoming" mid-festival. NULL performance_date inherits the
     // event's start date (the #543 convention: day-1 sets and single-day
     // events store NULL). Archived events always go to past regardless of date.
-    const upcomingPerformances = allPerformances.filter(
+    const upcomingPerformances = visiblePerformances.filter(
       (p) => (p.performance_date || p.event_date) >= today && p.event_status !== "archived",
     );
-    const pastPerformances = allPerformances.filter(
+    const pastPerformances = visiblePerformances.filter(
       (p) => (p.performance_date || p.event_date) < today || p.event_status === "archived",
     );
 
     // Get unique venues
     const venueMap = new Map();
-    allPerformances.forEach((p) => {
+    statsPerformances.forEach((p) => {
       if (p.venue_id) {
         const count = venueMap.get(p.venue_id) || { ...p, count: 0 };
         count.count++;
@@ -171,10 +189,10 @@ export async function onRequestGet(context) {
         : null;
 
     // Get unique events
-    const uniqueEvents = new Set(allPerformances.map((p) => p.event_id).filter(Boolean));
+    const uniqueEvents = new Set(statsPerformances.map((p) => p.event_id).filter(Boolean));
 
     // Calculate average set time in minutes
-    const setTimes = allPerformances
+    const setTimes = statsPerformances
       .filter((p) => p.start_time && p.end_time)
       .map((p) => {
         const [startH, startM] = p.start_time.split(":").map(Number);
@@ -189,7 +207,7 @@ export async function onRequestGet(context) {
       setTimes.length > 0 ? Math.round(setTimes.reduce((sum, t) => sum + t, 0) / setTimes.length) : null;
 
     // Get debut and latest dates
-    const sortedDates = allPerformances
+    const sortedDates = statsPerformances
       .map((p) => p.event_date)
       .filter(Boolean)
       .sort();
@@ -219,7 +237,7 @@ export async function onRequestGet(context) {
         linktree: socialLinks.linktree || null,
       },
       stats: {
-        total_performances: allPerformances.length,
+        total_performances: statsPerformances.length,
         unique_venues: uniqueVenues.length,
         unique_events: uniqueEvents.size,
         debut_date: debutDate,
@@ -255,6 +273,7 @@ export async function onRequestGet(context) {
         venue_address: p.venue_address || formatVenueAddress(p),
         start_time: p.start_time,
         end_time: p.end_time,
+        is_cancelled: p.is_cancelled,
       })),
       past: pastPerformances.map((p) => ({
         id: p.performance_id,
@@ -269,6 +288,7 @@ export async function onRequestGet(context) {
         venue_id: p.venue_id,
         venue_name: p.venue_name,
         venue_address: p.venue_address || formatVenueAddress(p),
+        is_cancelled: p.is_cancelled,
         start_time: p.start_time,
         end_time: p.end_time,
       })),

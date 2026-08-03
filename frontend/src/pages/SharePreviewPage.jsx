@@ -252,7 +252,16 @@ export default function SharePreviewPage() {
           Add {stopCount} stop{stopCount !== 1 ? 's' : ''} to my route for {shareData.event_name}
         </button>
 
-        <LockInLineupPanel performanceIds={shareData.performance_ids} bandCount={stopCount} />
+        {/* shareData.bands is the LIVE, filtered list (#733 drops hard-deleted
+            rows); shareData.performance_ids is the untouched snapshot kept
+            only for the ?import=1 apply path (App.jsx) and still contains ids
+            that no longer resolve. Deriving from bands here keeps the follow
+            request in sync with what stopCount and the rows above actually
+            show. */}
+        <LockInLineupPanel
+          performanceIds={shareData.bands?.map(b => b.performance_id) ?? shareData.performance_ids}
+          bandCount={stopCount}
+        />
       </div>
     </div>
   )

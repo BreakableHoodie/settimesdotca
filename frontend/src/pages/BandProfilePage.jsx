@@ -22,7 +22,7 @@ import { Alert, Badge, Button, Card, BandProfileSkeleton } from '../components/u
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
 import { fetchPublicJson } from '../utils/publicApi'
 import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
-import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
+import { formatPerformanceDayLabel, formatTimeRange } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
 import { useTurnstile } from '../hooks/useTurnstile'
 
@@ -758,16 +758,10 @@ export default function BandProfilePage() {
                             )}
                           </h3>
                           <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
-                            {performance.event_date && (
+                            {(performance.performance_date || performance.event_date) && (
                               <span className="flex items-center gap-2">
                                 <CalendarDays size={14} className="text-accent-500" />
-                                {(
-                                  parseLocalDate(performance.event_date) || new Date(performance.event_date)
-                                ).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric',
-                                })}
+                                {formatPerformanceDayLabel(performance)}
                               </span>
                             )}
                             {performance.venue_name && (
@@ -792,6 +786,9 @@ export default function BandProfilePage() {
                               </span>
                             )}
                           </div>
+                          {performance.notes && (
+                            <p className="mt-2 text-sm italic text-text-tertiary">{performance.notes}</p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-2">
                           <Button
@@ -855,16 +852,10 @@ export default function BandProfilePage() {
                             )}
                           </div>
                           <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
-                            {performance.event_date && (
+                            {(performance.performance_date || performance.event_date) && (
                               <span className="flex items-center gap-2">
                                 <CalendarDays size={14} className="text-text-tertiary" />
-                                {(
-                                  parseLocalDate(performance.event_date) || new Date(performance.event_date)
-                                ).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric',
-                                })}
+                                {formatPerformanceDayLabel(performance)}
                               </span>
                             )}
                             {performance.venue_name && (
@@ -889,6 +880,9 @@ export default function BandProfilePage() {
                               </span>
                             )}
                           </div>
+                          {performance.notes && (
+                            <p className="mt-2 text-sm italic text-text-tertiary">{performance.notes}</p>
+                          )}
                         </div>
                         {performance.event_slug && (
                           <Button as={Link} to={`/event/${performance.event_slug}`} variant="secondary" size="sm">

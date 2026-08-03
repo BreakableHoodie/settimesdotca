@@ -20,6 +20,54 @@ export function parseLocalDate(dateStr) {
   return new Date(year, month - 1, day)
 }
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24
+
+/**
+ * Format a performance's date for display, appending a "(Day N)" label when
+ * the event is multi-day (#739).
+ *
+ * - Uses `performance_date` when present, falling back to `event_date` (the
+ *   #543 convention: day-1 sets and single-day events store NULL
+ *   performance_date).
+ * - The "(Day N)" suffix is gated on `event_end_date` being non-null — a
+ *   single-day event must never show a day label (#540/#541 convention).
+ * - `performance_date` already stores the EVENING a set belongs to, so no
+ *   after-midnight (6AM) offset is applied here on top of it — that would
+ *   wrongly push a 00:35 set stored under day 1 to "(Day 2)".
+ * - Day offset arithmetic uses parseLocalDate (calendar-local midnight), not
+ *   `new Date('YYYY-MM-DD')`, which parses as UTC midnight and shifts the
+ *   day in UTC-negative timezones.
+ *
+ * @param {{performance_date?: string|null, event_date?: string|null, event_end_date?: string|null}} performance
+ * @returns {string|null}
+ */
+export function formatPerformanceDayLabel(performance) {
+  const rawDate = performance?.performance_date || performance?.event_date
+  if (!rawDate) return null
+
+  const displayDate = parseLocalDate(rawDate) || new Date(rawDate)
+  const dateLabel = displayDate.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+
+  if (!performance?.event_end_date) {
+    return dateLabel
+  }
+
+  const eventStart = parseLocalDate(performance.event_date)
+  const perfDay = parseLocalDate(rawDate)
+  if (!eventStart || !perfDay) {
+    return dateLabel
+  }
+
+  const dayOffset = Math.round((perfDay.getTime() - eventStart.getTime()) / MS_PER_DAY)
+  const dayNumber = dayOffset + 1
+
+  return dayNumber >= 1 ? `${dateLabel} (Day ${dayNumber})` : dateLabel
+}
+
 export function formatTime(time24, { fallback = '—' } = {}) {
   if (!isValidTimeString(time24)) {
     return fallback

@@ -187,6 +187,7 @@ export function createTestDB() {
       updated_at TEXT DEFAULT (datetime('now')),
       is_announced INTEGER NOT NULL DEFAULT 1,
       band_follow_notified INTEGER NOT NULL DEFAULT 0,
+      is_cancelled INTEGER NOT NULL DEFAULT 0,
       performance_date TEXT
     );
 

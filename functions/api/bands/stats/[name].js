@@ -1,7 +1,7 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 import { safeReflectSocialLinks } from "../../../utils/validation.js";
-import { eventLocalToday } from "../../../utils/eventDay.js";
+import { eventLocalFestivalToday } from "../../../utils/eventDay.js";
 
 /**
  * Public API: Get band profile with rich stats
@@ -138,9 +138,6 @@ export async function onRequestGet(context) {
 
     const allPerformances = performances.results || [];
 
-    // Calculate statistics
-    const today = eventLocalToday();
-
     // A cancelled set stays visible on this band's page while its EVENT is
     // still current -- fans need to know the set is off -- and drops out of
     // both upcoming and past entirely once the event has passed, mirroring
@@ -150,7 +147,12 @@ export async function onRequestGet(context) {
     // multi-day event still belongs on the page while day 2/3 are still to
     // come, so it stays in the "past" bucket (its own day has elapsed) rather
     // than disappearing.
-    const isEventPast = (p) => (p.event_end_date || p.event_date) < today || p.event_status === "archived";
+    // Currency is keyed on the FESTIVAL day, not the calendar day (#732): at
+    // 00:15 on show night the calendar has rolled over while after-midnight
+    // sets are still playing, and a cancelled set must not vanish from this
+    // page at exactly the moment a fan checks whether it is still on.
+    const festivalToday = eventLocalFestivalToday();
+    const isEventPast = (p) => (p.event_end_date || p.event_date) < festivalToday || p.event_status === "archived";
     const visiblePerformances = allPerformances.filter((p) => !p.is_cancelled || !isEventPast(p));
 
     // A cancelled set must never inflate the stats block, regardless of
@@ -164,11 +166,17 @@ export async function onRequestGet(context) {
     // still "upcoming" mid-festival. NULL performance_date inherits the
     // event's start date (the #543 convention: day-1 sets and single-day
     // events store NULL). Archived events always go to past regardless of date.
+    //
+    // Compared against the FESTIVAL day for the same reason as isEventPast:
+    // performance_date stores the EVENING a set belongs to, so a 00:35 set is
+    // filed under the previous date. Against the calendar day it would be
+    // classified "past" the moment the clock passed midnight -- twenty minutes
+    // BEFORE it played. Outside 00:00-06:00 the two are identical.
     const upcomingPerformances = visiblePerformances.filter(
-      (p) => (p.performance_date || p.event_date) >= today && p.event_status !== "archived",
+      (p) => (p.performance_date || p.event_date) >= festivalToday && p.event_status !== "archived",
     );
     const pastPerformances = visiblePerformances.filter(
-      (p) => (p.performance_date || p.event_date) < today || p.event_status === "archived",
+      (p) => (p.performance_date || p.event_date) < festivalToday || p.event_status === "archived",
     );
 
     // Get unique venues

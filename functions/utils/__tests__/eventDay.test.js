@@ -1,5 +1,55 @@
 import { describe, it, expect } from "vitest";
-import { eventLocalToday, eventLocalClock } from "../eventDay.js";
+import {
+  eventLocalToday,
+  eventLocalClock,
+  eventLocalFestivalToday,
+  AFTER_MIDNIGHT_THRESHOLD_HOUR,
+} from "../eventDay.js";
+
+// The FESTIVAL day, not the calendar day. A set before 6 AM belongs to the
+// previous evening, so between local midnight and 06:00 the festival day is
+// still yesterday's date. Every assertion here pins an explicit instant --
+// the two functions only differ inside that six-hour window, so an unpinned
+// test would pass against a plain eventLocalToday() implementation for
+// eighteen hours out of every twenty-four.
+describe("eventLocalFestivalToday", () => {
+  it("matches the calendar day during normal hours", () => {
+    // 20:00 EDT on 2026-08-07 -> 2026-08-08T00:00Z
+    const evening = new Date("2026-08-08T00:00:00Z");
+    expect(eventLocalFestivalToday(evening)).toBe("2026-08-07");
+    expect(eventLocalFestivalToday(evening)).toBe(eventLocalToday(evening));
+  });
+
+  it("stays on the previous date at 00:15 local, while after-midnight sets are still playing", () => {
+    // 00:15 EDT on 2026-08-08 -> 2026-08-08T04:15Z. The calendar has rolled
+    // over; the festival night has not.
+    const afterMidnight = new Date("2026-08-08T04:15:00Z");
+    expect(eventLocalToday(afterMidnight)).toBe("2026-08-08");
+    expect(eventLocalFestivalToday(afterMidnight)).toBe("2026-08-07");
+  });
+
+  it("still reports the previous date at 05:59 local", () => {
+    const justBefore = new Date("2026-08-08T09:59:00Z"); // 05:59 EDT
+    expect(eventLocalFestivalToday(justBefore)).toBe("2026-08-07");
+  });
+
+  it("rolls over at exactly 06:00 local — the threshold is exclusive", () => {
+    const atThreshold = new Date("2026-08-08T10:00:00Z"); // 06:00 EDT
+    expect(eventLocalFestivalToday(atThreshold)).toBe("2026-08-08");
+  });
+
+  it("steps back a CALENDAR day across a DST boundary, not a fixed 24h", () => {
+    // 2026-11-01 is the EDT->EST transition (local day is 25 hours long), so
+    // subtracting 86_400_000 ms from 01:30 local lands on the wrong date.
+    // 01:30 EST on 2026-11-01 -> 2026-11-01T06:30Z.
+    const dstNight = new Date("2026-11-01T06:30:00Z");
+    expect(eventLocalFestivalToday(dstNight)).toBe("2026-10-31");
+  });
+
+  it("exports the threshold so no caller re-encodes 6", () => {
+    expect(AFTER_MIDNIGHT_THRESHOLD_HOUR).toBe(6);
+  });
+});
 
 describe("eventLocalToday", () => {
   it("returns YYYY-MM-DD", () => {

@@ -102,6 +102,7 @@ export async function onRequestGet(context) {
         p.start_time,
         p.end_time,
         p.performance_date,
+        p.notes,
         v.id as venue_id,
         v.name as venue_name,
         v.address as venue_address,
@@ -123,7 +124,7 @@ export async function onRequestGet(context) {
       WHERE p.band_profile_id = ?
         AND e.status IN ('published', 'archived')
         AND (e.reveal_mode = 0 OR p.is_announced = 1)
-      ORDER BY e.date DESC, p.start_time
+      ORDER BY e.date DESC, COALESCE(p.performance_date, e.date) ASC, p.start_time
     `,
     )
       .bind(bandProfile.id)
@@ -238,6 +239,12 @@ export async function onRequestGet(context) {
         // event's saved schedule isn't wiped as stale on day 2.
         event_end_date: p.event_end_date || null,
         event_status: p.event_status,
+        // The evening this SET belongs to (#739) — distinct from event_date
+        // on day 2+ of a multi-day event. NULL for day-1 sets and
+        // single-day events (the #543 convention); clients fall back to
+        // event_date themselves.
+        performance_date: p.performance_date || null,
+        notes: p.notes || null,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
         venue_address: p.venue_address || formatVenueAddress(p),
@@ -252,6 +259,8 @@ export async function onRequestGet(context) {
         event_date: p.event_date,
         event_end_date: p.event_end_date || null,
         event_status: p.event_status,
+        performance_date: p.performance_date || null,
+        notes: p.notes || null,
         venue_id: p.venue_id,
         venue_name: p.venue_name,
         venue_address: p.venue_address || formatVenueAddress(p),

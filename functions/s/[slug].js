@@ -22,7 +22,7 @@ export async function onRequest(context) {
   let row;
   try {
     row = await DB.prepare(
-      `SELECT sl.slug, sl.band_names, e.name AS event_name
+      `SELECT sl.slug, sl.performance_ids, sl.band_names, e.name AS event_name
        FROM share_links sl
        JOIN events e ON e.id = sl.event_id
        WHERE sl.slug = ? AND sl.expires_at > datetime('now')`,
@@ -41,8 +41,9 @@ export async function onRequest(context) {
     return env.ASSETS.fetch(request);
   }
 
-  let bandNames;
+  let performanceIds, bandNames;
   try {
+    performanceIds = JSON.parse(row.performance_ids);
     bandNames = JSON.parse(row.band_names);
   } catch (_err) {
     console.error("Share link band_names corrupted:", row.slug);
@@ -53,9 +54,41 @@ export async function onRequest(context) {
     return env.ASSETS.fetch(request);
   }
 
-  const count = bandNames.length;
+  // `band_names`/`performance_ids` are the STALE snapshot taken when the link
+  // was shared. A performance hard-deleted since then (#733) must not appear
+  // in this card, or the iMessage/WhatsApp preview contradicts the page it
+  // opens (SharePreviewPage, via GET /api/schedule/share/[slug], which
+  // resolves the same way). A CANCELLED-but-not-deleted performance still
+  // resolves and still counts here -- only existence matters for this plain-
+  // text card, not cancellation state.
+  let resolvedNames = bandNames;
+  if (Array.isArray(performanceIds) && performanceIds.length > 0) {
+    try {
+      const placeholders = performanceIds.map(() => "?").join(",");
+      const detail = await DB.prepare(
+        `SELECT p.id AS performance_id, bp.name AS name
+         FROM performances p
+         JOIN band_profiles bp ON bp.id = p.band_profile_id
+         WHERE p.id IN (${placeholders})`,
+      )
+        .bind(...performanceIds)
+        .all();
+      const byId = new Map((detail.results || []).map((r) => [r.performance_id, r.name]));
+      resolvedNames = performanceIds.map((id) => byId.get(id)).filter(Boolean);
+    } catch (err) {
+      // Resolution failure degrades to the stale snapshot rather than losing
+      // the OG card entirely -- a slightly-off card beats none.
+      console.error("Share-link performance resolution failed:", slug, err);
+    }
+  }
+
+  if (resolvedNames.length === 0) {
+    return env.ASSETS.fetch(request);
+  }
+
+  const count = resolvedNames.length;
   const ogTitle = `${count}-stop route for ${row.event_name}`;
-  const featured = bandNames.slice(0, 3).join(", ");
+  const featured = resolvedNames.slice(0, 3).join(", ");
   const remainder = count > 3 ? ` and ${count - 3} more` : "";
   const ogDescription = `Featuring ${featured}${remainder}`;
 

@@ -300,7 +300,15 @@ export async function onRequestGet(context) {
           v.city,
           v.region,
           v.postal_code,
-          v.country
+          v.country,
+          -- Always 0: the JOIN below excludes cancelled rows, so none can
+          -- reach here. Projected anyway so the now, upcoming and past band
+          -- objects share one shape -- without it the key is absent rather
+          -- than 0, and the next person to write a strict === 0 comparison
+          -- instead of a truthiness check gets a silent false on this bucket
+          -- only. (No backticks in this comment: it lives inside a JS
+          -- template literal, where one would terminate the string.)
+          0 AS is_cancelled
         FROM events e
         LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1) AND p.is_cancelled = 0
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id

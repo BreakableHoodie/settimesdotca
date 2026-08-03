@@ -17,6 +17,93 @@ import { describe, expect, it } from "vitest";
 import { onRequestGet as timelineHandler } from "../timeline.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 
+// The "now" query is the riskiest gate in this feature and had no test.
+// Two distinct properties, and the second is the one a careless refactor
+// breaks: moving `AND p.is_cancelled = 0` from the JOIN condition to a WHERE
+// clause demotes the LEFT JOIN to an effective INNER JOIN, which drops the
+// EVENT ROW ENTIRELY when every one of its sets is cancelled. The event would
+// vanish from "Happening Now" on the night it is running.
+describe("Timeline real-DB — the 'now' query excludes cancelled sets (#732)", () => {
+  const todayLocal = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
+  const yesterdayLocal = () =>
+    new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
+
+  // A multi-day event running yesterday -> today is unambiguously "now": the
+  // #569 doors/start edge gates only an event's FIRST day, so day 2+ is never
+  // re-gated. A single-day event dated today would instead flip between
+  // "upcoming" and "now" depending on the wall clock at test time -- passing
+  // after 20:00 and failing before it.
+  const seedRunningEvent = (rawDb, { name, slug }) => {
+    const event = insertEvent(rawDb, {
+      name,
+      slug,
+      date: yesterdayLocal(),
+      end_date: todayLocal(),
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    return event;
+  };
+
+  it("drops a cancelled set from now[].bands while keeping its scheduled sibling", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+    const event = seedRunningEvent(rawDb, { name: "Tonight Fest", slug: "tonight-fest" });
+
+    const cancelled = insertBand(rawDb, {
+      name: "Deer Fang",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    insertBand(rawDb, {
+      name: "Sam Nabi",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "21:00",
+      end_time: "22:00",
+    });
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(cancelled.id);
+
+    const response = await timelineHandler({ request: new Request("https://example.test/api/events/timeline"), env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    // Assert on WHO is there, not just how many -- a count alone would pass
+    // if the wrong one were dropped.
+    expect(found.bands.map((b) => b.name)).toEqual(["Sam Nabi"]);
+  });
+
+  it("still returns the event when EVERY set is cancelled (LEFT JOIN must not become INNER)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    const event = seedRunningEvent(rawDb, { name: "All Off Fest", slug: "all-off-fest" });
+
+    const only = insertBand(rawDb, {
+      name: "Deer Fang",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(only.id);
+
+    const response = await timelineHandler({ request: new Request("https://example.test/api/events/timeline"), env });
+    const data = await response.json();
+
+    // The event survives with an empty lineup. Under a WHERE-clause refactor
+    // it disappears from the timeline altogether.
+    const found = data.now.find((e) => e.id === event.id);
+    expect(found).toBeDefined();
+    expect(found.bands).toEqual([]);
+  });
+});
+
 describe("Timeline real-DB — is_cancelled surfaces on upcoming[].bands (#732)", () => {
   it("a cancelled set stays in upcoming[].bands with is_cancelled: 1, alongside a scheduled set with is_cancelled: 0", async () => {
     const { env, rawDb } = createTestEnv();

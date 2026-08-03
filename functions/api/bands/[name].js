@@ -1,6 +1,7 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { normalizeBandName } from "../../utils/bandName.js";
 import { safeReflectSocialLinks } from "../../utils/validation.js";
+import { eventLocalToday } from "../../utils/eventDay.js";
 
 /**
  * Public API: Get band profile by name
@@ -90,13 +91,18 @@ export async function onRequestGet(context) {
       });
     }
 
-    // Get all performances for this band profile
+    // Get all publicly visible performances for this band profile. Cancellation
+    // is intentionally NOT part of this existence gate -- see the in-memory
+    // filter below -- matching the reveal_mode precedent just below: 404 means
+    // "this band was never part of a visible lineup," not "nothing to show
+    // right now."
     const performances = await DB.prepare(
       `
       SELECT
         p.id as performance_id,
         p.start_time,
         p.end_time,
+        p.is_cancelled,
         v.name as venue_name,
         v.address as venue_address,
         v.address_line1,
@@ -108,6 +114,7 @@ export async function onRequestGet(context) {
         e.name as event_name,
         e.slug as event_slug,
         e.date as event_date,
+        e.end_date as event_end_date,
         e.is_published as event_published
       FROM performances p
       LEFT JOIN venues v ON p.venue_id = v.id
@@ -121,13 +128,25 @@ export async function onRequestGet(context) {
       .bind(bandProfile.id)
       .all();
 
-    const history = performances.results || [];
-    if (history.length === 0) {
+    const allHistory = performances.results || [];
+    if (allHistory.length === 0) {
       return new Response(JSON.stringify({ error: "Band not found" }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    // A cancelled set stays visible while its event is current -- fans need to
+    // know the set is off -- and drops out of the band's history once the
+    // event has passed, because a cancellation is frequently not the
+    // artist's fault (#732). `eventLocalToday()` is REQUIRED here: a
+    // toISOString().slice(0, 10) comparison flips to tomorrow at 8 PM Eastern
+    // (#568) and would erase cancelled sets from the live schedule
+    // mid-evening. Applied AFTER the 404 existence gate above, so a band
+    // whose only-ever performance is cancelled-and-past still gets a real
+    // profile page with an empty history, not a false "not found".
+    const today = eventLocalToday();
+    const history = allHistory.filter((p) => !p.is_cancelled || (p.event_end_date || p.event_date) >= today);
 
     const socialLinks = safeReflectSocialLinks(bandProfile.social_links);
 
@@ -150,6 +169,7 @@ export async function onRequestGet(context) {
         venue_address: p.venue_address || formatVenueAddress(p),
         start_time: p.start_time,
         end_time: p.end_time,
+        is_cancelled: p.is_cancelled,
       })),
     };
 

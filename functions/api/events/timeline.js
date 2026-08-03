@@ -252,6 +252,15 @@ export async function onRequestGet(context) {
     // the event's [date, end_date] span, so a multi-day event stays "now" on
     // day 2+ instead of sliding into "past" (#539). NULL end_date collapses
     // this to the original `e.date = today` for single-day events.
+    //
+    // `AND p.is_cancelled = 0` on the JOIN (not a WHERE clause, which would
+    // silently demote a LEFT JOIN to an INNER JOIN and drop the event row
+    // entirely when every performance is cancelled) excludes cancelled sets
+    // from this event's `bands` list and from the start-edge gate below
+    // (#732). This is the "Happening Now" query -- directing a fan to a band
+    // that is not actually playing right now is the worst failure mode of
+    // this feature, so unlike the history endpoint's past/current nuance,
+    // the exclusion here is unconditional.
     if (includeNow) {
       slots.now = statements.length;
       statements.push(
@@ -287,7 +296,7 @@ export async function onRequestGet(context) {
           v.postal_code,
           v.country
         FROM events e
-        LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
+        LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1) AND p.is_cancelled = 0
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1

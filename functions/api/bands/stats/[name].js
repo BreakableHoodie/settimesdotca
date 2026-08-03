@@ -94,7 +94,11 @@ export async function onRequestGet(context) {
       });
     }
 
-    // Get all performances for this band profile
+    // Get all performances for this band profile. A cancelled set is excluded
+    // unconditionally (unlike bands/[name].js's history endpoint, which keeps
+    // a cancelled set visible until its event is past) -- a set that never
+    // happened must never inflate total_performances, unique_venues, or the
+    // debut/latest date range (#732).
     const performances = await DB.prepare(
       `
       SELECT
@@ -124,6 +128,7 @@ export async function onRequestGet(context) {
       WHERE p.band_profile_id = ?
         AND e.status IN ('published', 'archived')
         AND (e.reveal_mode = 0 OR p.is_announced = 1)
+        AND p.is_cancelled = 0
       ORDER BY e.date DESC, COALESCE(p.performance_date, e.date) ASC, p.start_time
     `,
     )

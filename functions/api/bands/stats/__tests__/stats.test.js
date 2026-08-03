@@ -395,3 +395,122 @@ describe("GET /api/bands/stats/:name — per-performance classification (#603)",
     expect(payload.upcoming).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// #739 — a band playing two days of the same multi-day event must expose
+// each set's OWN performance_date and notes, and the two sets must be
+// ordered by that per-set day (day 1 before day 2), not by the tie-prone
+// e.date + start_time pairing that put ALL's Aug 8 set ahead of its Aug 7
+// set in production. Mirrors the real "ALL" / Buddies Fest 2 production data
+// from the issue (two bonus sets, distinct notes on each).
+// ---------------------------------------------------------------------------
+describe("GET /api/bands/stats/:name — per-set performance_date, notes, and ordering (#739)", () => {
+  test("upcoming: two sets at one multi-day event carry distinct performance_date + notes, ordered day 1 before day 2", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+    const event = insertEvent(rawDb, {
+      name: "Buddies Fest 2",
+      slug: "buddies-fest-2-739",
+      date: "2099-08-07",
+      end_date: "2099-08-09",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    // Day-1 bonus set: later performance_date-adjacent clock time (22:00) but
+    // the EARLIER performance_date — this is the exact shape that broke
+    // under "ORDER BY e.date DESC, p.start_time" (ties on e.date, so
+    // start_time alone decided order and put day 2 first).
+    const day1 = insertBand(rawDb, {
+      name: "ALL",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "22:00",
+      end_time: "23:00",
+    });
+    rawDb
+      .prepare("UPDATE performances SET performance_date=?, notes=? WHERE id=?")
+      .run("2099-08-07", "Bonus set: ALL w/ Scott (Reynolds) -- sold out", day1.id);
+
+    const day2 = insertBand(rawDb, {
+      name: "ALL",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "21:00",
+      end_time: "22:00",
+    });
+    rawDb
+      .prepare("UPDATE performances SET performance_date=?, notes=? WHERE id=?")
+      .run("2099-08-08", "Bonus set: ALL w/ Chad (Price)", day2.id);
+
+    const request = new Request("https://example.test/api/bands/stats/ALL");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.upcoming).toHaveLength(2);
+
+    // Assert on the actual dates, not just array length (a broken
+    // implementation that omits performance_date entirely still returns 2
+    // items here).
+    const dates = payload.upcoming.map((p) => p.performance_date);
+    expect(dates).toEqual(["2099-08-07", "2099-08-08"]);
+    expect(dates[0]).not.toBe(dates[1]);
+
+    // Notes on the correct set, not swapped.
+    expect(payload.upcoming[0].notes).toBe("Bonus set: ALL w/ Scott (Reynolds) -- sold out");
+    expect(payload.upcoming[1].notes).toBe("Bonus set: ALL w/ Chad (Price)");
+  });
+
+  test("past: two sets at one multi-day event carry distinct performance_date + notes, ordered day 1 before day 2", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    const event = insertEvent(rawDb, {
+      name: "Past Buddies Fest",
+      slug: "past-buddies-fest-739",
+      date: "2001-08-07",
+      end_date: "2001-08-09",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const day1 = insertBand(rawDb, {
+      name: "Kepi Ghoulie",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "18:25",
+      end_time: "18:55",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2001-08-07", day1.id);
+
+    const day2 = insertBand(rawDb, {
+      name: "Kepi Ghoulie",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "15:55",
+      end_time: "16:30",
+    });
+    rawDb
+      .prepare("UPDATE performances SET performance_date=?, notes=? WHERE id=?")
+      .run("2001-08-08", "All-ages kids set", day2.id);
+
+    const request = new Request("https://example.test/api/bands/stats/Kepi%20Ghoulie");
+    const response = await onRequestGet({ request, env });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.past).toHaveLength(2);
+
+    const dates = payload.past.map((p) => p.performance_date);
+    expect(dates).toEqual(["2001-08-07", "2001-08-08"]);
+
+    // day1 has no notes in production data — must come through as null, not
+    // undefined or the string "null".
+    expect(payload.past[0].notes).toBeNull();
+    expect(payload.past[1].notes).toBe("All-ages kids set");
+  });
+});

@@ -22,7 +22,7 @@ import { Alert, Badge, Button, Card, BandProfileSkeleton } from '../components/u
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
 import { fetchPublicJson } from '../utils/publicApi'
 import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
-import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
+import { formatPerformanceDayLabel, formatTimeRange } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
 import { useTurnstile } from '../hooks/useTurnstile'
 
@@ -741,76 +741,79 @@ export default function BandProfilePage() {
                   </h2>
                 </div>
                 <div className="space-y-4">
-                  {profile.upcoming.map((performance, idx) => (
-                    <Card key={idx} variant="outline" hoverable className="p-4">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-accent-500 mb-2">
-                            {performance.event_slug ? (
-                              <Link
-                                to={`/event/${performance.event_slug}`}
-                                className="transition-colors hover:text-accent-400 hover:underline"
-                              >
-                                {performance.event_name}
-                              </Link>
-                            ) : (
-                              performance.event_name
+                  {profile.upcoming.map(performance => {
+                    // Computed once: the guard and the rendered value must be
+                    // the same expression, or an unparseable date passes the
+                    // guard and renders a calendar icon with no label.
+                    const dayLabel = formatPerformanceDayLabel(performance)
+                    return (
+                      <Card key={performance.id} variant="outline" hoverable className="p-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-semibold text-accent-500 mb-2">
+                              {performance.event_slug ? (
+                                <Link
+                                  to={`/event/${performance.event_slug}`}
+                                  className="transition-colors hover:text-accent-400 hover:underline"
+                                >
+                                  {performance.event_name}
+                                </Link>
+                              ) : (
+                                performance.event_name
+                              )}
+                            </h3>
+                            <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
+                              {dayLabel && (
+                                <span className="flex items-center gap-2">
+                                  <CalendarDays size={14} className="text-accent-500" />
+                                  {dayLabel}
+                                </span>
+                              )}
+                              {performance.venue_name && (
+                                <span className="flex items-center gap-2">
+                                  <MapPin size={14} className="text-accent-500" />
+                                  {performance.venue_id ? (
+                                    <Link
+                                      to={`/venue/${performance.venue_id}`}
+                                      className="transition-colors hover:text-accent-400 hover:underline"
+                                    >
+                                      {performance.venue_name}
+                                    </Link>
+                                  ) : (
+                                    performance.venue_name
+                                  )}
+                                </span>
+                              )}
+                              {performance.start_time && performance.end_time && (
+                                <span className="flex items-center gap-2">
+                                  <Clock size={14} className="text-accent-500" />
+                                  {formatTimeRange(performance.start_time, performance.end_time)}
+                                </span>
+                              )}
+                            </div>
+                            {performance.notes && (
+                              <p className="mt-2 text-sm italic text-text-tertiary">{performance.notes}</p>
                             )}
-                          </h3>
-                          <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
-                            {performance.event_date && (
-                              <span className="flex items-center gap-2">
-                                <CalendarDays size={14} className="text-accent-500" />
-                                {(
-                                  parseLocalDate(performance.event_date) || new Date(performance.event_date)
-                                ).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric',
-                                })}
-                              </span>
-                            )}
-                            {performance.venue_name && (
-                              <span className="flex items-center gap-2">
-                                <MapPin size={14} className="text-accent-500" />
-                                {performance.venue_id ? (
-                                  <Link
-                                    to={`/venue/${performance.venue_id}`}
-                                    className="transition-colors hover:text-accent-400 hover:underline"
-                                  >
-                                    {performance.venue_name}
-                                  </Link>
-                                ) : (
-                                  performance.venue_name
-                                )}
-                              </span>
-                            )}
-                            {performance.start_time && performance.end_time && (
-                              <span className="flex items-center gap-2">
-                                <Clock size={14} className="text-accent-500" />
-                                {formatTimeRange(performance.start_time, performance.end_time)}
-                              </span>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              onClick={() => toggleSchedule(performance)}
+                              variant={isInSchedule(performance) ? 'success' : 'secondary'}
+                              size="sm"
+                              icon={isInSchedule(performance) ? <Check size={14} /> : <Plus size={14} />}
+                            >
+                              {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
+                            </Button>
+                            {performance.event_slug && (
+                              <Button as={Link} to={`/event/${performance.event_slug}`} variant="primary" size="sm">
+                                View Event →
+                              </Button>
                             )}
                           </div>
                         </div>
-                        <div className="flex flex-col gap-2">
-                          <Button
-                            onClick={() => toggleSchedule(performance)}
-                            variant={isInSchedule(performance) ? 'success' : 'secondary'}
-                            size="sm"
-                            icon={isInSchedule(performance) ? <Check size={14} /> : <Plus size={14} />}
-                          >
-                            {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
-                          </Button>
-                          {performance.event_slug && (
-                            <Button as={Link} to={`/event/${performance.event_slug}`} variant="primary" size="sm">
-                              View Event →
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    )
+                  })}
                 </div>
               </Card>
             )}
@@ -830,74 +833,77 @@ export default function BandProfilePage() {
                   </h2>
                 </div>
                 <div className="space-y-4">
-                  {profile.past.map((performance, idx) => (
-                    <Card key={idx} variant="outline" hoverable className="p-4">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <h3 className="text-xl font-semibold text-accent-500">
-                              {performance.event_slug ? (
-                                <Link
-                                  to={`/event/${performance.event_slug}`}
-                                  className="transition-colors hover:text-accent-400 hover:underline"
-                                >
-                                  {performance.event_name}
-                                </Link>
-                              ) : (
-                                performance.event_name
-                              )}
-                            </h3>
-                            {performance.event_status === 'archived' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-text-primary/10 text-text-tertiary border border-text-primary/10">
-                                <Archive size={12} aria-hidden="true" />
-                                Archived
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
-                            {performance.event_date && (
-                              <span className="flex items-center gap-2">
-                                <CalendarDays size={14} className="text-text-tertiary" />
-                                {(
-                                  parseLocalDate(performance.event_date) || new Date(performance.event_date)
-                                ).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric',
-                                })}
-                              </span>
-                            )}
-                            {performance.venue_name && (
-                              <span className="flex items-center gap-2">
-                                <MapPin size={14} className="text-text-tertiary" />
-                                {performance.venue_id ? (
+                  {profile.past.map(performance => {
+                    // Computed once: the guard and the rendered value must be
+                    // the same expression, or an unparseable date passes the
+                    // guard and renders a calendar icon with no label.
+                    const dayLabel = formatPerformanceDayLabel(performance)
+                    return (
+                      <Card key={performance.id} variant="outline" hoverable className="p-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <h3 className="text-xl font-semibold text-accent-500">
+                                {performance.event_slug ? (
                                   <Link
-                                    to={`/venue/${performance.venue_id}`}
+                                    to={`/event/${performance.event_slug}`}
                                     className="transition-colors hover:text-accent-400 hover:underline"
                                   >
-                                    {performance.venue_name}
+                                    {performance.event_name}
                                   </Link>
                                 ) : (
-                                  performance.venue_name
+                                  performance.event_name
                                 )}
-                              </span>
-                            )}
-                            {performance.start_time && performance.end_time && (
-                              <span className="flex items-center gap-2">
-                                <Clock size={14} className="text-text-tertiary" />
-                                {formatTimeRange(performance.start_time, performance.end_time)}
-                              </span>
+                              </h3>
+                              {performance.event_status === 'archived' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-text-primary/10 text-text-tertiary border border-text-primary/10">
+                                  <Archive size={12} aria-hidden="true" />
+                                  Archived
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
+                              {dayLabel && (
+                                <span className="flex items-center gap-2">
+                                  <CalendarDays size={14} className="text-text-tertiary" />
+                                  {dayLabel}
+                                </span>
+                              )}
+                              {performance.venue_name && (
+                                <span className="flex items-center gap-2">
+                                  <MapPin size={14} className="text-text-tertiary" />
+                                  {performance.venue_id ? (
+                                    <Link
+                                      to={`/venue/${performance.venue_id}`}
+                                      className="transition-colors hover:text-accent-400 hover:underline"
+                                    >
+                                      {performance.venue_name}
+                                    </Link>
+                                  ) : (
+                                    performance.venue_name
+                                  )}
+                                </span>
+                              )}
+                              {performance.start_time && performance.end_time && (
+                                <span className="flex items-center gap-2">
+                                  <Clock size={14} className="text-text-tertiary" />
+                                  {formatTimeRange(performance.start_time, performance.end_time)}
+                                </span>
+                              )}
+                            </div>
+                            {performance.notes && (
+                              <p className="mt-2 text-sm italic text-text-tertiary">{performance.notes}</p>
                             )}
                           </div>
+                          {performance.event_slug && (
+                            <Button as={Link} to={`/event/${performance.event_slug}`} variant="secondary" size="sm">
+                              View Event →
+                            </Button>
+                          )}
                         </div>
-                        {performance.event_slug && (
-                          <Button as={Link} to={`/event/${performance.event_slug}`} variant="secondary" size="sm">
-                            View Event →
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    )
+                  })}
                 </div>
               </Card>
             )}

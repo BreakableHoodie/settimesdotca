@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Ban, RotateCcw } from 'lucide-react'
 import { bandsApi, eventsApi, venuesApi } from '../utils/adminApi'
 import AnnouncementPlanningPanel from './AnnouncementPlanningPanel'
 import BandForm from './BandForm'
@@ -88,6 +88,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [submitting, setSubmitting] = useState(false)
   const [togglingId, setTogglingId] = useState(null)
   const [resendingId, setResendingId] = useState(null)
+  const [cancelingId, setCancelingId] = useState(null)
   const [serverConflicts, setServerConflicts] = useState({ overlaps: [], conflicts: [] })
 
   // Selected IDs for bulk delete within event
@@ -401,6 +402,21 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       showToast(err.message || 'Failed to update announced status', 'error')
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  const handleCancelToggle = async (performanceId, currentValue) => {
+    setCancelingId(performanceId)
+    try {
+      // Reversible by design (#732): cancelling never deletes the row, so
+      // restoring a set just flips this flag back — the whole point of not
+      // using DELETE to pull a band from a live lineup.
+      await bandsApi.patch(performanceId, { is_cancelled: currentValue !== 1 })
+      await loadData()
+    } catch (err) {
+      showToast(err.message || 'Failed to update cancelled status', 'error')
+    } finally {
+      setCancelingId(null)
     }
   }
 
@@ -945,7 +961,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                         return (
                           <tr
                             key={band.id}
-                            className={`hover:bg-bg-navy/30 transition-colors ${rowHighlight} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
+                            className={`hover:bg-bg-navy/30 transition-colors ${rowHighlight} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${(selectedEvent?.reveal_mode === 1 && !band.is_announced) || band.is_cancelled ? 'opacity-50' : ''}`}
                           >
                             {!readOnly && (
                               <td className="px-4 py-3">
@@ -968,7 +984,14 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                               </td>
                             )}
                             <td className="px-4 py-3 text-white font-medium">
-                              <div>{band.name}</div>
+                              <div className="flex items-center gap-2">
+                                <span>{band.name}</span>
+                                {band.is_cancelled === 1 && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-900/60 text-red-200">
+                                    Cancelled
+                                  </span>
+                                )}
+                              </div>
                               {band.notes && (
                                 <div
                                   className="text-xs font-normal text-text-tertiary mt-0.5 max-w-xs truncate"
@@ -1021,6 +1044,25 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                   </button>
                                 )}
                                 <button
+                                  type="button"
+                                  onClick={() => handleCancelToggle(band.id, band.is_cancelled)}
+                                  disabled={cancelingId === band.id}
+                                  title={
+                                    band.is_cancelled
+                                      ? 'Restore this set to the lineup'
+                                      : 'Cancel this set (reversible — the band stays on the schedule as cancelled)'
+                                  }
+                                  className={`px-4 py-2 min-h-[44px] rounded text-sm flex items-center gap-1.5 text-white ${
+                                    band.is_cancelled
+                                      ? 'bg-green-700 hover:bg-green-800'
+                                      : 'bg-orange-700 hover:bg-orange-800'
+                                  } ${cancelingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  aria-label={`${band.is_cancelled ? 'Restore' : 'Cancel'} ${band.name}`}
+                                >
+                                  {band.is_cancelled ? <RotateCcw size={14} /> : <Ban size={14} />}
+                                  {band.is_cancelled ? 'Restore' : 'Cancel'}
+                                </button>
+                                <button
                                   onClick={() => startEdit(band)}
                                   className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
                                 >
@@ -1068,7 +1110,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                     return (
                       <div
                         key={band.id}
-                        className={`px-4 py-3 space-y-2 ${cardHighlight} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${selectedEvent?.reveal_mode === 1 && !band.is_announced ? 'opacity-50' : ''}`}
+                        className={`px-4 py-3 space-y-2 ${cardHighlight} ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''} ${(selectedEvent?.reveal_mode === 1 && !band.is_announced) || band.is_cancelled ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <label className="flex items-center gap-3 text-white">
@@ -1081,6 +1123,11 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                               />
                             )}
                             <span className="font-medium">{band.name}</span>
+                            {band.is_cancelled === 1 && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-900/60 text-red-200">
+                                Cancelled
+                              </span>
+                            )}
                           </label>
                           {exactConflicts.length ? (
                             <span className="text-xs font-bold text-red-400">CONFLICT</span>
@@ -1121,6 +1168,25 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                 {band.is_announced ? <Eye size={14} /> : <EyeOff size={14} />}
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => handleCancelToggle(band.id, band.is_cancelled)}
+                              disabled={cancelingId === band.id}
+                              title={
+                                band.is_cancelled
+                                  ? 'Restore this set to the lineup'
+                                  : 'Cancel this set (reversible — the band stays on the schedule as cancelled)'
+                              }
+                              className={`px-4 py-2 min-h-[44px] rounded text-sm flex items-center gap-1.5 text-white ${
+                                band.is_cancelled
+                                  ? 'bg-green-700 hover:bg-green-800'
+                                  : 'bg-orange-700 hover:bg-orange-800'
+                              } ${cancelingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              aria-label={`${band.is_cancelled ? 'Restore' : 'Cancel'} ${band.name}`}
+                            >
+                              {band.is_cancelled ? <RotateCcw size={14} /> : <Ban size={14} />}
+                              {band.is_cancelled ? 'Restore' : 'Cancel'}
+                            </button>
                             <button
                               onClick={() => startEdit(band)}
                               className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"

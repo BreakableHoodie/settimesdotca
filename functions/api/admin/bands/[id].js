@@ -690,7 +690,7 @@ export async function onRequestPut(context) {
   }
 }
 
-// PATCH - Toggle is_announced for a performance
+// PATCH - Toggle is_announced and/or is_cancelled for a performance
 export async function onRequestPatch(context) {
   const { request, env } = context;
   const { DB } = env;
@@ -716,17 +716,32 @@ export async function onRequestPatch(context) {
     }
 
     const body = await request.json().catch(() => ({}));
-    if (typeof body.is_announced !== "boolean") {
+    const hasAnnounced = body.is_announced !== undefined;
+    const hasCancelled = body.is_cancelled !== undefined;
+
+    if (!hasAnnounced && !hasCancelled) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
-          message: "is_announced (boolean) is required",
+          message: "is_announced or is_cancelled is required",
         }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
-    const performance = await DB.prepare("SELECT id, is_announced, band_follow_notified FROM performances WHERE id = ?")
+    if (hasAnnounced && typeof body.is_announced !== "boolean") {
+      return new Response(
+        JSON.stringify({
+          error: "Bad request",
+          message: "is_announced must be a boolean",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const performance = await DB.prepare(
+      "SELECT id, is_announced, is_cancelled, band_follow_notified FROM performances WHERE id = ?",
+    )
       .bind(performanceId)
       .first();
 
@@ -751,15 +766,31 @@ export async function onRequestPatch(context) {
       );
     }
 
-    const newValue = body.is_announced ? 1 : 0;
-    await DB.prepare("UPDATE performances SET is_announced = ?, updated_at = datetime('now') WHERE id = ?")
-      .bind(newValue, performanceId)
+    const newValue = hasAnnounced ? (body.is_announced ? 1 : 0) : performance.is_announced;
+    // Reversible by design (#732): un-cancelling restores the set, which is
+    // the entire reason this is a column and not a DELETE.
+    const isCancelled = hasCancelled ? (body.is_cancelled ? 1 : 0) : performance.is_cancelled;
+
+    const updates = ["updated_at = datetime('now')"];
+    const params = [];
+    if (hasAnnounced) {
+      updates.push("is_announced = ?");
+      params.push(newValue);
+    }
+    if (hasCancelled) {
+      updates.push("is_cancelled = ?");
+      params.push(isCancelled);
+    }
+    params.push(performanceId);
+
+    await DB.prepare(`UPDATE performances SET ${updates.join(", ")} WHERE id = ?`)
+      .bind(...params)
       .run();
 
     // Queue band-follower notifications on first 0 → 1 transition.
     // Followers are batched into band_announce_queue; POST /api/admin/flush-announce-digest
     // groups them by (email, event) and sends one digest per fan per event.
-    if (newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified) {
+    if (hasAnnounced && newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified) {
       const perf = await DB.prepare(
         `SELECT p.band_profile_id, bp.name as band_name,
                 e.id as event_id, e.name as event_name, e.slug as event_slug
@@ -811,17 +842,34 @@ export async function onRequestPatch(context) {
       }
     }
 
+    // Pick the most specific audit action name: a request only ever flips one
+    // of these two flags in practice (the LineupTab announce toggle and the
+    // cancel toggle are separate buttons), but a combined request still logs
+    // sensibly rather than lying about which flag moved.
+    let auditAction = "performance.updated";
+    if (hasCancelled && !hasAnnounced) {
+      auditAction = isCancelled ? "performance.cancelled" : "performance.restored";
+    } else if (hasAnnounced && !hasCancelled) {
+      auditAction = newValue ? "performance.announced" : "performance.unannounced";
+    }
+
     await auditLog(
       env,
       user.userId,
-      newValue ? "performance.announced" : "performance.unannounced",
+      auditAction,
       "performance",
       Number(performanceId),
-      { is_announced: newValue, changedBy: user.email },
+      {
+        ...(hasAnnounced ? { is_announced: newValue } : {}),
+        ...(hasCancelled ? { is_cancelled: isCancelled } : {}),
+        changedBy: user.email,
+      },
       ipAddress,
     );
 
-    const updated = await DB.prepare("SELECT band_follow_notified FROM performances WHERE id = ?")
+    const updated = await DB.prepare(
+      "SELECT is_announced, is_cancelled, band_follow_notified FROM performances WHERE id = ?",
+    )
       .bind(performanceId)
       .first();
 
@@ -830,14 +878,15 @@ export async function onRequestPatch(context) {
         success: true,
         performance: {
           id: Number(performanceId),
-          is_announced: newValue,
+          is_announced: updated?.is_announced ?? newValue,
+          is_cancelled: updated?.is_cancelled ?? isCancelled,
           band_follow_notified: updated?.band_follow_notified ?? 0,
         },
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error("Error toggling is_announced:", error);
+    console.error("Error toggling is_announced/is_cancelled:", error);
     return new Response(
       JSON.stringify({
         error: "Database error",

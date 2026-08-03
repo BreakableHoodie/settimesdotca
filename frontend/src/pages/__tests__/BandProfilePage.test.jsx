@@ -108,6 +108,70 @@ describe('BandProfilePage — per-set performance_date, notes, and Day N label (
     expect(screen.getByText('Bonus set: ALL w/ Chad (Price)')).toBeInTheDocument()
   })
 
+  // Regression: the PAST section kept a raw-field date guard after the
+  // upcoming section moved to gating on the computed label, so an unparseable
+  // date passed the guard and rendered a calendar icon with no text beside it.
+  // Both reviewers caught this because no page-level test exercised the past
+  // section at all — this is that test.
+  it('suppresses the whole date row in the PAST section when the date is unparseable', async () => {
+    fetchPublicJson.mockReset()
+    fetchPublicJson.mockResolvedValue({
+      id: 206,
+      name: 'ALL',
+      photo_url: null,
+      photo_alt_text: null,
+      description: null,
+      genre: null,
+      origin: null,
+      social: {},
+      stats: null,
+      upcoming: [],
+      past: [
+        {
+          id: 3001,
+          event_id: 70,
+          event_name: 'Corrupted Date Show',
+          event_slug: 'corrupted-date-show',
+          event_date: 'not-a-date',
+          event_end_date: null,
+          event_status: 'published',
+          performance_date: 'not-a-date',
+          notes: null,
+          venue_id: 5,
+          venue_name: 'Blue Room',
+          venue_address: null,
+          start_time: '20:00',
+          end_time: '21:00',
+        },
+      ],
+    })
+
+    const { container } = renderPage('206')
+    expect(await screen.findByRole('heading', { level: 1, name: 'ALL' })).toBeInTheDocument()
+
+    // The event still renders (the name appears in both the card heading and
+    // its event link, hence getAllByText); only the unusable date row goes.
+    expect(screen.getAllByText('Corrupted Date Show').length).toBeGreaterThan(0)
+    expect(screen.getByText('Blue Room')).toBeInTheDocument()
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
+    expect(screen.queryByText('not-a-date')).not.toBeInTheDocument()
+
+    // Text assertions alone CANNOT catch this regression: with the old
+    // raw-field guard the label is null either way, so the row renders as a
+    // calendar icon with empty text and no assertion above changes. The
+    // defect is structural, so assert structurally — the metadata row holds
+    // the venue only, with no orphaned date entry beside it.
+    const metaRow = container.querySelector('.flex.flex-wrap.gap-3')
+    expect(metaRow).not.toBeNull()
+    const entries = [...metaRow.querySelectorAll(':scope > span')]
+    // Venue + set time only — no third, textless entry for the dead date.
+    expect(entries).toHaveLength(2)
+    // The load-bearing assertion: every entry carries text. A suppressed row
+    // is absent; a badly-guarded one is present but empty beside its icon.
+    expect(entries.map(entry => entry.textContent.trim())).not.toContain('')
+    expect(metaRow.textContent).toContain('Blue Room')
+  })
+
   it('shows no Day N label on a single-day event', async () => {
     fetchPublicJson.mockReset()
     fetchPublicJson.mockResolvedValue({

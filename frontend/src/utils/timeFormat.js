@@ -29,8 +29,12 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24
  * - Uses `performance_date` when present, falling back to `event_date` (the
  *   #543 convention: day-1 sets and single-day events store NULL
  *   performance_date).
- * - The "(Day N)" suffix is gated on `event_end_date` being non-null — a
- *   single-day event must never show a day label (#540/#541 convention).
+ * - The "(Day N)" suffix is gated on the event actually SPANNING more than one
+ *   day (`event_end_date` strictly after `event_date`) — a single-day event
+ *   must never show a day label (#540/#541 convention), including one stored
+ *   with an `end_date` equal to its `date`.
+ * - The year is shown only when it is not the current year, so an archived
+ *   performance keeps the context that places it in time.
  * - `performance_date` already stores the EVENING a set belongs to, so no
  *   after-midnight (6AM) offset is applied here on top of it — that would
  *   wrongly push a 00:35 set stored under day 1 to "(Day 2)".
@@ -46,19 +50,25 @@ export function formatPerformanceDayLabel(performance) {
   if (!rawDate) return null
 
   const displayDate = parseLocalDate(rawDate) || new Date(rawDate)
+  // Keep the year on anything outside the current one. A band's history spans
+  // years, and "Sun, May 22" strips the only thing that places an archived set
+  // in time; current-year dates stay compact.
+  const showYear = displayDate.getFullYear() !== new Date().getFullYear()
   const dateLabel = displayDate.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
+    ...(showYear ? { year: 'numeric' } : {}),
   })
 
-  if (!performance?.event_end_date) {
-    return dateLabel
-  }
-
-  const eventStart = parseLocalDate(performance.event_date)
+  const eventStart = parseLocalDate(performance?.event_date)
+  const eventEnd = parseLocalDate(performance?.event_end_date)
   const perfDay = parseLocalDate(rawDate)
-  if (!eventStart || !perfDay) {
+  // "Multi-day" means the event actually SPANS more than one day. Gating on
+  // event_end_date being merely non-null treats an event stored with end_date
+  // EQUAL to date as multi-day and renders a redundant "(Day 1)" on what is a
+  // single-day event (#540/#541).
+  if (!eventStart || !eventEnd || !perfDay || eventEnd.getTime() <= eventStart.getTime()) {
     return dateLabel
   }
 

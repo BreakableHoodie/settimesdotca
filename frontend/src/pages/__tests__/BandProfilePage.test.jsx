@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BandProfilePage from '../BandProfilePage.jsx'
 import { ThemeProvider } from '../../components/ThemeProvider.jsx'
 import { fetchPublicJson } from '../../utils/publicApi'
@@ -30,6 +30,22 @@ function renderPage(id = '206') {
 // fix (performance_date + notes emitted, ordered day 1 before day 2) lands.
 // ---------------------------------------------------------------------------
 describe('BandProfilePage — per-set performance_date, notes, and Day N label (#739)', () => {
+  // The fixtures below use 2099 so the sets always classify as "upcoming"
+  // regardless of when the suite runs. Pin the clock into that same year so
+  // they also read as CURRENT-year dates — which is what the real case is
+  // (Buddies Fest 2 is a current-year event), and the year suffix that
+  // formatPerformanceDayLabel adds for other years therefore stays out of the
+  // expected strings. Without this, the assertions would encode a rendering
+  // ("Fri, Aug 7, 2099") that never appears for the bug being fixed.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(2099, 7, 1)) // 2099-08-01, before both fixtures
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it("renders each set's OWN date (Aug 7 and Aug 8), not the event start date twice, with a Day N label on the multi-day event", async () => {
     fetchPublicJson.mockReset()
     fetchPublicJson.mockResolvedValue({

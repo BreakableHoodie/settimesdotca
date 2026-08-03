@@ -108,11 +108,9 @@ describe('BandProfilePage — per-set performance_date, notes, and Day N label (
     expect(screen.getByText('Bonus set: ALL w/ Chad (Price)')).toBeInTheDocument()
   })
 
-  // Regression: the PAST section kept a raw-field date guard after the
-  // upcoming section moved to gating on the computed label, so an unparseable
-  // date passed the guard and rendered a calendar icon with no text beside it.
-  // Both reviewers caught this because no page-level test exercised the past
-  // section at all — this is that test.
+  // #739: an unparseable-but-non-empty date must suppress the ENTIRE date row,
+  // icon included. Guarding on the raw date field instead of the computed
+  // label leaves the icon rendered beside empty text.
   it('suppresses the whole date row in the PAST section when the date is unparseable', async () => {
     fetchPublicJson.mockReset()
     fetchPublicJson.mockResolvedValue({
@@ -146,7 +144,7 @@ describe('BandProfilePage — per-set performance_date, notes, and Day N label (
       ],
     })
 
-    const { container } = renderPage('206')
+    renderPage('206')
     expect(await screen.findByRole('heading', { level: 1, name: 'ALL' })).toBeInTheDocument()
 
     // The event still renders (the name appears in both the card heading and
@@ -161,7 +159,10 @@ describe('BandProfilePage — per-set performance_date, notes, and Day N label (
     // calendar icon with empty text and no assertion above changes. The
     // defect is structural, so assert structurally — the metadata row holds
     // the venue only, with no orphaned date entry beside it.
-    const metaRow = container.querySelector('.flex.flex-wrap.gap-3')
+    // Anchored on THIS performance's venue: a page-level query would match the
+    // first metadata row anywhere on the page, which could belong to a
+    // different performance and would let the empty entry survive undetected.
+    const metaRow = screen.getByText('Blue Room').closest('.flex.flex-wrap.gap-3')
     expect(metaRow).not.toBeNull()
     const entries = [...metaRow.querySelectorAll(':scope > span')]
     // Venue + set time only — no third, textless entry for the dead date.

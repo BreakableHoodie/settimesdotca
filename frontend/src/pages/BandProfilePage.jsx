@@ -741,13 +741,13 @@ export default function BandProfilePage() {
                   </h2>
                 </div>
                 <div className="space-y-4">
-                  {profile.upcoming.map((performance, idx) => {
+                  {profile.upcoming.map(performance => {
                     // Computed once: the guard and the rendered value must be
                     // the same expression, or an unparseable date passes the
                     // guard and renders a calendar icon with no label.
                     const dayLabel = formatPerformanceDayLabel(performance)
                     return (
-                      <Card key={idx} variant="outline" hoverable className="p-4">
+                      <Card key={performance.id} variant="outline" hoverable className="p-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
                             <h3 className="text-xl font-semibold text-accent-500 mb-2">
@@ -833,13 +833,13 @@ export default function BandProfilePage() {
                   </h2>
                 </div>
                 <div className="space-y-4">
-                  {profile.past.map((performance, idx) => {
+                  {profile.past.map(performance => {
                     // Computed once: the guard and the rendered value must be
                     // the same expression, or an unparseable date passes the
                     // guard and renders a calendar icon with no label.
                     const dayLabel = formatPerformanceDayLabel(performance)
                     return (
-                      <Card key={idx} variant="outline" hoverable className="p-4">
+                      <Card key={performance.id} variant="outline" hoverable className="p-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">

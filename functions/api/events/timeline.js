@@ -195,6 +195,12 @@ export async function onRequestGet(context) {
               photo_url: row.photo_url,
               venue_id: row.venue_id,
               venue_name: row.venue_name,
+              // Present on "upcoming"/"past" rows (their SELECTs project
+              // p.is_cancelled). "now" never selects it because its JOIN
+              // condition already excludes cancelled rows outright (#732) —
+              // a cancelled set can never reach this push from that query, so
+              // the key is simply absent there rather than a redundant 0.
+              is_cancelled: row.is_cancelled,
             });
           }
 
@@ -330,6 +336,7 @@ export async function onRequestGet(context) {
           b.name as band_name,
           p.start_time,
           p.end_time,
+          p.is_cancelled,
           b.social_links,
           b.genre,
           b.origin,
@@ -386,6 +393,7 @@ export async function onRequestGet(context) {
           b.name as band_name,
           p.start_time,
           p.end_time,
+          p.is_cancelled,
           b.social_links,
           b.genre,
           b.origin,

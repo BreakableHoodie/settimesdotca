@@ -1,4 +1,4 @@
-import { Archive, CalendarDays, Check, Clock, Funnel, History, MapPin, Music, X } from 'lucide-react'
+import { Archive, CalendarDays, Check, Clock, Funnel, History, MapPin, Music, TriangleAlert, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
@@ -807,18 +807,31 @@ function EventCard({
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-text-tertiary text-sm mb-3">Performers:</p>
             <div className="flex flex-wrap gap-2">
-              {featuredBands.map(band => (
-                <Badge
-                  key={band.id}
-                  as="a"
-                  href={buildBandProfileHref(band.name, event.slug)}
-                  variant="default"
-                  size="md"
-                  className="hover:bg-primary-500/20 cursor-pointer transition-colors"
-                >
-                  {band.name}
-                </Badge>
-              ))}
+              {featuredBands.map(band => {
+                // `is_cancelled` is a raw SQLite 0/1 INTEGER, not a boolean --
+                // `0 && <X/>` renders the literal text "0" in React (only
+                // false/null/undefined render nothing), so this MUST be
+                // coerced before using it in `&&` JSX expressions below.
+                const isCancelled = Boolean(band.is_cancelled)
+                return (
+                  <Badge
+                    key={band.id}
+                    as="a"
+                    href={buildBandProfileHref(band.name, event.slug)}
+                    variant={isCancelled ? 'warning' : 'default'}
+                    size="md"
+                    className="hover:bg-primary-500/20 cursor-pointer transition-colors inline-flex items-center gap-1.5"
+                  >
+                    {isCancelled && <TriangleAlert size={12} aria-hidden="true" />}
+                    {isCancelled ? <s>{band.name}</s> : band.name}
+                    {/* The visible label is the accessible carrier, not the
+                        strikethrough -- line-through alone is not announced by
+                        NVDA/JAWS by default (WCAG 1.4.1). Matches the BandCard
+                        cancelled pill on the live schedule (#732). */}
+                    {isCancelled && <span>Cancelled</span>}
+                  </Badge>
+                )
+              })}
             </div>
           </div>
         )}

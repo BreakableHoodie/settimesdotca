@@ -19,7 +19,7 @@ function BandCard({
   currentTime,
 }) {
   const handleToggle = () => {
-    if (!clickable) return
+    if (!isInteractive) return
     onToggle?.(band.id)
   }
 
@@ -30,17 +30,22 @@ function BandCard({
   }
 
   const handleKeyDown = e => {
-    if (!clickable) return
+    if (!isInteractive) return
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       handleToggle()
     }
   }
 
-  const isPlaying = isHappeningNow(band)
+  // A cancelled set is never live, never "starting soon", and never
+  // selectable. Both isHappeningNow and isStartingSoon are pure time math
+  // (#732) and will light up a cancelled row otherwise.
+  const isCancelled = Boolean(band.is_cancelled)
+  const isPlaying = !isCancelled && isHappeningNow(band)
   const nowMs = +currentTime
-  const startingSoon = isStartingSoon(band, currentTime)
+  const startingSoon = !isCancelled && isStartingSoon(band, currentTime)
   const minutesUntil = startingSoon ? Math.ceil((band.startMs - nowMs) / 60000) : 0
+  const isInteractive = clickable && !isCancelled
 
   // Both selected and playing states use the amber gradient — dark text required throughout
   const onAmber = isSelected || isPlaying
@@ -59,15 +64,15 @@ function BandCard({
   return (
     <div
       className={`${baseClasses} ${
-        clickable ? 'cursor-pointer hover:brightness-110 active:scale-95' : 'cursor-default'
+        isInteractive ? 'cursor-pointer hover:brightness-110 active:scale-95' : 'cursor-default'
       }`}
-      onClick={clickable ? handleToggle : undefined}
-      onKeyDown={clickable ? handleKeyDown : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      role={clickable ? undefined : 'group'}
-      aria-label={clickable ? undefined : `${band.name} at ${band.venue}`}
+      onClick={isInteractive ? handleToggle : undefined}
+      onKeyDown={isInteractive ? handleKeyDown : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      role={isInteractive ? undefined : 'group'}
+      aria-label={isInteractive ? undefined : `${band.name} at ${band.venue}`}
     >
-      {showToggleButton && (
+      {showToggleButton && !isCancelled && (
         <button
           type="button"
           onClick={handleRemove}
@@ -107,19 +112,35 @@ function BandCard({
               state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
               onClick={e => e.stopPropagation()}
               className={`font-display font-bold text-base md:text-lg leading-snug transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
-                onAmber ? 'text-bg-navy' : 'text-text-primary hover:text-accent-400'
+                onAmber
+                  ? 'text-bg-navy'
+                  : isCancelled
+                    ? 'text-text-secondary'
+                    : 'text-text-primary hover:text-accent-400'
               }`}
             >
-              {band.name}
+              {isCancelled ? <s>{band.name}</s> : band.name}
             </Link>
           ) : (
             <h3
-              className={`font-display font-bold text-base md:text-lg leading-snug ${onAmber ? 'text-bg-navy' : 'text-text-primary'}`}
+              className={`font-display font-bold text-base md:text-lg leading-snug ${
+                onAmber ? 'text-bg-navy' : isCancelled ? 'text-text-secondary' : 'text-text-primary'
+              }`}
             >
-              Unnamed Artist
+              {isCancelled ? <s>Unnamed Artist</s> : 'Unnamed Artist'}
             </h3>
           )}
         </div>
+        {isCancelled && (
+          <span
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+              onAmber ? 'bg-yellow-900/80 text-yellow-100' : 'bg-warning-500/25 text-text-primary'
+            }`}
+          >
+            <TriangleAlert size={14} aria-hidden="true" />
+            Cancelled
+          </span>
+        )}
         {band.genre && (
           <span
             className={`text-xs px-2 py-0.5 rounded-full border leading-normal ${

@@ -9,6 +9,18 @@ import { formatPerformanceDayLabel } from '../timeFormat'
 // (#540/#541).
 // ---------------------------------------------------------------------------
 describe('formatPerformanceDayLabel (#739)', () => {
+  // These fixtures are 2026 dates asserted WITHOUT a year, which is only
+  // correct while 2026 is the current year. Unpinned, every expectation here
+  // starts failing on 2027-01-01 when the year is correctly appended.
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 3)) // 2026-08-03, local midnight
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   test('single-day event: no Day N label, even when performance_date is set', () => {
     const label = formatPerformanceDayLabel({
       performance_date: '2026-08-08',
@@ -134,6 +146,18 @@ describe('formatPerformanceDayLabel — year and single-day gating (#739)', () =
       event_end_date: '2027-08-09',
     })
     expect(label).toBe('Sun, Aug 8, 2027 (Day 2)')
+  })
+
+  // A malformed date is non-empty, so a caller guarding on "is the field set?"
+  // reaches the formatter. It must return null, not the literal string
+  // "Invalid Date" rendered onto the page next to a calendar icon.
+  test('malformed date returns null rather than "Invalid Date"', () => {
+    const label = formatPerformanceDayLabel({
+      performance_date: 'not-a-date',
+      event_date: 'not-a-date',
+      event_end_date: null,
+    })
+    expect(label).toBeNull()
   })
 
   test('event_end_date EQUAL to event_date is single-day: no Day label', () => {

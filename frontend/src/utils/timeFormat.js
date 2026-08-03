@@ -49,7 +49,11 @@ export function formatPerformanceDayLabel(performance) {
   const rawDate = performance?.performance_date || performance?.event_date
   if (!rawDate) return null
 
+  // A malformed date string is non-empty, so a caller guarding on "is the date
+  // field set?" would still reach this. Return null rather than letting
+  // toLocaleDateString render the literal text "Invalid Date" onto the page.
   const displayDate = parseLocalDate(rawDate) || new Date(rawDate)
+  if (Number.isNaN(displayDate.getTime())) return null
   // Keep the year on anything outside the current one. A band's history spans
   // years, and "Sun, May 22" strips the only thing that places an archived set
   // in time; current-year dates stay compact.

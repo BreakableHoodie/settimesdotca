@@ -758,7 +758,7 @@ export default function BandProfilePage() {
                             )}
                           </h3>
                           <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
-                            {(performance.performance_date || performance.event_date) && (
+                            {formatPerformanceDayLabel(performance) && (
                               <span className="flex items-center gap-2">
                                 <CalendarDays size={14} className="text-accent-500" />
                                 {formatPerformanceDayLabel(performance)}

@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { axe, toHaveNoViolations } from 'jest-axe'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BandCard from '../BandCard'
+
+expect.extend(toHaveNoViolations)
 
 // A set that IS currently playing by the clock, so any suppression assertion
 // below proves the guard fired -- not merely that the fixture lacked data.
@@ -40,6 +43,29 @@ describe('BandCard — cancelled sets', () => {
   })
   afterEach(() => {
     delete globalThis.__debugScheduleTime
+  })
+
+  // WCAG 1.4.1 (Use of Colour): cancellation must NOT be carried by the
+  // strikethrough alone. `text-decoration: line-through` is not announced by
+  // NVDA or JAWS by default, so a screen-reader user would hear an ordinary
+  // set. The visible "Cancelled" text is the accessible carrier; the <s> is
+  // the sighted redundancy. Assert BOTH, and that they sit on the same card.
+  it('conveys cancellation in text, not by strikethrough alone (WCAG 1.4.1)', async () => {
+    const { container } = renderCard({ is_cancelled: 1 })
+
+    const struck = container.querySelector('s')
+    expect(struck).not.toBeNull()
+    expect(struck.textContent).toContain('Deer Fang')
+
+    // The state reaches the accessibility tree as text, independent of styling.
+    expect(container.textContent).toMatch(/cancelled/i)
+
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('has no axe violations when NOT cancelled either (baseline)', async () => {
+    const { container } = renderCard({ is_cancelled: 0 })
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('shows a visible Cancelled pill', () => {

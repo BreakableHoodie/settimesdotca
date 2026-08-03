@@ -151,7 +151,7 @@ export async function onRequestGet(context) {
         endTime: extractTime(band.endTime),
         url: primaryUrl,
         notes: band.notes || null,
-        is_cancelled: band.is_cancelled ?? 0,
+        is_cancelled: band.is_cancelled,
       };
     });
 

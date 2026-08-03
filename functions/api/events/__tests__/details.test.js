@@ -244,6 +244,48 @@ describe("GET /api/events/:id/details - reveal_mode gate", () => {
   });
 });
 
+describe("GET /api/events/:id/details - is_cancelled (#732)", () => {
+  test("flips is_cancelled to 1 and keeps the row -- this endpoint never gates", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Cancel Details Event",
+      slug: "details-cancel-732",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    const band = insertBand(rawDb, {
+      name: "Deer Fang",
+      event_id: event.id,
+      venue_id: venue.id,
+    });
+
+    const fetchDetails = () =>
+      onRequestGet({
+        request: new Request(`https://example.test/api/events/${event.id}/details`),
+        env,
+        params: { id: String(event.id) },
+      });
+
+    const before = await (await fetchDetails()).json();
+    const beforeBand = before.bands.find((b) => b.performance_id === band.id);
+    // toHaveProperty proves the column is actually PROJECTED -- a dropped
+    // `p.is_cancelled` in the SELECT yields `undefined`, which JSON.stringify
+    // strips entirely, so a missing-property check catches it where a `?? 0`
+    // fallback would silently pass.
+    expect(beforeBand).toHaveProperty("is_cancelled", 0);
+
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(band.id);
+
+    const after = await (await fetchDetails()).json();
+    const afterBand = after.bands.find((b) => b.performance_id === band.id);
+    // This endpoint never gates -- the row must still be present.
+    expect(afterBand).toBeDefined();
+    expect(afterBand).toHaveProperty("is_cancelled", 1);
+  });
+});
+
 describe("GET /api/events/:id/details - ticket_url sanitization (#504)", () => {
   test("nulls out a legacy javascript: ticket_url value seeded directly via SQL", async () => {
     const { env, rawDb } = createTestEnv();

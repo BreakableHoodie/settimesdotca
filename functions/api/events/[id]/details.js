@@ -124,7 +124,7 @@ export async function onRequestGet(context) {
         name: row.band_name,
         start_time: row.start_time,
         end_time: row.end_time,
-        is_cancelled: row.is_cancelled ?? 0,
+        is_cancelled: row.is_cancelled,
         genre: row.genre,
         photo_url: row.photo_url,
         venue_id: row.venue_id,

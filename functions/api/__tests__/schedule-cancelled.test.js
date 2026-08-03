@@ -17,7 +17,11 @@ describe("GET /api/schedule — is_cancelled", () => {
     const beforeRes = await scheduleHandler.onRequestGet({ request: beforeReq, env });
     const beforeData = await beforeRes.json();
     const beforeBand = beforeData.bands.find((b) => b.performance_id === performanceId);
-    expect(beforeBand.is_cancelled).toBe(0);
+    // toHaveProperty proves the column is actually PROJECTED, not merely
+    // defaulted: JSON.stringify drops an `undefined` value entirely, so if
+    // `p.is_cancelled` were dropped from the SELECT this would fail on a
+    // missing property instead of silently passing via a `?? 0` fallback.
+    expect(beforeBand).toHaveProperty("is_cancelled", 0);
 
     rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(performanceId);
 
@@ -27,6 +31,6 @@ describe("GET /api/schedule — is_cancelled", () => {
     const afterBand = afterData.bands.find((b) => b.performance_id === performanceId);
     // The row is still present -- this endpoint never gates.
     expect(afterBand).toBeDefined();
-    expect(afterBand.is_cancelled).toBe(1);
+    expect(afterBand).toHaveProperty("is_cancelled", 1);
   });
 });

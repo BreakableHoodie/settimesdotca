@@ -22,13 +22,23 @@ const SEND_CONCURRENCY = 8;
 export async function flushAnnounceDigest(env, DB) {
   const publicUrl = getPublicBaseUrl(env);
 
-  // Fetch every pending entry, joining band_follows for email + unsubscribe_token.
+  // Fetch every pending entry, joining band_follows for email + unsubscribe_token
+  // and performances for a fresh is_cancelled read. The performance can be
+  // cancelled AFTER it was queued but BEFORE this flush runs — admin/bands/[id].js
+  // sweeps its own queue rows on cancel, but that's a separate request from
+  // this one, so a row queued moments earlier can still be sitting here when
+  // the cancellation lands. Joining performances (not trusting the queue
+  // row's stale snapshot) closes that race (#732 MAJOR 1). ON DELETE CASCADE
+  // on performance_id (migration 0046) means a hard-deleted performance's
+  // queue rows are already gone by the time this runs, so an INNER JOIN never
+  // silently strands one.
   const { results: queue } = await DB.prepare(
     `SELECT q.id, q.band_follow_id, q.performance_id, q.event_id,
             q.band_name, q.event_name, q.event_slug, q.band_profile_id,
-            bf.email, bf.unsubscribe_token
+            bf.email, bf.unsubscribe_token, p.is_cancelled
      FROM band_announce_queue q
      JOIN band_follows bf ON bf.id = q.band_follow_id
+     JOIN performances p ON p.id = q.performance_id
      ORDER BY q.event_id, bf.email, q.queued_at`,
   ).all();
 
@@ -53,11 +63,20 @@ export async function flushAnnounceDigest(env, DB) {
     const { email, event_name, event_slug } = items[0];
     const eventUrl = `${publicUrl}/event/${event_slug}`;
 
+    // A performance cancelled between queuing and this flush (#732 MAJOR 1)
+    // must never be claimed or sent — excluded up front, before the claim
+    // loop even runs, so it can never consume a band_follow_notifications
+    // row. Leaving that row unclaimed is what lets a later restore + fresh
+    // announce still reach this fan; claiming it here (even without sending)
+    // would permanently hide them from resend-announcement's recovery query.
+    const liveItems = items.filter((item) => !item.is_cancelled);
+    const cancelledCount = items.length - liveItems.length;
+
     // Claim each (performance_id, band_follow_id) atomically before sending.
     // INSERT OR IGNORE: changes=0 means already claimed by a concurrent flush
     // or by the resend-announcement endpoint — skip those items.
     const claimed = [];
-    for (const item of items) {
+    for (const item of liveItems) {
       const result = await DB.prepare(
         "INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)",
       )
@@ -66,12 +85,15 @@ export async function flushAnnounceDigest(env, DB) {
       if (result.meta.changes > 0) claimed.push(item);
     }
 
-    // Delete every queue entry for this group — whether claimed now or
-    // already handled by a concurrent path.
+    // Delete every queue entry for this group — whether claimed now,
+    // cancelled, or already handled by a concurrent path. A cancelled entry
+    // must not accumulate as a dead row forever.
     await DB.batch(items.map((item) => DB.prepare("DELETE FROM band_announce_queue WHERE id = ?").bind(item.id)));
 
+    skipped += cancelledCount;
+
     if (!claimed.length) {
-      skipped += items.length;
+      skipped += liveItems.length;
       continue;
     }
 

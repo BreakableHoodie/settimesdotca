@@ -797,6 +797,16 @@ export async function onRequestPatch(context) {
       .bind(...params)
       .run();
 
+    // Sweep this performance's own pending band_announce_queue rows the
+    // moment it's cancelled (#732 MAJOR 1 hygiene) -- a set that will never
+    // be sent shouldn't sit in the queue as a dead row. The digest itself
+    // also re-checks is_cancelled at send time (functions/utils/announceDigest.js)
+    // as a second layer of defense for the race where cancellation lands
+    // between the queue insert and the flush's read.
+    if (hasCancelled && isCancelled === 1) {
+      await DB.prepare("DELETE FROM band_announce_queue WHERE performance_id = ?").bind(performanceId).run();
+    }
+
     // Queue band-follower notifications on first 0 → 1 transition.
     // Followers are batched into band_announce_queue; POST /api/admin/flush-announce-digest
     // groups them by (email, event) and sends one digest per fan per event.

@@ -97,4 +97,71 @@ describe("admin single-band handler — is_cancelled", () => {
     const after = await getListForEvent();
     expect(after.find((b) => b.id === performanceId).is_cancelled).toBe(1);
   });
+
+  // #732 MAJOR 1 hygiene — cancelling a performance must sweep its own
+  // pending band_announce_queue rows, so the queue doesn't accumulate dead
+  // entries for a set that will never be sent (the digest itself also
+  // re-checks is_cancelled at send time as a second layer of defense — see
+  // functions/api/admin/bands/__tests__/announce-digest-cancelled.test.js).
+  it("deletes the performance's own pending band_announce_queue rows when cancelled", async () => {
+    const { db, eventId, performanceId, patch } = await seedEditorContext();
+    const bandProfileId = db
+      .prepare("SELECT band_profile_id FROM performances WHERE id = ?")
+      .get(performanceId).band_profile_id;
+
+    const followId = db
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("hygiene@example.com", bandProfileId, "tok-hygiene").lastInsertRowid;
+    db.prepare(
+      `INSERT INTO band_announce_queue
+       (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(followId, performanceId, eventId, "Cancel Band", "CancelToggle Event", "cancel-toggle-event", bandProfileId);
+
+    await patch({ is_cancelled: true });
+
+    const remaining = db.prepare("SELECT * FROM band_announce_queue WHERE performance_id = ?").all(performanceId);
+    expect(remaining).toHaveLength(0);
+  });
+
+  it("only sweeps the cancelled performance's own queue rows, leaving a sibling performance's rows untouched", async () => {
+    const { db, eventId, performanceId, patch } = await seedEditorContext();
+    const venue = insertVenue(db, { name: "Sibling Venue" });
+    const sibling = insertBand(db, { name: "Sibling Band", event_id: eventId, venue_id: venue.id });
+
+    const bandProfileId = db
+      .prepare("SELECT band_profile_id FROM performances WHERE id = ?")
+      .get(performanceId).band_profile_id;
+
+    const followId = db
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("hygiene-scope@example.com", bandProfileId, "tok-hygiene-scope").lastInsertRowid;
+    const siblingFollowId = db
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("hygiene-scope@example.com", sibling.band_profile_id, "tok-hygiene-scope-2").lastInsertRowid;
+
+    db.prepare(
+      `INSERT INTO band_announce_queue
+       (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(followId, performanceId, eventId, "Cancel Band", "CancelToggle Event", "cancel-toggle-event", bandProfileId);
+    db.prepare(
+      `INSERT INTO band_announce_queue
+       (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      siblingFollowId,
+      sibling.id,
+      eventId,
+      "Sibling Band",
+      "CancelToggle Event",
+      "cancel-toggle-event",
+      sibling.band_profile_id,
+    );
+
+    await patch({ is_cancelled: true });
+
+    expect(db.prepare("SELECT * FROM band_announce_queue WHERE performance_id = ?").all(performanceId)).toHaveLength(0);
+    expect(db.prepare("SELECT * FROM band_announce_queue WHERE performance_id = ?").all(sibling.id)).toHaveLength(1);
+  });
 });

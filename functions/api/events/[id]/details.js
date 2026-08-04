@@ -82,7 +82,10 @@ export async function onRequestGet(context) {
       LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
         AND (? = 0 OR p.is_announced = 1)
-      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time, v.name
+      -- Final key is the BAND name, not the venue's: two bands sharing a venue
+      -- and start time would otherwise come back in non-deterministic order.
+      -- Matches recap.js, which already orders on bp.name.
+      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time, b.name
     `,
     )
       .bind(eventId, event.reveal_mode ?? 0, event.date)

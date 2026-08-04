@@ -1495,10 +1495,12 @@ describe("Timeline real-DB — end-edge gate (#751)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
-    // 2026-07-11T10:15:00Z = 06:15 EDT on Jul 11 — just past the after-midnight
-    // threshold. The event must not linger in "now" forever.
+    // 2026-07-11T10:00:00Z = 06:00 EDT on Jul 11 -- EXACTLY at the threshold.
+    // eventLocalFestivalToday() steps back only while hour < 6, so testing
+    // 06:15 would still pass against an implementation that used > instead
+    // of >=. The boundary instant is the only one that discriminates.
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-11T10:15:00Z"));
+    vi.setSystemTime(new Date("2026-07-11T10:00:00Z"));
 
     const event = insertEvent(rawDb, {
       name: "After Midnight Single Night Cutover",

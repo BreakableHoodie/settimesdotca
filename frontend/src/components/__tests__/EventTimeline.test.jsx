@@ -45,20 +45,26 @@ describe('EventTimeline', () => {
       resolveDetails = resolve
     })
 
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
 
-      if (url === '/api/events/1/details') {
-        return detailsPromise
-      }
+        if (url === '/api/events/1/details') {
+          return detailsPromise
+        }
 
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
   })
 
   afterEach(() => {
+    // restoreAllMocks does NOT undo a direct assignment to global.fetch --
+    // only unstubAllGlobals does, and only for vi.stubGlobal'd properties.
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -128,18 +134,24 @@ describe('EventTimeline duplicate performer chips (#605)', () => {
       resolveDetails = resolve
     })
 
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      if (url === '/api/events/1/details') {
-        return detailsPromise
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        if (url === '/api/events/1/details') {
+          return detailsPromise
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
   })
 
   afterEach(() => {
+    // restoreAllMocks does NOT undo a direct assignment to global.fetch --
+    // only unstubAllGlobals does, and only for vi.stubGlobal'd properties.
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -230,15 +242,21 @@ describe('EventTimeline recap links', () => {
       upcoming: [{ ...baseEvent, id: 1, name: 'Upcoming Fest', slug: 'upcoming-fest', date: '2099-05-10' }],
       past: [{ ...baseEvent, id: 2, name: 'Past Fest', slug: 'past-fest', date: '2020-05-10' }],
     }
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
   })
 
   afterEach(() => {
+    // restoreAllMocks does NOT undo a direct assignment to global.fetch --
+    // only unstubAllGlobals does, and only for vi.stubGlobal'd properties.
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -270,6 +288,9 @@ describe('EventTimeline recap links', () => {
 // for a single-day event (#540/#541: no lone "Day 1").
 describe('EventTimeline performance day labels (#743)', () => {
   afterEach(() => {
+    // restoreAllMocks does NOT undo a direct assignment to global.fetch --
+    // only unstubAllGlobals does, and only for vi.stubGlobal'd properties.
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -299,15 +320,18 @@ describe('EventTimeline performance day labels (#743)', () => {
     const detailsPromise = new Promise(resolve => {
       resolveDetails = resolve
     })
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      if (url === '/api/events/1/details') {
-        return detailsPromise
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        if (url === '/api/events/1/details') {
+          return detailsPromise
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
 
     render(
       <MemoryRouter>
@@ -394,15 +418,18 @@ describe('EventTimeline performance day labels (#743)', () => {
     const detailsPromise = new Promise(resolve => {
       resolveDetails = resolve
     })
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      if (url === '/api/events/1/details') {
-        return detailsPromise
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        if (url === '/api/events/1/details') {
+          return detailsPromise
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
 
     render(
       <MemoryRouter>
@@ -426,7 +453,11 @@ describe('EventTimeline performance day labels (#743)', () => {
             venue_name: 'The Mill',
             start_time: '20:00',
             end_time: '20:45',
-            performance_date: null,
+            // POPULATED, not null: the API supplies each set's own date, so a
+            // null fixture would only exercise the missing-date path and
+            // would not catch a regression that renders a label whenever
+            // performance_date exists on a single-day event.
+            performance_date: '2026-08-07',
           },
         ],
         band_count: 1,
@@ -442,7 +473,7 @@ describe('EventTimeline performance day labels (#743)', () => {
 
     // A single-day event must not show a redundant date on every set (#540/#541).
     const soleDayLabel = formatPerformanceDayLabel({
-      performance_date: null,
+      performance_date: '2026-08-07',
       event_date: '2026-08-07',
       event_end_date: null,
     })
@@ -455,6 +486,9 @@ describe('EventTimeline performance day labels (#743)', () => {
 // first real word) — regardless of the set-time order the API returns.
 describe('EventTimeline collapsed performer chips ordering', () => {
   afterEach(() => {
+    // restoreAllMocks does NOT undo a direct assignment to global.fetch --
+    // only unstubAllGlobals does, and only for vi.stubGlobal'd properties.
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -484,12 +518,15 @@ describe('EventTimeline collapsed performer chips ordering', () => {
       past: [],
     }
 
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
 
     render(
       <MemoryRouter>
@@ -515,6 +552,9 @@ describe('EventTimeline collapsed performer chips ordering', () => {
 // haven't had a poster uploaded yet.
 describe('EventTimeline poster thumbnails (#658)', () => {
   afterEach(() => {
+    // restoreAllMocks does NOT undo a direct assignment to global.fetch --
+    // only unstubAllGlobals does, and only for vi.stubGlobal'd properties.
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -547,12 +587,15 @@ describe('EventTimeline poster thumbnails (#658)', () => {
       past: [],
     }
 
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
 
     const { container } = render(
       <MemoryRouter>
@@ -599,12 +642,15 @@ describe('EventTimeline poster thumbnails (#658)', () => {
       past: [],
     }
 
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
 
     const { container } = render(
       <MemoryRouter>
@@ -625,6 +671,9 @@ describe('EventTimeline poster thumbnails (#658)', () => {
 // fetches a single past poster until "Show History" is clicked.
 describe('EventTimeline past-section poster lazy mounting (#658)', () => {
   afterEach(() => {
+    // restoreAllMocks does NOT undo a direct assignment to global.fetch --
+    // only unstubAllGlobals does, and only for vi.stubGlobal'd properties.
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -650,12 +699,15 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       past: [pastEvent(1, 'Past Fest One'), pastEvent(2, 'Past Fest Two'), pastEvent(3, 'Past Fest Three')],
     }
 
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
 
     const { container } = render(
       <MemoryRouter>
@@ -765,12 +817,15 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       ],
     }
 
-    global.fetch = vi.fn(url => {
-      if (url.startsWith('/api/events/timeline')) {
-        return Promise.resolve(jsonResponse(timelineData))
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
-    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
 
     const { container } = render(
       <MemoryRouter>

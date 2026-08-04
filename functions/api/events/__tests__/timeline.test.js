@@ -1425,6 +1425,166 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Real-DB — end-edge gate (#751). The "now"/"past" split bound to
+// eventLocalToday() (the CALENDAR day) drops an event out of "now" into
+// "past" at local midnight on its last night, even while its after-midnight
+// sets (AFTER_MIDNIGHT_THRESHOLD_HOUR = 6, functions/utils/eventDay.js) are
+// still playing. This mirrors the #569 start-edge suite: only the END bound
+// (`COALESCE(e.end_date, e.date) >= / < today`) uses eventLocalFestivalToday()
+// — the START bound (`e.date <= today`) stays on the plain calendar day so the
+// existing #569 "last-resort fallback" case (an event that has ALREADY
+// started earlier tonight, before 6 AM, with no doors/set-time signal) is
+// unaffected: that event's own `e.date` still equals the actual calendar day.
+// Clocks are pinned inside the 00:00–06:00 window specifically, since outside
+// it eventLocalFestivalToday() and eventLocalToday() return identical values
+// and any test would pass against both the broken and fixed implementation.
+// ---------------------------------------------------------------------------
+describe("Timeline real-DB — end-edge gate (#751)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("single-day event with an after-midnight set stays in 'now' (not 'past') at 00:15 the following calendar day", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-11T04:15:00Z = 00:15 EDT on Jul 11 — 15 minutes past local
+    // midnight, well before the 06:00 threshold. Calendar day has already
+    // rolled to Jul 11; the event is dated Jul 10.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T04:15:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "After Midnight Single Night",
+      slug: "timeline-endedge-single",
+      date: "2026-07-10",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "Roost" });
+    const evening = insertBand(rawDb, {
+      name: "Evening Headliner",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "19:00",
+      end_time: "20:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-07-10", evening.id);
+    const nightOwl = insertBand(rawDb, {
+      name: "Night Owl Set",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "01:00",
+      end_time: "02:00",
+    });
+    // After-midnight set: belongs to the Jul 10 evening (per convention), even
+    // though it's actually playing during the Jul 11 small hours.
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-07-10", nightOwl.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+    expect(data.past.find((e) => e.id === event.id)).toBeUndefined();
+  });
+
+  test("that same single-day event flips to 'past' once the 06:00 threshold passes", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-07-11T10:15:00Z = 06:15 EDT on Jul 11 — just past the after-midnight
+    // threshold. The event must not linger in "now" forever.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T10:15:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "After Midnight Single Night Cutover",
+      slug: "timeline-endedge-single-cutover",
+      date: "2026-07-10",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeUndefined();
+    expect(data.past.find((e) => e.id === event.id)).toBeDefined();
+  });
+
+  test("multi-day event's after-midnight sets on the LAST night keep it in 'now' at 00:15 the following day (Buddies Fest 2 production case)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    // 2026-08-10T04:15:00Z = 00:15 EDT on Aug 10. The event's end_date is
+    // Aug 9 -- exactly the reported production failure (#751).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-10T04:15:00Z"));
+
+    const event = insertEvent(rawDb, {
+      name: "Buddies Fest 2",
+      slug: "timeline-endedge-multiday",
+      date: "2026-08-07",
+      end_date: "2026-08-09",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const venue = insertVenue(rawDb, { name: "The Mill" });
+    const lastNightSet = insertBand(rawDb, {
+      name: "Last Night Owl Set",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "01:00",
+      end_time: "02:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-09", lastNightSet.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+    expect(data.past.find((e) => e.id === event.id)).toBeUndefined();
+  });
+
+  // Proves the START bound was deliberately left on the calendar day: the
+  // existing #569 last-resort-fallback test (an event with NO doors/set-time
+  // signal, pinned at 00:01 on its OWN start date) must stay green. If the
+  // START bound were also switched to eventLocalFestivalToday(), the event's
+  // `e.date` (today) would no longer satisfy `e.date <= today` (yesterday, in
+  // festival terms) and it would vanish from "now" entirely.
+  test("an event just past its OWN local midnight (no signals) still starts in 'now' — start bound unaffected", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T04:01:00Z")); // 00:01 EDT, Jul 10 is TODAY
+
+    const event = insertEvent(rawDb, {
+      name: "No Doors Info Event End-Edge Check",
+      slug: "timeline-endedge-startbound-check",
+      date: "2026-07-10",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const request = new Request("https://example.test/api/events/timeline");
+    const response = await timelineHandler({ request, env });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.now.find((e) => e.id === event.id)).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Real-DB — end_date exposed on every timeline bucket (#542 PR-1). Clients key
 // schedule stale-detection on `end_date || date`; keying it on the start date
 // alone wipes a fan's saved schedule on day 2 of a multi-day event. The "now"

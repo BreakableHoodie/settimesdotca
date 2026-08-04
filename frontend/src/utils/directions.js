@@ -13,7 +13,13 @@
 // rather than mid-street — a bare street address can resolve to the wrong
 // side of the road or a neighbouring building.
 export function buildDirectionsHref(name, address) {
-  if (!address) return null
-  const query = name ? `${name}, ${address}` : address
+  // Trim before the guard: a whitespace-only address is truthy, and it IS
+  // reachable -- formatAddress() in functions/api/venues/[id].js builds the
+  // string with filter(Boolean), which keeps a "   " address_line1. Without
+  // this, bad admin data produces a link to an empty map query.
+  const trimmedAddress = typeof address === 'string' ? address.trim() : ''
+  if (!trimmedAddress) return null
+  const trimmedName = typeof name === 'string' ? name.trim() : ''
+  const query = trimmedName ? `${trimmedName}, ${trimmedAddress}` : trimmedAddress
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }

@@ -108,6 +108,9 @@ export default function VenuePage() {
 
   const website = venue ? safeExternalHref(venue.website) : '#'
   const directionsHref = venue ? buildDirectionsHref(venue.name, venue.address) : null
+  // Same trim rule as the helper: a whitespace-only address is truthy and would
+  // otherwise render an empty address row with no link beside it.
+  const displayAddress = typeof venue?.address === 'string' ? venue.address.trim() : ''
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
@@ -171,9 +174,9 @@ export default function VenuePage() {
                 </a>
               )}
             </div>
-            {venue.address && (
+            {displayAddress && (
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-tertiary">
-                <span>{venue.address}</span>
+                <span>{displayAddress}</span>
                 {directionsHref && (
                   <a
                     href={directionsHref}

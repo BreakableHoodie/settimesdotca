@@ -72,4 +72,25 @@ describe('VenuePage — Directions handoff (#742)', () => {
     // anchor with the text still visible. Assert on the visible text too.
     expect(screen.queryByText('Directions')).not.toBeInTheDocument()
   })
+
+  // A whitespace-only address is truthy, and reachable: formatAddress() in
+  // functions/api/venues/[id].js joins with filter(Boolean), which keeps a
+  // "   " address_line1. Neither the address row nor the link may render.
+  it('renders neither the address row nor a Directions link for a whitespace-only address', async () => {
+    fetchPublicJson.mockReset()
+    fetchPublicJson.mockResolvedValue({
+      venue: { id: 22, name: 'Blank Address Venue', location: 'Waterloo, ON', address: '   ', website: null },
+      upcoming: [],
+      past: [],
+    })
+
+    renderPage('22')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Blank Address Venue' })).toBeInTheDocument()
+
+    expect(screen.queryByRole('link', { name: /Directions/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Directions')).not.toBeInTheDocument()
+    // The row itself must be gone, not merely empty -- an empty <p> beside the
+    // heading is a visible layout gap.
+    expect(document.querySelector('p.mt-1.flex')).toBeNull()
+  })
 })

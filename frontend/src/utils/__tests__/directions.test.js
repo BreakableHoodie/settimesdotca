@@ -34,3 +34,28 @@ describe('buildDirectionsHref (#742)', () => {
     expect(href).toContain(encodeURIComponent("Bob & Ray's, 1 Main St, Unit #2, Waterloo, ON"))
   })
 })
+
+// A whitespace-only address is truthy, so the original `if (!address)` guard
+// let it through and produced a link to an empty map query. It IS reachable:
+// formatAddress() in functions/api/venues/[id].js joins parts with
+// filter(Boolean), which keeps a "   " address_line1.
+describe('buildDirectionsHref — blank-ish input', () => {
+  test.each([['   '], ['\t'], ['\n  \n']])('returns null for whitespace-only address %j', blank => {
+    expect(buildDirectionsHref('The Mill', blank)).toBeNull()
+  })
+
+  test('returns null for a non-string address', () => {
+    expect(buildDirectionsHref('The Mill', undefined)).toBeNull()
+    expect(buildDirectionsHref('The Mill', null)).toBeNull()
+  })
+
+  test('trims surrounding whitespace instead of encoding it into the query', () => {
+    const href = buildDirectionsHref('  The Mill  ', '  20 John Pound Road  ')
+    expect(href).toBe('https://www.google.com/maps/search/?api=1&query=The%20Mill%2C%2020%20John%20Pound%20Road')
+  })
+
+  test('falls back to the address alone when the name is whitespace-only', () => {
+    const href = buildDirectionsHref('   ', '20 John Pound Road')
+    expect(href).toBe('https://www.google.com/maps/search/?api=1&query=20%20John%20Pound%20Road')
+  })
+})

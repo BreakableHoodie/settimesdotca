@@ -294,6 +294,13 @@ describe("Admin bands API - GET without event_id returns one row per profile (#6
     expect(band.last_event_name).toBe("Already Happened");
     expect(band.last_event_date).toBe("2025-06-01");
     expect(band.next_event_name).not.toBe(band.last_event_name);
+
+    // The IDs are what a future exact-event filter will key on, and nothing
+    // else asserts them -- they could come back null or swapped and the name
+    // and date assertions above would still pass.
+    expect(band.next_event_id).toBe(futureEvent.id);
+    expect(band.last_event_id).toBe(pastEvent.id);
+    expect(band.next_event_id).not.toBe(band.last_event_id);
   });
 
   // #710 / #568 bug class — the calendar day rolls over at local midnight,

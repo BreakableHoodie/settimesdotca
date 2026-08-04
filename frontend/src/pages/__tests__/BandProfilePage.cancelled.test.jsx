@@ -128,11 +128,24 @@ describe('BandProfilePage — cancelled set rendering (#732)', () => {
     expect(screen.getByRole('link', { name: /view event/i })).toBeInTheDocument()
   })
 
-  it('renders a cancelled PAST set struck through with a visible Cancelled label, alongside the existing Archived badge', async () => {
+  // #732 MINOR 3 (Copilot) — the previous version of this fixture combined
+  // is_cancelled: 1 with event_status: 'archived'. Per the backend lifecycle
+  // rule (functions/api/bands/stats/[name].js's visiblePerformances filter),
+  // a cancelled set is dropped ENTIRELY once its event is past — and
+  // event_status === 'archived' always counts as past, regardless of dates.
+  // The API can never legitimately send that combination in the `past`
+  // array, so asserting on it locked in a payload shape the backend must
+  // never produce. The real case where a cancelled set legitimately appears
+  // in `past` is a multi-day event that hasn't ended yet: day 1 already
+  // elapsed (so this SET is in the past bucket) while the EVENT is still
+  // ongoing through day 3 (so it isn't dropped) — mirrors the
+  // "Multiday 732 Event" fixture in
+  // functions/api/bands/stats/__tests__/stats-cancelled-lifecycle.test.js.
+  it('renders a cancelled PAST set (day 1 of an ONGOING multi-day event) struck through with a visible Cancelled label', async () => {
     fetchPublicJson.mockReset()
     fetchPublicJson.mockResolvedValue({
       id: 209,
-      name: 'Archived Cancelled Band',
+      name: 'Ongoing Multiday Cancelled Band',
       photo_url: null,
       photo_alt_text: null,
       description: null,
@@ -141,14 +154,26 @@ describe('BandProfilePage — cancelled set rendering (#732)', () => {
       social: {},
       stats: null,
       upcoming: [],
-      past: [performance({ event_status: 'archived', is_cancelled: 1 })],
+      past: [
+        performance({
+          event_status: 'published',
+          event_date: '2026-07-10',
+          event_end_date: '2026-07-12',
+          performance_date: '2026-07-10',
+          is_cancelled: 1,
+        }),
+      ],
     })
 
     renderPage('209')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Archived Cancelled Band' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Ongoing Multiday Cancelled Band' })
+    ).toBeInTheDocument()
 
     expect(screen.getByText('Cancelled')).toBeInTheDocument()
-    expect(screen.getByText('Archived')).toBeInTheDocument()
+    // Never archived -- the whole point of this fixture is that the EVENT is
+    // still current, only this set's own day has elapsed.
+    expect(screen.queryByText('Archived')).not.toBeInTheDocument()
     const heading = screen.getByRole('heading', { level: 3, name: 'Vol. 17' })
     expect(heading.querySelector('s')).not.toBeNull()
   })

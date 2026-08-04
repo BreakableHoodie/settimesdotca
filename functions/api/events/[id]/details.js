@@ -86,10 +86,12 @@ export async function onRequestGet(context) {
       LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
         AND (? = 0 OR p.is_announced = 1)
-      -- Final key is the BAND name, not the venue's: two bands sharing a venue
-      -- and start time would otherwise come back in non-deterministic order.
-      -- Matches recap.js, which already orders on bp.name.
-      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time, b.name
+      -- Ordered by the BAND name rather than the venue's: two bands sharing a
+      -- venue and start time would otherwise come back in arbitrary order.
+      -- p.id is the final, UNIQUE key -- name alone still ties when one band
+      -- plays two sets at the same time slot, and SQLite gives no stable order
+      -- for a full tie. Matches the venues/[id].js ordering.
+      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time, b.name, p.id
     `,
     )
       .bind(eventId, event.reveal_mode ?? 0, event.date)

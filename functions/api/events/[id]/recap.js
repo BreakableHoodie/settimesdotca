@@ -110,7 +110,10 @@ export async function onRequestGet(context) {
       JOIN band_profiles bp ON p.band_profile_id = bp.id
       LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
-      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time NULLS LAST, bp.name
+      -- p.id is the final, UNIQUE key: bp.name alone still ties when one band
+      -- plays two sets in the same slot, and SQLite gives no stable order for
+      -- a full tie. Matches details.js and venues/[id].js.
+      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time NULLS LAST, bp.name, p.id
       `,
     )
       .bind(event.id, event.date, event.date, event.id, event.id, event.date)

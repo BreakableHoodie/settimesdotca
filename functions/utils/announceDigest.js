@@ -53,6 +53,8 @@ export async function flushAnnounceDigest(env, DB) {
   }
 
   let skipped = 0;
+  let sent = 0;
+  let failed = 0;
 
   // ── Phase A (sequential) ─────────────────────────────────────────────────
   // For each group: claim slots, delete queue rows, build the email payload.
@@ -72,23 +74,58 @@ export async function flushAnnounceDigest(env, DB) {
     const liveItems = items.filter((item) => !item.is_cancelled);
     const cancelledCount = items.length - liveItems.length;
 
-    // Claim each (performance_id, band_follow_id) atomically before sending.
-    // INSERT OR IGNORE: changes=0 means already claimed by a concurrent flush
-    // or by the resend-announcement endpoint — skip those items.
-    const claimed = [];
-    for (const item of liveItems) {
-      const result = await DB.prepare(
-        "INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)",
-      )
-        .bind(item.performance_id, item.band_follow_id)
-        .run();
-      if (result.meta.changes > 0) claimed.push(item);
-    }
-
+    // Claim each (performance_id, band_follow_id) atomically before sending,
+    // batched together with this group's queue-row deletes into ONE
+    // DB.batch() call. D1's batch() is all-or-nothing (CLAUDE.md), so a
+    // failure here can never leave a partial claim behind: either every
+    // claim + delete in this group commits, or none of it does.
+    //
+    // Previously the claims ran as a per-item loop with no error handling
+    // (bare awaited .run() calls) and the deletes ran as a separate,
+    // unrelated DB.batch() call. If a later item's claim threw, the throw
+    // propagated straight out of flushAnnounceDigest — Phase B (delivery)
+    // never ran, so EARLIER groups, which had already had their claims
+    // written and their queue rows deleted by this same loop, never got
+    // emailed either. Their fans were stranded: the ledger said "already
+    // notified," the queue row was gone, and resend-announcement's recovery
+    // query (which only looks for followers WITHOUT a notification row)
+    // would never find them again (#732 MAJOR).
+    const claimStatements = liveItems.map((item) =>
+      DB.prepare("INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)").bind(
+        item.performance_id,
+        item.band_follow_id,
+      ),
+    );
     // Delete every queue entry for this group — whether claimed now,
     // cancelled, or already handled by a concurrent path. A cancelled entry
     // must not accumulate as a dead row forever.
-    await DB.batch(items.map((item) => DB.prepare("DELETE FROM band_announce_queue WHERE id = ?").bind(item.id)));
+    const deleteStatements = items.map((item) =>
+      DB.prepare("DELETE FROM band_announce_queue WHERE id = ?").bind(item.id),
+    );
+
+    let batchResults;
+    try {
+      batchResults = await DB.batch([...claimStatements, ...deleteStatements]);
+    } catch (batchError) {
+      // Handle this group's failure locally: leave its band_announce_queue
+      // rows exactly as they were (nothing in this group was claimed or
+      // deleted) so the next flush retries them from scratch, and move on to
+      // the next group. One group's D1 failure must never block delivery of
+      // groups already prepared ahead of it, nor abort the whole flush.
+      logger.error("announce digest claim batch failed; queue rows left in place for retry", {
+        event_id: items[0].event_id,
+        item_count: items.length,
+        error: batchError,
+      });
+      failed += liveItems.length;
+      continue;
+    }
+
+    // The first liveItems.length results correspond 1:1 to the claim INSERTs
+    // above — DB.batch() preserves statement order. changes=0 means already
+    // claimed by a concurrent flush or by the resend-announcement endpoint —
+    // skip those items rather than double-sending.
+    const claimed = liveItems.filter((_, i) => batchResults[i]?.meta?.changes > 0);
 
     skipped += cancelledCount;
 
@@ -135,8 +172,6 @@ export async function flushAnnounceDigest(env, DB) {
   // ── Phase B (bounded concurrency) ────────────────────────────────────────
   // Send the collected tasks in chunks of SEND_CONCURRENCY. On send failure,
   // release that task's claims so resend-announcement can recover.
-  let sent = 0;
-  let failed = 0;
 
   // Logs every claimed id so a stranded row can be found and cleared by hand.
   function logStrandedClaims(task, message, error) {

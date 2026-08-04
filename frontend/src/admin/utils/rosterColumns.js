@@ -30,6 +30,12 @@ export const FILTERABLE_COLUMNS = [
   { key: 'name', label: 'Name', type: 'values', getValues: band => single(band.name) },
   { key: 'origin', label: 'Origin', type: 'values', getValues: band => single(formatOrigin(band)) },
   { key: 'genre', label: 'Genre', type: 'values', getValues: band => tokens(band.genre) },
+  // #710 — the earliest upcoming/in-progress event and the most recent past
+  // event for this profile (functions/api/admin/bands.js's next_event_name /
+  // last_event_name). Blank means "no upcoming booking" / "no performance
+  // history" respectively, which is itself a useful (Blanks) filter view.
+  { key: 'next_event', label: 'Next event', type: 'values', getValues: band => single(band.next_event_name) },
+  { key: 'last_event', label: 'Past event', type: 'values', getValues: band => single(band.last_event_name) },
   { key: 'is_active', label: 'Status', type: 'values', getValues: band => [isInactive(band) ? 'Inactive' : 'Active'] },
   { key: 'link_count', label: 'Links', type: 'links' },
   { key: 'contact_email', label: 'Contact', type: 'values', getValues: band => single(band.contact_email) },

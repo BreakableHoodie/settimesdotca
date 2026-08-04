@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils";
 import * as bandsHandler from "../../bands.js";
 import * as bandIdHandler from "../[id].js";
@@ -160,6 +160,10 @@ describe("Admin bands API - CRUD operations", () => {
 });
 
 describe("Admin bands API - GET without event_id returns one row per profile (#618)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("a band whose only performance is on the OLDEST event still appears when total performance rows exceed the requested limit", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
     const oldEvent = insertEvent(rawDb, { name: "Old Event 618", slug: "old-event-618", date: "2020-01-01" });
@@ -204,7 +208,13 @@ describe("Admin bands API - GET without event_id returns one row per profile (#6
     expect(names).toContain("Adelleda Regression");
   });
 
-  it("returns exactly one row per profile even when the band has multiple performances", async () => {
+  it("returns exactly one row per profile even when the band has multiple performances, all in the PAST", async () => {
+    // Pinned well after every event date below so all three are unambiguously
+    // past relative to "today" (#710: next/last must not depend on wall-clock
+    // time when the test runs).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-15T12:00:00Z"));
+
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
     const ev1 = insertEvent(rawDb, { name: "Dedup Event 1", slug: "dedup-event-1", date: "2025-01-01" });
     const ev2 = insertEvent(rawDb, { name: "Dedup Event 2", slug: "dedup-event-2", date: "2025-06-01" });
@@ -240,10 +250,144 @@ describe("Admin bands API - GET without event_id returns one row per profile (#6
 
     const matches = data.bands.filter((b) => b.name === "Triple Booked Band");
     expect(matches.length).toBe(1);
-    // "Last played" context should reflect the band's MOST RECENT event (ev3),
-    // via SQLite's bare-column-with-MAX() semantics.
-    expect(matches[0].event_name).toBe("Dedup Event 3");
-    expect(matches[0].event_date).toBe("2025-12-01");
+    // All three events are past — the LATEST one (ev3) is "last played", not
+    // the MAX(e.date)-across-all-time value the old query produced. There is
+    // no upcoming booking, so next_event_* stays null/blank.
+    expect(matches[0].last_event_name).toBe("Dedup Event 3");
+    expect(matches[0].last_event_date).toBe("2025-12-01");
+    expect(matches[0].next_event_name ?? null).toBeNull();
+    // event_ids exposes every distinct event the profile played, in support
+    // of the roster's event filter (#710) — not just the one "last" event.
+    const eventIds = (matches[0].event_ids || "")
+      .split(",")
+      .map(Number)
+      .sort((a, b) => a - b);
+    expect(eventIds).toEqual([ev1.id, ev2.id, ev3.id].sort((a, b) => a - b));
+  });
+
+  // #710 — next_event and last_event must resolve to genuinely different
+  // events, not the same MAX()-across-all-time value the old query produced.
+  // An assertion that only checks "next_event_name is non-null" would still
+  // pass against the broken implementation, since the broken query's single
+  // "most recent" column could itself be non-null; asserting the two columns
+  // point at DIFFERENT events is what actually distinguishes the fix.
+  it("next_event and last_event resolve to different events for a band with one past and one future booking", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-15T12:00:00Z")); // "today" = 2026-01-15
+
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const pastEvent = insertEvent(rawDb, { name: "Already Happened", slug: "already-happened", date: "2025-06-01" });
+    const futureEvent = insertEvent(rawDb, { name: "Still Coming", slug: "still-coming", date: "2026-03-01" });
+    const venue = insertVenue(rawDb, { name: "Timeline Venue" });
+
+    insertBand(rawDb, { name: "Two Timeline Band", event_id: pastEvent.id, venue_id: venue.id });
+    insertBand(rawDb, { name: "Two Timeline Band", event_id: futureEvent.id, venue_id: venue.id });
+
+    const getReq = new Request("https://example.test/api/admin/bands", { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    expect(getRes.status).toBe(200);
+    const data = await getRes.json();
+    const band = data.bands.find((b) => b.name === "Two Timeline Band");
+
+    expect(band.next_event_name).toBe("Still Coming");
+    expect(band.next_event_date).toBe("2026-03-01");
+    expect(band.last_event_name).toBe("Already Happened");
+    expect(band.last_event_date).toBe("2025-06-01");
+    expect(band.next_event_name).not.toBe(band.last_event_name);
+  });
+
+  // #710 / #568 bug class — the calendar day rolls over at local midnight,
+  // but the after-midnight convention (AFTER_MIDNIGHT_THRESHOLD_HOUR = 6)
+  // says the FESTIVAL day doesn't roll until 6 AM. At 2 AM Toronto time on
+  // the morning after a show opened, an event dated the PREVIOUS calendar day
+  // is still current — doors are open, after-midnight sets may still be
+  // playing. Using the plain calendar day here would flip this event to
+  // "last" while it is still running.
+  it("an event still running after midnight stays in Next, not Past, before the 6 AM festival-day boundary", async () => {
+    // 2026-08-05T06:00:00Z = 02:00 EDT (America/Toronto is UTC-4 in August).
+    // eventLocalToday() (calendar day) = "2026-08-05".
+    // eventLocalFestivalToday() (festival day) = "2026-08-04" (hour 2 < 6).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T06:00:00Z"));
+
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const tonightsEvent = insertEvent(rawDb, {
+      name: "After Midnight Show",
+      slug: "after-midnight-show",
+      date: "2026-08-04",
+    });
+    const venue = insertVenue(rawDb, { name: "Late Night Venue" });
+    insertBand(rawDb, { name: "After Midnight Band", event_id: tonightsEvent.id, venue_id: venue.id });
+
+    const getReq = new Request("https://example.test/api/admin/bands", { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    expect(getRes.status).toBe(200);
+    const data = await getRes.json();
+    const band = data.bands.find((b) => b.name === "After Midnight Band");
+
+    expect(band.next_event_name).toBe("After Midnight Show");
+    expect(band.last_event_name ?? null).toBeNull();
+  });
+
+  // #710 — multi-day events must stay "next" through their final day, keyed
+  // off COALESCE(end_date, date) rather than the bare start date. On day 2 of
+  // a 3-day event, the bare `date` column (day 1) is already in the past, but
+  // the event itself is still running.
+  it("a multi-day event stays in Next through its final day, not Past on day 2", async () => {
+    // Noon UTC in August = 08:00 EDT — safely mid-morning on 2026-08-02,
+    // well past the 6 AM festival-day boundary.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-02T12:00:00Z"));
+
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const multiDayEvent = insertEvent(rawDb, {
+      name: "Three Day Fest",
+      slug: "three-day-fest",
+      date: "2026-08-01",
+      end_date: "2026-08-03",
+    });
+    const venue = insertVenue(rawDb, { name: "Fest Venue" });
+    insertBand(rawDb, { name: "Multi Day Band", event_id: multiDayEvent.id, venue_id: venue.id });
+
+    const getReq = new Request("https://example.test/api/admin/bands", { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    expect(getRes.status).toBe(200);
+    const data = await getRes.json();
+    const band = data.bands.find((b) => b.name === "Multi Day Band");
+
+    expect(band.next_event_name).toBe("Three Day Fest");
+    expect(band.last_event_name ?? null).toBeNull();
+  });
+
+  // #710 / #618 — the fix must not regress to a join that fans out per
+  // performance. Three profiles with 5 performances each (15 performances
+  // total, across 15 distinct events) must still yield exactly 3 roster rows:
+  // row count is bounded by PROFILE count, never performance count.
+  it("roster row count is bounded by roster size, not performance count", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const venue = insertVenue(rawDb, { name: "Scale Venue" });
+    const profileNames = ["Prolific A", "Prolific B", "Prolific C"];
+
+    let eventCounter = 0;
+    for (const name of profileNames) {
+      for (let i = 0; i < 5; i++) {
+        eventCounter += 1;
+        const ev = insertEvent(rawDb, {
+          name: `Scale Event ${eventCounter}`,
+          slug: `scale-event-${eventCounter}`,
+          date: `2024-${String((eventCounter % 12) + 1).padStart(2, "0")}-01`,
+        });
+        insertBand(rawDb, { name, event_id: ev.id, venue_id: venue.id });
+      }
+    }
+
+    const getReq = new Request("https://example.test/api/admin/bands", { headers });
+    const getRes = await bandsHandler.onRequestGet({ request: getReq, env, data: { user: { role: "editor" } } });
+    expect(getRes.status).toBe(200);
+    const data = await getRes.json();
+
+    const matches = data.bands.filter((b) => profileNames.includes(b.name));
+    expect(matches.length).toBe(3);
   });
 
   it("includes inactive profiles in the roster branch with is_active: 0 on the row (#619)", async () => {

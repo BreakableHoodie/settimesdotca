@@ -255,6 +255,176 @@ describe('RosterTab — Links column filtering (formerly the Data-gaps popover)'
   })
 })
 
+// #710 — Next event / Past event columns let the roster be filtered down to
+// "who's missing data for THIS upcoming event" instead of a hand-written D1
+// query. next_event_name/last_event_name come from functions/api/admin/bands.js.
+const BAND_UPCOMING = {
+  id: 'profile_10',
+  band_profile_id: 10,
+  name: 'Upcoming Act',
+  genre: 'rock',
+  origin_city: 'Waterloo',
+  origin_region: 'ON',
+  is_active: 1,
+  follower_count: 0,
+  social_links: '{}',
+  next_event_name: 'Buddies Fest 2',
+  next_event_date: '2026-08-07',
+  last_event_name: null,
+  last_event_date: null,
+}
+
+const BAND_WITH_HISTORY_ONLY = {
+  id: 'profile_11',
+  band_profile_id: 11,
+  name: 'Bygone Band',
+  genre: 'jazz',
+  origin_city: 'Kitchener',
+  origin_region: 'ON',
+  is_active: 1,
+  follower_count: 0,
+  social_links: '{}',
+  next_event_name: null,
+  next_event_date: null,
+  last_event_name: 'Vol. 16',
+  last_event_date: '2025-08-02',
+}
+
+describe('RosterTab — Next event / Past event columns (#710)', () => {
+  it('renders the Next event and Past event column headers and values', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_UPCOMING, BAND_WITH_HISTORY_ONLY] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Upcoming Act')
+
+    expect(screen.getAllByRole('columnheader', { name: /^Next event/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('columnheader', { name: /^Past event/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Buddies Fest 2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Vol. 16').length).toBeGreaterThan(0)
+  })
+
+  it('filters to a specific Next event via the column dropdown', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_UPCOMING, BAND_WITH_HISTORY_ONLY] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Upcoming Act')
+
+    fireEvent.click(screen.getByLabelText('Filter by Next event'))
+    fireEvent.click(screen.getByLabelText('Buddies Fest 2 — 1'))
+
+    expect(screen.getAllByText('Upcoming Act').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Bygone Band')).toHaveLength(0)
+  })
+
+  it('an artist with no upcoming booking falls into (Blanks) under Next event', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_UPCOMING, BAND_WITH_HISTORY_ONLY] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Upcoming Act')
+
+    fireEvent.click(screen.getByLabelText('Filter by Next event'))
+    fireEvent.click(screen.getByLabelText('(Blanks) — 1'))
+
+    expect(screen.getAllByText('Bygone Band').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Upcoming Act')).toHaveLength(0)
+  })
+
+  // Names are deliberately the OPPOSITE alphabetical order from their
+  // next_event_name -- same anti-coincidence trick as ZERO_LINKS_BAND above.
+  // Name-ascending (the default sort) gives [Alpha Booking, Zeta Booking];
+  // next_event-ascending must give the reverse, [Zeta Booking, Alpha
+  // Booking], since "Aaa Fest" < "Zzz Fest". A generic `a['next_event']`
+  // fallback (undefined for every row) would leave the name-ascending order
+  // untouched, so this only passes if the dedicated comparator runs.
+  const BAND_NEXT_EVENT_ZZZ = {
+    id: 'profile_30',
+    band_profile_id: 30,
+    name: 'Alpha Booking',
+    genre: 'rock',
+    origin_city: 'Waterloo',
+    origin_region: 'ON',
+    is_active: 1,
+    follower_count: 0,
+    social_links: '{}',
+    next_event_name: 'Zzz Fest',
+    last_event_name: null,
+  }
+  const BAND_NEXT_EVENT_AAA = {
+    id: 'profile_31',
+    band_profile_id: 31,
+    name: 'Zeta Booking',
+    genre: 'rock',
+    origin_city: 'Waterloo',
+    origin_region: 'ON',
+    is_active: 1,
+    follower_count: 0,
+    social_links: '{}',
+    next_event_name: 'Aaa Fest',
+    last_event_name: null,
+  }
+
+  it('sorts by Next event, alphabetically, and reverses on a second click', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_NEXT_EVENT_ZZZ, BAND_NEXT_EVENT_AAA] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Alpha Booking')
+
+    const nextEventButton = screen.getByRole('button', { name: /^Next event/ })
+
+    fireEvent.click(nextEventButton)
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Zeta Booking') // "Aaa Fest"
+    expect(rows[1]).toHaveTextContent('Alpha Booking') // "Zzz Fest"
+
+    fireEvent.click(nextEventButton)
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Alpha Booking')
+    expect(rows[1]).toHaveTextContent('Zeta Booking')
+  })
+
+  // Same anti-coincidence naming trick, this time on last_event_name.
+  const BAND_LAST_EVENT_ZZZ = {
+    id: 'profile_32',
+    band_profile_id: 32,
+    name: 'Alpha History',
+    genre: 'rock',
+    origin_city: 'Waterloo',
+    origin_region: 'ON',
+    is_active: 1,
+    follower_count: 0,
+    social_links: '{}',
+    next_event_name: null,
+    last_event_name: 'Zzz Fest',
+  }
+  const BAND_LAST_EVENT_AAA = {
+    id: 'profile_33',
+    band_profile_id: 33,
+    name: 'Zeta History',
+    genre: 'rock',
+    origin_city: 'Waterloo',
+    origin_region: 'ON',
+    is_active: 1,
+    follower_count: 0,
+    social_links: '{}',
+    next_event_name: null,
+    last_event_name: 'Aaa Fest',
+  }
+
+  it('sorts by Past event, alphabetically, and reverses on a second click', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [BAND_LAST_EVENT_ZZZ, BAND_LAST_EVENT_AAA] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Alpha History')
+
+    const pastEventButton = screen.getByRole('button', { name: /^Past event/ })
+
+    fireEvent.click(pastEventButton)
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Zeta History') // "Aaa Fest"
+    expect(rows[1]).toHaveTextContent('Alpha History') // "Zzz Fest"
+
+    fireEvent.click(pastEventButton)
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Alpha History')
+    expect(rows[1]).toHaveTextContent('Zeta History')
+  })
+})
+
 // Fixture set for the cross-column tests below:
 // Alpha — Active,   genre "punk"
 // Beta  — Active,   genre "metal"

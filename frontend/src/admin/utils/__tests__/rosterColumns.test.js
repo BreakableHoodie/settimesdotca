@@ -82,6 +82,28 @@ describe('getValues — genre column (multi-valued)', () => {
   })
 })
 
+describe('getValues — next_event column (#710)', () => {
+  it('returns the next event name as a single-element array', () => {
+    expect(getValuesFor('next_event', band({ next_event_name: 'Buddies Fest 2' }))).toEqual(['Buddies Fest 2'])
+  })
+
+  it('treats a missing next_event_name as blank — artists with no upcoming booking', () => {
+    expect(getValuesFor('next_event', band({ next_event_name: null }))).toEqual([BLANK])
+    expect(getValuesFor('next_event', band({}))).toEqual([BLANK])
+  })
+})
+
+describe('getValues — last_event column (#710)', () => {
+  it('returns the last (past) event name as a single-element array', () => {
+    expect(getValuesFor('last_event', band({ last_event_name: 'Vol. 16' }))).toEqual(['Vol. 16'])
+  })
+
+  it('treats a missing last_event_name as blank — artists with no performance history', () => {
+    expect(getValuesFor('last_event', band({ last_event_name: null }))).toEqual([BLANK])
+    expect(getValuesFor('last_event', band({}))).toEqual([BLANK])
+  })
+})
+
 describe('getValues — is_active (Status) column', () => {
   it('reports Inactive for is_active: 0', () => {
     expect(getValuesFor('is_active', band({ is_active: 0 }))).toEqual(['Inactive'])

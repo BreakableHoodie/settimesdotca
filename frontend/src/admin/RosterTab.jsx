@@ -207,6 +207,16 @@ export default function RosterTab({ showToast, readOnly = false }) {
         const bVal = formatOrigin(b).toLowerCase()
         return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
       }
+      if (sortConfig.key === 'next_event') {
+        const aVal = (a.next_event_name || '').toLowerCase()
+        const bVal = (b.next_event_name || '').toLowerCase()
+        return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      }
+      if (sortConfig.key === 'last_event') {
+        const aVal = (a.last_event_name || '').toLowerCase()
+        const bVal = (b.last_event_name || '').toLowerCase()
+        return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      }
       if (sortConfig.key === 'follower_count') {
         const aVal = a.follower_count ?? 0
         const bVal = b.follower_count ?? 0
@@ -711,6 +721,28 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       renderColumnFilterPanel={renderColumnFilterPanel}
                     />
                     <FilterableHeader
+                      sortKey="next_event"
+                      label="Next event"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.next_event}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    <FilterableHeader
+                      sortKey="last_event"
+                      label="Past event"
+                      sortConfig={sortConfig}
+                      columnFilters={columnFilters}
+                      openFilterKey={openFilterKey}
+                      onSort={handleSort}
+                      onToggleFilter={toggleFilterPanel}
+                      triggerRef={filterRefs.last_event}
+                      renderColumnFilterPanel={renderColumnFilterPanel}
+                    />
+                    <FilterableHeader
                       sortKey="is_active"
                       label="Status"
                       sortConfig={sortConfig}
@@ -793,6 +825,8 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       </td>
                       <td className="px-4 py-3 text-white/70">{formatOrigin(band) || '-'}</td>
                       <td className="px-4 py-3 text-white/70">{band.genre || '-'}</td>
+                      <td className="px-4 py-3 text-white/70">{band.next_event_name || '-'}</td>
+                      <td className="px-4 py-3 text-white/70">{band.last_event_name || '-'}</td>
                       <td className="px-4 py-3 text-white/70">
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
@@ -880,6 +914,8 @@ export default function RosterTab({ showToast, readOnly = false }) {
                   <div className="text-sm text-text-secondary space-y-1">
                     <div>Origin: {formatOrigin(band) || '-'}</div>
                     <div>Genre: {band.genre || '-'}</div>
+                    <div>Next event: {band.next_event_name || '-'}</div>
+                    <div>Past event: {band.last_event_name || '-'}</div>
                     <div>Status: {isInactive(band) ? 'Inactive' : 'Active'}</div>
                     <div className="flex items-center gap-2">
                       <span>Links:</span>

@@ -173,3 +173,60 @@ describe("GET /api/venues/:id — end-edge gate (#750)", () => {
     expect(payload.past[0].performance_id).toBe(perf.id);
   });
 });
+
+// #741 — a venue hosting sets across every day of a multi-day event returned
+// only `event_date`, so all of them reported day 1, and ordering on
+// `start_time` alone put a late-afternoon day-3 set ahead of an evening day-1
+// set. Verified against production: The Mill had 12 sets across 3 days, all
+// reporting 2026-08-07.
+describe("GET /api/venues/:id — multi-day ordering and per-set dates (#741)", () => {
+  test("returns each set's own performance_date, ordered day 1 before day 3", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "The Mill" });
+    const event = insertEvent(rawDb, {
+      name: "Three Day Fest",
+      slug: "three-day-fest",
+      date: "2099-08-07",
+      end_date: "2099-08-09",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    // Deliberately inserted out of order, with the LATEST day carrying the
+    // EARLIEST clock time -- the exact shape that made start_time-only
+    // ordering wrong.
+    const day3 = insertBand(rawDb, {
+      name: "Day Three Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "16:10",
+      end_time: "16:45",
+    });
+    const day1 = insertBand(rawDb, {
+      name: "Day One Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "20:45",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date = ? WHERE id = ?").run("2099-08-09", day3.id);
+    rawDb.prepare("UPDATE performances SET performance_date = ? WHERE id = ?").run("2099-08-07", day1.id);
+
+    const response = await onRequestGet({
+      request: new Request("https://x.test/api/venues/1"),
+      env,
+      params: { id: String(venue.id) },
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+
+    // Assert on the DATES and the ORDER, not the count: a length check passes
+    // against the broken version, which returned two rows too.
+    expect(payload.upcoming.map((p) => p.performance_date)).toEqual(["2099-08-07", "2099-08-09"]);
+    expect(payload.upcoming.map((p) => p.band_name)).toEqual(["Day One Band", "Day Three Band"]);
+    // The client needs the span to decide whether a "(Day N)" suffix belongs.
+    expect(payload.upcoming[0].event_end_date).toBe("2099-08-09");
+  });
+});

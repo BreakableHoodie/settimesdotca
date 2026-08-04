@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { ArrowLeft, CalendarDays, Globe, MapPin, TriangleAlert } from 'lucide-react'
 import Footer from '../components/Footer'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import { formatPerformanceDayLabel } from '../utils/timeFormat'
 import { fetchPublicJson } from '../utils/publicApi'
 import { trackPageView } from '../utils/metrics'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
@@ -41,10 +42,15 @@ function PerformanceRow({ perf }) {
         ) : (
           <span>{perf.event_name}</span>
         )}
-        {perf.event_date && (
+        {/* This set's OWN day, not the event's start date (#741). A venue
+            hosting 12 sets across a 3-day festival previously showed all of
+            them as day 1. formatPerformanceDayLabel adds "(Day N)" only when
+            the event actually spans more than one day (#540/#541) and returns
+            null for an unparseable date, so the whole row is gated on it. */}
+        {formatPerformanceDayLabel(perf) && (
           <span className="inline-flex items-center gap-1">
             <CalendarDays size={13} aria-hidden="true" />
-            {perf.event_date}
+            {formatPerformanceDayLabel(perf)}
           </span>
         )}
       </p>

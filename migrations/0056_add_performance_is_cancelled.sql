@@ -1,0 +1,12 @@
+-- Adds a reversible cancelled state to performances (#732).
+--
+-- Before this column, pulling a band from a lineup meant DELETING the
+-- performance row: the set silently vanished from the schedule and left an
+-- orphaned name on already-shared routes (#733). `is_announced` is not a
+-- workaround -- every public query guards with
+-- `AND (e.reveal_mode = 0 OR p.is_announced = 1)`, so on a reveal_mode = 0
+-- event un-announcing short-circuits true and changes nothing on the live site.
+--
+-- Matches the house boolean convention (is_announced, is_published,
+-- band_follow_notified). DEFAULT 0 backfills every existing row as scheduled.
+ALTER TABLE performances ADD COLUMN is_cancelled INTEGER NOT NULL DEFAULT 0;

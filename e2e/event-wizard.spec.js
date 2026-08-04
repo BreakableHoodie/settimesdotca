@@ -89,8 +89,12 @@ test.describe("Event Wizard", () => {
     await expect(dialog).not.toBeVisible({ timeout: 10000 });
     await expect(page.getByRole("alert")).toContainText(`Event "${eventName}" created successfully!`);
 
-    // App auto-navigates to the new event's Lineup tab — verify band is there
-    await expect(page.getByRole("cell", { name: "The Test Subjects" })).toBeVisible();
+    // App auto-navigates to the new event's Lineup tab — verify band is there.
+    // `exact` is required: the row's ACTIONS cell contains per-row buttons
+    // labelled with the band name ("Cancel The Test Subjects", "Edit"), so its
+    // accessible name also contains this string and a substring match resolves
+    // to two cells (#732). Match the name cell alone.
+    await expect(page.getByRole("cell", { name: "The Test Subjects", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "The Playwright Lounge" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "8:00 PM – 9:30 PM" })).toBeVisible();
 

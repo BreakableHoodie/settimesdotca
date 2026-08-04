@@ -177,6 +177,7 @@ export async function onRequestGet(context) {
           p.performance_date,
           p.notes,
           p.is_announced,
+          p.is_cancelled,
           bp.id as band_profile_id,
           bp.name,
           bp.genre,

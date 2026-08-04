@@ -19,7 +19,7 @@ function ComingUp({ bands, currentTime }) {
             diff: startMs - nowMs,
           }
         })
-        .filter(band => band.diff > 0)
+        .filter(band => band.diff > 0 && !band.is_cancelled)
         .sort((a, b) => a.diff - b.diff)
 
       if (upcomingBands.length > 0) {

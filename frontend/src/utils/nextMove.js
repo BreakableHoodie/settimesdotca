@@ -34,9 +34,12 @@ export function directionsHref(band) {
 export function computeNextMove(bands, now, { windowMin = LIVE_WINDOW_MIN } = {}) {
   const nowMs = (now instanceof Date ? now : new Date(now || Date.now())).getTime()
 
-  // Only bands with usable precomputed times participate.
+  // Only bands with usable precomputed times participate -- and never a
+  // cancelled set (#732). Routing a fan across town for a band that is not
+  // playing is the worst failure mode of this feature, so the guard lives
+  // here at the single choke point every consumer shares.
   const timed = (Array.isArray(bands) ? bands : []).filter(
-    b => Number.isFinite(b.startMs) && b.startMs > 0 && Number.isFinite(b.endMs) && b.endMs > 0
+    b => Number.isFinite(b.startMs) && b.startMs > 0 && Number.isFinite(b.endMs) && b.endMs > 0 && !b.is_cancelled
   )
 
   const playingNow = timed.filter(b => b.startMs <= nowMs && nowMs < b.endMs).sort((a, b) => a.endMs - b.endMs)

@@ -1,4 +1,4 @@
-import { Archive, CalendarDays, Check, Clock, Funnel, History, MapPin, Music, X } from 'lucide-react'
+import { Archive, CalendarDays, Check, Clock, Funnel, History, MapPin, Music, TriangleAlert, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
@@ -530,17 +530,29 @@ function GenreDiscovery({ bands, eventSlug, eventDate }) {
             <div className="flex flex-wrap gap-3">
               {groupBands.map(band => {
                 const isSelected = selectedIds.has(band.id)
+                // A cancelled band must never be added to a fan's schedule
+                // from this wall -- mirrors BandCard's isInteractive gate on
+                // the live schedule (#732), which freezes toggling entirely
+                // (not just hides a button) once a set is cancelled.
+                const isCancelled = Boolean(band.is_cancelled)
                 return (
                   <button
                     key={band.id}
                     type="button"
-                    onClick={() => toggleBand(band.id)}
-                    aria-pressed={isSelected}
-                    aria-label={`${isSelected ? 'Remove' : 'Add'} ${band.name} ${isSelected ? 'from' : 'to'} my schedule`}
+                    onClick={isCancelled ? undefined : () => toggleBand(band.id)}
+                    disabled={isCancelled}
+                    aria-pressed={isCancelled ? undefined : isSelected}
+                    aria-label={
+                      isCancelled
+                        ? `${band.name} — cancelled`
+                        : `${isSelected ? 'Remove' : 'Add'} ${band.name} ${isSelected ? 'from' : 'to'} my schedule`
+                    }
                     className={`w-24 flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-1 ${
-                      isSelected
-                        ? 'bg-accent-500/10 ring-2 ring-accent-500'
-                        : 'bg-surface ring-1 ring-border hover:bg-surface-hover hover:ring-primary-500/40'
+                      isCancelled
+                        ? 'opacity-60 cursor-default'
+                        : isSelected
+                          ? 'bg-accent-500/10 ring-2 ring-accent-500'
+                          : 'bg-surface ring-1 ring-border hover:bg-surface-hover hover:ring-primary-500/40'
                     }`}
                   >
                     {/* Photo or placeholder */}
@@ -558,7 +570,7 @@ function GenreDiscovery({ bands, eventSlug, eventDate }) {
                         </div>
                       )}
                       {/* Selected checkmark overlay */}
-                      {isSelected && (
+                      {isSelected && !isCancelled && (
                         <div className="absolute inset-0 bg-accent-500/20 flex items-end justify-end p-1">
                           <div className="bg-accent-500 rounded-full p-0.5">
                             <Check size={10} className="text-bg-navy" aria-hidden="true" />
@@ -570,11 +582,15 @@ function GenreDiscovery({ bands, eventSlug, eventDate }) {
                     {/* Band name */}
                     <span
                       className={`text-xs font-medium text-center leading-tight line-clamp-2 min-h-[2rem] ${
-                        isSelected ? 'text-accent-500' : 'text-text-primary'
+                        isCancelled ? 'text-text-secondary' : isSelected ? 'text-accent-500' : 'text-text-primary'
                       }`}
                     >
-                      {band.name}
+                      {isCancelled ? <s>{band.name}</s> : band.name}
                     </span>
+                    {/* The visible label is the accessible carrier, not the
+                        strikethrough alone (WCAG 1.4.1) -- matches the
+                        Cancelled pill everywhere else in this feature. */}
+                    {isCancelled && <span className="text-[10px] font-semibold text-warning-500">Cancelled</span>}
                   </button>
                 )
               })}
@@ -807,18 +823,31 @@ function EventCard({
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-text-tertiary text-sm mb-3">Performers:</p>
             <div className="flex flex-wrap gap-2">
-              {featuredBands.map(band => (
-                <Badge
-                  key={band.id}
-                  as="a"
-                  href={buildBandProfileHref(band.name, event.slug)}
-                  variant="default"
-                  size="md"
-                  className="hover:bg-primary-500/20 cursor-pointer transition-colors"
-                >
-                  {band.name}
-                </Badge>
-              ))}
+              {featuredBands.map(band => {
+                // `is_cancelled` is a raw SQLite 0/1 INTEGER, not a boolean --
+                // `0 && <X/>` renders the literal text "0" in React (only
+                // false/null/undefined render nothing), so this MUST be
+                // coerced before using it in `&&` JSX expressions below.
+                const isCancelled = Boolean(band.is_cancelled)
+                return (
+                  <Badge
+                    key={band.id}
+                    as="a"
+                    href={buildBandProfileHref(band.name, event.slug)}
+                    variant={isCancelled ? 'warning' : 'default'}
+                    size="md"
+                    className="hover:bg-primary-500/20 cursor-pointer transition-colors inline-flex items-center gap-1.5"
+                  >
+                    {isCancelled && <TriangleAlert size={12} aria-hidden="true" />}
+                    {isCancelled ? <s>{band.name}</s> : band.name}
+                    {/* The visible label is the accessible carrier, not the
+                        strikethrough -- line-through alone is not announced by
+                        NVDA/JAWS by default (WCAG 1.4.1). Matches the BandCard
+                        cancelled pill on the live schedule (#732). */}
+                    {isCancelled && <span>Cancelled</span>}
+                  </Badge>
+                )
+              })}
             </div>
           </div>
         )}
@@ -872,52 +901,71 @@ function EventCard({
             <div className="p-6">
               <h4 className="text-lg font-bold text-text-primary mb-4">All Performers ({allBandCount})</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {allBands.map(band => (
-                  <Card
-                    key={band.performance_id ?? band.id}
-                    as={Link}
-                    to={buildBandProfileHref(band.name, event.slug)}
-                    padding="sm"
-                    hoverable
-                    className="group"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="font-semibold text-text-primary group-hover:text-accent-500 transition-colors flex-1">
-                        {band.name}
+                {allBands.map(band => {
+                  // `is_cancelled` is a raw SQLite 0/1 INTEGER, not a boolean --
+                  // matches the same coercion the collapsed chips above use
+                  // (Boolean(), not a bare truthy/`0 &&` check).
+                  const isCancelled = Boolean(band.is_cancelled)
+                  return (
+                    <Card
+                      key={band.performance_id ?? band.id}
+                      as={Link}
+                      to={buildBandProfileHref(band.name, event.slug)}
+                      padding="sm"
+                      hoverable
+                      className="group"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div
+                          className={`font-semibold transition-colors flex-1 ${
+                            isCancelled ? 'text-text-secondary' : 'text-text-primary group-hover:text-accent-500'
+                          }`}
+                        >
+                          {isCancelled ? <s>{band.name}</s> : band.name}
+                        </div>
+                        {band.photo_url && (
+                          <div className="w-12 h-12 rounded-full bg-bg-darker overflow-hidden shrink-0 ring-2 ring-border">
+                            <img
+                              src={band.photo_url}
+                              alt={band.name}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        )}
                       </div>
-                      {band.photo_url && (
-                        <div className="w-12 h-12 rounded-full bg-bg-darker overflow-hidden shrink-0 ring-2 ring-border">
-                          <img
-                            src={band.photo_url}
-                            alt={band.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
+
+                      {isCancelled && (
+                        <div className="mb-3">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+                            <TriangleAlert size={12} aria-hidden="true" />
+                            Cancelled
+                          </span>
                         </div>
                       )}
-                    </div>
 
-                    <div className="space-y-1 text-sm">
-                      <div className="text-text-secondary flex items-center gap-2">
-                        <MapPin size={12} aria-hidden="true" />
-                        <span>{band.venue_name}</span>
-                      </div>
-
-                      <div className="text-text-tertiary flex items-center gap-2">
-                        <Clock size={12} aria-hidden="true" />
-                        <span>{formatTimeRange(band.start_time, band.end_time)}</span>
-                      </div>
-
-                      {band.genre && (
-                        <div className="pt-2">
-                          <Badge variant="default" size="sm">
-                            {band.genre}
-                          </Badge>
+                      <div className="space-y-1 text-sm">
+                        <div className="text-text-secondary flex items-center gap-2">
+                          <MapPin size={12} aria-hidden="true" />
+                          <span>{band.venue_name}</span>
                         </div>
-                      )}
-                    </div>
-                  </Card>
-                ))}
+
+                        <div className="text-text-tertiary flex items-center gap-2">
+                          <Clock size={12} aria-hidden="true" />
+                          <span>{formatTimeRange(band.start_time, band.end_time)}</span>
+                        </div>
+
+                        {band.genre && (
+                          <div className="pt-2">
+                            <Badge variant="default" size="sm">
+                              {band.genre}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  )
+                })}
               </div>
             </div>
           )}

@@ -195,6 +195,14 @@ export async function onRequestGet(context) {
               photo_url: row.photo_url,
               venue_id: row.venue_id,
               venue_name: row.venue_name,
+              // All three buckets ("now"/"upcoming"/"past") project
+              // is_cancelled, so this key is always present, never absent.
+              // "now"'s SELECT literally projects `0 AS is_cancelled` (see
+              // below) because its JOIN condition already excludes cancelled
+              // rows outright (#732) — a cancelled set can never reach this
+              // push from that query, so the value there is always 0, not a
+              // missing key.
+              is_cancelled: row.is_cancelled,
             });
           }
 
@@ -252,6 +260,15 @@ export async function onRequestGet(context) {
     // the event's [date, end_date] span, so a multi-day event stays "now" on
     // day 2+ instead of sliding into "past" (#539). NULL end_date collapses
     // this to the original `e.date = today` for single-day events.
+    //
+    // `AND p.is_cancelled = 0` on the JOIN (not a WHERE clause, which would
+    // silently demote a LEFT JOIN to an INNER JOIN and drop the event row
+    // entirely when every performance is cancelled) excludes cancelled sets
+    // from this event's `bands` list and from the start-edge gate below
+    // (#732). This is the "Happening Now" query -- directing a fan to a band
+    // that is not actually playing right now is the worst failure mode of
+    // this feature, so unlike the history endpoint's past/current nuance,
+    // the exclusion here is unconditional.
     if (includeNow) {
       slots.now = statements.length;
       statements.push(
@@ -285,9 +302,17 @@ export async function onRequestGet(context) {
           v.city,
           v.region,
           v.postal_code,
-          v.country
+          v.country,
+          -- Always 0: the JOIN below excludes cancelled rows, so none can
+          -- reach here. Projected anyway so the now, upcoming and past band
+          -- objects share one shape -- without it the key is absent rather
+          -- than 0, and the next person to write a strict === 0 comparison
+          -- instead of a truthiness check gets a silent false on this bucket
+          -- only. (No backticks in this comment: it lives inside a JS
+          -- template literal, where one would terminate the string.)
+          0 AS is_cancelled
         FROM events e
-        LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
+        LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1) AND p.is_cancelled = 0
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
         WHERE e.is_published = 1
@@ -321,6 +346,7 @@ export async function onRequestGet(context) {
           b.name as band_name,
           p.start_time,
           p.end_time,
+          p.is_cancelled,
           b.social_links,
           b.genre,
           b.origin,
@@ -377,6 +403,7 @@ export async function onRequestGet(context) {
           b.name as band_name,
           p.start_time,
           p.end_time,
+          p.is_cancelled,
           b.social_links,
           b.genre,
           b.origin,

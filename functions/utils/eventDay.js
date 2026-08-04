@@ -39,6 +39,49 @@ export function eventLocalToday(now = new Date()) {
   return TORONTO_DAY.format(now);
 }
 
+// The after-midnight convention, server-side. A set starting before 6 AM
+// belongs to the PREVIOUS evening, so between local midnight and 06:00 the
+// festival day is still yesterday's date.
+//
+// The canonical home for this number is frontend/src/utils/festivalDays.js,
+// but Pages Functions cannot import from frontend/, so the server needs its
+// own definition. This is that ONE definition -- `functions/` currently
+// re-encodes it privately in two more places (#746). Import from here; never
+// write `6` or `"06:00"` again.
+export const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6;
+
+/**
+ * The current FESTIVAL day in America/Toronto — the calendar day, except
+ * between local midnight and AFTER_MIDNIGHT_THRESHOLD_HOUR, when it is still
+ * the previous date.
+ *
+ * Use this, not `eventLocalToday()`, for any "is this event still current?"
+ * question. At 00:15 on show night the calendar has rolled over but the event
+ * has not: a fan is standing outside the venue while after-midnight sets are
+ * still playing. Classifying the night as "past" there drops a cancelled set
+ * off the artist page at exactly the moment someone checks whether it is
+ * still on (#732).
+ *
+ * @param {Date} [now] - injectable for tests; defaults to the current instant
+ * @returns {string} the current festival date in America/Toronto, YYYY-MM-DD
+ */
+export function eventLocalFestivalToday(now = new Date()) {
+  const { date, time } = eventLocalClock(now);
+  const hour = Number(time.slice(0, 2));
+  if (!Number.isFinite(hour) || hour >= AFTER_MIDNIGHT_THRESHOLD_HOUR) {
+    return date;
+  }
+  // Step back a CALENDAR day, not 86_400_000ms: on a DST boundary a local day
+  // is 23 or 25 hours long, so fixed-millisecond arithmetic lands on the wrong
+  // date. `date` is already the Toronto-local Y-M-D, so building a UTC instant
+  // from its parts and decrementing the day lets Date normalise month and year
+  // rollovers without ever re-entering a timezone conversion.
+  const [year, month, day] = date.split("-").map(Number);
+  const previous = new Date(Date.UTC(year, month - 1, day - 1));
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${previous.getUTCFullYear()}-${pad(previous.getUTCMonth() + 1)}-${pad(previous.getUTCDate())}`;
+}
+
 /**
  * @param {Date} [now] - injectable for tests; defaults to the current instant
  * @returns {{ date: string, time: string }} the current America/Toronto

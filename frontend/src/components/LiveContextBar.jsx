@@ -123,6 +123,9 @@ function LiveContextBar({
   posterUrl = null,
   onPosterOpen,
 }) {
+  // venueOptions stays on the FULL `bands` list, deliberately -- a venue
+  // whose only set is cancelled must stay filterable so fans can actually
+  // find the cancellation (#732).
   const venueOptions = useMemo(() => [...new Set(bands.map(band => band.venue).filter(Boolean))].sort(), [bands])
   const hasVenueFilter = venueOptions.length > 1
   const uniqueVenues = useMemo(() => {
@@ -134,9 +137,13 @@ function LiveContextBar({
     return venueOptions.length
   }, [eventData?.venue_info, venueOptions.length])
 
+  // Cancelled sets must not sustain a "Happening Now" lifecycle label or
+  // inflate the set count in the summary line (#732).
+  const activeBands = useMemo(() => bands.filter(b => !b.is_cancelled), [bands])
+
   const lifecycle = useMemo(
-    () => getLifecycleLabel(eventData?.date, currentTime, bands, eventData?.doors_json),
-    [bands, currentTime, eventData?.date, eventData?.doors_json]
+    () => getLifecycleLabel(eventData?.date, currentTime, activeBands, eventData?.doors_json),
+    [activeBands, currentTime, eventData?.date, eventData?.doors_json]
   )
 
   // Doors time for the event's FIRST date only (#569) — this header isn't
@@ -261,7 +268,7 @@ function LiveContextBar({
   const mobileSummary = useMemo(() => {
     const summaryItems = [
       `${uniqueVenues} ${uniqueVenues === 1 ? 'venue' : 'venues'}`,
-      `${bands.length} ${bands.length === 1 ? 'set' : 'sets'}`,
+      `${activeBands.length} ${activeBands.length === 1 ? 'set' : 'sets'}`,
     ]
 
     if (doorsTime) {
@@ -273,7 +280,7 @@ function LiveContextBar({
     }
 
     return summaryItems.join(' • ')
-  }, [bands.length, daysUntil, doorsTime, uniqueVenues])
+  }, [activeBands.length, daysUntil, doorsTime, uniqueVenues])
 
   if (!eventData?.name) {
     return null
@@ -399,7 +406,13 @@ function LiveContextBar({
           <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-text-secondary">
             <CalendarDays size={14} aria-hidden="true" className="text-accent-400" />
             <span>
-              {bands.length} {bands.length === 1 ? 'set' : 'sets'}
+              {/* Not in the plan's literal text (which only named
+                  mobileSummary) -- this desktop chip is a second, separate
+                  render of the same "N sets" stat and would otherwise still
+                  show the inflated raw count while mobile showed the
+                  corrected one. Using activeBands here for consistency
+                  between the two surfaces (#732). */}
+              {activeBands.length} {activeBands.length === 1 ? 'set' : 'sets'}
             </span>
           </div>
           {doorsTime && (

@@ -1,4 +1,16 @@
-import { Archive, ArrowLeft, CalendarDays, Check, Clock, Globe, Guitar, MapPin, Plus, TrendingUp } from 'lucide-react'
+import {
+  Archive,
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  Clock,
+  Globe,
+  Guitar,
+  MapPin,
+  Plus,
+  TrendingUp,
+  TriangleAlert,
+} from 'lucide-react'
 import {
   AppleMusicIcon,
   BandcampIcon,
@@ -746,22 +758,35 @@ export default function BandProfilePage() {
                     // the same expression, or an unparseable date passes the
                     // guard and renders a calendar icon with no label.
                     const dayLabel = formatPerformanceDayLabel(performance)
+                    const isCancelled = Boolean(performance.is_cancelled)
                     return (
                       <Card key={performance.id} variant="outline" hoverable className="p-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
-                            <h3 className="text-xl font-semibold text-accent-500 mb-2">
-                              {performance.event_slug ? (
-                                <Link
-                                  to={`/event/${performance.event_slug}`}
-                                  className="transition-colors hover:text-accent-400 hover:underline"
-                                >
-                                  {performance.event_name}
-                                </Link>
-                              ) : (
-                                performance.event_name
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <h3
+                                className={`text-xl font-semibold ${isCancelled ? 'text-text-secondary' : 'text-accent-500'}`}
+                              >
+                                {performance.event_slug ? (
+                                  <Link
+                                    to={`/event/${performance.event_slug}`}
+                                    className="transition-colors hover:text-accent-400 hover:underline"
+                                  >
+                                    {isCancelled ? <s>{performance.event_name}</s> : performance.event_name}
+                                  </Link>
+                                ) : isCancelled ? (
+                                  <s>{performance.event_name}</s>
+                                ) : (
+                                  performance.event_name
+                                )}
+                              </h3>
+                              {isCancelled && (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+                                  <TriangleAlert size={14} aria-hidden="true" />
+                                  Cancelled
+                                </span>
                               )}
-                            </h3>
+                            </div>
                             <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
                               {dayLabel && (
                                 <span className="flex items-center gap-2">
@@ -796,14 +821,19 @@ export default function BandProfilePage() {
                             )}
                           </div>
                           <div className="flex flex-col gap-2">
-                            <Button
-                              onClick={() => toggleSchedule(performance)}
-                              variant={isInSchedule(performance) ? 'success' : 'secondary'}
-                              size="sm"
-                              icon={isInSchedule(performance) ? <Check size={14} /> : <Plus size={14} />}
-                            >
-                              {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
-                            </Button>
+                            {/* A cancelled set is not selectable -- the toggle is hidden,
+                                matching BandCard's treatment (#732). Adding a set that
+                                isn't happening to a saved schedule would be misleading. */}
+                            {!isCancelled && (
+                              <Button
+                                onClick={() => toggleSchedule(performance)}
+                                variant={isInSchedule(performance) ? 'success' : 'secondary'}
+                                size="sm"
+                                icon={isInSchedule(performance) ? <Check size={14} /> : <Plus size={14} />}
+                              >
+                                {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
+                              </Button>
+                            )}
                             {performance.event_slug && (
                               <Button as={Link} to={`/event/${performance.event_slug}`} variant="primary" size="sm">
                                 View Event →
@@ -838,23 +868,34 @@ export default function BandProfilePage() {
                     // the same expression, or an unparseable date passes the
                     // guard and renders a calendar icon with no label.
                     const dayLabel = formatPerformanceDayLabel(performance)
+                    const isCancelled = Boolean(performance.is_cancelled)
                     return (
                       <Card key={performance.id} variant="outline" hoverable className="p-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
-                              <h3 className="text-xl font-semibold text-accent-500">
+                              <h3
+                                className={`text-xl font-semibold ${isCancelled ? 'text-text-secondary' : 'text-accent-500'}`}
+                              >
                                 {performance.event_slug ? (
                                   <Link
                                     to={`/event/${performance.event_slug}`}
                                     className="transition-colors hover:text-accent-400 hover:underline"
                                   >
-                                    {performance.event_name}
+                                    {isCancelled ? <s>{performance.event_name}</s> : performance.event_name}
                                   </Link>
+                                ) : isCancelled ? (
+                                  <s>{performance.event_name}</s>
                                 ) : (
                                   performance.event_name
                                 )}
                               </h3>
+                              {isCancelled && (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+                                  <TriangleAlert size={14} aria-hidden="true" />
+                                  Cancelled
+                                </span>
+                              )}
                               {performance.event_status === 'archived' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-text-primary/10 text-text-tertiary border border-text-primary/10">
                                   <Archive size={12} aria-hidden="true" />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { ArrowLeft, CalendarDays, Globe, MapPin } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Globe, MapPin, TriangleAlert } from 'lucide-react'
 import Footer from '../components/Footer'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import { fetchPublicJson } from '../utils/publicApi'
@@ -10,15 +10,28 @@ import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { safeExternalHref } from '../utils/urlSafety'
 
 function PerformanceRow({ perf }) {
+  // #732 — functions/api/venues/[id].js already returns is_cancelled (row
+  // always included), but this row rendered it exactly like an ordinary
+  // performance. The visible "Cancelled" label is the accessible carrier
+  // (WCAG 1.4.1) -- strikethrough alone isn't announced by screen readers.
+  const isCancelled = Boolean(perf.is_cancelled)
   return (
     <div className="rounded-lg border border-border bg-bg-purple/40 p-4">
       {perf.band_name && (
         <Link
           to={buildBandProfileHref(perf.band_name)}
-          className="font-display text-lg font-semibold text-text-primary transition-colors hover:text-accent-400"
+          className={`font-display text-lg font-semibold transition-colors hover:text-accent-400 ${
+            isCancelled ? 'text-text-secondary' : 'text-text-primary'
+          }`}
         >
-          {perf.band_name}
+          {isCancelled ? <s>{perf.band_name}</s> : perf.band_name}
         </Link>
+      )}
+      {isCancelled && (
+        <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+          <TriangleAlert size={14} aria-hidden="true" />
+          Cancelled
+        </span>
       )}
       <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-tertiary">
         {perf.event_slug ? (

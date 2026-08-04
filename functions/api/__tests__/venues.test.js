@@ -135,3 +135,37 @@ describe("Public venue detail - GET /api/venues/:id", () => {
     expect(res.status).toBe(503);
   });
 });
+
+describe("Public venue detail - is_cancelled (#732)", () => {
+  it("flips is_cancelled to 1 and keeps the performance in the lineup -- never gates", async () => {
+    const { env, rawDb } = seedEnv();
+    const ev = insertEvent(rawDb, { name: "Cancel Venue Event", slug: "venue-cancel-732" });
+    publish(rawDb, ev.id);
+    const roost = insertVenue(rawDb, { name: "Roost", city: "Waterloo" });
+    const band = insertBand(rawDb, {
+      name: "Deer Fang",
+      event_id: ev.id,
+      venue_id: roost.id,
+      start_time: "21:00",
+      end_time: "22:00",
+    });
+
+    const fetchVenue = () => venueDetail.onRequestGet({ params: { id: String(roost.id) }, env });
+
+    const before = await (await fetchVenue()).json();
+    const beforePerf = [...before.upcoming, ...before.past].find((p) => p.performance_id === band.id);
+    // toHaveProperty proves the column is actually PROJECTED -- a dropped
+    // `p.is_cancelled` in the SELECT yields `undefined`, which JSON.stringify
+    // strips entirely, catching a missing-property bug a `?? 0` fallback
+    // would silently paper over.
+    expect(beforePerf).toHaveProperty("is_cancelled", 0);
+
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(band.id);
+
+    const after = await (await fetchVenue()).json();
+    const afterPerf = [...after.upcoming, ...after.past].find((p) => p.performance_id === band.id);
+    // The venue lineup never gates on cancellation -- the set must still show.
+    expect(afterPerf).toBeDefined();
+    expect(afterPerf).toHaveProperty("is_cancelled", 1);
+  });
+});

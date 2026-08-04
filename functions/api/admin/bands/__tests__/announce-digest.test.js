@@ -593,4 +593,118 @@ describe("flushAnnounceDigest", () => {
       }
     });
   });
+
+  describe("#732 MAJOR: Phase A claim batch failure-injection", () => {
+    // Poisons the specific claim statement (INSERT OR IGNORE INTO
+    // band_follow_notifications for one (performance_id, band_follow_id)
+    // pair) so it throws on execution. This is deliberately done at the
+    // DB.prepare/.bind() layer, not at DB.batch() — a per-item loop executes
+    // the poisoned statement via a direct `.run()`, while a per-group batch
+    // executes the SAME bound statement object inside `DB.batch([...])`.
+    // Poisoning at this layer means the test exercises the real defect
+    // (CodeRabbit #732 MAJOR: "Phase A claims notification-ledger rows in a
+    // per-item loop with no error handling") against whichever code shape is
+    // live, rather than assuming the fix's own DB.batch() call already
+    // exists.
+    function stubClaimToThrow(env, { performanceId, followId }) {
+      const originalPrepare = env.DB.prepare.bind(env.DB);
+      return vi.spyOn(env.DB, "prepare").mockImplementation((sql) => {
+        const wrapper = originalPrepare(sql);
+        const normalized = sql.replace(/\s+/g, " ").trim().toUpperCase();
+        if (!normalized.startsWith("INSERT OR IGNORE INTO BAND_FOLLOW_NOTIFICATIONS")) {
+          return wrapper;
+        }
+        const originalBind = wrapper.bind.bind(wrapper);
+        return {
+          ...wrapper,
+          bind(...args) {
+            const [boundPerformanceId, boundFollowId] = args;
+            if (Number(boundPerformanceId) === Number(performanceId) && Number(boundFollowId) === Number(followId)) {
+              const poisoned = () => {
+                throw new Error("simulated D1 claim failure");
+              };
+              return { sql, run: poisoned, all: poisoned, first: poisoned };
+            }
+            return originalBind(...args);
+          },
+        };
+      });
+    }
+
+    it("still delivers an earlier group's email, leaves the failing group's queue rows for retry, and claims no orphan notification row for it", async () => {
+      const { env, rawDb } = createTestEnv();
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const ev = insertEvent(rawDb, { name: "Batch Fest", slug: "batch-fail-fest" });
+      const venue = insertVenue(rawDb, { name: "Batch Hall" });
+
+      // Same event, so group order is driven by email — "a-..." sorts before
+      // "z-..." in the flush's own `ORDER BY q.event_id, bf.email,
+      // q.queued_at`, making group A the "earlier, already prepared" group
+      // and group B the "later" one whose claim fails.
+      const perfA = insertBand(rawDb, { name: "Band Early", event_id: ev.id, venue_id: venue.id });
+      const perfB = insertBand(rawDb, { name: "Band Late", event_id: ev.id, venue_id: venue.id });
+
+      const followA = rawDb
+        .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+        .run("a-claim-fail@example.com", perfA.band_profile_id, "tok-a-claim").lastInsertRowid;
+      const followB = rawDb
+        .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+        .run("z-claim-fail@example.com", perfB.band_profile_id, "tok-b-claim").lastInsertRowid;
+
+      rawDb
+        .prepare(
+          `INSERT INTO band_announce_queue
+         (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(followA, perfA.id, ev.id, "Band Early", "Batch Fest", "batch-fail-fest", perfA.band_profile_id);
+      rawDb
+        .prepare(
+          `INSERT INTO band_announce_queue
+         (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(followB, perfB.id, ev.id, "Band Late", "Batch Fest", "batch-fail-fest", perfB.band_profile_id);
+
+      const queueRowB = rawDb.prepare("SELECT id FROM band_announce_queue WHERE band_follow_id = ?").get(followB);
+
+      const prepareSpy = stubClaimToThrow(env, { performanceId: perfB.id, followId: followB });
+
+      try {
+        const stats = await flushAnnounceDigest(env, env.DB);
+
+        // (a) group A was already fully prepared (claimed + queue row
+        // deleted) before group B's claim throws — its email must still go
+        // out. Under the pre-fix per-item loop, group B's throw propagates
+        // out of the whole flush before Phase B (delivery) ever runs, so
+        // sendEmail is never called at all and this assertion is what fails.
+        expect(sendEmail).toHaveBeenCalledOnce();
+        const [, { subject }] = sendEmail.mock.calls[0];
+        expect(subject).toContain("Band Early");
+        expect(stats.sent).toBe(1);
+
+        // (b) group B's queue row survives, retryable on the next flush —
+        // proves the failure was handled locally rather than aborting with
+        // the row already deleted.
+        const remaining = rawDb.prepare("SELECT id FROM band_announce_queue WHERE id = ?").get(queueRowB.id);
+        expect(remaining).toBeDefined();
+
+        // (c) the atomicity proof: no orphan notification row for group B.
+        // A non-batched (or partially-batched) implementation could commit
+        // the claim before hitting the failure that aborts the delete/send —
+        // stranding this follower exactly like #672, but with no queue row
+        // left behind to explain why resend-announcement never finds them.
+        const orphan = rawDb
+          .prepare("SELECT * FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
+          .get(perfB.id, followB);
+        expect(orphan).toBeUndefined();
+
+        // The batch failure is logged so a human can see it happened.
+        expect(errorSpy).toHaveBeenCalled();
+      } finally {
+        prepareSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+    });
+  });
 });

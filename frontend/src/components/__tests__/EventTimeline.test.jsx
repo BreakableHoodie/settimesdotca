@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import EventTimeline from '../EventTimeline'
 import { POSTER_IMAGE_HOST } from '../../utils/posterImage'
+import { formatPerformanceDayLabel } from '../../utils/timeFormat'
 
 function jsonResponse(data) {
   return {
@@ -257,6 +258,195 @@ describe('EventTimeline recap links', () => {
     const recapLinks = screen.getAllByRole('link', { name: 'Recap' })
     expect(recapLinks).toHaveLength(1)
     expect(recapLinks[0]).toHaveAttribute('href', '/events/past-fest/recap')
+  })
+})
+
+// #743 — the "All Performers" grid rendered set times with no day, so a fan
+// looking at a multi-day event's expanded lineup couldn't tell which day a
+// set was on. formatPerformanceDayLabel() is the single source of truth for
+// that label text (do not re-derive it here) — these tests only prove
+// EventTimeline actually calls it with the right performance_date/event_date/
+// event_end_date and renders the result, and that it's suppressed entirely
+// for a single-day event (#540/#541: no lone "Day 1").
+describe('EventTimeline performance day labels (#743)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('labels each set with its own festival day for a multi-day event', async () => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Buddies Fest 2',
+          slug: 'buddies-fest-2',
+          date: '2026-08-07',
+          end_date: '2026-08-09',
+          status: 'published',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 2,
+          venue_count: 1,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    }
+
+    let resolveDetails
+    const detailsPromise = new Promise(resolve => {
+      resolveDetails = resolve
+    })
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      if (url === '/api/events/1/details') {
+        return detailsPromise
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Buddies Fest 2')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /view details/i }))
+    expect(await screen.findByText(/loading performers and venues/i)).toBeInTheDocument()
+
+    resolveDetails(
+      jsonResponse({
+        venues: [{ id: 7, name: 'The Mill', band_count: 2, address: '123 King St' }],
+        bands: [
+          {
+            id: 20,
+            performance_id: 201,
+            name: 'Day One Band',
+            venue_id: 7,
+            venue_name: 'The Mill',
+            start_time: '20:00',
+            end_time: '20:45',
+            performance_date: '2026-08-07',
+          },
+          {
+            id: 21,
+            performance_id: 202,
+            name: 'Day Three Band',
+            venue_id: 7,
+            venue_name: 'The Mill',
+            start_time: '16:10',
+            end_time: '16:45',
+            performance_date: '2026-08-09',
+          },
+        ],
+        band_count: 2,
+        venue_count: 1,
+      })
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()
+    })
+
+    const day1Label = formatPerformanceDayLabel({
+      performance_date: '2026-08-07',
+      event_date: '2026-08-07',
+      event_end_date: '2026-08-09',
+    })
+    const day3Label = formatPerformanceDayLabel({
+      performance_date: '2026-08-09',
+      event_date: '2026-08-07',
+      event_end_date: '2026-08-09',
+    })
+
+    expect(await screen.findByText(day1Label)).toBeInTheDocument()
+    expect(await screen.findByText(day3Label)).toBeInTheDocument()
+  })
+
+  it('shows no day label at all for a single-day event', async () => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'One Night Only',
+          slug: 'one-night-only',
+          date: '2026-08-07',
+          end_date: null,
+          status: 'published',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 1,
+          venue_count: 1,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    }
+
+    let resolveDetails
+    const detailsPromise = new Promise(resolve => {
+      resolveDetails = resolve
+    })
+    global.fetch = vi.fn(url => {
+      if (url.startsWith('/api/events/timeline')) {
+        return Promise.resolve(jsonResponse(timelineData))
+      }
+      if (url === '/api/events/1/details') {
+        return detailsPromise
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('One Night Only')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /view details/i }))
+    expect(await screen.findByText(/loading performers and venues/i)).toBeInTheDocument()
+
+    resolveDetails(
+      jsonResponse({
+        venues: [{ id: 7, name: 'The Mill', band_count: 1, address: '123 King St' }],
+        bands: [
+          {
+            id: 20,
+            performance_id: 201,
+            name: 'Only Band',
+            venue_id: 7,
+            venue_name: 'The Mill',
+            start_time: '20:00',
+            end_time: '20:45',
+            performance_date: null,
+          },
+        ],
+        band_count: 1,
+        venue_count: 1,
+      })
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()
+    })
+    // Appears in both the GenreDiscovery wall and the All Performers grid.
+    expect((await screen.findAllByText('Only Band'))[0]).toBeInTheDocument()
+
+    // A single-day event must not show a redundant date on every set (#540/#541).
+    const soleDayLabel = formatPerformanceDayLabel({
+      performance_date: null,
+      event_date: '2026-08-07',
+      event_end_date: null,
+    })
+    expect(screen.queryByText(soleDayLabel)).not.toBeInTheDocument()
   })
 })
 

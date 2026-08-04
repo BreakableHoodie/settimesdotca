@@ -80,6 +80,80 @@ describe("GET /api/events/:id/details", () => {
   });
 });
 
+// #743 — performance_date missing from the details projection. A multi-day
+// event's sets all reported the SAME event-level `date` and were sorted by
+// `p.start_time` alone, so a Day 3 late-afternoon set sorted ahead of a Day 1
+// evening set and the frontend (EventTimeline.jsx's "All Performers" grid)
+// had no way to render which day a set belonged to.
+describe("GET /api/events/:id/details - performance_date across a multi-day event (#743)", () => {
+  test("emits performance_date on every band and orders by performance day before start_time", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Buddies Fest 2",
+      slug: "details-multiday-743",
+      date: "2026-08-07",
+      end_date: "2026-08-09",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "The Mill" });
+
+    // Day 3, EARLY time -- if sorted on start_time alone this sorts FIRST.
+    const day3 = insertBand(rawDb, {
+      name: "Day 3 Early Act",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "16:10",
+      end_time: "16:45",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-09", day3.id);
+
+    // Day 1, LATE time -- NULL performance_date (the #543 convention: day-1
+    // sets store NULL, inheriting the event's own date).
+    const day1 = insertBand(rawDb, {
+      name: "Day 1 Late Act",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "20:45",
+    });
+
+    // Day 2, mid time.
+    const day2 = insertBand(rawDb, {
+      name: "Day 2 Mid Act",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "18:00",
+      end_time: "18:45",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-08", day2.id);
+
+    const request = new Request(`https://example.test/api/events/${event.id}/details`);
+    const response = await onRequestGet({
+      request,
+      env,
+      params: { id: String(event.id) },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+
+    expect(payload.bands).toHaveLength(3);
+
+    // Every band exposes its own performance_date (day 1 NULL -- the raw
+    // stored value, not synthesized -- days 2/3 their explicit dates).
+    const byName = Object.fromEntries(payload.bands.map((b) => [b.name, b]));
+    expect(byName["Day 1 Late Act"].performance_date).toBeNull();
+    expect(byName["Day 2 Mid Act"].performance_date).toBe("2026-08-08");
+    expect(byName["Day 3 Early Act"].performance_date).toBe("2026-08-09");
+
+    // Order: Day 1 (20:00) -> Day 2 (18:00) -> Day 3 (16:10). A start_time-only
+    // sort would put Day 3's 16:10 FIRST -- assert on the actual order, not a
+    // length, to catch that regression.
+    expect(payload.bands.map((b) => b.name)).toEqual(["Day 1 Late Act", "Day 2 Mid Act", "Day 3 Early Act"]);
+  });
+});
+
 // Regression: a band playing two sets at one event was counted twice in
 // band_count (the details endpoint's expanded lineup flips the stat row from
 // "32 Bands" collapsed to 34 after expanding). `bands` stays per-performance

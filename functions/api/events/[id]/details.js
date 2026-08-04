@@ -64,6 +64,7 @@ export async function onRequestGet(context) {
         b.name as band_name,
         p.start_time,
         p.end_time,
+        p.performance_date,
         p.is_cancelled,
         b.genre,
         b.photo_url,
@@ -81,10 +82,10 @@ export async function onRequestGet(context) {
       LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
         AND (? = 0 OR p.is_announced = 1)
-      ORDER BY p.start_time, v.name
+      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time, v.name
     `,
     )
-      .bind(eventId, event.reveal_mode ?? 0)
+      .bind(eventId, event.reveal_mode ?? 0, event.date)
       .all();
 
     const rows = bandsResult.results || [];
@@ -124,6 +125,11 @@ export async function onRequestGet(context) {
         name: row.band_name,
         start_time: row.start_time,
         end_time: row.end_time,
+        // NULL for day-1 sets and single-day events (#543 convention) --
+        // exposed raw, not synthesized to event.date, since
+        // formatPerformanceDayLabel() already falls back to event_date itself
+        // when performance_date is absent.
+        performance_date: row.performance_date,
         is_cancelled: row.is_cancelled,
         genre: row.genre,
         photo_url: row.photo_url,

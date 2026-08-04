@@ -431,6 +431,70 @@ describe("GET /api/events/:id/recap", () => {
     expect(payload.event.poster_url).toBeNull();
   });
 
+  // #743 — performance_date missing from the recap projection, and the final
+  // sort keyed on start_time ALONE, so a Day 3 late-afternoon set sorted
+  // ahead of a Day 1 evening set across a multi-day archived event.
+  test("emits performance_date + event.end_date, and orders bands by performance day before start_time", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Buddies Fest 2 Recap",
+      slug: "recap-multiday-743",
+      date: "2026-08-07",
+      end_date: "2026-08-09",
+      status: "archived",
+    });
+
+    const venue = insertVenue(rawDb, { name: "The Mill" });
+
+    // Day 3, EARLY time -- if sorted on start_time alone this sorts FIRST.
+    const day3 = insertBand(rawDb, {
+      name: "Day 3 Early Act",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "16:10",
+      end_time: "16:45",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-09", day3.id);
+
+    // Day 1, LATE time -- NULL performance_date (#543 convention).
+    insertBand(rawDb, {
+      name: "Day 1 Late Act",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "20:45",
+    });
+
+    // Day 2, mid time.
+    const day2 = insertBand(rawDb, {
+      name: "Day 2 Mid Act",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "18:00",
+      end_time: "18:45",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-08", day2.id);
+
+    const request = new Request(`https://example.test/api/events/${event.slug}/recap`);
+    const response = await onRequestGet({ request, env, params: { id: event.slug } });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+
+    expect(payload.event.end_date).toBe("2026-08-09");
+
+    expect(payload.bands).toHaveLength(3);
+    const byName = Object.fromEntries(payload.bands.map((b) => [b.name, b]));
+    expect(byName["Day 1 Late Act"].performance_date).toBeNull();
+    expect(byName["Day 2 Mid Act"].performance_date).toBe("2026-08-08");
+    expect(byName["Day 3 Early Act"].performance_date).toBe("2026-08-09");
+
+    // Order: Day 1 (20:00) -> Day 2 (18:00) -> Day 3 (16:10). A start_time-only
+    // sort would put Day 3's 16:10 FIRST -- assert on the actual order.
+    expect(payload.bands.map((b) => b.name)).toEqual(["Day 1 Late Act", "Day 2 Mid Act", "Day 3 Early Act"]);
+  });
+
   test("returns 503 when PUBLIC_DATA_PUBLISH_ENABLED is not set", async () => {
     const { env, rawDb } = createTestEnv();
     // Do NOT set PUBLIC_DATA_PUBLISH_ENABLED

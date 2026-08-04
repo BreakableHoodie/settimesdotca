@@ -76,14 +76,22 @@ const localInstant = (dateStr, hours, minutes = 0) => {
 };
 
 /**
- * Seeds one published event with two sets at the same venue: a cancelled
- * set whose 19:00–19:30 window brackets the fixed clock time below (so
- * WITHOUT the suppression it would show "Live Now" and be selectable — the
- * fixture must sit inside the live window, or a broken suppression and a
- * correct one would look identical), and a normal scheduled set later the
- * same night as a live comparison baseline.
+ * Seeds one published event with sets at the same venue: a cancelled set
+ * whose 19:00–19:30 window brackets the fixed clock time below (so WITHOUT
+ * the suppression it would show "Live Now" and be selectable — the fixture
+ * must sit inside the live window, or a broken suppression and a correct one
+ * would look identical), and a normal scheduled set later the same night as
+ * a live comparison baseline.
+ *
+ * `includeLiveComparison` (MINOR 7) adds a THIRD band, at a different venue,
+ * in the identical 19:00–19:30 window but NOT cancelled — a positive control
+ * that is genuinely live at the pinned clock. Without it, asserting "Live
+ * Now" is absent from the cancelled card proves nothing: at 19:15 nothing
+ * else on the page is live either (the comparison band above starts at
+ * 20:00), so the assertion would pass identically whether suppression works
+ * or the whole live/soon feature were deleted.
  */
-async function seedEventWithCancelledSet(page, suffix) {
+async function seedEventWithCancelledSet(page, suffix, { includeLiveComparison = false } = {}) {
   await loginAsAdmin(page);
 
   const today = localToday();
@@ -129,17 +137,40 @@ async function seedEventWithCancelledSet(page, suffix) {
     endTime: "20:30",
   });
 
+  let liveName = null;
+  let liveVenueName = null;
+  if (includeLiveComparison) {
+    // A different venue than the cancelled set so the two 19:00–19:30 sets
+    // never register as a scheduling conflict (checkConflicts scopes to
+    // event + venue).
+    const liveVenue = venuesData.venues?.[1];
+    expect(liveVenue).toBeTruthy();
+    liveName = `Actually Live ${suffix}`;
+    liveVenueName = liveVenue.name;
+    await apiPost(page, "/api/admin/bands", {
+      eventId,
+      venueId: liveVenue.id,
+      name: liveName,
+      startTime: "19:00",
+      endTime: "19:30",
+    });
+  }
+
   await apiPost(page, `/api/admin/events/${eventId}/publish`, { publish: true });
 
   await apiPatch(page, `/api/admin/bands/${cancelledPerformanceId}`, { is_cancelled: true });
 
-  return { slug, today, venueName: venue.name, cancelledName, scheduledName };
+  return { slug, today, venueName: venue.name, cancelledName, scheduledName, liveName, liveVenueName };
 }
 
 test.describe("Cancelled set — rendering and accessibility (#732)", () => {
   test("a cancelled set is marked accessibly and is not selectable", async ({ page }) => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const { slug, today, venueName, cancelledName, scheduledName } = await seedEventWithCancelledSet(page, suffix);
+    const { slug, today, venueName, cancelledName, scheduledName, liveName } = await seedEventWithCancelledSet(
+      page,
+      suffix,
+      { includeLiveComparison: true },
+    );
 
     // Fixed at 19:15 — inside the cancelled set's 19:00–19:30 window, so any
     // assertion below that the card is quiet proves the suppression actually
@@ -169,8 +200,31 @@ test.describe("Cancelled set — rendering and accessibility (#732)", () => {
     // scheduled comparison band below).
     await expect(card.getByRole("button", { name: /route/i })).toHaveCount(0);
 
-    // 3. No live/soon time math leaks through, even though 19:15 sits
-    // squarely inside this set's window.
+    // 3. Positive control (MINOR 7): "Actually Live" sits in the SAME
+    // 19:00–19:30 window as the cancelled set and IS live at 19:15 — its
+    // status text and route button must be genuinely present. Without this,
+    // asserting "Live Now" is absent from the cancelled card proves nothing:
+    // nothing else on the page is live at 19:15 either (the scheduled
+    // comparison below starts at 20:00), so the negative assertion would
+    // pass identically whether suppression works or the whole live/soon
+    // feature were deleted.
+    //
+    // Scoped to the live band's OWN card (via its route button's nearest
+    // "rounded-xl" ancestor, the card's root div) rather than a bare
+    // `page.getByText("Live Now")` -- if suppression regressed and the
+    // CANCELLED card also started showing "Live Now", an unscoped locator
+    // would hit a strict-mode "resolved to 2 elements" error instead of
+    // cleanly failing step 4 below, which is a much noisier signal for the
+    // same underlying regression.
+    const liveRouteButton = page.getByRole("button", { name: new RegExp(`Add ${liveName} to my route`) });
+    await expect(liveRouteButton).toBeVisible();
+    const liveCard = liveRouteButton.locator('xpath=ancestor::div[contains(@class, "rounded-xl")][1]');
+    await expect(liveCard.getByText("Live Now")).toBeVisible();
+
+    // 4. No live/soon time math leaks through onto the CANCELLED card
+    // specifically, even though 19:15 sits squarely inside its own window
+    // too — proven meaningful by step 3 above actually finding "Live Now"
+    // on the live band's card.
     await expect(card.getByText("Live Now")).toHaveCount(0);
     await expect(card.getByText(/Starts in \d+m/)).toHaveCount(0);
 

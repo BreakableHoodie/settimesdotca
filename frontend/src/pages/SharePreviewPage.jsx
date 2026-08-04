@@ -190,7 +190,23 @@ export default function SharePreviewPage() {
   // been hard-deleted since the link was shared (#733). `band_names` is the
   // untouched snapshot kept for the ?import=1 apply path, so counting it here
   // would render N-1 rows under an "N-stop route" heading.
-  const stopCount = shareData.bands?.length ?? shareData.band_names.length
+  //
+  // `Array.isArray`, not `.length`, is what distinguishes an ABSENT bands
+  // field (fall back to the snapshot) from a PRESENT-but-EMPTY live list
+  // (every shared performance was hard-deleted -- `[]` is itself the correct
+  // answer, not a signal to fall back). This single `hasLiveBands`/
+  // `routeBands` pair now drives the heading, the row list, the Add button,
+  // and LockInLineupPanel -- previously each read a DIFFERENT falsy-zero
+  // check (`shareData.bands?.length ?? ...` vs `shareData.bands?.length ? ...
+  // : ...`) and disagreed with each other on an empty `bands: []`: the
+  // heading correctly showed "0-stop route" (0 is not nullish) while the row
+  // list fell through to the stale band_names snapshot (0 IS falsy in a
+  // ternary) and rendered every deleted band's name underneath it (MAJOR 2).
+  const hasLiveBands = Array.isArray(shareData.bands)
+  const routeBands = hasLiveBands
+    ? [...shareData.bands].sort(compareBands)
+    : shareData.band_names.map(name => ({ name }))
+  const stopCount = routeBands.length
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
@@ -213,10 +229,7 @@ export default function SharePreviewPage() {
         </div>
 
         <ul aria-label="Bands in this route" className="mb-8 list-none space-y-3 p-0">
-          {(shareData.bands?.length
-            ? [...shareData.bands].sort(compareBands)
-            : shareData.band_names.map(name => ({ name }))
-          ).map((band, i, list) => (
+          {routeBands.map((band, i, list) => (
             <li key={band.performance_id ?? i} className="rounded-xl border border-border bg-surface px-4 py-3">
               <p className="font-semibold text-text-primary">
                 {band.is_cancelled ? <s className="text-text-secondary">{band.name}</s> : band.name}
@@ -252,14 +265,15 @@ export default function SharePreviewPage() {
           Add {stopCount} stop{stopCount !== 1 ? 's' : ''} to my route for {shareData.event_name}
         </button>
 
-        {/* shareData.bands is the LIVE, filtered list (#733 drops hard-deleted
-            rows); shareData.performance_ids is the untouched snapshot kept
-            only for the ?import=1 apply path (App.jsx) and still contains ids
-            that no longer resolve. Deriving from bands here keeps the follow
-            request in sync with what stopCount and the rows above actually
-            show. */}
+        {/* routeBands is the SAME resolved list driving the heading and the
+            rows above -- shareData.performance_ids is the untouched snapshot
+            kept only for the ?import=1 apply path (App.jsx) and still
+            contains ids that no longer resolve. Deriving from routeBands
+            here keeps the follow request in sync with what stopCount and the
+            rows above actually show, including the empty-live-route case
+            (routeBands = [], not the stale snapshot). */}
         <LockInLineupPanel
-          performanceIds={shareData.bands?.map(b => b.performance_id) ?? shareData.performance_ids}
+          performanceIds={hasLiveBands ? routeBands.map(b => b.performance_id) : shareData.performance_ids}
           bandCount={stopCount}
         />
       </div>

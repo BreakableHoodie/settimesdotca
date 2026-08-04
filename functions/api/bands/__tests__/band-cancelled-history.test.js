@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { onRequestGet } from "../[name].js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 import { eventLocalToday } from "../../../utils/eventDay.js";
@@ -27,6 +27,10 @@ async function seedAndFetch({ endDate, isCancelled = 0, bandName = "Deer Fang" }
 }
 
 describe("GET /api/bands/[name] — cancelled set lifecycle", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("keeps a cancelled set visible while the event is still current", async () => {
     const today = eventLocalToday();
     const { response } = await seedAndFetch({ endDate: today, isCancelled: 1 });
@@ -53,5 +57,29 @@ describe("GET /api/bands/[name] — cancelled set lifecycle", () => {
     // 8 PM Eastern, which would classify a live event as past and make the
     // cancelled set vanish on the night it matters most.
     expect(eventLocalToday(new Date("2026-08-07T23:30:00-04:00"))).toBe("2026-08-07");
+  });
+
+  // #732 MAJOR 2 (Copilot) — this endpoint gated cancellation visibility on
+  // eventLocalToday() (the CALENDAR day), not eventLocalFestivalToday() (the
+  // FESTIVAL day, #732's own fix for the identical bug at
+  // bands/stats/[name].js). Between local midnight and 06:00 the calendar has
+  // already rolled to tomorrow while an after-midnight set is still playing —
+  // eventLocalToday() would already call a single-day event whose date was
+  // YESTERDAY "past" and drop its cancelled set from history at exactly the
+  // moment a fan checks whether it's still on. The two functions only differ
+  // inside that six-hour window (see functions/utils/eventDay.js), so the
+  // clock MUST be pinned there — an unpinned test passes against either
+  // implementation for eighteen hours out of every twenty-four.
+  it("keeps a cancelled set visible at 00:15 local for a single-day event dated the PREVIOUS calendar day (festival day, not calendar day)", async () => {
+    vi.useFakeTimers();
+    // 00:15 EDT on 2026-08-08 -> 2026-08-08T04:15Z (same instant used by the
+    // eventDay.js unit suite). Calendar day is already 2026-08-08; festival
+    // day is still 2026-08-07 until the 06:00 threshold.
+    vi.setSystemTime(new Date("2026-08-08T04:15:00Z"));
+
+    const { response } = await seedAndFetch({ endDate: "2026-08-07", isCancelled: 1 });
+    const body = await response.json();
+    expect(body.performances).toHaveLength(1);
+    expect(body.performances[0].is_cancelled).toBe(1);
   });
 });

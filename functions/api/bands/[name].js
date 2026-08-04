@@ -1,7 +1,7 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { normalizeBandName } from "../../utils/bandName.js";
 import { safeReflectSocialLinks } from "../../utils/validation.js";
-import { eventLocalToday } from "../../utils/eventDay.js";
+import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 
 /**
  * Public API: Get band profile by name
@@ -139,13 +139,17 @@ export async function onRequestGet(context) {
     // A cancelled set stays visible while its event is current -- fans need to
     // know the set is off -- and drops out of the band's history once the
     // event has passed, because a cancellation is frequently not the
-    // artist's fault (#732). `eventLocalToday()` is REQUIRED here: a
-    // toISOString().slice(0, 10) comparison flips to tomorrow at 8 PM Eastern
-    // (#568) and would erase cancelled sets from the live schedule
-    // mid-evening. Applied AFTER the 404 existence gate above, so a band
-    // whose only-ever performance is cancelled-and-past still gets a real
-    // profile page with an empty history, not a false "not found".
-    const today = eventLocalToday();
+    // artist's fault (#732). `eventLocalFestivalToday()` (not the plain
+    // calendar day) is REQUIRED here, mirroring the identical rule at
+    // bands/stats/[name].js: between local midnight and 06:00 the calendar
+    // has already rolled to tomorrow while an after-midnight set is still
+    // playing, and a plain calendar-day comparison would erase a cancelled
+    // set from a fan's view at exactly the moment they check whether it's
+    // still on (#732 MAJOR 2, Copilot). Applied AFTER the 404 existence gate
+    // above, so a band whose only-ever performance is cancelled-and-past
+    // still gets a real profile page with an empty history, not a false
+    // "not found".
+    const today = eventLocalFestivalToday();
     const history = allHistory.filter((p) => !p.is_cancelled || (p.event_end_date || p.event_date) >= today);
 
     const socialLinks = safeReflectSocialLinks(bandProfile.social_links);

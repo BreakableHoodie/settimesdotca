@@ -6,7 +6,7 @@
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { validateId } from "../../utils/validation.js";
-import { eventLocalToday } from "../../utils/eventDay.js";
+import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -73,7 +73,13 @@ export async function onRequestGet(context) {
       .all();
 
     const all = perfs.results || [];
-    const today = eventLocalToday();
+    // (#750) Same bug class fixed in #732 for bands/[name].js and
+    // bands/stats/[name].js: eventLocalToday() is the CALENDAR day, which
+    // rolls over at local midnight while an after-midnight set (before
+    // AFTER_MIDNIGHT_THRESHOLD_HOUR = 6, functions/utils/eventDay.js) is still
+    // playing. eventLocalFestivalToday() stays on the previous date until
+    // 06:00, so the split doesn't flip a still-airing performance to "past".
+    const today = eventLocalFestivalToday();
     const isPast = (p) => p.event_date < today || p.event_status === "archived";
 
     const mapPerf = (p) => ({

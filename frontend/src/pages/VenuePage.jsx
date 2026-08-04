@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { ArrowLeft, CalendarDays, Globe, MapPin, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Globe, MapPin, Navigation, TriangleAlert } from 'lucide-react'
 import Footer from '../components/Footer'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import { formatPerformanceDayLabel } from '../utils/timeFormat'
@@ -9,6 +9,7 @@ import { fetchPublicJson } from '../utils/publicApi'
 import { trackPageView } from '../utils/metrics'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { safeExternalHref } from '../utils/urlSafety'
+import { buildDirectionsHref } from '../utils/directions'
 
 function PerformanceRow({ perf }) {
   // #732 — functions/api/venues/[id].js already returns is_cancelled (row
@@ -106,6 +107,10 @@ export default function VenuePage() {
   }, [id])
 
   const website = venue ? safeExternalHref(venue.website) : '#'
+  const directionsHref = venue ? buildDirectionsHref(venue.name, venue.address) : null
+  // Same trim rule as the helper: a whitespace-only address is truthy and would
+  // otherwise render an empty address row with no link beside it.
+  const displayAddress = typeof venue?.address === 'string' ? venue.address.trim() : ''
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
@@ -169,7 +174,23 @@ export default function VenuePage() {
                 </a>
               )}
             </div>
-            {venue.address && <p className="mt-1 text-sm text-text-tertiary">{venue.address}</p>}
+            {displayAddress && (
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-tertiary">
+                <span>{displayAddress}</span>
+                {directionsHref && (
+                  <a
+                    href={directionsHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Directions to ${venue.name}`}
+                    className="inline-flex min-h-[44px] items-center gap-1.5 text-accent-400 hover:text-accent-300"
+                  >
+                    <Navigation size={14} aria-hidden="true" />
+                    Directions
+                  </a>
+                )}
+              </p>
+            )}
 
             <Section title="Upcoming" items={upcoming} />
             <Section title="Past shows" items={past} />

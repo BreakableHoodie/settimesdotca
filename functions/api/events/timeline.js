@@ -1,6 +1,6 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
-import { eventLocalToday, eventLocalClock } from "../../utils/eventDay.js";
+import { eventLocalToday, eventLocalFestivalToday, eventLocalClock } from "../../utils/eventDay.js";
 
 /**
  * 24-hour "HH:MM" time regex — mirrors DOORS_TIME_REGEX in validation.js.
@@ -121,6 +121,18 @@ export async function onRequestGet(context) {
     };
 
     const today = eventLocalToday(); // YYYY-MM-DD, events' local (Toronto) day — not UTC
+    // (#751) The END edge of "now"/"past" uses the FESTIVAL day, not the
+    // calendar day: between local midnight and AFTER_MIDNIGHT_THRESHOLD_HOUR
+    // (06:00), an event's last night is still airing even though the calendar
+    // has already rolled over. Only the END bound (COALESCE(end_date, date)
+    // >= / < today) uses this — the START bound (e.date <= today, below)
+    // deliberately stays on the plain calendar day: the #569 start-edge gate
+    // already handles an event's OWN first-day start precisely (doors → first
+    // set → midnight fallback), and switching the START bound too would drop
+    // a same-day event with no start-edge signal out of the "now" SQL results
+    // entirely during its own 00:00-06:00 window (see the "start bound
+    // unaffected" regression test in timeline.test.js).
+    const todayFestivalEnd = eventLocalFestivalToday();
 
     // Helper function to group bands by event (processes results from JOIN query)
     function groupEventData(rows) {
@@ -256,10 +268,13 @@ export async function onRequestGet(context) {
     const slots = {};
 
     // "Now" events (happening today) - single JOIN query.
-    // e.date <= today AND COALESCE(end_date, date) >= today: today falls within
-    // the event's [date, end_date] span, so a multi-day event stays "now" on
-    // day 2+ instead of sliding into "past" (#539). NULL end_date collapses
-    // this to the original `e.date = today` for single-day events.
+    // e.date <= today AND COALESCE(end_date, date) >= todayFestivalEnd: today
+    // falls within the event's [date, end_date] span, so a multi-day event
+    // stays "now" on day 2+ instead of sliding into "past" (#539). NULL
+    // end_date collapses this to the original `e.date = today` for
+    // single-day events. The END side uses the FESTIVAL day (#751) so an
+    // event's last-night after-midnight sets keep it in "now" until 06:00 the
+    // next calendar day instead of dropping out at local midnight.
     //
     // `AND p.is_cancelled = 0` on the JOIN (not a WHERE clause, which would
     // silently demote a LEFT JOIN to an INNER JOIN and drop the event row
@@ -320,7 +335,7 @@ export async function onRequestGet(context) {
         AND COALESCE(e.end_date, e.date) >= ?
         ORDER BY e.date DESC, p.start_time, v.name
       `,
-        ).bind(today, today),
+        ).bind(today, todayFestivalEnd),
       );
     }
 
@@ -382,9 +397,13 @@ export async function onRequestGet(context) {
     }
 
     // "Past" events (historical) - single JOIN query.
-    // COALESCE(end_date, date) < today: a multi-day event isn't "past" until
-    // its end_date has elapsed, so it doesn't slip out of "now" a day early
-    // (#539). NULL end_date collapses this to the original `e.date < today`.
+    // COALESCE(end_date, date) < todayFestivalEnd: a multi-day event isn't
+    // "past" until its end_date has elapsed, so it doesn't slip out of "now" a
+    // day early (#539). NULL end_date collapses this to the original
+    // `e.date < today`. Uses the FESTIVAL day (#751, same value as the "now"
+    // query's END bound above) so the two buckets stay mutually exclusive —
+    // an event doesn't drop into "past" while its after-midnight sets are
+    // still keeping it "now".
     if (includePast) {
       slots.past = statements.length;
       statements.push(
@@ -435,7 +454,7 @@ export async function onRequestGet(context) {
         )
         ORDER BY e.date DESC, p.start_time, v.name
       `,
-        ).bind(today, today, pastLimit),
+        ).bind(todayFestivalEnd, todayFestivalEnd, pastLimit),
       );
     }
 

@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { ArrowLeft, CalendarDays, Globe, MapPin, TriangleAlert } from 'lucide-react'
 import Footer from '../components/Footer'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import { formatPerformanceDayLabel } from '../utils/timeFormat'
 import { fetchPublicJson } from '../utils/publicApi'
 import { trackPageView } from '../utils/metrics'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
@@ -15,6 +16,12 @@ function PerformanceRow({ perf }) {
   // performance. The visible "Cancelled" label is the accessible carrier
   // (WCAG 1.4.1) -- strikethrough alone isn't announced by screen readers.
   const isCancelled = Boolean(perf.is_cancelled)
+  // Computed once: the guard and the rendered value must be the same
+  // expression, or they can drift apart. Unlike EventTimeline this is NOT
+  // gated on the event being multi-day -- this row shows no other date, so on
+  // a single-day event the label is the only one present and suppressing it
+  // would remove information rather than redundancy.
+  const dayLabel = formatPerformanceDayLabel(perf)
   return (
     <div className="rounded-lg border border-border bg-bg-purple/40 p-4">
       {perf.band_name && (
@@ -41,10 +48,10 @@ function PerformanceRow({ perf }) {
         ) : (
           <span>{perf.event_name}</span>
         )}
-        {perf.event_date && (
+        {dayLabel && (
           <span className="inline-flex items-center gap-1">
             <CalendarDays size={13} aria-hidden="true" />
-            {perf.event_date}
+            {dayLabel}
           </span>
         )}
       </p>

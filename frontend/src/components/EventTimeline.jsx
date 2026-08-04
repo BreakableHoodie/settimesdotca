@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition 
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
-import { formatTimeRange, parseLocalDate } from '../utils/timeFormat'
+import { formatPerformanceDayLabel, formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
 import { getSelectedBands, saveSelectedBands } from '../utils/scheduleStorage'
@@ -618,6 +618,13 @@ function EventCard({
   const [expanded, setExpanded] = useState(isLive) // Auto-expand live events
   const ticketHref = safeExternalHref(event.ticket_url)
 
+  // Gates the per-set day label in the "All Performers" grid below (#743) —
+  // a single-day event must never show a redundant date on every set
+  // (#540/#541 convention: no lone "Day 1"). Mirrors the admin's
+  // isMultiDayEvent (admin/utils/dayOptions.js) but kept local: this is a
+  // public-facing component and doesn't import from admin/.
+  const isMultiDayEvent = Boolean(event.end_date && event.end_date > event.date)
+
   // No `weekday` (#681): a festival day runs 6 AM -> 6 AM, so an
   // after-midnight set's calendar weekday can mismatch the festival day a
   // fan actually experienced — month/day/year carries the same information
@@ -906,6 +913,23 @@ function EventCard({
                   // matches the same coercion the collapsed chips above use
                   // (Boolean(), not a bare truthy/`0 &&` check).
                   const isCancelled = Boolean(band.is_cancelled)
+                  // The details payload carries each set's own performance_date
+                  // but not the EVENT's span, and formatPerformanceDayLabel
+                  // needs both: performance_date decides which day, while
+                  // event_date/event_end_date decide whether a "(Day N)" suffix
+                  // belongs at all (single-day events never show one, #540/#541).
+                  // Gated on isMultiDayEvent, not merely on the formatter's
+                  // return: for a SINGLE-day event it returns a bare date with
+                  // no "(Day N)" suffix, which is truthy but redundant here --
+                  // the card already shows the event's date. Single-day events
+                  // show no day row at all (#540/#541).
+                  const dayLabel = isMultiDayEvent
+                    ? formatPerformanceDayLabel({
+                        ...band,
+                        event_date: event.date,
+                        event_end_date: event.end_date,
+                      })
+                    : null
                   return (
                     <Card
                       key={band.performance_id ?? band.id}
@@ -949,6 +973,18 @@ function EventCard({
                           <MapPin size={12} aria-hidden="true" />
                           <span>{band.venue_name}</span>
                         </div>
+
+                        {/* On a multi-day event the time alone is ambiguous --
+                            "4:10 PM" could be any of three days, and a fan
+                            adding a set here cannot tell which (#743).
+                            formatPerformanceDayLabel omits the "(Day N)" suffix
+                            entirely on single-day events, so no gate is needed. */}
+                        {dayLabel && (
+                          <div className="text-text-tertiary flex items-center gap-2">
+                            <CalendarDays size={12} aria-hidden="true" />
+                            <span>{dayLabel}</span>
+                          </div>
+                        )}
 
                         <div className="text-text-tertiary flex items-center gap-2">
                           <Clock size={12} aria-hidden="true" />

@@ -1,5 +1,5 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
-import { normalizeHttpUrl } from "../../../utils/validation.js";
+import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
 
 /**
  * Public API: Get event details (bands + venues) for a single published event
@@ -23,8 +23,12 @@ export async function onRequestGet(context) {
     return [line1, line2, line3].filter(Boolean).join(", ");
   };
 
-  const eventId = Number(params.id);
-  if (!Number.isFinite(eventId)) {
+  // Standing convention: every params.id from a Pages Functions route goes
+  // through validateId() before it reaches a query. Number.isFinite() alone
+  // accepted 1.5, 0 and -3 here; validateId requires a positive integer.
+  const idCheck = validateId(params.id);
+  const eventId = idCheck.value;
+  if (!idCheck.valid) {
     return new Response(JSON.stringify({ error: "Invalid event id" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -64,6 +68,7 @@ export async function onRequestGet(context) {
         b.name as band_name,
         p.start_time,
         p.end_time,
+        p.performance_date,
         p.is_cancelled,
         b.genre,
         b.photo_url,
@@ -81,10 +86,15 @@ export async function onRequestGet(context) {
       LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
         AND (? = 0 OR p.is_announced = 1)
-      ORDER BY p.start_time, v.name
+      -- Ordered by the BAND name rather than the venue's: two bands sharing a
+      -- venue and start time would otherwise come back in arbitrary order.
+      -- p.id is the final, UNIQUE key -- name alone still ties when one band
+      -- plays two sets at the same time slot, and SQLite gives no stable order
+      -- for a full tie. Matches the venues/[id].js ordering.
+      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time, b.name, p.id
     `,
     )
-      .bind(eventId, event.reveal_mode ?? 0)
+      .bind(eventId, event.reveal_mode ?? 0, event.date)
       .all();
 
     const rows = bandsResult.results || [];
@@ -124,6 +134,11 @@ export async function onRequestGet(context) {
         name: row.band_name,
         start_time: row.start_time,
         end_time: row.end_time,
+        // NULL for day-1 sets and single-day events (#543 convention) --
+        // exposed raw, not synthesized to event.date, since
+        // formatPerformanceDayLabel() already falls back to event_date itself
+        // when performance_date is absent.
+        performance_date: row.performance_date,
         is_cancelled: row.is_cancelled,
         genre: row.genre,
         photo_url: row.photo_url,

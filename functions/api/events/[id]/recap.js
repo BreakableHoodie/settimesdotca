@@ -14,6 +14,22 @@ function compareStartTimeNullsLast(a, b) {
   return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0;
 }
 
+// (#743) A multi-day event's sets must sort by the DAY they belong to before
+// clock time — sorting on start_time alone interleaves days (a Day 3 16:10
+// set sorting ahead of a Day 1 20:00 set). `performance_date` is NULL for
+// day-1 sets and single-day events (#543 convention), so it falls back to the
+// event's own start date. Returns a comparator closed over that fallback.
+function comparePerformanceDayThenStartTime(eventDate) {
+  return (a, b) => {
+    const dayA = a.performance_date || eventDate;
+    const dayB = b.performance_date || eventDate;
+    if (dayA !== dayB) {
+      return dayA < dayB ? -1 : 1;
+    }
+    return compareStartTimeNullsLast(a, b);
+  };
+}
+
 /**
  * Public API: Get recap stats and band list for a single archived event
  *
@@ -40,12 +56,12 @@ export async function onRequestGet(context) {
   try {
     const event = isNumeric
       ? await DB.prepare(
-          `SELECT id, name, slug, date, poster_url FROM events WHERE id = ? AND status = 'archived' LIMIT 1`,
+          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE id = ? AND status = 'archived' LIMIT 1`,
         )
           .bind(numericId)
           .first()
       : await DB.prepare(
-          `SELECT id, name, slug, date, poster_url FROM events WHERE slug = ? AND status = 'archived' LIMIT 1`,
+          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE slug = ? AND status = 'archived' LIMIT 1`,
         )
           .bind(rawId)
           .first();
@@ -71,6 +87,7 @@ export async function onRequestGet(context) {
         bp.photo_url,
         p.start_time,
         p.end_time,
+        p.performance_date,
         v.id   AS venue_id,
         v.name AS venue_name,
         CASE WHEN EXISTS (
@@ -93,10 +110,13 @@ export async function onRequestGet(context) {
       JOIN band_profiles bp ON p.band_profile_id = bp.id
       LEFT JOIN venues v ON p.venue_id = v.id
       WHERE p.event_id = ?
-      ORDER BY p.start_time NULLS LAST, bp.name
+      -- p.id is the final, UNIQUE key: bp.name alone still ties when one band
+      -- plays two sets in the same slot, and SQLite gives no stable order for
+      -- a full tie. Matches details.js and venues/[id].js.
+      ORDER BY COALESCE(p.performance_date, ?) ASC, p.start_time NULLS LAST, bp.name, p.id
       `,
     )
-      .bind(event.id, event.date, event.date, event.id, event.id)
+      .bind(event.id, event.date, event.date, event.id, event.id, event.date)
       .all();
 
     const rows = bandsResult.results || [];
@@ -125,13 +145,19 @@ export async function onRequestGet(context) {
         photo_url: row.photo_url,
         start_time: row.start_time,
         end_time: row.end_time,
+        // NULL for day-1 sets and single-day events (#543 convention) --
+        // exposed raw, not synthesized to event.date, since
+        // formatPerformanceDayLabel() already falls back to event_date itself
+        // when performance_date is absent.
+        performance_date: row.performance_date,
         venue_id: row.venue_id,
         venue_name: row.venue_name,
         is_returning: isReturning,
       };
     });
 
-    bands.sort((a, b) => compareStartTimeNullsLast(a, b) || sortableName(a.name).localeCompare(sortableName(b.name)));
+    const comparePerformanceDay = comparePerformanceDayThenStartTime(event.date);
+    bands.sort((a, b) => comparePerformanceDay(a, b) || sortableName(a.name).localeCompare(sortableName(b.name)));
 
     const stats = {
       total_sets: rows.length, // performance slots; one band playing two sets counts as 2

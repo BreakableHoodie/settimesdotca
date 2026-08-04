@@ -72,7 +72,10 @@ export async function onRequestGet(context) {
       -- Ordering on start_time alone put a day-3 16:10 set ahead of a day-1
       -- 20:00 set, because every set at one event shares e.date. The coalesce
       -- keeps single-day events (NULL performance_date) working unchanged.
-      ORDER BY e.date DESC, COALESCE(p.performance_date, e.date) ASC, p.start_time
+      -- bp.name and p.id are the deterministic tie-break: without them two sets
+      -- sharing an event date, performance date and start time come back in
+      -- whatever order SQLite happens to produce, which can differ run to run.
+      ORDER BY e.date DESC, COALESCE(p.performance_date, e.date) ASC, p.start_time, bp.name, p.id
     `,
     )
       .bind(id)

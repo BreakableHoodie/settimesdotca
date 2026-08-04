@@ -110,7 +110,7 @@ describe("GET /api/events/:id/details - performance_date across a multi-day even
 
     // Day 1, LATE time -- NULL performance_date (the #543 convention: day-1
     // sets store NULL, inheriting the event's own date).
-    const day1 = insertBand(rawDb, {
+    insertBand(rawDb, {
       name: "Day 1 Late Act",
       event_id: event.id,
       venue_id: venue.id,

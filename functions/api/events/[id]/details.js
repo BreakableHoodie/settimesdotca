@@ -1,5 +1,5 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
-import { normalizeHttpUrl } from "../../../utils/validation.js";
+import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
 
 /**
  * Public API: Get event details (bands + venues) for a single published event
@@ -23,8 +23,12 @@ export async function onRequestGet(context) {
     return [line1, line2, line3].filter(Boolean).join(", ");
   };
 
-  const eventId = Number(params.id);
-  if (!Number.isFinite(eventId)) {
+  // Standing convention: every params.id from a Pages Functions route goes
+  // through validateId() before it reaches a query. Number.isFinite() alone
+  // accepted 1.5, 0 and -3 here; validateId requires a positive integer.
+  const idCheck = validateId(params.id);
+  const eventId = idCheck.value;
+  if (!idCheck.valid) {
     return new Response(JSON.stringify({ error: "Invalid event id" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },

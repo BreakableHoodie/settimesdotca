@@ -204,7 +204,12 @@ describe("GET /api/venues/:id — multi-day ordering and per-set dates (#741)", 
       start_time: "16:10",
       end_time: "16:45",
     });
-    const day1 = insertBand(rawDb, {
+    // Day 1 is deliberately left with a NULL performance_date, matching
+    // production (#543): only day 2+ carries an explicit date. Writing
+    // "2099-08-07" here would bypass the COALESCE(p.performance_date, e.date)
+    // fallback the ordering depends on, so the test would still pass with the
+    // coalesce removed.
+    insertBand(rawDb, {
       name: "Day One Band",
       event_id: event.id,
       venue_id: venue.id,
@@ -212,7 +217,6 @@ describe("GET /api/venues/:id — multi-day ordering and per-set dates (#741)", 
       end_time: "20:45",
     });
     rawDb.prepare("UPDATE performances SET performance_date = ? WHERE id = ?").run("2099-08-09", day3.id);
-    rawDb.prepare("UPDATE performances SET performance_date = ? WHERE id = ?").run("2099-08-07", day1.id);
 
     const response = await onRequestGet({
       request: new Request("https://x.test/api/venues/1"),
@@ -224,7 +228,7 @@ describe("GET /api/venues/:id — multi-day ordering and per-set dates (#741)", 
 
     // Assert on the DATES and the ORDER, not the count: a length check passes
     // against the broken version, which returned two rows too.
-    expect(payload.upcoming.map((p) => p.performance_date)).toEqual(["2099-08-07", "2099-08-09"]);
+    expect(payload.upcoming.map((p) => p.performance_date)).toEqual([null, "2099-08-09"]);
     expect(payload.upcoming.map((p) => p.band_name)).toEqual(["Day One Band", "Day Three Band"]);
     // The client needs the span to decide whether a "(Day N)" suffix belongs.
     expect(payload.upcoming[0].event_end_date).toBe("2099-08-09");

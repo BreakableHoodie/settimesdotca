@@ -16,6 +16,12 @@ function PerformanceRow({ perf }) {
   // performance. The visible "Cancelled" label is the accessible carrier
   // (WCAG 1.4.1) -- strikethrough alone isn't announced by screen readers.
   const isCancelled = Boolean(perf.is_cancelled)
+  // Computed once: the guard and the rendered value must be the same
+  // expression, or they can drift apart. Unlike EventTimeline this is NOT
+  // gated on the event being multi-day -- this row shows no other date, so on
+  // a single-day event the label is the only one present and suppressing it
+  // would remove information rather than redundancy.
+  const dayLabel = formatPerformanceDayLabel(perf)
   return (
     <div className="rounded-lg border border-border bg-bg-purple/40 p-4">
       {perf.band_name && (
@@ -42,15 +48,10 @@ function PerformanceRow({ perf }) {
         ) : (
           <span>{perf.event_name}</span>
         )}
-        {/* This set's OWN day, not the event's start date (#741). A venue
-            hosting 12 sets across a 3-day festival previously showed all of
-            them as day 1. formatPerformanceDayLabel adds "(Day N)" only when
-            the event actually spans more than one day (#540/#541) and returns
-            null for an unparseable date, so the whole row is gated on it. */}
-        {formatPerformanceDayLabel(perf) && (
+        {dayLabel && (
           <span className="inline-flex items-center gap-1">
             <CalendarDays size={13} aria-hidden="true" />
-            {formatPerformanceDayLabel(perf)}
+            {dayLabel}
           </span>
         )}
       </p>

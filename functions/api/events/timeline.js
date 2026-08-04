@@ -195,11 +195,13 @@ export async function onRequestGet(context) {
               photo_url: row.photo_url,
               venue_id: row.venue_id,
               venue_name: row.venue_name,
-              // Present on "upcoming"/"past" rows (their SELECTs project
-              // p.is_cancelled). "now" never selects it because its JOIN
-              // condition already excludes cancelled rows outright (#732) —
-              // a cancelled set can never reach this push from that query, so
-              // the key is simply absent there rather than a redundant 0.
+              // All three buckets ("now"/"upcoming"/"past") project
+              // is_cancelled, so this key is always present, never absent.
+              // "now"'s SELECT literally projects `0 AS is_cancelled` (see
+              // below) because its JOIN condition already excludes cancelled
+              // rows outright (#732) — a cancelled set can never reach this
+              // push from that query, so the value there is always 0, not a
+              // missing key.
               is_cancelled: row.is_cancelled,
             });
           }

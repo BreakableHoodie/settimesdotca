@@ -739,6 +739,16 @@ export async function onRequestPatch(context) {
       );
     }
 
+    if (hasCancelled && typeof body.is_cancelled !== "boolean") {
+      return new Response(
+        JSON.stringify({
+          error: "Bad request",
+          message: "is_cancelled must be a boolean",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const performance = await DB.prepare(
       "SELECT id, is_announced, is_cancelled, band_follow_notified FROM performances WHERE id = ?",
     )
@@ -790,7 +800,22 @@ export async function onRequestPatch(context) {
     // Queue band-follower notifications on first 0 → 1 transition.
     // Followers are batched into band_announce_queue; POST /api/admin/flush-announce-digest
     // groups them by (email, event) and sends one digest per fan per event.
-    if (hasAnnounced && newValue === 1 && performance.is_announced === 0 && !performance.band_follow_notified) {
+    //
+    // `isCancelled` above already holds the EFFECTIVE post-request value (the
+    // new body value if this request touched is_cancelled, otherwise the
+    // stored one) -- gating on it here, not performance.is_cancelled, is what
+    // catches BOTH a same-request cancel+announce (body sets is_cancelled
+    // true) AND an announce-only request against a row that was already
+    // cancelled (body never sets is_cancelled, so the stored value carries
+    // through unchanged). Without this a cancelled set could still email
+    // every verified follower (#732 MAJOR 1).
+    if (
+      hasAnnounced &&
+      newValue === 1 &&
+      isCancelled === 0 &&
+      performance.is_announced === 0 &&
+      !performance.band_follow_notified
+    ) {
       const perf = await DB.prepare(
         `SELECT p.band_profile_id, bp.name as band_name,
                 e.id as event_id, e.name as event_name, e.slug as event_slug

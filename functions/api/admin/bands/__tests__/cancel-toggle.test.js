@@ -47,18 +47,38 @@ describe("admin single-band handler — is_cancelled", () => {
     const { db, performanceId, patch } = await seedEditorContext();
     const read = () => db.prepare("SELECT is_cancelled FROM performances WHERE id = ?").get(performanceId).is_cancelled;
 
-    await patch({ is_cancelled: 1 });
+    await patch({ is_cancelled: true });
     expect(read()).toBe(1);
 
     // Reversibility is the whole point -- a one-way flag would be a DELETE
     // with extra steps.
-    await patch({ is_cancelled: 0 });
+    await patch({ is_cancelled: false });
     expect(read()).toBe(0);
+  });
+
+  // #732 MINOR 4 — matches the existing is_announced validation (line ~732):
+  // `body.is_cancelled !== undefined` alone accepts ANY defined value, and the
+  // handler then coerces it with a bare truthy check (`body.is_cancelled ? 1
+  // : 0`), so `1`, `"false"` (a non-empty string, truthy), and `{}` all
+  // silently become is_cancelled = 1 in the DB instead of being rejected.
+  it("rejects a non-boolean is_cancelled value", async () => {
+    const { db, performanceId, patch } = await seedEditorContext();
+    const read = () => db.prepare("SELECT is_cancelled FROM performances WHERE id = ?").get(performanceId).is_cancelled;
+
+    for (const badValue of [1, "false", {}]) {
+      const res = await patch({ is_cancelled: badValue });
+      expect(res.status).toBe(400);
+      // Bad request must not mutate the row -- the string "false" is the
+      // sharpest case: truthy as a JS value, but its intent is obviously
+      // "not cancelled", so silently accepting it would flip the flag the
+      // wrong way instead of merely the wrong TYPE.
+      expect(read()).toBe(0);
+    }
   });
 
   it("rejects a viewer", async () => {
     const { patchAsViewer } = await seedEditorContext();
-    const res = await patchAsViewer({ is_cancelled: 1 });
+    const res = await patchAsViewer({ is_cancelled: true });
     expect(res.status).toBe(403);
   });
 
@@ -72,7 +92,7 @@ describe("admin single-band handler — is_cancelled", () => {
     const before = await getListForEvent();
     expect(before.find((b) => b.id === performanceId).is_cancelled).toBe(0);
 
-    await patch({ is_cancelled: 1 });
+    await patch({ is_cancelled: true });
 
     const after = await getListForEvent();
     expect(after.find((b) => b.id === performanceId).is_cancelled).toBe(1);

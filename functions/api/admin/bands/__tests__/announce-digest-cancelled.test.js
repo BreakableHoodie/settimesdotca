@@ -165,3 +165,164 @@ describe("flushAnnounceDigest — re-checks cancellation at send time (#732 MAJO
     expect(rawDb.prepare("SELECT * FROM band_announce_queue").all()).toHaveLength(0);
   });
 });
+
+/**
+ * The top-level SELECT (announceDigest.js ~line 35) reads `is_cancelled`
+ * ONCE for every queued row, up front. Phase A's per-group loop then claims
+ * sequentially, group by group, awaiting a real DB.batch() round-trip each
+ * time. A performance can be cancelled by an editor in the gap AFTER that
+ * one-time SELECT already read is_cancelled=0 for it, but BEFORE its own
+ * group's turn in the loop — invisible to the group's `item.is_cancelled`
+ * snapshot, since that snapshot was taken before the cancellation landed.
+ *
+ * The tests above (re-checks cancellation at send time) cover cancellation
+ * landing BEFORE the SELECT runs at all — the SELECT's join already handles
+ * that case. This describe block covers the narrower, later window: the
+ * claim itself must re-check cancellation at execution time, not trust the
+ * SELECT's snapshot, because check-then-send can never close a DB-read vs.
+ * network-send race — only making the claim's own write conditional can.
+ */
+describe("flushAnnounceDigest — the claim itself re-checks cancellation, closing the post-SELECT race (#732)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Poisons env.DB.batch so that, immediately after the FIRST group's real
+  // claim+delete batch resolves, it cancels a performance belonging to a
+  // LATER group — reproducing the exact ordering of the race: group 2 is
+  // claimed strictly after group 1's DB.batch() call returns.
+  function cancelAfterFirstBatch(env, rawDb, performanceId) {
+    const originalBatch = env.DB.batch.bind(env.DB);
+    let fired = false;
+    return vi.spyOn(env.DB, "batch").mockImplementation(async (statements) => {
+      const result = await originalBatch(statements);
+      if (!fired) {
+        fired = true;
+        rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(performanceId);
+      }
+      return result;
+    });
+  }
+
+  it("never emails a performance cancelled after the SELECT but before its own claim, and leaves no ledger row for it", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Mid-Flush Fest", slug: "digest-midflush-race" });
+    const venue = insertVenue(rawDb, { name: "Race Hall" });
+
+    // Group A sorts first ("a-..." < "z-..." in the flush's own
+    // `ORDER BY q.event_id, bf.email, q.queued_at`) and is untouched — its
+    // claim+delete batch is what triggers the mid-flush cancellation of
+    // group B, which is claimed strictly after.
+    const perfA = insertBand(rawDb, { name: "Early Band", event_id: ev.id, venue_id: venue.id });
+    const perfB = insertBand(rawDb, { name: "Doomed Band", event_id: ev.id, venue_id: venue.id });
+
+    const followA = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("a-midflush@example.com", perfA.band_profile_id, "tok-midflush-a").lastInsertRowid;
+    const followB = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("z-midflush@example.com", perfB.band_profile_id, "tok-midflush-b").lastInsertRowid;
+
+    for (const [followId, perf, name] of [
+      [followA, perfA, "Early Band"],
+      [followB, perfB, "Doomed Band"],
+    ]) {
+      rawDb
+        .prepare(
+          `INSERT INTO band_announce_queue
+           (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(followId, perf.id, ev.id, name, ev.name, ev.slug, perf.band_profile_id);
+    }
+
+    const queueRowB = rawDb.prepare("SELECT id FROM band_announce_queue WHERE band_follow_id = ?").get(followB);
+
+    const batchSpy = cancelAfterFirstBatch(env, rawDb, perfB.id);
+
+    try {
+      const stats = await flushAnnounceDigest(env, env.DB);
+
+      // Only group A's (unaffected) email goes out.
+      expect(sendEmail).toHaveBeenCalledOnce();
+      const [, { subject }] = sendEmail.mock.calls[0];
+      expect(subject).toContain("Early Band");
+      expect(stats.sent).toBe(1);
+
+      // Property 2 (load-bearing): the mid-flush-cancelled performance must
+      // leave NO ledger row. A claimed-but-never-sent row would permanently
+      // exclude this follower from resend-announcement's recovery query
+      // (which only looks for followers WITHOUT a notification row) even
+      // after the set is later restored and re-announced.
+      const claim = rawDb
+        .prepare("SELECT * FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
+        .get(perfB.id, followB);
+      expect(claim).toBeUndefined();
+
+      // Property 3: its queue row is still swept — a cancelled entry must
+      // not accumulate as a dead row forever.
+      const remaining = rawDb.prepare("SELECT id FROM band_announce_queue WHERE id = ?").get(queueRowB.id);
+      expect(remaining).toBeUndefined();
+    } finally {
+      batchSpy.mockRestore();
+    }
+  });
+
+  it("lets restore-then-announce reach the fan after a mid-flush cancellation, mirroring the pre-SELECT race's recovery path", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Mid-Flush Restore Fest", slug: "digest-midflush-restore" });
+    const venue = insertVenue(rawDb, { name: "Race Hall" });
+
+    const perfA = insertBand(rawDb, { name: "Early Band", event_id: ev.id, venue_id: venue.id });
+    const perfB = insertBand(rawDb, { name: "Doomed Band", event_id: ev.id, venue_id: venue.id });
+
+    const followA = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("a-midflush-restore@example.com", perfA.band_profile_id, "tok-midflush-restore-a").lastInsertRowid;
+    const followB = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("z-midflush-restore@example.com", perfB.band_profile_id, "tok-midflush-restore-b").lastInsertRowid;
+
+    for (const [followId, perf, name] of [
+      [followA, perfA, "Early Band"],
+      [followB, perfB, "Doomed Band"],
+    ]) {
+      rawDb
+        .prepare(
+          `INSERT INTO band_announce_queue
+           (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(followId, perf.id, ev.id, name, ev.name, ev.slug, perf.band_profile_id);
+    }
+
+    const batchSpy = cancelAfterFirstBatch(env, rawDb, perfB.id);
+    try {
+      const firstFlush = await flushAnnounceDigest(env, env.DB);
+      expect(firstFlush.sent).toBe(1); // group A only
+    } finally {
+      batchSpy.mockRestore();
+    }
+
+    // Restore the set and queue it again — UNIQUE(band_follow_id,
+    // performance_id) on band_announce_queue requires the earlier row to be
+    // gone, which the digest's own sweep already guaranteed.
+    rawDb.prepare("UPDATE performances SET is_cancelled = 0 WHERE id = ?").run(perfB.id);
+    rawDb
+      .prepare(
+        `INSERT INTO band_announce_queue
+         (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(followB, perfB.id, ev.id, "Doomed Band", ev.name, ev.slug, perfB.band_profile_id);
+
+    const secondFlush = await flushAnnounceDigest(env, env.DB);
+    expect(secondFlush.sent).toBe(1);
+    expect(sendEmail).toHaveBeenCalledTimes(2); // 1 from first flush + 1 from second
+
+    const claim = rawDb
+      .prepare("SELECT * FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
+      .get(perfB.id, followB);
+    expect(claim).toBeDefined();
+  });
+});

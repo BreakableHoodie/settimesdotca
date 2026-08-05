@@ -80,9 +80,13 @@ describe('Performance Utilities - Console Logging', () => {
       const { measurePageLoad } = await import('../performance.js')
       measurePageLoad()
       window.dispatchEvent(new Event('load'))
-      await new Promise(resolve => setTimeout(resolve, 10))
 
-      expect(consoleTableSpy).toHaveBeenCalled()
+      // Same fixed-sleep flake as the LCP test below (#758): this waits on
+      // the production code's own setTimeout(0) inside runMeasurements, which
+      // can be delayed past a fixed window under a loaded `vitest run`.
+      await vi.waitFor(() => {
+        expect(consoleTableSpy).toHaveBeenCalled()
+      })
     })
 
     it('should log LCP metric in dev mode', async () => {
@@ -274,57 +278,68 @@ describe('Performance Utilities - Console Logging', () => {
       }
     })
 
+    // No fixed sleep here (#758 sibling): the wait now happens per-assertion
+    // via vi.waitFor below, so this only performs the synchronous setup.
     async function runAndFlush() {
       const { measurePageLoad } = await import('../performance.js')
       measurePageLoad()
       window.dispatchEvent(new Event('load'))
-      await new Promise(resolve => setTimeout(resolve, 10))
     }
 
     it('should calculate DNS time correctly', async () => {
       await runAndFlush()
-      expect(consoleTableSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          dns: 20,
-        })
-      )
+      await vi.waitFor(() => {
+        expect(consoleTableSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            dns: 20,
+          })
+        )
+      })
     })
 
     it('should calculate TCP time correctly', async () => {
       await runAndFlush()
-      expect(consoleTableSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tcp: 30,
-        })
-      )
+      await vi.waitFor(() => {
+        expect(consoleTableSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tcp: 30,
+          })
+        )
+      })
     })
 
     it('should calculate total load time correctly', async () => {
       await runAndFlush()
-      expect(consoleTableSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          load: 500,
-        })
-      )
+      await vi.waitFor(() => {
+        expect(consoleTableSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            load: 500,
+          })
+        )
+      })
     })
 
     it('should extract FCP metric', async () => {
       await runAndFlush()
-      expect(consoleTableSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          fcp: 300,
-        })
-      )
+      await vi.waitFor(() => {
+        expect(consoleTableSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fcp: 300,
+          })
+        )
+      })
     })
 
     it('should return null for missing FCP', async () => {
       global.performance.getEntriesByType = vi.fn().mockReturnValue([])
       await runAndFlush()
-      expect(consoleTableSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          fcp: null,
-        })
-      )
+      await vi.waitFor(() => {
+        expect(consoleTableSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fcp: null,
+          })
+        )
+      })
     })
   })
 

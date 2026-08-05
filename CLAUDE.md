@@ -222,6 +222,22 @@ Enforced via `checkPermission(context, "viewer"|"editor"|"admin")` in `functions
 
 ---
 
+## Pulling a band from a live lineup
+
+**Use the cancel toggle (`is_cancelled = 1`). Do not un-announce, and do not delete the row.**
+
+`is_announced = 0` is **not** a way to hide a set. Every public query guards with `AND (e.reveal_mode = 0 OR p.is_announced = 1)` — five of them: `bands/[name].js`, `bands/stats/[name].js`, `events/timeline.js`, `feeds/ical.js`, `venues/[id].js`. On a `reveal_mode = 0` event the left side short-circuits **true**, so un-announcing changes nothing the public can see. The set stays on the schedule, the artist page, the venue page and the iCal feed. Nothing errors; the failure is invisible until fans arrive at a dark venue.
+
+`reveal_mode = 0` is the normal state for a published lineup — Buddies Fest 2 (event 36) is `reveal_mode = 0`. So this trap applies to exactly the events you are most likely to be editing during a show.
+
+Deleting the performance row does hide it, but it is lossy in two ways: a fan who already saw the lineup gets no signal the set was cancelled, and `share_links` stores a `band_names` snapshot, so a deleted performance leaves the band's **name** on already-shared routes (#733).
+
+Since #732 the correct action is the reversible cancel toggle in LineupTab (`PATCH /api/admin/bands/:id` with `is_cancelled: true`, `editor` role or above). It keeps the set visible and struck through with a "Cancelled" label on every fan surface, suppresses it from "up next" routing and live/starting-soon time math, makes it unselectable, emits `STATUS:CANCELLED` to calendar subscribers, and **blocks the announcement email** — a cancelled performance can neither queue nor send a follower notification, and un-cancelling restores normal announce behaviour.
+
+Operational detail: cancelling is scoped to *one performance*. A band playing two sets (ALL and Kepi Ghoulie each play twice at BF2) needs each set cancelled separately.
+
+The human-facing version of this, plus what to do when a set time changes or something looks wrong mid-event, is `docs/SHOW_DAY_RUNBOOK.md`. Keep the two in step — if a procedure changes, change both in the same commit.
+
 ## Band Announcements
 
 Band follows are **double opt-in**: `POST /api/bands/:name/follow` creates the row `verified = 0` with a `verification_token` and sends only a confirmation email. Clicking the link hits `GET /api/bands/:name/confirm-follow?token=…`, which sets `verified = 1` and clears the token (idempotent). Announcement emails target `verified = 1` followers **only** (the `WHERE … verified = 1` filter in `admin/bands/[id].js` and `resend-announcement.js`), so an address the submitter doesn't control can never be enrolled in the announcement stream — it receives at most one confirmation email. **Do not revert follow to auto-verify (`verified = 1` on insert)** — it reopens the email-bombing vector.

@@ -124,4 +124,97 @@ describe("GET /api/schedule/share/[slug]", () => {
     const row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("import12");
     expect(row.view_count).toBe(0);
   });
+
+  test("increments import_count for an import refetch (?import=1) but not view_count (#703)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
+    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    insertShareLink(rawDb, {
+      slug: "import99",
+      event_id: event.id,
+      event_slug: "my-fest",
+      performance_ids: [10],
+      band_names: ["Band A"],
+    });
+
+    const importFetch = () =>
+      onRequestGet({
+        request: new Request("https://example.test/api/schedule/share/import99?import=1"),
+        params: { slug: "import99" },
+        env,
+      });
+
+    await importFetch();
+    await importFetch();
+
+    const row = rawDb.prepare("SELECT view_count, import_count FROM share_links WHERE slug = ?").get("import99");
+    expect(row.import_count).toBe(2);
+    expect(row.view_count).toBe(0);
+  });
+
+  test("a normal GET (no ?import=1) increments view_count but not import_count (#703)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
+    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    insertShareLink(rawDb, {
+      slug: "normal01",
+      event_id: event.id,
+      event_slug: "my-fest",
+      performance_ids: [10],
+      band_names: ["Band A"],
+    });
+
+    await onRequestGet({
+      request: makeRequest("normal01"),
+      params: { slug: "normal01" },
+      env,
+    });
+
+    const row = rawDb.prepare("SELECT view_count, import_count FROM share_links WHERE slug = ?").get("normal01");
+    expect(row.view_count).toBe(1);
+    expect(row.import_count).toBe(0);
+  });
+
+  test("an import-counter write failure still returns the share payload with 200 (#703)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
+    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    insertShareLink(rawDb, {
+      slug: "failimp1",
+      event_id: event.id,
+      event_slug: "my-fest",
+      performance_ids: [10],
+      band_names: ["Band A"],
+    });
+
+    // Simulate the import_count UPDATE throwing while every other statement
+    // (including the row SELECT) works normally -- the best-effort contract
+    // means this must never surface to the caller as a failed request.
+    const originalPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("UPDATE share_links SET import_count")) {
+        return {
+          bind: () => ({
+            run: () => {
+              throw new Error("simulated import-count write failure");
+            },
+          }),
+        };
+      }
+      return originalPrepare(sql);
+    };
+
+    const res = await onRequestGet({
+      request: new Request("https://example.test/api/schedule/share/failimp1?import=1"),
+      params: { slug: "failimp1" },
+      env,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.slug).toBe("failimp1");
+
+    const row = rawDb.prepare("SELECT import_count FROM share_links WHERE slug = ?").get("failimp1");
+    expect(row.import_count).toBe(0);
+  });
 });

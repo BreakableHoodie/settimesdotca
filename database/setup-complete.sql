@@ -425,7 +425,7 @@ CREATE TABLE IF NOT EXISTS share_links (
   band_names      TEXT    NOT NULL,
   created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
   expires_at      TEXT    NOT NULL
-, view_count INTEGER NOT NULL DEFAULT 0);
+, view_count INTEGER NOT NULL DEFAULT 0, import_count INTEGER NOT NULL DEFAULT 0);
 
 CREATE INDEX IF NOT EXISTS idx_share_links_slug ON share_links(slug);
 

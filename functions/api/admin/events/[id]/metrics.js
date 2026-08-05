@@ -41,7 +41,8 @@ export async function onRequestGet(context) {
         ).bind(eventId),
         DB.prepare(
           `SELECT COUNT(*) AS total_shares,
-                COALESCE(SUM(view_count), 0) AS total_share_views
+                COALESCE(SUM(view_count), 0) AS total_share_views,
+                COALESCE(SUM(import_count), 0) AS total_share_imports
          FROM share_links WHERE event_id = ?`,
         ).bind(eventId),
         DB.prepare(
@@ -118,6 +119,7 @@ export async function onRequestGet(context) {
           popularBands: popularBands,
           totalShares: shareStats?.total_shares || 0,
           totalShareViews: shareStats?.total_share_views || 0,
+          totalShareImports: shareStats?.total_share_imports || 0,
           topSharedRoutes: topSharedRoutes,
           announcementPlanning: announcementPlanning,
           totalEventViews: telemetryStats?.total_event_views || 0,

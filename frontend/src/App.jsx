@@ -178,6 +178,13 @@ function App() {
   const [scheduleToast, setScheduleToast] = useState(null)
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const scheduleToastTimeoutRef = useRef(null)
+  // Guards the ?import=1 refetch below against firing twice for the same shared
+  // slug (React 19 StrictMode double-invokes mount effects in dev, and `bands`
+  // populating a second time before the `share` param removal commits would
+  // otherwise double-count an import server-side). Claimed synchronously,
+  // before the async setSearchParams/fetch, so a second same-render
+  // invocation of this effect body sees the claim and bails.
+  const importedShareSlugRef = useRef(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -449,6 +456,8 @@ function App() {
   useEffect(() => {
     const shareSlug = searchParams.get('share')
     if (!shareSlug || bands.length === 0) return
+    if (importedShareSlugRef.current === shareSlug) return
+    importedShareSlugRef.current = shareSlug
 
     setSearchParams(
       prev => {

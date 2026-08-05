@@ -226,11 +226,17 @@ Enforced via `checkPermission(context, "viewer"|"editor"|"admin")` in `functions
 
 **Use the cancel toggle (`is_cancelled = 1`). Do not un-announce, and do not delete the row.**
 
-`is_announced = 0` is **not** a way to hide a set. Every public query guards with `AND (e.reveal_mode = 0 OR p.is_announced = 1)` — five of them: `bands/[name].js`, `bands/stats/[name].js`, `events/timeline.js`, `feeds/ical.js`, `venues/[id].js`. On a `reveal_mode = 0` event the left side short-circuits **true**, so un-announcing changes nothing the public can see. The set stays on the schedule, the artist page, the venue page and the iCal feed. Nothing errors; the failure is invisible until fans arrive at a dark venue.
+`is_announced = 0` is **not** a way to hide a set. Every public read path guards with `AND (e.reveal_mode = 0 OR p.is_announced = 1)` — **8 files**, and two of them bind `reveal_mode` as a parameter (`AND (? = 0 OR p.is_announced = 1)`), so grep for `is_announced = 1` rather than the literal `e.reveal_mode` form or you will undercount:
+
+`api/bands/[name].js`, `api/bands/stats/[name].js`, `api/events/[id]/details.js`, `api/events/timeline.js`, `api/feeds/ical.js`, `api/schedule.js`, `api/venues/[id].js`, `event/[slug].js`
+
+On a `reveal_mode = 0` event the left side short-circuits **true**, so `is_announced` is never consulted for visibility. The set stays on the schedule, the artist page, the venue page and the iCal feed. Nothing errors; the failure is invisible until fans arrive at a dark venue.
+
+`is_announced` is not meaningless on such an event, though — the **`0 → 1` transition still drives the follower announcement email** (see "Band Announcements" below). Un-announcing and re-announcing a set on a `reveal_mode = 0` event changes nothing publicly while still being capable of sending mail.
 
 `reveal_mode = 0` is the normal state for a published lineup — Buddies Fest 2 (event 36) is `reveal_mode = 0`. So this trap applies to exactly the events you are most likely to be editing during a show.
 
-Deleting the performance row does hide it, but it is lossy in two ways: a fan who already saw the lineup gets no signal the set was cancelled, and `share_links` stores a `band_names` snapshot, so a deleted performance leaves the band's **name** on already-shared routes (#733).
+Deleting the performance row does hide it, but it is lossy: a fan who already saw the lineup gets no signal the set was cancelled, and since #733 the set is **dropped entirely** from already-shared routes — `schedule/share/[slug].js` resolves live performances and filters out ids that no longer exist, so a fan reopening their shared link finds the stop silently gone rather than marked off. (Before #733 it left an orphaned name with no time or venue, which read as a rendering bug; dropping it is better, but neither tells the fan the set was cancelled.)
 
 Since #732 the correct action is the reversible cancel toggle in LineupTab (`PATCH /api/admin/bands/:id` with `is_cancelled: true`, `editor` role or above). It keeps the set visible and struck through with a "Cancelled" label on every fan surface, suppresses it from "up next" routing and live/starting-soon time math, makes it unselectable, emits `STATUS:CANCELLED` to calendar subscribers, and **blocks the announcement email** — a cancelled performance can neither queue nor send a follower notification, and un-cancelling restores normal announce behaviour.
 

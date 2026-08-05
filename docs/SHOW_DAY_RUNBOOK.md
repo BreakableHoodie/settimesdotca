@@ -23,8 +23,8 @@ Why not the alternatives:
 
 | Action | What actually happens |
 |---|---|
-| Set `is_announced = 0` | **Nothing visible.** See "Silent no-ops" below |
-| Delete the performance row | Hides it, but a fan who already saw the lineup gets no signal, and the band's name is left stranded on already-shared routes |
+| Set `is_announced = 0` | **No public change at all** on a published lineup. See "Silent no-ops" below. It can still send email if re-announced |
+| Delete the performance row | Hides it — but a fan who already saw the lineup gets no signal, and the stop vanishes from their shared route without explanation |
 
 **A band with two sets needs each one cancelled separately.** At BF2, ALL and Kepi Ghoulie each play twice.
 
@@ -32,7 +32,11 @@ Why not the alternatives:
 
 Admin → Lineup tab → edit the set's start/end time.
 
-**If the new time is after midnight, check the date field.** `performance_date` stores **the evening the set belongs to**, not the wall-clock calendar date. A set at 00:25 on the night of Saturday the 8th is stored as `2026-08-08`, not the 9th. Getting this wrong makes the set sort to the top of the wrong day.
+**If the new time is after midnight, check the date field.** `performance_date` stores **the evening the set belongs to**, not the wall-clock calendar date.
+
+Worked example: a set that starts at **00:25 in the early hours of Sunday, August 9** — i.e. the tail of **Saturday, August 8's** night — is stored as `performance_date = 2026-08-08`. Where's Shane? is exactly this case at BF2.
+
+Getting it wrong sorts the set to the top of the wrong day instead of the end of the right one.
 
 The cutover is 6 AM: anything starting before 06:00 belongs to the previous evening.
 
@@ -50,9 +54,12 @@ This drives the "Live Tonight" / "Happening Now" edge on an event's **first day 
 
 ## Silent no-ops — things that look like they worked
 
-**Un-announcing a set on a published lineup.** Every public query guards with `AND (e.reveal_mode = 0 OR p.is_announced = 1)`. When `reveal_mode = 0` — the normal state for a published event, and BF2's state — that condition is already true, so `is_announced` is never consulted. The set stays fully visible. Nothing errors.
+**Un-announcing a set on a published lineup.** All 8 public read paths guard with `AND (e.reveal_mode = 0 OR p.is_announced = 1)`. When `reveal_mode = 0` — the normal state for a published event, and BF2's state — that condition is already true, so `is_announced` is never consulted **for visibility**. The set stays fully visible. Nothing errors.
 
-`is_announced` is only meaningful on a `reveal_mode = 1` event, where the lineup is revealed act by act.
+Two things follow, and they are easy to conflate:
+
+- **Visibility:** un-announcing hides nothing on a `reveal_mode = 0` event. Only the cancel toggle does that. Hiding act-by-act is what `reveal_mode = 1` is for.
+- **Email:** `is_announced` going `0 → 1` is still what triggers the follower announcement email, on *any* reveal mode. So un-announcing and re-announcing a set here is publicly invisible **and** capable of sending mail. (A *cancelled* set cannot send — that guard is separate and holds regardless.)
 
 **Editing a shared route.** `share_links` stores a snapshot of the band names taken when the link was created. Changing the lineup afterwards does not rewrite existing share links; the page resolves live data for times and venues, and drops sets that no longer exist.
 
@@ -60,7 +67,7 @@ This drives the "Live Tonight" / "Happening Now" edge on an event's **first day 
 
 ## If something looks wrong on the live site
 
-1. **Check the API before the page.** `https://settimes.ca/api/events/<id>/details` and `/api/venues/<id>` show exactly what the frontend receives. Most "the page is wrong" reports are the payload being wrong.
+1. **Check the API before the page.** `https://settimes.ca/api/events/{id}/details` and `https://settimes.ca/api/venues/{id}` show exactly what the frontend receives (Buddies Fest 2 is event `36`). Most "the page is wrong" reports are the payload being wrong.
 2. **Deploys are automatic on merge to `main`**, including database migrations. There is no manual apply step. A change that is merged but not visible is usually a deploy still running — check Actions.
 3. **The API caches for 5 minutes** (`Cache-Control: public, max-age=300` on the public read endpoints). A correct-looking database and a stale page is usually this; wait it out rather than re-editing.
 4. **Times are Toronto-local everywhere.** If something classifies as the wrong day, suspect the after-midnight rule (above) before suspecting a timezone bug.

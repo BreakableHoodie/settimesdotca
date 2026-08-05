@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDirectionsHref } from '../directions'
+import { buildDirectionsHref, buildDirectionsHrefForBand } from '../directions'
 
 // #742 — the venue page hands a fan's phone off to whichever maps app it has.
 // Assert on the resolved href string itself, not merely that a value comes
@@ -57,5 +57,26 @@ describe('buildDirectionsHref — blank-ish input', () => {
   it('falls back to the address alone when the name is whitespace-only', () => {
     const href = buildDirectionsHref('   ', '20 John Pound Road')
     expect(href).toBe('https://www.google.com/maps/search/?api=1&query=20%20John%20Pound%20Road')
+  })
+})
+
+// Migrated from utils/__tests__/nextMove.test.js — buildDirectionsHrefForBand
+// used to be nextMove.js's own directionsHref(band); #754's correction found
+// it was never folded into this file despite #753 assuming it had been.
+describe('buildDirectionsHrefForBand (#754)', () => {
+  it('builds a coordinate directions link when coords are present', () => {
+    const href = buildDirectionsHrefForBand({ venue: 'Roost', venue_lat: 43.46, venue_lng: -80.52 })
+    expect(href).toBe('https://www.google.com/maps/dir/?api=1&destination=43.46,-80.52')
+  })
+
+  it('falls back to a name search when coords are missing', () => {
+    const href = buildDirectionsHrefForBand({ venue: 'The Roost' })
+    expect(href).toContain('/maps/search/')
+    expect(href).toContain(encodeURIComponent('The Roost Waterloo ON'))
+  })
+
+  it('returns null when there is nothing to locate', () => {
+    expect(buildDirectionsHrefForBand({})).toBe(null)
+    expect(buildDirectionsHrefForBand(null)).toBe(null)
   })
 })

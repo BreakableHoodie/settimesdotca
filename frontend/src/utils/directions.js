@@ -6,8 +6,7 @@
 // device's own installed maps app, and it still resolves in a desktop
 // browser — so it covers every target CLAUDE.md calls out without the
 // fragility of parsing navigator.userAgent for what is, after all, just a
-// link. Matches the existing precedent in utils/nextMove.js's
-// directionsHref(), which uses the same api=1 Google Maps URL family.
+// link.
 //
 // Name + address (not address alone) so the pin lands on the venue itself
 // rather than mid-street — a bare street address can resolve to the wrong
@@ -22,4 +21,28 @@ export function buildDirectionsHref(name, address) {
   const trimmedName = typeof name === 'string' ? name.trim() : ''
   const query = trimmedName ? `${trimmedName}, ${trimmedAddress}` : trimmedAddress
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+}
+
+// Directions for a performance/band object shaped like the schedule API's
+// payload (venue NAME + optional venue_lat/venue_lng — schedule.js never
+// joins the venue's address). Prefers exact coordinates, which opens the
+// device's native maps app rather than a Google web search; falls back to a
+// "<venue> Waterloo ON" name search when coordinates aren't available.
+//
+// Consolidated from utils/nextMove.js's own copy of this exact function
+// (#754) — issue #754's correction confirmed there were two directions-URL
+// builders live simultaneously, not the one #753 assumed had already
+// consolidated them. This is now the single builder both address-shaped
+// (`buildDirectionsHref`) and coordinate-shaped (this function) venue data
+// go through; do not reintroduce a third copy in a component file.
+export function buildDirectionsHrefForBand(band) {
+  if (!band) return null
+  const { venue_lat: lat, venue_lng: lng, venue } = band
+  if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+  }
+  if (venue) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venue} Waterloo ON`)}`
+  }
+  return null
 }

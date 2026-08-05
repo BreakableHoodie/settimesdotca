@@ -1,8 +1,21 @@
-import { Archive, CalendarDays, Check, Clock, Funnel, History, MapPin, Music, TriangleAlert, X } from 'lucide-react'
+import {
+  Archive,
+  CalendarDays,
+  Check,
+  Clock,
+  Funnel,
+  History,
+  MapPin,
+  Music,
+  Navigation,
+  TriangleAlert,
+  X,
+} from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
+import { buildDirectionsHref } from '../utils/directions'
 import { formatPerformanceDayLabel, formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
@@ -890,15 +903,38 @@ function EventCard({
             <div className="p-6 border-b border-border">
               <h4 className="text-lg font-bold text-text-primary mb-4">Venues</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {venueList.map(venue => (
-                  <Card key={venue.id} padding="sm" variant="elevated">
-                    <div className="font-semibold text-text-primary mb-1">{venue.name}</div>
-                    <div className="text-text-secondary text-sm">
-                      {venue.band_count} {venue.band_count === 1 ? 'band' : 'bands'}
-                    </div>
-                    {venue.address && <div className="text-text-tertiary text-xs mt-1">{venue.address}</div>}
-                  </Card>
-                ))}
+                {venueList.map(venue => {
+                  // Name + address (never address alone) so the pin lands on
+                  // the venue itself rather than mid-street (see
+                  // utils/directions.js). Returns null when address is
+                  // missing/blank, so no dead Directions link renders (#754).
+                  const directionsHref = buildDirectionsHref(venue.name, venue.address)
+                  return (
+                    <Card key={venue.id} padding="sm" variant="elevated">
+                      <div className="font-semibold text-text-primary mb-1">{venue.name}</div>
+                      <div className="text-text-secondary text-sm">
+                        {venue.band_count} {venue.band_count === 1 ? 'band' : 'bands'}
+                      </div>
+                      {venue.address && (
+                        <p className="text-text-tertiary text-xs mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span>{venue.address}</span>
+                          {directionsHref && (
+                            <a
+                              href={directionsHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Directions to ${venue.name}`}
+                              className="inline-flex items-center gap-1 text-accent-400 hover:text-accent-300"
+                            >
+                              <Navigation size={12} aria-hidden="true" />
+                              Directions
+                            </a>
+                          )}
+                        </p>
+                      )}
+                    </Card>
+                  )
+                })}
               </div>
             </div>
           )}

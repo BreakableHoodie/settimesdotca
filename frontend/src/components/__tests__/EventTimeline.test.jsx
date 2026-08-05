@@ -839,3 +839,103 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
     expect(img.closest('a')).toBeNull()
   })
 })
+
+// #754 — the Venues grid (expanded event details) rendered a venue's address
+// as inert text with no way to get directions. It now builds a
+// buildDirectionsHref(name, address) link.
+//
+// Testing gotcha (per #753's postmortem): an <a> with no `href` has NO
+// implicit ARIA `link` role, so `queryByRole('link', ...)` returns null even
+// against a rendered dead anchor -- a "no link" assertion written that way
+// would pass against the broken (pre-#754) implementation too. Every
+// assertion here also checks the visible "Directions" text so a regression
+// to inert text is caught either way.
+describe('EventTimeline Venues grid directions (#754)', () => {
+  beforeEach(() => {
+    const timelineData = {
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Test Event',
+          slug: 'test-event',
+          date: '2026-05-10',
+          status: 'published',
+          is_published: true,
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    }
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        if (url === '/api/events/1/details') {
+          return Promise.resolve(
+            jsonResponse({
+              venues: [
+                { id: 7, name: 'The Mill', band_count: 1, address: '20 John Pound Road, Tillsonburg, ON' },
+                { id: 8, name: 'Roost', band_count: 1, address: null },
+              ],
+              bands: [],
+              band_count: 2,
+              venue_count: 2,
+            })
+          )
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('renders a directions link with the venue name in its accessible name', async () => {
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Test Event')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /view details/i }))
+    expect(await screen.findByText('The Mill')).toBeInTheDocument()
+
+    const link = screen.getByRole('link', { name: 'Directions to The Mill' })
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveTextContent('Directions')
+    expect(link).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/search/?api=1&query=' +
+        encodeURIComponent('The Mill, 20 John Pound Road, Tillsonburg, ON')
+    )
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'))
+  })
+
+  it('renders no crash and no directions link/address row for a venue with no address', async () => {
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Test Event')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /view details/i }))
+    expect(await screen.findByText('Roost')).toBeInTheDocument()
+
+    expect(screen.queryByRole('link', { name: /directions to roost/i })).not.toBeInTheDocument()
+  })
+})

@@ -84,6 +84,34 @@ function resolveGradientAccentStops(theme) {
   return { start: match[1], end: match[2] }
 }
 
+// gradient-card's stops are `rgba(...)` with real alpha (0.9-0.96), unlike
+// gradient-accent's opaque hex stops above — the card itself is a
+// translucent overlay on the page background, not a solid fill. Returns both
+// stops as {rgb, alpha} so the caller can composite each over the page
+// background and use whichever is darker (#721).
+function resolveGradientCardStops(theme) {
+  const raw =
+    getRawVar(themeBlocks[theme], '--background-image-gradient-card') ||
+    getRawVar(rootBlock, '--background-image-gradient-card')
+  if (!raw) {
+    throw new Error(`themeTokens.test.js: --background-image-gradient-card is not defined for theme "${theme}"`)
+  }
+  const match =
+    /rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\s*\)\s*0%,\s*rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\s*\)\s*100%/.exec(
+      raw
+    )
+  if (!match) {
+    throw new Error(
+      `themeTokens.test.js: could not parse rgba start/end stops out of --background-image-gradient-card for theme "${theme}": ${raw}`
+    )
+  }
+  const [, r1, g1, b1, a1, r2, g2, b2, a2] = match
+  return {
+    start: { rgb: [Number(r1), Number(g1), Number(b1)], alpha: a1 === undefined ? 1 : Number(a1) },
+    end: { rgb: [Number(r2), Number(g2), Number(b2)], alpha: a2 === undefined ? 1 : Number(a2) },
+  }
+}
+
 // --- WCAG 2.x contrast (relative luminance + contrast ratio) --------------
 function hexToRgb(hex) {
   let h = hex.replace('#', '')
@@ -135,6 +163,19 @@ function blend(fgHex, bgHex, alphaPercent) {
   return `#${[mixChannel(fr, br), mixChannel(fg, bg), mixChannel(fb, bb)]
     .map(c => c.toString(16).padStart(2, '0'))
     .join('')}`
+}
+
+function rgbToHex([r, g, b]) {
+  return `#${[r, g, b].map(c => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+// gradient-card is a translucent overlay (real rgba alpha, not an opaque
+// fill) painted over the page background, so a gradient-card stop has to be
+// resolved to what actually renders on screen — the stop alpha-blended over
+// the page backdrop — before anything else (e.g. the pill tint) can be
+// composited on top of it in turn (#721).
+function compositeCardStopOverPage(stop, pageBgHex) {
+  return blend(rgbToHex(stop.rgb), pageBgHex, stop.alpha * 100)
 }
 
 // Pulls the `.soon-pill` rule's actual `background: color-mix(...)` and
@@ -197,26 +238,41 @@ describe('theme token contrast (WCAG AA, 4.5:1)', () => {
     // never renders — .soon-pill's text sits on its OWN
     // `color-mix(in srgb, warning-400 15%, transparent)` tint, which
     // (per `blend()` above) pulls the effective background toward
-    // warning-400's hue and erodes the real on-screen contrast to ~3.9:1 on
-    // daybreak/silver-lining, failing AA. This composites the tint the same
-    // way the browser does and checks the pill's actual text token
-    // (--color-warning-pill-text) against that composited result. bg-navy is
-    // used as the compositing backdrop (rather than parsing BandCard's
-    // gradient-card, which this file doesn't otherwise resolve) because
-    // gradient-card's stops are near-identical to bg-navy/bg-purple on every
-    // theme, and bg-navy is what every other assertion in this file already
-    // anchors to.
-    it('soon-pill text clears 4.5:1 against its composited (color-mix) pill background', () => {
+    // warning-400's hue and erodes the real on-screen contrast. This
+    // composites the tint the same way the browser does and checks the
+    // pill's actual text token (--color-warning-pill-text) against that
+    // composited result.
+    //
+    // The pill only ever renders on BandCard's default `bg-gradient-card`
+    // state (BandCard.jsx swaps to the opaque `.soon-pill--dark` style
+    // whenever the amber `bg-gradient-accent` background is active), and
+    // gradient-card is a translucent rgba overlay — NOT near-identical to
+    // bg-navy, contrary to what this comment used to claim (#721). On
+    // daybreak, gradient-card's darkest stop is rgba(247,234,220,0.92)
+    // against bg-navy #fff8f1 — visibly darker, which erodes contrast for
+    // the pill's dark text. So the real backdrop for the pill tint is
+    // gradient-card's stop, itself composited over the page background
+    // (bg-navy), not bg-navy directly. Both gradient-card stops are checked
+    // and the lower (worse) resulting ratio is asserted, since the pill can
+    // sit anywhere along the card's gradient.
+    it('soon-pill text clears 4.5:1 against its composited (color-mix over gradient-card) pill background', () => {
       const tintColor = resolveHex(pillSpec.tintToken, theme)
       const textColor = resolveHex(pillSpec.textToken, theme)
-      const compositedPillBg = blend(tintColor, bgNavy, pillSpec.tintPercent)
-      const ratio = contrastRatio(textColor, compositedPillBg)
+      const cardStops = resolveGradientCardStops(theme)
+
+      const results = [cardStops.start, cardStops.end].map(stop => {
+        const cardBg = compositeCardStopOverPage(stop, bgNavy)
+        const pillBg = blend(tintColor, cardBg, pillSpec.tintPercent)
+        return { cardBg, pillBg, ratio: contrastRatio(textColor, pillBg) }
+      })
+      const worst = results[0].ratio <= results[1].ratio ? results[0] : results[1]
+
       expect(
-        ratio,
+        worst.ratio,
         `[${theme}] .soon-pill text (${pillSpec.textToken}=${textColor}) against its composited pill ` +
-          `background (${pillSpec.tintPercent}% ${pillSpec.tintToken}=${tintColor} color-mixed over ` +
-          `--color-bg-navy=${bgNavy} => ${compositedPillBg}) computes to ${ratio.toFixed(2)}:1, below the ` +
-          `${MIN_CONTRAST}:1 WCAG AA floor`
+          `background (${pillSpec.tintPercent}% ${pillSpec.tintToken}=${tintColor} color-mixed over the ` +
+          `gradient-card stop composited over --color-bg-navy=${bgNavy} => ${worst.cardBg} => ${worst.pillBg}) ` +
+          `computes to ${worst.ratio.toFixed(2)}:1, below the ${MIN_CONTRAST}:1 WCAG AA floor`
       ).toBeGreaterThanOrEqual(MIN_CONTRAST)
     })
 

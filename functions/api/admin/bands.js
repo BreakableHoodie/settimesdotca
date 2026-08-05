@@ -18,33 +18,21 @@ import { buildIntervals, intervalsOverlap } from "../../utils/timeConflicts.js";
 import { parseOrigin } from "../../utils/parseOrigin.js";
 import { normalizeBandName } from "../../utils/bandName.js";
 import { sortableName } from "../../utils/sortableName.js";
+import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 
 // SQLite `ORDER BY` can't strip a leading article inline (#587), so the SQL
-// in onRequestGet below is a coarse pre-sort (correct on start_time/event_date,
-// raw-byte on name) and the exact ordering is re-derived in JS afterward,
-// swapping the name comparison for the article-stripped `sortableName` key.
-// These mirror the NULL-ordering SQLite applies by default: ASC puts NULLs
-// first, DESC puts NULLs last.
+// in onRequestGet below is a coarse pre-sort (correct on start_time, raw-byte
+// on name) and the exact ordering is re-derived in JS afterward, swapping the
+// name comparison for the article-stripped `sortableName` key. This mirrors
+// the NULL-ordering SQLite applies by default: ASC puts NULLs first, DESC
+// puts NULLs last. Only used by the eventId branch below — the no-eventId
+// (roster) branch sorts on name alone (#710 removed its per-performance
+// bare columns).
 function compareStartTimeNullsLast(a, b) {
   if (a.start_time == null && b.start_time == null) return 0;
   if (a.start_time == null) return 1;
   if (b.start_time == null) return -1;
   return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0;
-}
-
-function compareStartTimeNullsFirst(a, b) {
-  if (a.start_time == null && b.start_time == null) return 0;
-  if (a.start_time == null) return -1;
-  if (b.start_time == null) return 1;
-  return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0;
-}
-
-function compareEventDateDescNullsLast(a, b) {
-  if (a.event_date == null && b.event_date == null) return 0;
-  if (a.event_date == null) return 1;
-  if (b.event_date == null) return -1;
-  if (a.event_date === b.event_date) return 0;
-  return a.event_date > b.event_date ? -1 : 1;
 }
 
 async function getEventStatus(DB, eventId) {
@@ -205,16 +193,15 @@ export async function onRequestGet(context) {
         .all();
     } else {
       // List ALL band PROFILES — active and inactive (#619) — one row per
-      // profile (#618). A profile can have zero, one, or many performances
-      // across many events; the old query LEFT JOINed to performances with no
-      // GROUP BY, so a band with N performances produced N rows. Combined
-      // with `ORDER BY e.date DESC` + `LIMIT`, any profile whose only
-      // performances were on older events could sort past the limit and
-      // vanish entirely (#618 — Adelleda, whose sole performance was a 2024
-      // event, was missing from the roster). GROUP BY bp.id collapses that
-      // back to one row per profile, so the LIMIT now bounds roster size
-      // (~218 active + a handful of inactive profiles in prod), not
-      // performance-row count.
+      // profile (#618), guaranteed STRUCTURALLY: the base table below is
+      // `FROM band_profiles bp` with no top-level join to `performances`, so
+      // there is no row-fan-out to collapse with GROUP BY in the first place
+      // (the old query LEFT JOINed to performances with no GROUP BY, so a
+      // band with N performances produced N rows; combined with
+      // `ORDER BY e.date DESC` + `LIMIT`, a profile whose only performances
+      // were on older events could sort past the limit and vanish entirely —
+      // #618, Adelleda). LIMIT here bounds roster size (~218 active + a
+      // handful of inactive profiles in prod), never performance-row count.
       //
       // Deliberately no `WHERE bp.is_active = 1` here (#619): the admin
       // roster is the tool that manages profiles, so it must be able to see
@@ -225,29 +212,48 @@ export async function onRequestGet(context) {
       // (it never filtered on is_active); this brings the admin roster in
       // line with it.
       //
-      // The per-performance columns (event/venue name, event date, etc.) are
-      // kept for a "last played" display, sourced from the band's MOST RECENT
-      // performance: SQLite's bare-column-with-MAX() semantics say that when a
-      // query has exactly one MAX() aggregate, bare columns in the same result
-      // row are pulled from the input row that produced the max — including
-      // per GROUP BY group, not just whole-table aggregates. So MAX(e.date)
-      // plus the bare v.name/e.name/p.* columns below consistently resolve to
-      // the same (most recent) performance row, without a subquery or window
-      // function. Profiles with zero performances get NULLs throughout (LEFT
-      // JOIN), same as before.
+      // #710 — next_event_*/last_event_* replace the old MAX(e.date) +
+      // bare-column trick, which had no date predicate at all: MAX() picked
+      // the furthest-out event in EITHER direction, so a not-yet-happened
+      // event (e.g. Buddies Fest 2, still weeks away) was reported as the
+      // band's "most recent performance". Nothing in frontend/src/admin/
+      // rendered event_name/event_date either (dead weight on the wire) — both
+      // are replaced outright, along with the rest of the per-performance
+      // bare columns (venue_name, start_time, end_time, performance_date,
+      // notes) that rode along with the same broken trick and also have no
+      // consumer in this branch (RosterTab and LineupTab's ArtistPicker only
+      // read profile-level fields + band_profile_id from this branch).
+      //
+      // "Today" is `eventLocalFestivalToday()` (America/Toronto, after-
+      // midnight-aware — see functions/utils/eventDay.js), bound as a
+      // parameter — never SQLite's `date('now')` (UTC) and never the plain
+      // calendar-day `eventLocalToday()`. Between local midnight and 6 AM the
+      // calendar day has rolled but the festival night has not; an event
+      // still running (after-midnight sets) must not jump from "next" to
+      // "past" while doors are open. Multi-day events compare against
+      // COALESCE(e.end_date, e.date) so a 3-day event stays "next" through
+      // its final day rather than moving to "past" on day 2 — same
+      // COALESCE(end_date, date) convention as saveSelectedBands.
+      //
+      // event_ids (GROUP_CONCAT DISTINCT) exposes every event the profile has
+      // ever played. The roster's Next/Past event FILTERABLE_COLUMNS entries
+      // (frontend/src/admin/utils/rosterColumns.js) currently filter on
+      // next_event_name/last_event_name only, so event_ids and the *_id/*_date
+      // siblings (next_event_id, next_event_date, last_event_id,
+      // last_event_date) have no wired-up consumer yet — they're returned per
+      // #710's spec as the exact-id/date building blocks for a future
+      // name-collision-proof filter (two different events sharing a display
+      // name would otherwise be indistinguishable by name alone).
+      //
       // We construct a synthetic ID: 'profile_' || bp.id (unique per profile —
       // no consumer in this branch reads `id` as a real performance id; both
       // RosterTab and LineupTab's ArtistPicker key off `band_profile_id`).
-      result = await DB.prepare(
-        `
+      {
+        const today = eventLocalFestivalToday();
+        result = await DB.prepare(
+          `
         SELECT
           'profile_' || bp.id as id,
-          p.event_id,
-          p.venue_id,
-          p.start_time,
-          p.end_time,
-          p.performance_date,
-          p.notes,
           bp.id as band_profile_id,
           bp.name,
           bp.genre,
@@ -261,42 +267,74 @@ export async function onRequestGet(context) {
           bp.photo_alt_text,
           bp.social_links,
           (SELECT COUNT(*) FROM band_follows bf WHERE bf.band_profile_id = bp.id AND bf.verified = 1) AS follower_count,
-          v.name as venue_name,
-          e.name as event_name,
-          MAX(e.date) as event_date
+          (SELECT GROUP_CONCAT(DISTINCT perf.event_id) FROM performances perf WHERE perf.band_profile_id = bp.id) AS event_ids,
+          (
+            SELECT e.id FROM events e
+            JOIN performances perf ON perf.event_id = e.id
+            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) >= ?
+            ORDER BY e.date ASC, e.id ASC
+            LIMIT 1
+          ) AS next_event_id,
+          (
+            SELECT e.name FROM events e
+            JOIN performances perf ON perf.event_id = e.id
+            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) >= ?
+            ORDER BY e.date ASC, e.id ASC
+            LIMIT 1
+          ) AS next_event_name,
+          (
+            SELECT e.date FROM events e
+            JOIN performances perf ON perf.event_id = e.id
+            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) >= ?
+            ORDER BY e.date ASC, e.id ASC
+            LIMIT 1
+          ) AS next_event_date,
+          (
+            SELECT e.id FROM events e
+            JOIN performances perf ON perf.event_id = e.id
+            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) < ?
+            ORDER BY COALESCE(e.end_date, e.date) DESC, e.id DESC
+            LIMIT 1
+          ) AS last_event_id,
+          (
+            SELECT e.name FROM events e
+            JOIN performances perf ON perf.event_id = e.id
+            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) < ?
+            ORDER BY COALESCE(e.end_date, e.date) DESC, e.id DESC
+            LIMIT 1
+          ) AS last_event_name,
+          (
+            SELECT e.date FROM events e
+            JOIN performances perf ON perf.event_id = e.id
+            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) < ?
+            ORDER BY COALESCE(e.end_date, e.date) DESC, e.id DESC
+            LIMIT 1
+          ) AS last_event_date
         FROM band_profiles bp
-        LEFT JOIN performances p ON bp.id = p.band_profile_id
-        LEFT JOIN venues v ON p.venue_id = v.id
-        LEFT JOIN events e ON p.event_id = e.id
-        GROUP BY bp.id
-        ORDER BY event_date DESC, bp.name
+        ORDER BY bp.name
         LIMIT ?
         OFFSET ?
       `,
-      )
-        .bind(limit, offset)
-        .all();
+        )
+          .bind(today, today, today, today, today, today, limit, offset)
+          .all();
+      }
     }
 
     const bands = (result.results || []).map(unpackSocialLinks);
 
     // Re-derive the exact ordering in JS with the article-stripped sort key
-    // (#587) — see the comparator helpers above. Pagination-boundary
-    // guarantee: the eventId branch has no LIMIT/OFFSET (one event's full
-    // lineup). The no-eventId branch is GROUP BY bp.id (#618) — exactly one
-    // row per active band_profile — so its row count is bounded by roster
-    // size, not by how many performances a band has; the JS re-sort below
-    // never has to worry about a truncated LIMIT window splitting a single
-    // band across pages.
+    // (#587) — see the compareStartTimeNullsLast comment above. Pagination-
+    // boundary guarantee: the eventId branch has no LIMIT/OFFSET (one event's
+    // full lineup). The no-eventId branch has no join to `performances` at
+    // its top level (#618/#710) — exactly one row per band_profile,
+    // structurally — so its row count is bounded by roster size, not by how
+    // many performances a band has; the JS re-sort below never has to worry
+    // about a truncated LIMIT window splitting a single band across pages.
     if (eventId) {
       bands.sort((a, b) => compareStartTimeNullsLast(a, b) || sortableName(a.name).localeCompare(sortableName(b.name)));
     } else {
-      bands.sort(
-        (a, b) =>
-          compareEventDateDescNullsLast(a, b) ||
-          compareStartTimeNullsFirst(a, b) ||
-          sortableName(a.name).localeCompare(sortableName(b.name)),
-      );
+      bands.sort((a, b) => sortableName(a.name).localeCompare(sortableName(b.name)));
     }
 
     return new Response(JSON.stringify({ success: true, bands }), {

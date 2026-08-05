@@ -117,9 +117,17 @@ describe('Performance Utilities - Console Logging', () => {
       const { measurePageLoad } = await import('../performance.js')
       measurePageLoad()
       window.dispatchEvent(new Event('load'))
-      await new Promise(resolve => setTimeout(resolve, 10))
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('LCP:', expect.any(Number), 'ms')
+      // A fixed sleep here stood in for "the PerformanceObserver callback has
+      // fired" and flaked under a loaded `vitest run` (#758): the mock's own
+      // `setTimeout(..., 0)` is a THIRD timer registered dynamically inside
+      // the production code's own `setTimeout(..., 0)`, so under contention
+      // it can land in a later event-loop tick than a single fixed-delay
+      // wait registered up front. vi.waitFor polls the real assertion
+      // instead of guessing a delay, so it's correct under any load.
+      await vi.waitFor(() => {
+        expect(consoleLogSpy).toHaveBeenCalledWith('LCP:', expect.any(Number), 'ms')
+      })
     })
   })
 

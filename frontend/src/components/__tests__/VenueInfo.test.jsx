@@ -62,6 +62,12 @@ describe('VenueInfo directions fallback (#754)', () => {
     const link = screen.getByRole('link', { name: 'Open directions to The Copper Mug' })
     expect(link).toBeInTheDocument()
     expect(link).toHaveAttribute('href', 'https://maps.example.com/copper-mug-exact-pin')
+    // This href is admin-supplied and external, so the noopener/noreferrer
+    // contract is load-bearing: without it the opened tab can reach back
+    // through window.opener. Asserted here so dropping it fails a test.
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'))
 
     // No second/competing "Directions to ..." link should exist.
     expect(screen.queryByRole('link', { name: 'Directions to The Copper Mug' })).not.toBeInTheDocument()
@@ -77,8 +83,7 @@ describe('VenueInfo directions fallback (#754)', () => {
 
   // The MapPin row must not render for a blank address, in EITHER branch —
   // otherwise a location icon sits next to an empty span, labelling nothing.
-  // CodeRabbit flagged only the no-googleMaps branch; the admin-set branch
-  // below had the identical defect and is covered here too.
+  // Both branches are covered because both build the row independently.
   it.each([
     ['null', null],
     ['empty', ''],

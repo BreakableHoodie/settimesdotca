@@ -678,13 +678,26 @@ export default function RosterTab({ showToast, readOnly = false }) {
                 <thead className="bg-bg-navy/50 border-b border-accent-500/20">
                   <tr>
                     {!readOnly && (
-                      <th className="px-4 py-3 w-12 text-center align-middle">
-                        <input
-                          type="checkbox"
-                          className="cursor-pointer h-5 w-5 align-middle"
-                          onChange={e => handleSelectAll(e.target.checked)}
-                          checked={effectiveSelectedIds.size === filteredBands.length && filteredBands.length > 0}
-                        />
+                      <th className="sticky left-0 z-10 bg-bg-navy px-3 py-3 w-12 text-center align-middle">
+                        {/* The w-6 box is load-bearing, not decoration: it is what
+                            makes this column exactly the 3rem that `left-12` pins
+                            the Name column to. `w-12` alone does NOT survive —
+                            the table overflows its container, so the auto layout
+                            algorithm squeezes every column to its MINIMUM CONTENT
+                            width and discards the preferred width. Min-content
+                            here is the checkbox (20px) plus px-3 (24px) = 44px,
+                            which left a 4px sliver between the two frozen columns
+                            with the scrolling table visible through it. 24px + 24px
+                            lands on 48px exactly. Measured in a browser; jsdom has
+                            no layout and cannot catch a regression here. */}
+                        <div className="flex w-6 justify-center">
+                          <input
+                            type="checkbox"
+                            className="cursor-pointer h-5 w-5 align-middle"
+                            onChange={e => handleSelectAll(e.target.checked)}
+                            checked={effectiveSelectedIds.size === filteredBands.length && filteredBands.length > 0}
+                          />
+                        </div>
                       </th>
                     )}
                     <FilterableHeader
@@ -697,6 +710,12 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       onToggleFilter={toggleFilterPanel}
                       triggerRef={filterRefs.name}
                       renderColumnFilterPanel={renderColumnFilterPanel}
+                      // Name is always the first sticky column after the (optional)
+                      // checkbox column -- its left offset must match the checkbox
+                      // column's actual rendered width (w-12 = 3rem) only when that
+                      // column exists. Hardcoding left-12 unconditionally would leave
+                      // a gap (or worse, overlap) when readOnly hides the checkbox.
+                      stickyClassName={`sticky z-10 bg-bg-navy ${readOnly ? 'left-0' : 'left-12'}`}
                     />
                     <FilterableHeader
                       sortKey="origin"
@@ -788,85 +807,118 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       renderColumnFilterPanel={renderColumnFilterPanel}
                     />
                     {!readOnly && (
-                      <th className="px-4 py-3 text-right text-white font-semibold whitespace-nowrap align-middle">
+                      <th className="sticky right-0 z-10 bg-bg-navy px-3 py-3 text-right text-white font-semibold whitespace-nowrap align-middle">
                         Actions
                       </th>
                     )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-accent-500/10">
-                  {sortedBands.map(band => (
-                    <tr
-                      key={band.id}
-                      className={`hover:bg-bg-navy/30 transition-colors ${selectedIds.has(band.id) ? 'bg-blue-900/30' : ''}`}
-                    >
-                      {!readOnly && (
-                        <td className="px-4 py-3 text-center align-middle">
-                          <input
-                            type="checkbox"
-                            className="cursor-pointer h-5 w-5 align-middle"
-                            checked={selectedIds.has(band.id)}
-                            onChange={e => handleSelect(band.id, e.target.checked)}
-                          />
-                        </td>
-                      )}
-                      <td className="px-4 py-3 text-white font-medium">
-                        <div className="flex items-center gap-2">
-                          <a
-                            href={`/band/${band.band_profile_id || band.id?.toString().replace('profile_', '')}`}
-                            className="text-accent-400 hover:underline"
-                            target="_blank"
-                            rel="noreferrer"
+                  {sortedBands.map(band => {
+                    // Sticky cells (checkbox, Name, Actions) are opaque by necessity
+                    // (see below), which means they can't just inherit the <tr>'s own
+                    // translucent hover/selected background -- non-sticky cells would
+                    // show through a transparent sticky cell as the table scrolls
+                    // horizontally underneath it. Each sticky cell gets its own opaque
+                    // base (bg-bg-purple, matching the table's resting background) plus
+                    // an absolutely-positioned ::before tint layer (before:-z-10 keeps
+                    // it behind the cell's real content) driven by `group-hover:` (the
+                    // <tr> below carries `group`) and this row's own selected flag --
+                    // that's two independent translucent layers that can't both live on
+                    // one `background-color`, so this splits them across the cell's own
+                    // paint and the pseudo-element's. No `relative` here -- every caller
+                    // already applies `sticky`, which is itself a positioned element and
+                    // so already provides the containing block the `before:absolute`
+                    // pseudo needs; stacking `relative` alongside `sticky` on the same
+                    // element would leave the winner to Tailwind's internal class
+                    // ordering rather than source order, risking silently breaking the
+                    // sticky positioning entirely.
+                    const isSelected = selectedIds.has(band.id)
+                    const stickyCellClassName = `bg-bg-purple before:absolute before:inset-0 before:-z-10 before:content-[''] before:transition-colors group-hover:before:bg-bg-navy/30 ${isSelected ? 'before:bg-blue-900/30' : ''}`
+                    return (
+                      <tr
+                        key={band.id}
+                        className={`group hover:bg-bg-navy/30 transition-colors ${isSelected ? 'bg-blue-900/30' : ''}`}
+                      >
+                        {!readOnly && (
+                          <td
+                            className={`sticky left-0 z-10 px-3 py-3 w-12 text-center align-middle ${stickyCellClassName}`}
                           >
-                            {band.name}
-                          </a>
-                          {isInactive(band) && <InactiveBadge />}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-white/70">{formatOrigin(band) || '-'}</td>
-                      <td className="px-4 py-3 text-white/70">{band.genre || '-'}</td>
-                      <td className="px-4 py-3 text-white/70">{band.next_event_name || '-'}</td>
-                      <td className="px-4 py-3 text-white/70">{band.last_event_name || '-'}</td>
-                      <td className="px-4 py-3 text-white/70">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
-                            isInactive(band) ? 'bg-gray-700 text-white/80' : 'bg-emerald-600/20 text-emerald-200'
-                          }`}
-                        >
-                          {isInactive(band) ? 'Inactive' : 'Active'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <SocialLinksIcons band={band} />
-                      </td>
-                      <td className="px-4 py-3 text-white/70">{band.contact_email || '-'}</td>
-                      <td className="px-4 py-3 text-right text-white/70">
-                        {band.follower_count > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-accent-500/15 px-2 py-1 text-xs font-semibold text-accent-300">
-                            {band.follower_count}
-                          </span>
-                        ) : (
-                          <span className="text-white/30">0</span>
+                            {/* Must match the header's w-6 box — see the comment
+                                there. Both cells share one column, so a mismatch
+                                reopens the 4px gap. */}
+                            <div className="flex w-6 justify-center">
+                              <input
+                                type="checkbox"
+                                className="cursor-pointer h-5 w-5 align-middle"
+                                checked={isSelected}
+                                onChange={e => handleSelect(band.id, e.target.checked)}
+                              />
+                            </div>
+                          </td>
                         )}
-                      </td>
-                      {!readOnly && (
-                        <td className="px-4 py-3 flex justify-end gap-2">
-                          <button
-                            onClick={() => startEdit(band)}
-                            className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(band.id, band.name)}
-                            className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                          >
-                            Delete
-                          </button>
+                        <td
+                          className={`sticky ${readOnly ? 'left-0' : 'left-12'} z-10 px-3 py-3 text-white font-medium ${stickyCellClassName}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`/band/${band.band_profile_id || band.id?.toString().replace('profile_', '')}`}
+                              className="text-accent-400 hover:underline"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {band.name}
+                            </a>
+                            {isInactive(band) && <InactiveBadge />}
+                          </div>
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="px-3 py-3 text-white/70">{formatOrigin(band) || '-'}</td>
+                        <td className="px-3 py-3 text-white/70">{band.genre || '-'}</td>
+                        <td className="px-3 py-3 text-white/70 max-w-[10rem]">{band.next_event_name || '-'}</td>
+                        <td className="px-3 py-3 text-white/70 max-w-[10rem]">{band.last_event_name || '-'}</td>
+                        <td className="px-3 py-3 text-white/70">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
+                              isInactive(band) ? 'bg-gray-700 text-white/80' : 'bg-emerald-600/20 text-emerald-200'
+                            }`}
+                          >
+                            {isInactive(band) ? 'Inactive' : 'Active'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <SocialLinksIcons band={band} />
+                        </td>
+                        <td className="px-3 py-3 text-white/70">{band.contact_email || '-'}</td>
+                        <td className="px-3 py-3 text-right text-white/70">
+                          {band.follower_count > 0 ? (
+                            <span className="inline-flex items-center rounded-full bg-accent-500/15 px-2 py-1 text-xs font-semibold text-accent-300">
+                              {band.follower_count}
+                            </span>
+                          ) : (
+                            <span className="text-white/30">0</span>
+                          )}
+                        </td>
+                        {!readOnly && (
+                          <td className={`sticky right-0 z-10 px-3 py-3 ${stickyCellClassName}`}>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => startEdit(band)}
+                                className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(band.id, band.name)}
+                                className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

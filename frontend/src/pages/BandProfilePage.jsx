@@ -22,6 +22,7 @@ import {
 } from '../components/ui/SocialIcons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { renderMarkdownToSafeHtml, stripMarkdownToText } from '../utils/markdown'
+import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { Helmet } from 'react-helmet-async'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import BandFacts from '../components/BandFacts'
@@ -486,7 +487,7 @@ export default function BandProfilePage() {
                 src={profile.photo_url}
                 alt={profile.photo_alt_text || profile.name}
                 loading="lazy"
-                className="h-full w-full object-cover opacity-60"
+                className={`h-full w-full object-cover opacity-60 ${BAND_PHOTO_CROP}`}
               />
               <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent" />
               {/* Page-level action lives in the header, not beside the bio —

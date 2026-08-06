@@ -1,6 +1,7 @@
 import { Image, LoaderCircle, Trash, Upload } from 'lucide-react'
 import { useState, useRef } from 'react'
 import { getAdminFormDataHeaders } from '../../utils/adminApi'
+import { BAND_PHOTO_CROP } from '../../utils/bandPhoto'
 
 /**
  * Downscale an image client-side via canvas before upload (#616 leanness
@@ -284,7 +285,10 @@ export default function PhotoUpload({
         {preview ? (
           /* Preview */
           <div className="relative h-full w-full group">
-            <img src={preview} alt="Band profile" className="w-full h-full object-cover" />
+            {/* Same crop as every public surface (BAND_PHOTO_CROP) — a preview
+                that framed the photo differently would be worse than none: it
+                would show an upload the fans never see. */}
+            <img src={preview} alt="Band profile" className={`w-full h-full object-cover ${BAND_PHOTO_CROP}`} />
 
             {/* Overlay with actions */}
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">

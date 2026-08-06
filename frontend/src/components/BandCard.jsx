@@ -1,4 +1,4 @@
-import { Plus, TriangleAlert, X, Zap } from 'lucide-react'
+import { CalendarDays, Plus, TriangleAlert, X, Zap } from 'lucide-react'
 import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
@@ -17,6 +17,7 @@ function BandCard({
   warningType,
   warningText,
   currentTime,
+  dayLabel,
 }) {
   const handleToggle = () => {
     if (!isInteractive) return
@@ -165,6 +166,23 @@ function BandCard({
           {getTimeDescription(band)}
           {isPlaying && <span className="ml-2 text-xs uppercase tracking-wide">Live Now</span>}
         </p>
+        {/* Optional per-set day indicator (#742, venue page). getTimeDescription
+            above is date-blind within the same festival week -- three sets on
+            three different days of a multi-day event at the same clock time all
+            read as a bare "8:00 PM" with nothing to tell them apart. Callers on
+            a single event already disambiguate via day tabs/dividers outside
+            this card, so dayLabel is opt-in and every existing caller is
+            unaffected. */}
+        {dayLabel && (
+          <p
+            className={`flex items-center gap-1.5 text-xs font-medium leading-snug ${
+              onAmber ? 'text-bg-navy/80' : 'text-text-tertiary'
+            }`}
+          >
+            <CalendarDays size={12} aria-hidden="true" />
+            {dayLabel}
+          </p>
+        )}
         {showVenue && (
           <p className={`text-sm font-medium leading-snug ${onAmber ? 'text-bg-navy' : 'text-text-tertiary'}`}>
             {band.venue}

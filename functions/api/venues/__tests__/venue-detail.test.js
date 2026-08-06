@@ -234,3 +234,109 @@ describe("GET /api/venues/:id — multi-day ordering and per-set dates (#741)", 
     expect(payload.upcoming[0].event_end_date).toBe("2099-08-09");
   });
 });
+
+// #742 — correction to the issue's own "data gap" claim: latitude/longitude
+// were added by migrations 0043/0044 and are already selected by `SELECT *
+// FROM venues` at the top of this handler. What dropped them was the
+// hand-written projection a few lines down -- same defect shape as
+// performance_date (#739 -> #741 -> #743), same file, same root cause: the
+// row has the field, the projection never asked for it.
+describe("GET /api/venues/:id — coordinate projection (#742)", () => {
+  test("projects latitude/longitude when the row has them", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+    rawDb.prepare("UPDATE venues SET latitude = ?, longitude = ? WHERE id = ?").run(43.466445, -80.522916, venue.id);
+
+    const response = await onRequestGet({ env, params: { id: String(venue.id) } });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.venue.latitude).toBe(43.466445);
+    expect(payload.venue.longitude).toBe(-80.522916);
+  });
+
+  test("projects null latitude/longitude for a venue that has neither", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "No Coordinates Venue" });
+
+    const response = await onRequestGet({ env, params: { id: String(venue.id) } });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.venue.latitude).toBeNull();
+    expect(payload.venue.longitude).toBeNull();
+  });
+});
+
+// #742 — performer-card prerequisite: the venue lineup query selected only
+// `bp.id AS band_id, bp.name AS band_name`, so a card built from this payload
+// had no photo and no genre pill to render.
+describe("GET /api/venues/:id — performer card fields (#742)", () => {
+  test("projects photo_url and genre on each performance, for both upcoming and past", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Prohibition Warehouse" });
+
+    const upcomingEvent = insertEvent(rawDb, {
+      name: "Card Fields Upcoming",
+      slug: "card-fields-upcoming",
+      date: "2099-01-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(upcomingEvent.id);
+    insertBand(rawDb, {
+      name: "Photogenic Band",
+      event_id: upcomingEvent.id,
+      venue_id: venue.id,
+      genre: "Punk",
+      photo_url: "https://example.com/photogenic.jpg",
+    });
+
+    const pastEvent = insertEvent(rawDb, {
+      name: "Card Fields Past",
+      slug: "card-fields-past",
+      date: "2001-01-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(pastEvent.id);
+    insertBand(rawDb, {
+      name: "Archived Photogenic Band",
+      event_id: pastEvent.id,
+      venue_id: venue.id,
+      genre: "Ska",
+      photo_url: "https://example.com/archived.jpg",
+    });
+
+    const response = await onRequestGet({ env, params: { id: String(venue.id) } });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.upcoming).toHaveLength(1);
+    expect(payload.upcoming[0].photo_url).toBe("https://example.com/photogenic.jpg");
+    expect(payload.upcoming[0].genre).toBe("Punk");
+    expect(payload.past).toHaveLength(1);
+    expect(payload.past[0].photo_url).toBe("https://example.com/archived.jpg");
+    expect(payload.past[0].genre).toBe("Ska");
+  });
+
+  test("projects null photo_url/genre for a band with neither set", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const venue = insertVenue(rawDb, { name: "Blank Fields Venue" });
+    const event = insertEvent(rawDb, { name: "Blank Fields Event", slug: "blank-fields-event", date: "2099-01-01" });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    insertBand(rawDb, { name: "Plain Band", event_id: event.id, venue_id: venue.id });
+
+    const response = await onRequestGet({ env, params: { id: String(venue.id) } });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.upcoming).toHaveLength(1);
+    expect(payload.upcoming[0].photo_url).toBeNull();
+    expect(payload.upcoming[0].genre).toBeNull();
+  });
+});

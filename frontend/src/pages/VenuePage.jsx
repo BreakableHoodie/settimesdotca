@@ -1,73 +1,92 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { ArrowLeft, CalendarDays, Globe, MapPin, Navigation, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Globe, MapPin, Navigation } from 'lucide-react'
 import Footer from '../components/Footer'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import BandCard from '../components/BandCard'
 import { formatPerformanceDayLabel } from '../utils/timeFormat'
+import { prepareBands } from '../utils/bandUtils'
 import { fetchPublicJson } from '../utils/publicApi'
 import { trackPageView } from '../utils/metrics'
-import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { safeExternalHref } from '../utils/urlSafety'
 import { buildDirectionsHref } from '../utils/directions'
 
-function PerformanceRow({ perf }) {
-  // #732 — functions/api/venues/[id].js already returns is_cancelled (row
-  // always included), but this row rendered it exactly like an ordinary
-  // performance. The visible "Cancelled" label is the accessible carrier
-  // (WCAG 1.4.1) -- strikethrough alone isn't announced by screen readers.
-  const isCancelled = Boolean(perf.is_cancelled)
-  // Computed once: the guard and the rendered value must be the same
-  // expression, or they can drift apart. Unlike EventTimeline this is NOT
-  // gated on the event being multi-day -- this row shows no other date, so on
-  // a single-day event the label is the only one present and suppressing it
-  // would remove information rather than redundancy.
+// Read-only performer card (#742). Selection (add-to-route) deliberately
+// isn't wired up here -- that pulls in scheduleStorage and the `end_date ||
+// date` staleness rule (see CLAUDE.md "Schedule Storage"), which is scope
+// this page doesn't need: a venue's lineup spans many events, so there is no
+// single event date to key staleness on. Tracked as a follow-up, not built.
+function VenuePerformerCard({ perf, venueName, currentTime }) {
+  // BandCard/prepareBands expect camelCase startTime/endTime and a `date`
+  // that is the FESTIVAL DAY this set belongs to -- performance_date, falling
+  // back to the event's start date (the #543 convention functions/api/venues/[id].js's
+  // own isPast/mapPerf already follow). prepareBands() applies the
+  // AFTER_MIDNIGHT_THRESHOLD_HOUR offset from that pair, exactly like every
+  // other schedule surface, so an after-midnight set (e.g. a 00:25 start)
+  // sorts and displays after -- not before -- the same evening's earlier sets.
+  const [band] = prepareBands([
+    {
+      id: perf.band_id,
+      name: perf.band_name,
+      // Feeds BandCard's non-interactive aria-label (`${name} at ${venue}`) --
+      // showVenue={false} below only hides the *visible* venue line, not this.
+      venue: venueName,
+      photo_url: perf.photo_url,
+      genre: perf.genre,
+      is_cancelled: perf.is_cancelled,
+      startTime: perf.start_time,
+      endTime: perf.end_time,
+      date: perf.performance_date || perf.event_date,
+    },
+  ])
+
+  // getTimeDescription (inside BandCard) can't distinguish same-week days at
+  // the same clock time -- during a 3-day event like Buddies Fest 2, three
+  // sets at 8 PM on three different nights all read as a bare "8:00 PM" with
+  // nothing to tell them apart. formatPerformanceDayLabel is the explicit,
+  // already-multi-day-aware carrier: it adds "(Day N)", suppresses itself on
+  // single-day events (#540/#541), and does NOT re-offset an after-midnight
+  // set's stored (already-previous-evening) date.
   const dayLabel = formatPerformanceDayLabel(perf)
+
   return (
-    <div className="rounded-lg border border-border bg-bg-purple/40 p-4">
-      {perf.band_name && (
-        <Link
-          to={buildBandProfileHref(perf.band_name)}
-          className={`font-display text-lg font-semibold transition-colors hover:text-accent-400 ${
-            isCancelled ? 'text-text-secondary' : 'text-text-primary'
-          }`}
-        >
-          {isCancelled ? <s>{perf.band_name}</s> : perf.band_name}
-        </Link>
+    <div>
+      <BandCard
+        band={band}
+        clickable={false}
+        showToggleButton={false}
+        showVenue={false}
+        eventSlug={perf.event_slug}
+        currentTime={currentTime}
+        dayLabel={dayLabel}
+      />
+      {/* A venue's lineup spans multiple events over time (e.g. Vol. 17 and
+          Buddies Fest 2 both play the same rooms) -- the day label alone
+          doesn't say WHICH event a past set belonged to. */}
+      {perf.event_name && (
+        <p className="mt-2 text-center text-xs text-text-tertiary">
+          {perf.event_slug ? (
+            <Link to={`/event/${perf.event_slug}`} className="hover:text-accent-400">
+              {perf.event_name}
+            </Link>
+          ) : (
+            perf.event_name
+          )}
+        </p>
       )}
-      {isCancelled && (
-        <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
-          <TriangleAlert size={14} aria-hidden="true" />
-          Cancelled
-        </span>
-      )}
-      <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-tertiary">
-        {perf.event_slug ? (
-          <Link to={`/event/${perf.event_slug}`} className="hover:text-accent-400">
-            {perf.event_name}
-          </Link>
-        ) : (
-          <span>{perf.event_name}</span>
-        )}
-        {dayLabel && (
-          <span className="inline-flex items-center gap-1">
-            <CalendarDays size={13} aria-hidden="true" />
-            {dayLabel}
-          </span>
-        )}
-      </p>
     </div>
   )
 }
 
-function Section({ title, items }) {
+function Section({ title, items, venueName, currentTime }) {
   if (!items.length) return null
   return (
     <section className="mt-8">
       <h2 className="mb-3 font-display text-xl font-bold text-text-primary">{title}</h2>
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {items.map(perf => (
-          <PerformanceRow key={perf.performance_id} perf={perf} />
+          <VenuePerformerCard key={perf.performance_id} perf={perf} venueName={venueName} currentTime={currentTime} />
         ))}
       </div>
     </section>
@@ -81,6 +100,19 @@ export default function VenuePage() {
   const [past, setPast] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [currentTime, setCurrentTime] = useState(() => new Date())
+
+  // BandCard derives "Starts in Nm" / "Live Now" from this prop, so a frozen
+  // value strands a fan on a stale countdown -- and this is the page someone
+  // opens standing outside the venue. Same 60s cadence as App.jsx,
+  // EmbedPage.jsx and MySchedule.jsx.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -192,8 +224,8 @@ export default function VenuePage() {
               </p>
             )}
 
-            <Section title="Upcoming" items={upcoming} />
-            <Section title="Past shows" items={past} />
+            <Section title="Upcoming" items={upcoming} venueName={venue.name} currentTime={currentTime} />
+            <Section title="Past shows" items={past} venueName={venue.name} currentTime={currentTime} />
 
             {upcoming.length === 0 && past.length === 0 && (
               <p className="py-16 text-center text-text-secondary">No published performances at this venue yet.</p>

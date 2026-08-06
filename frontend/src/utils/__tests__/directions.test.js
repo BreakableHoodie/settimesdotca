@@ -75,6 +75,25 @@ describe('buildDirectionsHrefForBand (#754)', () => {
     expect(href).toContain(encodeURIComponent('The Roost Waterloo ON'))
   })
 
+  // Bad coordinates must degrade to the venue-name search, not build a pin
+  // that lands nowhere. A fan mid-crawl can still navigate from a name; they
+  // cannot navigate from "destination=Infinity,Infinity".
+  it.each([
+    ['Infinity', Infinity, Infinity],
+    ['-Infinity', -Infinity, -Infinity],
+    ['NaN', NaN, NaN],
+    ['out-of-range latitude', 91, -80.52],
+    ['out-of-range longitude', 43.46, 181],
+    ['string coords', '43.46', '-80.52'],
+  ])('falls back to the name search for %s coords', (_label, lat, lng) => {
+    const href = buildDirectionsHrefForBand({ venue: 'Roost', venue_lat: lat, venue_lng: lng })
+    expect(href).toBe('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Roost Waterloo ON'))
+  })
+
+  it('returns null when coords are unusable and there is no venue name', () => {
+    expect(buildDirectionsHrefForBand({ venue_lat: Infinity, venue_lng: Infinity })).toBe(null)
+  })
+
   it('returns null when there is nothing to locate', () => {
     expect(buildDirectionsHrefForBand({})).toBe(null)
     expect(buildDirectionsHrefForBand(null)).toBe(null)

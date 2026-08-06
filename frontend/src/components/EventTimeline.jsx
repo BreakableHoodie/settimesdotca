@@ -909,13 +909,18 @@ function EventCard({
                   // utils/directions.js). Returns null when address is
                   // missing/blank, so no dead Directions link renders (#754).
                   const directionsHref = buildDirectionsHref(venue.name, venue.address)
+                  // Guard on the TRIMMED address so this agrees with
+                  // buildDirectionsHref, which trims before deciding. A
+                  // whitespace-only address would otherwise render an address
+                  // row with no directions link inside it.
+                  const hasAddress = typeof venue.address === 'string' && venue.address.trim() !== ''
                   return (
                     <Card key={venue.id} padding="sm" variant="elevated">
                       <div className="font-semibold text-text-primary mb-1">{venue.name}</div>
                       <div className="text-text-secondary text-sm">
                         {venue.band_count} {venue.band_count === 1 ? 'band' : 'bands'}
                       </div>
-                      {venue.address && (
+                      {hasAddress && (
                         <p className="text-text-tertiary text-xs mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span>{venue.address}</span>
                           {directionsHref && (

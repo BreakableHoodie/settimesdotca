@@ -937,5 +937,14 @@ describe('EventTimeline Venues grid directions (#754)', () => {
     expect(await screen.findByText('Roost')).toBeInTheDocument()
 
     expect(screen.queryByRole('link', { name: /directions to roost/i })).not.toBeInTheDocument()
+
+    // The role query above is NOT sufficient on its own: an <a> with no href
+    // has no implicit ARIA link role, so a rendered-but-dead "Directions"
+    // anchor is invisible to queryByRole and this test would pass against the
+    // broken implementation (the #753 trap). Assert on the visible label too,
+    // and pin the count so a stray second control can't hide behind it —
+    // only The Mill has an address in this fixture.
+    expect(screen.getAllByText('Directions')).toHaveLength(1)
+    expect(screen.getByRole('link', { name: /directions to the mill/i })).toBeInTheDocument()
   })
 })

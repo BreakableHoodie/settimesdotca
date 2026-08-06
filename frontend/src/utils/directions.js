@@ -38,7 +38,12 @@ export function buildDirectionsHref(name, address) {
 export function buildDirectionsHrefForBand(band) {
   if (!band) return null
   const { venue_lat: lat, venue_lng: lng, venue } = band
-  if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+  // Number.isFinite (not !Number.isNaN) — the latter accepts Infinity, which
+  // would build a literal "destination=Infinity,Infinity" URL. Range-check to
+  // WGS84 bounds too: an out-of-range pair is bad data, and a broken pin is
+  // worse than the venue-name search below, which still gets a fan there.
+  const hasUsableCoords = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+  if (hasUsableCoords) {
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
   }
   if (venue) {

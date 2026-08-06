@@ -22,7 +22,8 @@ import {
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx'
 import { copyToClipboard } from '../utils/clipboard'
-import { addLocalDays, dayNumberMapFromDays, formatFestivalDate, orderedFestivalDays } from '../utils/festivalDays'
+import { dayNumberMapFromDays, formatFestivalDate, orderedFestivalDays } from '../utils/festivalDays'
+import { prepareBands } from '../utils/bandUtils'
 import { formatTimeRange } from '../utils/timeFormat'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
@@ -160,34 +161,16 @@ function MySchedule({
   )
 
   const highlightedBandIds = useMemo(() => new Set(HIGHLIGHTED_BANDS), [])
-  const normalizedBands = useMemo(() => {
-    return dayFilteredBands.map(band => {
-      const parsedStartMs = Date.parse(`${band.date}T${band.startTime}:00`)
-      const parsedEndMs = Date.parse(`${band.date}T${band.endTime}:00`)
-      const startMs =
-        Number.isFinite(band.startMs) && band.startMs > 0
-          ? band.startMs
-          : Number.isNaN(parsedStartMs)
-            ? 0
-            : parsedStartMs
-
-      let endMs =
-        Number.isFinite(band.endMs) && band.endMs > 0 ? band.endMs : Number.isNaN(parsedEndMs) ? 0 : parsedEndMs
-
-      if (startMs > 0 && endMs > 0 && endMs < startMs) {
-        // Advance the LOCAL CALENDAR DATE, not a fixed 24h — see addLocalDays'
-        // doc comment in festivalDays.js (#768). Sibling of the same fix in
-        // bandUtils.js's prepareBands().
-        endMs = addLocalDays(endMs, 1)
-      }
-
-      return {
-        ...band,
-        startMs,
-        endMs,
-      }
-    })
-  }, [dayFilteredBands])
+  // Delegate to prepareBands rather than re-deriving startMs/endMs here.
+  // CLAUDE.md's after-midnight invariant requires every consumer to apply the
+  // same offset or delegate to prepareBands; the previous local normalization
+  // did the endMs overnight wrap but NOT the sub-6-AM offset, so any band
+  // arriving without a precomputed startMs would have sorted to the top of the
+  // schedule instead of the end. App.jsx already prepares these bands, so this
+  // is idempotent in production (prepareBands recomputes from date/startTime/
+  // endTime and never reads startMs) — it closes the latent hole in the
+  // fallback path and removes the duplicated arithmetic (#768).
+  const normalizedBands = useMemo(() => prepareBands(dayFilteredBands), [dayFilteredBands])
 
   // Calculate time until/since a band
   const getTimeStatus = band => {

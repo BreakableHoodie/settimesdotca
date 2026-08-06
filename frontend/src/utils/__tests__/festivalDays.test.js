@@ -239,7 +239,12 @@ describe('addLocalDays (#768 — DST-safe day offset)', () => {
   })
 
   afterAll(() => {
-    process.env.TZ = originalTz
+    // process.env coerces to string, so assigning an undefined originalTz
+    // would leave the literal 'undefined' as the TZ for every later test in
+    // this process — an invalid zone, on exactly the machines that don't set
+    // TZ (CI). Delete the key instead of assigning it back.
+    if (originalTz === undefined) delete process.env.TZ
+    else process.env.TZ = originalTz
   })
 
   it('is a no-op-equivalent to +24h on an ordinary (non-transition) date — no regression to the 99% case', () => {

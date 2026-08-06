@@ -186,7 +186,12 @@ describe('prepareBands — DST-safe after-midnight offset (#768)', () => {
   })
 
   afterAll(() => {
-    process.env.TZ = originalTz
+    // process.env coerces to string, so assigning an undefined originalTz
+    // would leave the literal 'undefined' as the TZ for every later test in
+    // this process — an invalid zone, on exactly the machines that don't set
+    // TZ (CI). Delete the key instead of assigning it back.
+    if (originalTz === undefined) delete process.env.TZ
+    else process.env.TZ = originalTz
   })
 
   it('regression: ordinary (non-transition) dates are unchanged by the DST-safe offset', () => {

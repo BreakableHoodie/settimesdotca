@@ -28,10 +28,13 @@ describe('BAND_PHOTO_CROP', () => {
     expect(source).not.toMatch(/BAND_PHOTO_CROP\s*=\s*[`'"].*\$\{/)
   })
 
-  it('anchors above centre, or it would not fix anything', () => {
+  // Pinned exactly, not to a range. The value is a shared contract across
+  // eight surfaces, so drifting it to 40% would still be "above centre" while
+  // quietly putting the hero back on the midsections — the whole bug.
+  it('anchors at 25%, above centre', () => {
+    expect(BAND_PHOTO_CROP).toBe('object-[50%_25%]')
     const percent = Number(BAND_PHOTO_CROP.match(/_(\d+)%\]$/)?.[1])
-    expect(percent).toBeGreaterThan(0)
-    expect(percent).toBeLessThan(50)
+    expect(percent).toBe(25)
   })
 
   // The bug class: `object-cover` defaults to a CENTRE crop, which frames a

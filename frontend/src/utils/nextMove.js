@@ -17,19 +17,10 @@ export const LIVE_WINDOW_MIN = 240
 
 const toMinutes = ms => Math.round(ms / 60000)
 
-// Build a maps directions deep-link for a band's venue. Prefers exact
-// coordinates (opens the Maps app on mobile); falls back to a name search.
-export function directionsHref(band) {
-  if (!band) return null
-  const { venue_lat: lat, venue_lng: lng, venue } = band
-  if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
-  }
-  if (venue) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venue} Waterloo ON`)}`
-  }
-  return null
-}
+// The directions-link builder used to live here (directionsHref(band)). It
+// moved to utils/directions.js as buildDirectionsHrefForBand — see #754 —
+// so there is exactly one venue-directions builder for coordinate-shaped
+// data, not a copy per consumer. Import it from '../utils/directions'.
 
 export function computeNextMove(bands, now, { windowMin = LIVE_WINDOW_MIN } = {}) {
   const nowMs = (now instanceof Date ? now : new Date(now || Date.now())).getTime()

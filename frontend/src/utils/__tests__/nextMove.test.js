@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeNextMove, directionsHref, LIVE_WINDOW_MIN } from '../nextMove'
+import { computeNextMove, LIVE_WINDOW_MIN } from '../nextMove'
 
 const BASE = new Date('2026-08-02T20:00:00').getTime()
 const now = new Date(BASE)
@@ -92,20 +92,6 @@ describe('computeNextMove', () => {
   })
 })
 
-describe('directionsHref', () => {
-  it('builds a coordinate directions link when coords are present', () => {
-    const href = directionsHref({ venue: 'Roost', venue_lat: 43.46, venue_lng: -80.52 })
-    expect(href).toBe('https://www.google.com/maps/dir/?api=1&destination=43.46,-80.52')
-  })
-
-  it('falls back to a name search when coords are missing', () => {
-    const href = directionsHref({ venue: 'The Roost' })
-    expect(href).toContain('/maps/search/')
-    expect(href).toContain(encodeURIComponent('The Roost Waterloo ON'))
-  })
-
-  it('returns null when there is nothing to locate', () => {
-    expect(directionsHref({})).toBe(null)
-    expect(directionsHref(null)).toBe(null)
-  })
-})
+// directionsHref(band) moved to utils/directions.js as buildDirectionsHrefForBand
+// (#754 — folding nextMove.js's own copy into the one directions builder).
+// Its tests live in utils/__tests__/directions.test.js now.

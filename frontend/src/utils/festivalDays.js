@@ -22,8 +22,9 @@
  * This is the single canonical definition (#550) — every consumer imports
  * it rather than re-encoding `6`:
  * - `frontend/src/utils/bandUtils.js` (`prepareBands`) offsets sub-6-AM
- *   start times by `MS_PER_DAY` so they sort after the same evening's
- *   earlier sets rather than at the top of the schedule.
+ *   start times by one local calendar day (`addLocalDays`, below) so they
+ *   sort after the same evening's earlier sets rather than at the top of
+ *   the schedule.
  * - `frontend/src/admin/utils/timeUtils.js` derives
  *   `AFTER_MIDNIGHT_THRESHOLD_MINUTES` (`AFTER_MIDNIGHT_THRESHOLD_HOUR * 60`)
  *   from this for its own minutes-based offset (`adjustForMidnight`).
@@ -154,4 +155,38 @@ export function resolveActiveFestivalDay({ days, dayParam, todayStr, startDate =
   }
 
   return 1
+}
+
+/**
+ * Advances a LOCAL epoch-ms timestamp by `days` local calendar days — NOT a
+ * fixed `days * 86_400_000`. A local day is 23h or 25h across a DST
+ * transition (spring-forward / fall-back), so a flat millisecond add lands
+ * on the wrong wall-clock time, and sometimes the wrong calendar date, for
+ * any after-midnight set on a transition night (#768).
+ *
+ * `setDate()` walks the calendar and re-resolves the UTC offset for the
+ * landing date, so it is DST-correct by construction. This is the same
+ * technique `SharePreviewPage.jsx`'s `sortKey()` already uses (stepping
+ * backward across the boundary) — see the comment there for the reasoning;
+ * this is that pattern's forward-stepping, shared home so `bandUtils.js`
+ * and `MySchedule.jsx` don't each re-derive it.
+ *
+ * Spring-forward edge case: advancing into the 2:00–2:59 AM hour on the
+ * night clocks jump forward lands on a local time that does not exist.
+ * `setDate()` normalizes it forward by the size of the gap (e.g. 2:30 AM ->
+ * 3:30 AM) rather than throwing — the same normalization a wall clock
+ * itself performs on that night. That is treated as correct here, not an
+ * accident of the engine: an after-midnight set is deliberately re-anchored
+ * to the previous evening's day, and the exact minute a non-existent
+ * wall-clock time resolves to is a one-night-a-year edge no fan-facing
+ * surface distinguishes. Pinned by a test in `bandUtils.test.js`.
+ *
+ * @param {number} ms - epoch milliseconds
+ * @param {number} days - number of local calendar days to advance (may be negative)
+ * @returns {number} new epoch milliseconds
+ */
+export function addLocalDays(ms, days) {
+  const d = new Date(ms)
+  d.setDate(d.getDate() + days)
+  return d.getTime()
 }

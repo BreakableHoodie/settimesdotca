@@ -1,6 +1,5 @@
-import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from './festivalDays'
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR, addLocalDays } from './festivalDays'
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 // Times starting before AFTER_MIDNIGHT_THRESHOLD_HOUR are treated as after-midnight sets
 // of the event night, so they sort after same-day evening sets rather than appearing at
 // the top of the schedule. Canonical definition lives in festivalDays.js (#550).
@@ -27,13 +26,17 @@ export function prepareBands(list) {
     if (!Number.isNaN(startMs)) {
       const startHour = parseInt(String(band.startTime ?? '').split(':')[0], 10)
       if (Number.isFinite(startHour) && startHour < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
-        startMs += MS_PER_DAY
-        if (!Number.isNaN(endMs)) endMs += MS_PER_DAY
+        // Advance the LOCAL CALENDAR DATE, not a fixed 24h — a local day is
+        // 23h/25h across a DST transition, so a flat millisecond add lands on
+        // the wrong wall-clock time (and sometimes the wrong calendar date)
+        // for an after-midnight set on a transition night (#768).
+        startMs = addLocalDays(startMs, 1)
+        if (!Number.isNaN(endMs)) endMs = addLocalDays(endMs, 1)
       }
     }
 
     if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs < startMs) {
-      endMs += MS_PER_DAY
+      endMs = addLocalDays(endMs, 1)
     }
 
     return {

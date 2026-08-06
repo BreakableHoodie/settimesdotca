@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterAll, beforeAll, describe, it, expect } from 'vitest'
 import { prepareBands } from '../bandUtils'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -161,5 +161,97 @@ describe('prepareBands — multi-day festival-day support (#538)', () => {
     const [day1Late] = prepareBands([makeBand('01:00', '02:00', '2026-08-02')])
     const [day2Late] = prepareBands([makeBand('01:00', '02:00', '2026-08-03')])
     expect(day2Late.startMs - day1Late.startMs).toBe(DAY_MS)
+  })
+})
+
+// #768: prepareBands' after-midnight offset must advance the LOCAL CALENDAR
+// DATE (via addLocalDays in festivalDays.js), not a fixed 24h/86,400,000ms —
+// a local day is 23h/25h across a DST transition, so a flat millisecond add
+// lands on the wrong wall-clock time, and sometimes the wrong calendar date,
+// for a transition-night after-midnight set. Ground-truth values below were
+// derived by running the actual Date arithmetic under TZ=America/Toronto
+// (not hand-computed), then cross-checked against the values CodeRabbit
+// derived in issue #768.
+//
+// This repo has no prior convention for pinning a test's timezone, so these
+// tests set process.env.TZ directly (scoped to this describe block, restored
+// in afterAll) rather than introducing one. That makes the DST assertions
+// deterministic regardless of the machine or CI runner's default TZ.
+describe('prepareBands — DST-safe after-midnight offset (#768)', () => {
+  let originalTz
+
+  beforeAll(() => {
+    originalTz = process.env.TZ
+    process.env.TZ = 'America/Toronto'
+  })
+
+  afterAll(() => {
+    process.env.TZ = originalTz
+  })
+
+  it('regression: ordinary (non-transition) dates are unchanged by the DST-safe offset', () => {
+    const [band] = prepareBands([makeBand('01:00', '02:00', '2026-08-02')])
+    const baseStart = Date.parse('2026-08-02T01:00:00')
+    const baseEnd = Date.parse('2026-08-02T02:00:00')
+    expect(band.startMs).toBe(baseStart + DAY_MS)
+    expect(band.endMs).toBe(baseEnd + DAY_MS)
+  })
+
+  it('fall back (2026-11-01): a 00:25 after-midnight set lands Nov 2 00:25 EST, not Nov 1 23:25 EST', () => {
+    // Toronto falls back 02:00 EDT -> 01:00 EST on 2026-11-01. Verified via
+    // `TZ=America/Toronto node`: the broken `+= MS_PER_DAY` implementation
+    // produces "Sun Nov 01 2026 23:25:00 GMT-0500" — wrong hour AND wrong
+    // calendar day.
+    const [band] = prepareBands([makeBand('00:25', '01:10', '2026-11-01')])
+
+    expect(new Date(band.startMs).toString()).toContain('Mon Nov 02 2026 00:25:00 GMT-0500')
+
+    const brokenStartMs = Date.parse('2026-11-01T00:25:00') + DAY_MS
+    expect(band.startMs).not.toBe(brokenStartMs)
+  })
+
+  it('spring forward (2027-03-14): a 00:25 after-midnight set lands Mar 15 00:25 EDT, not Mar 15 01:25 EDT', () => {
+    // Toronto springs forward 02:00 EST -> 03:00 EDT on 2027-03-14. Verified
+    // via `TZ=America/Toronto node`: the broken `+= MS_PER_DAY`
+    // implementation produces "Mon Mar 15 2027 01:25:00 GMT-0400" — wrong
+    // hour (calendar date happens to still be correct for this input).
+    const [band] = prepareBands([makeBand('00:25', '01:10', '2027-03-14')])
+
+    expect(new Date(band.startMs).toString()).toContain('Mon Mar 15 2027 00:25:00 GMT-0400')
+
+    const brokenStartMs = Date.parse('2027-03-14T00:25:00') + DAY_MS
+    expect(band.startMs).not.toBe(brokenStartMs)
+  })
+
+  it('non-existent local time edge: an after-midnight set that lands in the spring-forward gap normalizes forward by the gap size (intentional)', () => {
+    // A 02:30 set belonging to the 2027-03-13 evening lineup (hour 2 < the
+    // AFTER_MIDNIGHT_THRESHOLD_HOUR of 6) is offset forward one calendar day
+    // to 2027-03-14 — but 02:00-02:59 does not exist that day, because
+    // Toronto's clocks jump straight from 02:00 to 03:00. `addLocalDays`
+    // (via `Date#setDate`) normalizes this forward by the size of the gap
+    // (to 03:30 EDT) rather than throwing, the same way the wall clock
+    // itself behaves that night. This is pinned as deliberate, not left as
+    // incidental engine behavior (#768).
+    const [band] = prepareBands([makeBand('02:30', '03:15', '2027-03-13')])
+
+    expect(new Date(band.startMs).toString()).toContain('Sun Mar 14 2027 03:30:00 GMT-0400')
+    // Sanity: matches direct construction of the same nonexistent local time.
+    expect(band.startMs).toBe(new Date(2027, 2, 14, 2, 30, 0).getTime())
+  })
+
+  it('overnight-wrap (endMs < startMs) on the spring-forward transition day itself is also DST-safe', () => {
+    // An evening set on the transition day (2027-03-14 23:30) ending just
+    // after midnight (00:20, parsed on the same calendar date so it is
+    // BEFORE startMs) triggers the `endMs < startMs` wrap at the bottom of
+    // prepareBands — a genuine sibling of the after-midnight offset above,
+    // using the same addLocalDays helper. Verified via `TZ=America/Toronto
+    // node`: the broken `+= MS_PER_DAY` implementation produces "Mon Mar 15
+    // 2027 01:20:00 GMT-0400" — one hour late.
+    const [band] = prepareBands([makeBand('23:30', '00:20', '2027-03-14')])
+
+    expect(new Date(band.endMs).toString()).toContain('Mon Mar 15 2027 00:20:00 GMT-0400')
+
+    const brokenEndMs = Date.parse('2027-03-14T00:20:00') + DAY_MS
+    expect(band.endMs).not.toBe(brokenEndMs)
   })
 })

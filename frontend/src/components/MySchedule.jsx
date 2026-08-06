@@ -22,7 +22,7 @@ import {
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx'
 import { copyToClipboard } from '../utils/clipboard'
-import { dayNumberMapFromDays, formatFestivalDate, orderedFestivalDays } from '../utils/festivalDays'
+import { addLocalDays, dayNumberMapFromDays, formatFestivalDate, orderedFestivalDays } from '../utils/festivalDays'
 import { formatTimeRange } from '../utils/timeFormat'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
@@ -161,8 +161,6 @@ function MySchedule({
 
   const highlightedBandIds = useMemo(() => new Set(HIGHLIGHTED_BANDS), [])
   const normalizedBands = useMemo(() => {
-    const oneDayMs = 24 * 60 * 60 * 1000
-
     return dayFilteredBands.map(band => {
       const parsedStartMs = Date.parse(`${band.date}T${band.startTime}:00`)
       const parsedEndMs = Date.parse(`${band.date}T${band.endTime}:00`)
@@ -177,7 +175,10 @@ function MySchedule({
         Number.isFinite(band.endMs) && band.endMs > 0 ? band.endMs : Number.isNaN(parsedEndMs) ? 0 : parsedEndMs
 
       if (startMs > 0 && endMs > 0 && endMs < startMs) {
-        endMs += oneDayMs
+        // Advance the LOCAL CALENDAR DATE, not a fixed 24h — see addLocalDays'
+        // doc comment in festivalDays.js (#768). Sibling of the same fix in
+        // bandUtils.js's prepareBands().
+        endMs = addLocalDays(endMs, 1)
       }
 
       return {

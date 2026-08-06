@@ -228,7 +228,12 @@ describe("Timeline API - Optimized JOIN Queries", () => {
       const response = await onRequestGet(mockContext);
 
       expect(response.headers.get("Content-Type")).toBe("application/json");
-      expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
+      // Pinned to the literal, not to the imported constant: asserting a
+      // constant equals itself would pass no matter what the value became.
+      // The TTL is the point — this endpoint drives "Happening Now", so a set
+      // cancelled mid-show must not stay visible for five minutes. If someone
+      // raises max-age here, this test is the thing that should stop them.
+      expect(response.headers.get("Cache-Control")).toBe("public, max-age=60, stale-while-revalidate=300");
     });
 
     it("should return 200 status on success", async () => {

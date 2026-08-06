@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -84,6 +84,13 @@ describe('VenuePage — performer cards (#742)', () => {
     // not "8:00 PM", so anchoring on the meridiem marker would be
     // environment-dependent rather than a real assertion about the app.
     expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument()
+
+    // A venue's lineup spans multiple events, so the event attribution is the
+    // only thing saying WHICH show a set belonged to. Assert the destination,
+    // not just the text -- a plain-text fallback renders when event_slug is
+    // absent, and that path would satisfy a text-only assertion.
+    const eventLink = screen.getByRole('link', { name: 'Buddies Fest 2' })
+    expect(eventLink).toHaveAttribute('href', '/event/buddies-fest-2')
   })
 
   it('renders no genre pill and no photo when the performance has neither', async () => {
@@ -108,6 +115,13 @@ describe('VenuePage — performer cards (#742)', () => {
   // "this week" bucket and render a bare "8:00 PM"); the day label is what
   // must carry the distinction.
   it('shows a distinct per-set day label for two sets on different days of a multi-day event', async () => {
+    // Pin the clock. These assert literal day-label strings, and
+    // formatPerformanceDayLabel is date-relative -- left on the real clock
+    // they would change meaning on Aug 7-8 2026, i.e. DURING Buddies Fest 2,
+    // the exact weekend this code ships for. A test that only passes before
+    // show day is worse than none.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(2026, 7, 1, 12, 0, 0)) // Aug 1 2026 — within 2 weeks of the event
     fetchPublicJson.mockReset()
     fetchPublicJson.mockResolvedValue({
       venue: { id: 3, name: 'Prohibition Warehouse', location: 'Waterloo, ON', address: null, website: null },
@@ -140,6 +154,16 @@ describe('VenuePage — performer cards (#742)', () => {
   // (CLAUDE.md "After-midnight band sorting"). The day label must reflect
   // that evening, NOT the calendar date the clock happened to roll over to.
   it('groups an after-midnight set with the PREVIOUS evening, not the calendar date of its start time', async () => {
+    // Pinned for the same reason as the multi-day test above, but here the
+    // exact date matters. Pin EARLIER than two weeks before the set and this
+    // test fails -- getTimeDescription's >2-weeks fallback branch renders the
+    // raw +1-day-offset timestamp ("Aug 8") instead of the festival day
+    // ("Aug 7"). That is the open bug #689 Finding 1, not a venue-page
+    // defect. Aug 1 keeps the set inside the window fans actually view it in,
+    // so this asserts THIS page's behaviour rather than re-failing on a known
+    // timeFilter bug.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(2026, 7, 1, 12, 0, 0)) // Aug 1 2026
     fetchPublicJson.mockReset()
     fetchPublicJson.mockResolvedValue({
       venue: { id: 3, name: 'Prohibition Warehouse', location: 'Waterloo, ON', address: null, website: null },
@@ -203,6 +227,45 @@ describe('VenuePage — performer cards (#742)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Prohibition Warehouse' })).toBeInTheDocument()
 
     expect(screen.getByText(/Starts in 15m/)).toBeInTheDocument()
+  })
+
+  // The countdown above is only correct at the instant of first render. This
+  // is the page a fan opens standing outside the venue and leaves open, so a
+  // `currentTime` captured once strands them on "Starts in 15m" long after
+  // the set began. Advancing the clock must move the card's state on.
+  it('refreshes the countdown while the page stays open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(2026, 7, 8, 19, 45, 0)) // 15 min before the set
+
+    fetchPublicJson.mockReset()
+    fetchPublicJson.mockResolvedValue({
+      venue: { id: 3, name: 'Prohibition Warehouse', location: 'Waterloo, ON', address: null, website: null },
+      upcoming: [
+        perf({
+          performance_id: 5,
+          band_name: 'Ticking Band',
+          start_time: '20:00',
+          end_time: '20:30',
+          event_date: '2026-08-07',
+          performance_date: '2026-08-08',
+        }),
+      ],
+      past: [],
+    })
+
+    renderPage('3')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Prohibition Warehouse' })).toBeInTheDocument()
+    expect(screen.getByText(/Starts in 15m/)).toBeInTheDocument()
+
+    // Past the start time. Without the interval the card keeps rendering the
+    // stale countdown; with it, the set reads as live.
+    await act(async () => {
+      vi.setSystemTime(new Date(2026, 7, 8, 20, 5, 0))
+      await vi.advanceTimersByTimeAsync(60000)
+    })
+
+    expect(screen.queryByText(/Starts in 15m/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Live Now/i)).toBeInTheDocument()
   })
 
   it('renders a cancelled set struck through inside the new card, not as a plain row', async () => {

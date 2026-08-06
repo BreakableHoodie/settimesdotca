@@ -103,7 +103,19 @@ export default function VenuePage() {
   // Feeds BandCard's "starting soon" minute math; a one-time snapshot is
   // enough here since these cards are read-only (no live add/remove UI to
   // keep in sync with a ticking clock).
-  const [currentTime] = useState(() => new Date())
+  const [currentTime, setCurrentTime] = useState(() => new Date())
+
+  // BandCard derives "Starts in Nm" / "Live Now" from this prop, so a frozen
+  // value strands a fan on a stale countdown -- and this is the page someone
+  // opens standing outside the venue. Same 60s cadence as App.jsx,
+  // EmbedPage.jsx and MySchedule.jsx.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     let active = true

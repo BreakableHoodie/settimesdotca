@@ -39,7 +39,19 @@ describe('BandCard — optional dayLabel prop (#742)', () => {
   })
 
   it('renders no day label row when dayLabel is an empty string', () => {
-    renderCard({ dayLabel: '' })
+    const { container } = renderCard({ dayLabel: '' })
     expect(screen.queryByText(/Day \d/)).toBeNull()
+    // Assert the same icon absence the omitted case checks. A text-only
+    // assertion would still pass if an empty label row rendered -- an icon
+    // with nothing beside it, which is exactly the defect this guards.
+    expect(container.querySelector('svg.lucide-calendar-days')).toBeNull()
+  })
+
+  it('renders the day label with its calendar icon when provided', () => {
+    const { container } = renderCard({ dayLabel: 'Fri, Aug 7 (Day 1)' })
+    expect(screen.getByText('Fri, Aug 7 (Day 1)')).toBeInTheDocument()
+    // Pins the positive half of the contract the two absence tests assert
+    // against, so "icon absent" stays meaningful rather than vacuously true.
+    expect(container.querySelector('svg.lucide-calendar-days')).not.toBeNull()
   })
 })

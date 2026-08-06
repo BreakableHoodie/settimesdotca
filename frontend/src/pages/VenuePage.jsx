@@ -100,9 +100,6 @@ export default function VenuePage() {
   const [past, setPast] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  // Feeds BandCard's "starting soon" minute math; a one-time snapshot is
-  // enough here since these cards are read-only (no live add/remove UI to
-  // keep in sync with a ticking clock).
   const [currentTime, setCurrentTime] = useState(() => new Date())
 
   // BandCard derives "Starts in Nm" / "Live Now" from this prop, so a frozen

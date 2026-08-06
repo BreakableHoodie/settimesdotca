@@ -1,5 +1,5 @@
 import { ArrowRight, CircleAlert, Clock, Footprints, Guitar, Navigation } from 'lucide-react'
-import { directionsHref } from '../utils/nextMove'
+import { buildDirectionsHrefForBand } from '../utils/directions'
 
 // Glanceable live-event companion. Renders the single "what do I do right now"
 // answer produced by computeNextMove() — see utils/nextMove.js. Purely
@@ -21,7 +21,7 @@ const KIND_META = {
 }
 
 function DirectionsButton({ band }) {
-  const href = directionsHref(band)
+  const href = buildDirectionsHrefForBand(band)
   if (!href) return null
   return (
     <a

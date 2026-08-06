@@ -28,8 +28,13 @@
 export const CACHE_SHOW_CRITICAL = "public, max-age=60, stale-while-revalidate=300";
 
 /**
- * Browse and discovery surfaces that do not change mid-show — event lists,
- * artist and venue indexes, aggregate stats. A stale minute here costs nothing,
- * so these keep the longer TTL.
+ * Browse and discovery surfaces carrying no live performance state — event
+ * lists, artist and venue indexes, aggregate-only stats. A stale minute here
+ * costs nothing, so these keep the longer TTL.
+ *
+ * "Stats" alone is not the test: `api/bands/stats/[name].js` is named for its
+ * aggregates but also returns upcoming and past performances, cancellations and
+ * venue assignments, so it belongs to CACHE_SHOW_CRITICAL. Any response that
+ * carries live performance state does, whatever it is called.
  */
 export const CACHE_BROWSE = "public, max-age=300";

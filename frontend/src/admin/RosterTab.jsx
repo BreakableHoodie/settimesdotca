@@ -693,6 +693,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                         <div className="flex w-6 justify-center">
                           <input
                             type="checkbox"
+                            aria-label="Select all visible artists"
                             className="cursor-pointer h-5 w-5 align-middle"
                             onChange={e => handleSelectAll(e.target.checked)}
                             checked={effectiveSelectedIds.size === filteredBands.length && filteredBands.length > 0}
@@ -850,6 +851,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
                             <div className="flex w-6 justify-center">
                               <input
                                 type="checkbox"
+                                aria-label={`Select ${band.name}`}
                                 className="cursor-pointer h-5 w-5 align-middle"
                                 checked={isSelected}
                                 onChange={e => handleSelect(band.id, e.target.checked)}

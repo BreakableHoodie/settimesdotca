@@ -23,6 +23,11 @@ function VenueInfo({ eventData }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-5xl mx-auto">
           {venues.map(venue => {
             const mapHref = safeExternalHref(venue.googleMaps)
+            // Guard the address row on the TRIMMED value, in BOTH branches.
+            // buildDirectionsHref trims before deciding, so an untrimmed
+            // truthiness check renders a MapPin next to an empty span for a
+            // whitespace-only address — an icon labelling nothing.
+            const hasAddress = typeof venue.address === 'string' && venue.address.trim() !== ''
             const cardClassName =
               'bg-bg-purple/50 hover:bg-bg-purple transition-colors p-4 rounded-lg border border-accent-500/30 text-center focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500'
 
@@ -36,10 +41,12 @@ function VenueInfo({ eventData }) {
               return (
                 <div key={venue.name} className={cardClassName}>
                   <h4 className="font-bold text-text-primary text-sm mb-2">{venue.name}</h4>
-                  <p className="text-accent-400 text-xs mb-1 flex items-center justify-center gap-2">
-                    <MapPin size={12} aria-hidden="true" />
-                    <span>{venue.address}</span>
-                  </p>
+                  {hasAddress && (
+                    <p className="text-accent-400 text-xs mb-1 flex items-center justify-center gap-2">
+                      <MapPin size={12} aria-hidden="true" />
+                      <span>{venue.address}</span>
+                    </p>
+                  )}
                   {fallbackDirectionsHref && (
                     <a
                       href={fallbackDirectionsHref}
@@ -68,10 +75,12 @@ function VenueInfo({ eventData }) {
                 aria-label={`Open directions to ${venue.name}`}
               >
                 <h4 className="font-bold text-text-primary text-sm mb-2">{venue.name}</h4>
-                <p className="text-accent-400 text-xs mb-1 flex items-center justify-center gap-2">
-                  <MapPin size={14} aria-hidden="true" />
-                  <span>{venue.address}</span>
-                </p>
+                {hasAddress && (
+                  <p className="text-accent-400 text-xs mb-1 flex items-center justify-center gap-2">
+                    <MapPin size={14} aria-hidden="true" />
+                    <span>{venue.address}</span>
+                  </p>
+                )}
                 {venue.note && <p className="text-text-tertiary text-xs italic mt-2">{venue.note}</p>}
               </a>
             )

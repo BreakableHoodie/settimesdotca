@@ -46,8 +46,16 @@ export function buildDirectionsHrefForBand(band) {
   if (hasUsableCoords) {
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
   }
-  if (venue) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venue} Waterloo ON`)}`
+  // KNOWN LIMITATION: this fallback hardcodes "Waterloo ON", which is wrong
+  // for events outside Waterloo Region (Buddies Fest 2 is in Tillsonburg).
+  // It is currently unreachable in production -- every venue row has
+  // latitude/longitude (migrations 0043/0044) and schedule.js projects them
+  // as venue_lat/venue_lng, so the coordinate branch above always wins.
+  // Threading the event's own city through here is tracked in #767; until
+  // then, do NOT rely on this branch for a non-Waterloo event.
+  const trimmedVenue = typeof venue === 'string' ? venue.trim() : ''
+  if (trimmedVenue) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${trimmedVenue} Waterloo ON`)}`
   }
   return null
 }

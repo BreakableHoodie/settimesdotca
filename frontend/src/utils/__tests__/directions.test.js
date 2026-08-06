@@ -94,6 +94,17 @@ describe('buildDirectionsHrefForBand (#754)', () => {
     expect(buildDirectionsHrefForBand({ venue_lat: Infinity, venue_lng: Infinity })).toBe(null)
   })
 
+  // A whitespace-only venue is truthy, so an untrimmed check would search for
+  // "   Waterloo ON" — a link to nowhere. Matches buildDirectionsHref's
+  // trimming invariant.
+  it.each([
+    ['whitespace-only', '   '],
+    ['empty', ''],
+    ['non-string', 42],
+  ])('returns null for a %s venue name with no usable coords', (_label, venue) => {
+    expect(buildDirectionsHrefForBand({ venue })).toBe(null)
+  })
+
   it('returns null when there is nothing to locate', () => {
     expect(buildDirectionsHrefForBand({})).toBe(null)
     expect(buildDirectionsHrefForBand(null)).toBe(null)

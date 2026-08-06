@@ -75,6 +75,33 @@ describe('VenueInfo directions fallback (#754)', () => {
     expect(screen.queryByRole('link', { name: /directions/i })).not.toBeInTheDocument()
   })
 
+  // The MapPin row must not render for a blank address, in EITHER branch —
+  // otherwise a location icon sits next to an empty span, labelling nothing.
+  // CodeRabbit flagged only the no-googleMaps branch; the admin-set branch
+  // below had the identical defect and is covered here too.
+  it.each([
+    ['null', null],
+    ['empty', ''],
+    ['whitespace-only', '   '],
+  ])('renders no address row for a %s address (no-googleMaps branch)', (_label, address) => {
+    const { container } = renderVenueInfo([{ name: 'Roost', address }])
+
+    expect(screen.getByText('Roost')).toBeInTheDocument()
+    expect(container.querySelector('svg.lucide-map-pin')).toBeNull()
+    expect(screen.queryByText('Directions')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['null', null],
+    ['empty', ''],
+    ['whitespace-only', '   '],
+  ])('renders no address row for a %s address (admin googleMaps branch)', (_label, address) => {
+    const { container } = renderVenueInfo([{ name: 'Roost', address, googleMaps: 'https://maps.google.com/?q=Roost' }])
+
+    expect(screen.getByRole('link', { name: 'Open directions to Roost' })).toBeInTheDocument()
+    expect(container.querySelector('svg.lucide-map-pin')).toBeNull()
+  })
+
   it('does not crash and renders no directions link when address is an empty string', () => {
     renderVenueInfo([{ name: 'Roost', address: '' }])
 

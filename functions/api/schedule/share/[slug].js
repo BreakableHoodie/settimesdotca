@@ -45,6 +45,16 @@ export async function onRequestGet(context) {
       } catch (err) {
         console.error("Share link view-count increment failed:", slug, err);
       }
+    } else {
+      // Best-effort import counter (#703) — same discipline as the view counter
+      // above: never break share retrieval, log rather than swallow. This is the
+      // conversion signal view_count can't provide: a fan adopted someone else's
+      // route as their own, not just opened the link.
+      try {
+        await DB.prepare("UPDATE share_links SET import_count = import_count + 1 WHERE slug = ?").bind(slug).run();
+      } catch (err) {
+        console.error("Share link import-count increment failed:", slug, err);
+      }
     }
 
     let performance_ids, band_names;

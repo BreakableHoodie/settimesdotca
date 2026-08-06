@@ -58,6 +58,12 @@ export default function MetricsDashboard({ eventId }) {
           <div className="text-gray-400 text-sm">Share Views</div>
           <div className="text-3xl font-bold text-white mt-2">{metrics.totalShareViews ?? 0}</div>
         </div>
+
+        {/* Shares Imported — the conversion signal: a fan adopted someone else's route */}
+        <div className="bg-bg-purple rounded-lg p-4">
+          <div className="text-gray-400 text-sm">Shares Imported</div>
+          <div className="text-3xl font-bold text-white mt-2">{metrics.totalShareImports ?? 0}</div>
+        </div>
       </div>
 
       {/* Popular Bands */}

@@ -64,6 +64,42 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     expect(body.metrics.topSharedRoutes[0].view_count).toBe(5);
   });
 
+  test("includes share import totals -- the conversion signal beside shares/views (#703)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Fest", slug: "fest" });
+    insertShareLink(rawDb, {
+      slug: "routeccc",
+      event_id: event.id,
+      event_slug: "fest",
+      performance_ids: [1],
+      band_names: ["A"],
+    });
+    insertShareLink(rawDb, {
+      slug: "routeddd",
+      event_id: event.id,
+      event_slug: "fest",
+      performance_ids: [1, 2],
+      band_names: ["A", "B"],
+    });
+    rawDb.prepare("UPDATE share_links SET import_count = ? WHERE slug = ?").run(3, "routeccc");
+    rawDb.prepare("UPDATE share_links SET import_count = ? WHERE slug = ?").run(1, "routeddd");
+
+    const res = await call(env, event.id);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.metrics.totalShareImports).toBe(4);
+  });
+
+  test("event with no share links returns zeroed share import totals, not errors", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Quiet Share Fest", slug: "quiet-share-fest" });
+
+    const res = await call(env, event.id);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.metrics.totalShareImports).toBe(0);
+  });
+
   test("popularBands is ordered by schedule_count desc and totalScheduleBuilds/uniqueVisitors reflect inserted rows", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Band Fest", slug: "band-fest" });

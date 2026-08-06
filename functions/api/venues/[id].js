@@ -61,7 +61,9 @@ export async function onRequestGet(context) {
         e.end_date AS event_end_date,
         e.status AS event_status,
         bp.id AS band_id,
-        bp.name AS band_name
+        bp.name AS band_name,
+        bp.photo_url,
+        bp.genre
       FROM performances p
       JOIN events e ON e.id = p.event_id
       JOIN band_profiles bp ON bp.id = p.band_profile_id
@@ -112,6 +114,10 @@ export async function onRequestGet(context) {
       event_date: p.event_date,
       band_id: p.band_id,
       band_name: p.band_name,
+      // Performer-card prerequisites (#742): photo + genre, same fields the
+      // schedule surfaces already send BandCard.
+      photo_url: p.photo_url,
+      genre: p.genre,
     });
 
     return json(
@@ -124,6 +130,11 @@ export async function onRequestGet(context) {
           website: venue.website || null,
           instagram: venue.instagram || null,
           facebook: venue.facebook || null,
+          // #742 — the row already carries these (migrations 0043/0044); the
+          // hand-written projection below just never selected them. Same
+          // defect class as performance_date (#739 -> #741 -> #743), same file.
+          latitude: venue.latitude ?? null,
+          longitude: venue.longitude ?? null,
           performance_count: all.length,
           event_count: new Set(all.map((p) => p.event_id)).size,
         },

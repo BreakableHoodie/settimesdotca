@@ -10,22 +10,30 @@
  * of them — had already been dropped to 60s and made env-tunable. That gap was
  * an oversight, not a decision.
  *
- * `stale-while-revalidate` is what makes the shorter TTL cheap: past 60s the
- * client still paints instantly from cache and refreshes in the background, so
- * a correction lands within about a minute without the origin taking a
- * thundering-herd of blocking revalidations.
+ * **No `stale-while-revalidate` here, deliberately.** It is the obvious thing
+ * to reach for and it is wrong for this purpose. Inside the SWR window a cache
+ * serves the STALE response and revalidates asynchronously (RFC 5861), so the
+ * fresh body only reaches the *next* request. A fan who opens the page once —
+ * which is the normal case — would still read the cancelled set as playing, and
+ * `max-age=60, stale-while-revalidate=300` would let that happen for up to 360s:
+ * worse than the 300s this change exists to fix. Plain `max-age` blocks and
+ * returns fresh data instead. SWR optimises latency; the goal here is freshness,
+ * and the two pull in opposite directions.
+ *
+ * The 60s also matches `api/schedule.js`, which already defaults there.
  *
  * Note these are currently **browser** caches, not edge ones — Cloudflare
  * returns `cf-cache-status: DYNAMIC` for Pages Functions responses, so nothing
  * is held at the edge. Shortening the TTL therefore costs no CDN efficiency; it
- * only narrows the window a single client can hold a stale copy.
+ * only narrows the window a single client can hold a stale copy, and the extra
+ * revalidations land on an origin that was already serving every request.
  */
 
 /**
  * Anything rendering live show state: what is on now, what is next, set times,
  * cancellations, venue assignments.
  */
-export const CACHE_SHOW_CRITICAL = "public, max-age=60, stale-while-revalidate=300";
+export const CACHE_SHOW_CRITICAL = "public, max-age=60";
 
 /**
  * Browse and discovery surfaces carrying no live performance state — event

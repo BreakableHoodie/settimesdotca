@@ -233,7 +233,11 @@ describe("Timeline API - Optimized JOIN Queries", () => {
       // The TTL is the point — this endpoint drives "Happening Now", so a set
       // cancelled mid-show must not stay visible for five minutes. If someone
       // raises max-age here, this test is the thing that should stop them.
-      expect(response.headers.get("Cache-Control")).toBe("public, max-age=60, stale-while-revalidate=300");
+      expect(response.headers.get("Cache-Control")).toBe("public, max-age=60");
+      // And it must not acquire stale-while-revalidate: inside the SWR window a
+      // cache serves the STALE body and revalidates async (RFC 5861), so a fan
+      // opening the page once would still see a cancelled set as playing.
+      expect(response.headers.get("Cache-Control")).not.toMatch(/stale-while-revalidate/);
     });
 
     it("should return 200 status on success", async () => {

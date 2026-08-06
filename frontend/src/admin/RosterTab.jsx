@@ -614,7 +614,13 @@ export default function RosterTab({ showToast, readOnly = false }) {
 
       {/* Bulk Actions */}
       {!readOnly && effectiveSelectedIds.size > 0 && (
-        <div className="bg-bg-navy/80 p-4 rounded border border-accent-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky top-20 z-10 backdrop-blur-md">
+        /* z-20, not z-10: the frozen columns below are z-10 and come LATER in
+           DOM order, so on an equal z-index they would win the paint order and
+           cover this bar's action select and Apply button exactly when a
+           selection is active. Nothing isolates the two subtrees — the table
+           wrapper's `overflow-hidden` does not create a stacking context. Keep
+           this strictly above the sticky cells. */
+        <div className="bg-bg-navy/80 p-4 rounded border border-accent-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky top-20 z-20 backdrop-blur-md">
           <span className="text-white font-medium">
             {effectiveSelectedIds.size} selected
             {hiddenSelectedCount > 0 && (

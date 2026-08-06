@@ -720,9 +720,13 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     await screen.findAllByText('Band A')
 
     // Select all 3 bands (no filter)
-    const selectAllCheckbox = screen
-      .getAllByRole('checkbox')
-      .find(cb => cb.closest('tr') === screen.getAllByRole('row')[0])
+    // Query by accessible name rather than walking the DOM to the header row:
+    // a structural walk silently yields undefined when the markup shifts (a
+    // wrapper div was enough to break it), and fireEvent then fails with
+    // "please provide a DOM element" instead of naming the real problem. The
+    // mobile card list's select-all is named "Select all", so this is
+    // unambiguous.
+    const selectAllCheckbox = screen.getByRole('checkbox', { name: 'Select all visible artists' })
     fireEvent.click(selectAllCheckbox)
     expect(screen.getAllByText(/3 selected/)).toBeDefined()
 
@@ -805,9 +809,13 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     await screen.findAllByText('Band A')
 
     // Select all 3
-    const selectAllCheckbox = screen
-      .getAllByRole('checkbox')
-      .find(cb => cb.closest('tr') === screen.getAllByRole('row')[0])
+    // Query by accessible name rather than walking the DOM to the header row:
+    // a structural walk silently yields undefined when the markup shifts (a
+    // wrapper div was enough to break it), and fireEvent then fails with
+    // "please provide a DOM element" instead of naming the real problem. The
+    // mobile card list's select-all is named "Select all", so this is
+    // unambiguous.
+    const selectAllCheckbox = screen.getByRole('checkbox', { name: 'Select all visible artists' })
     fireEvent.click(selectAllCheckbox)
 
     // Apply filter that hides 1 row
@@ -828,9 +836,13 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     await screen.findAllByText('Band A')
 
     // Select all 3
-    const selectAllCheckbox = screen
-      .getAllByRole('checkbox')
-      .find(cb => cb.closest('tr') === screen.getAllByRole('row')[0])
+    // Query by accessible name rather than walking the DOM to the header row:
+    // a structural walk silently yields undefined when the markup shifts (a
+    // wrapper div was enough to break it), and fireEvent then fails with
+    // "please provide a DOM element" instead of naming the real problem. The
+    // mobile card list's select-all is named "Select all", so this is
+    // unambiguous.
+    const selectAllCheckbox = screen.getByRole('checkbox', { name: 'Select all visible artists' })
     fireEvent.click(selectAllCheckbox)
 
     // Apply filter
@@ -1045,18 +1057,24 @@ describe('RosterTab — sticky identity + actions columns (#772)', () => {
     render(<RosterTab showToast={vi.fn()} />)
     await screen.findAllByText('Active Aardvarks')
 
-    const editButton = screen
+    const actionsCell = screen
       .getAllByRole('button', { name: 'Edit' })
       .map(el => el.closest('td'))
       .find(Boolean)
-    expect(editButton).not.toBeNull()
-    expect(editButton.className).toMatch(/\bsticky\b/)
-    expect(editButton.className).toMatch(/\bright-0\b/)
+    expect(actionsCell).not.toBeNull()
+    expect(actionsCell.className).toMatch(/\bsticky\b/)
+    expect(actionsCell.className).toMatch(/\bright-0\b/)
     // The <td> itself must NOT carry `flex` -- that was the bug (#772):
     // display:flex on a <td> drops it out of the table layout algorithm and
     // fights sticky positioning. The flex wrapper is an inner <div> instead.
-    expect(editButton.className).not.toMatch(/(?:^|\s)flex(?:\s|$)/)
-    expect(editButton.querySelector(':scope > div.flex')).not.toBeNull()
+    expect(actionsCell.className).not.toMatch(/(?:^|\s)flex(?:\s|$)/)
+    // Walk children directly rather than querySelector(':scope > …') — :scope
+    // support varies across DOM implementations, and this asserts the same
+    // thing without depending on it.
+    const flexWrapper = Array.from(actionsCell.children).find(
+      child => child.tagName === 'DIV' && child.classList.contains('flex')
+    )
+    expect(flexWrapper).toBeDefined()
   })
 
   // Sticky cells are opaque (bg-bg-purple) so scrolled content can't show

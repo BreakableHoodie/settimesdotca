@@ -486,7 +486,12 @@ export default function BandProfilePage() {
               <img
                 src={profile.photo_url}
                 alt={profile.photo_alt_text || profile.name}
-                loading="lazy"
+                // This hero is the first thing on the page, so it is the LCP
+                // element — lazy-loading it defers the very resource the metric
+                // measures and pops it in late on slow connections. Same call,
+                // and same reasoning, as EventPosterThumbnail's inline variant.
+                loading="eager"
+                fetchPriority="high"
                 className={`h-full w-full object-cover opacity-60 ${BAND_PHOTO_CROP}`}
               />
               <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent" />

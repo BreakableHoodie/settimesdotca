@@ -134,13 +134,14 @@ describe("GET /api/schedule/share/[slug]", () => {
       band_names: ["Band A"],
     });
 
-    // Pasting a link into iMessage/Slack/WhatsApp/Twitter makes each service
-    // fetch it once to build an unfurl card. None of them is a fan.
+    // JS-rendering crawlers are the ones that can actually reach this JSON
+    // route — non-JS unfurlers fetch /s/[slug], which counts nothing. The
+    // unfurler UAs are included because the filter still lists them.
     for (const ua of [
+      "Mozilla/5.0 (compatible; Googlebot/2.1)",
+      "Mozilla/5.0 (compatible; Applebot/0.1)",
       "facebookexternalhit/1.1",
       "Twitterbot/1.0",
-      "Slackbot-LinkExpanding 1.0",
-      "WhatsApp/2.23.20.0",
     ]) {
       const res = await callAsVisitor(env, "crawler1", IP_A, ua);
       // Crawlers must still receive the snapshot — the unfurl card depends on

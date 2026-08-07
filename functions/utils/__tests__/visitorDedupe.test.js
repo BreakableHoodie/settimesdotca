@@ -18,30 +18,29 @@ function req(ip, userAgent) {
 }
 
 describe("isLikelyCrawler", () => {
-  // These are the actual unfurlers that hit a pasted share link. Each one that
-  // slips through is a phantom "view" on a route nobody opened.
   it.each([
+    // JS-rendering crawlers — the only ones that can actually reach the JSON
+    // route this guards. Non-JS unfurlers fetch /s/[slug] instead.
+    ["Mozilla/5.0 (compatible; Googlebot/2.1)", "googlebot"],
+    ["Mozilla/5.0 (compatible; Applebot/0.1)", "applebot"],
+    ["Mozilla/5.0 (compatible; bingbot/2.0)", "bingbot"],
+    // Listed but inert today; kept in case the payload moves server-side.
     ["facebookexternalhit/1.1", "facebook/iMessage"],
     ["Twitterbot/1.0", "twitter"],
     ["Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)", "slack"],
-    ["WhatsApp/2.23.20.0", "whatsapp"],
-    ["Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)", "discord"],
-    ["TelegramBot (like TwitterBot)", "telegram"],
-    ["LinkedInBot/1.0", "linkedin"],
-    ["Mozilla/5.0 (compatible; Applebot/0.1)", "applebot"],
-    ["SkypeUriPreview Preview/0.5", "skype"],
-    ["Mozilla/5.0 (compatible; Googlebot/2.1)", "googlebot"],
+    ["Mozilla/5.0 (compatible; Discordbot/2.0)", "discord"],
   ])("treats %s as a crawler (%s)", (ua) => {
     expect(isLikelyCrawler(ua)).toBe(true);
   });
 
-  it("treats a missing or blank User-Agent as a crawler", () => {
-    // Every real browser sends one. Failing this direction undercounts rather
-    // than inflating, which is the safe direction for this metric.
-    expect(isLikelyCrawler(undefined)).toBe(true);
-    expect(isLikelyCrawler(null)).toBe(true);
-    expect(isLikelyCrawler("")).toBe(true);
-    expect(isLikelyCrawler("   ")).toBe(true);
+  it("treats a missing or blank User-Agent as a PERSON", () => {
+    // Only browser fetch() reaches this route, so an absent UA is far more
+    // likely a privacy extension than a bot. Discarding those visitors would
+    // be an invisible undercount. An earlier revision had this inverted.
+    expect(isLikelyCrawler(undefined)).toBe(false);
+    expect(isLikelyCrawler(null)).toBe(false);
+    expect(isLikelyCrawler("")).toBe(false);
+    expect(isLikelyCrawler("   ")).toBe(false);
   });
 
   it("does NOT treat real browsers as crawlers", () => {
@@ -49,6 +48,19 @@ describe("isLikelyCrawler", () => {
     // forever and look like nobody opens share links.
     expect(isLikelyCrawler(CHROME)).toBe(false);
     expect(isLikelyCrawler(SAFARI_IOS)).toBe(false);
+  });
+
+  // Regression guard for real people a generic substring list silently ate.
+  // Every UA reaching this route belongs to a human, so a false positive here
+  // discards a fan with no trace. Do not reintroduce bare "bot"/"preview"/
+  // "pinterest"/"crawler"/"spider" markers.
+  it.each([
+    ["Mozilla/5.0 (Linux; Android 11; CUBOT NOTE 20) AppleWebKit/537.36 Chrome/124", 'phone model contains "bot"'],
+    ["Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Safari Technology Preview/17.0", 'channel contains "preview"'],
+    ["Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 [Pinterest/iOS]", 'in-app browser contains "pinterest"'],
+    ["Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 [FBAN/FBIOS;FB_IAB/FB4A]", "Messenger in-app browser"],
+  ])("counts %s as a person (%s)", (ua) => {
+    expect(isLikelyCrawler(ua)).toBe(false);
   });
 
   it("is case-insensitive", () => {

@@ -56,17 +56,27 @@ export async function onRequestGet(context) {
       if (!isLikelyCrawler(request.headers.get("User-Agent"))) {
         try {
           const hash = await visitorHash(request, slug);
-          const insert = await DB.prepare("INSERT OR IGNORE INTO share_link_views (slug, visitor_hash) VALUES (?, ?)")
-            .bind(slug, hash)
-            .run();
-          if (insert.meta?.changes > 0) {
-            await DB.prepare("UPDATE share_links SET view_count = view_count + 1 WHERE slug = ?").bind(slug).run();
-          }
+          // One atomic batch, and view_count is DERIVED from the ledger rather
+          // than incremented alongside it. Two separate writes would leave a
+          // permanent, unrecoverable hole: if the insert landed and the update
+          // did not (D1 hiccup, isolate eviction between awaits), that
+          // visitor's row already claims the slot, so no later visit could
+          // ever count them. Recomputing from COUNT(*) makes a dropped write
+          // self-healing — the next visitor repairs it — and removes any
+          // dependence on D1's `meta.changes` shape, where an undefined `meta`
+          // would silently stop the counter forever.
+          await DB.batch([
+            DB.prepare("INSERT OR IGNORE INTO share_link_views (slug, visitor_hash) VALUES (?, ?)").bind(slug, hash),
+            DB.prepare(
+              "UPDATE share_links SET view_count = (SELECT COUNT(*) FROM share_link_views WHERE slug = ?) WHERE slug = ?",
+            ).bind(slug, slug),
+          ]);
         } catch (err) {
-          // Best-effort, same discipline as before: a counter failure must
-          // never break share retrieval. Logged, not swallowed, so a broken
-          // ledger surfaces instead of silently zeroing the metric.
-          console.error("Share link view-count increment failed:", slug, err);
+          // Best-effort: a counter failure must never break share retrieval.
+          // Named for the ledger, not the increment — during migration lag the
+          // failing statement is the INSERT, and "increment failed" would send
+          // the reader looking at the wrong statement.
+          console.error("Share view ledger write failed (view_count will not advance):", slug, err);
         }
       }
     } else {

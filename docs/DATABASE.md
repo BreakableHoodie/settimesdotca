@@ -315,9 +315,24 @@ migration 0037; `view_count` added in migration 0040.
 | `band_names`      | TEXT    | NOT NULL (JSON array)                                                                                                              |
 | `created_at`      | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                |
 | `expires_at`      | TEXT    | NOT NULL                                                                                                                           |
-| `view_count`      | INTEGER | NOT NULL, DEFAULT 0 — best-effort increment on preview view, not on the post-import refetch (see `GET /api/schedule/share/[slug]`) |
+| `view_count`      | INTEGER | NOT NULL, DEFAULT 0 — **unique visitors per link, all-time** (#705). Derived: `COUNT(*)` over `share_link_views`, recomputed whenever a new visitor row is inserted. Not incremented per fetch, and not counted on the post-import refetch (see `GET /api/schedule/share/[slug]`) |
+| `view_count_legacy` | INTEGER | Nullable — each link's pre-#705 per-fetch count, preserved at the dedupe cutover (migration 0058). Nothing reads it; it keeps the cutover reversible |
 
 Indexes: `idx_share_links_slug(slug)`, `idx_share_links_expires_at(expires_at)`.
+
+### `share_link_views`
+
+One row per (share link, visitor). The dedupe ledger behind `share_links.view_count` (#705).
+
+| Column         | Type | Notes                                                                                                        |
+| -------------- | ---- | ------------------------------------------------------------------------------------------------------------ |
+| `slug`         | TEXT | NOT NULL, part of PK, FK → `share_links(slug)` ON DELETE CASCADE                                              |
+| `visitor_hash` | TEXT | NOT NULL, part of PK — SHA-256 of `ip\|user-agent\|slug` (`functions/utils/visitorDedupe.js`). The raw IP is never stored; the slug salts each link so a visitor is not correlatable across links |
+| `first_seen`   | TEXT | NOT NULL, DEFAULT `datetime('now')` — written only by the default, never from JS                              |
+
+Index: `idx_share_link_views_slug(slug)`.
+
+**The `ON DELETE CASCADE` does not fire for the expiry cron.** `functions/scheduled/expire-share-links.js` runs via `_scheduled.js`, which never passes through `_middleware.js` where `PRAGMA foreign_keys = ON` is set, and D1 defaults it OFF. That cron therefore deletes ledger rows explicitly, child-first, in a `DB.batch()`. The cascade *is* live on the event-deletion path, which is an HTTP request.
 Per `CLAUDE.md`, `share_links` — not telemetry events — is the source of truth
 for share create/view counts.
 

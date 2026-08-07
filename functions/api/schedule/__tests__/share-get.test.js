@@ -2,6 +2,26 @@ import { describe, expect, test } from "vitest";
 import { onRequestGet } from "../share/[slug].js";
 import { createTestEnv, insertEvent, insertShareLink } from "../../test-utils.js";
 
+// RFC 5737 documentation IPs plus a realistic browser UA. These exist to make
+// the visitor hash DETERMINISTIC and distinct per test (#705) — not to dodge
+// bot classification. A request without them is still counted: isLikelyCrawler
+// treats a missing UA as a person, and visitorHash falls back to ip="unknown",
+// which would silently collapse every such visitor into one ledger row.
+const IP_A = "203.0.113.10";
+const IP_B = "203.0.113.11";
+const CHROME_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+function callAsVisitor(env, slug, ip, userAgent) {
+  return onRequestGet({
+    request: new Request(`https://example.test/api/schedule/share/${slug}`, {
+      headers: { "CF-Connecting-IP": ip, "User-Agent": userAgent },
+    }),
+    params: { slug },
+    env,
+  });
+}
+
 describe("GET /api/schedule/share/[slug]", () => {
   function makeRequest(slug) {
     return new Request(`https://example.test/api/schedule/share/${slug}`);
@@ -73,7 +93,7 @@ describe("GET /api/schedule/share/[slug]", () => {
     expect(res.status).toBe(400);
   });
 
-  test("increments view_count each time the share link is fetched", async () => {
+  test("counts one view per visitor, not one per fetch (#705)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
     rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
@@ -85,18 +105,107 @@ describe("GET /api/schedule/share/[slug]", () => {
       band_names: ["Band A"],
     });
 
-    const call = () =>
-      onRequestGet({
-        request: makeRequest("view1234"),
-        params: { slug: "view1234" },
-        env,
-      });
+    // Same person reloading. This used to record 2 — the bug that made one
+    // developer refreshing a preview read as 42 "views".
+    await callAsVisitor(env, "view1234", IP_A, CHROME_UA);
+    await callAsVisitor(env, "view1234", IP_A, CHROME_UA);
 
-    await call();
-    await call();
+    let row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("view1234");
+    expect(row.view_count).toBe(1);
 
-    const row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("view1234");
+    // A genuinely different visitor still counts, so the dedupe cannot be
+    // satisfied by simply never incrementing.
+    await callAsVisitor(env, "view1234", IP_B, CHROME_UA);
+    row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("view1234");
     expect(row.view_count).toBe(2);
+
+    // The ledger backs the count: one row per distinct visitor.
+    const ledger = rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("view1234");
+    expect(ledger.n).toBe(2);
+  });
+
+  test("never writes an orphan ledger row when the parent link is gone (#705)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
+    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    insertShareLink(rawDb, {
+      slug: "orphan01",
+      event_id: event.id,
+      event_slug: "my-fest",
+      performance_ids: [10],
+      band_names: ["Band A"],
+    });
+
+    // Production reality: `_middleware.js` skips PRAGMA foreign_keys = ON for
+    // GET, so the declared FK does NOT protect this insert. Reproduce that,
+    // or the FK would silently do the work and leave the guard untested.
+    rawDb.pragma("foreign_keys = OFF");
+
+    // The race must be INTERLEAVED. Deleting the parent before the request
+    // proves nothing — the handler's own SELECT would 404 and never reach the
+    // counter, so the test would pass for the wrong reason. The window is
+    // between that SELECT and the batch, so the expiry sweep is simulated by
+    // deleting at the moment batch() is invoked.
+    const realBatch = env.DB.batch.bind(env.DB);
+    const racingEnv = {
+      ...env,
+      DB: {
+        ...env.DB,
+        prepare: env.DB.prepare.bind(env.DB),
+        batch: (statements) => {
+          rawDb.prepare("DELETE FROM share_links WHERE slug = ?").run("orphan01");
+          return realBatch(statements);
+        },
+      },
+    };
+
+    // Must not throw — a counter concern never breaks share retrieval.
+    const res = await onRequestGet({
+      request: new Request("https://example.test/api/schedule/share/orphan01", {
+        headers: { "CF-Connecting-IP": IP_A, "User-Agent": CHROME_UA },
+      }),
+      params: { slug: "orphan01" },
+      env: racingEnv,
+    });
+    expect(res.status).toBe(200);
+
+    // An orphan here would be permanent: the expiry cron finds ledger rows by
+    // joining to slugs that still exist, so it could never sweep this one.
+    const orphans = rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("orphan01");
+    expect(orphans.n).toBe(0);
+  });
+
+  test("link-preview crawlers never count (#705)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
+    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    insertShareLink(rawDb, {
+      slug: "crawler1",
+      event_id: event.id,
+      event_slug: "my-fest",
+      performance_ids: [10],
+      band_names: ["Band A"],
+    });
+
+    // JS-rendering crawlers are the ones that can actually reach this JSON
+    // route — non-JS unfurlers fetch /s/[slug], which counts nothing. The
+    // unfurler UAs are included because the filter still lists them.
+    for (const ua of [
+      "Mozilla/5.0 (compatible; Googlebot/2.1)",
+      "Mozilla/5.0 (compatible; Applebot/0.1)",
+      "facebookexternalhit/1.1",
+      "Twitterbot/1.0",
+    ]) {
+      const res = await callAsVisitor(env, "crawler1", IP_A, ua);
+      // Crawlers must still receive the snapshot — the unfurl card depends on
+      // it. They just must not be counted.
+      expect(res.status).toBe(200);
+    }
+
+    const row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("crawler1");
+    expect(row.view_count).toBe(0);
+    const ledger = rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("crawler1");
+    expect(ledger.n).toBe(0);
   });
 
   test("does not increment view_count for an import refetch (?import=1)", async () => {
@@ -164,11 +273,9 @@ describe("GET /api/schedule/share/[slug]", () => {
       band_names: ["Band A"],
     });
 
-    await onRequestGet({
-      request: makeRequest("normal01"),
-      params: { slug: "normal01" },
-      env,
-    });
+    // Must present as a real visitor: since #705 a UA-less request is treated
+    // as a crawler and counts nothing.
+    await callAsVisitor(env, "normal01", IP_A, CHROME_UA);
 
     const row = rawDb.prepare("SELECT view_count, import_count FROM share_links WHERE slug = ?").get("normal01");
     expect(row.view_count).toBe(1);

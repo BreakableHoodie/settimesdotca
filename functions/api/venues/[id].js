@@ -5,6 +5,7 @@
 // archived events). Gated by PUBLIC_DATA_PUBLISH_ENABLED.
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+import { CACHE_SHOW_CRITICAL } from "../../utils/cacheHeaders.js";
 import { validateId } from "../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 
@@ -142,7 +143,7 @@ export async function onRequestGet(context) {
         past: all.filter(isPast).map(mapPerf),
       },
       200,
-      { "Cache-Control": "public, max-age=300" },
+      { "Cache-Control": CACHE_SHOW_CRITICAL },
     );
   } catch (error) {
     console.error("Error fetching venue:", error);

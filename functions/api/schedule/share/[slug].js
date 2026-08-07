@@ -42,17 +42,19 @@ export async function onRequestGet(context) {
     // only genuine preview views (SharePreviewPage, no flag) increment.
     const isImportRefetch = new URL(request.url).searchParams.get("import") === "1";
     if (!isImportRefetch) {
-      // Count PEOPLE, not fetches (#705). Two filters, in order:
+      // Count PEOPLE, not fetches (#705).
       //
-      //  1. Crawlers never count. Pasting a share link into iMessage, Slack,
-      //     WhatsApp or Twitter makes each service fetch the URL to build an
-      //     unfurl card, so sharing a route once could add several "views"
-      //     before a human opened it.
-      //  2. Humans count once per link, ever. The ledger insert is the guard:
-      //     view_count is incremented ONLY when INSERT OR IGNORE actually
-      //     created a row, so a reload is a no-op. Reading a count and then
-      //     writing would race under concurrent opens; letting the PRIMARY KEY
-      //     arbitrate makes the dedupe atomic.
+      // The inflation this fixes is RELOADS — the same person refreshing
+      // counted every time. Each human now counts once per link, ever: the
+      // ledger's PRIMARY KEY arbitrates, so a reload is a no-op. Reading a
+      // count and then writing would race under concurrent opens; letting the
+      // key decide makes the dedupe atomic.
+      //
+      // The crawler filter below is NOT what fixes the observed inflation —
+      // link-preview unfurlers fetch the HTML document /s/[slug], which does no
+      // counting, and cannot reach this JSON route because it is fetched after
+      // hydration. It guards only JS-rendering crawlers (Googlebot, Applebot).
+      // See functions/utils/visitorDedupe.js for the full reasoning.
       if (!isLikelyCrawler(request.headers.get("User-Agent"))) {
         try {
           const hash = await visitorHash(request, slug);
@@ -66,7 +68,19 @@ export async function onRequestGet(context) {
           // dependence on D1's `meta.changes` shape, where an undefined `meta`
           // would silently stop the counter forever.
           await DB.batch([
-            DB.prepare("INSERT OR IGNORE INTO share_link_views (slug, visitor_hash) VALUES (?, ?)").bind(slug, hash),
+            // The WHERE EXISTS is the FK guard this route cannot get for free.
+            // `_middleware.js` skips `PRAGMA foreign_keys = ON` for GET, so the
+            // declared FK is NOT enforced here — and the parent was SELECTed
+            // earlier in this request, so an expiry sweep landing in between
+            // would let an orphan commit. The cron cannot clean that up either:
+            // it deletes ledger rows by joining to slugs that still exist, so
+            // an orphan would be invisible to it forever. Re-checking the parent
+            // inside the same atomic batch closes the window without widening
+            // the middleware guard for every read path.
+            DB.prepare(
+              `INSERT OR IGNORE INTO share_link_views (slug, visitor_hash)
+               SELECT ?, ? WHERE EXISTS (SELECT 1 FROM share_links WHERE slug = ?)`,
+            ).bind(slug, hash, slug),
             DB.prepare(
               "UPDATE share_links SET view_count = (SELECT COUNT(*) FROM share_link_views WHERE slug = ?) WHERE slug = ?",
             ).bind(slug, slug),

@@ -1,13 +1,16 @@
 -- #705 — share_links.view_count counted fetches, not people.
 --
--- The old counter incremented on every non-import GET with no deduplication, so
--- it blended human reloads with link-preview crawlers (iMessage, Slack,
--- WhatsApp, Twitter, Facebook and friends each fetch the URL once to build an
--- unfurl card). Observed in production: 42 "views" for one person reloading a
--- preview during development.
+-- The old counter incremented on every non-import GET with no deduplication,
+-- so the same person refreshing a preview counted every time. Observed in
+-- production: 42 "views" from one developer reloading during development.
 --
--- Those numbers cannot be corrected — there is no recoverable ratio between
--- crawler hits and real visitors — so they are retired as a metric. They are
+-- Not crawlers, despite the obvious guess: link-preview unfurlers fetch the
+-- HTML document /s/[slug], which does no counting, and cannot reach the JSON
+-- endpoint that does (it is fetched by the React app after hydration). Reloads
+-- account for the inflation on their own.
+--
+-- Those numbers cannot be corrected — nothing distinguishes a reload from a
+-- distinct visitor after the fact — so they are retired as a metric. They are
 -- NOT destroyed: view_count_legacy preserves each row's pre-cutover value, so
 -- the decision stays reversible and the old figure is still auditable.
 --

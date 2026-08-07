@@ -2,9 +2,11 @@ import { describe, expect, test } from "vitest";
 import { onRequestGet } from "../share/[slug].js";
 import { createTestEnv, insertEvent, insertShareLink } from "../../test-utils.js";
 
-// RFC 5737 documentation IPs, and a UA that must NOT read as a crawler —
-// view counting is now visitor-scoped and crawler-filtered (#705), so a
-// request without these counts as a bot and records nothing.
+// RFC 5737 documentation IPs plus a realistic browser UA. These exist to make
+// the visitor hash DETERMINISTIC and distinct per test (#705) — not to dodge
+// bot classification. A request without them is still counted: isLikelyCrawler
+// treats a missing UA as a person, and visitorHash falls back to ip="unknown",
+// which would silently collapse every such visitor into one ledger row.
 const IP_A = "203.0.113.10";
 const IP_B = "203.0.113.11";
 const CHROME_UA =
@@ -120,6 +122,57 @@ describe("GET /api/schedule/share/[slug]", () => {
     // The ledger backs the count: one row per distinct visitor.
     const ledger = rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("view1234");
     expect(ledger.n).toBe(2);
+  });
+
+  test("never writes an orphan ledger row when the parent link is gone (#705)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
+    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    insertShareLink(rawDb, {
+      slug: "orphan01",
+      event_id: event.id,
+      event_slug: "my-fest",
+      performance_ids: [10],
+      band_names: ["Band A"],
+    });
+
+    // Production reality: `_middleware.js` skips PRAGMA foreign_keys = ON for
+    // GET, so the declared FK does NOT protect this insert. Reproduce that,
+    // or the FK would silently do the work and leave the guard untested.
+    rawDb.pragma("foreign_keys = OFF");
+
+    // The race must be INTERLEAVED. Deleting the parent before the request
+    // proves nothing — the handler's own SELECT would 404 and never reach the
+    // counter, so the test would pass for the wrong reason. The window is
+    // between that SELECT and the batch, so the expiry sweep is simulated by
+    // deleting at the moment batch() is invoked.
+    const realBatch = env.DB.batch.bind(env.DB);
+    const racingEnv = {
+      ...env,
+      DB: {
+        ...env.DB,
+        prepare: env.DB.prepare.bind(env.DB),
+        batch: (statements) => {
+          rawDb.prepare("DELETE FROM share_links WHERE slug = ?").run("orphan01");
+          return realBatch(statements);
+        },
+      },
+    };
+
+    // Must not throw — a counter concern never breaks share retrieval.
+    const res = await onRequestGet({
+      request: new Request("https://example.test/api/schedule/share/orphan01", {
+        headers: { "CF-Connecting-IP": IP_A, "User-Agent": CHROME_UA },
+      }),
+      params: { slug: "orphan01" },
+      env: racingEnv,
+    });
+    expect(res.status).toBe(200);
+
+    // An orphan here would be permanent: the expiry cron finds ledger rows by
+    // joining to slugs that still exist, so it could never sweep this one.
+    const orphans = rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("orphan01");
+    expect(orphans.n).toBe(0);
   });
 
   test("link-preview crawlers never count (#705)", async () => {

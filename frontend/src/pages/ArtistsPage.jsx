@@ -12,6 +12,7 @@ import {
   YouTubeIcon,
 } from '../components/ui/SocialIcons'
 import Footer from '../components/Footer'
+import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import { fetchPublicJson } from '../utils/publicApi'
 import { trackPageView, trackSocialClick } from '../utils/metrics'
@@ -69,7 +70,7 @@ function ArtistCard({ artist }) {
             src={artist.photo_url}
             alt=""
             loading="lazy"
-            className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-border"
+            className={`h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-border ${BAND_PHOTO_CROP}`}
           />
         ) : (
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent-500/20 text-2xl font-bold text-accent-400">

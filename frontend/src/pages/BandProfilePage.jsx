@@ -22,6 +22,7 @@ import {
 } from '../components/ui/SocialIcons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { renderMarkdownToSafeHtml, stripMarkdownToText } from '../utils/markdown'
+import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { Helmet } from 'react-helmet-async'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import BandFacts from '../components/BandFacts'
@@ -485,20 +486,35 @@ export default function BandProfilePage() {
               <img
                 src={profile.photo_url}
                 alt={profile.photo_alt_text || profile.name}
-                loading="lazy"
-                className="h-full w-full object-cover opacity-60"
+                // This hero is the first thing on the page, so it is the LCP
+                // element — lazy-loading it defers the very resource the metric
+                // measures and pops it in late on slow connections. Same call,
+                // and same reasoning, as EventPosterThumbnail's inline variant.
+                loading="eager"
+                fetchPriority="high"
+                className={`h-full w-full object-cover opacity-60 ${BAND_PHOTO_CROP}`}
               />
               <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent" />
               {/* Page-level action lives in the header, not beside the bio —
                   the old placement floated awkwardly above the bio on mobile
                   and forced an empty column on desktop (Dre, 2026-07-17). */}
               <div className="absolute right-4 top-4">
+                {/* Fixed light-on-dark, NOT the theme tokens ShareButton
+                    defaults to. This instance sits over the band photo's dark
+                    scrim, which does not change with the theme — so on the two
+                    light themes the default `text-text-primary` renders
+                    near-black on a dark photo and all but disappears. Same
+                    reasoning as the `text-white` <h1> below it: over a dark
+                    photo scrim, theme-independent is correct. The no-photo
+                    branch further down keeps the themed default, because there
+                    the button really does sit on the theme surface. */}
                 <ShareButton
                   url={
                     typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined
                   }
                   title={profile.name}
                   text={`${profile.name} on SetTimes`}
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/30 bg-black/50 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
                 />
               </div>
               <div className="absolute inset-x-0 bottom-0 p-6">

@@ -3,6 +3,7 @@ import PhotoUpload from './components/PhotoUpload'
 import RichTextEditor from './components/RichTextEditor'
 import { Input, Button, Tooltip } from '../components/ui'
 import Combobox from '../components/ui/Combobox'
+import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { Info } from 'lucide-react'
 import { FIELD_LIMITS } from '../utils/validation'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
@@ -122,7 +123,11 @@ export default function BandForm({
         {isSchedulingExisting ? (
           <div className="sm:col-span-2 bg-white/5 border border-white/10 rounded-lg p-4 flex items-center gap-4 mb-2">
             {selectedProfile.photo_url ? (
-              <img src={selectedProfile.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
+              <img
+                src={selectedProfile.photo_url}
+                alt=""
+                className={`w-16 h-16 rounded-full object-cover ${BAND_PHOTO_CROP}`}
+              />
             ) : (
               <div className="w-16 h-16 rounded-full bg-accent-500/20 flex items-center justify-center text-accent-400 text-xl font-bold">
                 {selectedProfile.name.charAt(0)}

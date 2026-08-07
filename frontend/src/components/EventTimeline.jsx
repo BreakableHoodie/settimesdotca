@@ -15,6 +15,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition 
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
+import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { buildDirectionsHref } from '../utils/directions'
 import { formatPerformanceDayLabel, formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
@@ -574,7 +575,7 @@ function GenreDiscovery({ bands, eventSlug, eventDate }) {
                         <img
                           src={band.photo_url}
                           alt={band.name}
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full object-cover ${BAND_PHOTO_CROP}`}
                           loading="lazy"
                         />
                       ) : (
@@ -993,7 +994,7 @@ function EventCard({
                             <img
                               src={band.photo_url}
                               alt={band.name}
-                              className="w-full h-full object-cover"
+                              className={`w-full h-full object-cover ${BAND_PHOTO_CROP}`}
                               loading="lazy"
                             />
                           </div>

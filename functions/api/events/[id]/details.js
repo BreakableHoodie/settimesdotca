@@ -1,4 +1,5 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
+import { CACHE_SHOW_CRITICAL } from "../../../utils/cacheHeaders.js";
 import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
 
 /**
@@ -159,7 +160,7 @@ export async function onRequestGet(context) {
         status: 200,
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=300",
+          "Cache-Control": CACHE_SHOW_CRITICAL,
         },
       },
     );

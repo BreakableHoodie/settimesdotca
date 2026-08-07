@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
+import { BAND_PHOTO_CROP } from '../../utils/bandPhoto'
 
 export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel, loading = false, venues = [] }) {
   const [query, setQuery] = useState('')
@@ -96,7 +97,7 @@ export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel
                   <img
                     src={artist.photo_url}
                     alt=""
-                    className="w-9 h-9 rounded-full object-cover bg-white/10 shrink-0"
+                    className={`w-9 h-9 rounded-full object-cover bg-white/10 shrink-0 ${BAND_PHOTO_CROP}`}
                   />
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-accent-500/20 flex items-center justify-center text-accent-400 font-bold shrink-0">

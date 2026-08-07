@@ -720,9 +720,13 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     await screen.findAllByText('Band A')
 
     // Select all 3 bands (no filter)
-    const selectAllCheckbox = screen
-      .getAllByRole('checkbox')
-      .find(cb => cb.parentElement.parentElement === screen.getAllByRole('row')[0])
+    // Query by accessible name rather than walking the DOM to the header row:
+    // a structural walk silently yields undefined when the markup shifts (a
+    // wrapper div was enough to break it), and fireEvent then fails with
+    // "please provide a DOM element" instead of naming the real problem. The
+    // mobile card list's select-all is named "Select all", so this is
+    // unambiguous.
+    const selectAllCheckbox = screen.getByRole('checkbox', { name: 'Select all visible artists' })
     fireEvent.click(selectAllCheckbox)
     expect(screen.getAllByText(/3 selected/)).toBeDefined()
 
@@ -805,9 +809,13 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     await screen.findAllByText('Band A')
 
     // Select all 3
-    const selectAllCheckbox = screen
-      .getAllByRole('checkbox')
-      .find(cb => cb.parentElement.parentElement === screen.getAllByRole('row')[0])
+    // Query by accessible name rather than walking the DOM to the header row:
+    // a structural walk silently yields undefined when the markup shifts (a
+    // wrapper div was enough to break it), and fireEvent then fails with
+    // "please provide a DOM element" instead of naming the real problem. The
+    // mobile card list's select-all is named "Select all", so this is
+    // unambiguous.
+    const selectAllCheckbox = screen.getByRole('checkbox', { name: 'Select all visible artists' })
     fireEvent.click(selectAllCheckbox)
 
     // Apply filter that hides 1 row
@@ -828,9 +836,13 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     await screen.findAllByText('Band A')
 
     // Select all 3
-    const selectAllCheckbox = screen
-      .getAllByRole('checkbox')
-      .find(cb => cb.parentElement.parentElement === screen.getAllByRole('row')[0])
+    // Query by accessible name rather than walking the DOM to the header row:
+    // a structural walk silently yields undefined when the markup shifts (a
+    // wrapper div was enough to break it), and fireEvent then fails with
+    // "please provide a DOM element" instead of naming the real problem. The
+    // mobile card list's select-all is named "Select all", so this is
+    // unambiguous.
+    const selectAllCheckbox = screen.getByRole('checkbox', { name: 'Select all visible artists' })
     fireEvent.click(selectAllCheckbox)
 
     // Apply filter
@@ -979,5 +991,113 @@ describe('RosterTab — mobile Filters button', () => {
 
     // Assert no duplicates: Set size must equal array length
     expect(ids.length).toBe(new Set(ids).size)
+  })
+})
+
+// #772 — the desktop table's intrinsic width exceeds the container, so it
+// scrolls horizontally. Without pinning, scrolling right to reach Actions
+// takes Name out of view -- a row with a live Delete button and no visible
+// artist name. `getByRole('columnheader'/'row')` only matches the desktop
+// <table> (the mobile branch is div-based with no table roles), so these
+// selectors are unambiguous without the getAllBy*/queryAllBy* workaround
+// the rest of this file needs.
+describe('RosterTab — sticky identity + actions columns (#772)', () => {
+  it('pins the Name header to the right of the checkbox column (left-12) and Actions to the right edge', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND, INACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    const nameHeader = screen.getByRole('columnheader', { name: /^Name/ })
+    expect(nameHeader.className).toMatch(/\bsticky\b/)
+    expect(nameHeader.className).toMatch(/\bleft-12\b/)
+    expect(nameHeader.className).not.toMatch(/\bleft-0\b/)
+
+    const actionsHeader = screen.getByRole('columnheader', { name: 'Actions' })
+    expect(actionsHeader.className).toMatch(/\bsticky\b/)
+    expect(actionsHeader.className).toMatch(/\bright-0\b/)
+  })
+
+  it('readOnly: Name sticks to the left edge (left-0) since there is no checkbox column, and Actions is absent', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} readOnly />)
+    await screen.findAllByText('Active Aardvarks')
+
+    // No checkbox column in read-only mode -- Name is the first column.
+    const headerRow = screen.getAllByRole('row')[0]
+    expect(headerRow.querySelector('input[type="checkbox"]')).toBeNull()
+
+    const nameHeader = screen.getByRole('columnheader', { name: /^Name/ })
+    expect(nameHeader.className).toMatch(/\bsticky\b/)
+    expect(nameHeader.className).toMatch(/\bleft-0\b/)
+    expect(nameHeader.className).not.toMatch(/\bleft-12\b/)
+
+    // Actions only renders when !readOnly.
+    expect(screen.queryByRole('columnheader', { name: 'Actions' })).toBeNull()
+  })
+
+  it('gives the body Name cell a sticky, opaque background so the artist stays identifiable while scrolled', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    // The mobile card list renders a same-named link too -- narrow to the
+    // one living inside a <td> (the desktop table).
+    const nameLink = screen
+      .getAllByRole('link', { name: 'Active Aardvarks' })
+      .map(el => el.closest('td'))
+      .find(Boolean)
+    expect(nameLink).not.toBeNull()
+    expect(nameLink.className).toMatch(/\bsticky\b/)
+    expect(nameLink.className).toMatch(/\bleft-12\b/)
+    expect(nameLink.className).toMatch(/\bbg-bg-purple\b/)
+  })
+
+  it('gives the body Actions cell a sticky right-0 position, and moves the flex layout off the <td> onto an inner wrapper', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    const actionsCell = screen
+      .getAllByRole('button', { name: 'Edit' })
+      .map(el => el.closest('td'))
+      .find(Boolean)
+    expect(actionsCell).not.toBeNull()
+    expect(actionsCell.className).toMatch(/\bsticky\b/)
+    expect(actionsCell.className).toMatch(/\bright-0\b/)
+    // The <td> itself must NOT carry `flex` -- that was the bug (#772):
+    // display:flex on a <td> drops it out of the table layout algorithm and
+    // fights sticky positioning. The flex wrapper is an inner <div> instead.
+    expect(actionsCell.className).not.toMatch(/(?:^|\s)flex(?:\s|$)/)
+    // Walk children directly rather than querySelector(':scope > …') — :scope
+    // support varies across DOM implementations, and this asserts the same
+    // thing without depending on it.
+    const flexWrapper = Array.from(actionsCell.children).find(
+      child => child.tagName === 'DIV' && child.classList.contains('flex')
+    )
+    expect(flexWrapper).toBeDefined()
+  })
+
+  // Sticky cells are opaque (bg-bg-purple) so scrolled content can't show
+  // through, which means the row's own translucent hover/selected
+  // background-color can't just paint on the cell directly -- the fix
+  // splits it onto a `before:` pseudo-element tint layer instead. This
+  // proves the selected half of that split actually toggles per-row.
+  it('the sticky Name cell carries the selected-tint class only once its row is selected', async () => {
+    bandsApi.getAll.mockResolvedValue({ bands: [ACTIVE_BAND] })
+    render(<RosterTab showToast={vi.fn()} />)
+    await screen.findAllByText('Active Aardvarks')
+
+    const getNameCell = () =>
+      screen
+        .getAllByRole('link', { name: 'Active Aardvarks' })
+        .map(el => el.closest('td'))
+        .find(Boolean)
+
+    expect(getNameCell().className).not.toMatch(/before:bg-blue-900\/30/)
+
+    const bodyRow = screen.getAllByRole('row').find(r => r.textContent.includes('Active Aardvarks'))
+    fireEvent.click(bodyRow.querySelector('input[type="checkbox"]'))
+
+    expect(getNameCell().className).toMatch(/before:bg-blue-900\/30/)
   })
 })

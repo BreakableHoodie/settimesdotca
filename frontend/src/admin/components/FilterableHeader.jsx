@@ -51,11 +51,22 @@ export default function FilterableHeader({
   onToggleFilter,
   triggerRef,
   renderColumnFilterPanel,
+  stickyClassName = '',
 }) {
+  // Sticky columns (Name, pinned to the left edge of the roster's horizontal
+  // scroll container -- #772) need `position: sticky` plus an opaque
+  // background and z-index instead of the default `relative` (which exists
+  // only to anchor the filter dropdown panel below). `sticky` is itself a
+  // valid containing block for the panel's `absolute` positioning, so this
+  // is a full replacement, never both at once -- stacking two `position`
+  // utilities on one element leaves the winner to Tailwind's internal class
+  // ordering rather than source order, and if `relative` won the column
+  // would silently stop sticking.
+  const positionClassName = stickyClassName || 'relative'
   const thClassName =
     align === 'right'
-      ? 'relative px-4 py-3 text-right text-white font-semibold whitespace-nowrap align-middle'
-      : 'relative px-4 py-3 text-left text-white font-semibold whitespace-nowrap align-middle'
+      ? `${positionClassName} px-3 py-3 text-right text-white font-semibold whitespace-nowrap align-middle`
+      : `${positionClassName} px-3 py-3 text-left text-white font-semibold whitespace-nowrap align-middle`
   const wrapperClassName = align === 'right' ? 'flex items-center justify-end gap-1' : 'flex items-center gap-1'
 
   return (
@@ -92,4 +103,5 @@ FilterableHeader.propTypes = {
   onToggleFilter: PropTypes.func.isRequired,
   triggerRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
   renderColumnFilterPanel: PropTypes.func.isRequired,
+  stickyClassName: PropTypes.string,
 }

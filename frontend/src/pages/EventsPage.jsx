@@ -80,20 +80,31 @@ export default function EventsPage() {
               <span className="text-accent-500">Set</span>Times
             </h1>
             <p className="text-lg text-accent-400">Discover · Plan · Experience</p>
-            <Link
-              to="/artists"
-              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent-400 transition-colors hover:text-accent-300"
-            >
-              <Users size={15} aria-hidden="true" /> Browse all artists
-              <ArrowRight size={12} aria-hidden="true" />
-            </Link>
-            <Link
-              to="/venues"
-              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent-400 transition-colors hover:text-accent-300"
-            >
-              <MapPin size={15} aria-hidden="true" /> Browse venues
-              <ArrowRight size={12} aria-hidden="true" />
-            </Link>
+            {/* One flex row owning the space BETWEEN the links, rather than two
+                inline-flex siblings separated only by collapsed JSX whitespace.
+                That whitespace is a single space (~4px) while each link's own
+                gap-1.5 is 6px — so the space between the groups was smaller
+                than the space inside them, and the first link's arrow read as
+                belonging to the second link's pin. gap-x-5 (20px) puts the
+                grouping the right way round. flex-wrap + gap-y keeps them
+                readable if they wrap on a narrow screen, which the old inline
+                layout handled badly (mt-3 applied to each link separately). */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <Link
+                to="/artists"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-400 transition-colors hover:text-accent-300"
+              >
+                <Users size={15} aria-hidden="true" /> Browse all artists
+                <ArrowRight size={12} aria-hidden="true" />
+              </Link>
+              <Link
+                to="/venues"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-400 transition-colors hover:text-accent-300"
+              >
+                <MapPin size={15} aria-hidden="true" /> Browse venues
+                <ArrowRight size={12} aria-hidden="true" />
+              </Link>
+            </div>
           </div>
           <ThemeToggle />
         </div>

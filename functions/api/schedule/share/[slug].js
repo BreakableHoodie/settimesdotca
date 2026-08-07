@@ -1,6 +1,8 @@
 // Public API: Fetch a schedule share link snapshot
 // GET /api/schedule/share/[slug]
 
+import { isLikelyCrawler, visitorHash } from "../../../utils/visitorDedupe.js";
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -40,10 +42,32 @@ export async function onRequestGet(context) {
     // only genuine preview views (SharePreviewPage, no flag) increment.
     const isImportRefetch = new URL(request.url).searchParams.get("import") === "1";
     if (!isImportRefetch) {
-      try {
-        await DB.prepare("UPDATE share_links SET view_count = view_count + 1 WHERE slug = ?").bind(slug).run();
-      } catch (err) {
-        console.error("Share link view-count increment failed:", slug, err);
+      // Count PEOPLE, not fetches (#705). Two filters, in order:
+      //
+      //  1. Crawlers never count. Pasting a share link into iMessage, Slack,
+      //     WhatsApp or Twitter makes each service fetch the URL to build an
+      //     unfurl card, so sharing a route once could add several "views"
+      //     before a human opened it.
+      //  2. Humans count once per link, ever. The ledger insert is the guard:
+      //     view_count is incremented ONLY when INSERT OR IGNORE actually
+      //     created a row, so a reload is a no-op. Reading a count and then
+      //     writing would race under concurrent opens; letting the PRIMARY KEY
+      //     arbitrate makes the dedupe atomic.
+      if (!isLikelyCrawler(request.headers.get("User-Agent"))) {
+        try {
+          const hash = await visitorHash(request, slug);
+          const insert = await DB.prepare("INSERT OR IGNORE INTO share_link_views (slug, visitor_hash) VALUES (?, ?)")
+            .bind(slug, hash)
+            .run();
+          if (insert.meta?.changes > 0) {
+            await DB.prepare("UPDATE share_links SET view_count = view_count + 1 WHERE slug = ?").bind(slug).run();
+          }
+        } catch (err) {
+          // Best-effort, same discipline as before: a counter failure must
+          // never break share retrieval. Logged, not swallowed, so a broken
+          // ledger surfaces instead of silently zeroing the metric.
+          console.error("Share link view-count increment failed:", slug, err);
+        }
       }
     } else {
       // Best-effort import counter (#703) — same discipline as the view counter

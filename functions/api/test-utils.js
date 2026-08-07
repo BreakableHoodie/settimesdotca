@@ -372,7 +372,20 @@ export function createTestDB() {
       created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
       expires_at      TEXT    NOT NULL,
       view_count      INTEGER NOT NULL DEFAULT 0,
-      import_count    INTEGER NOT NULL DEFAULT 0
+      import_count    INTEGER NOT NULL DEFAULT 0,
+      -- Pre-#705 counts, preserved at the dedupe cutover (migration 0058).
+      view_count_legacy INTEGER
+    );
+
+    -- One row per (share link, visitor). view_count is incremented only when an
+    -- INSERT OR IGNORE here actually creates a row, which is what makes it
+    -- unique-visitors rather than fetches (#705, migration 0058).
+    CREATE TABLE share_link_views (
+      slug         TEXT NOT NULL,
+      visitor_hash TEXT NOT NULL,
+      first_seen   TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (slug, visitor_hash),
+      FOREIGN KEY (slug) REFERENCES share_links(slug) ON DELETE CASCADE
     );
   `);
 

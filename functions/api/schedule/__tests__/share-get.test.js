@@ -2,6 +2,24 @@ import { describe, expect, test } from "vitest";
 import { onRequestGet } from "../share/[slug].js";
 import { createTestEnv, insertEvent, insertShareLink } from "../../test-utils.js";
 
+// RFC 5737 documentation IPs, and a UA that must NOT read as a crawler —
+// view counting is now visitor-scoped and crawler-filtered (#705), so a
+// request without these counts as a bot and records nothing.
+const IP_A = "203.0.113.10";
+const IP_B = "203.0.113.11";
+const CHROME_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+function callAsVisitor(env, slug, ip, userAgent) {
+  return onRequestGet({
+    request: new Request(`https://example.test/api/schedule/share/${slug}`, {
+      headers: { "CF-Connecting-IP": ip, "User-Agent": userAgent },
+    }),
+    params: { slug },
+    env,
+  });
+}
+
 describe("GET /api/schedule/share/[slug]", () => {
   function makeRequest(slug) {
     return new Request(`https://example.test/api/schedule/share/${slug}`);
@@ -73,7 +91,7 @@ describe("GET /api/schedule/share/[slug]", () => {
     expect(res.status).toBe(400);
   });
 
-  test("increments view_count each time the share link is fetched", async () => {
+  test("counts one view per visitor, not one per fetch (#705)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
     rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
@@ -85,18 +103,55 @@ describe("GET /api/schedule/share/[slug]", () => {
       band_names: ["Band A"],
     });
 
-    const call = () =>
-      onRequestGet({
-        request: makeRequest("view1234"),
-        params: { slug: "view1234" },
-        env,
-      });
+    // Same person reloading. This used to record 2 — the bug that made one
+    // developer refreshing a preview read as 42 "views".
+    await callAsVisitor(env, "view1234", IP_A, CHROME_UA);
+    await callAsVisitor(env, "view1234", IP_A, CHROME_UA);
 
-    await call();
-    await call();
+    let row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("view1234");
+    expect(row.view_count).toBe(1);
 
-    const row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("view1234");
+    // A genuinely different visitor still counts, so the dedupe cannot be
+    // satisfied by simply never incrementing.
+    await callAsVisitor(env, "view1234", IP_B, CHROME_UA);
+    row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("view1234");
     expect(row.view_count).toBe(2);
+
+    // The ledger backs the count: one row per distinct visitor.
+    const ledger = rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("view1234");
+    expect(ledger.n).toBe(2);
+  });
+
+  test("link-preview crawlers never count (#705)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
+    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    insertShareLink(rawDb, {
+      slug: "crawler1",
+      event_id: event.id,
+      event_slug: "my-fest",
+      performance_ids: [10],
+      band_names: ["Band A"],
+    });
+
+    // Pasting a link into iMessage/Slack/WhatsApp/Twitter makes each service
+    // fetch it once to build an unfurl card. None of them is a fan.
+    for (const ua of [
+      "facebookexternalhit/1.1",
+      "Twitterbot/1.0",
+      "Slackbot-LinkExpanding 1.0",
+      "WhatsApp/2.23.20.0",
+    ]) {
+      const res = await callAsVisitor(env, "crawler1", IP_A, ua);
+      // Crawlers must still receive the snapshot — the unfurl card depends on
+      // it. They just must not be counted.
+      expect(res.status).toBe(200);
+    }
+
+    const row = rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("crawler1");
+    expect(row.view_count).toBe(0);
+    const ledger = rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("crawler1");
+    expect(ledger.n).toBe(0);
   });
 
   test("does not increment view_count for an import refetch (?import=1)", async () => {
@@ -164,11 +219,9 @@ describe("GET /api/schedule/share/[slug]", () => {
       band_names: ["Band A"],
     });
 
-    await onRequestGet({
-      request: makeRequest("normal01"),
-      params: { slug: "normal01" },
-      env,
-    });
+    // Must present as a real visitor: since #705 a UA-less request is treated
+    // as a crawler and counts nothing.
+    await callAsVisitor(env, "normal01", IP_A, CHROME_UA);
 
     const row = rawDb.prepare("SELECT view_count, import_count FROM share_links WHERE slug = ?").get("normal01");
     expect(row.view_count).toBe(1);

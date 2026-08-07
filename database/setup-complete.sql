@@ -425,7 +425,7 @@ CREATE TABLE IF NOT EXISTS share_links (
   band_names      TEXT    NOT NULL,
   created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
   expires_at      TEXT    NOT NULL
-, view_count INTEGER NOT NULL DEFAULT 0, import_count INTEGER NOT NULL DEFAULT 0);
+, view_count INTEGER NOT NULL DEFAULT 0, import_count INTEGER NOT NULL DEFAULT 0, view_count_legacy INTEGER);
 
 CREATE INDEX IF NOT EXISTS idx_share_links_slug ON share_links(slug);
 
@@ -497,6 +497,19 @@ CREATE TABLE IF NOT EXISTS event_daily_stats (
 );
 
 CREATE INDEX IF NOT EXISTS idx_event_daily_stats_date ON event_daily_stats(date);
+
+CREATE TABLE IF NOT EXISTS share_link_views (
+  slug         TEXT NOT NULL,
+  visitor_hash TEXT NOT NULL,
+  -- datetime('now') yields 'YYYY-MM-DD HH:MM:SS' (space separator). Do not
+  -- store a JS toISOString() value here — the T separator breaks string
+  -- comparisons against datetime('now'), the SEC-F1 bug class in CLAUDE.md.
+  first_seen   TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (slug, visitor_hash),
+  FOREIGN KEY (slug) REFERENCES share_links(slug) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_share_link_views_slug ON share_link_views(slug);
 
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)

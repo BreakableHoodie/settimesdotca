@@ -261,6 +261,10 @@ function LiveContextBar({
     if (lifecycle.label !== 'Upcoming' || !eventData?.date) return null
     const eventDateObj = new Date(eventData.date + 'T00:00:00')
     const nowDate = currentTime instanceof Date ? currentTime : new Date(+currentTime)
+    // Safe across DST despite the raw division below (#768): the LOCAL Y/M/D
+    // fields are read first, then reprojected through Date.UTC — a UTC day is
+    // always exactly 86,400,000ms by definition, so the subtraction is exact
+    // and never sees the 23h/25h local-day variation a DST transition causes.
     const eventDay = Date.UTC(eventDateObj.getFullYear(), eventDateObj.getMonth(), eventDateObj.getDate())
     const todayDay = Date.UTC(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate())
     return Math.ceil((eventDay - todayDay) / 86400000)

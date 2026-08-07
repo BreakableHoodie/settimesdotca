@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  addLocalDays,
   dayNumberByDate,
   dayNumberMapFromDays,
   formatFestivalDate,
@@ -218,5 +219,86 @@ describe('isMultiDay', () => {
 
   it('is false for empty input', () => {
     expect(isMultiDay([])).toBe(false)
+  })
+})
+
+// #768: addLocalDays must advance the LOCAL CALENDAR DATE, not a fixed
+// 86,400,000ms — a local day is 23h/25h across a DST transition, so a flat
+// millisecond add lands on the wrong wall-clock time (and sometimes the
+// wrong calendar date). These tests pin process.env.TZ to America/Toronto
+// so the DST assertions are deterministic regardless of the machine/CI TZ —
+// this repo has no prior TZ-pinning convention for tests, so the pin is
+// scoped to this describe block and restored afterward rather than added
+// globally to src/test/setup.js.
+describe('addLocalDays (#768 — DST-safe day offset)', () => {
+  let originalTz
+
+  beforeAll(() => {
+    originalTz = process.env.TZ
+    process.env.TZ = 'America/Toronto'
+  })
+
+  afterAll(() => {
+    // process.env coerces to string, so assigning an undefined originalTz
+    // would leave the literal 'undefined' as the TZ for every later test in
+    // this process — an invalid zone, on exactly the machines that don't set
+    // TZ (CI). Delete the key instead of assigning it back.
+    if (originalTz === undefined) delete process.env.TZ
+    else process.env.TZ = originalTz
+  })
+
+  it('is a no-op-equivalent to +24h on an ordinary (non-transition) date — no regression to the 99% case', () => {
+    const ms = Date.parse('2026-08-02T01:00:00')
+    const DAY_MS = 24 * 60 * 60 * 1000
+    expect(addLocalDays(ms, 1)).toBe(ms + DAY_MS)
+  })
+
+  it('fall back (2026-11-01): keeps 00:25 wall-clock time and lands on the correct next calendar day', () => {
+    // Toronto falls back 02:00 EDT -> 01:00 EST on 2026-11-01. A 00:25 set
+    // belonging to the Nov 1 evening lineup must land Nov 2 00:25 EST — the
+    // fixed +24h add instead produces Nov 1 23:25 EST (wrong hour AND wrong
+    // calendar day; asserted as the "broken" comparison below).
+    const startMs = Date.parse('2026-11-01T00:25:00')
+    const result = addLocalDays(startMs, 1)
+
+    expect(new Date(result).toString()).toContain('Nov 02 2026 00:25:00')
+    expect(new Date(result).toString()).toContain('GMT-0500')
+
+    const broken = startMs + 24 * 60 * 60 * 1000
+    expect(result).not.toBe(broken)
+  })
+
+  it('spring forward (2027-03-14): keeps 00:25 wall-clock time and lands on the correct next calendar day', () => {
+    // Toronto springs forward 02:00 EST -> 03:00 EDT on 2027-03-14. A 00:25 set
+    // belonging to the Mar 14 evening lineup must land Mar 15 00:25 EDT — the
+    // fixed +24h add instead produces Mar 15 01:25 EDT (wrong hour).
+    const startMs = Date.parse('2027-03-14T00:25:00')
+    const result = addLocalDays(startMs, 1)
+
+    expect(new Date(result).toString()).toContain('Mar 15 2027 00:25:00')
+    expect(new Date(result).toString()).toContain('GMT-0400')
+
+    const broken = startMs + 24 * 60 * 60 * 1000
+    expect(result).not.toBe(broken)
+  })
+
+  it('non-existent local time edge: stepping into the spring-forward gap normalizes forward by the gap size (intentional)', () => {
+    // 2027-03-13 02:30 is an ordinary after-midnight set (belongs to the Mar 13
+    // evening lineup, before the transition). Advancing it by one local
+    // calendar day lands on 2027-03-14 02:30 — a wall-clock time that never
+    // occurs, because Toronto's clocks jump straight from 02:00 to 03:00 that
+    // night. setDate() normalizes this forward by the size of the gap (to
+    // 03:30 EDT) rather than throwing, matching how the wall clock itself
+    // behaves that night. This is deliberately pinned as correct, not left as
+    // incidental engine behavior (#768).
+    const startMs = Date.parse('2027-03-13T02:30:00')
+    const result = addLocalDays(startMs, 1)
+
+    expect(new Date(result).toString()).toContain('Mar 14 2027 03:30:00')
+    expect(new Date(result).toString()).toContain('GMT-0400')
+
+    // Sanity: matches direct construction of the same nonexistent local time.
+    const direct = new Date(2027, 2, 14, 2, 30, 0)
+    expect(result).toBe(direct.getTime())
   })
 })

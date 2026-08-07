@@ -76,6 +76,12 @@ export function formatPerformanceDayLabel(performance) {
     return dateLabel
   }
 
+  // Math.round (not Math.floor, not a bare division) is load-bearing: across a
+  // DST transition the true elapsed time between two local midnights is 23h or
+  // 25h, not exactly MS_PER_DAY, so the raw quotient drifts by a fraction of a
+  // day. Rounding absorbs that fraction; it would take roughly a dozen
+  // *accumulated* transitions in one event to flip the rounding, and no
+  // festival spans anywhere close to that (#768).
   const dayOffset = Math.round((perfDay.getTime() - eventStart.getTime()) / MS_PER_DAY)
   const dayNumber = dayOffset + 1
 

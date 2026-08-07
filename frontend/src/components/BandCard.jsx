@@ -2,6 +2,7 @@ import { CalendarDays, Plus, TriangleAlert, X, Zap } from 'lucide-react'
 import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
+import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { getTimeDescription, isHappeningNow, isStartingSoon } from '../utils/timeFilter'
 import { formatTime } from '../utils/timeFormat'
 
@@ -95,7 +96,7 @@ function BandCard({
             src={band.photo_url}
             alt=""
             loading="lazy"
-            className={`h-16 w-16 rounded-full object-cover ring-2 ${onAmber ? 'ring-bg-navy/20' : 'ring-border'}`}
+            className={`h-16 w-16 rounded-full object-cover ring-2 ${BAND_PHOTO_CROP} ${onAmber ? 'ring-bg-navy/20' : 'ring-border'}`}
           />
         )}
         {startingSoon && (

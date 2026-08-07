@@ -1,4 +1,5 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+import { CACHE_SHOW_CRITICAL } from "../../utils/cacheHeaders.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
 import { eventLocalToday, eventLocalFestivalToday, eventLocalClock } from "../../utils/eventDay.js";
 
@@ -528,7 +529,7 @@ export async function onRequestGet(context) {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+        "Cache-Control": CACHE_SHOW_CRITICAL,
       },
     });
   } catch (error) {

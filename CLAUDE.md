@@ -33,6 +33,27 @@ The mechanical form is usually one grep. "Which files select `p.start_time` but 
 
 Prefer a durable guard over a repeat audit: a source-scanning test (as `bandFields.test.js` does for Tailwind class literals) collapses a whole bug class into one failing test.
 
+### The efficiency ladder — before you write
+
+Adapted from the [ponytail](https://github.com/DietrichGebert/ponytail) ruleset. Before writing code, stop at the first rung that applies:
+
+1. **YAGNI** — does this need to exist at all?
+2. **Reuse** — does it already exist here? (`functions/utils/`, `frontend/src/utils/`, the `bandFields.js` registry, `prepareBands`)
+3. **Standard library / platform** — does JS, Web Crypto, or D1 already do it? (see the PBKDF2 and TOTP invariants — this repo has repeatedly chosen the platform primitive over a dependency)
+4. **Existing dependency** — does something already in `package.json` solve it?
+5. **One line** — can it be one line?
+6. **Minimum working code** — only then.
+
+Deletion over addition. Boring over clever. Fewest files that work.
+
+**The ladder runs after you understand the problem, not instead of it.** Trace the real flow end-to-end first. A short diff that patches a symptom is worse than a longer one that fixes the cause — the ladder ranks *solutions to the actual problem*; it does not rank problems by how cheap they are to make disappear. It defers to the debugging discipline, always.
+
+**The ladder governs the fix. It does not govern the sweep.** The sibling sweep and its durable guard test are *requested work* — part of the definition of done for any bug fix — never speculative additions for rung 1 to eliminate. And on the merits: one source-scanning test that retires a bug class permanently is less total work than re-running that sweep by hand on every future PR. **The guard is the lazy option**, not the expensive one.
+
+Never be lazy about understanding, input validation, error handling that prevents data loss, security, accessibility, theme-token correctness, or anything explicitly asked for.
+
+> Adopted as doctrine only — the ponytail plugin itself was evaluated and **not installed** (2026-08-06). Its hard rules ("no boilerplate that wasn't asked for", "shortest working diff wins") cut against the sweep discipline above, and its benchmark is n=4 on Haiku 4.5. Take the ladder, skip the installation; don't re-litigate.
+
 ---
 
 ## Agent Delegation Workflow (standing default)

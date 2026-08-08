@@ -194,6 +194,22 @@ Use `document.title = pageTitle` directly in a `useEffect` within the page compo
 
 Example: `frontend/src/pages/BandProfilePage.jsx` — uses both `<Helmet>` (for other meta) and `document.title = ...` for the title.
 
+### `<Helmet>` APPENDS meta tags — it never replaces the ones baked into `index.html`
+
+Helmet only manages tags it created itself. Any `<meta>` hardcoded in `frontend/index.html` is invisible to it, so a page declaring its own `og:url` ends up with **two** tags in the rendered DOM: the homepage default first, the page-specific one second.
+
+**Duplication is harmless when the two values AGREE, and fatal when they disagree.** `/band/199` renders `canonical` twice — both `https://settimes.ca/band/199` — and Google is fine with it. The statically-routed pages disagreed: `index.html` claims `og:url="https://settimes.ca/"` on every page, so `/artists` simultaneously declared canonical `/artists` and `og:url` = homepage. Google reads `og:url` as a canonicalization hint, prefers the first tag, and overrode our canonical — surfacing in Search Console as **"Duplicate, Google chose different canonical than user."** All nine static-routed pages also served a byte-identical 4217-byte shell, reinforcing the duplicate cluster.
+
+The fix is server-side, never client-side: `serveWithInjectedMeta()` (`functions/utils/ssrMeta.js`) strips the homepage defaults via `DEFAULT_META_RE` *before* injecting page-specific tags, so exactly one of each reaches the crawler.
+
+- **Every indexable route needs a Pages Function that injects its own meta.** `/event/*`, `/band/*`, `/venue/*` have always had one; the eight static pages now go through the `STATIC_PAGES` registry in `functions/utils/staticPageMeta.js`, with one 2-line route file each. `/events/*/recap` (the archive recap page, distinct from singular `/event/*`) is D1-backed like `/event/*`/`/band/*`/`/venue/*` rather than registry-driven — `functions/events/[slug]/recap.js` — because its title/description embed per-event stats (`total_sets`, `venue_count`) a static registry entry can't express.
+- **Registry values must stay verbatim-identical to the page's own `<Helmet>`** — that agreement is what makes the post-hydration duplicate harmless. Changing copy in a page component without updating the registry re-creates the bug.
+- **`/` is deliberately excluded.** `index.html`'s baked-in defaults *are* the homepage's correct meta, and EventsPage's Helmet canonical already matches.
+- **Build every URL from `CANONICAL_HOST`, never `request.url`** — preview deploys must not self-canonicalise.
+- **`_routes.json` `exclude` beats `include`.** A path listed in both never reaches its Function, and the page silently regresses to the shared shell. The guard test in `functions/__tests__/staticPageMeta.test.js` scans `_routes.json` and fails if an included path lacks either a route file or a registry entry.
+
+Mocked unit tests prove the handler *builds* correct HTML; they cannot prove Cloudflare *dispatches* to it. Verify routing changes against a real `npx wrangler pages dev --port 8788` and diff the tag counts per path.
+
 ---
 
 ## Theming

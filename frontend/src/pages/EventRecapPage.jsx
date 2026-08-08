@@ -167,6 +167,8 @@ export default function EventRecapPage() {
           name="description"
           content={`Recap for ${event.name} on ${formattedDate}. ${stats.total_sets ?? 0} sets across ${stats.venue_count ?? 0} venues.`}
         />
+        <link rel="canonical" href={`https://settimes.ca/events/${event.slug}/recap`} />
+        <meta property="og:url" content={`https://settimes.ca/events/${event.slug}/recap`} />
       </Helmet>
 
       <main id="main-content" className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple px-4 py-10">

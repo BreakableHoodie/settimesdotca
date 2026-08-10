@@ -106,6 +106,16 @@ export function toPlainText(rawInput, maxLength = 200) {
 // the longer one, so truncate(truncate(t, 5000), 200) === truncate(t, 200).
 // Expects text that is already stripped and whitespace-collapsed.
 export function truncatePlainText(text, maxLength) {
+  // Clamp rather than throw. `slice(0, maxLength - 1)` turns a maxLength of 0
+  // into slice(0, -1), which drops one char and appends an ellipsis -- so
+  // truncatePlainText("abc", 0) returned "ab…", LONGER than the limit asked for
+  // (#798 review; the same latent defect lived in toPlainText before this
+  // function was split out of it). No caller passes a non-positive length, but
+  // this is an exported helper, so it has to be total. A throw would be wrong
+  // here specifically: band/[id].js calls this outside any try block, so a
+  // RangeError would escape onRequest as a 500 rather than degrading to the SPA
+  // shell -- the opposite of this module's stated fallback contract.
+  if (!(maxLength > 0)) return "";
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1).trimEnd()}…`;
 }

@@ -170,17 +170,13 @@ export default function ArtistsPage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
+      {/* Identity meta (canonical/og:* /description) is SSR-owned for this route
+          -- functions/utils/staticPageMeta.js's STATIC_PAGES["/artists"] entry
+          injects it server-side. Declaring it here too would duplicate it on
+          mount instead of replacing it (react-helmet-async can't adopt tags it
+          didn't create). */}
       <Helmet>
         <title>{PAGE_TITLE}</title>
-        <meta
-          name="description"
-          content="Browse and search every artist who has played a SetTimes event — explore their profiles, past sets, and upcoming shows."
-        />
-        <link rel="canonical" href="https://settimes.ca/artists" />
-        <meta property="og:title" content="Artists – SetTimes" />
-        <meta property="og:description" content="Browse and search every artist who has played a SetTimes event." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://settimes.ca/artists" />
       </Helmet>
 
       <header className="border-b border-accent-500/30 px-4 py-8">

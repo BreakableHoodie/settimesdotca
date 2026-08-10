@@ -1,28 +1,30 @@
 // Registry of statically-routed pages that need SSR meta injection.
 //
 // frontend/index.html hardcodes the HOMEPAGE's identity meta (og:url="/",
-// generic og:title/description, etc.). React Helmet only manages tags it
-// created itself, so client-side it APPENDS a page-specific copy rather than
-// replacing the homepage defaults — a crawler that doesn't execute JS (and
-// even Google's og:url canonicalization hint, which prefers the FIRST tag)
-// only ever sees the homepage identity, never the page's own. See
-// functions/utils/ssrMeta.js for the full rationale and DEFAULT_META_RE,
-// which strips those defaults before this file's tags are injected.
+// generic og:title/description, etc.). See functions/utils/ssrMeta.js for
+// DEFAULT_META_RE, which strips those defaults before this file's tags are
+// injected, and for the ownership rule this registry implements: SSR is the
+// SINGLE owner of identity meta (canonical/og:*/twitter:*/description) on
+// every page below. The corresponding client <Helmet> block
+// (frontend/src/pages/*.jsx) must declare <title> only — never any of this
+// file's tags, or Helmet appends a duplicate copy on mount instead of
+// replacing the SSR-injected one.
 //
-// Every value below is copied VERBATIM from the corresponding page's own
-// <Helmet> block (frontend/src/pages/*.jsx) so the server-rendered meta
-// matches what client-side hydration ultimately settles on. Duplication
-// across the two render passes is harmless when the values AGREE — it is
-// only fatal when they disagree, which is the bug this registry fixes.
+// Every value below was originally copied VERBATIM from each page's <Helmet>
+// so the two agreed while both existed; the client copies are gone now, but
+// this file's values remain the single source of truth and must stay in sync
+// with what each page component actually is (title/description prose,
+// primarily — <title> is still client-owned and must match this registry's
+// `title`).
 //
-// Pages whose Helmet has no og:title/og:description (About, Contact,
+// Pages whose old Helmet had no og:title/og:description (About, Contact,
 // Privacy, Terms) derive them from that same page's own title/description —
 // never from the homepage strings, and never invented marketing copy.
 //
 // `/` is deliberately NOT in this registry: index.html's baked-in defaults
 // ARE the homepage's correct meta, and EventsPage's own Helmet canonical is
-// already CANONICAL_HOST + "/". Adding a handler for `/` would just
-// duplicate what's already correct.
+// already CANONICAL_HOST + "/". EventsPage keeps full client-side ownership
+// of its identity meta — the only route in the app that does.
 import { serveWithInjectedMeta, escapeAttr, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "./ssrMeta.js";
 
 export const STATIC_PAGES = {
@@ -106,6 +108,11 @@ export function staticPageHandler(path) {
       `<meta property="og:title" content="${escapeAttr(ogTitle)}" />`,
       `<meta property="og:description" content="${escapeAttr(ogDescription)}" />`,
       `<meta property="og:type" content="website" />`,
+      // SubscribePage.jsx's old client Helmet was the only STATIC_PAGES entry
+      // that declared og:site_name — carried forward here so the ownership
+      // sweep (#784 CodeRabbit) doesn't silently drop it, and applied to all
+      // registered pages for consistency (og:site_name never varies by page).
+      `<meta property="og:site_name" content="SetTimes" />`,
       `<meta property="og:image" content="${escapeAttr(DEFAULT_OG_IMAGE)}" />`,
       `<meta name="twitter:card" content="summary_large_image" />`,
       `<meta name="twitter:title" content="${escapeAttr(ogTitle)}" />`,

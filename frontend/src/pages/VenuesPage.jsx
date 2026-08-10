@@ -92,17 +92,13 @@ export default function VenuesPage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
+      {/* Identity meta (canonical/og:* /description) is SSR-owned for this route
+          -- functions/utils/staticPageMeta.js's STATIC_PAGES["/venues"] entry
+          injects it server-side. Declaring it here too would duplicate it on
+          mount instead of replacing it (react-helmet-async can't adopt tags it
+          didn't create). */}
       <Helmet>
         <title>{PAGE_TITLE}</title>
-        <meta
-          name="description"
-          content="Browse every venue that has hosted a SetTimes event — explore their lineups, past shows, and upcoming performances."
-        />
-        <link rel="canonical" href="https://settimes.ca/venues" />
-        <meta property="og:title" content="Venues – SetTimes" />
-        <meta property="og:description" content="Browse every venue that has hosted a SetTimes event." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://settimes.ca/venues" />
       </Helmet>
 
       <header className="border-b border-accent-500/30 px-4 py-8">

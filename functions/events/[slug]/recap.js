@@ -9,7 +9,8 @@
 
 import { isPublicDataEnabled } from "../../utils/publicGate.js";
 import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../../utils/ssrMeta.js";
-import { normalizeHttpUrl } from "../../utils/validation.js";
+import { normalizeHttpUrl, validateDate } from "../../utils/validation.js";
+import { eventLocalToday } from "../../utils/eventDay.js";
 
 const DATE_LABEL_FORMAT = { year: "numeric", month: "long", day: "numeric" };
 
@@ -38,7 +39,7 @@ export async function onRequestGet(context) {
   let event;
   try {
     event = await env.DB.prepare(
-      `SELECT id, name, slug, date, poster_url
+      `SELECT id, name, slug, date, end_date, poster_url
        FROM events
        WHERE slug = ? AND (is_published = 1 OR status = 'archived')`,
     )
@@ -49,6 +50,28 @@ export async function onRequestGet(context) {
     return env.ASSETS.fetch(request);
   }
   if (!event) return env.ASSETS.fetch(request);
+
+  // This route claims to be the ARCHIVE recap (see file header) -- the
+  // published/archived gate above says nothing about whether the event has
+  // actually happened yet. Without this check, a direct request for a
+  // future published event would get recap-specific meta ("recap for X on
+  // <date>") for a show that hasn't played, ahead of the sitemap ever
+  // listing it there. end_date || date mirrors the multi-day convention
+  // elsewhere (CLAUDE.md, scheduleStorage) -- a multi-day event isn't over
+  // until its LAST day has passed, not its first.
+  //
+  // `date`/`end_date` are TEXT columns with no DB-level format constraint, so
+  // a legacy row can hold a syntactically-YYYY-MM-DD but calendar-invalid
+  // value (e.g. "2026-02-30"). A plain typeof/string check doesn't catch
+  // that, and a lexicographic compare against an out-of-range day can still
+  // resolve either way -- validateDate() (validation.js) does real
+  // month-length/leap-year validation, same helper the write-side event form
+  // uses, so an invalid legacy date falls back to the shell rather than
+  // risking a wrong-signed comparison (CodeRabbit, #784 follow-up).
+  const lastDay = event.end_date || event.date;
+  if (!validateDate(lastDay).valid || lastDay >= eventLocalToday()) {
+    return env.ASSETS.fetch(request);
+  }
 
   // Cheap aggregate -- mirrors the two numbers EventRecapPage.jsx's Helmet
   // actually quotes (stats.total_sets, stats.venue_count). The full
@@ -84,11 +107,11 @@ export async function onRequestGet(context) {
   const safePosterUrl = normalizeHttpUrl(event.poster_url);
   const ogImageUrl = safePosterUrl || DEFAULT_OG_IMAGE;
 
-  // EventRecapPage's own Helmet sets only title/description/canonical/og:url
-  // -- no og:title/og:description of its own. Per the STATIC_PAGES registry
-  // convention (functions/utils/staticPageMeta.js), those are derived from
+  // SSR owns this route's identity meta (see functions/utils/ssrMeta.js) --
+  // EventRecapPage.jsx's client <Helmet> sets <title> only now. og:title/
+  // og:description have no client precedent to match; they're derived from
   // this page's own title/description, never from the homepage defaults and
-  // never invented copy.
+  // never invented copy (same STATIC_PAGES registry convention).
   const metaTags = [
     `<link rel="canonical" href="${escapeAttr(url)}" />`,
     `<meta name="description" content="${escapeAttr(description)}" />`,
@@ -96,6 +119,11 @@ export async function onRequestGet(context) {
     `<meta property="og:title" content="${escapeAttr(title)}" />`,
     `<meta property="og:description" content="${escapeAttr(description)}" />`,
     `<meta property="og:type" content="website" />`,
+    // index.html's baked-in og:site_name is stripped by DEFAULT_META_RE
+    // (ssrMeta.js) same as every other identity tag -- this route must
+    // re-emit it or it silently disappears rather than merely de-duplicating
+    // (#784 CodeRabbit follow-up).
+    `<meta property="og:site_name" content="SetTimes" />`,
     `<meta property="og:image" content="${escapeAttr(ogImageUrl)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${escapeAttr(title)}" />`,

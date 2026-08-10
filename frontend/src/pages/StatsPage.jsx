@@ -81,20 +81,13 @@ export default function StatsPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+      {/* Identity meta (canonical/og:* /description) is SSR-owned for this route
+          -- functions/utils/staticPageMeta.js's STATIC_PAGES["/stats"] entry
+          injects it server-side. Declaring it here too would duplicate it on
+          mount instead of replacing it (react-helmet-async can't adopt tags it
+          didn't create). */}
       <Helmet>
         <title>Stats | SetTimes</title>
-        <meta
-          name="description"
-          content="SetTimes by the numbers — bands, venues, events, and fan engagement across our free Waterloo Region live-music schedule tool."
-        />
-        <link rel="canonical" href="https://settimes.ca/stats" />
-        <meta property="og:title" content="Stats | SetTimes" />
-        <meta
-          property="og:description"
-          content="SetTimes by the numbers — bands, venues, events, and fan engagement across Waterloo Region."
-        />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://settimes.ca/stats" />
       </Helmet>
 
       <main id="main-content" tabIndex={-1} className="container mx-auto max-w-2xl px-4 py-12">

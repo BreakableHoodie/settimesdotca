@@ -12,13 +12,12 @@ export default function TermsPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+      {/* description/canonical are SSR-owned for this route --
+          functions/utils/staticPageMeta.js's STATIC_PAGES["/terms"] entry
+          injects them server-side; declaring them here too would duplicate
+          them on mount instead of replacing them. */}
       <Helmet>
         <title>Terms of Service | SetTimes</title>
-        <meta
-          name="description"
-          content="Terms of Service for SetTimes — Waterloo region live music event scheduling tool."
-        />
-        <link rel="canonical" href="https://settimes.ca/terms" />
       </Helmet>
 
       <main id="main-content" tabIndex={-1} className="container mx-auto px-4 max-w-2xl py-12 legal-document">

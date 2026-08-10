@@ -20,6 +20,7 @@ const STUB_HTML = `<!doctype html><html><head>
     <meta property="og:title" content="SetTimes – Live Music Events &amp; Show Schedules" />
     <meta property="og:description" content="Homepage description" />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SetTimes" />
     <meta property="og:image" content="https://settimes.ca/og-default.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="SetTimes – Live Music Events &amp; Show Schedules" />
@@ -35,6 +36,7 @@ const IDENTITY_TAG_PATTERNS = [
   /property="og:description"/g,
   /property="og:image"/g,
   /property="og:type"/g,
+  /property="og:site_name"/g,
   /name="description"/g,
   /name="twitter:card"/g,
   /name="twitter:title"/g,
@@ -185,6 +187,69 @@ describe("SSR /events/[slug]/recap", () => {
     // neither half of the (is_published = 1 OR status = 'archived') gate.
 
     const response = await onRequestGet(makeContext({ env, slug: "draft-event-recap" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toBe(STUB_HTML);
+  });
+
+  // CodeRabbit Major (#784 follow-up): this route claims to be the ARCHIVE
+  // recap, reachable once an event's date is past -- but the published/
+  // archived gate alone says nothing about timing. A published event dated
+  // in the future must still fall back to the plain shell, not get
+  // recap-specific meta for a show that hasn't happened.
+  test("falls back to the plain shell for a published event whose date is in the future", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Future Event",
+      slug: "future-event-recap",
+      date: "2999-01-01",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const response = await onRequestGet(makeContext({ env, slug: "future-event-recap" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toBe(STUB_HTML);
+  });
+
+  // Multi-day events: the last day (end_date), not the first (date), is what
+  // decides whether the event is over -- mirrors the end_date || date
+  // convention documented in CLAUDE.md (scheduleStorage stale-detection).
+  // A multi-day event whose START date has passed but END date hasn't must
+  // still fall back to the plain shell.
+  test("falls back to the plain shell for a multi-day event still in progress (end_date in the future)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "In-Progress Multiday Event",
+      slug: "in-progress-multiday-recap",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1, end_date='2999-01-01' WHERE id=?").run(event.id);
+
+    const response = await onRequestGet(makeContext({ env, slug: "in-progress-multiday-recap" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toBe(STUB_HTML);
+  });
+
+  // CodeRabbit Minor (#784 follow-up): `date`/`end_date` are TEXT columns
+  // with no DB-level format constraint. A legacy row can hold a
+  // syntactically-YYYY-MM-DD but calendar-invalid value (Feb 30 doesn't
+  // exist). A plain typeof/string check doesn't catch that; this proves the
+  // real calendar-date validator (validateDate(), validation.js) does.
+  test("falls back to the plain shell for a calendar-invalid legacy date (Feb 30)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Bad Legacy Date Event",
+      slug: "bad-legacy-date-recap",
+      date: "2026-02-30",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const response = await onRequestGet(makeContext({ env, slug: "bad-legacy-date-recap" }));
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toBe(STUB_HTML);

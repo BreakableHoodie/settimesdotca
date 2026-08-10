@@ -40,6 +40,11 @@ export async function onRequest(context) {
     `<meta property="og:description" content="${escapeAttr(description)}" />`,
     `<meta property="og:type" content="website" />`,
     `<meta property="og:url" content="${escapeAttr(url)}" />`,
+    // index.html's baked-in og:site_name is stripped by DEFAULT_META_RE
+    // (ssrMeta.js) same as every other identity tag -- this route must
+    // re-emit it or it silently disappears rather than merely de-duplicating
+    // (#784 CodeRabbit follow-up).
+    `<meta property="og:site_name" content="SetTimes" />`,
     `<meta property="og:image" content="${escapeAttr(DEFAULT_OG_IMAGE)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${escapeAttr(venue.name)}" />`,

@@ -39,6 +39,7 @@ const IDENTITY_TAG_PATTERNS = {
   "og:description": /property="og:description"/g,
   "og:image": /property="og:image"/g,
   "og:type": /property="og:type"/g,
+  "og:site_name": /property="og:site_name"/g,
   description: /name="description"/g,
   "twitter:card": /name="twitter:card"/g,
   "twitter:title": /name="twitter:title"/g,
@@ -110,6 +111,19 @@ describe("staticPageMeta — every registered static page", () => {
         const html = await res.text();
 
         expect(html).toContain(`<title>${page.title}</title>`);
+      });
+
+      // #784 CodeRabbit follow-up: og:site_name was declared by
+      // SubscribePage.jsx's old client Helmet but never emitted by this
+      // handler -- silently dropped, not merely duplicated, once the client
+      // Helmet ownership sweep removed it. Every registered page emits it now
+      // for consistency (og:site_name never varies by page).
+      it("emits og:site_name", async () => {
+        const handler = staticPageHandler(pagePath);
+        const res = await handler(makeContext(`${CANONICAL_HOST}${pagePath}`));
+        const html = await res.text();
+
+        expect(html).toContain('<meta property="og:site_name" content="SetTimes" />');
       });
     });
   }

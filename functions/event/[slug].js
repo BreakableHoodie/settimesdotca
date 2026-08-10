@@ -276,6 +276,12 @@ export async function onRequest(context) {
     `<meta property="og:description" content="${escapeAttr(description)}" />`,
     `<meta property="og:type" content="website" />`,
     `<meta property="og:url" content="${escapeAttr(url)}" />`,
+    // App.jsx's old client Helmet declared og:site_name (and og:type="event",
+    // which Facebook's OG spec requires event:start_time/end_time properties
+    // for that this route never emitted — "website" below is the spec-valid
+    // value every other route already uses). Carried forward here so the
+    // ownership sweep (#784 CodeRabbit) doesn't silently drop it.
+    `<meta property="og:site_name" content="SetTimes" />`,
     `<meta name="twitter:title" content="${escapeAttr(event.name)}" />`,
     `<meta name="twitter:description" content="${escapeAttr(description)}" />`,
     `<link rel="canonical" href="${escapeAttr(url)}" />`,

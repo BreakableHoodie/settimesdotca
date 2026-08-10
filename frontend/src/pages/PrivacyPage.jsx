@@ -12,10 +12,12 @@ export default function PrivacyPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+      {/* description/canonical are SSR-owned for this route --
+          functions/utils/staticPageMeta.js's STATIC_PAGES["/privacy"] entry
+          injects them server-side; declaring them here too would duplicate
+          them on mount instead of replacing them. */}
       <Helmet>
         <title>Privacy Policy | SetTimes</title>
-        <meta name="description" content="Privacy policy for SetTimes — Waterloo region music festival scheduling." />
-        <link rel="canonical" href="https://settimes.ca/privacy" />
       </Helmet>
 
       <main id="main-content" tabIndex={-1} className="container mx-auto px-4 max-w-2xl py-12 legal-document">

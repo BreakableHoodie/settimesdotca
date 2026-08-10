@@ -1,7 +1,7 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { normalizeHttpUrl } from "../../../utils/validation.js";
 import { sortableName } from "../../../utils/sortableName.js";
-import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
+import { archivedEventStatusSql, publicEventStatusSql } from "../../../utils/eventVisibility.js";
 
 // SQLite `ORDER BY` can't strip a leading article inline (#587); the SQL
 // query below is a coarse pre-sort and this comparator re-derives the exact
@@ -57,12 +57,12 @@ export async function onRequestGet(context) {
   try {
     const event = isNumeric
       ? await DB.prepare(
-          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE id = ? AND status = 'archived' LIMIT 1`,
+          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE id = ? AND ${archivedEventStatusSql()} LIMIT 1`,
         )
           .bind(numericId)
           .first()
       : await DB.prepare(
-          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE slug = ? AND status = 'archived' LIMIT 1`,
+          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE slug = ? AND ${archivedEventStatusSql()} LIMIT 1`,
         )
           .bind(rawId)
           .first();

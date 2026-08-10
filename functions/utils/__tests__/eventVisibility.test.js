@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { publicEventStatusSql, archivedEventStatusSql } from "../eventVisibility.js";
+import { publicEventStatusSql, archivedEventStatusSql, publishedEventStatusSql } from "../eventVisibility.js";
 
 describe("publicEventStatusSql", () => {
   it("returns the unaliased predicate by default", () => {
@@ -36,6 +36,39 @@ describe("archivedEventStatusSql", () => {
 
   it("throws on an invalid alias", () => {
     expect(() => archivedEventStatusSql("e; DROP TABLE events;--")).toThrow();
+  });
+});
+
+describe("publishedEventStatusSql", () => {
+  it("returns the unaliased predicate by default", () => {
+    expect(publishedEventStatusSql()).toBe("status = 'published'");
+  });
+
+  it("prefixes the given alias", () => {
+    expect(publishedEventStatusSql("e")).toBe("e.status = 'published'");
+  });
+
+  it("excludes archived, unlike publicEventStatusSql", () => {
+    // The distinction that matters: /api/schedule?event=current must not serve
+    // an event archived on its own final day as tonight's live schedule.
+    expect(publishedEventStatusSql()).not.toContain("archived");
+    expect(publicEventStatusSql()).toContain("archived");
+  });
+
+  it("throws on an invalid alias", () => {
+    expect(() => publishedEventStatusSql("e; DROP TABLE events;--")).toThrow();
+  });
+});
+
+describe("alias validation rejects non-strings", () => {
+  // String(null) === "null", which matches the identifier pattern. Without an
+  // explicit typeof guard, a null alias would pass validation and then quietly
+  // fall through to an unaliased column, producing valid-but-wrong SQL in a
+  // multi-table join. Regression guard for that exact hole.
+  it.each([[null], [0], [1], [{}], [[]], [true]])("throws for %p", (value) => {
+    expect(() => publicEventStatusSql(value)).toThrow(/invalid table alias/);
+    expect(() => archivedEventStatusSql(value)).toThrow(/invalid table alias/);
+    expect(() => publishedEventStatusSql(value)).toThrow(/invalid table alias/);
   });
 });
 

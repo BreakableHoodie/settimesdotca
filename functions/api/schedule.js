@@ -5,7 +5,7 @@
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
 import { normalizeHttpUrl, safeReflectSocialLinks } from "../utils/validation.js";
 import { logger } from "../utils/logger.js";
-import { publicEventStatusSql } from "../utils/eventVisibility.js";
+import { publicEventStatusSql, publishedEventStatusSql } from "../utils/eventVisibility.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -24,14 +24,17 @@ export async function onRequestGet(context) {
     let event;
 
     if (eventParam === "current") {
-      // Get the current or next upcoming published event
+      // Get the current or next upcoming published event.
       // The -6 hour buffer keeps the event visible during late-night/overnight
-      // sets that span past midnight (e.g. 11:30pm-12:30am)
+      // sets that span past midnight (e.g. 11:30pm-12:30am).
+      // Deliberately published-only, unlike the slug branch below: that same
+      // -6h buffer means an event archived on its own final day still matches
+      // the date filter, and serving that as tonight's live schedule is wrong.
       event = await DB.prepare(
         `
         SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
         FROM events
-        WHERE ${publicEventStatusSql()}
+        WHERE ${publishedEventStatusSql()}
           AND COALESCE(end_date, date) >= date('now', '-6 hours')
         ORDER BY date ASC
         LIMIT 1

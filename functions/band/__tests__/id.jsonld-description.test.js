@@ -12,6 +12,15 @@ import { describe, expect, test } from "vitest";
 import { onRequest } from "../[id].js";
 import { createTestEnv } from "../../api/test-utils.js";
 
+// Selects the schema by @type rather than by position. The route emits
+// jsonLd: [musicGroup, breadcrumb], so "the first block" happens to work today,
+// but that couples the assertion to injection order and would break silently if
+// the route or index.html ever gained another block (#790 review).
+function findSchema(html, type) {
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+  return blocks.map((m) => JSON.parse(m[1])).find((schema) => schema["@type"] === type);
+}
+
 const STUB_HTML = `<!doctype html><html><head>
     <meta name="description" content="Homepage description" />
     <title>SetTimes</title>
@@ -51,13 +60,8 @@ describe("SSR /band/[id] — JSON-LD description is not SERP-truncated (#790)", 
     expect(metaDescription.endsWith("…")).toBe(true);
     expect(metaDescription).not.toBe(longBio);
 
-    // musicGroup is the first schema in jsonLd: [musicGroup, breadcrumb], so
-    // the first <script type="application/ld+json"> block in document order
-    // is always musicGroup -- same assumption the #644 og-image test makes.
-    const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
-    expect(jsonLdMatch).not.toBeNull();
-    const musicGroup = JSON.parse(jsonLdMatch[1]);
-    expect(musicGroup["@type"]).toBe("MusicGroup");
+    const musicGroup = findSchema(html, "MusicGroup");
+    expect(musicGroup).toBeDefined();
     expect(musicGroup.description).toBe(longBio);
     expect(musicGroup.description.length).toBe(250);
   });
@@ -77,8 +81,7 @@ describe("SSR /band/[id] — JSON-LD description is not SERP-truncated (#790)", 
     const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
     const html = await response.text();
 
-    const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
-    const musicGroup = JSON.parse(jsonLdMatch[1]);
+    const musicGroup = findSchema(html, "MusicGroup");
     expect(musicGroup.description).toHaveLength(5000);
     expect(musicGroup.description.endsWith("…")).toBe(true);
   });
@@ -97,8 +100,7 @@ describe("SSR /band/[id] — JSON-LD description is not SERP-truncated (#790)", 
     const metaMatch = html.match(/<meta name="description" content="([^"]*)" \/>/);
     expect(metaMatch[1]).toBe(shortBio);
 
-    const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
-    const musicGroup = JSON.parse(jsonLdMatch[1]);
+    const musicGroup = findSchema(html, "MusicGroup");
     expect(musicGroup.description).toBe(shortBio);
   });
 });

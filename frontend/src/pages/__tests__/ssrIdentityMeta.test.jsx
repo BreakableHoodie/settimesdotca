@@ -7,11 +7,13 @@
 // at once. That produced a real "Duplicate, Google chose different canonical
 // than user" Search Console error (see CLAUDE.md, "SSR owns identity meta").
 // The fix is ownership: on every SSR-injected route below, the page's own
-// <Helmet> was trimmed to <title> only. #790 extended the same fix (and this
-// file's same seed-then-mount-then-count pattern) to JSON-LD on /band/:id and
-// /venue/:id, whose client <Helmet> used to emit its own MusicGroup/
-// MusicVenue <script> block duplicating the one functions/band/[id].js and
-// functions/venue/[id].js already inject server-side.
+// <Helmet> was stripped of everything SSR emits. It may still declare tags SSR
+// does NOT emit (BandProfilePage's <meta name="keywords"> is the live case) --
+// deleting one of those would drop the tag rather than de-duplicate it. #790
+// extended the same fix (and this file's seed-then-mount-then-count pattern) to
+// JSON-LD on /band/:id and /venue/:id, whose client <Helmet> used to emit its
+// own MusicGroup/MusicVenue <script> block duplicating the one
+// functions/band/[id].js and functions/venue/[id].js already inject server-side.
 //
 // This app is client-side rendered, not server-rendered: main.jsx calls
 // ReactDOM.createRoot(...).render(...), never hydrateRoot — the SSR layer
@@ -111,9 +113,10 @@ function seedSsrJsonLd(schemas) {
 // JSON-LD block would therefore land in <body>, NOT <head> -- confirmed by
 // instrumenting react-helmet-async's React19Dispatcher directly. Scoping
 // this count to document.head would make the assertion below pass whether or
-// not the client still declares the block, which is the vacuous-test failure
-// mode this repo has hit before (see CLAUDE.md "Vacuous test defect class"
-// memory) -- querying the whole document is the only selector that can
+// not the client still declares the block -- a test that survives both the
+// correct and the broken implementation, i.e. no guard at all. This was caught
+// by mutation-checking (restoring the deleted client block and confirming the
+// test then fails); querying the whole document is the only selector that can
 // actually observe a real duplicate here.
 function countJsonLdByType() {
   const counts = {}

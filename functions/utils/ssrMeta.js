@@ -95,7 +95,17 @@ export function toPlainText(rawInput, maxLength = 200) {
   };
   text = text.replace(/&(?:nbsp|amp|lt|gt|quot|#39);/gi, (m) => ENTITY_MAP[m.toLowerCase()] ?? m);
 
-  text = text.replace(/\s+/g, " ").trim();
+  return truncatePlainText(text.replace(/\s+/g, " ").trim(), maxLength);
+}
+
+// Truncation half of toPlainText, split out so a caller needing the SAME text at
+// two lengths (band/[id].js emits a 200-char meta description and a 5000-char
+// JSON-LD one) strips once and truncates twice, rather than running toPlainText's
+// ~15 regex passes over the same input twice on a hot SSR path (#790 review).
+// Truncating an already-truncated string is safe: the shorter cut is a prefix of
+// the longer one, so truncate(truncate(t, 5000), 200) === truncate(t, 200).
+// Expects text that is already stripped and whitespace-collapsed.
+export function truncatePlainText(text, maxLength) {
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1).trimEnd()}…`;
 }

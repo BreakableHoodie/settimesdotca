@@ -2,7 +2,14 @@
 // for crawlers. See functions/utils/ssrMeta.js for the rationale + fallback contract.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../utils/ssrMeta.js";
+import {
+  escapeAttr,
+  toPlainText,
+  truncatePlainText,
+  serveWithInjectedMeta,
+  CANONICAL_HOST,
+  DEFAULT_OG_IMAGE,
+} from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 
 export async function onRequest(context) {
@@ -42,8 +49,10 @@ export async function onRequest(context) {
   // artist bios in production run past 200 chars, longest 2521. 5000 gives
   // headroom over that without an unbounded payload.
   const JSONLD_DESCRIPTION_MAX_LENGTH = 5000;
-  const plainDesc = toPlainText(band.description, 200);
   const schemaDesc = toPlainText(band.description, JSONLD_DESCRIPTION_MAX_LENGTH);
+  // Derived from schemaDesc rather than a second toPlainText pass: the strip
+  // work is identical and the 200-char cut is a prefix of the 5000-char one.
+  const plainDesc = truncatePlainText(schemaDesc, 200);
   const tagline = [band.genre, band.origin].filter(Boolean).join(" · ");
   const description =
     plainDesc || `${band.name}${tagline ? ` — ${tagline}` : ""} on SetTimes, Waterloo Region's live music platform.`;

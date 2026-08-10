@@ -665,24 +665,18 @@ function App() {
   // Breadcrumb navigation
   const breadcrumbs = [{ label: 'Events', href: '/' }, { label: eventData?.name || 'Event Schedule' }]
 
-  const eventDescription = eventData?.name
-    ? `View the full schedule and set times for ${eventData.name}. Browse all artists and plan your evening.`
-    : null
-
   return (
     <div className="min-h-screen pb-20">
+      {/* Identity meta (canonical/og:* /twitter:* /description) is SSR-owned for
+          this route -- functions/event/[slug].js injects it server-side (and
+          emits the richer, spec-valid og:type="website"/twitter:card=
+          "summary_large_image" every other route uses, not this component's
+          old "event"/"summary"). Declaring those tags here too would
+          duplicate them on mount instead of replacing them (react-helmet-async
+          can't adopt tags it didn't create). <title> stays client-owned, same
+          as the direct document.title assignment above. */}
       <Helmet>
         <title>{eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'}</title>
-        {eventDescription && <meta name="description" content={eventDescription} />}
-        {slug && <link rel="canonical" href={`https://settimes.ca/event/${slug}`} />}
-        {eventData && <meta property="og:title" content={`${eventData.name} | SetTimes`} />}
-        {eventDescription && <meta property="og:description" content={eventDescription} />}
-        <meta property="og:type" content="event" />
-        {slug && <meta property="og:url" content={`https://settimes.ca/event/${slug}`} />}
-        <meta property="og:site_name" content="SetTimes" />
-        <meta name="twitter:card" content="summary" />
-        {eventData && <meta name="twitter:title" content={`${eventData.name} | SetTimes`} />}
-        {eventDescription && <meta name="twitter:description" content={eventDescription} />}
       </Helmet>
       <OfflineIndicator />
       {isArchived ? (

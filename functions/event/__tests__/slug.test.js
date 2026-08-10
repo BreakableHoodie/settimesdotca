@@ -458,3 +458,59 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD venue reveal_mode gate (#635)
     expect(html).not.toContain("Hidden Venue");
   });
 });
+
+// #784 CodeRabbit follow-up: og:site_name and og:type="website" were declared
+// by App.jsx's old client Helmet (as "SetTimes" and, inconsistently,
+// og:type="event") but this handler never emitted og:site_name at all, and
+// og:type here has always been "website" -- the spec-valid value every other
+// route uses (Facebook's "event" type requires event:start_time/end_time
+// properties this route never emitted). Once the client Helmet ownership
+// sweep removed the duplicate/conflicting client-side tags, og:site_name
+// would have been silently dropped rather than merely de-duplicated.
+// The shared STUB_HTML above (no og:site_name/og:type) can't prove
+// DEFAULT_META_RE actually strips the homepage's baked-in defaults -- it
+// never has one to strip. This mirrors the REAL frontend/index.html shell
+// (og:site_name + og:type included), so "exactly one" below is a real
+// de-duplication assertion, not a vacuous presence check (CodeRabbit,
+// #784 follow-up).
+const SHELL_WITH_DEFAULTS_HTML = `<!doctype html><html><head>
+    <meta name="description" content="Homepage description" />
+    <meta property="og:site_name" content="SetTimes" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://settimes.ca/" />
+    <title>SetTimes</title>
+  </head><body><div id="root"></div></body></html>`;
+
+function makeContextWithDefaultsShell({ env, slug }) {
+  env.ASSETS = {
+    fetch: async () =>
+      new Response(SHELL_WITH_DEFAULTS_HTML, { status: 200, headers: { "content-type": "text/html" } }),
+  };
+  return {
+    request: new Request(`https://settimes.ca/event/${slug}`),
+    env,
+    params: { slug },
+  };
+}
+
+describe("SSR /event/[slug] — og:site_name (#784 ownership sweep)", () => {
+  test("emits exactly one og:site_name and one og:type=website, not a duplicate of the homepage shell's", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Site Name Event",
+      slug: "slug-784-site-name",
+      date: "2026-08-02",
+    });
+    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+
+    const response = await onRequest(makeContextWithDefaultsShell({ env, slug: "slug-784-site-name" }));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+
+    expect(html).toContain('<meta property="og:site_name" content="SetTimes" />');
+    expect(html).toContain('<meta property="og:type" content="website" />');
+    expect(html.match(/property="og:site_name"/g)?.length).toBe(1);
+    expect(html.match(/property="og:type"/g)?.length).toBe(1);
+  });
+});

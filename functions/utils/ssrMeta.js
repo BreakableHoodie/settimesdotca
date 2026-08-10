@@ -7,6 +7,22 @@
 // serveWithInjectedMeta(). On ANY problem (gate closed, not found, DB error, asset
 // fetch fail) the caller falls back to env.ASSETS.fetch(request) — the SPA still
 // renders client-side, just without the rich tags.
+//
+// OWNERSHIP: on every route this injects into, identity meta (canonical, og:*,
+// twitter:*, description) is SSR-only — the page's own client <Helmet> must NOT
+// also declare them. react-helmet-async marks tags it manages with data-rh; a
+// plain <meta>/<link> injected here carries no such marker, so Helmet can't tell
+// it owns the slot and APPENDS a second copy on mount instead of replacing the
+// first — two canonicals, two og:url, live in the DOM at once. That produced a
+// real "Duplicate, Google chose different canonical than user" Search Console
+// error (see CLAUDE.md, "SSR owns identity meta"). The fix is ownership, not
+// coordination: making SSR-injected tags Helmet-adoptable (a data-rh marker) was
+// considered and rejected — it would make correctness depend on Helmet reliably
+// adopting and replacing tags it didn't create, the same behavior already
+// documented elsewhere in this repo as unreliable for document.title under React
+// 19. A route's client Helmet may still set <title> (backed by a direct
+// `document.title = ...` assignment, same reasoning) and page-specific JSON-LD —
+// just never the identity tags this file injects.
 
 // Canonical host for SSR-injected canonicals and og:url. Preview deploys
 // (*.pages.dev) must NOT emit their own host as the canonical — pin to prod.
@@ -77,9 +93,14 @@ export function toPlainText(rawInput, maxLength = 200) {
 
 // Default homepage meta tags baked into index.html — stripped so the page-specific
 // ones replace (not duplicate) them. Facebook often honours the FIRST og:title, so
-// appending isn't enough; the defaults must be removed.
+// appending isn't enough; the defaults must be removed. Every og:*/twitter:*/
+// description property index.html declares must be listed here — #784's
+// ownership sweep found og:site_name missing (index.html has always had one;
+// nothing SSR-injected emitted its own until this sweep added it), which
+// would have produced a fresh, real duplicate the moment it was added instead
+// of the silent-drop this file's other og:site_name comments describe.
 const DEFAULT_META_RE =
-  /[ \t]*<meta\s+(?:property="og:(?:title|description|image|type|url)"|name="(?:description|twitter:(?:card|title|description|image))")[^>]*>\r?\n?/gi;
+  /[ \t]*<meta\s+(?:property="og:(?:title|description|image|type|url|site_name)"|name="(?:description|twitter:(?:card|title|description|image))")[^>]*>\r?\n?/gi;
 
 // Fetch the SPA index.html, strip the default homepage meta, swap the <title>, and
 // inject the page-specific meta tags + an optional JSON-LD block just before </head>.

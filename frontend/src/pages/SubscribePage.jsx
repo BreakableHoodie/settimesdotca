@@ -4,8 +4,6 @@ import { Helmet } from 'react-helmet-async'
 import { useTurnstile } from '../hooks/useTurnstile'
 
 const PAGE_TITLE = 'Subscribe — Never Miss a Show | SetTimes'
-const PAGE_DESCRIPTION =
-  'Get notified about new live music events and lineup announcements in Waterloo Region. Subscribe for show alerts from SetTimes.'
 
 export default function SubscribePage() {
   // Turnstile stays fully dormant (no script, no iframe, no layout space)
@@ -77,18 +75,15 @@ export default function SubscribePage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple p-4">
+      {/* Identity meta (canonical/og:* /twitter:* /description) is SSR-owned for
+          this route -- functions/utils/staticPageMeta.js's
+          STATIC_PAGES["/subscribe"] entry injects it server-side (with
+          twitter:card="summary_large_image" + a real twitter:image, not this
+          component's old imageless "summary" — the more complete value wins
+          now that there's only one). Declaring those tags here too would
+          duplicate them on mount instead of replacing them. */}
       <Helmet>
         <title>{PAGE_TITLE}</title>
-        <meta name="description" content={PAGE_DESCRIPTION} />
-        <link rel="canonical" href="https://settimes.ca/subscribe" />
-        <meta property="og:title" content={PAGE_TITLE} />
-        <meta property="og:description" content={PAGE_DESCRIPTION} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://settimes.ca/subscribe" />
-        <meta property="og:site_name" content="SetTimes" />
-        <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content={PAGE_TITLE} />
-        <meta name="twitter:description" content={PAGE_DESCRIPTION} />
       </Helmet>
       <div className="max-w-2xl mx-auto pt-20">
         {/* Header */}

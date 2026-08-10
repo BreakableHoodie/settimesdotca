@@ -161,12 +161,13 @@ export default function EventRecapPage() {
 
   return (
     <>
+      {/* Identity meta (canonical/og:* /description) is SSR-owned for this route
+          -- functions/events/[slug]/recap.js injects it server-side. Declaring
+          it here too would duplicate it on mount instead of replacing it
+          (react-helmet-async can't adopt tags it didn't create). <title> stays
+          client-owned, same as the direct document.title assignment above. */}
       <Helmet>
         <title>{event.name} — Event Recap | SetTimes.ca</title>
-        <meta
-          name="description"
-          content={`Recap for ${event.name} on ${formattedDate}. ${stats.total_sets ?? 0} sets across ${stats.venue_count ?? 0} venues.`}
-        />
       </Helmet>
 
       <main id="main-content" className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple px-4 py-10">

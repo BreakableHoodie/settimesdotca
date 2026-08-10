@@ -11,13 +11,13 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+      {/* description/canonical are SSR-owned for this route --
+          functions/utils/staticPageMeta.js's STATIC_PAGES["/about"] entry
+          injects them server-side; declaring them here too would duplicate
+          them on mount instead of replacing them. <title> and the JSON-LD
+          below stay client-owned. */}
       <Helmet>
         <title>About | SetTimes</title>
-        <meta
-          name="description"
-          content="A free, community-run live-music schedule tool for Waterloo Region, Ontario. Plan your night across venues and discover local artists with SetTimes."
-        />
-        <link rel="canonical" href="https://settimes.ca/about" />
         <script type="application/ld+json">
           {JSON.stringify({
             '@context': 'https://schema.org',

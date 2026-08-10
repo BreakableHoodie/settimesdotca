@@ -384,34 +384,20 @@ export default function BandProfilePage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-bg-navy">
-      {/* SEO Meta Tags */}
+      {/* SEO Meta Tags -- description/og:* /twitter:* /canonical are SSR-owned
+          for this route (functions/band/[id].js injects them server-side,
+          always with a real og:image/twitter:image via the branded default
+          fallback, unlike this component's old profile.photo_url-only
+          conditionals). Declaring them here too would duplicate them on mount
+          instead of replacing them. keywords has no SSR equivalent and stays
+          client-only; the JSON-LD below stays client-owned too (it dupes its
+          own MusicGroup block SSR-side -- tracked separately, out of scope for
+          the canonical/og:* /twitter:* /description ownership fix here). */}
       <Helmet>
-        <meta
-          name="description"
-          content={
-            plainDescription
-              ? `${plainDescription.slice(0, 155)}...`
-              : `${profile.name} profile on SetTimes. ${profile.genre ? `Genre: ${profile.genre}. ` : ''}${profile.stats ? `${profile.stats.total_performances} performances.` : ''}`
-          }
-        />
         <meta
           name="keywords"
           content={`${profile.name}, ${profile.genre || 'music'}, ${profile.origin || 'band'}, live music, SetTimes`}
         />
-
-        {/* OpenGraph */}
-        <meta property="og:title" content={`${profile.name} - Band Profile`} />
-        <meta property="og:description" content={plainDescription || `${profile.name} on SetTimes`} />
-        <meta property="og:type" content="profile" />
-        {profile.photo_url && <meta property="og:image" content={profile.photo_url} />}
-        <meta property="og:url" content={`https://settimes.ca/band/${profile?.id || id}`} />
-        <link rel="canonical" href={`https://settimes.ca/band/${profile?.id || id}`} />
-
-        {/* Twitter Card */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={`${profile.name} - Band Profile`} />
-        <meta name="twitter:description" content={plainDescription || `${profile.name} on SetTimes`} />
-        {profile.photo_url && <meta name="twitter:image" content={profile.photo_url} />}
 
         {/* Structured Data (JSON-LD) */}
         <script type="application/ld+json">

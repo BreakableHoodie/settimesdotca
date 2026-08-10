@@ -146,15 +146,15 @@ export default function VenuePage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
+      {/* description/canonical are SSR-owned for this route --
+          functions/venue/[id].js injects them server-side; declaring them
+          here too would duplicate them on mount instead of replacing them.
+          <title> and the JSON-LD below stay client-owned (JSON-LD dupes its
+          own MusicVenue block SSR-side too -- tracked separately, out of
+          scope for the canonical/og:* /twitter:* /description ownership fix
+          here). */}
       <Helmet>
         <title>{venue ? `${venue.name} – SetTimes` : 'Venue – SetTimes'}</title>
-        {venue && (
-          <meta
-            name="description"
-            content={`${venue.name}${venue.location ? ` in ${venue.location}` : ''} — events and lineups on SetTimes.`}
-          />
-        )}
-        {venue && <link rel="canonical" href={`https://settimes.ca/venue/${venue.id}`} />}
         {venue && (
           <script type="application/ld+json">
             {JSON.stringify({

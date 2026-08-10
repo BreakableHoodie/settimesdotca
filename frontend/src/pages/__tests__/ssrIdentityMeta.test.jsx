@@ -1,0 +1,349 @@
+// Regression guard for the Helmet-duplicates-SSR-meta bug (PR #784, CodeRabbit
+// Major finding): react-helmet-async marks the tags it manages with data-rh.
+// SSR-injected canonical/og:url/etc. carry no such marker, so if a page's
+// client <Helmet> also declares them, Helmet can't tell it already owns the
+// slot and APPENDS a second copy on mount instead of replacing the first —
+// two <link rel="canonical">, two <meta property="og:url">, live in the DOM
+// at once. That produced a real "Duplicate, Google chose different canonical
+// than user" Search Console error (see CLAUDE.md, "SSR owns identity meta").
+// The fix is ownership: on every SSR-injected route below, the page's own
+// <Helmet> was trimmed to <title> (+ JSON-LD where present) only.
+//
+// This app is client-side rendered, not server-rendered: main.jsx calls
+// ReactDOM.createRoot(...).render(...), never hydrateRoot — the SSR layer
+// (functions/utils/ssrMeta.js) only injects <head> meta into an otherwise
+// EMPTY index.html shell (`<div id="root"></div>`), never app markup. So the
+// production sequence this test reproduces is: (1) the browser parses HTML
+// with the SSR-injected head tags already present, then (2) React mounts the
+// page component into #root the exact same way main.jsx does. seedSsrHead()
+// below stands in for step 1; render() (which uses createRoot under the
+// hood, like main.jsx) is step 2 unmodified — this is the real production
+// sequence, not an approximation of a hydrateRoot pass that never runs here.
+//
+// Mutation check performed by hand: reverting any one of the Helmet trims in
+// this PR (restoring that page's old canonical/og:url declaration) turns its
+// "exactly one" assertion below into "found 2" and fails — see the PR
+// description for the recorded run. That's what makes this a real
+// regression guard rather than a tautology that would pass either way.
+import { render, screen } from '@testing-library/react'
+import '@testing-library/jest-dom'
+import { HelmetProvider } from 'react-helmet-async'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import App from '../../App.jsx'
+import ArtistsPage from '../ArtistsPage.jsx'
+import VenuesPage from '../VenuesPage.jsx'
+import AboutPage from '../AboutPage.jsx'
+import ContactPage from '../ContactPage.jsx'
+import StatsPage from '../StatsPage.jsx'
+import PrivacyPage from '../PrivacyPage.jsx'
+import TermsPage from '../TermsPage.jsx'
+import SubscribePage from '../SubscribePage.jsx'
+import EventRecapPage from '../EventRecapPage.jsx'
+import VenuePage from '../VenuePage.jsx'
+import BandProfilePage from '../BandProfilePage.jsx'
+import { ThemeProvider } from '../../components/ThemeProvider.jsx'
+import { fetchPublicJson } from '../../utils/publicApi'
+
+vi.mock('../../utils/metrics', () => ({
+  trackPageView: vi.fn(),
+  trackSocialClick: vi.fn(),
+  trackArtistView: vi.fn(),
+  trackEventView: vi.fn(),
+}))
+vi.mock('../../utils/publicApi', () => ({ fetchPublicJson: vi.fn() }))
+
+// The two tags every SSR handler built on functions/utils/ssrMeta.js injects
+// for an affected route, and the two Google's canonicalization signal keys
+// on -- what the real GSC incident hit. Standing in for the backend's actual
+// injected HTML (functions/__tests__/staticPageMeta.test.js and
+// functions/events/__tests__/recap.test.js already prove THAT string is
+// correct and singular server-side; this file proves the client doesn't
+// re-add a second copy on top of it).
+function seedSsrHead(path) {
+  const canonical = document.createElement('link')
+  canonical.setAttribute('rel', 'canonical')
+  canonical.setAttribute('href', `https://settimes.ca${path}`)
+  document.head.appendChild(canonical)
+
+  const ogUrl = document.createElement('meta')
+  ogUrl.setAttribute('property', 'og:url')
+  ogUrl.setAttribute('content', `https://settimes.ca${path}`)
+  document.head.appendChild(ogUrl)
+}
+
+function countIdentityTags() {
+  return {
+    canonical: document.head.querySelectorAll('link[rel="canonical"]').length,
+    ogUrl: document.head.querySelectorAll('meta[property="og:url"]').length,
+  }
+}
+
+// Helmet's own tags (data-rh="true") are removed on unmount by
+// react-helmet-async itself; the SSR tags seeded above are plain nodes
+// Helmet never owned and RTL's cleanup() doesn't know about them, so each
+// test starts from a clean head regardless of what a prior test left behind.
+afterEach(() => {
+  document.head.querySelectorAll('link[rel="canonical"], meta[property="og:url"]').forEach(el => el.remove())
+})
+
+function withProviders(children, { themed = false } = {}) {
+  const withHelmet = <HelmetProvider>{children}</HelmetProvider>
+  return themed ? <ThemeProvider>{withHelmet}</ThemeProvider> : withHelmet
+}
+
+describe('SSR-injected routes — client Helmet must not duplicate canonical/og:url after mount', () => {
+  beforeEach(() => {
+    fetchPublicJson.mockReset()
+  })
+
+  it('ArtistsPage (/artists)', async () => {
+    fetchPublicJson.mockResolvedValue({ artists: [], hasMore: false })
+    seedSsrHead('/artists')
+
+    render(
+      withProviders(
+        <MemoryRouter>
+          <ArtistsPage />
+        </MemoryRouter>,
+        { themed: true }
+      )
+    )
+    await screen.findByRole('searchbox', { name: /search artists/i })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('VenuesPage (/venues)', async () => {
+    fetchPublicJson.mockResolvedValue({ venues: [], hasMore: false })
+    seedSsrHead('/venues')
+
+    render(
+      withProviders(
+        <MemoryRouter>
+          <VenuesPage />
+        </MemoryRouter>,
+        { themed: true }
+      )
+    )
+    await screen.findByRole('heading', { level: 1 })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('AboutPage (/about)', async () => {
+    seedSsrHead('/about')
+
+    render(
+      withProviders(
+        <MemoryRouter>
+          <AboutPage />
+        </MemoryRouter>
+      )
+    )
+    await screen.findByRole('heading', { level: 1 })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('ContactPage (/contact)', async () => {
+    seedSsrHead('/contact')
+
+    render(
+      withProviders(
+        <MemoryRouter>
+          <ContactPage />
+        </MemoryRouter>
+      )
+    )
+    await screen.findByRole('heading', { level: 1 })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('StatsPage (/stats)', async () => {
+    fetchPublicJson.mockResolvedValue({
+      bands: 22,
+      venues: 6,
+      events: 1,
+      performances: 23,
+      routes_shared: 14,
+      route_views: 40,
+      fans_following: 8,
+      page_views: 500,
+      top_bands: [],
+    })
+    seedSsrHead('/stats')
+
+    render(
+      withProviders(
+        <MemoryRouter>
+          <StatsPage />
+        </MemoryRouter>,
+        { themed: true }
+      )
+    )
+    await screen.findByText(/22/)
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('PrivacyPage (/privacy)', async () => {
+    seedSsrHead('/privacy')
+
+    render(
+      withProviders(
+        <MemoryRouter>
+          <PrivacyPage />
+        </MemoryRouter>
+      )
+    )
+    await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('TermsPage (/terms)', async () => {
+    seedSsrHead('/terms')
+
+    render(
+      withProviders(
+        <MemoryRouter>
+          <TermsPage />
+        </MemoryRouter>
+      )
+    )
+    await screen.findByRole('heading', { level: 1, name: 'Terms of Service' })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('SubscribePage (/subscribe)', async () => {
+    seedSsrHead('/subscribe')
+
+    render(
+      withProviders(
+        <MemoryRouter>
+          <SubscribePage />
+        </MemoryRouter>
+      )
+    )
+    await screen.findByRole('heading', { level: 1, name: 'Never Miss a Show' })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('EventRecapPage (/events/:slug/recap)', async () => {
+    fetchPublicJson.mockResolvedValue({
+      event: { id: 1, name: 'LWBC Vol17', slug: 'lwbc17', date: '2026-08-02' },
+      stats: { total_sets: 2, venue_count: 1, first_timers: 1, returning_acts: 1 },
+      bands: [],
+    })
+    seedSsrHead('/events/lwbc17/recap')
+
+    render(
+      withProviders(
+        <MemoryRouter initialEntries={['/events/lwbc17/recap']}>
+          <Routes>
+            <Route path="/events/:slug/recap" element={<EventRecapPage />} />
+          </Routes>
+        </MemoryRouter>
+      )
+    )
+    await screen.findByText('LWBC Vol17')
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('VenuePage (/venue/:id)', async () => {
+    fetchPublicJson.mockResolvedValue({
+      venue: { id: 3, name: 'Room 47', location: 'Waterloo, ON', address: null, website: null },
+      upcoming: [],
+      past: [],
+    })
+    seedSsrHead('/venue/3')
+
+    render(
+      withProviders(
+        <MemoryRouter initialEntries={['/venue/3']}>
+          <Routes>
+            <Route path="/venue/:id" element={<VenuePage />} />
+          </Routes>
+        </MemoryRouter>,
+        { themed: true }
+      )
+    )
+    await screen.findByRole('heading', { level: 1, name: 'Room 47' })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  it('BandProfilePage (/band/:id)', async () => {
+    fetchPublicJson.mockResolvedValue({
+      id: 206,
+      name: 'ALL',
+      photo_url: null,
+      photo_alt_text: null,
+      description: null,
+      genre: 'Punk',
+      origin: null,
+      social: {},
+      stats: null,
+      upcoming: [],
+      past: [],
+    })
+    seedSsrHead('/band/206')
+
+    render(
+      withProviders(
+        <MemoryRouter initialEntries={['/band/206']}>
+          <Routes>
+            <Route path="/band/:id" element={<BandProfilePage />} />
+          </Routes>
+        </MemoryRouter>,
+        { themed: true }
+      )
+    )
+    await screen.findByRole('heading', { level: 1, name: 'ALL' })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+  })
+
+  // App.jsx is the /event/:slug route's own component (main.jsx routes it
+  // directly, not through a dedicated page component) -- it fetches via raw
+  // fetch(), not fetchPublicJson, so it gets its own minimal mock rather than
+  // the shared fetchPublicJson mock above.
+  it('App (/event/:slug)', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        bands: [],
+        event: { id: 1, name: 'LWBC Vol17', slug: 'lwbc17', date: '2026-08-02', end_date: null },
+      }),
+    })
+    seedSsrHead('/event/lwbc17')
+
+    try {
+      render(
+        withProviders(
+          <MemoryRouter initialEntries={['/event/lwbc17']}>
+            <Routes>
+              <Route path="/event/:slug" element={<App />} />
+            </Routes>
+          </MemoryRouter>,
+          { themed: true }
+        )
+      )
+      // The event name renders in more than one place once loaded (breadcrumb,
+      // sticky context bar) -- findAllByText tolerates that; findByText would
+      // throw on the very success condition this is waiting for.
+      await screen.findAllByText(/LWBC Vol17/, {}, { timeout: 3000 })
+
+      expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    } finally {
+      global.fetch = originalFetch
+    }
+  })
+})

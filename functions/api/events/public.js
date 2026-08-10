@@ -4,6 +4,7 @@
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
+import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -38,7 +39,7 @@ export async function onRequestGet(context) {
         COUNT(DISTINCT p.venue_id) as venue_count
       FROM events e
       LEFT JOIN performances p ON p.event_id = e.id
-      WHERE e.is_published = 1
+      WHERE ${publicEventStatusSql("e")}
     `;
 
     const params = [];

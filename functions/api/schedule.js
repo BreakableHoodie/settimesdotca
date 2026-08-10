@@ -5,6 +5,7 @@
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
 import { normalizeHttpUrl, safeReflectSocialLinks } from "../utils/validation.js";
 import { logger } from "../utils/logger.js";
+import { publicEventStatusSql } from "../utils/eventVisibility.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -30,7 +31,7 @@ export async function onRequestGet(context) {
         `
         SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
         FROM events
-        WHERE is_published = 1
+        WHERE ${publicEventStatusSql()}
           AND COALESCE(end_date, date) >= date('now', '-6 hours')
         ORDER BY date ASC
         LIMIT 1
@@ -42,7 +43,7 @@ export async function onRequestGet(context) {
         `
         SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
         FROM events
-        WHERE slug = ? AND (is_published = 1 OR status = 'archived')
+        WHERE slug = ? AND ${publicEventStatusSql()}
       `,
       )
         .bind(eventParam)

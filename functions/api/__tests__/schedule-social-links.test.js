@@ -12,7 +12,7 @@ describe("GET /api/schedule - malformed social_links (#678 item 4)", () => {
 
     try {
       const ev = insertEvent(rawDb, { name: "Corrupt Fest", slug: "corrupt-social-links" });
-      rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+      rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
       const venue = insertVenue(rawDb, { name: "Venue C" });
       insertBand(rawDb, {
         name: "Broken Links Band",

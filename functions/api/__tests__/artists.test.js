@@ -9,7 +9,7 @@ function seedEnv() {
 }
 
 function publish(rawDb, eventId) {
-  rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(eventId);
+  rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(eventId);
 }
 
 async function getArtists(env, query = "") {

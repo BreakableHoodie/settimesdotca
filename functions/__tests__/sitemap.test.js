@@ -18,7 +18,7 @@ async function fetchSitemap(env) {
 }
 
 function publish(rawDb, eventId) {
-  rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(eventId);
+  rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(eventId);
 }
 
 describe("GET /sitemap.xml — recap entries (#555)", () => {

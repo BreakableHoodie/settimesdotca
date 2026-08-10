@@ -8,6 +8,7 @@ import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_SHOW_CRITICAL } from "../../utils/cacheHeaders.js";
 import { validateId } from "../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../utils/eventDay.js";
+import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -69,7 +70,7 @@ export async function onRequestGet(context) {
       JOIN events e ON e.id = p.event_id
       JOIN band_profiles bp ON bp.id = p.band_profile_id
       WHERE p.venue_id = ?
-        AND (e.is_published = 1 OR e.status = 'archived')
+        AND ${publicEventStatusSql("e")}
         AND (e.reveal_mode = 0 OR p.is_announced = 1)
       -- Events newest-first, but sets CHRONOLOGICAL within an event (#741).
       -- Ordering on start_time alone put a day-3 16:10 set ahead of a day-1

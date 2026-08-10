@@ -724,7 +724,7 @@ describe("Timeline real-DB — reveal_mode JOIN gate (SQL exercise)", () => {
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET reveal_mode=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const perf = insertBand(rawDb, {
@@ -771,7 +771,6 @@ describe("Timeline real-DB — upcoming has no fixed day-window cap (SQL exercis
       date: farFuture,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -818,7 +817,6 @@ describe("Timeline real-DB — NULL venue_id must not inflate venue_count (#479)
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     // venue_id defaults to null in insertBand — performance has no venue assigned
     insertBand(rawDb, { name: "Unassigned Band", event_id: event.id });
@@ -869,7 +867,6 @@ describe("Timeline real-DB — derived band url is scheme-validated (#483)", () 
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, {
@@ -908,7 +905,6 @@ describe("Timeline real-DB — derived band url is scheme-validated (#483)", () 
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, {
@@ -954,7 +950,6 @@ describe("Timeline real-DB — event ticket_url is scheme-validated (#504)", () 
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     rawDb
       .prepare("UPDATE events SET ticket_url = ? WHERE id = ?")
       // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 read-path guard
@@ -983,7 +978,6 @@ describe("Timeline real-DB — event ticket_url is scheme-validated (#504)", () 
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/crawl", event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
@@ -1020,7 +1014,6 @@ describe("Timeline real-DB — event poster_url is present and scheme-validated 
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     rawDb
       .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
       .run("https://cdn.example.com/posters/poster-event.jpg", event.id);
@@ -1048,7 +1041,6 @@ describe("Timeline real-DB — event poster_url is present and scheme-validated 
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1073,7 +1065,6 @@ describe("Timeline real-DB — event poster_url is present and scheme-validated 
       date: today,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #658 read-path guard
     rawDb.prepare("UPDATE events SET poster_url = ? WHERE id = ?").run("javascript:alert(1)", event.id);
 
@@ -1119,7 +1110,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       status: "published",
       doors_json: JSON.stringify({ "2026-07-10": "16:00" }),
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1145,7 +1135,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       status: "published",
       doors_json: JSON.stringify({ "2026-07-10": "16:00" }),
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1173,7 +1162,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       status: "published",
       doors_json: JSON.stringify({ "2026-07-10": "16:00", "2026-07-11": "10:00" }),
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1201,7 +1189,7 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
     });
     // Seed malformed JSON directly — bypasses validateDoorsJson, simulating a
     // legacy/corrupt row.
-    rawDb.prepare("UPDATE events SET is_published=1, doors_json=? WHERE id=?").run("{not valid json", event.id);
+    rawDb.prepare("UPDATE events SET doors_json=? WHERE id=?").run("{not valid json", event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1227,7 +1215,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       date: "2026-07-10",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1251,7 +1238,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       date: "2026-07-10",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, {
@@ -1285,7 +1271,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       date: "2026-07-10",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, {
@@ -1321,7 +1306,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       status: "published",
       doors_json: JSON.stringify({ "2026-07-10": "16:00" }),
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, {
@@ -1359,7 +1343,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       date: "2026-07-10",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, {
@@ -1403,7 +1386,6 @@ describe("Timeline real-DB — start-edge gate (#569)", () => {
       end_date: "2026-07-11",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Roost" });
     const fridayPerf = insertBand(rawDb, {
@@ -1469,7 +1451,6 @@ describe("Timeline real-DB — end-edge gate (#751)", () => {
       date: "2026-07-10",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Roost" });
     const evening = insertBand(rawDb, {
@@ -1517,7 +1498,6 @@ describe("Timeline real-DB — end-edge gate (#751)", () => {
       date: "2026-07-10",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1544,7 +1524,6 @@ describe("Timeline real-DB — end-edge gate (#751)", () => {
       end_date: "2026-08-09",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "The Mill" });
     const lastNightSet = insertBand(rawDb, {
@@ -1584,7 +1563,6 @@ describe("Timeline real-DB — end-edge gate (#751)", () => {
       date: "2026-07-10",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1630,7 +1608,6 @@ describe("Timeline real-DB — end_date exposed on event objects (#542 PR-1)", (
       end_date: "2026-07-12",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1654,7 +1631,6 @@ describe("Timeline real-DB — end_date exposed on event objects (#542 PR-1)", (
       end_date: "2026-07-22",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(multiDay.id);
 
     const singleDay = insertEvent(rawDb, {
       name: "Future One-Nighter",
@@ -1662,7 +1638,6 @@ describe("Timeline real-DB — end_date exposed on event objects (#542 PR-1)", (
       date: "2026-07-15",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(singleDay.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1690,7 +1665,6 @@ describe("Timeline real-DB — end_date exposed on event objects (#542 PR-1)", (
       end_date: "2026-07-05",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const request = new Request("https://example.test/api/events/timeline");
     const response = await timelineHandler({ request, env });
@@ -1726,7 +1700,6 @@ describe("Timeline real-DB — duplicate performer chips for a two-set band (#60
       date: farFuture,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     insertBand(rawDb, {

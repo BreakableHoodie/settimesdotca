@@ -1,6 +1,7 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { normalizeHttpUrl } from "../../../utils/validation.js";
 import { sortableName } from "../../../utils/sortableName.js";
+import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
 
 // SQLite `ORDER BY` can't strip a leading article inline (#587); the SQL
 // query below is a coarse pre-sort and this comparator re-derives the exact
@@ -99,7 +100,7 @@ export async function onRequestGet(context) {
             -- it's archived — restricting to status='archived' would then miss
             -- prior editions that are only published so far and wrongly call a
             -- returning act a first-timer. published-or-archived covers both.
-            AND (e2.is_published = 1 OR e2.status = 'archived')
+            AND ${publicEventStatusSql("e2")}
             -- "Returning" means chronologically earlier, not merely "some other
             -- event" (#613): without this, a band that only played a LATER
             -- archived edition counted as returning at an EARLIER one. Same-day

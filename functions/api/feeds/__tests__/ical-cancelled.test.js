@@ -12,7 +12,7 @@ describe("GET /api/feeds/ical — cancelled sets", () => {
       slug: "ical-cancelled",
       date: futureDate,
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Blue Room" });
 
     // Insert one cancelled set and one scheduled set

@@ -29,7 +29,6 @@ describe("SSR /s/[slug] — OG card resolves live performances (#733)", () => {
   function seed() {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Vol. 17", slug: "vol17" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     return { env, rawDb, event, venue };
   }

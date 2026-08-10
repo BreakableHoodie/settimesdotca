@@ -3,6 +3,7 @@
 // Body: { event_id, event_slug, performance_ids[], band_names[] }
 
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
+import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 const MAX_PERFORMANCE_IDS = 50;
 const MAX_BAND_NAME_LENGTH = 100;
@@ -58,7 +59,7 @@ export async function onRequestPost(context) {
       return json({ error: `Band names must not exceed ${MAX_BAND_NAME_LENGTH} characters` }, 400);
     }
 
-    const event = await DB.prepare(`SELECT id FROM events WHERE id = ? AND (is_published = 1 OR status = 'archived')`)
+    const event = await DB.prepare(`SELECT id FROM events WHERE id = ? AND ${publicEventStatusSql()}`)
       .bind(Number(event_id))
       .first();
     if (!event) {

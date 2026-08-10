@@ -4,6 +4,7 @@
  */
 import { getPublicDataGateResponse } from "./utils/publicGate.js";
 import { eventLocalToday } from "./utils/eventDay.js";
+import { publicEventStatusSql } from "./utils/eventVisibility.js";
 
 export async function onRequestGet(context) {
   const { env } = context;
@@ -15,20 +16,20 @@ export async function onRequestGet(context) {
 
   try {
     const [{ results: events }, { results: bands }, { results: venues }] = await Promise.all([
-      env.DB.prepare(`SELECT slug, date FROM events WHERE is_published = 1 ORDER BY date DESC`).all(),
+      env.DB.prepare(`SELECT slug, date FROM events WHERE ${publicEventStatusSql()} ORDER BY date DESC`).all(),
       env.DB.prepare(
         `SELECT DISTINCT bp.id
          FROM band_profiles bp
          INNER JOIN performances p ON p.band_profile_id = bp.id
          INNER JOIN events e ON e.id = p.event_id
-         WHERE e.is_published = 1`,
+         WHERE ${publicEventStatusSql("e")}`,
       ).all(),
       env.DB.prepare(
         `SELECT DISTINCT v.id
          FROM venues v
          INNER JOIN performances p ON p.venue_id = v.id
          INNER JOIN events e ON e.id = p.event_id
-         WHERE e.is_published = 1`,
+         WHERE ${publicEventStatusSql("e")}`,
       ).all(),
     ]);
 

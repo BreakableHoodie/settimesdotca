@@ -59,14 +59,12 @@ describe("SSR /events/[slug]/recap", () => {
   test("injects the recap's own canonical + og:url, and strips the homepage's", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const event = insertEvent(rawDb, {
+    insertEvent(rawDb, {
       name: "Recap Event",
       slug: "recap-event",
       date: "2026-08-02",
       status: "archived",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
-
     const response = await onRequestGet(makeContext({ env, slug: "recap-event" }));
     expect(response.status).toBe(200);
     const html = await response.text();
@@ -83,14 +81,12 @@ describe("SSR /events/[slug]/recap", () => {
   test("exactly one of every identity tag — no duplicate from the homepage shell", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const event = insertEvent(rawDb, {
+    insertEvent(rawDb, {
       name: "Single Tag Event",
       slug: "single-tag-event",
       date: "2026-08-02",
       status: "archived",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
-
     const response = await onRequestGet(makeContext({ env, slug: "single-tag-event" }));
     const html = await response.text();
 
@@ -108,7 +104,6 @@ describe("SSR /events/[slug]/recap", () => {
       date: "2025-08-03",
       status: "archived",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Main Stage" });
     insertBand(rawDb, { name: "Band A", event_id: event.id, venue_id: venue.id });
     insertBand(rawDb, { name: "Band B", event_id: event.id, venue_id: venue.id });
@@ -127,14 +122,12 @@ describe("SSR /events/[slug]/recap", () => {
   test("falls back to the branded default og:image when the event has no poster", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const event = insertEvent(rawDb, {
+    insertEvent(rawDb, {
       name: "No Poster Event",
       slug: "no-poster-event",
       date: "2026-08-02",
       status: "archived",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
-
     const response = await onRequestGet(makeContext({ env, slug: "no-poster-event" }));
     const html = await response.text();
 
@@ -152,7 +145,7 @@ describe("SSR /events/[slug]/recap", () => {
       status: "archived",
     });
     rawDb
-      .prepare("UPDATE events SET is_published=1, poster_url = ? WHERE id = ?")
+      .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
       .run("https://band-photos.settimes.ca/event-posters/recap.jpg", event.id);
 
     const response = await onRequestGet(makeContext({ env, slug: "postered-event" }));
@@ -183,8 +176,8 @@ describe("SSR /events/[slug]/recap", () => {
       date: "2026-08-02",
       status: "draft",
     });
-    // is_published stays 0 (default) and status stays 'draft' -- matches
-    // neither half of the (is_published = 1 OR status = 'archived') gate.
+    // status stays 'draft' (the insertEvent default) -- doesn't satisfy
+    // publicEventStatusSql()'s status IN ('published', 'archived') gate.
 
     const response = await onRequestGet(makeContext({ env, slug: "draft-event-recap" }));
     expect(response.status).toBe(200);
@@ -200,12 +193,12 @@ describe("SSR /events/[slug]/recap", () => {
   test("falls back to the plain shell for a published event whose date is in the future", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const event = insertEvent(rawDb, {
+    insertEvent(rawDb, {
       name: "Future Event",
       slug: "future-event-recap",
       date: "2999-01-01",
+      status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const response = await onRequestGet(makeContext({ env, slug: "future-event-recap" }));
     expect(response.status).toBe(200);
@@ -225,8 +218,9 @@ describe("SSR /events/[slug]/recap", () => {
       name: "In-Progress Multiday Event",
       slug: "in-progress-multiday-recap",
       date: "2026-08-02",
+      status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, end_date='2999-01-01' WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET end_date='2999-01-01' WHERE id=?").run(event.id);
 
     const response = await onRequestGet(makeContext({ env, slug: "in-progress-multiday-recap" }));
     expect(response.status).toBe(200);
@@ -242,12 +236,12 @@ describe("SSR /events/[slug]/recap", () => {
   test("falls back to the plain shell for a calendar-invalid legacy date (Feb 30)", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const event = insertEvent(rawDb, {
+    insertEvent(rawDb, {
       name: "Bad Legacy Date Event",
       slug: "bad-legacy-date-recap",
       date: "2026-02-30",
+      status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const response = await onRequestGet(makeContext({ env, slug: "bad-legacy-date-recap" }));
     expect(response.status).toBe(200);
@@ -258,14 +252,12 @@ describe("SSR /events/[slug]/recap", () => {
   test("falls back to the plain shell when the public-data gate is closed", async () => {
     const { env, rawDb } = createTestEnv();
     // PUBLIC_DATA_PUBLISH_ENABLED intentionally left unset.
-    const event = insertEvent(rawDb, {
+    insertEvent(rawDb, {
       name: "Gated Event",
       slug: "gated-event",
       date: "2026-08-02",
       status: "archived",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
-
     const response = await onRequestGet(makeContext({ env, slug: "gated-event" }));
     expect(response.status).toBe(200);
     const html = await response.text();

@@ -30,7 +30,7 @@ describe("GET /api/schedule/share/[slug]", () => {
   test("returns share link data for a valid slug", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     insertShareLink(rawDb, {
       slug: "abc12345",
       event_id: event.id,
@@ -96,7 +96,7 @@ describe("GET /api/schedule/share/[slug]", () => {
   test("counts one view per visitor, not one per fetch (#705)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     insertShareLink(rawDb, {
       slug: "view1234",
       event_id: event.id,
@@ -127,7 +127,7 @@ describe("GET /api/schedule/share/[slug]", () => {
   test("never writes an orphan ledger row when the parent link is gone (#705)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     insertShareLink(rawDb, {
       slug: "orphan01",
       event_id: event.id,
@@ -178,7 +178,7 @@ describe("GET /api/schedule/share/[slug]", () => {
   test("link-preview crawlers never count (#705)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     insertShareLink(rawDb, {
       slug: "crawler1",
       event_id: event.id,
@@ -211,7 +211,7 @@ describe("GET /api/schedule/share/[slug]", () => {
   test("does not increment view_count for an import refetch (?import=1)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     insertShareLink(rawDb, {
       slug: "import12",
       event_id: event.id,
@@ -237,7 +237,7 @@ describe("GET /api/schedule/share/[slug]", () => {
   test("increments import_count for an import refetch (?import=1) but not view_count (#703)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     insertShareLink(rawDb, {
       slug: "import99",
       event_id: event.id,
@@ -264,7 +264,7 @@ describe("GET /api/schedule/share/[slug]", () => {
   test("a normal GET (no ?import=1) increments view_count but not import_count (#703)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     insertShareLink(rawDb, {
       slug: "normal01",
       event_id: event.id,
@@ -285,7 +285,7 @@ describe("GET /api/schedule/share/[slug]", () => {
   test("an import-counter write failure still returns the share payload with 200 (#703)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     insertShareLink(rawDb, {
       slug: "failimp1",
       event_id: event.id,

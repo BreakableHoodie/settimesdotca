@@ -72,7 +72,7 @@ describe("JSON-LD golden snapshot — /event/[slug]", () => {
       slug: "golden-lwbc17",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     // Pin created_at: offers.validFrom is derived from it (see [slug].js),
     // so leaving the schema default (datetime('now')) would make the
     // snapshot re-run non-deterministic — a new validFrom every day.

@@ -16,7 +16,7 @@ describe("GET /api/venues/:id — reveal_mode gate", () => {
       slug: "venue-reveal-hidden",
       date: futureDate,
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Hidden Venue Band",
       event_id: event.id,
@@ -45,7 +45,7 @@ describe("GET /api/venues/:id — reveal_mode gate", () => {
       slug: "venue-reveal-shown",
       date: futureDate,
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Revealed Venue Band",
       event_id: event.id,
@@ -74,7 +74,7 @@ describe("GET /api/venues/:id — reveal_mode gate", () => {
       slug: "venue-reveal-mode0",
       date: futureDate,
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=0 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Normal Venue Band",
       event_id: event.id,
@@ -124,7 +124,7 @@ describe("GET /api/venues/:id — end-edge gate (#750)", () => {
       slug: "venue-endedge-single",
       date: "2026-08-07",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Night Owl Set",
       event_id: event.id,
@@ -157,7 +157,7 @@ describe("GET /api/venues/:id — end-edge gate (#750)", () => {
       slug: "venue-endedge-single-cutover",
       date: "2026-08-07",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Cutover Band",
       event_id: event.id,
@@ -192,7 +192,7 @@ describe("GET /api/venues/:id — multi-day ordering and per-set dates (#741)", 
       end_date: "2099-08-09",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
 
     // Deliberately inserted out of order, with the LATEST day carrying the
     // EARLIEST clock time -- the exact shape that made start_time-only
@@ -287,7 +287,7 @@ describe("GET /api/venues/:id — performer card fields (#742)", () => {
       slug: "card-fields-upcoming",
       date: "2099-01-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(upcomingEvent.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(upcomingEvent.id);
     insertBand(rawDb, {
       name: "Photogenic Band",
       event_id: upcomingEvent.id,
@@ -301,7 +301,7 @@ describe("GET /api/venues/:id — performer card fields (#742)", () => {
       slug: "card-fields-past",
       date: "2001-01-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(pastEvent.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(pastEvent.id);
     insertBand(rawDb, {
       name: "Archived Photogenic Band",
       event_id: pastEvent.id,
@@ -328,7 +328,7 @@ describe("GET /api/venues/:id — performer card fields (#742)", () => {
 
     const venue = insertVenue(rawDb, { name: "Blank Fields Venue" });
     const event = insertEvent(rawDb, { name: "Blank Fields Event", slug: "blank-fields-event", date: "2099-01-01" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     insertBand(rawDb, { name: "Plain Band", event_id: event.id, venue_id: venue.id });
 
     const response = await onRequestGet({ env, params: { id: String(venue.id) } });

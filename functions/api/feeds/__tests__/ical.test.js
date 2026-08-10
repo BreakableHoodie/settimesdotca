@@ -254,7 +254,7 @@ describe("GET /api/feeds/ical — reveal_mode gate (real-DB)", () => {
       slug: "ical-reveal-hidden",
       date: futureDate,
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const perf = insertBand(rawDb, {
       name: "Hidden iCal Band",
@@ -281,7 +281,7 @@ describe("GET /api/feeds/ical — reveal_mode gate (real-DB)", () => {
       slug: "ical-reveal-shown",
       date: futureDate,
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Princess Cafe" });
     const perf = insertBand(rawDb, {
       name: "Revealed iCal Band",
@@ -308,7 +308,7 @@ describe("GET /api/feeds/ical — reveal_mode gate (real-DB)", () => {
       slug: "ical-reveal-mode0",
       date: futureDate,
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=0 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Room 47" });
     const perf = insertBand(rawDb, {
       name: "Normal iCal Band",
@@ -348,7 +348,7 @@ describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
       date: day1,
       end_date: day2,
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Roost" });
 
     const day2Perf = insertBand(rawDb, {
@@ -388,7 +388,7 @@ describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
       date: day1,
       end_date: day2,
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Prohibition Warehouse" });
 
     const lateNightPerf = insertBand(rawDb, {
@@ -426,7 +426,7 @@ describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
       date: day1,
       end_date: day2,
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Room 47" });
 
     // Day-1 early set (NULL performance_date — inherits the event's date).
@@ -496,7 +496,7 @@ describe("GET /api/feeds/ical — midnight-straddling DTEND rolls to the next da
       slug: "ical-straddle",
       date: "2099-03-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Room 47" });
 
     insertBand(rawDb, {
@@ -527,7 +527,7 @@ describe("GET /api/feeds/ical — midnight-straddling DTEND rolls to the next da
       slug: "ical-month-boundary",
       date: "2099-03-31",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Princess Cafe" });
 
     insertBand(rawDb, {

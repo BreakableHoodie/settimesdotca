@@ -2,6 +2,7 @@ import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_SHOW_CRITICAL } from "../../utils/cacheHeaders.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
 import { eventLocalToday, eventLocalFestivalToday, eventLocalClock } from "../../utils/eventDay.js";
+import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 /**
  * 24-hour "HH:MM" time regex — mirrors DOORS_TIME_REGEX in validation.js.
@@ -331,7 +332,7 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1) AND p.is_cancelled = 0
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
-        WHERE e.is_published = 1
+        WHERE ${publicEventStatusSql("e")}
         AND e.date <= ?
         AND COALESCE(e.end_date, e.date) >= ?
         ORDER BY e.date DESC, p.start_time, v.name
@@ -382,11 +383,11 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
-        WHERE e.is_published = 1
+        WHERE ${publicEventStatusSql("e")}
         AND e.date > ?
         AND e.id IN (
           SELECT id FROM events
-          WHERE is_published = 1
+          WHERE ${publicEventStatusSql()}
           AND date > ?
           ORDER BY date ASC
           LIMIT 10
@@ -443,13 +444,12 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
-        WHERE (
-          (e.is_published = 1 AND COALESCE(e.end_date, e.date) < ?)
-          OR e.status = 'archived'
-        )
+        WHERE ${publicEventStatusSql("e")}
+        AND COALESCE(e.end_date, e.date) < ?
         AND e.id IN (
           SELECT id FROM events
-          WHERE (is_published = 1 AND COALESCE(end_date, date) < ?) OR status = 'archived'
+          WHERE ${publicEventStatusSql()}
+          AND COALESCE(end_date, date) < ?
           ORDER BY date DESC
           LIMIT ?
         )

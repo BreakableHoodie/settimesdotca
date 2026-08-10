@@ -1,6 +1,7 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { CACHE_SHOW_CRITICAL } from "../../../utils/cacheHeaders.js";
 import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
+import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
 
 /**
  * Public API: Get event details (bands + venues) for a single published event
@@ -41,7 +42,7 @@ export async function onRequestGet(context) {
       `
       SELECT id, name, slug, date, ticket_url, status, reveal_mode
       FROM events
-      WHERE id = ? AND (is_published = 1 OR status = 'archived')
+      WHERE id = ? AND ${publicEventStatusSql()}
       LIMIT 1
     `,
     )

@@ -2,6 +2,7 @@ import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { normalizeBandName } from "../../utils/bandName.js";
 import { safeReflectSocialLinks } from "../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../utils/eventDay.js";
+import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 /**
  * Public API: Get band profile by name
@@ -114,13 +115,12 @@ export async function onRequestGet(context) {
         e.name as event_name,
         e.slug as event_slug,
         e.date as event_date,
-        e.end_date as event_end_date,
-        e.is_published as event_published
+        e.end_date as event_end_date
       FROM performances p
       LEFT JOIN venues v ON p.venue_id = v.id
       LEFT JOIN events e ON p.event_id = e.id
       WHERE p.band_profile_id = ?
-        AND e.is_published = 1
+        AND ${publicEventStatusSql("e")}
         AND (e.reveal_mode = 0 OR p.is_announced = 1)
       ORDER BY e.date DESC, p.start_time
     `,

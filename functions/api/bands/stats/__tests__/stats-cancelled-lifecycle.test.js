@@ -28,7 +28,6 @@ describe("GET /api/bands/stats/:name — cancelled set lifecycle (#732)", () => 
       date: "2099-01-01",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Stats 732 Cancelled Band",
       event_id: event.id,
@@ -66,7 +65,6 @@ describe("GET /api/bands/stats/:name — cancelled set lifecycle (#732)", () => 
       date: "2001-01-01",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Stats 732 Past Cancelled Band",
       event_id: event.id,
@@ -94,7 +92,6 @@ describe("GET /api/bands/stats/:name — cancelled set lifecycle (#732)", () => 
       date: "2001-01-01",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     insertBand(rawDb, {
       name: "Stats 732 Past Normal Band",
       event_id: event.id,
@@ -127,7 +124,6 @@ describe("GET /api/bands/stats/:name — cancelled set lifecycle (#732)", () => 
       end_date: "2026-07-12",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const day1 = insertBand(rawDb, {
       name: "Stats 732 Multiday Band",

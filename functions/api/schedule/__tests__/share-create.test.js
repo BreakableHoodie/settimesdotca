@@ -14,7 +14,7 @@ describe("POST /api/schedule/share", () => {
   test("creates a share link and returns a slug", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { slug: "my-event" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
     const venue = insertVenue(rawDb);
     const perf = insertBand(rawDb, { event_id: event.id, venue_id: venue.id });
 

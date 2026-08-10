@@ -8,6 +8,7 @@
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
 import { safeReflectSocialLinks } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
+import { publicEventStatusSql } from "../utils/eventVisibility.js";
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 60;
@@ -64,7 +65,7 @@ export async function onRequestGet(context) {
       FROM band_profiles bp
       JOIN performances p ON p.band_profile_id = bp.id
       JOIN events e ON e.id = p.event_id
-      WHERE (e.is_published = 1 OR e.status = 'archived')
+      WHERE ${publicEventStatusSql("e")}
         AND (
           ? = ''
           OR bp.name LIKE ? ESCAPE '\\'

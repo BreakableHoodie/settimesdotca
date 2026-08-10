@@ -62,6 +62,27 @@ describe("SSR /band/[id] — JSON-LD description is not SERP-truncated (#790)", 
     expect(musicGroup.description.length).toBe(250);
   });
 
+  test("musicGroup.description is still capped, at JSONLD_DESCRIPTION_MAX_LENGTH", async () => {
+    // The point of the fix is a LONGER limit, not an absent one -- without a
+    // cap a pathological bio would inflate every crawler's payload. Production's
+    // longest bio is 2521 chars, so nothing hits this today; the test exists so
+    // that stays a deliberate headroom choice rather than an accident.
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const hugeBio = "A".repeat(5001);
+    const info = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized, description) VALUES (?, ?, ?)")
+      .run("Huge Bio Band", "hugebioband", hugeBio);
+
+    const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
+    const html = await response.text();
+
+    const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    const musicGroup = JSON.parse(jsonLdMatch[1]);
+    expect(musicGroup.description).toHaveLength(5000);
+    expect(musicGroup.description.endsWith("…")).toBe(true);
+  });
+
   test("a bio under 200 chars is identical (untruncated) in both places", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";

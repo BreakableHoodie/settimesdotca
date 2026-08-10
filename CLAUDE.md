@@ -194,7 +194,7 @@ Use `document.title = pageTitle` directly in a `useEffect` within the page compo
 
 Example: `frontend/src/pages/BandProfilePage.jsx` — uses both `<Helmet>` (for other meta) and `document.title = ...` for the title.
 
-### SSR owns identity meta and JSON-LD where it emits either; client `<Helmet>` owns only `<title>` — never canonical/og:*/twitter:*/description, and never JSON-LD on a route whose SSR handler already emits it
+### SSR owns identity meta and JSON-LD where it emits either; client `<Helmet>` owns only `<title>` — never canonical/`og:*`/`twitter:*`/description, and never JSON-LD on a route whose SSR handler already emits it
 
 `<Helmet>` only manages tags it created itself, marked internally with `data-rh`. Neither `index.html`'s baked-in defaults nor a Pages Function's server-injected `<meta>`/`<link>` carry that marker, so Helmet can't tell it already owns the slot — it **appends** a second copy on mount instead of replacing the first. `/artists` first showed this as `index.html`'s homepage `og:url="https://settimes.ca/"` sitting ahead of the page's own client-declared canonical: Google reads `og:url` as a canonicalization hint, prefers the first tag, and overrode our canonical — surfacing in Search Console as **"Duplicate, Google chose different canonical than user."**
 

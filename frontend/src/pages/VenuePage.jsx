@@ -146,27 +146,17 @@ export default function VenuePage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
-      {/* description/canonical are SSR-owned for this route --
-          functions/venue/[id].js injects them server-side; declaring them
-          here too would duplicate them on mount instead of replacing them.
-          <title> and the JSON-LD below stay client-owned (JSON-LD dupes its
-          own MusicVenue block SSR-side too -- tracked separately, out of
-          scope for the canonical/og:* /twitter:* /description ownership fix
-          here). */}
+      {/* description/canonical/og:* /twitter:* AND JSON-LD are all SSR-owned
+          for this route -- functions/venue/[id].js injects them server-side
+          (with a structured PostalAddress and a broader sameAs than this
+          component ever emitted). Declaring any of them here too would
+          duplicate them on mount instead of replacing them. <title> has no
+          SSR equivalent (SSR sets <title> on the raw HTML response only) and
+          stays client-owned, backed by the direct document.title assignment
+          in the effect above -- same React 19 Helmet-unreliability reasoning
+          as every other SSR-injected route. */}
       <Helmet>
         <title>{venue ? `${venue.name} – SetTimes` : 'Venue – SetTimes'}</title>
-        {venue && (
-          <script type="application/ld+json">
-            {JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'MusicVenue',
-              name: venue.name,
-              url: `https://settimes.ca/venue/${venue.id}`,
-              ...(venue.address && { address: venue.address }),
-              ...(safeExternalHref(venue.website) !== '#' && { sameAs: [venue.website] }),
-            })}
-          </script>
-        )}
       </Helmet>
 
       <header className="border-b border-accent-500/30 px-4 py-6">

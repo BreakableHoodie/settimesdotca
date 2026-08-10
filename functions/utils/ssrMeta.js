@@ -21,8 +21,17 @@
 // adopting and replacing tags it didn't create, the same behavior already
 // documented elsewhere in this repo as unreliable for document.title under React
 // 19. A route's client Helmet may still set <title> (backed by a direct
-// `document.title = ...` assignment, same reasoning) and page-specific JSON-LD —
-// just never the identity tags this file injects.
+// `document.title = ...` assignment, same reasoning) — just never the identity
+// tags this file injects.
+//
+// JSON-LD ownership follows the same rule, scoped to whether THIS file's
+// caller passes a jsonLd block for the route it's serving: where it does
+// (currently /band/*, /venue/* and /event/*), SSR owns it and the page's
+// client Helmet must not also declare it, for the identical append-not-replace
+// reason above (#790). Where the route's SSR handler emits no jsonLd (the
+// STATIC_PAGES registry entries and the recap page currently pass none, and
+// `/` is excluded from this file's ownership entirely), the page's own
+// client Helmet remains the only copy and stays responsible for it.
 
 // Canonical host for SSR-injected canonicals and og:url. Preview deploys
 // (*.pages.dev) must NOT emit their own host as the canonical — pin to prod.
@@ -86,7 +95,27 @@ export function toPlainText(rawInput, maxLength = 200) {
   };
   text = text.replace(/&(?:nbsp|amp|lt|gt|quot|#39);/gi, (m) => ENTITY_MAP[m.toLowerCase()] ?? m);
 
-  text = text.replace(/\s+/g, " ").trim();
+  return truncatePlainText(text.replace(/\s+/g, " ").trim(), maxLength);
+}
+
+// Truncation half of toPlainText, split out so a caller needing the SAME text at
+// two lengths (band/[id].js emits a 200-char meta description and a 5000-char
+// JSON-LD one) strips once and truncates twice, rather than running toPlainText's
+// ~15 regex passes over the same input twice on a hot SSR path (#790 review).
+// Truncating an already-truncated string is safe: the shorter cut is a prefix of
+// the longer one, so truncate(truncate(t, 5000), 200) === truncate(t, 200).
+// Expects text that is already stripped and whitespace-collapsed.
+export function truncatePlainText(text, maxLength) {
+  // Clamp rather than throw. `slice(0, maxLength - 1)` turns a maxLength of 0
+  // into slice(0, -1), which drops one char and appends an ellipsis -- so
+  // truncatePlainText("abc", 0) returned "ab…", LONGER than the limit asked for
+  // (#798 review; the same latent defect lived in toPlainText before this
+  // function was split out of it). No caller passes a non-positive length, but
+  // this is an exported helper, so it has to be total. A throw would be wrong
+  // here specifically: band/[id].js calls this outside any try block, so a
+  // RangeError would escape onRequest as a 500 rather than degrading to the SPA
+  // shell -- the opposite of this module's stated fallback contract.
+  if (!(maxLength > 0)) return "";
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1).trimEnd()}…`;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST } from "../ssrMeta.js";
+import { escapeAttr, toPlainText, truncatePlainText, serveWithInjectedMeta, CANONICAL_HOST } from "../ssrMeta.js";
 
 const DEFAULT_HTML = `<!doctype html><html><head>
     <meta name="description" content="Homepage description" />
@@ -53,6 +53,35 @@ describe("ssrMeta.toPlainText", () => {
   });
   it("returns empty string for empty input", () => {
     expect(toPlainText(null)).toBe("");
+  });
+});
+
+describe("ssrMeta.truncatePlainText", () => {
+  it("never returns more characters than asked for", () => {
+    // The bug this guards: slice(0, maxLength - 1) turns a maxLength of 0 into
+    // slice(0, -1), which drops one char and still appends the ellipsis --
+    // "abc" came back as "ab…", longer than the zero requested (#798 review).
+    expect(truncatePlainText("abc", 0)).toBe("");
+    expect(truncatePlainText("abc", -5)).toBe("");
+    // Degenerate-but-positive: one character of budget spends it on the ellipsis.
+    expect(truncatePlainText("abc", 1)).toBe("…");
+  });
+  it("clamps a non-numeric length instead of throwing", () => {
+    // band/[id].js calls this outside any try block, so throwing would surface
+    // as a 500 rather than the SPA-shell fallback this module promises.
+    expect(truncatePlainText("abc", undefined)).toBe("");
+    expect(truncatePlainText("abc", NaN)).toBe("");
+  });
+  it("passes text through untouched when it already fits", () => {
+    expect(truncatePlainText("abc", 3)).toBe("abc");
+    expect(truncatePlainText("abc", 99)).toBe("abc");
+  });
+  it("is equivalent to truncating the original directly", () => {
+    // Why band/[id].js can derive its 200-char meta description from the
+    // already-truncated 5000-char JSON-LD one: the shorter cut is a prefix of
+    // the longer, so re-truncating is the same as truncating once.
+    const long = "x".repeat(9000);
+    expect(truncatePlainText(truncatePlainText(long, 5000), 200)).toBe(truncatePlainText(long, 200));
   });
 });
 

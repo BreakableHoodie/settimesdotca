@@ -7,7 +7,13 @@
 // at once. That produced a real "Duplicate, Google chose different canonical
 // than user" Search Console error (see CLAUDE.md, "SSR owns identity meta").
 // The fix is ownership: on every SSR-injected route below, the page's own
-// <Helmet> was trimmed to <title> (+ JSON-LD where present) only.
+// <Helmet> was stripped of everything SSR emits. It may still declare tags SSR
+// does NOT emit (BandProfilePage's <meta name="keywords"> is the live case) --
+// deleting one of those would drop the tag rather than de-duplicate it. #790
+// extended the same fix (and this file's seed-then-mount-then-count pattern) to
+// JSON-LD on /band/:id and /venue/:id, whose client <Helmet> used to emit its
+// own MusicGroup/MusicVenue <script> block duplicating the one
+// functions/band/[id].js and functions/venue/[id].js already inject server-side.
 //
 // This app is client-side rendered, not server-rendered: main.jsx calls
 // ReactDOM.createRoot(...).render(...), never hydrateRoot — the SSR layer
@@ -21,9 +27,10 @@
 // sequence, not an approximation of a hydrateRoot pass that never runs here.
 //
 // Mutation check performed by hand: reverting any one of the Helmet trims in
-// this PR (restoring that page's old canonical/og:url declaration) turns its
-// "exactly one" assertion below into "found 2" and fails — see the PR
-// description for the recorded run. That's what makes this a real
+// this PR (restoring that page's old canonical/og:url declaration, or
+// restoring the /band/:id or /venue/:id client JSON-LD block removed in
+// #790) turns its "exactly one" assertion below into "found 2" and fails —
+// see the PR description for the recorded run. That's what makes this a real
 // regression guard rather than a tautology that would pass either way.
 import { render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
@@ -80,12 +87,59 @@ function countIdentityTags() {
   }
 }
 
+// Stands in for the JSON-LD <script> blocks functions/band/[id].js and
+// functions/venue/[id].js inject server-side (#790) -- appended to <head>,
+// matching serveWithInjectedMeta's real injection point (just before
+// </head>) -- the same seed-then-mount-then-count pattern seedSsrHead/
+// countIdentityTags use for canonical/og:url above, extended to JSON-LD
+// since those two routes' client Helmet used to duplicate their own
+// MusicGroup/MusicVenue schema on mount the same way it used to duplicate
+// canonical/og:url.
+function seedSsrJsonLd(schemas) {
+  schemas.forEach(schema => {
+    const script = document.createElement('script')
+    script.setAttribute('type', 'application/ld+json')
+    script.textContent = JSON.stringify(schema)
+    document.head.appendChild(script)
+  })
+}
+
+// Counts JSON-LD <script> blocks ANYWHERE in the document (not just <head>)
+// by their @type. This is not a stylistic choice: under React 19,
+// react-helmet-async (v3) only auto-hoists <script async> tags to <head> --
+// a bare <script type="application/ld+json"> (no `async`, as this codebase's
+// JSON-LD blocks are) renders in place in the React tree instead, i.e.
+// inside <body>, wherever <Helmet> sits as a component. A client-duplicated
+// JSON-LD block would therefore land in <body>, NOT <head> -- confirmed by
+// instrumenting react-helmet-async's React19Dispatcher directly. Scoping
+// this count to document.head would make the assertion below pass whether or
+// not the client still declares the block -- a test that survives both the
+// correct and the broken implementation, i.e. no guard at all. This was caught
+// by mutation-checking (restoring the deleted client block and confirming the
+// test then fails); querying the whole document is the only selector that can
+// actually observe a real duplicate here.
+function countJsonLdByType() {
+  const counts = {}
+  document.querySelectorAll('script[type="application/ld+json"]').forEach(el => {
+    let type
+    try {
+      type = JSON.parse(el.textContent)['@type']
+    } catch {
+      type = 'unparseable'
+    }
+    counts[type] = (counts[type] || 0) + 1
+  })
+  return counts
+}
+
 // Helmet's own tags (data-rh="true") are removed on unmount by
 // react-helmet-async itself; the SSR tags seeded above are plain nodes
 // Helmet never owned and RTL's cleanup() doesn't know about them, so each
 // test starts from a clean head regardless of what a prior test left behind.
 afterEach(() => {
-  document.head.querySelectorAll('link[rel="canonical"], meta[property="og:url"]').forEach(el => el.remove())
+  document
+    .querySelectorAll('link[rel="canonical"], meta[property="og:url"], script[type="application/ld+json"]')
+    .forEach(el => el.remove())
 })
 
 function withProviders(children, { themed = false } = {}) {
@@ -263,6 +317,11 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       past: [],
     })
     seedSsrHead('/venue/3')
+    // Mirrors functions/venue/[id].js's jsonLd: [musicVenue, breadcrumb] (#790).
+    seedSsrJsonLd([
+      { '@context': 'https://schema.org', '@type': 'MusicVenue', name: 'Room 47', url: 'https://settimes.ca/venue/3' },
+      { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [] },
+    ])
 
     render(
       withProviders(
@@ -277,6 +336,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1, name: 'Room 47' })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    expect(countJsonLdByType()).toEqual({ MusicVenue: 1, BreadcrumbList: 1 })
   })
 
   it('BandProfilePage (/band/:id)', async () => {
@@ -294,6 +354,11 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       past: [],
     })
     seedSsrHead('/band/206')
+    // Mirrors functions/band/[id].js's jsonLd: [musicGroup, breadcrumb] (#790).
+    seedSsrJsonLd([
+      { '@context': 'https://schema.org', '@type': 'MusicGroup', name: 'ALL', url: 'https://settimes.ca/band/206' },
+      { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [] },
+    ])
 
     render(
       withProviders(
@@ -308,6 +373,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1, name: 'ALL' })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    expect(countJsonLdByType()).toEqual({ MusicGroup: 1, BreadcrumbList: 1 })
   })
 
   // App.jsx is the /event/:slug route's own component (main.jsx routes it

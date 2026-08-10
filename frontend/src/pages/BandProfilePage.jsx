@@ -21,7 +21,7 @@ import {
   YouTubeIcon,
 } from '../components/ui/SocialIcons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { renderMarkdownToSafeHtml, stripMarkdownToText } from '../utils/markdown'
+import { renderMarkdownToSafeHtml } from '../utils/markdown'
 import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { Helmet } from 'react-helmet-async'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -171,23 +171,6 @@ export default function BandProfilePage() {
       cleaned = `<p>${cleaned}</p>`
     }
     return cleaned
-  }, [profile?.description])
-
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  const plainDescription = useMemo(() => {
-    if (!profile?.description) return ''
-    // Render markdown then strip all tags \u2192 clean plain text for meta/og.
-    return stripMarkdownToText(profile.description)
-      .replace(NBSP_ENTITY_REGEX, ' ')
-      .replace(/\u00A0/g, ' ')
-      .replace(ZERO_WIDTH_ENTITY_REGEX, '')
-      .replace(/\u00AD/g, '')
-      .replace(/\u200B/g, '')
-      .replace(/\u200C/g, '')
-      .replace(/\u200D/g, '')
-      .replace(/\uFEFF/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
   }, [profile?.description])
 
   const errorStatus = error?.status || null
@@ -384,48 +367,19 @@ export default function BandProfilePage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-bg-navy">
-      {/* SEO Meta Tags -- description/og:* /twitter:* /canonical are SSR-owned
-          for this route (functions/band/[id].js injects them server-side,
-          always with a real og:image/twitter:image via the branded default
-          fallback, unlike this component's old profile.photo_url-only
-          conditionals). Declaring them here too would duplicate them on mount
-          instead of replacing them. keywords has no SSR equivalent and stays
-          client-only; the JSON-LD below stays client-owned too (it dupes its
-          own MusicGroup block SSR-side -- tracked separately, out of scope for
-          the canonical/og:* /twitter:* /description ownership fix here). */}
+      {/* SEO Meta Tags -- description/og:* /twitter:* /canonical AND JSON-LD
+          are all SSR-owned for this route (functions/band/[id].js injects
+          them server-side, always with a real og:image/twitter:image via the
+          branded default fallback, unlike this component's old
+          profile.photo_url-only conditionals, and with an untruncated
+          MusicGroup.description -- #790). Declaring any of them here too
+          would duplicate them on mount instead of replacing them. keywords
+          has no SSR equivalent and stays client-only. */}
       <Helmet>
         <meta
           name="keywords"
           content={`${profile.name}, ${profile.genre || 'music'}, ${profile.origin || 'band'}, live music, SetTimes`}
         />
-
-        {/* Structured Data (JSON-LD) */}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'MusicGroup',
-            name: profile.name,
-            genre: profile.genre,
-            description: plainDescription,
-            image: profile.photo_url,
-            url: `https://settimes.ca/band/${profile?.id || id}`,
-            ...(profile.origin && { foundingLocation: profile.origin }),
-            ...(profile.social && {
-              sameAs: [
-                profile.social.website,
-                safeInstagramHref(profile.social.instagram) !== '#'
-                  ? safeInstagramHref(profile.social.instagram)
-                  : null,
-                profile.social.facebook,
-                profile.social.bandcamp,
-                profile.social.youtube,
-                profile.social.spotify,
-                profile.social.apple_music,
-                profile.social.linktree,
-              ].filter(Boolean),
-            }),
-          })}
-        </script>
       </Helmet>
 
       {/* Sticky Navigation Header */}

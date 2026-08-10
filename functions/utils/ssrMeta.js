@@ -21,8 +21,17 @@
 // adopting and replacing tags it didn't create, the same behavior already
 // documented elsewhere in this repo as unreliable for document.title under React
 // 19. A route's client Helmet may still set <title> (backed by a direct
-// `document.title = ...` assignment, same reasoning) and page-specific JSON-LD —
-// just never the identity tags this file injects.
+// `document.title = ...` assignment, same reasoning) — just never the identity
+// tags this file injects.
+//
+// JSON-LD ownership follows the same rule, scoped to whether THIS file's
+// caller passes a jsonLd block for the route it's serving: where it does
+// (currently /band/*, /venue/* and /event/*), SSR owns it and the page's
+// client Helmet must not also declare it, for the identical append-not-replace
+// reason above (#790). Where the route's SSR handler emits no jsonLd (the
+// STATIC_PAGES registry entries and the recap page currently pass none, and
+// `/` is excluded from this file's ownership entirely), the page's own
+// client Helmet remains the only copy and stays responsible for it.
 
 // Canonical host for SSR-injected canonicals and og:url. Preview deploys
 // (*.pages.dev) must NOT emit their own host as the canonical — pin to prod.

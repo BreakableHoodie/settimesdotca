@@ -36,7 +36,14 @@ export async function onRequest(context) {
   // returns null for anything that isn't a real http(s) URL, which falls the
   // og:image/twitter:image back to the branded default (#644 review, CodeRabbit).
   const safePhotoUrl = normalizeHttpUrl(band.photo_url);
+  // 200 is a SERP-friendly length for the meta/og/twitter description family
+  // below. JSON-LD's musicGroup.description has no such limit -- truncating
+  // it there is a real content loss, not a de-duplication (#790): 44 of 62
+  // artist bios in production run past 200 chars, longest 2521. 5000 gives
+  // headroom over that without an unbounded payload.
+  const JSONLD_DESCRIPTION_MAX_LENGTH = 5000;
   const plainDesc = toPlainText(band.description, 200);
+  const schemaDesc = toPlainText(band.description, JSONLD_DESCRIPTION_MAX_LENGTH);
   const tagline = [band.genre, band.origin].filter(Boolean).join(" · ");
   const description =
     plainDesc || `${band.name}${tagline ? ` — ${tagline}` : ""} on SetTimes, Waterloo Region's live music platform.`;
@@ -100,7 +107,7 @@ export async function onRequest(context) {
     ...(band.genre ? { genre: band.genre } : {}),
     ...(foundingLocation ? { foundingLocation } : {}),
     ...(sameAs.length > 0 ? { sameAs } : {}),
-    ...(plainDesc ? { description: plainDesc } : {}),
+    ...(schemaDesc ? { description: schemaDesc } : {}),
     ...(safePhotoUrl ? { image: safePhotoUrl } : {}),
   };
 

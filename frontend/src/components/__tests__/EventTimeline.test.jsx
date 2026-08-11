@@ -984,6 +984,12 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+    // Unconditional here rather than a trailing call inside the one test that
+    // installs fake timers: if an assertion in that test throws, the trailing
+    // call never runs and fake timers leak into every subsequent test in this
+    // file, turning one real failure into a cascade of unrelated ones. A no-op
+    // when no fake timers were installed.
+    vi.useRealTimers()
   })
 
   function stubTimeline(timelineData) {
@@ -1318,8 +1324,6 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
       expect(screen.getByRole('button', { name: /show history/i })).toBeInTheDocument()
     })
     expect(screen.queryByText(/Long Weekend Band Crawl Vol 17/)).not.toBeInTheDocument()
-
-    vi.useRealTimers()
   })
 })
 

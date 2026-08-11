@@ -72,7 +72,7 @@ When a task has a clear implementation spec, dispatch a Sonnet agent to build it
 
 settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The next edition is **Long Weekend Band Crawl Vol. 18** on **October 11, 2026** (event 37, `lwbc18`, single-day).
 
-- **Focus:** Waterloo Region only (not Ottawa — do not reference Ottawa in new code/docs)
+- **Focus:** Waterloo Region. This governs **product language** — marketing copy, meta descriptions, SEO targeting, "where this is for" statements. It is not a censor on fact: the platform has hosted an event outside the region (Buddies Fest 2, Tillsonburg) and those records stay accurate wherever they appear. The specific drift this rule exists to prevent is describing the site as serving Ottawa, which it does not.
 - **Brand:** settimes.ca — no rebranding
 - **Target event:** Vol. 18, October 11, 2026
 - **Both fan-facing and admin tooling are equal priority**

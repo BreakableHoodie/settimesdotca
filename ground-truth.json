@@ -5,7 +5,8 @@
     "name": "SetTimes",
     "domain": "https://settimes.ca",
     "repo": "BreakableHoodie/settimesdotca",
-    "region": "Waterloo Region, Ontario, Canada (not Ottawa)",
+    "region": "Waterloo Region, Ontario, Canada",
+    "region_scope_rule": "Governs product language — marketing copy, meta descriptions, SEO targeting, statements about who the site is for. It does not override fact: the platform has hosted an event outside the region (Buddies Fest 2, Tillsonburg) and that record stays accurate. The specific drift to avoid is describing the site as serving Ottawa, which it does not.",
     "mission": "The best multi-venue / multi-artist event platform for Waterloo Region — fan-facing and admin tooling are equal priority",
     "design_principles": [
       "lean and highly performant — media weight is a cost the site refuses",

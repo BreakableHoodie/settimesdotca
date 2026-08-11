@@ -10,7 +10,7 @@ Build SetTimes.ca into the best multi-venue and multi-artist event platform for 
 
 ## Fixed Context
 
-- Region: Waterloo Region only, with current focus on Kitchener-Waterloo. No non-Waterloo references in new code/docs.
+- Region: Waterloo Region, currently focused on Kitchener-Waterloo. This governs **product language** — marketing copy, meta descriptions, SEO targeting, statements about who the site is for. It does not override fact: the platform has hosted an event outside the region (Buddies Fest 2, Tillsonburg, 2026-08-07→09) and that record stays accurate wherever it appears.
 - Brand: SetTimes.ca. Do not rebrand.
 - Next event: Long Weekend Band Crawl Vol. 18, October 11, 2026 (event 37, `lwbc18`, single day). Currently `status = 'draft'` with an empty lineup.
 - Shipped editions (both archived): Vol. 17 (event 21, 2026-08-02, 22 bands / 6 venues) and Buddies Fest 2 (event 36, 2026-08-07→09, Tillsonburg — the first multi-day production event). Lineups and venue rosters are live D1 data now, not spec.

@@ -6,9 +6,14 @@
 // `events.status TEXT` ('draft' | 'published' | 'archived'), but the column
 // was never dropped. `functions/api/admin/events/[id]/archive.js` writes
 // `status = 'archived', is_published = 0` — archiving an event therefore
-// UNPUBLISHES it under the old column. Every production event ends up
-// 'archived' or 'draft', so a public read path still gated on bare
-// `is_published = 1` matches ZERO rows once an event has been archived.
+// UNPUBLISHES it under the old column, so a public read path gated on bare
+// `is_published = 1` stops matching that event the instant it is archived.
+//
+// A live event really is `status = 'published'` with `is_published = 1`, so
+// the two columns agree while it runs and nothing looks wrong. The failure is
+// terminal rather than gradual: every edition eventually gets archived, and
+// when the last un-archived one does, every such read path drops to ZERO rows
+// at the same instant. That is what took the public site dark on 2026-08-10.
 //
 // `status` is the real gate. An event is publicly visible iff
 // `status IN ('published', 'archived')`; it is specifically archived iff

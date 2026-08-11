@@ -1,5 +1,5 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
-import { normalizeHttpUrl } from "../../../utils/validation.js";
+import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
 import { sortableName } from "../../../utils/sortableName.js";
 import { archivedEventStatusSql, publicEventStatusSql } from "../../../utils/eventVisibility.js";
 
@@ -54,12 +54,25 @@ export async function onRequestGet(context) {
   const numericId = Number(rawId);
   const isNumeric = Number.isFinite(numericId) && String(numericId) === rawId;
 
+  // A value that LOOKS numeric must still clear validateId() before it reaches
+  // a query -- the repo-wide contract for Pages `params.id` (matching
+  // functions/api/events/[id]/details.js). Number.isFinite() alone accepted
+  // "0", "-3" and "1.5" and bound them straight through. Slugs are unaffected:
+  // Number("bf2") is NaN, so they take the slug branch below.
+  const idCheck = isNumeric ? validateId(rawId) : null;
+  if (idCheck && !idCheck.valid) {
+    return new Response(JSON.stringify({ error: "Invalid event id" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const event = isNumeric
       ? await DB.prepare(
           `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE id = ? AND ${archivedEventStatusSql()} LIMIT 1`,
         )
-          .bind(numericId)
+          .bind(idCheck.value)
           .first()
       : await DB.prepare(
           `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE slug = ? AND ${archivedEventStatusSql()} LIMIT 1`,

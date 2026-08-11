@@ -1,6 +1,6 @@
 {
   "_comment": "Machine-readable project canon for agents and humans. Slow-moving facts only — live data (lineups, band profiles, counts) belongs to the database, not this file. Update via PR when canon changes; bump verified_at when a human or agent re-verifies against production.",
-  "verified_at": "2026-07-17",
+  "verified_at": "2026-08-11",
   "project": {
     "name": "SetTimes",
     "domain": "https://settimes.ca",
@@ -17,15 +17,19 @@
     "roadmap": "docs/ROADMAP.md"
   },
   "target_event": {
-    "name": "Long Weekend Band Crawl - Vol. 17",
-    "slug": "lwbc17",
-    "db_id": 21,
-    "date": "2026-08-02",
-    "doors": "18:30",
-    "show": "18:45",
-    "ages": "19+",
-    "band_count": 22,
-    "venue_street": "King St N, Waterloo"
+    "name": "Long Weekend Band Crawl Vol. 18",
+    "slug": "lwbc18",
+    "db_id": 37,
+    "date": "2026-10-11",
+    "end_date": null,
+    "status": "draft",
+    "band_count": 0,
+    "_note": "Not yet published and no lineup booked. Doors/show/ages/venues are not set — do not carry Vol. 17's forward as if they were. Publishing this event is what re-populates every 'upcoming' surface."
+  },
+  "season_state": {
+    "state": "between_seasons",
+    "explanation": "No event has status='published'. /api/events/public defaults to upcoming=true and the iCal feed only emits future events, so BOTH correctly return zero, while /api/stats/public and the sitemap stay fully populated from the archive. This is a supported state, not an outage — check whether anything is published before treating such a zero as a bug.",
+    "published_count": 0
   },
   "venues_vol17": [
     { "db_id": 16, "name": "Blue Room (Inside Revive Karaoke)", "address": "28 King St N, Waterloo" },
@@ -40,11 +44,11 @@
     "jane_bond": "Jane Bond (db_id 17) is Vol-16 only",
     "historical_2022": "Vol 1/2 venues (Dive Bar 85 King N, Revive Game Bar 90 King N, Pin Up Arcade Bar 8-247 King N) have no venue rows — they live in events.venue_info JSON; 85 King N is now Roost, Revive later moved to 28"
   },
-  "published_events": [
-    { "db_id": 35, "slug": "blr3", "name": "Bad Livin' Roadshow 3", "date": "2026-07-10", "end_date": "2026-07-12" },
-    { "db_id": 21, "slug": "lwbc17", "name": "Long Weekend Band Crawl - Vol. 17", "date": "2026-08-02" },
-    { "db_id": 36, "slug": "buddiesfest2", "name": "Buddies Fest 2", "date": "2026-08-07", "end_date": "2026-08-09" }
+  "published_events": [],
+  "draft_events": [
+    { "db_id": 37, "slug": "lwbc18", "name": "Long Weekend Band Crawl Vol. 18", "date": "2026-10-11" }
   ],
+  "_archived_events_note": "Chronological ascending. Every past edition is archived — as of 2026-08-11 this is the complete public catalogue (19 events), and it is what /api/stats/public, the sitemap and the recap pages are built from.",
   "archived_events": [
     { "db_id": 33, "slug": "lwbc01", "date": "2022-05-22" },
     { "db_id": 34, "slug": "lwbc02", "date": "2022-07-31" },
@@ -61,7 +65,10 @@
     { "db_id": 32, "slug": "lwbc13", "date": "2025-08-03" },
     { "db_id": 19, "slug": "lwbc14", "date": "2025-10-12" },
     { "db_id": 1, "slug": "lwbc15", "date": "2026-02-15" },
-    { "db_id": 20, "slug": "lwbc16", "date": "2026-05-17" }
+    { "db_id": 20, "slug": "lwbc16", "date": "2026-05-17" },
+    { "db_id": 35, "slug": "blr3", "name": "Bad Livin' Roadshow 3", "date": "2026-07-10", "end_date": "2026-07-12" },
+    { "db_id": 21, "slug": "lwbc17", "name": "Long Weekend Band Crawl - Vol. 17", "date": "2026-08-02" },
+    { "db_id": 36, "slug": "buddiesfest2", "name": "Buddies Fest 2", "date": "2026-08-07", "end_date": "2026-08-09" }
   ],
   "constants": {
     "timezone": "America/Toronto",

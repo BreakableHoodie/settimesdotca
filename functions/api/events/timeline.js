@@ -2,7 +2,7 @@ import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_SHOW_CRITICAL } from "../../utils/cacheHeaders.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
 import { eventLocalToday, eventLocalFestivalToday, eventLocalClock } from "../../utils/eventDay.js";
-import { archivedEventStatusSql, publishedEventStatusSql } from "../../utils/eventVisibility.js";
+import { concludedEventSql, publishedEventStatusSql } from "../../utils/eventVisibility.js";
 
 // Bucket membership is a lifecycle question before it is a date question.
 // `status = 'archived'` MEANS "this edition is concluded", so it outranks the
@@ -12,16 +12,16 @@ import { archivedEventStatusSql, publishedEventStatusSql } from "../../utils/eve
 //
 //   now      = published AND the festival window covers today
 //   upcoming = published AND dated in the future
-//   past     = archived OR (published AND concluded by date)
+//   past     = concludedEventSql() -- archived, or published and over
 //
 // Exhaustive and non-overlapping over publicly visible events. The two halves
 // only work together: narrowing now/upcoming to published-only WITHOUT the
-// `archived OR` below would make an archived-but-future-dated event match no
-// bucket at all and vanish from the timeline entirely.
-const concludedEventSql = (alias = "") => {
-  const dateExpr = alias ? `COALESCE(${alias}.end_date, ${alias}.date)` : "COALESCE(end_date, date)";
-  return `(${archivedEventStatusSql(alias)} OR (${publishedEventStatusSql(alias)} AND ${dateExpr} < ?))`;
-};
+// `archived OR` inside concludedEventSql would make an archived-but-future-
+// dated event match no bucket at all and vanish from the timeline entirely.
+//
+// concludedEventSql lives in functions/utils/eventVisibility.js since #787,
+// once the recap paths needed the identical answer: "has this edition ended?"
+// must not be spelled two ways -- that drift IS the defect #787 fixes.
 
 /**
  * 24-hour "HH:MM" time regex — mirrors DOORS_TIME_REGEX in validation.js.

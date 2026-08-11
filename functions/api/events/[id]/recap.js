@@ -1,7 +1,8 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
 import { sortableName } from "../../../utils/sortableName.js";
-import { archivedEventStatusSql, publicEventStatusSql } from "../../../utils/eventVisibility.js";
+import { concludedEventSql, publicEventStatusSql } from "../../../utils/eventVisibility.js";
+import { eventLocalFestivalToday } from "../../../utils/eventDay.js";
 
 // SQLite `ORDER BY` can't strip a leading article inline (#587); the SQL
 // query below is a coarse pre-sort and this comparator re-derives the exact
@@ -67,21 +68,35 @@ export async function onRequestGet(context) {
     });
   }
 
+  // A recap exists iff the event is publicly visible AND concluded (#787) --
+  // NOT `status = 'archived'` alone. Archiving is an admin housekeeping click
+  // that can lag the event's real end by days (BF2 sat unarchived for three),
+  // and gating on it made this API 404 for a published, finished event whose
+  // recap URL the sitemap already advertised and whose SSR meta
+  // functions/events/[slug]/recap.js already served -- an indexable soft-404.
+  // All three paths now ask the same question the same way.
+  //
+  // concludedEventSql() embeds one `?`, bound AFTER the id/slug below. The
+  // value must be eventLocalFestivalToday(): an event ending at 2 AM is still
+  // running, so the festival day steps back below the 6 AM threshold rather
+  // than declaring it over at midnight.
+  const concludedBy = eventLocalFestivalToday();
+
   try {
     const event = isNumeric
       ? await DB.prepare(
-          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE id = ? AND ${archivedEventStatusSql()} LIMIT 1`,
+          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE id = ? AND ${concludedEventSql()} LIMIT 1`,
         )
-          .bind(idCheck.value)
+          .bind(idCheck.value, concludedBy)
           .first()
       : await DB.prepare(
-          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE slug = ? AND ${archivedEventStatusSql()} LIMIT 1`,
+          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE slug = ? AND ${concludedEventSql()} LIMIT 1`,
         )
-          .bind(rawId)
+          .bind(rawId, concludedBy)
           .first();
 
     if (!event) {
-      return new Response(JSON.stringify({ error: "Event not found or not archived" }), {
+      return new Response(JSON.stringify({ error: "Event not found or has not concluded" }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });

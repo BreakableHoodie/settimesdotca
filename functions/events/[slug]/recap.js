@@ -10,8 +10,8 @@
 import { isPublicDataEnabled } from "../../utils/publicGate.js";
 import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../../utils/ssrMeta.js";
 import { normalizeHttpUrl, validateDate } from "../../utils/validation.js";
-import { eventLocalToday } from "../../utils/eventDay.js";
-import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { eventLocalToday, eventLocalFestivalToday } from "../../utils/eventDay.js";
+import { concludedEventSql } from "../../utils/eventVisibility.js";
 
 const DATE_LABEL_FORMAT = { year: "numeric", month: "long", day: "numeric" };
 
@@ -39,12 +39,18 @@ export async function onRequestGet(context) {
 
   let event;
   try {
+    // Publicly visible AND concluded (#787). This gate previously checked
+    // visibility only, so SSR would happily emit canonical/og:url/title for the
+    // recap of an event that had not happened yet, while
+    // GET /api/events/:id/recap -- which the page renders from -- returned
+    // nothing. Identical predicate and identical bind value as that API and as
+    // the sitemap: the drift between the three IS the bug.
     event = await env.DB.prepare(
       `SELECT id, name, slug, date, end_date, poster_url
        FROM events
-       WHERE slug = ? AND ${publicEventStatusSql()}`,
+       WHERE slug = ? AND ${concludedEventSql()}`,
     )
-      .bind(slug)
+      .bind(slug, eventLocalFestivalToday())
       .first();
   } catch (err) {
     console.error("SSR event recap lookup failed:", slug, err);

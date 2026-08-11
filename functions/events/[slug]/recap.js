@@ -1,16 +1,22 @@
 // CF Pages Function: serve /events/[slug]/recap with server-rendered meta for
 // crawlers. Distinct from /event/[slug] (singular) -- this is the ARCHIVE
-// recap page (frontend/src/pages/EventRecapPage.jsx), reachable once an
-// event's date is past (functions/sitemap.xml.js emits it there). Modeled on
-// functions/event/[slug].js: same D1 lookup shape, same published-event gate,
-// same fallback discipline (gate closed / not found / DB error -> the SPA
-// shell via env.ASSETS.fetch so the page still renders client-side). See
+// recap page (frontend/src/pages/EventRecapPage.jsx), reachable once an event
+// has CONCLUDED: archived, or published with its last day elapsed. That is
+// concludedEventSql() (functions/utils/eventVisibility.js), the single
+// predicate shared with GET /api/events/:id/recap and functions/sitemap.xml.js
+// so all three agree on which events have a recap (#787). Note "concluded" is
+// not "date is past" -- an archived event counts regardless of date, because
+// lifecycle outranks the calendar (#800).
+//
+// Modeled on functions/event/[slug].js: same D1 lookup shape, same fallback
+// discipline (gate closed / not found / DB error -> the SPA shell via
+// env.ASSETS.fetch so the page still renders client-side). See
 // functions/utils/ssrMeta.js for the full SSR-injection rationale.
 
 import { isPublicDataEnabled } from "../../utils/publicGate.js";
 import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../../utils/ssrMeta.js";
 import { normalizeHttpUrl, validateDate } from "../../utils/validation.js";
-import { eventLocalToday, eventLocalFestivalToday } from "../../utils/eventDay.js";
+import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 import { concludedEventSql } from "../../utils/eventVisibility.js";
 
 const DATE_LABEL_FORMAT = { year: "numeric", month: "long", day: "numeric" };
@@ -58,25 +64,29 @@ export async function onRequestGet(context) {
   }
   if (!event) return env.ASSETS.fetch(request);
 
-  // This route claims to be the ARCHIVE recap (see file header) -- the
-  // published/archived gate above says nothing about whether the event has
-  // actually happened yet. Without this check, a direct request for a
-  // future published event would get recap-specific meta ("recap for X on
-  // <date>") for a show that hasn't played, ahead of the sitemap ever
-  // listing it there. end_date || date mirrors the multi-day convention
-  // elsewhere (CLAUDE.md, scheduleStorage) -- a multi-day event isn't over
-  // until its LAST day has passed, not its first.
+  // NOT a second conclusion gate (#787). "Has this edition ended?" is answered
+  // once, by concludedEventSql() in the query above -- the same predicate, with
+  // the same bind value, that the recap API and the sitemap use.
   //
-  // `date`/`end_date` are TEXT columns with no DB-level format constraint, so
-  // a legacy row can hold a syntactically-YYYY-MM-DD but calendar-invalid
-  // value (e.g. "2026-02-30"). A plain typeof/string check doesn't catch
-  // that, and a lexicographic compare against an out-of-range day can still
-  // resolve either way -- validateDate() (validation.js) does real
-  // month-length/leap-year validation, same helper the write-side event form
-  // uses, so an invalid legacy date falls back to the shell rather than
-  // risking a wrong-signed comparison (CodeRabbit, #784 follow-up).
+  // This used to also compare `lastDay >= eventLocalToday()`, which quietly
+  // re-decided conclusion here and disagreed with the shared predicate for an
+  // ARCHIVED, FUTURE-DATED event: concludedEventSql treats archived as
+  // concluded regardless of date (lifecycle outranks the calendar, #800), so
+  // the API returned 200 and the sitemap advertised the URL while SSR alone
+  // fell back to the shell. An admin can produce that state by archiving an
+  // event early. It also used eventLocalToday() where the predicate uses
+  // eventLocalFestivalToday() -- two different "todays" for one question.
+  //
+  // What survives is an OUTPUT-SANITY guard, not a visibility rule:
+  // `date`/`end_date` are TEXT with no DB-level format constraint, so a legacy
+  // row can hold a syntactically-YYYY-MM-DD but calendar-invalid value (e.g.
+  // "2026-02-30"). validateDate() does real month-length/leap-year checking
+  // (the same helper the write-side event form uses), so rather than emit
+  // "recap for X on <impossible date>" into canonical/og:title we fall back to
+  // the shell (CodeRabbit, #784 follow-up). Corrupt data, not an unpublished
+  // or unfinished event.
   const lastDay = event.end_date || event.date;
-  if (!validateDate(lastDay).valid || lastDay >= eventLocalToday()) {
+  if (!validateDate(lastDay).valid) {
     return env.ASSETS.fetch(request);
   }
 

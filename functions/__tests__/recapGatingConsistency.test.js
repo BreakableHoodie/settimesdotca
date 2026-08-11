@@ -110,6 +110,21 @@ describe("#787 — sitemap, SSR and the recap API agree on whether a recap exist
     expect(await allThree(env)).toEqual({ sitemap: true, ssr: true, api: true });
   });
 
+  it("archived but future-dated: all three serve it", async () => {
+    // The case my first pass missed, caught by CodeRabbit and Codex
+    // independently. concludedEventSql treats archived as concluded regardless
+    // of date (lifecycle outranks the calendar, #800), and an admin can produce
+    // this by archiving an event early. SSR carried a SECOND, redundant
+    // `lastDay >= eventLocalToday()` check that re-decided conclusion locally
+    // and returned the shell here, while the API and sitemap said yes.
+    //
+    // The exact three-way disagreement this whole file exists to prevent --
+    // which is why "all three agree" beats "each path is individually correct".
+    const env = seed({ date: isoDaysFromNow(30), status: "archived" });
+
+    expect(await allThree(env)).toEqual({ sitemap: true, ssr: true, api: true });
+  });
+
   it("published but still in the future: none of the three serve it", async () => {
     const env = seed({ date: isoDaysFromNow(30), status: "published" });
 

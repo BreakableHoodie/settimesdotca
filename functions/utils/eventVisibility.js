@@ -123,6 +123,12 @@ export function publishedEventStatusSql(alias = "") {
  * @returns {string} e.g. "(status = 'archived' OR (status = 'published' AND COALESCE(end_date, date) < ?))"
  */
 export function concludedEventSql(alias = "") {
+  // Validate BEFORE interpolating. The two helpers below would throw on a bad
+  // alias anyway, but `dateExpr` is built first, so `${alias}` would already
+  // have stringified the argument -- running a custom toString() on a hostile
+  // object before any guard fired. Every other path in this module validates
+  // ahead of interpolation (see columnRef); this one now matches.
+  assertValidAlias(alias);
   const dateExpr = alias ? `COALESCE(${alias}.end_date, ${alias}.date)` : "COALESCE(end_date, date)";
   return `(${archivedEventStatusSql(alias)} OR (${publishedEventStatusSql(alias)} AND ${dateExpr} < ?))`;
 }

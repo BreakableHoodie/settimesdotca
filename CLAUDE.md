@@ -128,7 +128,14 @@ Bands starting before 6 AM are "after-midnight" sets that belong to the *previou
 
 **Bucket membership is a lifecycle question before a date question.** `/api/events/timeline` splits: `now`/`upcoming` = published-only; `past` = `archived OR (published AND concluded by date)`. Both halves are load-bearing — narrowing the live buckets without `archived OR` in past makes an archived event with a live or future date match no bucket and vanish entirely.
 
-Guard tests scan source on **both** sides of the build boundary (`functions/utils/__tests__/eventVisibility.test.js`, `frontend/src/__tests__/isPublishedGuard.test.js`) and fail the build on any `is_published` reference outside `functions/api/admin/**`, `frontend/src/admin/**`, `utils/adminApi.js`, and `__tests__/**`. Admin still *writes* the column so the eventual drop stays rollback-safe — that's #799, not an oversight.
+**Two** source-scanning guards enforce this, and they catch different things:
+
+1. **No `is_published` read** outside `functions/api/admin/**`, `frontend/src/admin/**`, `utils/adminApi.js`, and `__tests__/**` — scanned on both sides of the build boundary (`functions/utils/__tests__/eventVisibility.test.js`, `frontend/src/__tests__/isPublishedGuard.test.js`).
+2. **No non-admin file queries `events` without a status predicate.** The first guard only catches the *old column*; this one catches a route with no gate at all. That gap was real: `functions/s/[slug].js` (the OG card crawlers fetch for a shared schedule link) joined `events` ungated while both siblings for the same slug gated correctly, so an event unpublished *after* a link was shared still produced a crawler-facing card naming it. Exempt by design, named in the guard: `api/metrics.js` (write-path existence check, projects only `id`) and `utils/timeConflicts.js` (admin-only, must see drafts).
+
+Guard 2 is a file-level scan: it catches "never imported the helper" (the class that has occurred), not "imported it and missed one query". Don't mistake it for proof of the latter.
+
+Admin still *writes* `is_published` so the eventual drop stays rollback-safe — that's #799, not an oversight.
 
 ### Server-side "today"/"now" is Toronto-local — never UTC-sliced
 

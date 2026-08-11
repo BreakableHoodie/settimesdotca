@@ -25,14 +25,19 @@ function makeContext({ env, slug }) {
   };
 }
 
-describe("SSR /s/[slug] — OG card resolves live performances (#733)", () => {
-  function seed() {
-    const { env, rawDb } = createTestEnv();
-    const event = insertEvent(rawDb, { name: "Vol. 17", slug: "vol17" });
-    const venue = insertVenue(rawDb, { name: "Blue Room" });
-    return { env, rawDb, event, venue };
-  }
+// Module-level alongside makeContext so both describe blocks below can use it.
+// insertEvent defaults to status 'draft'; seed 'published' explicitly, because
+// this route gates the events JOIN on publicEventStatusSql() and a draft-event
+// share link cannot arise in production anyway -- share.js only mints links for
+// a publicly-visible event.
+function seed(status = "published") {
+  const { env, rawDb } = createTestEnv();
+  const event = insertEvent(rawDb, { name: "Vol. 17", slug: "vol17", status });
+  const venue = insertVenue(rawDb, { name: "Blue Room" });
+  return { env, rawDb, event, venue };
+}
 
+describe("SSR /s/[slug] — OG card resolves live performances (#733)", () => {
   test("drops a hard-deleted performance from the OG card count and Featuring list", async () => {
     const { env, rawDb, event, venue } = seed();
     const kept1 = insertBand(rawDb, { name: "Kept One", event_id: event.id, venue_id: venue.id });
@@ -105,5 +110,61 @@ describe("SSR /s/[slug] — OG card resolves live performances (#733)", () => {
     // appears in the card.
     expect(html).toContain('<meta property="og:title" content="2-stop route for Vol. 17" />');
     expect(html).toContain("Featuring Cancelled Band, Playing Band");
+  });
+});
+
+// Three routes serve a share slug and they must agree on event visibility:
+// POST /api/schedule/share (mint), GET /api/schedule/share/[slug] (the JSON the
+// page renders from), and this OG card. The first two have always gated on
+// publicEventStatusSql(); this one did not, so an event unpublished AFTER a
+// link was shared would still yield a crawler-facing card naming the event and
+// its bands while the page it opens rendered nothing. That split between a meta
+// layer and the data behind it is the #787 failure shape.
+describe("SSR /s/[slug] — event visibility gate", () => {
+  test("serves no OG card when the share link's event is a draft", async () => {
+    const { env, rawDb, event, venue } = seed("draft");
+    const band = insertBand(rawDb, { name: "Hidden Band", event_id: event.id, venue_id: venue.id });
+
+    insertShareLink(rawDb, {
+      slug: "ogdraft",
+      event_id: event.id,
+      event_slug: "vol17",
+      performance_ids: [band.id],
+      band_names: ["Hidden Band"],
+    });
+
+    const response = await onRequest(makeContext({ env, slug: "ogdraft" }));
+    const html = await response.text();
+
+    // Falls through to the plain SPA shell: no event name, no band name, no
+    // route card. Asserting on the leaked VALUES rather than only on the
+    // absence of og:title -- a card that omitted the title but still printed
+    // "Hidden Band" in the description would be just as much of a leak.
+    expect(html).not.toContain("Vol. 17");
+    expect(html).not.toContain("Hidden Band");
+    expect(html).not.toContain("1-stop route");
+    expect(html).toContain("Homepage description");
+  });
+
+  test("still serves the card for an ARCHIVED event — concluded is not hidden", async () => {
+    const { env, rawDb, event, venue } = seed("archived");
+    const band = insertBand(rawDb, { name: "Archived Band", event_id: event.id, venue_id: venue.id });
+
+    insertShareLink(rawDb, {
+      slug: "ogarchived",
+      event_id: event.id,
+      event_slug: "vol17",
+      performance_ids: [band.id],
+      band_names: ["Archived Band"],
+    });
+
+    const response = await onRequest(makeContext({ env, slug: "ogarchived" }));
+    const html = await response.text();
+
+    // Sibling proof that the gate narrows on STATUS rather than just rejecting
+    // everything -- publicEventStatusSql() is published-or-archived, and a fan
+    // reopening last season's shared link must still get a real preview.
+    expect(html).toContain('<meta property="og:title" content="1-stop route for Vol. 17" />');
+    expect(html).toContain("Featuring Archived Band");
   });
 });

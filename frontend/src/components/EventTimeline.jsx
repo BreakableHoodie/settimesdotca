@@ -146,14 +146,26 @@ export default function EventTimeline() {
   // Keyed on the RAW timeline arrays, not the filtered lists: keying on
   // filters would re-expand this section every time a fan filters upcoming
   // events away after deliberately collapsing it, fighting their own action.
-  // Only ever sets true -- never stomps a manual collapse.
+  //
+  // Fires only on the TRANSITION into past-only (tracked via wasPastOnlyRef),
+  // never merely because the state holds. The 60s poll above calls
+  // setTimeline(data) with a fresh object identity every tick, even when the
+  // shape is unchanged -- keying on `[timeline]` alone would re-run this
+  // effect on every poll and call setShowPast(true) again, reopening a
+  // section a fan just collapsed. Gating on the transition means a later
+  // poll that returns the same past-only shape finds wasPastOnlyRef already
+  // true and leaves a manual collapse alone.
+  const wasPastOnlyRef = useRef(false)
   useEffect(() => {
     const hasRawNow = (timeline.now || []).length > 0
     const hasRawUpcoming = (timeline.upcoming || []).length > 0
     const hasRawPast = (timeline.past || []).length > 0
-    if (!hasRawNow && !hasRawUpcoming && hasRawPast) {
+    const isPastOnly = !hasRawNow && !hasRawUpcoming && hasRawPast
+
+    if (isPastOnly && !wasPastOnlyRef.current) {
       setShowPast(true)
     }
+    wasPastOnlyRef.current = isPastOnly
   }, [timeline])
 
   const loadDetails = useCallback(async eventId => {
@@ -290,6 +302,20 @@ export default function EventTimeline() {
   const hasNow = filteredNow.length > 0
   const hasUpcoming = filteredUpcoming.length > 0
   const hasPast = filteredPast.length > 0
+
+  // Whether an active filter is actually WHY the between-seasons block below
+  // is showing, as opposed to a genuine gap where the raw timeline has
+  // nothing now/upcoming to hide. hasActiveFilters only proves a filter is
+  // SET -- not that it hid anything -- so a raw past-only timeline (between
+  // seasons) with an unrelated filter still active would otherwise get the
+  // false "your filters are hiding an upcoming event" copy, and clearing
+  // filters would land the fan right back in the same between-seasons state.
+  // Derived from the RAW buckets rather than filteredNow/filteredUpcoming:
+  // by the time the between-seasons block renders those are already both
+  // empty (that's its render condition), so checking them here would always
+  // read false and this would never fire.
+  const filtersHideFutureEvents =
+    hasActiveFilters && ((timeline.now || []).length > 0 || (timeline.upcoming || []).length > 0)
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -490,14 +516,14 @@ export default function EventTimeline() {
             <Alert variant="info">
               <div className="text-center">
                 <h3 className="text-lg font-bold mb-2">
-                  {hasActiveFilters ? 'No upcoming events match your filters' : 'No upcoming events right now'}
+                  {filtersHideFutureEvents ? 'No upcoming events match your filters' : 'No upcoming events right now'}
                 </h3>
                 <p className="text-text-secondary mb-4">
-                  {hasActiveFilters
+                  {filtersHideFutureEvents
                     ? "Your filters are hiding every upcoming event. Clear them to see what's next."
                     : "We're between seasons — browse past crawls below, or subscribe to hear about new dates first."}
                 </p>
-                {hasActiveFilters ? (
+                {filtersHideFutureEvents ? (
                   <Button variant="secondary" size="sm" onClick={clearFilters} icon={<X size={14} />}>
                     Clear Filters
                   </Button>

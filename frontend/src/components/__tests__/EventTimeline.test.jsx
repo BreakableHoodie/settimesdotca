@@ -1236,4 +1236,214 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
     expect(await screen.findByText('Discover upcoming band crawls and music events')).toBeInTheDocument()
     expect(screen.queryByText(/browse past band crawls/i)).not.toBeInTheDocument()
   })
+
+  // Regression: the auto-expand effect above is keyed on `[timeline]`, and
+  // the 60s poll (fetchTimeline(true) in the main data-fetch effect) calls
+  // setTimeline(data) with a fresh object identity every tick -- even when
+  // the shape is unchanged. Without the wasPastOnlyRef transition guard,
+  // that re-runs the auto-expand effect on every poll and calls
+  // setShowPast(true) again, silently reopening a section a fan just
+  // collapsed. This uses the same `vi.useFakeTimers({ shouldAdvanceTime:
+  // true })` + `vi.advanceTimersByTimeAsync` pattern as
+  // BandProfilePage.test.jsx (#739) -- shouldAdvanceTime keeps
+  // findBy/waitFor's own polling working under fake timers.
+  it('does not reopen a manually collapsed Past section on a later past-only poll', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    const pastOnlyTimeline = name => ({
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name,
+          slug: 'lwbc-17',
+          date: '2026-08-02',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    let fetchCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          fetchCount += 1
+          // The second (polled) response is a DISTINCT past-only payload --
+          // not a byte-for-byte repeat -- so a passing assertion below
+          // proves a real update was applied, not that the poll was a no-op.
+          const name = fetchCount === 1 ? 'Long Weekend Band Crawl Vol 17' : 'Long Weekend Band Crawl Vol 17 (Updated)'
+          return Promise.resolve(jsonResponse(pastOnlyTimeline(name)))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    // Past auto-expands because it's the only non-empty raw bucket.
+    expect(await screen.findByText('Long Weekend Band Crawl Vol 17')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide history/i })).toBeInTheDocument()
+
+    // Fan deliberately collapses it.
+    fireEvent.click(screen.getByRole('button', { name: /hide history/i }))
+    expect(screen.getByRole('button', { name: /show history/i })).toBeInTheDocument()
+    expect(screen.queryByText('Long Weekend Band Crawl Vol 17')).not.toBeInTheDocument()
+
+    // Drive the 60s poll. It must fetch a genuinely new payload.
+    await vi.advanceTimersByTimeAsync(60000)
+    await waitFor(() => expect(fetchCount).toBeGreaterThan(1))
+
+    // ...but the collapse must survive it: still "Show History", and no past
+    // event content leaked back into the DOM under either name. Testing
+    // Library's waitFor (not a bare synchronous assertion, and not vitest's
+    // own vi.waitFor) is required here -- it wraps each retry in act(),
+    // which is what actually flushes the setTimeline update from the
+    // interval's fetch into React's effects. A synchronous assertion
+    // immediately after advanceTimersByTimeAsync can read stale DOM and pass
+    // even when the auto-expand effect WOULD have reopened the section --
+    // confirmed by temporarily reverting the wasPastOnlyRef fix, which made
+    // this test pass right up until this assertion was switched to waitFor.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /show history/i })).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Long Weekend Band Crawl Vol 17/)).not.toBeInTheDocument()
+
+    vi.useRealTimers()
+  })
+})
+
+// Finding 2 companion to the between-seasons tests above: hasActiveFilters
+// only proves a filter is SET, not that it hid an upcoming event. These
+// cover both directions of that distinction using the between-seasons block
+// (`!hasNow && !hasUpcoming && hasPast`), which is the only place
+// filtersHideFutureEvents is consulted.
+describe('EventTimeline between-seasons filter copy accuracy', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  function stubTimeline(timelineData) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+  }
+
+  it('shows the between-seasons message, not the filter-recovery copy, when the raw timeline is genuinely past-only', async () => {
+    // Raw timeline has ONLY past events -- a real between-seasons gap. The
+    // active month filter still matches that past event (2026-08), so it
+    // does not empty the past bucket; it just happens to be set. Under the
+    // bug (hasActiveFilters), this would render "No upcoming events match
+    // your filters" / "Your filters are hiding every upcoming event" -- both
+    // false, since there was never a raw upcoming event to hide, and
+    // clearing filters would land the fan in the exact same state.
+    stubTimeline({
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name: 'Long Weekend Band Crawl Vol 17',
+          slug: 'lwbc-17',
+          date: '2026-08-02',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText(/no upcoming events right now/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /show filters/i }))
+    fireEvent.change(screen.getByLabelText(/filter by month/i), { target: { value: '2026-08' } })
+
+    const alertBox = await screen.findByRole('alert')
+    expect(within(alertBox).getByText(/no upcoming events right now/i)).toBeInTheDocument()
+    expect(within(alertBox).queryByText(/no upcoming events match your filters/i)).not.toBeInTheDocument()
+    expect(within(alertBox).queryByText(/your filters are hiding every upcoming event/i)).not.toBeInTheDocument()
+    expect(within(alertBox).getByRole('link', { name: /subscribe for updates/i })).toBeInTheDocument()
+    expect(within(alertBox).queryByRole('button', { name: /clear filters/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the filter-recovery copy when a filter genuinely hides every raw upcoming event', async () => {
+    // Raw timeline HAS an upcoming event. The month filter excludes it
+    // (2020-05 vs. the event's 2026-10) while still matching the past event,
+    // so filteredUpcoming is empty but the raw bucket was not -- the filter
+    // is the actual cause, and this copy should stay.
+    stubTimeline({
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Vol 18',
+          slug: 'vol-18',
+          date: '2026-10-11',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+        },
+      ],
+      past: [
+        {
+          id: 2,
+          name: 'Long Weekend Band Crawl Vol 17',
+          slug: 'lwbc-17',
+          date: '2020-05-10',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Vol 18')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /show filters/i }))
+    fireEvent.change(screen.getByLabelText(/filter by month/i), { target: { value: '2020-05' } })
+
+    const alertBox = await screen.findByRole('alert')
+    expect(within(alertBox).getByText(/no upcoming events match your filters/i)).toBeInTheDocument()
+    expect(within(alertBox).getByText(/your filters are hiding every upcoming event/i)).toBeInTheDocument()
+    expect(within(alertBox).getByRole('button', { name: /clear filters/i })).toBeInTheDocument()
+    expect(within(alertBox).queryByRole('link', { name: /subscribe for updates/i })).not.toBeInTheDocument()
+  })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { onRequestGet as timelineHandler } from "../timeline.js";
 import { createTestEnv, insertEvent } from "../../test-utils.js";
+import { eventLocalToday } from "../../../utils/eventDay.js";
 
 // Regression guard for how `status = 'archived'` interacts with the timeline's
 // now / upcoming / past bucketing.
@@ -25,10 +26,22 @@ import { createTestEnv, insertEvent } from "../../test-utils.js";
 // SQL actually returns, which a mock keyed on WHERE-clause substrings cannot
 // demonstrate.
 
+// Anchored on the Toronto-local event day, NOT `new Date().toISOString()`.
+// timeline.js buckets events off eventLocalToday()/eventLocalFestivalToday(),
+// so a UTC-sliced baseline runs a day ahead of the handler between local
+// 20:00 and midnight — the exact "server-side today is never UTC-sliced"
+// invariant this repo documents (fixed in #568). Offsetting from a UTC-midnight
+// Date built out of those Y/M/D parts keeps the arithmetic pure calendar days.
+//
+// Deliberately NOT mirrored into schedule-current-visibility.test.js: that
+// handler gates on SQLite `date('now','-6 hours')`, which really is UTC, so a
+// UTC baseline is the aligned one there. Same-looking helper, different correct
+// answer — the baseline has to match the handler under test, not a house style.
 function isoDaysFromNow(days) {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  const [year, month, day] = eventLocalToday().split("-").map(Number);
+  const base = new Date(Date.UTC(year, month - 1, day));
+  base.setUTCDate(base.getUTCDate() + days);
+  return base.toISOString().slice(0, 10);
 }
 
 async function getTimeline(env) {

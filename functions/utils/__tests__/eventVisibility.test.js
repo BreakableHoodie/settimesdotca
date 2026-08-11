@@ -113,13 +113,19 @@ describe("is_published never read outside admin/test infrastructure", () => {
     return false;
   }
 
+  // .ts is scanned even though functions/ is currently JS-only: a guard that
+  // silently stops covering a file type the day someone adds one is the exact
+  // failure mode guards exist to prevent. Mirrors the frontend half in
+  // frontend/src/__tests__/isPublishedGuard.test.js.
+  const SCANNED_EXTENSIONS = [".js", ".ts"];
+
   function walk(dir) {
     let files = [];
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         files = files.concat(walk(full));
-      } else if (entry.isFile() && entry.name.endsWith(".js")) {
+      } else if (entry.isFile() && SCANNED_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) {
         files.push(full);
       }
     }

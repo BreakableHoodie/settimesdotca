@@ -67,13 +67,18 @@ function isExempt(relPath) {
   return false
 }
 
+const SCANNED_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx']
+
 function walk(dir) {
   let files = []
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) {
       files = files.concat(walk(full))
-    } else if (entry.isFile() && (entry.name.endsWith('.js') || entry.name.endsWith('.jsx'))) {
+      // .ts/.tsx are scanned even though this codebase is currently JS-only:
+      // a guard that silently stops covering a file type the day someone adds
+      // one is the failure mode guards exist to prevent.
+    } else if (entry.isFile() && SCANNED_EXTENSIONS.some(ext => entry.name.endsWith(ext))) {
       files.push(full)
     }
   }

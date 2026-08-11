@@ -7,7 +7,7 @@ describe("GET /api/schedule - reveal mode", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-reveal-off", status: "draft" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     const venue = insertVenue(rawDb, { name: "Venue A" });
     insertBand(rawDb, { name: "Announced Band", event_id: ev.id, venue_id: venue.id });
     const unannounced = insertBand(rawDb, { name: "Hidden Band", event_id: ev.id, venue_id: venue.id });
@@ -26,7 +26,7 @@ describe("GET /api/schedule - reveal mode", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-reveal-on" });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(ev.id);
     const venue = insertVenue(rawDb, { name: "Venue B" });
     const announced = insertBand(rawDb, { name: "Visible Band", event_id: ev.id, venue_id: venue.id });
     rawDb.prepare("UPDATE performances SET is_announced=1 WHERE id=?").run(announced.id);
@@ -46,7 +46,7 @@ describe("GET /api/schedule - reveal mode", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-meta" });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(ev.id);
 
     const req = new Request("https://example.test/api/schedule?event=vol6-meta");
     const res = await scheduleHandler.onRequestGet({ request: req, env });
@@ -60,7 +60,7 @@ describe("GET /api/schedule - ticket_url sanitization (#504)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-unsafe-ticket" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     rawDb
       .prepare("UPDATE events SET ticket_url = ? WHERE id = ?")
       // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 read-path guard
@@ -77,7 +77,7 @@ describe("GET /api/schedule - ticket_url sanitization (#504)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-safe-ticket" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/vol6", ev.id);
 
     const req = new Request("https://example.test/api/schedule?event=vol6-safe-ticket");
@@ -93,7 +93,7 @@ describe("GET /api/schedule - multi-day per-set date (#539)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Multi-Day Fest", slug: "multi-day-fest", date: "2026-08-01" });
-    rawDb.prepare("UPDATE events SET is_published=1, end_date=? WHERE id=?").run("2026-08-02", ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published', end_date=? WHERE id=?").run("2026-08-02", ev.id);
     const venue = insertVenue(rawDb, { name: "Main Stage" });
 
     const day1Band = insertBand(rawDb, {
@@ -132,7 +132,7 @@ describe("GET /api/schedule - multi-day per-set date (#539)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Single Day Show", slug: "single-day-show", date: "2026-08-01" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     const venue = insertVenue(rawDb, { name: "Solo Venue" });
     insertBand(rawDb, { name: "Only Band", event_id: ev.id, venue_id: venue.id });
     // performance_date is left NULL (the column's default) here.
@@ -158,7 +158,7 @@ describe("GET /api/schedule - current-event window (#539)", () => {
     const yesterdayStr = yesterday.toISOString().split("T")[0];
 
     const ev = insertEvent(rawDb, { name: "Two Day Crawl", slug: "two-day-crawl", date: yesterdayStr });
-    rawDb.prepare("UPDATE events SET is_published=1, end_date=? WHERE id=?").run(todayStr, ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published', end_date=? WHERE id=?").run(todayStr, ev.id);
     const venue = insertVenue(rawDb, { name: "Some Venue" });
     insertBand(rawDb, { name: "Some Band", event_id: ev.id, venue_id: venue.id });
 
@@ -182,7 +182,7 @@ describe("GET /api/schedule - current-event window (#539)", () => {
     const twoDaysAgoStr = twoDaysAgo.toISOString().split("T")[0];
 
     const ev = insertEvent(rawDb, { name: "Old Single Day Show", slug: "old-single-day-show", date: twoDaysAgoStr });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
 
     const req = new Request("https://example.test/api/schedule?event=current");
     const res = await scheduleHandler.onRequestGet({ request: req, env });

@@ -11,7 +11,7 @@ describe("GET /api/schedule - genre (#725)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-genre" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     insertBand(rawDb, { name: "Genre Band", event_id: ev.id, venue_id: venue.id, genre: "Indie Rock" });
 
@@ -27,7 +27,7 @@ describe("GET /api/schedule - genre (#725)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-no-genre" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, { name: "No Genre Band", event_id: ev.id, venue_id: venue.id });
 

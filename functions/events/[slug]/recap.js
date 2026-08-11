@@ -11,6 +11,7 @@ import { isPublicDataEnabled } from "../../utils/publicGate.js";
 import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../../utils/ssrMeta.js";
 import { normalizeHttpUrl, validateDate } from "../../utils/validation.js";
 import { eventLocalToday } from "../../utils/eventDay.js";
+import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 const DATE_LABEL_FORMAT = { year: "numeric", month: "long", day: "numeric" };
 
@@ -41,7 +42,7 @@ export async function onRequestGet(context) {
     event = await env.DB.prepare(
       `SELECT id, name, slug, date, end_date, poster_url
        FROM events
-       WHERE slug = ? AND (is_published = 1 OR status = 'archived')`,
+       WHERE slug = ? AND ${publicEventStatusSql()}`,
     )
       .bind(slug)
       .first();

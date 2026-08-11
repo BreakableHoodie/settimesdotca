@@ -18,7 +18,7 @@ describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
       date: futureDate,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET reveal_mode=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Stats Hidden Band",
       event_id: event.id,
@@ -47,7 +47,7 @@ describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
       date: futureDate,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET reveal_mode=1 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Stats Revealed Band",
       event_id: event.id,
@@ -76,7 +76,7 @@ describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
       date: futureDate,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET reveal_mode=0 WHERE id=?").run(event.id);
     const perf = insertBand(rawDb, {
       name: "Stats Normal Band",
       event_id: event.id,
@@ -116,7 +116,6 @@ describe("GET /api/bands/stats/:name - social_links scheme sanitization (#483)",
       date: futureDate,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     insertBand(rawDb, {
       name: "Stats Scheme Band",
       event_id: event.id,
@@ -145,7 +144,6 @@ describe("GET /api/bands/stats/:name - social_links scheme sanitization (#483)",
       date: futureDate,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     insertBand(rawDb, {
       name: "Stats Valid Site Band",
       event_id: event.id,
@@ -181,7 +179,6 @@ describe("GET /api/bands/stats/:name — event_end_date exposure (#542 PR-1)", (
       end_date: "2099-01-03",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     insertBand(rawDb, {
       name: "Stats Multiday Band",
       event_id: event.id,
@@ -209,7 +206,6 @@ describe("GET /api/bands/stats/:name — event_end_date exposure (#542 PR-1)", (
       date: "2099-06-01",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(futureEvent.id);
     insertBand(rawDb, {
       name: "Stats Singleday Band",
       event_id: futureEvent.id,
@@ -222,7 +218,6 @@ describe("GET /api/bands/stats/:name — event_end_date exposure (#542 PR-1)", (
       date: "2001-01-01",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(pastEvent.id);
     insertBand(rawDb, {
       name: "Stats Singleday Band",
       event_id: pastEvent.id,
@@ -252,7 +247,6 @@ describe("GET /api/bands/stats/:name — event_end_date exposure (#542 PR-1)", (
       end_date: "2001-03-03",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     insertBand(rawDb, {
       name: "Stats Past Multiday Band",
       event_id: event.id,
@@ -304,7 +298,6 @@ describe("GET /api/bands/stats/:name — per-performance classification (#603)",
       end_date: "2026-07-12",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const day1Perf = insertBand(rawDb, {
       name: "Stats 603 Multiday Band",
@@ -344,7 +337,6 @@ describe("GET /api/bands/stats/:name — per-performance classification (#603)",
       end_date: "2026-07-12",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     // performance_date left NULL — the #543 convention for day-1 sets and
     // single-day events — so it must inherit event_date (2026-07-10), which
@@ -417,7 +409,6 @@ describe("GET /api/bands/stats/:name — per-set performance_date, notes, and or
       end_date: "2099-08-09",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     // Day-1 bonus set: later performance_date-adjacent clock time (22:00) but
     // the EARLIER performance_date — this is the exact shape that broke
@@ -476,7 +467,6 @@ describe("GET /api/bands/stats/:name — per-set performance_date, notes, and or
       end_date: "2001-08-09",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const day1 = insertBand(rawDb, {
       name: "Kepi Ghoulie",

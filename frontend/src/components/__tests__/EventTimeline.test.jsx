@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -30,7 +30,6 @@ describe('EventTimeline', () => {
           slug: 'test-event',
           date: '2026-05-10',
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 0,
@@ -119,7 +118,6 @@ describe('EventTimeline duplicate performer chips (#605)', () => {
           slug: 'two-set-event',
           date: '2026-05-10',
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 2,
@@ -232,7 +230,6 @@ describe('EventTimeline recap links', () => {
     band_count: 0,
     venue_count: 0,
     ticket_url: null,
-    is_published: true,
     status: 'published',
   }
 
@@ -305,7 +302,6 @@ describe('EventTimeline performance day labels (#743)', () => {
           date: '2026-08-07',
           end_date: '2026-08-09',
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 2,
@@ -403,7 +399,6 @@ describe('EventTimeline performance day labels (#743)', () => {
           date: '2026-08-07',
           end_date: null,
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 1,
@@ -502,7 +497,6 @@ describe('EventTimeline collapsed performer chips ordering', () => {
           slug: 'chip-sort-fest',
           date: '2026-09-01',
           status: 'published',
-          is_published: true,
           venues: [],
           // API order is set-time order — deliberately unalphabetical.
           bands: [
@@ -575,7 +569,6 @@ describe('EventTimeline poster thumbnails (#658)', () => {
           slug: 'poster-fest',
           date: '2026-08-02',
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 0,
@@ -630,7 +623,6 @@ describe('EventTimeline poster thumbnails (#658)', () => {
           slug: 'no-poster-fest',
           date: '2026-08-07',
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 0,
@@ -684,7 +676,6 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       slug: name.toLowerCase().replace(/\s+/g, '-'),
       date: '2020-05-10',
       status: 'archived',
-      is_published: true,
       venues: [],
       bands: [],
       band_count: 0,
@@ -695,7 +686,11 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
 
     const timelineData = {
       now: [],
-      upcoming: [],
+      // A non-empty upcoming bucket keeps Past collapsed by default (Past only
+      // auto-expands when it's the sole non-empty bucket) -- this test is
+      // about lazy mounting behind a MANUAL toggle, a different concern from
+      // that auto-expand, so it needs Past to start collapsed to exercise it.
+      upcoming: [{ ...pastEvent('upcoming', 'Unrelated Upcoming Event'), status: 'published', poster_url: null }],
       past: [pastEvent(1, 'Past Fest One'), pastEvent(2, 'Past Fest Two'), pastEvent(3, 'Past Fest Three')],
     }
 
@@ -758,7 +753,24 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
 
     const timelineData = {
       now: [],
-      upcoming: [],
+      // A non-empty upcoming bucket keeps Past collapsed by default (Past only
+      // auto-expands when it's the sole non-empty bucket), which this test
+      // relies on to exercise the manual "Show History" toggle below.
+      upcoming: [
+        {
+          id: 2,
+          name: 'Unrelated Upcoming Event',
+          slug: 'unrelated-upcoming-event',
+          date: '2099-01-01',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: null,
+        },
+      ],
       past: [
         {
           id: 1,
@@ -766,7 +778,6 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
           slug: 'axe-fest',
           date: '2020-05-10',
           status: 'archived',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 0,
@@ -798,7 +809,24 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
     // /event/undefined.
     const timelineData = {
       now: [],
-      upcoming: [],
+      // A non-empty upcoming bucket keeps Past collapsed by default (Past only
+      // auto-expands when it's the sole non-empty bucket), which this test
+      // relies on to exercise the manual "Show History" toggle below.
+      upcoming: [
+        {
+          id: 10,
+          name: 'Unrelated Upcoming Event',
+          slug: 'unrelated-upcoming-event',
+          date: '2099-01-01',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+          poster_url: null,
+        },
+      ],
       past: [
         {
           id: 9,
@@ -806,7 +834,6 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
           slug: null,
           date: '2020-05-10',
           status: 'archived',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 0,
@@ -861,7 +888,6 @@ describe('EventTimeline Venues grid directions (#754)', () => {
           slug: 'test-event',
           date: '2026-05-10',
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 0,
@@ -946,5 +972,482 @@ describe('EventTimeline Venues grid directions (#754)', () => {
     // only The Mill has an address in this fixture.
     expect(screen.getAllByText('Directions')).toHaveLength(1)
     expect(screen.getByRole('link', { name: /directions to the mill/i })).toBeInTheDocument()
+  })
+})
+
+// Between seasons (e.g. the last event archives and the next one is still a
+// draft with an empty lineup), the timeline previously rendered a heading, a
+// tagline claiming "upcoming" events, and 0 visible cards -- reading as
+// broken. These cover the fix: an announced-but-unlineup'd event's stat row,
+// and the page-level states when Now/Upcoming are both empty.
+describe('EventTimeline empty lineup and between-seasons states', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    // Unconditional here rather than a trailing call inside the one test that
+    // installs fake timers: if an assertion in that test throws, the trailing
+    // call never runs and fake timers leak into every subsequent test in this
+    // file, turning one real failure into a cascade of unrelated ones. A no-op
+    // when no fake timers were installed.
+    vi.useRealTimers()
+  })
+
+  function stubTimeline(timelineData) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+  }
+
+  it('renders "Lineup TBA" instead of "0 Bands" for an upcoming event with no lineup yet', async () => {
+    stubTimeline({
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Vol 18',
+          slug: 'vol-18',
+          date: '2026-10-11',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Vol 18')).toBeInTheDocument()
+    expect(screen.getByText('Lineup TBA')).toBeInTheDocument()
+    // The zero-count stat this replaces would have rendered its own "Bands"
+    // label (plural, since 0 !== 1) right next to the numeral.
+    expect(screen.queryByText('Bands')).not.toBeInTheDocument()
+  })
+
+  it('omits the lineup stat entirely for a past event with no recorded bands', async () => {
+    stubTimeline({
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Upcoming Fest',
+          slug: 'upcoming-fest',
+          date: '2099-05-10',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 5,
+          venue_count: 1,
+          ticket_url: null,
+        },
+      ],
+      past: [
+        {
+          id: 2,
+          name: 'Undocumented Past Fest',
+          slug: 'undocumented-past-fest',
+          date: '2020-05-10',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Upcoming Fest')).toBeInTheDocument()
+    // Past events sit behind the "Show History" toggle -- auto-expand does
+    // NOT fire here because Upcoming Fest keeps hasUpcoming true.
+    fireEvent.click(screen.getByRole('button', { name: /show history/i }))
+    expect(await screen.findByText('Undocumented Past Fest')).toBeInTheDocument()
+
+    const pastCard = screen
+      .getAllByTestId('event-card')
+      .find(card => within(card).queryByText('Undocumented Past Fest'))
+    expect(pastCard).toBeTruthy()
+    expect(within(pastCard).queryByText('Lineup TBA')).not.toBeInTheDocument()
+    expect(within(pastCard).queryByText('Bands')).not.toBeInTheDocument()
+    expect(within(pastCard).queryByText('Band')).not.toBeInTheDocument()
+  })
+
+  it('still renders "N Bands" for an event with a real lineup', async () => {
+    stubTimeline({
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Booked Fest',
+          slug: 'booked-fest',
+          date: '2026-10-11',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 3,
+          venue_count: 2,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Booked Fest')).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('Bands')).toBeInTheDocument()
+    expect(screen.queryByText('Lineup TBA')).not.toBeInTheDocument()
+  })
+
+  it('shows a between-seasons message (not the generic empty state) when only past events exist', async () => {
+    stubTimeline({
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name: 'Long Weekend Band Crawl Vol 17',
+          slug: 'lwbc-17',
+          date: '2026-08-02',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText(/no upcoming events right now/i)).toBeInTheDocument()
+    expect(screen.queryByText('No events found')).not.toBeInTheDocument()
+  })
+
+  it('auto-expands the Past section when it is the only non-empty bucket', async () => {
+    stubTimeline({
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name: 'Long Weekend Band Crawl Vol 17',
+          slug: 'lwbc-17',
+          date: '2026-08-02',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    // No click on "Show History" -- the past event should already be visible.
+    expect(await screen.findByText('Long Weekend Band Crawl Vol 17')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide history/i })).toBeInTheDocument()
+  })
+
+  it('reads the between-seasons tagline when there is nothing now/upcoming, and the original tagline otherwise', async () => {
+    stubTimeline({
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name: 'Long Weekend Band Crawl Vol 17',
+          slug: 'lwbc-17',
+          date: '2026-08-02',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText(/browse past band crawls/i)).toBeInTheDocument()
+    expect(screen.queryByText('Discover upcoming band crawls and music events')).not.toBeInTheDocument()
+    unmount()
+
+    stubTimeline({
+      now: [],
+      upcoming: [
+        {
+          id: 2,
+          name: 'Vol 18',
+          slug: 'vol-18',
+          date: '2026-10-11',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Discover upcoming band crawls and music events')).toBeInTheDocument()
+    expect(screen.queryByText(/browse past band crawls/i)).not.toBeInTheDocument()
+  })
+
+  // Regression: the auto-expand effect above is keyed on `[timeline]`, and
+  // the 60s poll (fetchTimeline(true) in the main data-fetch effect) calls
+  // setTimeline(data) with a fresh object identity every tick -- even when
+  // the shape is unchanged. Without the wasPastOnlyRef transition guard,
+  // that re-runs the auto-expand effect on every poll and calls
+  // setShowPast(true) again, silently reopening a section a fan just
+  // collapsed. This uses the same `vi.useFakeTimers({ shouldAdvanceTime:
+  // true })` + `vi.advanceTimersByTimeAsync` pattern as
+  // BandProfilePage.test.jsx (#739) -- shouldAdvanceTime keeps
+  // findBy/waitFor's own polling working under fake timers.
+  it('does not reopen a manually collapsed Past section on a later past-only poll', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    const pastOnlyTimeline = name => ({
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name,
+          slug: 'lwbc-17',
+          date: '2026-08-02',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    let fetchCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          fetchCount += 1
+          // The second (polled) response is a DISTINCT past-only payload --
+          // not a byte-for-byte repeat -- so a passing assertion below
+          // proves a real update was applied, not that the poll was a no-op.
+          const name = fetchCount === 1 ? 'Long Weekend Band Crawl Vol 17' : 'Long Weekend Band Crawl Vol 17 (Updated)'
+          return Promise.resolve(jsonResponse(pastOnlyTimeline(name)))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    // Past auto-expands because it's the only non-empty raw bucket.
+    expect(await screen.findByText('Long Weekend Band Crawl Vol 17')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide history/i })).toBeInTheDocument()
+
+    // Fan deliberately collapses it.
+    fireEvent.click(screen.getByRole('button', { name: /hide history/i }))
+    expect(screen.getByRole('button', { name: /show history/i })).toBeInTheDocument()
+    expect(screen.queryByText('Long Weekend Band Crawl Vol 17')).not.toBeInTheDocument()
+
+    // Drive the 60s poll. It must fetch a genuinely new payload.
+    await vi.advanceTimersByTimeAsync(60000)
+    await waitFor(() => expect(fetchCount).toBeGreaterThan(1))
+
+    // ...but the collapse must survive it: still "Show History", and no past
+    // event content leaked back into the DOM under either name. Testing
+    // Library's waitFor (not a bare synchronous assertion, and not vitest's
+    // own vi.waitFor) is required here -- it wraps each retry in act(),
+    // which is what actually flushes the setTimeline update from the
+    // interval's fetch into React's effects. A synchronous assertion
+    // immediately after advanceTimersByTimeAsync can read stale DOM and pass
+    // even when the auto-expand effect WOULD have reopened the section --
+    // confirmed by temporarily reverting the wasPastOnlyRef fix, which made
+    // this test pass right up until this assertion was switched to waitFor.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /show history/i })).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Long Weekend Band Crawl Vol 17/)).not.toBeInTheDocument()
+  })
+})
+
+// Finding 2 companion to the between-seasons tests above: hasActiveFilters
+// only proves a filter is SET, not that it hid an upcoming event. These
+// cover both directions of that distinction using the between-seasons block
+// (`!hasNow && !hasUpcoming && hasPast`), which is the only place
+// filtersHideFutureEvents is consulted.
+describe('EventTimeline between-seasons filter copy accuracy', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  function stubTimeline(timelineData) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse(timelineData))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+  }
+
+  it('shows the between-seasons message, not the filter-recovery copy, when the raw timeline is genuinely past-only', async () => {
+    // Raw timeline has ONLY past events -- a real between-seasons gap. The
+    // active month filter still matches that past event (2026-08), so it
+    // does not empty the past bucket; it just happens to be set. Under the
+    // bug (hasActiveFilters), this would render "No upcoming events match
+    // your filters" / "Your filters are hiding every upcoming event" -- both
+    // false, since there was never a raw upcoming event to hide, and
+    // clearing filters would land the fan in the exact same state.
+    stubTimeline({
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name: 'Long Weekend Band Crawl Vol 17',
+          slug: 'lwbc-17',
+          date: '2026-08-02',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText(/no upcoming events right now/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /show filters/i }))
+    fireEvent.change(screen.getByLabelText(/filter by month/i), { target: { value: '2026-08' } })
+
+    const alertBox = await screen.findByRole('alert')
+    expect(within(alertBox).getByText(/no upcoming events right now/i)).toBeInTheDocument()
+    expect(within(alertBox).queryByText(/no upcoming events match your filters/i)).not.toBeInTheDocument()
+    expect(within(alertBox).queryByText(/your filters are hiding every upcoming event/i)).not.toBeInTheDocument()
+    expect(within(alertBox).getByRole('link', { name: /subscribe for updates/i })).toBeInTheDocument()
+    expect(within(alertBox).queryByRole('button', { name: /clear filters/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the filter-recovery copy when a filter genuinely hides every raw upcoming event', async () => {
+    // Raw timeline HAS an upcoming event. The month filter excludes it
+    // (2020-05 vs. the event's 2026-10) while still matching the past event,
+    // so filteredUpcoming is empty but the raw bucket was not -- the filter
+    // is the actual cause, and this copy should stay.
+    stubTimeline({
+      now: [],
+      upcoming: [
+        {
+          id: 1,
+          name: 'Vol 18',
+          slug: 'vol-18',
+          date: '2026-10-11',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+        },
+      ],
+      past: [
+        {
+          id: 2,
+          name: 'Long Weekend Band Crawl Vol 17',
+          slug: 'lwbc-17',
+          date: '2020-05-10',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Vol 18')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /show filters/i }))
+    fireEvent.change(screen.getByLabelText(/filter by month/i), { target: { value: '2020-05' } })
+
+    const alertBox = await screen.findByRole('alert')
+    expect(within(alertBox).getByText(/no upcoming events match your filters/i)).toBeInTheDocument()
+    expect(within(alertBox).getByText(/your filters are hiding every upcoming event/i)).toBeInTheDocument()
+    expect(within(alertBox).getByRole('button', { name: /clear filters/i })).toBeInTheDocument()
+    expect(within(alertBox).queryByRole('link', { name: /subscribe for updates/i })).not.toBeInTheDocument()
   })
 })

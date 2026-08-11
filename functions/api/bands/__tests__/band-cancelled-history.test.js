@@ -16,7 +16,7 @@ async function seedAndFetch({ endDate, isCancelled = 0, bandName = "Deer Fang" }
     date: endDate,
     end_date: endDate,
   });
-  rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+  rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
   const venue = insertVenue(rawDb, { name: "Blue Room" });
   const band = insertBand(rawDb, { name: bandName, event_id: event.id, venue_id: venue.id });
   rawDb.prepare("UPDATE performances SET is_cancelled = ? WHERE id = ?").run(isCancelled, band.id);

@@ -308,7 +308,6 @@ describe("GET /api/events/:id/recap", () => {
       date: "2023-06-01",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(priorEvent.id);
 
     const currentEvent = insertEvent(rawDb, {
       name: "Archived Vol",
@@ -335,7 +334,10 @@ describe("GET /api/events/:id/recap", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const event = insertEvent(rawDb, { name: "Mixed Venues", slug: "mixed-venues" });
-    rawDb.prepare("UPDATE events SET status='archived', is_published=1 WHERE id=?").run(event.id);
+    // archive.js always writes is_published = 0 when it sets status = 'archived'
+    // (see functions/api/admin/events/[id]/archive.js) — status='archived' AND
+    // is_published=1 together is a combination production can never hold.
+    rawDb.prepare("UPDATE events SET status='archived' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Stage A" });
     insertBand(rawDb, { name: "Band With Venue", event_id: event.id, venue_id: venue.id });
     insertBand(rawDb, { name: "Band Without Venue", event_id: event.id }); // no venue

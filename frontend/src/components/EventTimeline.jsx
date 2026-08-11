@@ -138,6 +138,36 @@ export default function EventTimeline() {
     }
   }, [])
 
+  // Auto-expand Past when it's the only bucket with content -- e.g. between
+  // seasons, when the last event has been archived and the next one is still
+  // a draft with an empty lineup. Without this a fan lands on a page with
+  // nothing visible behind a collapsed "Show History" toggle.
+  //
+  // Keyed on the RAW timeline arrays, not the filtered lists: keying on
+  // filters would re-expand this section every time a fan filters upcoming
+  // events away after deliberately collapsing it, fighting their own action.
+  //
+  // Fires only on the TRANSITION into past-only (tracked via wasPastOnlyRef),
+  // never merely because the state holds. The 60s poll above calls
+  // setTimeline(data) with a fresh object identity every tick, even when the
+  // shape is unchanged -- keying on `[timeline]` alone would re-run this
+  // effect on every poll and call setShowPast(true) again, reopening a
+  // section a fan just collapsed. Gating on the transition means a later
+  // poll that returns the same past-only shape finds wasPastOnlyRef already
+  // true and leaves a manual collapse alone.
+  const wasPastOnlyRef = useRef(false)
+  useEffect(() => {
+    const hasRawNow = (timeline.now || []).length > 0
+    const hasRawUpcoming = (timeline.upcoming || []).length > 0
+    const hasRawPast = (timeline.past || []).length > 0
+    const isPastOnly = !hasRawNow && !hasRawUpcoming && hasRawPast
+
+    if (isPastOnly && !wasPastOnlyRef.current) {
+      setShowPast(true)
+    }
+    wasPastOnlyRef.current = isPastOnly
+  }, [timeline])
+
   const loadDetails = useCallback(async eventId => {
     if (!eventId) return
 
@@ -273,6 +303,20 @@ export default function EventTimeline() {
   const hasUpcoming = filteredUpcoming.length > 0
   const hasPast = filteredPast.length > 0
 
+  // Whether an active filter is actually WHY the between-seasons block below
+  // is showing, as opposed to a genuine gap where the raw timeline has
+  // nothing now/upcoming to hide. hasActiveFilters only proves a filter is
+  // SET -- not that it hid anything -- so a raw past-only timeline (between
+  // seasons) with an unrelated filter still active would otherwise get the
+  // false "your filters are hiding an upcoming event" copy, and clearing
+  // filters would land the fan right back in the same between-seasons state.
+  // Derived from the RAW buckets rather than filteredNow/filteredUpcoming:
+  // by the time the between-seasons block renders those are already both
+  // empty (that's its render condition), so checking them here would always
+  // read false and this would never fire.
+  const filtersHideFutureEvents =
+    hasActiveFilters && ((timeline.now || []).length > 0 || (timeline.upcoming || []).length > 0)
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header with Filters */}
@@ -285,7 +329,15 @@ export default function EventTimeline() {
                 navigating by heading level. Visual size is unchanged. See App.jsx
                 line 731-734 for the same pattern on the event schedule page. */}
             <h2 className="text-4xl font-bold text-text-primary mb-2">Events</h2>
-            <p className="text-text-secondary">Discover upcoming band crawls and music events</p>
+            {/* Between seasons (no now/upcoming events) the "Discover upcoming"
+                copy is simply false -- there's nothing upcoming to discover.
+                Swap to copy that's still true: past crawls are browsable and
+                new dates land here. */}
+            <p className="text-text-secondary">
+              {hasNow || hasUpcoming
+                ? 'Discover upcoming band crawls and music events'
+                : 'Browse past band crawls — new dates will be announced here'}
+            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -448,6 +500,38 @@ export default function EventTimeline() {
                     ? 'Try adjusting your filters to see more events'
                     : 'Check back soon for upcoming band crawls!'}
                 </p>
+              </div>
+            </Alert>
+          </div>
+        )}
+
+        {/* Between-Seasons State — past events exist but nothing is now/upcoming
+            (e.g. the last event archived and the next one is still a draft
+            with an empty lineup). This is NOT the same as the empty state
+            above: there IS content, just not in the sections a fan expects
+            to see first. Conflating the two would tell a fan "no events
+            found" while 19 past events sit collapsed one toggle away. */}
+        {!hasNow && !hasUpcoming && hasPast && (
+          <div className="py-16 text-center">
+            <Alert variant="info">
+              <div className="text-center">
+                <h3 className="text-lg font-bold mb-2">
+                  {filtersHideFutureEvents ? 'No upcoming events match your filters' : 'No upcoming events right now'}
+                </h3>
+                <p className="text-text-secondary mb-4">
+                  {filtersHideFutureEvents
+                    ? "Your filters are hiding every upcoming event. Clear them to see what's next."
+                    : "We're between seasons — browse past crawls below, or subscribe to hear about new dates first."}
+                </p>
+                {filtersHideFutureEvents ? (
+                  <Button variant="secondary" size="sm" onClick={clearFilters} icon={<X size={14} />}>
+                    Clear Filters
+                  </Button>
+                ) : (
+                  <Button as={Link} to="/subscribe" variant="secondary" size="sm">
+                    Subscribe for Updates
+                  </Button>
+                )}
               </div>
             </Alert>
           </div>
@@ -752,7 +836,6 @@ function EventCard({
                     Archived
                   </Badge>
                 )}
-                {event.is_published === false && <Badge variant="warning">Draft</Badge>}
               </div>
 
               <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
@@ -762,10 +845,21 @@ function EventCard({
 
               {/* Event Stats */}
               <div className="flex flex-wrap gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-text-primary">{allBandCount}</span>
-                  <span className="text-text-tertiary">{allBandCount === 1 ? 'Band' : 'Bands'}</span>
-                </div>
+                {allBandCount > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-text-primary">{allBandCount}</span>
+                    <span className="text-text-tertiary">{allBandCount === 1 ? 'Band' : 'Bands'}</span>
+                  </div>
+                ) : (
+                  // A future event with an empty lineup isn't missing data —
+                  // it just hasn't been booked yet, so say so instead of
+                  // showing "0 Bands" (which reads as broken). A CONCLUDED
+                  // event with zero bands is a different situation: there's
+                  // no lineup still coming, just a historical gap (same as
+                  // the "0 Venues" case below), so "Lineup TBA" would be
+                  // nonsense there — omit the stat entirely instead.
+                  !isPast && <span className="text-text-tertiary">Lineup TBA</span>
+                )}
                 {/* Historical volumes have roster-only lineups with no venue
                   assignments — "0 Venues" reads as missing data, so omit the
                   stat entirely rather than showing a zero. */}

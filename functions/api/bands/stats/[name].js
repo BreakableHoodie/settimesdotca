@@ -3,6 +3,7 @@ import { CACHE_SHOW_CRITICAL } from "../../../utils/cacheHeaders.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 import { safeReflectSocialLinks } from "../../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../../utils/eventDay.js";
+import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
 
 /**
  * Public API: Get band profile with rich stats
@@ -129,7 +130,7 @@ export async function onRequestGet(context) {
       LEFT JOIN venues v ON p.venue_id = v.id
       LEFT JOIN events e ON p.event_id = e.id
       WHERE p.band_profile_id = ?
-        AND e.status IN ('published', 'archived')
+        AND ${publicEventStatusSql("e")}
         AND (e.reveal_mode = 0 OR p.is_announced = 1)
       ORDER BY e.date DESC, COALESCE(p.performance_date, e.date) ASC, p.start_time
     `,

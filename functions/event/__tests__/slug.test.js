@@ -42,7 +42,7 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD ticket_url sanitization (#504
       slug: "slug-504-unsafe-ticket",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     rawDb
       .prepare("UPDATE events SET ticket_url = ? WHERE id = ?")
       // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 read-path guard
@@ -68,7 +68,7 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD ticket_url sanitization (#504
       slug: "slug-504-safe-ticket",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/crawl", event.id);
 
     const response = await onRequest(makeContext({ env, slug: "slug-504-safe-ticket" }));
@@ -90,7 +90,7 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD enrichment (#615)", () => {
       slug: "slug-615-enriched",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
 
     const response = await onRequest(makeContext({ env, slug: "slug-615-enriched" }));
     expect(response.status).toBe(200);
@@ -115,7 +115,7 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD enrichment (#615)", () => {
       slug: "slug-615-ticketed",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/crawl", event.id);
 
     const seededEvent = rawDb.prepare("SELECT created_at FROM events WHERE id = ?").get(event.id);
@@ -140,7 +140,7 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD enrichment (#615)", () => {
       slug: "slug-615-no-ticket",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
 
     const response = await onRequest(makeContext({ env, slug: "slug-615-no-ticket" }));
     expect(response.status).toBe(200);
@@ -160,7 +160,7 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
       slug: "slug-616-poster",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     rawDb
       .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
       .run("https://band-photos.settimes.ca/event-posters/1-vol17.jpg", event.id);
@@ -189,7 +189,7 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
       slug: "slug-616-no-poster",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
 
     const response = await onRequest(makeContext({ env, slug: "slug-616-no-poster" }));
     expect(response.status).toBe(200);
@@ -211,7 +211,7 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
       slug: "slug-616-unsafe-poster",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     rawDb
       .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
       // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504-style read-path guard
@@ -242,7 +242,7 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
       slug: "slug-542-multiday",
       date: "2026-08-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, end_date=? WHERE id=?").run("2026-08-02", event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', end_date=? WHERE id=?").run("2026-08-02", event.id);
     const venue = insertVenue(rawDb, { name: "Main Stage" });
 
     const day1Band = insertBand(rawDb, {
@@ -302,7 +302,7 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
       slug: "slug-542-singleday",
       date: "2026-08-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Solo Venue" });
     insertBand(rawDb, { name: "Only Band", event_id: event.id, venue_id: venue.id });
 
@@ -323,7 +323,7 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
       slug: "slug-542-same-date",
       date: "2026-08-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, end_date=? WHERE id=?").run("2026-08-01", event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', end_date=? WHERE id=?").run("2026-08-01", event.id);
 
     const response = await onRequest(makeContext({ env, slug: "slug-542-same-date" }));
     const html = await response.text();
@@ -339,7 +339,9 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
       slug: "slug-542-reveal",
       date: "2026-08-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, end_date=?, reveal_mode=1 WHERE id=?").run("2026-08-02", event.id);
+    rawDb
+      .prepare("UPDATE events SET status = 'published', end_date=?, reveal_mode=1 WHERE id=?")
+      .run("2026-08-02", event.id);
     const venue = insertVenue(rawDb, { name: "Reveal Stage" });
 
     const announced = insertBand(rawDb, { name: "Announced Band", event_id: event.id, venue_id: venue.id });
@@ -377,7 +379,7 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
       slug: "slug-542-after-midnight",
       date: "2026-08-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, end_date=? WHERE id=?").run("2026-08-02", event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', end_date=? WHERE id=?").run("2026-08-02", event.id);
     const venue = insertVenue(rawDb, { name: "Late Stage" });
 
     // Stored with performance_date = the literal calendar date the 1 AM set
@@ -408,11 +410,11 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
     const summerEvent = insertEvent(rawDb, { name: "Summer Show", slug: "slug-542-summer", date: "2026-08-02" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(summerEvent.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(summerEvent.id);
 
     // lwbc15 precedent (CLAUDE.md #542): a February event is EST, not EDT.
     const winterEvent = insertEvent(rawDb, { name: "Winter Show", slug: "slug-542-winter", date: "2026-02-14" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(winterEvent.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(winterEvent.id);
 
     const summerRes = await onRequest(makeContext({ env, slug: "slug-542-summer" }));
     const [summerMusicEvent] = extractJsonLd(await summerRes.text());
@@ -433,7 +435,7 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD venue reveal_mode gate (#635)
       slug: "slug-635-reveal-venue",
       date: "2026-08-01",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
 
     const visibleVenue = insertVenue(rawDb, { name: "Visible Venue" });
     const hiddenVenue = insertVenue(rawDb, { name: "Hidden Venue" });
@@ -502,7 +504,7 @@ describe("SSR /event/[slug] — og:site_name (#784 ownership sweep)", () => {
       slug: "slug-784-site-name",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
 
     const response = await onRequest(makeContextWithDefaultsShell({ env, slug: "slug-784-site-name" }));
     expect(response.status).toBe(200);

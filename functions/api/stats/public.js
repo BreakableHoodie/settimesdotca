@@ -14,6 +14,7 @@
 // Bands/venues/events are public data, so their names/counts are fine.
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 const TOP_BANDS_LIMIT = 8;
 
@@ -46,12 +47,12 @@ export async function onRequestGet(context) {
       await DB.batch([
         DB.prepare(`SELECT COUNT(*) AS count FROM band_profiles WHERE is_active = 1`),
         DB.prepare(`SELECT COUNT(*) AS count FROM venues`),
-        DB.prepare(`SELECT COUNT(*) AS count FROM events WHERE is_published = 1`),
+        DB.prepare(`SELECT COUNT(*) AS count FROM events WHERE ${publicEventStatusSql()}`),
         DB.prepare(
           `SELECT COUNT(*) AS count
            FROM performances p
            JOIN events e ON e.id = p.event_id
-           WHERE e.is_published = 1`,
+           WHERE ${publicEventStatusSql("e")}`,
         ),
         // share_links: aggregate only — count of rows + sum of view_count.
         DB.prepare(`SELECT COUNT(*) AS count, COALESCE(SUM(view_count), 0) AS total_views FROM share_links`),

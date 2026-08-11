@@ -11,7 +11,7 @@ describe("GET /api/schedule - poster_url (#655)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Buddies Fest 2", slug: "buddiesfest2-poster" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     rawDb
       .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
       .run("https://band-photos.settimes.ca/event-posters/36-buddiesfest2.jpg", ev.id);
@@ -27,7 +27,7 @@ describe("GET /api/schedule - poster_url (#655)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "No Poster Fest", slug: "no-poster-fest" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
 
     const req = new Request("https://example.test/api/schedule?event=no-poster-fest");
     const res = await scheduleHandler.onRequestGet({ request: req, env });
@@ -40,7 +40,7 @@ describe("GET /api/schedule - poster_url (#655)", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Unsafe Poster Fest", slug: "unsafe-poster-fest" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     rawDb
       .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
       // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #655 read-path guard
@@ -61,7 +61,7 @@ describe("GET /api/schedule - poster_url (#655)", () => {
     const futureDateStr = futureDate.toISOString().split("T")[0];
 
     const ev = insertEvent(rawDb, { name: "Current Poster Fest", slug: "current-poster-fest", date: futureDateStr });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     rawDb
       .prepare("UPDATE events SET poster_url = ? WHERE id = ?")
       .run("https://band-photos.settimes.ca/event-posters/current.jpg", ev.id);

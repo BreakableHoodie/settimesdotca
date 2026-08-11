@@ -1,6 +1,7 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
-import { normalizeHttpUrl } from "../../../utils/validation.js";
+import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
 import { sortableName } from "../../../utils/sortableName.js";
+import { archivedEventStatusSql, publicEventStatusSql } from "../../../utils/eventVisibility.js";
 
 // SQLite `ORDER BY` can't strip a leading article inline (#587); the SQL
 // query below is a coarse pre-sort and this comparator re-derives the exact
@@ -53,15 +54,28 @@ export async function onRequestGet(context) {
   const numericId = Number(rawId);
   const isNumeric = Number.isFinite(numericId) && String(numericId) === rawId;
 
+  // A value that LOOKS numeric must still clear validateId() before it reaches
+  // a query -- the repo-wide contract for Pages `params.id` (matching
+  // functions/api/events/[id]/details.js). Number.isFinite() alone accepted
+  // "0", "-3" and "1.5" and bound them straight through. Slugs are unaffected:
+  // Number("bf2") is NaN, so they take the slug branch below.
+  const idCheck = isNumeric ? validateId(rawId) : null;
+  if (idCheck && !idCheck.valid) {
+    return new Response(JSON.stringify({ error: "Invalid event id" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const event = isNumeric
       ? await DB.prepare(
-          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE id = ? AND status = 'archived' LIMIT 1`,
+          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE id = ? AND ${archivedEventStatusSql()} LIMIT 1`,
         )
-          .bind(numericId)
+          .bind(idCheck.value)
           .first()
       : await DB.prepare(
-          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE slug = ? AND status = 'archived' LIMIT 1`,
+          `SELECT id, name, slug, date, end_date, poster_url FROM events WHERE slug = ? AND ${archivedEventStatusSql()} LIMIT 1`,
         )
           .bind(rawId)
           .first();
@@ -99,7 +113,7 @@ export async function onRequestGet(context) {
             -- it's archived — restricting to status='archived' would then miss
             -- prior editions that are only published so far and wrongly call a
             -- returning act a first-timer. published-or-archived covers both.
-            AND (e2.is_published = 1 OR e2.status = 'archived')
+            AND ${publicEventStatusSql("e2")}
             -- "Returning" means chronologically earlier, not merely "some other
             -- event" (#613): without this, a band that only played a LATER
             -- archived edition counted as returning at an EARLIER one. Same-day

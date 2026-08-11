@@ -11,7 +11,7 @@ describe("GET /api/events/:id/details", () => {
       slug: "test-event",
       date: "2026-01-01",
     });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Test Venue", city: "Portland" });
     insertBand(rawDb, {
@@ -95,7 +95,7 @@ describe("GET /api/events/:id/details - performance_date across a multi-day even
       date: "2026-08-07",
       end_date: "2026-08-09",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "The Mill" });
 
     // Day 3, EARLY time -- if sorted on start_time alone this sorts FIRST.
@@ -170,7 +170,7 @@ describe("GET /api/events/:id/details - duplicate performer counting (#605)", ()
       slug: "details-two-set-band",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const firstSet = insertBand(rawDb, {
@@ -229,7 +229,7 @@ describe("GET /api/events/:id/details - reveal_mode gate", () => {
       slug: "reveal-details-1",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const announced = insertBand(rawDb, {
       name: "Visible Band",
@@ -265,7 +265,7 @@ describe("GET /api/events/:id/details - reveal_mode gate", () => {
       slug: "reveal-details-2",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Princess Cafe" });
     const announced = insertBand(rawDb, {
       name: "Announced Band",
@@ -295,7 +295,7 @@ describe("GET /api/events/:id/details - reveal_mode gate", () => {
       slug: "reveal-details-0",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=0 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Room 47" });
     const unannounced = insertBand(rawDb, {
       name: "Unannounced But Visible",
@@ -327,7 +327,7 @@ describe("GET /api/events/:id/details - is_cancelled (#732)", () => {
       slug: "details-cancel-732",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const band = insertBand(rawDb, {
       name: "Deer Fang",
@@ -369,7 +369,7 @@ describe("GET /api/events/:id/details - ticket_url sanitization (#504)", () => {
       slug: "details-504-unsafe-ticket",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     rawDb
       .prepare("UPDATE events SET ticket_url = ? WHERE id = ?")
       // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #504 read-path guard
@@ -395,7 +395,7 @@ describe("GET /api/events/:id/details - ticket_url sanitization (#504)", () => {
       slug: "details-504-safe-ticket",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     rawDb.prepare("UPDATE events SET ticket_url = ? WHERE id = ?").run("https://tickets.example.com/crawl", event.id);
 
     const request = new Request(`https://example.test/api/events/${event.id}/details`);

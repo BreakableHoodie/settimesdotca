@@ -13,6 +13,7 @@ import {
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 import { torontoUtcOffset } from "../utils/eventDay.js";
+import { publicEventStatusSql } from "../utils/eventVisibility.js";
 
 // Sets starting before 06:00 are after-midnight sets that belong to the
 // PREVIOUS festival day (AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention;
@@ -116,7 +117,7 @@ export async function onRequest(context) {
     event = await env.DB.prepare(
       `SELECT id, name, date, end_date, slug, description, city, ticket_url, poster_url, created_at, reveal_mode
        FROM events
-       WHERE slug = ? AND (is_published = 1 OR status = 'archived')`,
+       WHERE slug = ? AND ${publicEventStatusSql()}`,
     )
       .bind(slug)
       .first();

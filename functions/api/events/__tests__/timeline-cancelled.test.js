@@ -41,7 +41,6 @@ describe("Timeline real-DB — the 'now' query excludes cancelled sets (#732)", 
       end_date: todayLocal(),
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
     return event;
   };
 
@@ -118,7 +117,6 @@ describe("Timeline real-DB — is_cancelled surfaces on upcoming[].bands (#732)"
       date: farFuture,
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Room 47" });
     const cancelledPerf = insertBand(rawDb, {
@@ -172,7 +170,6 @@ describe("Timeline real-DB — is_cancelled surfaces on upcoming[].bands (#732)"
       date: "2020-01-01",
       status: "published",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
 
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const cancelledPerf = insertBand(rawDb, {

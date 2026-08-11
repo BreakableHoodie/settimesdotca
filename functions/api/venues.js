@@ -5,6 +5,7 @@
 // so venues are discoverable. Gated by PUBLIC_DATA_PUBLISH_ENABLED.
 
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
+import { publicEventStatusSql } from "../utils/eventVisibility.js";
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 60;
@@ -46,7 +47,7 @@ export async function onRequestGet(context) {
       FROM venues v
       JOIN performances p ON p.venue_id = v.id
       JOIN events e ON e.id = p.event_id
-      WHERE (e.is_published = 1 OR e.status = 'archived')
+      WHERE ${publicEventStatusSql("e")}
         AND (
           ? = ''
           OR v.name LIKE ? ESCAPE '\\'

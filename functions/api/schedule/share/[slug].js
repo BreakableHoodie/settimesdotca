@@ -2,6 +2,7 @@
 // GET /api/schedule/share/[slug]
 
 import { isLikelyCrawler, visitorHash } from "../../../utils/visitorDedupe.js";
+import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -25,7 +26,7 @@ export async function onRequestGet(context) {
     const row = await DB.prepare(
       `SELECT sl.slug, sl.event_slug, sl.performance_ids, sl.band_names, e.name AS event_name
        FROM share_links sl
-       JOIN events e ON e.id = sl.event_id AND (e.is_published = 1 OR e.status = 'archived')
+       JOIN events e ON e.id = sl.event_id AND ${publicEventStatusSql("e")}
        WHERE sl.slug = ? AND sl.expires_at > datetime('now')`,
     )
       .bind(slug)

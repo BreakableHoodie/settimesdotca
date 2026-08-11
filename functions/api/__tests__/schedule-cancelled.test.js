@@ -7,7 +7,7 @@ describe("GET /api/schedule — is_cancelled", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-cancel" });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(ev.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(ev.id);
     const venue = insertVenue(rawDb, { name: "Blue Room" });
     const band = insertBand(rawDb, { name: "Deer Fang", event_id: ev.id, venue_id: venue.id });
     const performanceId = band.id;

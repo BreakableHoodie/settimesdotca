@@ -11,7 +11,7 @@ describe("GET /api/bands/:name - reveal_mode gate", () => {
       slug: "vol17-band-profile-1",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Prohibition Warehouse" });
     const perf = insertBand(rawDb, {
       name: "Embargoed Artist",
@@ -36,7 +36,7 @@ describe("GET /api/bands/:name - reveal_mode gate", () => {
       slug: "vol17-band-profile-2",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=1 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Roost" });
     const perf = insertBand(rawDb, {
       name: "Revealed Artist",
@@ -62,7 +62,7 @@ describe("GET /api/bands/:name - reveal_mode gate", () => {
       slug: "vol17-band-profile-3",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1, reveal_mode=0 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode=0 WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Revive Karaoke" });
     const perf = insertBand(rawDb, {
       name: "Normal Artist",
@@ -97,7 +97,7 @@ describe("GET /api/bands/:name - social_links scheme sanitization (#483)", () =>
       slug: "vol17-band-profile-483-unsafe",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, {
       name: "Scheme Test Band",
@@ -124,7 +124,7 @@ describe("GET /api/bands/:name - social_links scheme sanitization (#483)", () =>
       slug: "vol17-band-profile-483-safe",
       date: "2026-08-02",
     });
-    rawDb.prepare("UPDATE events SET is_published=1 WHERE id=?").run(event.id);
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Roost" });
     insertBand(rawDb, {
       name: "Valid Site Band",

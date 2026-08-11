@@ -2,6 +2,26 @@ import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_SHOW_CRITICAL } from "../../utils/cacheHeaders.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
 import { eventLocalToday, eventLocalFestivalToday, eventLocalClock } from "../../utils/eventDay.js";
+import { archivedEventStatusSql, publishedEventStatusSql } from "../../utils/eventVisibility.js";
+
+// Bucket membership is a lifecycle question before it is a date question.
+// `status = 'archived'` MEANS "this edition is concluded", so it outranks the
+// calendar: an archived event must never surface as "Happening Now" or
+// "Upcoming" just because an admin closed it out on its own final day (the
+// same trap `/api/schedule?event=current` avoids with publishedEventStatusSql).
+//
+//   now      = published AND the festival window covers today
+//   upcoming = published AND dated in the future
+//   past     = archived OR (published AND concluded by date)
+//
+// Exhaustive and non-overlapping over publicly visible events. The two halves
+// only work together: narrowing now/upcoming to published-only WITHOUT the
+// `archived OR` below would make an archived-but-future-dated event match no
+// bucket at all and vanish from the timeline entirely.
+const concludedEventSql = (alias = "") => {
+  const dateExpr = alias ? `COALESCE(${alias}.end_date, ${alias}.date)` : "COALESCE(end_date, date)";
+  return `(${archivedEventStatusSql(alias)} OR (${publishedEventStatusSql(alias)} AND ${dateExpr} < ?))`;
+};
 
 /**
  * 24-hour "HH:MM" time regex — mirrors DOORS_TIME_REGEX in validation.js.
@@ -331,7 +351,7 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1) AND p.is_cancelled = 0
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
-        WHERE e.is_published = 1
+        WHERE ${publishedEventStatusSql("e")}
         AND e.date <= ?
         AND COALESCE(e.end_date, e.date) >= ?
         ORDER BY e.date DESC, p.start_time, v.name
@@ -382,11 +402,11 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
-        WHERE e.is_published = 1
+        WHERE ${publishedEventStatusSql("e")}
         AND e.date > ?
         AND e.id IN (
           SELECT id FROM events
-          WHERE is_published = 1
+          WHERE ${publishedEventStatusSql()}
           AND date > ?
           ORDER BY date ASC
           LIMIT 10
@@ -443,13 +463,10 @@ export async function onRequestGet(context) {
         LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
         LEFT JOIN band_profiles b ON p.band_profile_id = b.id
         LEFT JOIN venues v ON p.venue_id = v.id
-        WHERE (
-          (e.is_published = 1 AND COALESCE(e.end_date, e.date) < ?)
-          OR e.status = 'archived'
-        )
+        WHERE ${concludedEventSql("e")}
         AND e.id IN (
           SELECT id FROM events
-          WHERE (is_published = 1 AND COALESCE(end_date, date) < ?) OR status = 'archived'
+          WHERE ${concludedEventSql()}
           ORDER BY date DESC
           LIMIT ?
         )

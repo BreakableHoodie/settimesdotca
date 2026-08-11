@@ -3,6 +3,7 @@
 // Compatible with Google Calendar, Apple Calendar, Outlook
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 function sanitizeFilenamePart(value) {
   return (
@@ -50,7 +51,7 @@ export async function onRequestGet(context) {
       LEFT JOIN performances p ON p.event_id = e.id AND (e.reveal_mode = 0 OR p.is_announced = 1)
       LEFT JOIN band_profiles bp ON p.band_profile_id = bp.id
       LEFT JOIN venues v ON v.id = p.venue_id
-      WHERE e.is_published = 1
+      WHERE ${publicEventStatusSql("e")}
       AND COALESCE(e.end_date, e.date) >= date('now')
     `;
 

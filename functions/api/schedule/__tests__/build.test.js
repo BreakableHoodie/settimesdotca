@@ -6,7 +6,6 @@ describe("POST /api/schedule/build", () => {
   test("records schedule build for performance ids", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Build Event", slug: "build-event" });
-    rawDb.prepare("UPDATE events SET is_published = 1 WHERE id = ?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Build Venue" });
     const performance = insertBand(rawDb, {
       name: "Build Band",

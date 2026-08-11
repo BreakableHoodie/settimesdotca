@@ -41,7 +41,6 @@ describe('EventTimeline collapsed chips — cancelled sets (#732)', () => {
           slug: 'chip-sort-fest-cancelled',
           date: '2026-09-01',
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [
             { id: 1, name: 'Deer Fang', is_cancelled: 1 },
@@ -112,7 +111,6 @@ describe('EventTimeline expanded details render cancellation on every band-list 
           slug: 'cancel-coverage-fest',
           date: '2026-08-02',
           status: 'published',
-          is_published: true,
           venues: [],
           bands: [],
           band_count: 2,

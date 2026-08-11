@@ -2,6 +2,8 @@
 // Social crawlers (iMessage, WhatsApp, Twitter) hit this URL and need server-rendered
 // meta tags — React Helmet only runs client-side and crawlers won't see it.
 
+import { publicEventStatusSql } from "../utils/eventVisibility.js";
+
 // Pin og:url to the production host so preview deploys (*.pages.dev) don't
 // self-canonicalise — same class of bug as #443.
 const CANONICAL_HOST = "https://settimes.ca";
@@ -22,9 +24,17 @@ export async function onRequest(context) {
   let row;
   try {
     row = await DB.prepare(
+      // The status gate matters even though share.js only mints links for a
+      // publicly-visible event: an event can be unpublished AFTER a link is
+      // shared. Without it this card would render the event name and band list
+      // for a draft, while GET /api/schedule/share/[slug] -- which the page
+      // itself renders from, and which has always carried this predicate --
+      // returns nothing. That disagreement between a crawler-facing meta layer
+      // and the data layer behind it is the #787 failure shape; all three
+      // routes serving a share slug now gate identically.
       `SELECT sl.slug, sl.performance_ids, sl.band_names, e.name AS event_name
        FROM share_links sl
-       JOIN events e ON e.id = sl.event_id
+       JOIN events e ON e.id = sl.event_id AND ${publicEventStatusSql("e")}
        WHERE sl.slug = ? AND sl.expires_at > datetime('now')`,
     )
       .bind(slug)

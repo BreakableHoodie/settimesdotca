@@ -4,6 +4,26 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { publicEventStatusSql, archivedEventStatusSql, publishedEventStatusSql } from "../eventVisibility.js";
 
+// Module-level so both source-scanning guards below share one walker.
+// .ts is scanned even though functions/ is currently JS-only: a guard that
+// silently stops covering a file type the day someone adds one is the exact
+// failure mode guards exist to prevent. Mirrors the frontend half in
+// frontend/src/__tests__/isPublishedGuard.test.js.
+const SCANNED_EXTENSIONS = [".js", ".ts"];
+
+function walk(dir) {
+  let files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files = files.concat(walk(full));
+    } else if (entry.isFile() && SCANNED_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
 describe("publicEventStatusSql", () => {
   it("returns the unaliased predicate by default", () => {
     expect(publicEventStatusSql()).toBe("status IN ('published', 'archived')");
@@ -86,6 +106,71 @@ describe("alias validation rejects non-strings", () => {
 // frontend/src/admin/utils/__tests__/bandFields.test.js): the bug is a string
 // baked into a SQL template at module load time, so nothing about it is
 // observable by calling the exported functions.
+// --- Durable guard: every public `events` query goes through the helper ------
+//
+// The is_published scan below catches the OLD column, but not the more general
+// failure: a public route querying `events` with NO status gate at all. That is
+// how functions/s/[slug].js shipped an ungated JOIN while its two siblings for
+// the same share slug (api/schedule/share.js, api/schedule/share/[slug].js)
+// both gated correctly -- so an event unpublished after a link was shared still
+// produced a crawler-facing OG card naming it and its bands.
+//
+// Found by hand-sweeping all 20 non-admin files that touch the table. This
+// turns that sweep into a test so nobody has to repeat it.
+//
+// Known limit, stated plainly: this is a FILE-level scan. It catches "this file
+// queries events and never imports the helper at all" -- which is exactly how
+// s/[slug].js shipped -- but not "this file imports the helper and forgets it
+// on one of several queries", because the import line alone satisfies the
+// match. ESLint's unused-import rule covers the degenerate version of that
+// (helper imported, used nowhere). A precise check would need SQL parsing;
+// this catches the class that has actually occurred twice.
+describe("public events queries use the shared visibility predicate", () => {
+  const guardFile = fileURLToPath(import.meta.url);
+  const root = path.join(path.dirname(guardFile), "../../");
+
+  // Files that query `events` WITHOUT a status predicate, deliberately:
+  //  - api/metrics.js — a WRITE path. `SELECT id FROM events WHERE id IN (...)`
+  //    is an existence check before writing daily aggregates; it projects only
+  //    `id`, returns nothing to the caller, and ingestion is fire-and-forget,
+  //    so it is neither an exposure nor a probing oracle. Metrics for a draft
+  //    an admin is previewing are still legitimate to record.
+  //  - utils/timeConflicts.js — imported ONLY by functions/api/admin/**, which
+  //    legitimately sees drafts. Gating it would break conflict detection on
+  //    exactly the unpublished events admins are building.
+  const UNGATED_BY_DESIGN = new Set(["api/metrics.js", "utils/timeConflicts.js"]);
+
+  const QUERIES_EVENTS_RE = /\b(?:FROM|JOIN)\s+events\b/;
+  const USES_HELPER_RE = /EventStatusSql|concludedEventSql/;
+
+  it("has no non-admin file querying events without a status gate", () => {
+    const offenders = [];
+    for (const absPath of walk(root)) {
+      const relPath = path.relative(root, absPath).split(path.sep).join("/");
+      if (relPath.startsWith("api/admin/")) continue;
+      if (relPath.split("/").includes("__tests__")) continue;
+      if (relPath === "api/test-utils.js") continue;
+      if (UNGATED_BY_DESIGN.has(relPath)) continue;
+
+      const source = readFileSync(absPath, "utf8");
+      if (QUERIES_EVENTS_RE.test(source) && !USES_HELPER_RE.test(source)) {
+        offenders.push(relPath);
+      }
+    }
+
+    expect(
+      offenders,
+      offenders.length > 0
+        ? `These files query the events table on a non-admin path with no status gate: ` +
+            `${offenders.join(", ")}. Apply publicEventStatusSql()/publishedEventStatusSql()/` +
+            `archivedEventStatusSql() from functions/utils/eventVisibility.js — or, if the query genuinely ` +
+            `must see drafts (a write-path existence check, or an admin-only util), add it to ` +
+            `UNGATED_BY_DESIGN in this guard WITH a comment saying why.`
+        : undefined,
+    ).toEqual([]);
+  });
+});
+
 describe("is_published never read outside admin/test infrastructure", () => {
   const currentFile = fileURLToPath(import.meta.url);
   const functionsRoot = path.join(path.dirname(currentFile), "../../");
@@ -117,21 +202,6 @@ describe("is_published never read outside admin/test infrastructure", () => {
   // silently stops covering a file type the day someone adds one is the exact
   // failure mode guards exist to prevent. Mirrors the frontend half in
   // frontend/src/__tests__/isPublishedGuard.test.js.
-  const SCANNED_EXTENSIONS = [".js", ".ts"];
-
-  function walk(dir) {
-    let files = [];
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        files = files.concat(walk(full));
-      } else if (entry.isFile() && SCANNED_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) {
-        files.push(full);
-      }
-    }
-    return files;
-  }
-
   it("contains no bare is_published reads outside the allowlisted paths", () => {
     const offenders = [];
     for (const absPath of walk(functionsRoot)) {

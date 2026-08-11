@@ -40,6 +40,6 @@
     "email-validator": "^2.0.4"
   },
   "overrides": {
-    "js-yaml": "4.3.0"
+    "js-yaml": "^4.3.1"
   }
 }

@@ -70,18 +70,19 @@ When a task has a clear implementation spec, dispatch a Sonnet agent to build it
 
 ## Mission & Scope
 
-settimes.ca is evolving into the best multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON), starting with **Long Weekend Band Crawl Vol. 17** on **August 2, 2026**.
+settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The next edition is **Long Weekend Band Crawl Vol. 18** on **October 11, 2026** (event 37, `lwbc18`, single-day).
 
-- **Focus:** Waterloo Region only (not Ottawa — do not reference Ottawa in new code/docs)
+- **Focus:** Waterloo Region. This governs **product language** — marketing copy, meta descriptions, SEO targeting, "where this is for" statements. It is not a censor on fact: the platform has hosted an event outside the region (Buddies Fest 2, Tillsonburg) and those records stay accurate wherever they appear. The specific drift this rule exists to prevent is describing the site as serving Ottawa, which it does not.
 - **Brand:** settimes.ca — no rebranding
-- **Target event:** Vol. 17, August 2, 2026. Urgency applies to all work.
-- **Venues (6, King St N, Waterloo):** Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost
-- **Bands:** 22, doors 6:30PM / show 6:45PM, ages 19+
+- **Target event:** Vol. 18, October 11, 2026
 - **Both fan-facing and admin tooling are equal priority**
 - **SEO is a priority** (band pages, event pages, local discovery, structured data)
 - **Colour themes:** 4 user-selectable (dark + light presets) via Tailwind v4 CSS custom properties + `data-theme` on `<html>`, persisted in localStorage
 - **Single photo per band** — extends existing `photo_url` / R2 upload flow; no video embeds
-- **Design:** Fresh visual identity for Vol. 17 using Tailwind v4 `@theme`
+
+**Shipped editions** (both `status = 'archived'`): Vol. 17 (event 21, 2026-08-02, 22 bands across 6 King St N venues — Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost) and Buddies Fest 2 (event 36, 2026-08-07→09, Tillsonburg — the first multi-day production event). Their lineups and venue rosters are live data now, not spec; read them from D1 rather than from this file.
+
+**Between seasons is a supported state, not a bug.** With Vol. 17 and BF2 archived and Vol. 18 still a draft, every "upcoming" surface is legitimately empty — `/api/events/public` (which defaults to `upcoming=true`) and the iCal feed both correctly return zero, while `/api/stats/public` and the sitemap stay fully populated from the archived editions. `EventTimeline` has a dedicated between-seasons empty state and auto-expands Past for exactly this window. Before treating such a zero as a bug, check whether any event is actually `published`.
 
 Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude, OpenCode, and humans.
 
@@ -114,6 +115,27 @@ Bands starting before 6 AM are "after-midnight" sets that belong to the *previou
 - **Two homes, not more.** `functions/api/events/timeline.js` and `functions/event/[slug].js` still re-encode the threshold privately (as `"06:00"` and `6` respectively) instead of importing it — tracked in #746. Do not add a third; import from the appropriate canonical home.
 - Logic: `prepareBands()` adds `MS_PER_DAY` to `startMs`/`endMs` for times below this threshold
 - **Never remove or lower this threshold.** Any sort, filter, or conflict-detection that touches performance times must apply the same offset or delegate to `prepareBands`.
+
+### Public event visibility is `status`, never `is_published` (#800)
+
+`events.is_published INTEGER` was deprecated by migration 0005 and never dropped (0036 even added a fresh index on it). **`functions/api/admin/events/[id]/archive.js` writes `status = 'archived', is_published = 0`** — archiving unpublishes under the old column. On 2026-08-10 archiving the last un-archived event dropped 13 public read paths to zero rows simultaneously and took the public site dark.
+
+`functions/utils/eventVisibility.js` is the single canonical home, mirroring `eventDay.js`'s role for the after-midnight threshold:
+
+- `publicEventStatusSql(alias?)` → `status IN ('published','archived')`. The default for browse/history surfaces — **archived means concluded, not hidden.**
+- `archivedEventStatusSql(alias?)` → recap-only surfaces.
+- `publishedEventStatusSql(alias?)` → the narrower gate, for where serving a concluded event is *wrong* rather than merely unusual. Live case: `/api/schedule?event=current`, whose `-6 hours` buffer means an event archived on its own final day still passes the date filter.
+
+**Bucket membership is a lifecycle question before a date question.** `/api/events/timeline` splits: `now`/`upcoming` = published-only; `past` = `archived OR (published AND concluded by date)`. Both halves are load-bearing — narrowing the live buckets without `archived OR` in past makes an archived event with a live or future date match no bucket and vanish entirely.
+
+**Two** source-scanning guards enforce this, and they catch different things:
+
+1. **No `is_published` read** outside `functions/api/admin/**`, `frontend/src/admin/**`, `utils/adminApi.js`, and `__tests__/**` — scanned on both sides of the build boundary (`functions/utils/__tests__/eventVisibility.test.js`, `frontend/src/__tests__/isPublishedGuard.test.js`).
+2. **No non-admin file queries `events` without a status predicate.** The first guard only catches the *old column*; this one catches a route with no gate at all. That gap was real: `functions/s/[slug].js` (the OG card crawlers fetch for a shared schedule link) joined `events` ungated while both siblings for the same slug gated correctly, so an event unpublished *after* a link was shared still produced a crawler-facing card naming it. Exempt by design, named in the guard: `api/metrics.js` (write-path existence check, projects only `id`) and `utils/timeConflicts.js` (admin-only, must see drafts).
+
+Guard 2 is a file-level scan: it catches "never imported the helper" (the class that has occurred), not "imported it and missed one query". Don't mistake it for proof of the latter.
+
+Admin still *writes* `is_published` so the eventual drop stays rollback-safe — that's #799, not an oversight.
 
 ### Server-side "today"/"now" is Toronto-local — never UTC-sliced
 

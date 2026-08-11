@@ -478,7 +478,64 @@ describe("Event API - handler integration", () => {
     const res = await publishHandler.onRequestPost({ request, env });
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.event.is_published === 1 || data.event.is_published === true).toBeTruthy();
+    // Asserts `status`, not the deprecated publish-boolean (#799). That column
+    // is no longer written, so the old assertion checked a value the endpoint
+    // had stopped producing -- it only ever passed because the two were
+    // redundantly kept in lockstep.
+    expect(data.event.status).toBe("published");
+  });
+
+  // PUT /api/admin/events/:id/publish is a TOGGLE, distinct from the POST
+  // endpoint above. It used to flip on the deprecated publish-boolean; it now
+  // flips on `status` (#799). The archived case is the one that matters: the
+  // old code read that column, archive.js always cleared it to 0, so toggling
+  // an archived event flipped it to 1 and set status='published' -- silently
+  // RESURRECTING a concluded edition onto every public surface.
+  async function togglePublish(env, eventId) {
+    const request = new Request(`https://example.test/api/admin/events/${eventId}/publish`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({}),
+    });
+    return eventIdHandler.onRequestPut({ request, env });
+  }
+
+  it("publish toggle flips draft -> published on status", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "Toggle Me", slug: "toggle-me", status: "draft" });
+
+    const res = await togglePublish(env, ev.id);
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.status).toBe("published");
+  });
+
+  it("publish toggle flips published -> draft on status", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "Toggle Back", slug: "toggle-back", status: "published" });
+
+    const res = await togglePublish(env, ev.id);
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    // Both directions asserted so the fix can't be "always publish".
+    expect(data.event.status).toBe("draft");
+  });
+
+  it("publish toggle refuses to resurrect an ARCHIVED event", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "Concluded", slug: "concluded", status: "archived" });
+
+    const res = await togglePublish(env, ev.id);
+
+    expect(res.status).toBe(400);
+    // And the row is untouched -- rejecting must not half-apply.
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("archived");
   });
 
   // Negative / validation cases

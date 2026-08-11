@@ -108,12 +108,12 @@ export async function onRequestPost(context) {
     const result = await DB.prepare(
       `
       UPDATE events
-      SET status = ?, is_published = ?, updated_by_user_id = ?
+      SET status = ?, updated_by_user_id = ?
       WHERE id = ?
       RETURNING *
     `,
     )
-      .bind(newStatus, publish ? 1 : 0, currentUser.userId, eventId)
+      .bind(newStatus, currentUser.userId, eventId)
       .first();
 
     // Read-path sanitize (#493): RETURNING * echoes the full row, so

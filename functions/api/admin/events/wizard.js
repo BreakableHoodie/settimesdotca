@@ -192,8 +192,8 @@ export async function onRequestPost(context) {
 
     // --- Create event ---
     event = await DB.prepare(
-      `INSERT INTO events (name, date, slug, status, is_published, description, created_by_user_id)
-       VALUES (?, ?, ?, 'draft', 0, ?, ?)
+      `INSERT INTO events (name, date, slug, status, description, created_by_user_id)
+       VALUES (?, ?, ?, 'draft', ?, ?)
        RETURNING *`,
     )
       .bind(name, date, slug, description || null, currentUser.userId)

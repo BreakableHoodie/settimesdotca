@@ -45,23 +45,20 @@ const srcRoot = path.join(path.dirname(currentFile), '../')
 //  - any __tests__/** path — test fixtures legitimately seed/assert against
 //    the deprecated column (e.g. HistoricalImportModal's write, or an
 //    impossible-state regression guard).
-//  - utils/adminApi.js — not under admin/ by directory, but functionally
-//    part of the admin surface: it's the admin API client, imported
-//    exclusively by admin/** components (plus EventContext.jsx, itself an
-//    admin-panel-context provider) to normalize the same still-projected
-//    admin endpoint response as EventFormModal.jsx and AdminPanel.jsx above.
-//    Same justification as admin/**, just organized in utils/ as a shared
-//    client module rather than nested under admin/. Mirrors how the backend
-//    guard's EXEMPT_EXACT carves out utils/eventVisibility.js and
-//    api/test-utils.js for the same "right behaviour, wrong directory for
-//    the path-prefix rule" reason.
 //  - this file itself — its own header/comments name the column, which
 //    would otherwise flag itself.
-const EXEMPT_EXACT = new Set(['utils/adminApi.js', '__tests__/isPublishedGuard.test.js'])
+//
+// The admin/** and utils/adminApi.js exemptions are GONE as of #799. They
+// existed because the admin events endpoint still projected the column and the
+// admin UI read it as a draft/published indicator. Nothing reads it anywhere
+// now -- `events.status` is the only source of truth on both sides of the
+// build boundary -- so the entire frontend is in scope. Removing those
+// exemptions is what PROVES #799 is complete: if any admin file still touched
+// the column, this test would fail rather than quietly permit it.
+const EXEMPT_EXACT = new Set(['__tests__/isPublishedGuard.test.js'])
 
 function isExempt(relPath) {
   const normalized = relPath.split(path.sep).join('/')
-  if (normalized.startsWith('admin/')) return true
   if (normalized.split('/').includes('__tests__')) return true
   if (EXEMPT_EXACT.has(normalized)) return true
   return false

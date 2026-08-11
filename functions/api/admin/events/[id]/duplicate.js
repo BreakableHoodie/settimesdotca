@@ -75,10 +75,10 @@ export async function onRequestPost(context) {
     // of INSERT defaults the columns to NULL — start clean.
     const newEvent = await DB.prepare(
       `INSERT INTO events (
-         name, date, slug, status, is_published, description, city,
+         name, date, slug, status, description, city,
          ticket_url, venue_info, social_links, theme_colors, created_by_user_id
        )
-       VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`,
     )
       .bind(

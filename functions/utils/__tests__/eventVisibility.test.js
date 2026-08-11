@@ -176,9 +176,6 @@ describe("is_published never read outside admin/test infrastructure", () => {
   const functionsRoot = path.join(path.dirname(currentFile), "../../");
 
   // Directories/files exempt from the scan:
-  //  - functions/api/admin/**  — admin write paths must keep writing
-  //    is_published in lockstep with status (rollback safety for the
-  //    eventual column-drop migration); not a public read path.
   //  - any __tests__/** path   — test fixtures legitimately seed/assert
   //    against the deprecated column (e.g. verifying archive.js's write, or
   //    an impossible-state regression guard).
@@ -188,11 +185,20 @@ describe("is_published never read outside admin/test infrastructure", () => {
   //  - functions/utils/eventVisibility.js — this predicate's own canonical
   //    home. Its header comment documents the deprecated column by name, so
   //    a literal string scan would otherwise flag itself.
+  //
+  // The functions/api/admin/** exemption is GONE as of #799. It existed so the
+  // admin write paths could keep the deprecated column in lockstep with status,
+  // which kept #800 rollback-able. Admin no longer writes it, so the whole of
+  // functions/ is in scope. Removing that exemption is what PROVES #799 is
+  // complete -- a missed admin write fails this test instead of passing
+  // silently. api/test-utils.js keeps the column only because production still
+  // has it; it goes when the drop migration lands.
   const EXEMPT_EXACT = new Set(["api/test-utils.js", "utils/eventVisibility.js"]);
 
   function isExempt(relPath) {
     const normalized = relPath.split(path.sep).join("/");
-    if (normalized.startsWith("api/admin/")) return true;
+    // No api/admin/** exemption since #799: admin stopped writing the column,
+    // so nothing in functions/ may name it outside the two allowlisted files.
     if (normalized.split("/").includes("__tests__")) return true;
     if (EXEMPT_EXACT.has(normalized)) return true;
     return false;

@@ -27,7 +27,9 @@ import { parseDoorsJsonToForm, serializeDoorsForm } from './utils/doorsFormData'
  */
 export default function EventFormModal({ isOpen, onClose, event = null, onSave, canCreateArchived = false }) {
   const isEditing = !!event
-  const isPublished = event?.status === 'published' || Number(event?.is_published) === 1
+  // status only (#799) -- the deprecated boolean this also consulted is gone,
+  // and an OR across two columns could disagree with itself.
+  const isPublished = event?.status === 'published'
   const isArchivedEvent = event?.status === 'archived'
   const canEditSlug = !isEditing || !isPublished
 

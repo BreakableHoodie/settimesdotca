@@ -76,7 +76,7 @@ export async function onRequestPost(context) {
     const result = await DB.prepare(
       `
       UPDATE events
-      SET status = 'archived', archived_at = datetime('now'), is_published = 0, updated_by_user_id = ?
+      SET status = 'archived', archived_at = datetime('now'), updated_by_user_id = ?
       WHERE id = ?
       RETURNING *
     `,

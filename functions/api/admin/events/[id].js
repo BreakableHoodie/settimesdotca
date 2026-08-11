@@ -214,9 +214,7 @@ export async function onRequestPatch(context) {
         );
       }
       updates.push("status = ?");
-      updates.push("is_published = ?");
       params.push(status);
-      params.push(status === "published" ? 1 : 0);
     }
 
     if (description !== undefined) {
@@ -558,18 +556,36 @@ export async function onRequestPut(context) {
         );
       }
 
-      // Toggle publish status
-      const newStatus = event.is_published === 1 ? 0 : 1;
-      const nextStatus = newStatus === 1 ? "published" : "draft";
+      // Toggle publish status. Previously this flipped on the deprecated
+      // publish-boolean column, which could disagree with status (e.g. an
+      // archived event always had that column cleared — see archive.js) and
+      // would silently RESURRECT an archived event as "published" the next
+      // time this toggle ran. status is now the only source of truth (#799),
+      // so archived is rejected outright, matching the dedicated POST
+      // .../publish endpoint's guard — an archived event must never become
+      // published through this toggle.
+      if (event.status === "archived") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Archived events cannot be published or unpublished",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      const nextStatus = event.status === "published" ? "draft" : "published";
       const result = await DB.prepare(
         `
         UPDATE events
-        SET is_published = ?, status = ?, updated_by_user_id = ?
+        SET status = ?, updated_by_user_id = ?
         WHERE id = ?
         RETURNING *
       `,
       )
-        .bind(newStatus, nextStatus, currentUser.userId, eventId)
+        .bind(nextStatus, currentUser.userId, eventId)
         .first();
 
       // Read-path sanitize (#493): see the PATCH handler above.
@@ -580,7 +596,7 @@ export async function onRequestPut(context) {
       await auditLog(
         env,
         currentUser.userId,
-        newStatus === 1 ? "event.published" : "event.unpublished",
+        nextStatus === "published" ? "event.published" : "event.unpublished",
         "event",
         eventId,
         {
@@ -593,7 +609,7 @@ export async function onRequestPut(context) {
         JSON.stringify({
           success: true,
           event: result,
-          message: newStatus === 1 ? "Event published" : "Event unpublished",
+          message: nextStatus === "published" ? "Event published" : "Event unpublished",
         }),
         {
           status: 200,

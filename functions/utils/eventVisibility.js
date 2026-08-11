@@ -85,3 +85,50 @@ export function archivedEventStatusSql(alias = "") {
 export function publishedEventStatusSql(alias = "") {
   return `${columnRef(alias)} = 'published'`;
 }
+
+/**
+ * SQL predicate for "this event has concluded" — archived (any date), or
+ * published with its LAST day already elapsed. Promoted here from
+ * `functions/api/events/timeline.js`, where it powers the `past` bucket,
+ * once a second consumer (recap + sitemap gating, #787) needed the exact
+ * same answer (the #550 precedent: unify a duplicated predicate when a
+ * second consumer appears, not before).
+ *
+ * Lifecycle outranks the calendar: `status = 'archived'` MEANS "this edition
+ * is concluded", so an archived event counts as concluded regardless of its
+ * date — the same trap `/api/schedule?event=current` avoids in the other
+ * direction with publishedEventStatusSql(). Without the `archived OR` half,
+ * an event archived early (before its own date) would satisfy neither "not
+ * concluded" nor the archived branch and vanish from any bucket built on
+ * this predicate.
+ *
+ * A recap exists iff an event is publicly visible AND concluded — nothing
+ * more, nothing less. Gating recap visibility (or a sitemap recap URL) on
+ * anything narrower, such as `status = 'archived'` alone, produces a soft-404:
+ * an indexable URL / full SSR identity meta for an event whose JSON data API
+ * still 404s, because archiving is an admin housekeeping click that can lag
+ * the event's actual end by days.
+ *
+ * Embeds exactly ONE unbound `?` for the date comparison — the caller MUST
+ * bind one parameter for it, and that value MUST be
+ * `eventLocalFestivalToday()` (functions/utils/eventDay.js), never
+ * `eventLocalToday()`. An event ending at 2 AM is still running: the festival
+ * day steps back a calendar day below AFTER_MIDNIGHT_THRESHOLD_HOUR (6 AM) so
+ * a still-airing after-midnight set is never treated as concluded. Every
+ * consumer of this predicate must answer "is this event over?" with the same
+ * value the timeline's past bucket uses for itself, or two call sites drift
+ * back into disagreeing (the exact defect #787 fixes).
+ *
+ * @param {string} [alias] - table alias, e.g. "e"; "" (default) for none
+ * @returns {string} e.g. "(status = 'archived' OR (status = 'published' AND COALESCE(end_date, date) < ?))"
+ */
+export function concludedEventSql(alias = "") {
+  // Validate BEFORE interpolating. The two helpers below would throw on a bad
+  // alias anyway, but `dateExpr` is built first, so `${alias}` would already
+  // have stringified the argument -- running a custom toString() on a hostile
+  // object before any guard fired. Every other path in this module validates
+  // ahead of interpolation (see columnRef); this one now matches.
+  assertValidAlias(alias);
+  const dateExpr = alias ? `COALESCE(${alias}.end_date, ${alias}.date)` : "COALESCE(end_date, date)";
+  return `(${archivedEventStatusSql(alias)} OR (${publishedEventStatusSql(alias)} AND ${dateExpr} < ?))`;
+}

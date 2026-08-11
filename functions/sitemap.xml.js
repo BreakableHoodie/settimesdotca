@@ -3,8 +3,8 @@
  * Includes all published events and band profiles with at least one published performance.
  */
 import { getPublicDataGateResponse } from "./utils/publicGate.js";
-import { eventLocalToday } from "./utils/eventDay.js";
-import { publicEventStatusSql } from "./utils/eventVisibility.js";
+import { eventLocalFestivalToday } from "./utils/eventDay.js";
+import { concludedEventSql, publicEventStatusSql } from "./utils/eventVisibility.js";
 
 export async function onRequestGet(context) {
   const { env } = context;
@@ -16,7 +16,22 @@ export async function onRequestGet(context) {
 
   try {
     const [{ results: events }, { results: bands }, { results: venues }] = await Promise.all([
-      env.DB.prepare(`SELECT slug, date FROM events WHERE ${publicEventStatusSql()} ORDER BY date DESC`).all(),
+      // `is_concluded` is computed in SQL by the SAME predicate the recap API
+      // and the recap SSR route use, rather than re-derived in JS here (#787).
+      // Deriving it separately is exactly how the three drifted apart: this
+      // file compared `date` -- the START date -- so a multi-day edition got a
+      // recap URL emitted from day 2 onward, mid-festival (BLR3, Jul 10-12,
+      // would have had one live on the 11th and 12th). concludedEventSql uses
+      // COALESCE(end_date, date), which fixes that as a side effect.
+      env.DB.prepare(
+        `SELECT slug, date, end_date,
+                CASE WHEN ${concludedEventSql()} THEN 1 ELSE 0 END AS is_concluded
+         FROM events
+         WHERE ${publicEventStatusSql()}
+         ORDER BY date DESC`,
+      )
+        .bind(eventLocalFestivalToday())
+        .all(),
       env.DB.prepare(
         `SELECT DISTINCT bp.id
          FROM band_profiles bp
@@ -76,10 +91,9 @@ export async function onRequestGet(context) {
   </url>`,
     ];
 
-    // YYYY-MM-DD lexicographic comparison — never new Date('YYYY-MM-DD'),
-    // which UTC-parses and drifts a day (documented repo invariant).
-    const today = eventLocalToday();
-
+    // The recap cutoff used to be a JS date compare against eventLocalToday()
+    // here. It now rides on `is_concluded` from the shared SQL predicate (#787)
+    // so this file cannot drift from the recap API and SSR route again.
     for (const event of events) {
       rows.push(`  <url>
     <loc>https://settimes.ca/event/${event.slug}</loc>
@@ -89,11 +103,13 @@ export async function onRequestGet(context) {
   </url>`);
       // Past editions also get their recap page (#555) — a content-rich page
       // that was previously reachable only by typing the URL. Recaps only
-      // exist once the event has happened, so future events are excluded.
-      if (event.date < today) {
+      // exist once the event has concluded, and `is_concluded` comes from the
+      // shared predicate in SQL above (#787) rather than a local date compare,
+      // so this agrees with the recap API and SSR route by construction.
+      if (event.is_concluded) {
         rows.push(`  <url>
     <loc>https://settimes.ca/events/${event.slug}/recap</loc>
-    <lastmod>${event.date}</lastmod>
+    <lastmod>${event.end_date || event.date}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>`);

@@ -93,7 +93,9 @@ describe("Admin users API", () => {
   it("rejects duplicate user emails", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
 
-    rawDb.prepare("INSERT INTO users (email, role) VALUES (?, ?)").run("dup-user@test.com", "viewer");
+    rawDb
+      .prepare("INSERT INTO users (email, role, password_hash) VALUES (?, ?, 'placeholder')")
+      .run("dup-user@test.com", "viewer");
 
     const body = {
       email: "dup-user@test.com",

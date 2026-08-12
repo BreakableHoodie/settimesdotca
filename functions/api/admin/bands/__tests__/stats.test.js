@@ -477,12 +477,13 @@ describe("GET /api/admin/bands/stats/:name", () => {
       expect(data.stats.uniqueEvents).toBe(2);
     });
 
-    it("should handle bands with null event_id", async () => {
-      // Arrange - Rolodex band (no event)
+    it("counts a band's show and its venue", async () => {
+      // Arrange
+      const event = insertEvent(db, { name: "Practice Night", slug: "practice-night" });
       const venue = insertVenue(db, { name: "Practice Space" });
       insertBandWithProfile(db, {
         name: "Rolodex Band",
-        event_id: null,
+        event_id: event.id,
         venue_id: venue.id,
         start_time: "20:00",
         end_time: "21:00",
@@ -496,8 +497,8 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
       // Assert
       const data = await response.json();
-      expect(data.stats.totalShows).toBe(0); // No event = no show
-      expect(data.stats.uniqueVenues).toBe(1); // Still has venue
+      expect(data.stats.totalShows).toBe(1);
+      expect(data.stats.uniqueVenues).toBe(1);
     });
 
     it("should handle bands with null venue_id", async () => {
@@ -794,11 +795,17 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
     });
 
-    it("should handle null event and venue gracefully", async () => {
-      // Arrange - Rolodex entry with no event or venue
+    // Venue-only by design: `performances.venue_id` is nullable with
+    // `ON DELETE SET NULL`, so a venueless set is a real state an admin can
+    // create. `event_id` is NOT NULL, so there is no matching "null event"
+    // case to cover — hence the event assertion below is that it is always
+    // present.
+    it("should handle a null venue gracefully", async () => {
+      // Arrange - a set with no venue assigned yet
+      const event = insertEvent(db, { name: "Orphan Fest", slug: "orphan-fest" });
       insertBandWithProfile(db, {
         name: "Orphan Band",
-        event_id: null,
+        event_id: event.id,
         venue_id: null,
         start_time: "20:00",
         end_time: "21:00",
@@ -813,8 +820,11 @@ describe("GET /api/admin/bands/stats/:name", () => {
       // Assert
       const data = await response.json();
       expect(data.performances).toHaveLength(1);
-      expect(data.performances[0].event).toBeNull();
       expect(data.performances[0].venue).toBeNull();
+      // The event is always present — NOT NULL plus CASCADE means a
+      // performance can never outlive or precede its event.
+      expect(data.performances[0].event).not.toBeNull();
+      expect(data.performances[0].event.id).toBe(event.id);
       expect(data.performances[0].startTime).toBe("20:00");
       expect(data.performances[0].endTime).toBe("21:00");
     });

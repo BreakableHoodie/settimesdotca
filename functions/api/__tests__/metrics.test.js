@@ -258,7 +258,8 @@ describe("POST /api/metrics — date key is Toronto-local, not UTC (#668)", () =
 
   test("evening Toronto traffic is written under the Toronto date, not the UTC date", async () => {
     const { env, rawDb } = createTestEnv();
-    const band = insertBand(rawDb, { name: "Cool Band" });
+    const event = insertEvent(rawDb, { name: "Cool Fest", slug: "cool-fest" });
+    const band = insertBand(rawDb, { name: "Cool Band", event_id: event.id });
 
     // 2026-08-02T23:30:00-04:00 is 11:30 PM EDT on Aug 2 in Toronto, but
     // 2026-08-03T03:30:00Z in UTC — the exact drift window the bug hit.

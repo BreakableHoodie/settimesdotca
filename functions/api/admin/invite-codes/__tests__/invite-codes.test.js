@@ -70,7 +70,9 @@ describe("Admin invite codes API", () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
 
     const existingEmail = "existing-user@example.com";
-    rawDb.prepare("INSERT INTO users (email, role) VALUES (?, ?)").run(existingEmail, "viewer");
+    rawDb
+      .prepare("INSERT INTO users (email, role, password_hash) VALUES (?, ?, 'placeholder')")
+      .run(existingEmail, "viewer");
 
     const createReq = new Request("https://example.test/api/admin/invite-codes", {
       method: "POST",

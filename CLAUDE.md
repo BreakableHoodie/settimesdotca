@@ -66,6 +66,38 @@ Never be lazy about understanding, input validation, error handling that prevent
 
 When a task has a clear implementation spec, dispatch a Sonnet agent to build it; reserve Opus/Fable for the design up front and the review after. Always follow a Sonnet implementation with a big-brain review pass — that second perspective catches whole bug classes a to-spec implementer stops short of.
 
+### Delegating to OpenCode
+
+A third implementer, on a separate subscription: the `opencode-delegate` skill.
+
+**It is not in this repo and a fresh clone will not have it.** It is an external prerequisite, installed per-machine into the gitignored `.agents/skills/` (see `.gitignore`), which is why `relay.mjs` will not appear in `git ls-files`:
+
+```bash
+npx skills add amElnagdy/delegate-skills --skill opencode-delegate
+# lands in .agents/skills/opencode-delegate/, symlinked to .claude/skills/
+```
+
+It also needs the `opencode` CLI on PATH and an authenticated provider (`opencode auth list`).
+
+Use it for well-specified work that would otherwise consume this session's context. **The relay never commits — the orchestrator reviews the diff, re-runs `make gate`, and commits.** Same contract as a Sonnet agent, different process.
+
+Four rules, each learned by something breaking:
+
+1. **Always go through `relay.mjs`; never a raw `opencode run`.** Not for permissions — `opencode run` auto-approves by default, and a raw run *did* edit files headlessly in testing, so `--auto` is belt-and-braces rather than load-bearing. The relay earns its place for three other reasons: it feeds the brief over **stdin** (rule 3), it writes a structured `result.json` carrying `cost`, `touchedFiles` and the session id, and it never commits. A raw run gives up all three.
+2. **Always pass `--model` explicitly, from `opencode-go/*`.** That is the flat-rate subscription (18 models). **`opencode/*` is Zen and is metered per token** — and its `claude-*` entries are redundant with the orchestrator anyway.
+3. **The brief goes in a file (`--brief`), never on the command line.** Large content in argv hangs the CLI; the relay feeds it via stdin for exactly this reason. Measured: ~1.5 KB of argv hung past 180s, the identical text attached as a file returned in 11s.
+4. **`opencode.json` is the tooling surface** — it feeds OpenCode our `CLAUDE.md` plus 17 instruction files, 6 MCP servers (Cloudflare ×4, GitHub, Resend), four custom agents, and five commands. That is why a delegated diff can respect invariants nobody restated in the brief. Keep `model`/`small_model` pointing at *authenticated* providers: they named `anthropic/*` until 2026-08-12 while only OpenCode Zen and Go were authenticated, so every run that relied on the default failed.
+
+**Cost is the throughput constraint, and it does not track the tier name.** OpenCode Go is $10/month flat but capped in *usage dollars* — **$12 per 5 hours**, $30/week, $60/month — so an expensive model buys fewer delegations per afternoon, not a bigger bill. Measured, three runs:
+
+| Task | Model | Cost |
+|---|---|---|
+| #797 — delete one meta tag (3 files) | `glm-5.2` | $0.65 |
+| #766 — schema loader (2 files) | `deepseek-v4-pro` | **$0.125** |
+| #766 — 14 fixture fixes (10 files) | `glm-5.2` | $2.14 |
+
+`deepseek-v4-pro` came in **5× cheaper than `glm-5.2` on a smaller task**, so do not assume a "pro" tier costs more — cost tracks tokens consumed, which tracks how much the model explores, not its rate card. At $2.14/run the 5-hour cap allows ~5 runs; at $0.125 it allows ~96. Default to `opencode-go/deepseek-v4-pro` and read the `cost` field in `result.json` after every run. Three data points is not a ranking; treat any other model as unmeasured until it is run.
+
 ---
 
 ## Mission & Scope
@@ -221,7 +253,9 @@ This env var bypasses the invite-code requirement for signup. It must never be s
 
 Use `document.title = pageTitle` directly in a `useEffect` within the page component. Do NOT remove the direct assignment in favour of `<Helmet>` until react-helmet-async ships a React 19 compatible release.
 
-Example: `frontend/src/pages/BandProfilePage.jsx` — uses both `<Helmet>` (for other meta) and `document.title = ...` for the title.
+Example: `frontend/src/pages/EventRecapPage.jsx` — uses both `<Helmet>` (for other meta) and `document.title = ...` for the title.
+
+`BandProfilePage.jsx` was this example until #797 removed its `<meta name="keywords">` — the tag was its `<Helmet>`'s only child, so the wrapper and the `react-helmet-async` import went with it. That page now assigns `document.title` directly and declares no Helmet at all, which is why it no longer illustrates the pairing.
 
 ### SSR owns identity meta and JSON-LD where it emits either; the client `<Helmet>` owns only what SSR does not emit — never canonical/`og:*`/`twitter:*`/description, and never JSON-LD on a route whose SSR handler already emits it
 

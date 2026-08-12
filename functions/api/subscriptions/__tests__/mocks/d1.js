@@ -248,14 +248,21 @@ export class MockD1Database {
         ...(projectsPosterUrl ? { poster_url: event.poster_url ?? null } : {}),
         band_count: uniqueBandIds.size,
         venue_count: uniqueVenueIds.size,
-        is_published: event.is_published,
-        published: event.published,
+        status: event.status,
       };
     });
 
     // Apply WHERE filters
-    if (queryLower.includes("published = 1") || queryLower.includes("is_published = 1")) {
-      results = results.filter((e) => e.is_published !== 0 && e.published !== false);
+    //
+    // events.is_published is gone (migration 0059); every public query now
+    // gates on `status` via functions/utils/eventVisibility.js, which emits
+    // literal predicate text like "e.status IN ('published', 'archived')" —
+    // never a bare `published = 1`/`is_published = 1`. Matching that text
+    // (rather than dropping the branch outright) keeps this mock filtering
+    // equivalently instead of silently returning every event regardless of
+    // status.
+    if (queryLower.includes("in ('published', 'archived')")) {
+      results = results.filter((e) => e.status === "published" || e.status === "archived");
     }
 
     let paramIndex = 0;

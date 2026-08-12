@@ -1,8 +1,8 @@
 // --- Durable guard: `is_published` must never drive PUBLIC UI ---------------
 //
-// `events.is_published` is a deprecated column (migration 0005 superseded it
-// with `events.status`) that still gets written by the admin archive path for
-// rollback safety. Reading it on the SERVER took the public site dark on
+// `events.is_published` was a deprecated column (migration 0005 superseded it
+// with `events.status`; migration 0059 dropped it from the schema entirely).
+// Reading it on the SERVER took the public site dark on
 // 2026-08-10. The frontend never had that failure mode — it had the quieter
 // one: EventTimeline.jsx rendered a "Draft" badge off
 // `event.is_published === false`, which is ALWAYS false because the public

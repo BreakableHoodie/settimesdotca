@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS events (
   name TEXT NOT NULL,                    -- e.g., "Summer Music Festival 2025"
   date TEXT NOT NULL,                    -- Event date in YYYY-MM-DD format
   slug TEXT NOT NULL UNIQUE,             -- URL-friendly identifier, e.g., "vol-5"
-  is_published INTEGER NOT NULL DEFAULT 0, -- 0 = draft, 1 = published (visible to public)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , created_by_user_id INTEGER REFERENCES users(id), updated_by_user_id INTEGER REFERENCES users(id), updated_at TEXT DEFAULT (datetime('now')), status TEXT DEFAULT 'draft', archived_at TEXT, ticket_url TEXT, theme_colors TEXT, venue_info TEXT, social_links TEXT, city TEXT, description TEXT, reveal_mode INTEGER NOT NULL DEFAULT 0, end_date TEXT, doors_json TEXT, poster_url TEXT);
 
@@ -39,8 +38,6 @@ CREATE TABLE IF NOT EXISTS band_profiles (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , created_by_user_id INTEGER REFERENCES users(id), origin TEXT, origin_city TEXT, origin_region TEXT, contact_email TEXT, is_active INTEGER NOT NULL DEFAULT 1, total_views INTEGER DEFAULT 0, total_social_clicks INTEGER DEFAULT 0, popularity_score REAL DEFAULT 0, photo_alt_text TEXT);
-
-CREATE INDEX IF NOT EXISTS idx_events_published ON events(is_published);
 
 CREATE INDEX IF NOT EXISTS idx_events_slug ON events(slug);
 
@@ -414,8 +411,6 @@ CREATE INDEX IF NOT EXISTS idx_band_follows_band ON band_follows(band_profile_id
 
 CREATE INDEX IF NOT EXISTS idx_band_follows_email ON band_follows(email);
 
-CREATE INDEX IF NOT EXISTS idx_events_published_date ON events (is_published, date);
-
 CREATE TABLE IF NOT EXISTS share_links (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   slug            TEXT    NOT NULL UNIQUE,
@@ -510,6 +505,8 @@ CREATE TABLE IF NOT EXISTS share_link_views (
 );
 
 CREATE INDEX IF NOT EXISTS idx_share_link_views_slug ON share_link_views(slug);
+
+CREATE INDEX IF NOT EXISTS idx_events_status_date ON events (status, date);
 
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)

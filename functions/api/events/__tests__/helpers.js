@@ -10,8 +10,7 @@ export function createMockEvent(overrides = {}) {
     date: tomorrow.toISOString().split("T")[0],
     description: "Annual multi-venue music festival",
     city: "portland",
-    is_published: 1,
-    published: true,
+    status: "published",
     ...overrides,
   };
 }

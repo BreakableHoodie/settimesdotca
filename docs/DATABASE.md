@@ -87,8 +87,7 @@ One row per band-crawl event (e.g. Vol. 16, Vol. 17).
 | `date`               | TEXT    | NOT NULL, `YYYY-MM-DD`                                                                                            |
 | `end_date`           | TEXT    | Nullable; added in migration 0038 for multi-day events                                                            |
 | `slug`               | TEXT    | NOT NULL, UNIQUE                                                                                                  |
-| `is_published`       | INTEGER | NOT NULL, DEFAULT 0 (0 = draft, 1 = published)                                                                    |
-| `status`             | TEXT    | DEFAULT `'draft'` (e.g. also takes `'archived'`)                                                                  |
+| `status`             | TEXT    | DEFAULT `'draft'` (also `'published'`, `'archived'`) — the sole publication gate (`events.is_published` dropped in migration 0059; see CLAUDE.md "Public event visibility") |
 | `archived_at`        | TEXT    | Nullable                                                                                                          |
 | `description`        | TEXT    | Nullable                                                                                                          |
 | `city`               | TEXT    | Nullable                                                                                                          |
@@ -102,9 +101,12 @@ One row per band-crawl event (e.g. Vol. 16, Vol. 17).
 | `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                               |
 | `updated_at`         | TEXT    | DEFAULT `datetime('now')`, bumped on UPDATE by the `update_events_timestamp` trigger                              |
 
-Indexes: `idx_events_published(is_published)`, `idx_events_slug(slug)`,
-`idx_events_status(status)`, `idx_events_archived(archived_at)`,
-`idx_events_published_date(is_published, date)` (added in migration 0036).
+Indexes: `idx_events_slug(slug)`, `idx_events_status(status)`,
+`idx_events_archived(archived_at)`,
+`idx_events_status_date(status, date)` (migration 0059; replaces the dropped
+`idx_events_published(is_published)` and `idx_events_published_date(is_published, date)` —
+every public query that filtered/ordered on the old pair does the same on
+`status` now).
 
 #### `venues`
 
@@ -782,7 +784,7 @@ stored in the space-separated `datetime('now')` format:
 ```sql
 SELECT sl.slug, sl.event_slug, sl.performance_ids, sl.band_names, e.name AS event_name
 FROM share_links sl
-JOIN events e ON e.id = sl.event_id AND (e.is_published = 1 OR e.status = 'archived')
+JOIN events e ON e.id = sl.event_id AND e.status IN ('published', 'archived')
 WHERE sl.slug = ? AND sl.expires_at > datetime('now');
 ```
 

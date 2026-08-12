@@ -57,7 +57,7 @@
 
 **Key Tables:**
 
-- `events` - Multi-event management (name, date, slug, is_published)
+- `events` - Multi-event management (name, date, slug, status)
 - `venues` - Reusable venues across events
 - `bands` - Performance schedules with FK to events + venues
 - `auth_audit` - Security logging for all auth attempts
@@ -158,15 +158,15 @@
 ```
 ┌──────────────┐
 │   DRAFT      │  Admin creates event, unpublished
-│ is_published │  Visible only in admin panel
-│      = 0     │
+│    status    │  Visible only in admin panel
+│  = 'draft'   │
 └──────┬───────┘
        │ Admin clicks "Publish"
        ▼
 ┌──────────────┐
 │  PUBLISHED   │  Public-facing, appears in API
-│ is_published │  Attendees can view and build schedules
-│      = 1     │
+│    status    │  Attendees can view and build schedules
+│ = 'published'│
 └──────┬───────┘
        │ Event date passes (manual or automated)
        ▼
@@ -205,7 +205,7 @@ date: "YYYY-MM-DD"        → ISO 8601 format
 
 ```sql
 SELECT * FROM events
-WHERE is_published = 1
+WHERE status = 'published'
 ORDER BY date DESC
 LIMIT 1;
 ```
@@ -214,7 +214,7 @@ LIMIT 1;
 
 ```sql
 SELECT * FROM events
-WHERE slug = ? AND is_published = 1;
+WHERE slug = ? AND status = 'published';
 ```
 
 **All Published Events:**
@@ -222,9 +222,15 @@ WHERE slug = ? AND is_published = 1;
 ```sql
 SELECT id, name, date, slug
 FROM events
-WHERE is_published = 1
+WHERE status = 'published'
 ORDER BY date DESC;
 ```
+
+Real endpoints use the shared helpers in `functions/utils/eventVisibility.js`
+(`publishedEventStatusSql()`, `publicEventStatusSql()`,
+`archivedEventStatusSql()`) rather than a hand-written `status = 'published'`
+literal — see CLAUDE.md "Public event visibility". These examples are
+illustrative only.
 
 **Admin: All Events (Published + Draft):**
 
@@ -322,7 +328,7 @@ LIMIT 100;
 ✅ Find published events:
 
 ```sql
-SELECT * FROM events WHERE is_published = 1;  -- Uses idx_events_published
+SELECT * FROM events WHERE status = 'published';  -- Uses idx_events_status
 ```
 
 ✅ Find event by slug:
@@ -579,10 +585,10 @@ export async function onSchedule(event) {
 **Manual Cleanup Commands:**
 
 ```bash
-# Delete unpublished events older than 30 days
+# Delete draft events older than 30 days
 wrangler d1 execute settimes-db --command "
   DELETE FROM events
-  WHERE is_published = 0
+  WHERE status = 'draft'
   AND created_at < datetime('now', '-30 days')
 "
 
@@ -1028,7 +1034,7 @@ CREATE TABLE events (
   name TEXT NOT NULL,
   date TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
-  is_published INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'draft',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -1070,7 +1076,7 @@ CREATE TABLE rate_limit (
 );
 
 -- Indexes
-CREATE INDEX idx_events_published ON events(is_published);
+CREATE INDEX idx_events_status ON events(status);
 CREATE INDEX idx_events_slug ON events(slug);
 CREATE INDEX idx_bands_event ON bands(event_id);
 CREATE INDEX idx_bands_venue ON bands(venue_id);

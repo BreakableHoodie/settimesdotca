@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 const MAX_ERROR_OUTPUT_LENGTH = 500;
 
 const REQUIRED_SCHEMA = {
-  events: ["id", "slug", "city", "is_published", "reveal_mode"],
+  events: ["id", "slug", "city", "status", "reveal_mode"],
   venues: ["id", "name", "city"],
   band_profiles: ["id", "name", "name_normalized", "genre", "photo_url"],
   performances: [

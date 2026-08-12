@@ -26,7 +26,6 @@ export function createTestDB() {
       slug TEXT UNIQUE NOT NULL,
       date TEXT NOT NULL,
       status TEXT DEFAULT 'draft',
-      is_published INTEGER DEFAULT 0,
       description TEXT,
       city TEXT,
       ticket_url TEXT,

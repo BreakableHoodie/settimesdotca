@@ -99,10 +99,17 @@ describe("alias validation rejects non-strings", () => {
 // also wrote it (`is_published = 0`) to keep the eventual column-drop
 // migration safe. Archiving therefore UNPUBLISHED under the old column, so any
 // public read path gated on bare `is_published = 1` silently returned zero
-// rows the moment an event was archived. Nothing writes the column now, but
-// the rows written before #799 still carry those stale values, so a read
-// reintroduced today would fail exactly the same way. See
-// functions/utils/eventVisibility.js for the full incident writeup.
+// rows the moment an event was archived. See functions/utils/eventVisibility.js
+// for the full incident writeup.
+//
+// As of migration 0059 the column is DROPPED — it no longer exists in
+// production or in the test schema, so this scan can no longer fail on a
+// *live* column read. It stays in the suite as a permanent regression guard:
+// the postmortem it encodes (a single dead column silently zeroing 13 public
+// read paths at once) is worth more than the guard costs, and a future PR
+// resurrecting `is_published` — say, by copy-pasting an old query or
+// reverting this migration without reverting the callers — fails CI here
+// instead of shipping.
 //
 // This is a source scan, not a runtime assertion (same technique as
 // frontend/src/admin/utils/__tests__/bandFields.test.js): the bug is a string
@@ -178,29 +185,38 @@ describe("is_published never read outside admin/test infrastructure", () => {
   const functionsRoot = path.join(path.dirname(currentFile), "../../");
 
   // Directories/files exempt from the scan:
-  //  - any __tests__/** path   — test fixtures legitimately seed/assert
-  //    against the deprecated column (e.g. verifying archive.js's write, or
-  //    an impossible-state regression guard).
-  //  - functions/api/test-utils.js — the shared test D1 schema. Its
-  //    CREATE TABLE mirrors production (which still has the column); this is
-  //    schema parity, not a read.
+  //  - any __tests__/** path   — the guard tests below necessarily name the
+  //    retired column in strings/comments to describe what they scan for.
   //  - functions/utils/eventVisibility.js — this predicate's own canonical
-  //    home. Its header comment documents the deprecated column by name, so
-  //    a literal string scan would otherwise flag itself.
+  //    home. Its header comment narrates the 2026-08-10 incident by name, and
+  //    that postmortem is worth more than the exemption costs. A literal
+  //    string scan would otherwise flag itself.
   //
-  // The functions/api/admin/** exemption is GONE as of #799. It existed so the
-  // admin write paths could keep the deprecated column in lockstep with status,
-  // which kept #800 rollback-able. Admin no longer writes it, so the whole of
-  // functions/ is in scope. Removing that exemption is what PROVES #799 is
-  // complete -- a missed admin write fails this test instead of passing
-  // silently. api/test-utils.js keeps the column only because production still
-  // has it; it goes when the drop migration lands.
-  const EXEMPT_EXACT = new Set(["api/test-utils.js", "utils/eventVisibility.js"]);
+  // As of migration 0059 the column is DROPPED from the schema entirely —
+  // production and the test schema (functions/api/test-utils.js) alike. The
+  // functions/api/test-utils.js exemption that used to sit here is GONE: it
+  // existed only while the test schema mirrored production's dead column, and
+  // production no longer has one to mirror. A stray "is_published" appearing
+  // anywhere in functions/ now (test-utils.js included) is unambiguously a
+  // regression, not schema parity, so it is no longer exempt.
+  //
+  // The functions/api/admin/** exemption came out earlier, with #799. It
+  // existed so the admin write paths could keep the deprecated column in
+  // lockstep with status, which kept #800 rollback-able. Admin no longer
+  // writes it, so the whole of functions/ is in scope. Removing that
+  // exemption is what PROVED #799 complete -- a missed admin write would have
+  // failed this test instead of passing silently. This guard, and its
+  // frontend twin (frontend/src/__tests__/isPublishedGuard.test.js), stay in
+  // the suite even though the column is gone: they are what makes a
+  // reintroduction of the 2026-08-10 failure mode fail CI instead of
+  // shipping.
+  const EXEMPT_EXACT = new Set(["utils/eventVisibility.js"]);
 
   function isExempt(relPath) {
     const normalized = relPath.split(path.sep).join("/");
-    // No api/admin/** exemption since #799: admin stopped writing the column,
-    // so nothing in functions/ may name it outside the two allowlisted files.
+    // No api/admin/** exemption since #799, and no api/test-utils.js
+    // exemption since migration 0059: nothing in functions/ may name the
+    // column outside __tests__/** and eventVisibility.js's own postmortem.
     if (normalized.split("/").includes("__tests__")) return true;
     if (EXEMPT_EXACT.has(normalized)) return true;
     return false;

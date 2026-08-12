@@ -103,7 +103,7 @@ describe("Admin bands API - CRUD operations", () => {
 
   it("PUT /api/admin/bands/{id} allows band-profile edits (is_active) for a performance in an archived event", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
-    const ev = insertEvent(rawDb, { name: "ArchivedEdit", slug: "archived-edit", status: "archived", is_published: 0 });
+    const ev = insertEvent(rawDb, { name: "ArchivedEdit", slug: "archived-edit", status: "archived" });
     const venue = insertVenue(rawDb, { name: "Archived Edit Venue" });
     const band = insertBand(rawDb, { name: "Filthy Kitty", event_id: ev.id, venue_id: venue.id });
 
@@ -145,7 +145,7 @@ describe("Admin bands API - CRUD operations", () => {
 
   it("PUT /api/admin/bands/{id} still rejects set-time edits for a performance in an archived event", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
-    const ev = insertEvent(rawDb, { name: "ArchivedTime", slug: "archived-time", status: "archived", is_published: 0 });
+    const ev = insertEvent(rawDb, { name: "ArchivedTime", slug: "archived-time", status: "archived" });
     const venue = insertVenue(rawDb, { name: "Archived Time Venue" });
     const band = insertBand(rawDb, { name: "Frozen Set", event_id: ev.id, venue_id: venue.id });
 
@@ -426,7 +426,7 @@ describe("Admin bands API - GET without event_id returns one row per profile (#6
 describe("Admin bands API - Validation", () => {
   it("create rejects performances for archived events", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
-    const ev = insertEvent(rawDb, { name: "ArchivedAdd", slug: "archived-add", status: "archived", is_published: 0 });
+    const ev = insertEvent(rawDb, { name: "ArchivedAdd", slug: "archived-add", status: "archived" });
     const venue = insertVenue(rawDb, { name: "Archive Venue" });
 
     const body = { eventId: ev.id, venueId: venue.id, name: "Too Late Band", startTime: "18:00", endTime: "19:00" };
@@ -600,7 +600,6 @@ describe("Admin bands API - Validation", () => {
       name: "ArchivedUpdate",
       slug: "archived-update",
       status: "archived",
-      is_published: 0,
     });
     const venue = insertVenue(rawDb, { name: "Archive Update Venue" });
     const band = insertBand(rawDb, { name: "Frozen Band", event_id: ev.id, venue_id: venue.id });
@@ -637,7 +636,6 @@ describe("Admin bands API - Validation", () => {
       name: "ArchivedDelete",
       slug: "archived-delete",
       status: "archived",
-      is_published: 0,
     });
     const venue = insertVenue(rawDb, { name: "Archive Delete Venue" });
     const band = insertBand(rawDb, { name: "Protected Band", event_id: ev.id, venue_id: venue.id });
@@ -825,7 +823,6 @@ describe("Admin bands API - Bulk operations", () => {
       name: "Archived Bulk",
       slug: "archived-bulk",
       status: "archived",
-      is_published: 0,
     });
     const venue = insertVenue(rawDb, { name: "Archived Bulk Venue" });
     const band = insertBand(rawDb, { name: "Locked Bulk Band", event_id: ev.id, venue_id: venue.id });
@@ -849,7 +846,6 @@ describe("Admin bands API - Bulk operations", () => {
       name: "Archived Bulk Delete",
       slug: "archived-bulk-delete",
       status: "archived",
-      is_published: 0,
     });
     const venue = insertVenue(rawDb, { name: "Archived Bulk Delete Venue" });
     const band = insertBand(rawDb, { name: "Locked Delete Band", event_id: ev.id, venue_id: venue.id });
@@ -892,7 +888,6 @@ describe("Admin bands API - Bulk operations", () => {
       name: "Archived Preview",
       slug: "archived-preview",
       status: "archived",
-      is_published: 0,
     });
     const venue = insertVenue(rawDb, { name: "Archived Preview Venue" });
     const band = insertBand(rawDb, { name: "Preview Locked Band", event_id: ev.id, venue_id: venue.id });
@@ -1754,7 +1749,6 @@ describe("Admin bands API - Bulk POST onRequestPost full flow (T6)", () => {
       name: "Archived Event",
       slug: "archived-event",
       status: "archived",
-      is_published: 0,
     });
     const venue = insertVenue(rawDb, { name: "Venue A" });
     const band = insertBand(rawDb, { name: "Archived Band", event_id: archivedEvent.id, venue_id: venue.id });

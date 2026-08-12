@@ -75,7 +75,7 @@ async function fetchEventData(url) {
     date: date ? date.toISOString().split("T")[0] : null,
     venues,
     bands,
-    is_published: true, // Historical events are already published
+    status: "archived", // Historical events are concluded, not merely "published" (events.is_published was dropped in migration 0059)
   };
 }
 
@@ -100,11 +100,11 @@ async function generateSqlInserts(events) {
       .substring(0, 50);
 
     sql.push(`-- Event: ${event.name}`);
-    sql.push(`INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (`);
+    sql.push(`INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (`);
     sql.push(`  '${event.name.replace(/'/g, "''")}',`);
     sql.push(`  '${event.date}',`);
     sql.push(`  '${slug}',`);
-    sql.push(`  1`);
+    sql.push(`  '${event.status}'`);
     sql.push(`);`);
     sql.push(``);
 

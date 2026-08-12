@@ -57,7 +57,7 @@ SQL
 done
 
 if table_exists "events"; then
-  echo "UPDATE events SET is_published = 0;" >> "$OUT_FILE"
+  echo "UPDATE events SET status = 'draft';" >> "$OUT_FILE"
   if column_exists "events" "created_by_user_id"; then
     echo "UPDATE events SET created_by_user_id = NULL, updated_by_user_id = NULL;" >> "$OUT_FILE"
   fi

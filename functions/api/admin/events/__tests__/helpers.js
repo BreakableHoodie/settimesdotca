@@ -82,7 +82,6 @@ export class AdminMockD1Database extends MockD1Database {
         slug,
         date,
         status: status || "draft",
-        is_published: status === "published" ? 1 : 0,
         archived_at: null,
         created_by_user_id: userId,
         created_at: new Date().toISOString(),
@@ -105,7 +104,6 @@ export class AdminMockD1Database extends MockD1Database {
       if (queryLower.includes("set status = ?")) {
         const [status] = params;
         event.status = status;
-        event.is_published = status === "published" ? 1 : 0;
         return { success: true, meta: { changes: 1 } };
       }
 
@@ -167,7 +165,6 @@ export function createMockEvent({
     slug,
     date,
     status,
-    is_published: status === "published" ? 1 : 0,
     archived_at: status === "archived" ? new Date().toISOString() : null,
     created_by_user_id: 1,
     created_at: new Date().toISOString(),

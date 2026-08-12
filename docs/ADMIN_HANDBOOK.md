@@ -638,7 +638,7 @@ ORDER BY created_at DESC LIMIT 10;
 
 ```sql
 -- Check event status
-SELECT name, date, status, is_published FROM events WHERE id = <event_id>;
+SELECT name, date, status FROM events WHERE id = <event_id>;
 
 -- Check if bands assigned
 SELECT COUNT(*) FROM bands WHERE event_id = <event_id>;
@@ -646,8 +646,9 @@ SELECT COUNT(*) FROM bands WHERE event_id = <event_id>;
 
 **Solutions:**
 
-- Ensure `is_published = 1`
-- Ensure `status != 'archived'`
+- Ensure `status = 'published'` (or `'archived'` — archived events stay
+  publicly visible on browse/history surfaces; they're concluded, not hidden.
+  See CLAUDE.md "Public event visibility.")
 - Verify bands are assigned to event
 - Clear Cloudflare cache
 

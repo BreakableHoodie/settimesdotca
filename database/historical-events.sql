@@ -1,9 +1,9 @@
 -- Event: Long Weekend Band Crawl Vol. 14 - October 12 2025 - Long Weekend Band Crawl Vol. 14 - October 12 2025 | The Ripcordz
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl Vol. 14 - October 12 2025 - Long Weekend Band Crawl Vol. 14 - October 12 2025 | The Ripcordz',
   '2025-10-12',
   'long-weekend-band-crawl-vol-14-october-12-2025-lon',
-  1
+  'archived'
 );
 
 INSERT OR IGNORE INTO venues (name, address) VALUES (
@@ -114,11 +114,11 @@ INSERT OR IGNORE INTO performers (name) VALUES (
 -- End of Long Weekend Band Crawl Vol. 14 - October 12 2025 - Long Weekend Band Crawl Vol. 14 - October 12 2025 | The Ripcordz
 
 -- Event: Long Weekend Band Crawl Vol 13 - Long Weekend Band Crawl Vol 13 | Brutal Youth
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl Vol 13 - Long Weekend Band Crawl Vol 13 | Brutal Youth',
   '2025-08-03',
   'long-weekend-band-crawl-vol-13-long-weekend-band-c',
-  1
+  'archived'
 );
 
 INSERT OR IGNORE INTO venues (name, address) VALUES (
@@ -235,11 +235,11 @@ INSERT OR IGNORE INTO performers (name) VALUES (
 -- End of Long Weekend Band Crawl Vol 13 - Long Weekend Band Crawl Vol 13 | Brutal Youth
 
 -- Event: Long Weekend Band Crawl Vol 12 - Long Weekend Band Crawl Vol 12 | CATL
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl Vol 12 - Long Weekend Band Crawl Vol 12 | CATL',
   '2025-05-18',
   'long-weekend-band-crawl-vol-12-long-weekend-band-c',
-  1
+  'archived'
 );
 
 
@@ -358,11 +358,11 @@ INSERT OR IGNORE INTO performers (name) VALUES (
 -- End of Long Weekend Band Crawl Vol 12 - Long Weekend Band Crawl Vol 12 | CATL
 
 -- Event: Long Weekend Band Crawl Waterloo - Long Weekend Band Crawl Waterloo | Mononegatives
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl Waterloo - Long Weekend Band Crawl Waterloo | Mononegatives',
   '2023-08-06',
   'long-weekend-band-crawl-waterloo-long-weekend-band',
-  1
+  'archived'
 );
 
 
@@ -370,11 +370,11 @@ INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
 -- End of Long Weekend Band Crawl Waterloo - Long Weekend Band Crawl Waterloo | Mononegatives
 
 -- Event: Long Weekend Band Crawl - Vol 11 - Sunday February 16 - Long Weekend Band Crawl - Vol 11 - Sunday February 16 | Pkew Pkew Pkew, Waterloo, ON live at Room 47 - February 16, 2025
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl - Vol 11 - Sunday February 16 - Long Weekend Band Crawl - Vol 11 - Sunday February 16 | Pkew Pkew Pkew, Waterloo, ON live at Room 47 - February 16, 2025',
   '2025-02-16',
   'long-weekend-band-crawl-vol-11-sunday-february-16-',
-  1
+  'archived'
 );
 
 
@@ -382,11 +382,11 @@ INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
 -- End of Long Weekend Band Crawl - Vol 11 - Sunday February 16 - Long Weekend Band Crawl - Vol 11 - Sunday February 16 | Pkew Pkew Pkew, Waterloo, ON live at Room 47 - February 16, 2025
 
 -- Event: Long Weekend Band Crawl Vol. X - Long Weekend Band Crawl Vol. X | The Wormwood Scrubs, Waterloo, ON live at Revive Game Bar - October 13, 2024
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl Vol. X - Long Weekend Band Crawl Vol. X | The Wormwood Scrubs, Waterloo, ON live at Revive Game Bar - October 13, 2024',
   '2024-10-13',
   'long-weekend-band-crawl-vol-x-long-weekend-band-cr',
-  1
+  'archived'
 );
 
 INSERT OR IGNORE INTO venues (name, address) VALUES (
@@ -478,11 +478,11 @@ INSERT OR IGNORE INTO performers (name) VALUES (
 -- End of Long Weekend Band Crawl Vol. X - Long Weekend Band Crawl Vol. X | The Wormwood Scrubs, Waterloo, ON live at Revive Game Bar - October 13, 2024
 
 -- Event: Long Weekend Band Crawl Vol. 9 - Long Weekend Band Crawl Vol. 9 | Raider
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl Vol. 9 - Long Weekend Band Crawl Vol. 9 | Raider',
   '2024-08-04',
   'long-weekend-band-crawl-vol-9-long-weekend-band-cr',
-  1
+  'archived'
 );
 
 INSERT OR IGNORE INTO venues (name, address) VALUES (
@@ -565,11 +565,11 @@ INSERT OR IGNORE INTO performers (name) VALUES (
 -- End of Long Weekend Band Crawl Vol. 9 - Long Weekend Band Crawl Vol. 9 | Raider
 
 -- Event: Long Weekend Band Crawl - Sunday May 19 Vol. 8 - Long Weekend Band Crawl - Sunday May 19 Vol. 8 | BA Johnston
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl - Sunday May 19 Vol. 8 - Long Weekend Band Crawl - Sunday May 19 Vol. 8 | BA Johnston',
   '2024-05-19',
   'long-weekend-band-crawl-sunday-may-19-vol-8-long-w',
-  1
+  'archived'
 );
 
 INSERT OR IGNORE INTO venues (name, address) VALUES (
@@ -689,11 +689,11 @@ INSERT OR IGNORE INTO performers (name) VALUES (
 -- End of Long Weekend Band Crawl - Sunday May 19 Vol. 8 - Long Weekend Band Crawl - Sunday May 19 Vol. 8 | BA Johnston
 
 -- Event: Long Weekend Band Crawl February 18 - Vol 7 - Long Weekend Band Crawl February 18 - Vol 7 | Blackout!
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl February 18 - Vol 7 - Long Weekend Band Crawl February 18 - Vol 7 | Blackout!',
   '2024-02-18',
   'long-weekend-band-crawl-february-18-vol-7-long-wee',
-  1
+  'archived'
 );
 
 INSERT OR IGNORE INTO venues (name, address) VALUES (
@@ -745,11 +745,11 @@ INSERT OR IGNORE INTO performers (name) VALUES (
 -- End of Long Weekend Band Crawl February 18 - Vol 7 - Long Weekend Band Crawl February 18 - Vol 7 | Blackout!
 
 -- Event: Long Weekend Band Crawl - October 8 -  VOL 6 - Long Weekend Band Crawl - October 8 -  VOL 6 | Handheld, Waterloo, ON live at Dive Bar - October 8, 2023
-INSERT OR IGNORE INTO events (name, date, slug, is_published) VALUES (
+INSERT OR IGNORE INTO events (name, date, slug, status) VALUES (
   'Long Weekend Band Crawl - October 8 -  VOL 6 - Long Weekend Band Crawl - October 8 -  VOL 6 | Handheld, Waterloo, ON live at Dive Bar - October 8, 2023',
   '2023-10-08',
   'long-weekend-band-crawl-october-8-vol-6-long-weeke',
-  1
+  'archived'
 );
 
 

@@ -114,4 +114,26 @@ describe('eventsApi.setPublishState', () => {
     const [, options] = fetchMock.mock.calls[0]
     expect(JSON.parse(options.body)).toEqual({ publish: true, allowEmptyLineup: true })
   })
+
+  // A truthy non-boolean must not reach the wire as `true`. The server rejects
+  // non-booleans, but it never sees this one: coercing here would hand it a
+  // literal `true` and open the empty-lineup guard on input written to be
+  // refused. Throwing before the request keeps the client from laundering an
+  // invalid value into a valid one.
+  it.each([['yes'], [1], [{}], [[]]])('rejects a truthy non-boolean allowEmptyLineup (%p)', async value => {
+    const fetchMock = global.fetch
+    fetchMock.mockResolvedValue(
+      new globalThis.Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const { eventsApi } = await import('../adminApi.js')
+    await expect(eventsApi.setPublishState(1, true, { allowEmptyLineup: value })).rejects.toThrow(TypeError)
+
+    // The assertion that matters: no request was ever made, so the server had
+    // no chance to be handed a laundered `true`.
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })

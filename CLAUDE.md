@@ -77,7 +77,15 @@ Four rules, each learned by something breaking:
 3. **The brief goes in a file (`--brief`), never on the command line.** Large content in argv hangs the CLI; the relay feeds it via stdin for exactly this reason. Measured: ~1.5 KB of argv hung past 180s, the identical text attached as a file returned in 11s.
 4. **`opencode.json` is the tooling surface** — it feeds OpenCode our `CLAUDE.md` plus 17 instruction files, 6 MCP servers (Cloudflare ×4, GitHub, Resend), four custom agents, and five commands. That is why a delegated diff can respect invariants nobody restated in the brief. Keep `model`/`small_model` pointing at *authenticated* providers: they named `anthropic/*` until 2026-08-12 while only OpenCode Zen and Go were authenticated, so every run that relied on the default failed.
 
-Verified once (#797, `opencode-go/glm-5.2`, $0.65): the model list is otherwise unbenchmarked — match model to task and say so rather than implying a ranking that has not been measured.
+**Cost is the throughput constraint, and it does not track the tier name.** OpenCode Go is $10/month flat but capped in *usage dollars* — **$12 per 5 hours**, $30/week, $60/month — so an expensive model buys fewer delegations per afternoon, not a bigger bill. Measured, three runs:
+
+| Task | Model | Cost |
+|---|---|---|
+| #797 — delete one meta tag (3 files) | `glm-5.2` | $0.65 |
+| #766 — schema loader (2 files) | `deepseek-v4-pro` | **$0.125** |
+| #766 — 14 fixture fixes (10 files) | `glm-5.2` | $2.14 |
+
+`deepseek-v4-pro` came in **5× cheaper than `glm-5.2` on a smaller task**, so do not assume a "pro" tier costs more — cost tracks tokens consumed, which tracks how much the model explores, not its rate card. At $2.14/run the 5-hour cap allows ~5 runs; at $0.125 it allows ~96. Default to `opencode-go/deepseek-v4-pro` and read the `cost` field in `result.json` after every run. Three data points is not a ranking; treat any other model as unmeasured until it is run.
 
 ---
 

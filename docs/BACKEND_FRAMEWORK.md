@@ -171,9 +171,9 @@
        │ Event date passes (manual or automated)
        ▼
 ┌──────────────┐
-│   ARCHIVED   │  Optionally mark as archived (future enhancement)
-│  archived_at │  No longer shown as "current" but accessible by slug
-│  = timestamp │
+│   ARCHIVED   │  Concluded edition — still PUBLIC, on archive surfaces
+│    status    │  (recaps, artist/venue pages, sitemap). One-way.
+│ = 'archived' │  archived_at is metadata, not the state.
 └──────┬───────┘
        │ After retention period (future enhancement)
        ▼
@@ -183,7 +183,15 @@
 └──────────────┘
 ```
 
-**Current State:** Events have `DRAFT` and `PUBLISHED` states only. Archive/delete is manual.
+**`status` is the state; `archived_at` is only a timestamp.** All three states live in `status`
+(`'draft' | 'published' | 'archived'`) — never infer the state from `archived_at` being non-NULL.
+
+**Archived is not hidden.** `publicEventStatusSql()` resolves to `status IN ('published','archived')`,
+so a concluded edition stays publicly readable; that is the point of the archive. Only `draft` is
+non-public. See `functions/utils/eventVisibility.js`.
+
+**Archiving is one-way.** There is no unarchive endpoint, and all four routes that can write `status`
+reject a status change on an archived row — enforced in SQL, not merely checked in JS.
 
 ### Recommended Event Naming Convention
 

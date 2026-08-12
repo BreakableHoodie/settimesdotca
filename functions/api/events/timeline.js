@@ -1,7 +1,12 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_SHOW_CRITICAL } from "../../utils/cacheHeaders.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
-import { eventLocalToday, eventLocalFestivalToday, eventLocalClock } from "../../utils/eventDay.js";
+import {
+  eventLocalToday,
+  eventLocalFestivalToday,
+  eventLocalClock,
+  AFTER_MIDNIGHT_THRESHOLD_TIME,
+} from "../../utils/eventDay.js";
 import { concludedEventSql, publishedEventStatusSql } from "../../utils/eventVisibility.js";
 
 // Bucket membership is a lifecycle question before it is a date question.
@@ -29,16 +34,6 @@ import { concludedEventSql, publishedEventStatusSql } from "../../utils/eventVis
  * value here is simply treated as "no info" rather than throwing.
  */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-/**
- * Sets starting before 06:00 are after-midnight sets that belong to the
- * PREVIOUS evening (the AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention, see
- * frontend/src/utils/bandUtils.js and CLAUDE.md). They must never define the
- * first day's start edge — a 1 AM set would otherwise mark the event
- * "started" in the small hours of a morning whose show doesn't begin until
- * evening.
- */
-const AFTER_MIDNIGHT_THRESHOLD = "06:00";
 
 /**
  * Normalizes a performances.start_time value ("HH:MM", "HH:MM:SS", or legacy
@@ -505,9 +500,16 @@ export async function onRequestGet(context) {
           }
           if (row.performance_date == null || row.performance_date === row.event_date) {
             const start = normalizeStartTime(row.start_time);
+            // Sets starting before AFTER_MIDNIGHT_THRESHOLD_TIME are
+            // after-midnight sets that belong to the PREVIOUS evening (the
+            // AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention, see
+            // functions/utils/eventDay.js and CLAUDE.md). They must never
+            // define the first day's start edge — a 1 AM set would otherwise
+            // mark the event "started" in the small hours of a morning whose
+            // show doesn't begin until evening.
             if (
               start &&
-              start >= AFTER_MIDNIGHT_THRESHOLD &&
+              start >= AFTER_MIDNIGHT_THRESHOLD_TIME &&
               (info.firstDayStart === null || start < info.firstDayStart)
             ) {
               info.firstDayStart = start;

@@ -12,15 +12,13 @@ import {
 } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
-import { torontoUtcOffset } from "../utils/eventDay.js";
+import { torontoUtcOffset, AFTER_MIDNIGHT_THRESHOLD_HOUR } from "../utils/eventDay.js";
 import { publicEventStatusSql } from "../utils/eventVisibility.js";
 
 // Sets starting before 06:00 are after-midnight sets that belong to the
-// PREVIOUS festival day (AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention;
-// canonical definition frontend/src/utils/festivalDays.js, see CLAUDE.md).
-// Kept local rather than imported (functions/ doesn't import frontend/src) —
-// mirrors the same re-encoding in functions/api/events/timeline.js.
-const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6;
+// PREVIOUS festival day (AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention; the
+// canonical server-side definition is functions/utils/eventDay.js, imported
+// above — see CLAUDE.md).
 
 /**
  * Extracts the integer hour from a performances.start_time value ("HH:MM",

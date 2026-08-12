@@ -4,6 +4,7 @@ import {
   eventLocalClock,
   eventLocalFestivalToday,
   AFTER_MIDNIGHT_THRESHOLD_HOUR,
+  AFTER_MIDNIGHT_THRESHOLD_TIME,
 } from "../eventDay.js";
 
 // The FESTIVAL day, not the calendar day. A set before 6 AM belongs to the
@@ -48,6 +49,23 @@ describe("eventLocalFestivalToday", () => {
 
   it("exports the threshold so no caller re-encodes 6", () => {
     expect(AFTER_MIDNIGHT_THRESHOLD_HOUR).toBe(6);
+  });
+});
+
+// #746: functions/api/events/timeline.js needs the "HH:MM" string shape for a
+// lexicographic comparison against performances.start_time, while
+// eventLocalFestivalToday() above needs the numeric hour. Two shapes of the
+// same value is exactly the drift risk the single-home rule exists to
+// prevent — this pins that AFTER_MIDNIGHT_THRESHOLD_TIME is always derived
+// from AFTER_MIDNIGHT_THRESHOLD_HOUR, never a separately maintained literal.
+describe("AFTER_MIDNIGHT_THRESHOLD_TIME", () => {
+  it("agrees with AFTER_MIDNIGHT_THRESHOLD_HOUR", () => {
+    expect(Number(AFTER_MIDNIGHT_THRESHOLD_TIME.slice(0, 2))).toBe(AFTER_MIDNIGHT_THRESHOLD_HOUR);
+  });
+
+  it("is a zero-padded HH:MM string", () => {
+    expect(AFTER_MIDNIGHT_THRESHOLD_TIME).toMatch(/^\d{2}:\d{2}$/);
+    expect(AFTER_MIDNIGHT_THRESHOLD_TIME).toBe("06:00");
   });
 });
 

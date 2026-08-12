@@ -103,7 +103,7 @@ describe("POST /api/admin/bands/import", () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Fest", slug: "fest" });
     insertVenue(rawDb, { name: "The Hall" });
-    insertBand(rawDb, { name: "Alpha" });
+    insertBand(rawDb, { name: "Alpha", event_id: event.id });
 
     const res = await importRequest(env, {
       event_id: event.id,

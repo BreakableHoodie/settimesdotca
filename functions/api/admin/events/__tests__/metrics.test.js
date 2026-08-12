@@ -107,7 +107,7 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     const perfA = insertBand(rawDb, { name: "Alpha Band", event_id: event.id });
     const perfB = insertBand(rawDb, { name: "Beta Band", event_id: event.id });
 
-    // Alpha Band: 3 schedule builds across 2 sessions
+    // Alpha Band: 3 schedule builds across 3 sessions
     rawDb
       .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
       .run(event.id, perfA.id, "session-1");
@@ -116,8 +116,9 @@ describe("GET /api/admin/events/[id]/metrics", () => {
       .run(event.id, perfA.id, "session-2");
     rawDb
       .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
-      .run(event.id, perfA.id, "session-2");
-    // Beta Band: 1 schedule build in a new session
+      .run(event.id, perfA.id, "session-3");
+    // Beta Band: 1 schedule build, sharing session-3 with Alpha so the event
+    // still has exactly 3 distinct visitor sessions overall
     rawDb
       .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
       .run(event.id, perfB.id, "session-3");

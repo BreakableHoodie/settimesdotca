@@ -477,12 +477,27 @@ describe("GET /api/admin/bands/stats/:name", () => {
       expect(data.stats.uniqueEvents).toBe(2);
     });
 
-    it("should handle bands with null event_id", async () => {
-      // Arrange - Rolodex band (no event)
+    // DELETED (#766): "should handle bands with null event_id".
+    //
+    // It seeded `event_id: null` and asserted `totalShows === 0` with a 200 —
+    // a state production cannot hold. `performances.event_id` is
+    // `INTEGER NOT NULL` with `FOREIGN KEY … ON DELETE CASCADE`, so a
+    // performance without an event cannot be inserted and an orphan is deleted
+    // along with its event.
+    //
+    // It passed only because the hand-written test DDL wrongly allowed NULL.
+    // Now that createTestDB() loads the real schema the fixture is rejected,
+    // and no fixture satisfies both NOT NULL and `totalShows === 0`. It was
+    // pinning an unreachable branch, not a behaviour — so it is gone rather
+    // than reworked into something that asserts less.
+
+    it("counts a band's show and its venue", async () => {
+      // Arrange
+      const event = insertEvent(db, { name: "Practice Night", slug: "practice-night" });
       const venue = insertVenue(db, { name: "Practice Space" });
       insertBandWithProfile(db, {
         name: "Rolodex Band",
-        event_id: null,
+        event_id: event.id,
         venue_id: venue.id,
         start_time: "20:00",
         end_time: "21:00",
@@ -496,8 +511,8 @@ describe("GET /api/admin/bands/stats/:name", () => {
 
       // Assert
       const data = await response.json();
-      expect(data.stats.totalShows).toBe(0); // No event = no show
-      expect(data.stats.uniqueVenues).toBe(1); // Still has venue
+      expect(data.stats.totalShows).toBe(1);
+      expect(data.stats.uniqueVenues).toBe(1);
     });
 
     it("should handle bands with null venue_id", async () => {
@@ -794,11 +809,18 @@ describe("GET /api/admin/bands/stats/:name", () => {
       });
     });
 
-    it("should handle null event and venue gracefully", async () => {
-      // Arrange - Rolodex entry with no event or venue
+    // Narrowed (#766): this asserted `event === null` AND `venue === null`.
+    // Only the venue half is reachable. `performances.venue_id` is nullable
+    // with `ON DELETE SET NULL`, so a venueless set is a real state an admin
+    // can create. `event_id` is NOT NULL, so `event === null` never occurs —
+    // that half passed only under the old, wrong test DDL. The venue coverage
+    // is genuine and kept; the impossible half is dropped.
+    it("should handle a null venue gracefully", async () => {
+      // Arrange - a set with no venue assigned yet
+      const event = insertEvent(db, { name: "Orphan Fest", slug: "orphan-fest" });
       insertBandWithProfile(db, {
         name: "Orphan Band",
-        event_id: null,
+        event_id: event.id,
         venue_id: null,
         start_time: "20:00",
         end_time: "21:00",
@@ -813,8 +835,11 @@ describe("GET /api/admin/bands/stats/:name", () => {
       // Assert
       const data = await response.json();
       expect(data.performances).toHaveLength(1);
-      expect(data.performances[0].event).toBeNull();
       expect(data.performances[0].venue).toBeNull();
+      // The event is always present — NOT NULL plus CASCADE means a
+      // performance can never outlive or precede its event.
+      expect(data.performances[0].event).not.toBeNull();
+      expect(data.performances[0].event.id).toBe(event.id);
       expect(data.performances[0].startTime).toBe("20:00");
       expect(data.performances[0].endTime).toBe("21:00");
     });

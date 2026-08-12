@@ -60,7 +60,7 @@ describe("Admin user password reset API", () => {
   test("non-admin cannot reset password", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
     rawDb
-      .prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("noreset@test.com", "viewer", "No Reset");
     const user = rawDb.prepare("SELECT * FROM users WHERE email = ?").get("noreset@test.com");
     const request = new Request(`https://example.test/api/admin/users/${user.id}/reset-password`, {
@@ -96,7 +96,7 @@ describe("Admin user password reset API", () => {
   test("rejects reset for inactive user", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     rawDb
-      .prepare("INSERT INTO users (email, role, name, is_active) VALUES (?, ?, ?, ?)")
+      .prepare("INSERT INTO users (email, role, name, is_active, password_hash) VALUES (?, ?, ?, ?, 'placeholder')")
       .run("inactive@test.com", "viewer", "Inactive", 0);
     const user = rawDb.prepare("SELECT * FROM users WHERE email = ?").get("inactive@test.com");
     const request = new Request(`https://example.test/api/admin/users/${user.id}/reset-password`, {

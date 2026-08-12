@@ -7,7 +7,7 @@ describe("Admin user item API", () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     // Insert a viewer user to update
     rawDb
-      .prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("viewer2@test.com", "viewer", "View Two");
     const toUpdate = rawDb.prepare("SELECT * FROM users WHERE email = ?").get("viewer2@test.com");
 
@@ -53,7 +53,7 @@ describe("Admin user item API", () => {
   test("admin deactivates user and sets deactivation metadata", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     rawDb
-      .prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("tempuser@test.com", "viewer", "Temp User");
     const temp = rawDb.prepare("SELECT * FROM users WHERE email = ?").get("tempuser@test.com");
     const request = new Request(`https://example.test/api/admin/users/${temp.id}`, {
@@ -96,7 +96,9 @@ describe("Admin user item API", () => {
 
   test("admin permanently deletes a non-admin user and logs action", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
-    rawDb.prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)").run("delme@test.com", "viewer", "Del Me");
+    rawDb
+      .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
+      .run("delme@test.com", "viewer", "Del Me");
     const target = rawDb.prepare("SELECT * FROM users WHERE email = ?").get("delme@test.com");
     const request = new Request(`https://example.test/api/admin/users/${target.id}`, {
       method: "DELETE",
@@ -121,7 +123,7 @@ describe("Admin user item API", () => {
 
     // Create a user to be deleted
     rawDb
-      .prepare("INSERT INTO users (email, role, name) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("creator@test.com", "editor", "Content Creator");
     const creator = rawDb.prepare("SELECT * FROM users WHERE email = ?").get("creator@test.com");
 

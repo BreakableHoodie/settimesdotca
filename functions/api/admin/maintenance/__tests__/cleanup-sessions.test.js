@@ -63,16 +63,16 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
     // Expired email OTP — should be deleted
     rawDb
       .prepare(
-        "INSERT INTO email_otp_codes (user_id, code, expires_at, used) VALUES (?, ?, datetime('now', '-1 minute'), 0)",
+        "INSERT INTO email_otp_codes (user_id, code_hash, expires_at, verified) VALUES (?, ?, datetime('now', '-1 minute'), 0)",
       )
-      .run(1, "123456");
+      .run(1, "test-hash-123456");
 
     // Active email OTP — should survive
     rawDb
       .prepare(
-        "INSERT INTO email_otp_codes (user_id, code, expires_at, used) VALUES (?, ?, datetime('now', '+10 minutes'), 0)",
+        "INSERT INTO email_otp_codes (user_id, code_hash, expires_at, verified) VALUES (?, ?, datetime('now', '+10 minutes'), 0)",
       )
-      .run(1, "654321");
+      .run(1, "test-hash-654321");
 
     // Used password reset token — should be deleted
     rawDb
@@ -138,8 +138,12 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
     expect(rawDb.prepare("SELECT COUNT(*) as c FROM lucia_sessions WHERE id = ?").get("expired-token").c).toBe(0);
     expect(rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges WHERE token = ?").get("active-mfa-token").c).toBe(1);
     expect(rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges WHERE token = ?").get("used-mfa-token").c).toBe(0);
-    expect(rawDb.prepare("SELECT COUNT(*) as c FROM email_otp_codes WHERE code = ?").get("654321").c).toBe(1);
-    expect(rawDb.prepare("SELECT COUNT(*) as c FROM email_otp_codes WHERE code = ?").get("123456").c).toBe(0);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) as c FROM email_otp_codes WHERE code_hash = ?").get("test-hash-654321").c,
+    ).toBe(1);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) as c FROM email_otp_codes WHERE code_hash = ?").get("test-hash-123456").c,
+    ).toBe(0);
     expect(
       rawDb.prepare("SELECT COUNT(*) as c FROM password_reset_tokens WHERE token = ?").get("active-reset-token").c,
     ).toBe(1);

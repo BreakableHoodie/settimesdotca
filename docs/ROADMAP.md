@@ -97,7 +97,7 @@ Continuous: keep build warnings actionable and dependency alerts near zero (Depe
 
 Delivered and now proven in production: Phase 1 foundation (#543), Phase 2 polish (#542), day-scoped bulk conflict detection (#551), and the unified 6 AM festival-day boundary (#550). Buddies Fest 2 (2026-08-07→09) was the first multi-day event to run on it.
 
-Also delivered since the last revision: retiring the two private re-encodings of the 6 AM threshold (#746) — `api/events/timeline.js` and `event/[slug].js` both now import from the canonical server-side home (`functions/utils/eventDay.js`, which exports both the numeric hour and a derived `"HH:MM"` string) instead of typing the literal locally. A source-scanning guard (`functions/utils/__tests__/afterMidnightThreshold.test.js`) keeps a third private copy from creeping back in.
+Also delivered since the last revision: retiring the two private re-encodings of the 6 AM threshold (#746) — `api/events/timeline.js` and `event/[slug].js` both now import from the canonical server-side home (`functions/utils/eventDay.js`, which exports both the numeric hour and a derived `"HH:MM"` string) instead of typing the literal locally. A source-scanning guard (`functions/utils/__tests__/afterMidnightThreshold.test.js`) backstops it within `functions/`. It is a backstop, not a proof: the numeric half matches only identifiers containing `AFTER_MIDNIGHT`, so a differently-named constant set to a bare `6` would slip past — see CLAUDE.md "Two homes, not more" for why widening it further would be noise.
 
 Next: none currently open in this track. There remain deliberately two canonical homes, one per side of the build boundary (`frontend/src/utils/festivalDays.js`, `functions/utils/eventDay.js`); do not add a third.
 

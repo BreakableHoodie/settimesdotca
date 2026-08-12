@@ -967,7 +967,13 @@ function EventCard({
           </div>
         )}
 
-        {!expanded && featuredBands.length === 0 && (
+        {/* Only offer the hint when expanding would actually load something.
+            `featuredBands` is empty both when a lineup exists but hasn't been
+            fetched yet AND when the event has no lineup at all — gating on
+            allBandCount separates them. Without it a not-yet-booked event
+            reads "Lineup TBA" and then invites you to expand for the lineup it
+            just said doesn't exist; expanding loads nothing. */}
+        {!expanded && featuredBands.length === 0 && allBandCount > 0 && (
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-text-tertiary text-sm">Expand to load performers and venues.</p>
           </div>

@@ -1035,6 +1035,44 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
     // The zero-count stat this replaces would have rendered its own "Bands"
     // label (plural, since 0 !== 1) right next to the numeral.
     expect(screen.queryByText('Bands')).not.toBeInTheDocument()
+    // ...and it must not then invite the fan to expand for the lineup it just
+    // said does not exist. Expanding a 0-band event loads nothing.
+    expect(screen.queryByText('Expand to load performers and venues.')).not.toBeInTheDocument()
+  })
+
+  it('still offers the expand hint when the event has a lineup that is not loaded yet', async () => {
+    // The complement of the assertion above: `featuredBands` is empty here too
+    // (the collapsed card carries no band rows), but band_count proves there is
+    // something to load — so the hint is correct and must survive. Without this,
+    // the fix could be "delete the hint entirely" and still look green.
+    stubTimeline({
+      now: [],
+      upcoming: [
+        {
+          id: 2,
+          name: 'Booked Fest',
+          slug: 'booked-fest',
+          date: '2026-10-11',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 12,
+          venue_count: 3,
+          ticket_url: null,
+        },
+      ],
+      past: [],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Booked Fest')).toBeInTheDocument()
+    expect(screen.getByText('Expand to load performers and venues.')).toBeInTheDocument()
+    expect(screen.queryByText('Lineup TBA')).not.toBeInTheDocument()
   })
 
   it('omits the lineup stat entirely for a past event with no recorded bands', async () => {

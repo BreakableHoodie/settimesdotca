@@ -1088,6 +1088,111 @@ describe("Event API - handler integration", () => {
   });
 });
 
+// The empty-lineup guard above (bandCount.count === 0) blocks a real
+// workflow: announcing an event before its lineup is booked, so the page
+// starts accruing SEO runway early. "Lineup TBA" is a supported rendering
+// state (EventTimeline.jsx), so the guard must stay bypassable via an
+// explicit opt-in rather than an unconditional block.
+describe("Publish endpoint: allowEmptyLineup override", () => {
+  it("0 bands + no flag rejects publish and leaves the event in draft (persisted state)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "NoFlagNoBands", slug: "no-flag-no-bands" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ publish: true }),
+    });
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation error");
+    expect(data.message).toBe("Cannot publish event with no bands. Add at least one band first.");
+    expect(data.code).toBe("EMPTY_LINEUP");
+
+    // Rejecting must not half-apply -- confirm the row was never touched.
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("draft");
+  });
+
+  it("0 bands + allowEmptyLineup: true publishes the event", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "OverrideNoBands", slug: "override-no-bands" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ publish: true, allowEmptyLineup: true }),
+    });
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.status).toBe("published");
+
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("published");
+  });
+
+  it("0 bands + allowEmptyLineup: 'yes' (non-boolean) rejects with 400, event stays draft", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "BadFlagType", slug: "bad-flag-type" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ publish: true, allowEmptyLineup: "yes" }),
+    });
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+
+    // A truthy string must not silently unlock the guard -- the row must
+    // never have been published.
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("draft");
+  });
+
+  it("publish: false + allowEmptyLineup: true unpublishes normally -- the flag is a no-op on unpublish", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "UnpublishWithFlag", slug: "unpublish-with-flag", status: "published" });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ publish: false, allowEmptyLineup: true }),
+    });
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.status).toBe("draft");
+  });
+
+  it("an event WITH bands still publishes with no flag (no regression)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "HasBandsNoFlag", slug: "has-bands-no-flag" });
+    insertBand(rawDb, { name: "Regression Band", event_id: ev.id });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ publish: true }),
+    });
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.status).toBe("published");
+  });
+});
+
 describe("Event duplication atomicity (P0-B2)", () => {
   it("cleans up newly created event if performance copy fails", async () => {
     const rawDb = createTestDB();

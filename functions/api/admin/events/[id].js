@@ -619,6 +619,16 @@ export async function onRequestPut(context) {
           },
         );
       }
+      // Deliberately no band-count check here, unlike POST .../publish. This
+      // toggle carries no lineup requirement at all -- adding one would be a
+      // NEW restriction (this endpoint never had one), not a fix, and would
+      // make this route stricter than its sibling instead of matching it.
+      // POST .../publish is the guarded path, and its guard is bypassable via
+      // an explicit `allowEmptyLineup: true` on that endpoint (a supported
+      // "Lineup TBA" publish, e.g. announcing an event before booking is
+      // complete) -- don't "fix" the asymmetry by tightening this toggle;
+      // that would block the same workflow the other endpoint's override
+      // exists to allow.
       const nextStatus = event.status === "published" ? "draft" : "published";
       // Re-check status at write time: if a concurrent request archived this
       // event between the read above and this UPDATE, an unconditional write

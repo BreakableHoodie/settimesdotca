@@ -473,12 +473,18 @@ export const eventsApi = {
     return handleResponse(response)
   },
 
-  async setPublishState(eventId, publish) {
+  async setPublishState(eventId, publish, { allowEmptyLineup } = {}) {
+    const body = { publish }
+    // Only sent when true -- allowEmptyLineup:false is indistinguishable from
+    // omitting it server-side, so don't put it on every request.
+    if (allowEmptyLineup) {
+      body.allowEmptyLineup = true
+    }
     const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/publish`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
-      body: JSON.stringify({ publish }),
+      body: JSON.stringify(body),
     })
     return handleResponse(response)
   },

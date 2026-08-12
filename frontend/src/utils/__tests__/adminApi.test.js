@@ -54,3 +54,64 @@ describe('authApi.verifySession', () => {
     expect(window.localStorage.getItem('userEmail')).toBe('admin@test')
   })
 })
+
+describe('eventsApi.setPublishState', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    document.cookie = 'csrf_token=test-csrf-token; path=/'
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    document.cookie = 'csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+  })
+
+  it('omits allowEmptyLineup from the request body when not passed', async () => {
+    const fetchMock = global.fetch
+    fetchMock.mockResolvedValue(
+      new globalThis.Response(JSON.stringify({ success: true, event: { id: 1, status: 'published' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const { eventsApi } = await import('../adminApi.js')
+    await eventsApi.setPublishState(1, true)
+
+    const [, options] = fetchMock.mock.calls[0]
+    expect(JSON.parse(options.body)).toEqual({ publish: true })
+  })
+
+  it('omits allowEmptyLineup from the request body when explicitly false', async () => {
+    const fetchMock = global.fetch
+    fetchMock.mockResolvedValue(
+      new globalThis.Response(JSON.stringify({ success: true, event: { id: 1, status: 'draft' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const { eventsApi } = await import('../adminApi.js')
+    await eventsApi.setPublishState(1, false, { allowEmptyLineup: false })
+
+    const [, options] = fetchMock.mock.calls[0]
+    expect(JSON.parse(options.body)).toEqual({ publish: false })
+  })
+
+  it('includes allowEmptyLineup: true in the request body when passed', async () => {
+    const fetchMock = global.fetch
+    fetchMock.mockResolvedValue(
+      new globalThis.Response(JSON.stringify({ success: true, event: { id: 1, status: 'published' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const { eventsApi } = await import('../adminApi.js')
+    await eventsApi.setPublishState(1, true, { allowEmptyLineup: true })
+
+    const [, options] = fetchMock.mock.calls[0]
+    expect(JSON.parse(options.body)).toEqual({ publish: true, allowEmptyLineup: true })
+  })
+})

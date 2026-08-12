@@ -68,11 +68,22 @@ When a task has a clear implementation spec, dispatch a Sonnet agent to build it
 
 ### Delegating to OpenCode
 
-A third implementer, on a separate subscription: the `opencode-delegate` skill (`.agents/skills/`, from `amElnagdy/delegate-skills`). Use it for well-specified work that would otherwise consume this session's context. **The relay never commits — the orchestrator reviews the diff, re-runs `make gate`, and commits.** Same contract as a Sonnet agent, different process.
+A third implementer, on a separate subscription: the `opencode-delegate` skill.
+
+**It is not in this repo and a fresh clone will not have it.** It is an external prerequisite, installed per-machine into the gitignored `.agents/skills/` (see `.gitignore`), which is why `relay.mjs` will not appear in `git ls-files`:
+
+```bash
+npx skills add amElnagdy/delegate-skills --skill opencode-delegate
+# lands in .agents/skills/opencode-delegate/, symlinked to .claude/skills/
+```
+
+It also needs the `opencode` CLI on PATH and an authenticated provider (`opencode auth list`).
+
+Use it for well-specified work that would otherwise consume this session's context. **The relay never commits — the orchestrator reviews the diff, re-runs `make gate`, and commits.** Same contract as a Sonnet agent, different process.
 
 Four rules, each learned by something breaking:
 
-1. **Always go through `relay.mjs`; never a raw `opencode run`.** The relay passes `--auto`, and `opencode.json` sets `edit`/`bash`/`read`/`task` to `ask` — a headless run without `--auto` blocks forever on a permission prompt nobody can answer.
+1. **Always go through `relay.mjs`; never a raw `opencode run`.** Not for permissions — `opencode run` auto-approves by default, and a raw run *did* edit files headlessly in testing, so `--auto` is belt-and-braces rather than load-bearing. The relay earns its place for three other reasons: it feeds the brief over **stdin** (rule 3), it writes a structured `result.json` carrying `cost`, `touchedFiles` and the session id, and it never commits. A raw run gives up all three.
 2. **Always pass `--model` explicitly, from `opencode-go/*`.** That is the flat-rate subscription (18 models). **`opencode/*` is Zen and is metered per token** — and its `claude-*` entries are redundant with the orchestrator anyway.
 3. **The brief goes in a file (`--brief`), never on the command line.** Large content in argv hangs the CLI; the relay feeds it via stdin for exactly this reason. Measured: ~1.5 KB of argv hung past 180s, the identical text attached as a file returned in 11s.
 4. **`opencode.json` is the tooling surface** — it feeds OpenCode our `CLAUDE.md` plus 17 instruction files, 6 MCP servers (Cloudflare ×4, GitHub, Resend), four custom agents, and five commands. That is why a delegated diff can respect invariants nobody restated in the brief. Keep `model`/`small_model` pointing at *authenticated* providers: they named `anthropic/*` until 2026-08-12 while only OpenCode Zen and Go were authenticated, so every run that relied on the default failed.

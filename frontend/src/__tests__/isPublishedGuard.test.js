@@ -23,13 +23,10 @@
 // treats it as undefined, which is exactly how this bug hid in plain sight.
 // Only reading the source text catches it.
 //
-// EXEMPT admin/**: unlike the public timeline, the admin events list
-// (`GET /api/admin/events`, via `functions/api/admin/events/index.js`) DOES
-// still project `is_published`, and the admin UI legitimately reads it as a
-// draft/published indicator until it's migrated onto `status` (#799). This
-// guard protects PUBLIC surfaces, where the column is never projected and
-// any read of it is necessarily dead or wrong -- not the admin surface,
-// where it's still live data.
+// NO admin exemption as of #799: the admin UI used to read `is_published` as a
+// draft/published indicator, so this guard once protected only PUBLIC surfaces.
+// The admin surface is now entirely `status`-driven, which puts the whole of
+// frontend/src/ in scope -- see the exemption note above the allowlist below.
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -39,12 +36,8 @@ const currentFile = fileURLToPath(import.meta.url)
 const srcRoot = path.join(path.dirname(currentFile), '../')
 
 // Directories/files exempt from the scan:
-//  - admin/**        — the admin surface legitimately still reads
-//    is_published from admin endpoints that still project it (#799 tracks
-//    the eventual migration onto `status`).
 //  - any __tests__/** path — test fixtures legitimately seed/assert against
-//    the deprecated column (e.g. HistoricalImportModal's write, or an
-//    impossible-state regression guard).
+//    the deprecated column (e.g. an impossible-state regression guard).
 //  - this file itself — its own header/comments name the column, which
 //    would otherwise flag itself.
 //
@@ -97,10 +90,11 @@ describe('is_published never read outside admin/test infrastructure', () => {
     expect(
       offenders,
       offenders.length > 0
-        ? `is_published must never drive public UI (frontend/src/components/EventTimeline.jsx's dead "Draft" ` +
-            `badge was this exact bug) — found it in: ${offenders.join(', ')}. Use event.status instead, or add ` +
-            `the file to frontend/src/admin/**, a __tests__/** path, or the EXEMPT_EXACT allowlist in this guard ` +
-            `if it's genuinely admin infrastructure.`
+        ? `is_published is retired (#799) and must not drive ANY UI, admin included ` +
+            `(frontend/src/components/EventTimeline.jsx's dead "Draft" badge was this exact bug) — ` +
+            `found it in: ${offenders.join(', ')}. Use event.status instead. There is no admin escape hatch: ` +
+            `moving the file under frontend/src/admin/** will NOT satisfy this guard. Only __tests__/** and ` +
+            `the EXEMPT_EXACT allowlist are exempt.`
         : undefined
     ).toEqual([])
   })

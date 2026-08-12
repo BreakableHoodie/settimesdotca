@@ -35,7 +35,7 @@ Build SetTimes.ca into the best multi-venue and multi-artist event platform for 
 
 **The site is between seasons, which is a supported state.** Every "upcoming" surface is legitimately empty until Vol. 18 is published: `/api/events/public` defaults to `upcoming=true`, and the iCal feed only emits future events, so both correctly return zero while `/api/stats/public` and the sitemap stay fully populated from the archive. `EventTimeline` has a dedicated between-seasons state and auto-expands Past for this window. Check whether anything is `published` before treating such a zero as a bug.
 
-**Postmortem worth carrying forward (2026-08-10, #800):** archiving BF2 took the public site dark. `events.is_published` was deprecated by migration 0005 but never dropped, and `archive.js` zeroes it alongside setting `status='archived'` — so when the last un-archived event was closed out, 13 public read paths gated on the dead column all returned zero rows at once. Every **public event-visibility query** now goes through `functions/utils/eventVisibility.js`. Two source-scanning guards enforce it: no `is_published` read outside admin/test paths (both sides of the build boundary), and no non-admin file querying `events` without a status predicate. Two files are exempt by design and named in that guard — `api/metrics.js` (a write-path existence check projecting only `id`) and `utils/timeConflicts.js` (imported solely by admin, which must see drafts). The column drop itself is #799.
+**Postmortem worth carrying forward (2026-08-10, #800):** archiving BF2 took the public site dark. `events.is_published` was deprecated by migration 0005 but never dropped, and `archive.js` zeroed it alongside setting `status='archived'` — so when the last un-archived event was closed out, 13 public read paths gated on the dead column all returned zero rows at once. Every **public event-visibility query** now goes through `functions/utils/eventVisibility.js`. Two source-scanning guards enforce it: no `is_published` read or write anywhere outside `__tests__/**` and the shared test schema (both sides of the build boundary — the admin exemptions came out with #799 part 1, which is what proves the retirement complete), and no non-admin file querying `events` without a status predicate. Two files are exempt by design and named in that guard — `api/metrics.js` (a write-path existence check projecting only `id`) and `utils/timeConflicts.js` (imported solely by admin, which must see drafts). The column drop itself is #799.
 
 The review of that work turned up one route the original sweep missed: `functions/s/[slug].js`, the OG card social crawlers fetch for a shared schedule link, joined `events` ungated while both of its siblings for the same slug gated correctly — so an event unpublished *after* a link was shared still produced a crawler-facing card naming it and its bands. Fixed, and the hand sweep that found it is now the second guard above.
 
@@ -103,12 +103,13 @@ Next:
 
 The tracker is the source of truth. Every item from the previous (2026-07-07) list has since closed — #554, #555, #556, #542, #551, #550, #466, #510. The current queue is correctness debt plus Vol.-18 prep:
 
-1. **#787** — recap publish gating disagrees across sitemap, SSR, and the JSON API. **#800 armed this rather than closing it:** the sitemap now emits a recap URL per past event while the data API still requires `archived`, so a published-but-not-yet-archived past event becomes an indexable soft-404. Dormant today (all past events are archived); **fires when Vol. 18 concludes — must land before 2026-10-11.**
-2. **#799** — drop the dead `events.is_published` column and its two indexes, and stop the admin writes #800 deliberately kept for rollback safety.
-3. **#746** — the 6 AM after-midnight threshold is still re-encoded privately in `api/events/timeline.js` and `event/[slug].js` instead of importing a canonical home.
-4. **#766** — `functions/api/test-utils.js` hand-maintains a third, ungated copy of the schema.
-5. **#797** — drop the ignored `<meta name="keywords">` from `BandProfilePage`.
-6. **Vol. 18 prep** — publish event 37, then book and announce the lineup. Publishing is what re-populates every "upcoming" surface.
+1. **#799 (part 2)** — drop the dead `events.is_published` column and its two indexes (`idx_events_published` from 0001, `idx_events_published_date` from 0036), regenerate `setup-complete.sql`, and drop it from the test schema. Part 1 (stop all reads **and** the admin writes #800 kept for rollback safety) is done; the drop must not ship in the same deploy, because `Migrate and verify remote D1` runs *before* `Deploy to Cloudflare Pages`.
+2. **#746** — the 6 AM after-midnight threshold is still re-encoded privately in `api/events/timeline.js` and `event/[slug].js` instead of importing a canonical home.
+3. **#766** — `functions/api/test-utils.js` hand-maintains a third, ungated copy of the schema.
+4. **#797** — drop the ignored `<meta name="keywords">` from `BandProfilePage`.
+5. **Vol. 18 prep** — publish event 37, then book and announce the lineup. Publishing is what re-populates every "upcoming" surface.
+
+Closed since the last revision: **#787** (recap gating, fixed by #802 — the sitemap, SSR and the JSON API now share one `concludedEventSql()` definition of "concluded", so a published-but-unarchived past event is no longer an indexable soft-404 when Vol. 18 ends).
 
 Parked (do not resurface unprompted): band photo drives (explicitly deprioritized).
 

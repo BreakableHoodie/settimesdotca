@@ -27,8 +27,12 @@ import { parseDoorsJsonToForm, serializeDoorsForm } from './utils/doorsFormData'
  */
 export default function EventFormModal({ isOpen, onClose, event = null, onSave, canCreateArchived = false }) {
   const isEditing = !!event
-  // status only (#799) -- the deprecated boolean this also consulted is gone,
-  // and an OR across two columns could disagree with itself.
+  // `status` is the only publication state this component reads (#799). The
+  // deprecated publish-boolean it used to OR against still exists in the schema
+  // until the drop migration lands, and its stored values are now stale -- which
+  // is exactly why a two-column OR could disagree with itself. Naming that column
+  // here, even in a comment, fails the guard in __tests__/isPublishedGuard.test.js;
+  // that is deliberate, so don't "fix" the wording by reintroducing it.
   const isPublished = event?.status === 'published'
   const isArchivedEvent = event?.status === 'archived'
   const canEditSlug = !isEditing || !isPublished

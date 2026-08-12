@@ -334,9 +334,10 @@ describe("GET /api/events/:id/recap", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const event = insertEvent(rawDb, { name: "Mixed Venues", slug: "mixed-venues" });
-    // archive.js always writes is_published = 0 when it sets status = 'archived'
-    // (see functions/api/admin/events/[id]/archive.js) — status='archived' AND
-    // is_published=1 together is a combination production can never hold.
+    // Setting status alone mirrors production: archive.js writes only
+    // status = 'archived' (#799). It previously also wrote is_published = 0,
+    // so no archived row has ever carried is_published = 1 — that combination
+    // is unreachable both before and after the change.
     rawDb.prepare("UPDATE events SET status='archived' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Stage A" });
     insertBand(rawDb, { name: "Band With Venue", event_id: event.id, venue_id: venue.id });

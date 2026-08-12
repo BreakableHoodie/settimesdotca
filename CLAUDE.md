@@ -118,7 +118,9 @@ Bands starting before 6 AM are "after-midnight" sets that belong to the *previou
 
 ### Public event visibility is `status`, never `is_published` (#800)
 
-`events.is_published INTEGER` was deprecated by migration 0005 and never dropped (0036 even added a fresh index on it). **`functions/api/admin/events/[id]/archive.js` writes `status = 'archived', is_published = 0`** — archiving unpublishes under the old column. On 2026-08-10 archiving the last un-archived event dropped 13 public read paths to zero rows simultaneously and took the public site dark.
+`events.is_published INTEGER` was deprecated by migration 0005 and never dropped (0036 even added a fresh index on it). Until #799, **`functions/api/admin/events/[id]/archive.js` wrote `status = 'archived', is_published = 0`** — archiving unpublished under the old column. On 2026-08-10 archiving the last un-archived event dropped 13 public read paths to zero rows simultaneously and took the public site dark.
+
+Nothing writes the column any more, but **the stale values it already holds are permanent until it is dropped** — every row archived before #799 still reads `is_published = 0`. A read reintroduced today would fail exactly as it did on 2026-08-10, so the guards below are not merely historical.
 
 `functions/utils/eventVisibility.js` is the single canonical home, mirroring `eventDay.js`'s role for the after-midnight threshold:
 
@@ -130,12 +132,12 @@ Bands starting before 6 AM are "after-midnight" sets that belong to the *previou
 
 **Two** source-scanning guards enforce this, and they catch different things:
 
-1. **No `is_published` read** outside `functions/api/admin/**`, `frontend/src/admin/**`, `utils/adminApi.js`, and `__tests__/**` — scanned on both sides of the build boundary (`functions/utils/__tests__/eventVisibility.test.js`, `frontend/src/__tests__/isPublishedGuard.test.js`).
+1. **No `is_published` read or write anywhere**, outside `__tests__/**` and `functions/api/test-utils.js` (the shared test schema, which mirrors production) — scanned on both sides of the build boundary (`functions/utils/__tests__/eventVisibility.test.js`, `frontend/src/__tests__/isPublishedGuard.test.js`). The `functions/api/admin/**`, `frontend/src/admin/**` and `utils/adminApi.js` exemptions were **removed** by #799; deleting them is what proves the retirement is complete, since a missed admin write now fails the guard instead of passing silently.
 2. **No non-admin file queries `events` without a status predicate.** The first guard only catches the *old column*; this one catches a route with no gate at all. That gap was real: `functions/s/[slug].js` (the OG card crawlers fetch for a shared schedule link) joined `events` ungated while both siblings for the same slug gated correctly, so an event unpublished *after* a link was shared still produced a crawler-facing card naming it. Exempt by design, named in the guard: `api/metrics.js` (write-path existence check, projects only `id`) and `utils/timeConflicts.js` (admin-only, must see drafts).
 
 Guard 2 is a file-level scan: it catches "never imported the helper" (the class that has occurred), not "imported it and missed one query". Don't mistake it for proof of the latter.
 
-Admin still *writes* `is_published` so the eventual drop stays rollback-safe — that's #799, not an oversight.
+**Archiving is one-way, and that is now enforced in three places.** There is no unarchive endpoint: `POST .../publish`, the PUT publish-toggle, and PATCH all reject a status change on an archived event, and each `UPDATE` carries `AND status IN ('draft','published')` so a concurrent archive committing between the read and the write cannot be overwritten (a no-match returns 409, never a silent resurrection). PATCH was the last hole — it validated only the *requested* status, so `PATCH {status:"published"}` on an archived event republished it.
 
 ### Server-side "today"/"now" is Toronto-local — never UTC-sliced
 

@@ -213,6 +213,23 @@ export async function onRequestPatch(context) {
           },
         );
       }
+      // Archiving is one-way: once a row is archived, its status must never
+      // change via PATCH, including a request that targets draft/published.
+      // Without this guard, PATCH {status: "published"} on an archived event
+      // silently un-archives and republishes it -- the same resurrection bug
+      // the PUT toggle and the dedicated publish endpoint already reject.
+      if (event.status === "archived") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Archived events cannot change status",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
       updates.push("status = ?");
       params.push(status);
     }
@@ -577,16 +594,30 @@ export async function onRequestPut(context) {
         );
       }
       const nextStatus = event.status === "published" ? "draft" : "published";
+      // Re-check status at write time: if a concurrent request archived this
+      // event between the read above and this UPDATE, an unconditional write
+      // would silently resurrect it by publishing/unpublishing over
+      // 'archived' instead of the read-time check above catching it.
       const result = await DB.prepare(
         `
         UPDATE events
         SET status = ?, updated_by_user_id = ?
-        WHERE id = ?
+        WHERE id = ? AND status IN ('draft', 'published')
         RETURNING *
       `,
       )
         .bind(nextStatus, currentUser.userId, eventId)
         .first();
+
+      if (!result) {
+        return new Response(
+          JSON.stringify({
+            error: "Conflict",
+            message: "Event status changed concurrently. Reload and try again.",
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        );
+      }
 
       // Read-path sanitize (#493): see the PATCH handler above.
       result.social_links = safeReflectSocialLinksString(result.social_links, ["instagram", "x", "tiktok"]);

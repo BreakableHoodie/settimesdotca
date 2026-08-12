@@ -1140,3 +1140,156 @@ describe("Event duplication atomicity (P0-B2)", () => {
     expect(orphan).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------
+// PR #803 review follow-up: the PUT toggle and the dedicated publish
+// endpoint already rejected an *archived* event outright, but PATCH
+// {status: ...} never checked the CURRENT status -- only the requested
+// one -- so PATCHing an archived event to "published" or "draft" silently
+// un-archived and resurrected it. Archiving is one-way by design (no
+// unarchive endpoint), so once status === 'archived' no PATCH may change it.
+// ---------------------------------------------------------------------
+describe("PATCH cannot resurrect an archived event via status", () => {
+  it("PATCH {status: 'published'} on an archived event returns 400 and leaves the row archived", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "ArchivedPatchPublish",
+      slug: "archived-patch-publish",
+      status: "archived",
+    });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ status: "published" }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation error");
+
+    // Assert on the persisted row, not just the response -- a handler that
+    // returns 400 but writes anyway would pass a response-code-only check.
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("archived");
+  });
+
+  it("PATCH {status: 'draft'} on an archived event returns 400 and leaves the row archived", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "ArchivedPatchDraft",
+      slug: "archived-patch-draft",
+      status: "archived",
+    });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ status: "draft" }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation error");
+
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("archived");
+  });
+});
+
+// ---------------------------------------------------------------------
+// PR #803 review follow-up: publish.js, the PUT toggle in [id].js, and
+// archive.js each read the row, checked `status` in JS, then issued an
+// UNCONDITIONAL UPDATE. If a second request committed an archive in the
+// gap between that read and that write, the unconditional write would
+// silently overwrite 'archived'. The fix adds `AND status IN ('draft',
+// 'published')` to each UPDATE's WHERE clause and handles the resulting
+// null match (409) instead of crashing on `result.social_links = ...`.
+//
+// These tests simulate the interleaving directly: env.DB.prepare is
+// wrapped so that the first statement containing "UPDATE events" first
+// commits a separate archive straight to the underlying better-sqlite3
+// database (standing in for the concurrent request), THEN lets the
+// handler's own prepared UPDATE run against that now-stale row.
+// ---------------------------------------------------------------------
+describe("Status-transition UPDATEs are race-safe against a concurrent archive", () => {
+  function raceConcurrentArchive(env, rawDb, eventId) {
+    const originalPrepare = env.DB.prepare.bind(env.DB);
+    let fired = false;
+    env.DB.prepare = (sql) => {
+      if (!fired && sql.includes("UPDATE events")) {
+        fired = true;
+        rawDb.prepare("UPDATE events SET status = 'archived' WHERE id = ?").run(eventId);
+      }
+      return originalPrepare(sql);
+    };
+  }
+
+  it("POST publish endpoint returns 409 (not 500) when archived out from under it", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "RacePublish", slug: "race-publish", status: "draft" });
+    insertBand(rawDb, { name: "RaceBand", event_id: ev.id });
+
+    raceConcurrentArchive(env, rawDb, ev.id);
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ publish: true }),
+    });
+
+    const res = await publishHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error).toBe("Conflict");
+
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("archived");
+  });
+
+  it("PUT publish toggle returns 409 (not 500) when archived out from under it", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "RaceToggle", slug: "race-toggle", status: "draft" });
+
+    raceConcurrentArchive(env, rawDb, ev.id);
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/publish`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({}),
+    });
+
+    const res = await eventIdHandler.onRequestPut({ request, env });
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error).toBe("Conflict");
+
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("archived");
+  });
+
+  it("archive endpoint returns 409 (not 500) when archived by a concurrent request first", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "RaceArchive", slug: "race-archive", status: "draft" });
+
+    raceConcurrentArchive(env, rawDb, ev.id);
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}/archive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+    });
+
+    const res = await archiveHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error).toBe("Conflict");
+
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("archived");
+  });
+});

@@ -4,25 +4,28 @@
 //
 // `events.is_published` was deprecated in migration 0005 in favour of
 // `events.status TEXT` ('draft' | 'published' | 'archived'), but the column
-// was never dropped. `functions/api/admin/events/[id]/archive.js` writes
-// `status = 'archived', is_published = 0` — archiving an event therefore
-// UNPUBLISHES it under the old column, so a public read path gated on bare
-// `is_published = 1` stops matching that event the instant it is archived.
+// was never dropped. Until #799, `functions/api/admin/events/[id]/archive.js`
+// wrote `status = 'archived', is_published = 0` — archiving an event therefore
+// UNPUBLISHED it under the old column, so a public read path gated on bare
+// `is_published = 1` stopped matching that event the instant it was archived.
 //
-// A live event really is `status = 'published'` with `is_published = 1`, so
-// the two columns agree while it runs and nothing looks wrong. The failure is
+// A live event really was `status = 'published'` with `is_published = 1`, so
+// the two columns agreed while it ran and nothing looked wrong. The failure is
 // terminal rather than gradual: every edition eventually gets archived, and
 // when the last un-archived one does, every such read path drops to ZERO rows
 // at the same instant. That is what took the public site dark on 2026-08-10.
 //
 // `status` is the real gate. An event is publicly visible iff
 // `status IN ('published', 'archived')`; it is specifically archived iff
-// `status = 'archived'`. `is_published` must never be read on a public path
-// again — the guard test in functions/utils/__tests__/eventVisibility.test.js
-// scans the source tree and fails the build if it is. Admin write paths
-// (functions/api/admin/**) are exempt: they must keep writing `is_published`
-// in lockstep with `status` so the eventual column-drop migration stays safe
-// and this change stays rollback-able.
+// `status = 'archived'`.
+//
+// As of #799 NOTHING in functions/ or frontend/src/ reads or writes
+// `is_published` — the admin write paths that kept it in lockstep with
+// `status` (for rollback safety across #800) are gone, and the guard test in
+// functions/utils/__tests__/eventVisibility.test.js now scans the whole tree
+// with no admin exemption. The column itself still exists in the schema; the
+// migration that drops it, along with its two indexes, is the remaining half
+// of #799.
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

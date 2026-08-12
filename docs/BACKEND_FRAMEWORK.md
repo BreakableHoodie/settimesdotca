@@ -559,8 +559,10 @@ export async function onSchedule(event) {
   await env.DB.prepare(
     `
     UPDATE events
-    SET archived_at = datetime('now')
-    WHERE date < ? AND archived_at IS NULL
+    SET status = 'archived',
+        archived_at = datetime('now')
+    WHERE date < ?
+      AND status IN ('draft', 'published')
   `,
   )
     .bind(cutoffDate.toISOString())
@@ -1035,14 +1037,15 @@ settimes/
 
 ```sql
 -- Complete schema (for reference)
--- See database/schema.sql for authoritative version
+-- Illustrative only. Authoritative schema: database/setup-complete.sql
+-- (generated from migrations/ by scripts/regenerate-setup-complete.mjs).
 
 CREATE TABLE events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   date TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
-  status TEXT NOT NULL DEFAULT 'draft',
+  status TEXT DEFAULT 'draft',   -- nullable in the real schema; see setup-complete.sql
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

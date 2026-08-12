@@ -641,7 +641,7 @@ ORDER BY created_at DESC LIMIT 10;
 SELECT name, date, status FROM events WHERE id = <event_id>;
 
 -- Check if bands assigned
-SELECT COUNT(*) FROM bands WHERE event_id = <event_id>;
+SELECT COUNT(*) FROM performances WHERE event_id = <event_id>;
 ```
 
 **Solutions:**

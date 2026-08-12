@@ -70,11 +70,12 @@ Next: opportunistic contrast tuning as new surfaces land; keep the semantic-toke
 
 Done: SSR structured data + local signals on band/event/venue pages, site-wide Organization/WebSite JSON-LD, sitemap, per-page meta, Waterloo-consistent language.
 
-Also delivered since: internal linking + recurring-edition archive (#555), and SSR as the single owner of identity meta and JSON-LD on `/band/*` and `/venue/*` (#784, #790, #798).
+Also delivered since: internal linking + recurring-edition archive (#555), SSR as the single owner of identity meta and JSON-LD on `/band/*` and `/venue/*` (#784, #790, #798), and the recap-gating fix (#787, via #802) that removed the indexable-soft-404 risk before Vol. 18 concludes.
 
 Next:
-- **#787** — recap gating disagreement, now capable of producing indexable soft-404s. Highest-value SEO item and time-boxed to before 2026-10-11.
-- The sitemap gained ~268 URLs on 2026-08-11 when #800 restored archived editions to it (8 → 276, including 218 artist and 12 venue pages that had effectively never been submitted). Resubmit in Search Console and watch indexing.
+- **Watch indexing.** The sitemap gained ~268 URLs on 2026-08-11 when #800 restored archived editions to it (8 → 276, including 218 artist and 12 venue pages that had effectively never been submitted). Resubmitted to Search Console 2026-08-11 21:35 — 0 errors, 0 warnings. **Google's last fetch before that was 2026-08-10 08:42, i.e. the pre-#800 sitemap: 45 URLs, 0 indexed.** Re-check the indexed count once Google re-crawls; if it is still 0 against 276 submitted, that is a real signal rather than reporting lag.
+
+Issue-tracked SEO work lives in the **Next Up** queue below, not here — one status per issue, in one place.
 
 ## Track D: Admin Tooling — core delivered
 

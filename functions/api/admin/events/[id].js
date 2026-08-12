@@ -466,8 +466,6 @@ export async function onRequestPatch(context) {
       );
     }
 
-    // Execute update.
-    //
     // When this PATCH writes `status`, re-check the status at write time for
     // the same reason the PUT toggle, publish.js and archive.js do: the
     // archived guard above read the row at the top of the handler, and a

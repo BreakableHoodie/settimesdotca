@@ -66,6 +66,14 @@ describe("no private re-encoding of the after-midnight threshold outside eventDa
   // (eventDay.js's own AFTER_MIDNIGHT_THRESHOLD_TIME) — deriving from the
   // imported/canonical constant is correct and is what this repo wants; only
   // a bare literal on the right-hand side is the defect.
+  //
+  // Known blind spot, stated rather than papered over: this keys off the NAME
+  // containing AFTER_MIDNIGHT, so a constant called something else and set to
+  // a bare `6` (`const MIDNIGHT_HOUR = 6`) slips past. Widening it to every
+  // literal `6` in functions/ would be pure noise — `6` is an ordinary number
+  // — so the name is the only tractable signal for the numeric shape. The
+  // string shape has no such gap: the "06:00" scan below is name-independent
+  // and catches that form however it is declared.
   const LITERAL_DECLARATION_RE = /\b(?:const|let|var)\s+\w*AFTER_MIDNIGHT\w*\s*=\s*(?:6\b|["']06:00["'])/;
 
   it("has no file declaring the threshold from a literal outside utils/eventDay.js", () => {

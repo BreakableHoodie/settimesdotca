@@ -109,7 +109,9 @@ The durable part is the method:
 >
 > **These do not compare the models.** Different briefs, different repository states, no token counts captured — the numbers reflect task size at least as much as model choice. They are recorded only as order-of-magnitude evidence that delegation cost varies enough to matter, and as a reminder that a "pro" tier is not automatically the expensive one. A real comparison needs the same brief run per model; none has been done.
 >
-> Also environment-specific and dated to this same day: a ~1.5 KB brief passed through argv hung past 180s while the identical text attached with `-f` returned in 11s (rule 3); and `opencode.json` named `anthropic/*` models while only OpenCode's own providers were authenticated, so every run falling back to the config default failed (rule 4). Both were true of this machine on this date; re-verify rather than assume.
+> Also environment-specific and dated to this same day, both measured on **raw `opencode run`**, not through the relay: a ~1.5 KB brief passed in argv hung past 180s, while the identical text attached with `opencode run -f <file>` returned in 11s; and `opencode.json` named `anthropic/*` models while only OpenCode's own providers were authenticated, so every run falling back to the config default failed (rule 4).
+>
+> Note the flags belong to different tools and are not interchangeable: `-f` is a raw `opencode run` flag, whereas the relay takes `--brief <file>` and feeds it over **stdin**. So the 11s figure shows that *getting the brief out of argv* fixes the hang — it is not a measurement of the relay's own path, which was never argv-based. Rule 3 holds either way; only the mechanism differs. Re-verify rather than assume.
 
 ---
 

@@ -45,10 +45,18 @@ export function eventLocalToday(now = new Date()) {
 //
 // The canonical home for this number is frontend/src/utils/festivalDays.js,
 // but Pages Functions cannot import from frontend/, so the server needs its
-// own definition. This is that ONE definition -- `functions/` currently
-// re-encodes it privately in two more places (#746). Import from here; never
-// write `6` or `"06:00"` again.
+// own definition. This is that ONE definition on this side of the build
+// boundary (#746) -- import from here; never write `6` or `"06:00"` again.
 export const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6;
+
+// Same threshold, as a zero-padded "HH:MM" string. Two shapes exist because
+// callers need two different comparisons: eventLocalFestivalToday() below
+// does numeric hour arithmetic (`hour >= AFTER_MIDNIGHT_THRESHOLD_HOUR`),
+// while functions/api/events/timeline.js compares against
+// performances.start_time ("HH:MM") lexicographically, the same trick this
+// repo uses throughout for YYYY-MM-DD dates. DERIVED from the number, never
+// typed as a literal, so the two shapes cannot drift apart.
+export const AFTER_MIDNIGHT_THRESHOLD_TIME = `${String(AFTER_MIDNIGHT_THRESHOLD_HOUR).padStart(2, "0")}:00`;
 
 /**
  * The current FESTIVAL day in America/Toronto — the calendar day, except

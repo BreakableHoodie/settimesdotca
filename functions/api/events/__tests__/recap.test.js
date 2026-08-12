@@ -334,10 +334,12 @@ describe("GET /api/events/:id/recap", () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const event = insertEvent(rawDb, { name: "Mixed Venues", slug: "mixed-venues" });
-    // Setting status alone mirrors production: archive.js writes only
-    // status = 'archived' (#799). It previously also wrote is_published = 0,
-    // so no archived row has ever carried is_published = 1 — that combination
-    // is unreachable both before and after the change.
+    // Setting status alone mirrors production: status is the only
+    // PUBLICATION-STATE field archive.js writes (#799) — it also stamps
+    // archived_at and updated_by_user_id, which this fixture does not need.
+    // It previously wrote the deprecated publish-boolean to 0 as well, so no
+    // archived row has ever carried that column set — the combination is
+    // unreachable both before and after the change.
     rawDb.prepare("UPDATE events SET status='archived' WHERE id=?").run(event.id);
     const venue = insertVenue(rawDb, { name: "Stage A" });
     insertBand(rawDb, { name: "Band With Venue", event_id: event.id, venue_id: venue.id });

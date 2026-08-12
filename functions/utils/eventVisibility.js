@@ -19,7 +19,7 @@
 // `status IN ('published', 'archived')`; it is specifically archived iff
 // `status = 'archived'`.
 //
-// As of #799 NOTHING in functions/ or frontend/src/ reads or writes
+// As of #799 no PRODUCTION code in functions/ or frontend/src/ reads or writes
 // `is_published` — the admin write paths that kept it in lockstep with
 // `status` (for rollback safety across #800) are gone, and the guard test in
 // functions/utils/__tests__/eventVisibility.test.js now scans the whole tree

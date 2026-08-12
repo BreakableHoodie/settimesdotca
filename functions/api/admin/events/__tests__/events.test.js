@@ -1292,4 +1292,56 @@ describe("Status-transition UPDATEs are race-safe against a concurrent archive",
     const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
     expect(row.status).toBe("archived");
   });
+
+  // The fourth status-writing UPDATE, and the one the first sweep missed: the
+  // PATCH handler's DYNAMIC `UPDATE events SET ${updates}`. It does not contain
+  // the literal `SET status`, so grepping for that found only the three above.
+  it("PATCH {status} returns 409 (not 500) when archived out from under it", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "RacePatch", slug: "race-patch", status: "draft" });
+
+    raceConcurrentArchive(env, rawDb, ev.id);
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ status: "published" }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error).toBe("Conflict");
+
+    // The concurrent archive stands; the lost race changed nothing.
+    const row = rawDb.prepare("SELECT status FROM events WHERE id = ?").get(ev.id);
+    expect(row.status).toBe("archived");
+  });
+
+  // The PATCH predicate is applied ONLY when the body carries `status`.
+  // Editing an archived event's other fields is legitimate and must keep
+  // working -- applying the predicate unconditionally would silently break
+  // archived-event editing, which no other test in this file would catch.
+  it("PATCH of a non-status field still succeeds on an archived event", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, {
+      name: "ArchivedDescriptionEdit",
+      slug: "archived-description-edit",
+      status: "archived",
+    });
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ description: "Recap copy written after the show" }),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(200);
+
+    const row = rawDb.prepare("SELECT status, description FROM events WHERE id = ?").get(ev.id);
+    expect(row.description).toBe("Recap copy written after the show");
+    expect(row.status).toBe("archived");
+  });
 });

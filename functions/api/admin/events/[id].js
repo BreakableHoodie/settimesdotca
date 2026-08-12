@@ -466,10 +466,38 @@ export async function onRequestPatch(context) {
       );
     }
 
-    // Execute update
-    const result = await DB.prepare(`UPDATE events SET ${updates.join(", ")} WHERE id = ? RETURNING *`)
+    // Execute update.
+    //
+    // When this PATCH writes `status`, re-check the status at write time for
+    // the same reason the PUT toggle, publish.js and archive.js do: the
+    // archived guard above read the row at the top of the handler, and a
+    // concurrent archive committing in that gap would otherwise be silently
+    // overwritten. The predicate is conditional because PATCHing an archived
+    // event's OTHER fields (description, poster, venue info) is legitimate and
+    // deliberately still allowed — only a status change is one-way.
+    const patchesStatus = status !== undefined;
+    const statusGuardSql = patchesStatus ? " AND status IN ('draft', 'published')" : "";
+    const result = await DB.prepare(`UPDATE events SET ${updates.join(", ")} WHERE id = ?${statusGuardSql} RETURNING *`)
       .bind(...params)
       .first();
+
+    // A null result is only reachable by concurrent mutation, and it must be
+    // handled: every line below dereferences `result`, so falling through
+    // would turn a lost race into a 500.
+    if (!result) {
+      return patchesStatus
+        ? new Response(
+            JSON.stringify({
+              error: "Conflict",
+              message: "Event status changed concurrently. Reload and try again.",
+            }),
+            { status: 409, headers: { "Content-Type": "application/json" } },
+          )
+        : new Response(JSON.stringify({ error: "Not found", message: "Event not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          });
+    }
 
     // Read-path sanitize (#493): RETURNING * echoes the full row, so
     // social_links may reflect a pre-#483 (or otherwise legacy) value even

@@ -10,7 +10,7 @@
  *
  * Notes:
  * - This script only touches the local sqlite database under .wrangler.
- * - It never publishes the event (is_published = 0).
+ * - It never publishes the event (status = 'draft').
  */
 
 import fs from "node:fs";
@@ -198,7 +198,7 @@ const main = () => {
   // Insert event (draft only)
   runSql(
     dbFile,
-    `INSERT INTO events (name, date, slug, is_published, city) VALUES (${sqlEscape(eventName)}, ${sqlEscape(eventDate)}, ${sqlEscape(slug)}, 0, ${sqlEscape(schedule.location || null)});`,
+    `INSERT INTO events (name, date, slug, status, city) VALUES (${sqlEscape(eventName)}, ${sqlEscape(eventDate)}, ${sqlEscape(slug)}, 'draft', ${sqlEscape(schedule.location || null)});`,
   );
   const eventId = runSql(dbFile, `SELECT id FROM events WHERE slug = ${sqlEscape(slug)} LIMIT 1;`);
 

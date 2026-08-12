@@ -100,7 +100,6 @@ export function createTestDB() {
       date TEXT NOT NULL,
       end_date TEXT,
       status TEXT DEFAULT 'draft',
-      is_published INTEGER DEFAULT 0,
       description TEXT,
       city TEXT,
       ticket_url TEXT,

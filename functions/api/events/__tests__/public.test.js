@@ -23,6 +23,46 @@ function createMockEvents(count, overrides = {}) {
   return events;
 }
 
+// The mock's status filter had NO coverage before this: createMockEvent
+// defaults to status "published", so every seeded event passed the gate and
+// deleting the filter entirely changed no assertion (verified by mutation).
+// That left the one endpoint #800 took dark untested for the very thing that
+// took it dark. These seed a non-public event so the filter has work to do.
+describe("GET /api/events/public — status gating", () => {
+  let mockDB;
+  let mockEnv;
+
+  beforeEach(() => {
+    mockDB = new MockD1Database();
+    mockEnv = { DB: mockDB, PUBLIC_DATA_PUBLISH_ENABLED: "true" };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("excludes draft events and returns published ones", async () => {
+    const future = new Date();
+    future.setDate(future.getDate() + 7);
+    const date = future.toISOString().split("T")[0];
+
+    seedMockData(mockDB, [
+      createMockEvent({ id: 1, slug: "live-one", name: "Live One", date, status: "published" }),
+      createMockEvent({ id: 2, slug: "secret-one", name: "Secret One", date, status: "draft" }),
+    ]);
+
+    const res = await onRequestGet({ request: new Request("https://example.test/api/events/public"), env: mockEnv });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    const slugs = data.events.map((e) => e.slug);
+    expect(slugs).toContain("live-one");
+    // The assertion that matters: a draft must never reach a public response.
+    expect(slugs).not.toContain("secret-one");
+  });
+});
+
 describe("GET /api/events/public", () => {
   let mockDB;
   let mockEnv;

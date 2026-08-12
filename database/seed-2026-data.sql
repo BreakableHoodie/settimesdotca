@@ -5,20 +5,20 @@
 -- 2026 EVENTS (12 monthly events)
 -- ============================================
 
-INSERT OR REPLACE INTO events (id, name, date, slug, is_published, status, description, city, ticket_url) VALUES
-(28, 'Winter Warm-Up 2026', '2026-01-17', 'winter-warm-up-2026', 1, 'published', 'Annual winter festival returns for its third year. Bigger, louder, warmer.', 'Waterloo', 'https://ticketscene.ca/winter-warmup-2026'),
-(29, 'Frost Fest 2026', '2026-02-14', 'frost-fest-2026', 1, 'published', 'Valentine''s weekend meets the deep freeze. Love and music in the cold.', 'Waterloo', 'https://ticketscene.ca/frost-fest-2026'),
-(30, 'Spring Thaw 2026', '2026-03-21', 'spring-thaw-2026', 1, 'published', 'First day of spring celebration. New beginnings, new sounds.', 'Toronto', 'https://ticketscene.ca/spring-thaw-2026'),
-(31, 'April Amplified 2026', '2026-04-11', 'april-amplified-2026', 1, 'published', 'Turn it up to 11. Heavy music festival returns.', 'Montreal', 'https://ticketscene.ca/april-amp-2026'),
-(32, 'Tulip Tunes 2026', '2026-05-16', 'tulip-tunes-2026', 1, 'published', 'Blooming music festival. Outdoor stages and garden parties.', 'Waterloo', 'https://ticketscene.ca/tulip-2026'),
-(33, 'Summer Solstice 2026', '2026-06-20', 'summer-solstice-2026', 1, 'published', 'Longest day of the year, longest music festival. 15 hours of performances.', 'Toronto', 'https://ticketscene.ca/solstice-2026'),
-(34, 'Canada Day Festival 2026', '2026-07-01', 'canada-day-2026', 1, 'published', 'Celebrating 159 years of Canada with coast-to-coast music.', 'Waterloo', 'https://ticketscene.ca/canada-day-2026'),
-(35, 'August Heat Wave 2026', '2026-08-08', 'august-heat-2026', 1, 'published', 'Summer''s hottest weekend. Dance floors and outdoor stages.', 'Montreal', 'https://ticketscene.ca/august-heat-2026'),
-(36, 'Labour Day Loud 2026', '2026-09-07', 'labour-day-2026', 1, 'published', 'Working class music festival. Punk, hardcore, and union solidarity.', 'Hamilton', 'https://ticketscene.ca/labour-loud-2026'),
-(37, 'Autumn Acoustics 2026', '2026-10-10', 'autumn-acoustics-2026', 1, 'published', 'Thanksgiving weekend acoustic showcase. Intimate venues, grateful vibes.', 'Kingston', 'https://ticketscene.ca/autumn-2026'),
-(38, 'Halloween Havoc 2026', '2026-10-31', 'halloween-havoc-2026', 1, 'published', 'All Hallows Eve spectacular. Goth, industrial, and dark electronica.', 'Toronto', 'https://ticketscene.ca/halloween-2026'),
-(39, 'November Noise 2026', '2026-11-14', 'november-noise-2026', 1, 'published', 'Experimental music weekend. Push boundaries, break rules.', 'Montreal', 'https://ticketscene.ca/noise-2026'),
-(40, 'Holiday Hootenanny 2026', '2026-12-12', 'holiday-hootenanny-2026', 1, 'published', 'Fourth annual holiday party. Community celebration and music.', 'Waterloo', 'https://ticketscene.ca/holiday-2026');
+INSERT OR REPLACE INTO events (id, name, date, slug, status, description, city, ticket_url) VALUES
+(28, 'Winter Warm-Up 2026', '2026-01-17', 'winter-warm-up-2026', 'published', 'Annual winter festival returns for its third year. Bigger, louder, warmer.', 'Waterloo', 'https://ticketscene.ca/winter-warmup-2026'),
+(29, 'Frost Fest 2026', '2026-02-14', 'frost-fest-2026', 'published', 'Valentine''s weekend meets the deep freeze. Love and music in the cold.', 'Waterloo', 'https://ticketscene.ca/frost-fest-2026'),
+(30, 'Spring Thaw 2026', '2026-03-21', 'spring-thaw-2026', 'published', 'First day of spring celebration. New beginnings, new sounds.', 'Toronto', 'https://ticketscene.ca/spring-thaw-2026'),
+(31, 'April Amplified 2026', '2026-04-11', 'april-amplified-2026', 'published', 'Turn it up to 11. Heavy music festival returns.', 'Montreal', 'https://ticketscene.ca/april-amp-2026'),
+(32, 'Tulip Tunes 2026', '2026-05-16', 'tulip-tunes-2026', 'published', 'Blooming music festival. Outdoor stages and garden parties.', 'Waterloo', 'https://ticketscene.ca/tulip-2026'),
+(33, 'Summer Solstice 2026', '2026-06-20', 'summer-solstice-2026', 'published', 'Longest day of the year, longest music festival. 15 hours of performances.', 'Toronto', 'https://ticketscene.ca/solstice-2026'),
+(34, 'Canada Day Festival 2026', '2026-07-01', 'canada-day-2026', 'published', 'Celebrating 159 years of Canada with coast-to-coast music.', 'Waterloo', 'https://ticketscene.ca/canada-day-2026'),
+(35, 'August Heat Wave 2026', '2026-08-08', 'august-heat-2026', 'published', 'Summer''s hottest weekend. Dance floors and outdoor stages.', 'Montreal', 'https://ticketscene.ca/august-heat-2026'),
+(36, 'Labour Day Loud 2026', '2026-09-07', 'labour-day-2026', 'published', 'Working class music festival. Punk, hardcore, and union solidarity.', 'Hamilton', 'https://ticketscene.ca/labour-loud-2026'),
+(37, 'Autumn Acoustics 2026', '2026-10-10', 'autumn-acoustics-2026', 'published', 'Thanksgiving weekend acoustic showcase. Intimate venues, grateful vibes.', 'Kingston', 'https://ticketscene.ca/autumn-2026'),
+(38, 'Halloween Havoc 2026', '2026-10-31', 'halloween-havoc-2026', 'published', 'All Hallows Eve spectacular. Goth, industrial, and dark electronica.', 'Toronto', 'https://ticketscene.ca/halloween-2026'),
+(39, 'November Noise 2026', '2026-11-14', 'november-noise-2026', 'published', 'Experimental music weekend. Push boundaries, break rules.', 'Montreal', 'https://ticketscene.ca/noise-2026'),
+(40, 'Holiday Hootenanny 2026', '2026-12-12', 'holiday-hootenanny-2026', 'published', 'Fourth annual holiday party. Community celebration and music.', 'Waterloo', 'https://ticketscene.ca/holiday-2026');
 
 -- ============================================
 -- 2026 BANDS (150+ new bands)

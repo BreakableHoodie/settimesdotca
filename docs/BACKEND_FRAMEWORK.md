@@ -57,7 +57,7 @@
 
 **Key Tables:**
 
-- `events` - Multi-event management (name, date, slug, is_published)
+- `events` - Multi-event management (name, date, slug, status)
 - `venues` - Reusable venues across events
 - `bands` - Performance schedules with FK to events + venues
 - `auth_audit` - Security logging for all auth attempts
@@ -158,22 +158,22 @@
 ```
 ┌──────────────┐
 │   DRAFT      │  Admin creates event, unpublished
-│ is_published │  Visible only in admin panel
-│      = 0     │
+│    status    │  Visible only in admin panel
+│  = 'draft'   │
 └──────┬───────┘
        │ Admin clicks "Publish"
        ▼
 ┌──────────────┐
 │  PUBLISHED   │  Public-facing, appears in API
-│ is_published │  Attendees can view and build schedules
-│      = 1     │
+│    status    │  Attendees can view and build schedules
+│ = 'published'│
 └──────┬───────┘
        │ Event date passes (manual or automated)
        ▼
 ┌──────────────┐
-│   ARCHIVED   │  Optionally mark as archived (future enhancement)
-│  archived_at │  No longer shown as "current" but accessible by slug
-│  = timestamp │
+│   ARCHIVED   │  Concluded edition — still PUBLIC, on archive surfaces
+│    status    │  (recaps, artist/venue pages, sitemap). One-way.
+│ = 'archived' │  archived_at is metadata, not the state.
 └──────┬───────┘
        │ After retention period (future enhancement)
        ▼
@@ -183,7 +183,15 @@
 └──────────────┘
 ```
 
-**Current State:** Events have `DRAFT` and `PUBLISHED` states only. Archive/delete is manual.
+**`status` is the state; `archived_at` is only a timestamp.** All three states live in `status`
+(`'draft' | 'published' | 'archived'`) — never infer the state from `archived_at` being non-NULL.
+
+**Archived is not hidden.** `publicEventStatusSql()` resolves to `status IN ('published','archived')`,
+so a concluded edition stays publicly readable; that is the point of the archive. Only `draft` is
+non-public. See `functions/utils/eventVisibility.js`.
+
+**Archiving is one-way.** There is no unarchive endpoint, and all four routes that can write `status`
+reject a status change on an archived row — enforced in SQL, not merely checked in JS.
 
 ### Recommended Event Naming Convention
 
@@ -205,7 +213,7 @@ date: "YYYY-MM-DD"        → ISO 8601 format
 
 ```sql
 SELECT * FROM events
-WHERE is_published = 1
+WHERE status = 'published'
 ORDER BY date DESC
 LIMIT 1;
 ```
@@ -214,7 +222,7 @@ LIMIT 1;
 
 ```sql
 SELECT * FROM events
-WHERE slug = ? AND is_published = 1;
+WHERE slug = ? AND status = 'published';
 ```
 
 **All Published Events:**
@@ -222,9 +230,15 @@ WHERE slug = ? AND is_published = 1;
 ```sql
 SELECT id, name, date, slug
 FROM events
-WHERE is_published = 1
+WHERE status = 'published'
 ORDER BY date DESC;
 ```
+
+Real endpoints use the shared helpers in `functions/utils/eventVisibility.js`
+(`publishedEventStatusSql()`, `publicEventStatusSql()`,
+`archivedEventStatusSql()`) rather than a hand-written `status = 'published'`
+literal — see CLAUDE.md "Public event visibility". These examples are
+illustrative only.
 
 **Admin: All Events (Published + Draft):**
 
@@ -322,7 +336,7 @@ LIMIT 100;
 ✅ Find published events:
 
 ```sql
-SELECT * FROM events WHERE is_published = 1;  -- Uses idx_events_published
+SELECT * FROM events WHERE status = 'published';  -- Uses idx_events_status
 ```
 
 ✅ Find event by slug:
@@ -545,8 +559,10 @@ export async function onSchedule(event) {
   await env.DB.prepare(
     `
     UPDATE events
-    SET archived_at = datetime('now')
-    WHERE date < ? AND archived_at IS NULL
+    SET status = 'archived',
+        archived_at = datetime('now')
+    WHERE date < ?
+      AND status IN ('draft', 'published')
   `,
   )
     .bind(cutoffDate.toISOString())
@@ -579,10 +595,10 @@ export async function onSchedule(event) {
 **Manual Cleanup Commands:**
 
 ```bash
-# Delete unpublished events older than 30 days
+# Delete draft events older than 30 days
 wrangler d1 execute settimes-db --command "
   DELETE FROM events
-  WHERE is_published = 0
+  WHERE status = 'draft'
   AND created_at < datetime('now', '-30 days')
 "
 
@@ -1021,14 +1037,15 @@ settimes/
 
 ```sql
 -- Complete schema (for reference)
--- See database/schema.sql for authoritative version
+-- Illustrative only. Authoritative schema: database/setup-complete.sql
+-- (generated from migrations/ by scripts/regenerate-setup-complete.mjs).
 
 CREATE TABLE events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   date TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
-  is_published INTEGER NOT NULL DEFAULT 0,
+  status TEXT DEFAULT 'draft',   -- nullable in the real schema; see setup-complete.sql
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -1070,7 +1087,7 @@ CREATE TABLE rate_limit (
 );
 
 -- Indexes
-CREATE INDEX idx_events_published ON events(is_published);
+CREATE INDEX idx_events_status ON events(status);
 CREATE INDEX idx_events_slug ON events(slug);
 CREATE INDEX idx_bands_event ON bands(event_id);
 CREATE INDEX idx_bands_venue ON bands(venue_id);

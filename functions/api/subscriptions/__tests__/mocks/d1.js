@@ -228,35 +228,46 @@ export class MockD1Database {
     // COUNT(*) does not, since the trailing ")" fails the boundary check.
     const fromIndex = queryLower.indexOf(" from ");
     const selectList = fromIndex === -1 ? queryLower : queryLower.slice(0, fromIndex);
-    const projectsPosterUrl = /\bposter_url\b/.test(selectList) || /(^|[\s,])(\*|[a-z_]+\.\*)(\s|,|$)/.test(selectList);
+    const projectsWildcard = /(^|[\s,])(\*|[a-z_]+\.\*)(\s|,|$)/.test(selectList);
+    const projectsPosterUrl = /\bposter_url\b/.test(selectList) || projectsWildcard;
+    // `status` gets the same treatment for the same reason: api/events/public.js
+    // filters ON status but does not SELECT it, so projecting it unconditionally
+    // would let a test assert on a field the endpoint never returns.
+    const projectsStatus = /\bstatus\b/.test(selectList) || projectsWildcard;
+
+    // Gate on status against the SOURCE rows, before projection. The real query
+    // filters in SQL, so filtering here on a projected `status` would force the
+    // mock to expose a column it must not project (above).
+    //
+    // Every public query gates via functions/utils/eventVisibility.js, which
+    // emits literal predicate text like "e.status IN ('published', 'archived')".
+    // Matching that text — rather than dropping the branch — keeps the mock
+    // filtering equivalently instead of silently returning every event.
+    const gatesOnPublicStatus = queryLower.includes("in ('published', 'archived')");
 
     // This is a complex query with JOINs - return aggregated data
-    let results = this.data.events.map((event) => {
-      const eventPerformances = this.data.performances.filter((p) => p.event_id === event.id);
-      const uniqueBandIds = new Set(eventPerformances.map((p) => p.band_profile_id));
-      const uniqueVenueIds = new Set(eventPerformances.map((p) => p.venue_id).filter(Boolean));
+    let results = this.data.events
+      .filter((event) => !gatesOnPublicStatus || event.status === "published" || event.status === "archived")
+      .map((event) => {
+        const eventPerformances = this.data.performances.filter((p) => p.event_id === event.id);
+        const uniqueBandIds = new Set(eventPerformances.map((p) => p.band_profile_id));
+        const uniqueVenueIds = new Set(eventPerformances.map((p) => p.venue_id).filter(Boolean));
 
-      return {
-        id: event.id,
-        name: event.name,
-        slug: event.slug || `event-${event.id}`,
-        date: event.date,
-        end_date: event.end_date ?? null,
-        description: event.description,
-        city: event.city,
-        ticket_url: event.ticket_url,
-        ...(projectsPosterUrl ? { poster_url: event.poster_url ?? null } : {}),
-        band_count: uniqueBandIds.size,
-        venue_count: uniqueVenueIds.size,
-        is_published: event.is_published,
-        published: event.published,
-      };
-    });
-
-    // Apply WHERE filters
-    if (queryLower.includes("published = 1") || queryLower.includes("is_published = 1")) {
-      results = results.filter((e) => e.is_published !== 0 && e.published !== false);
-    }
+        return {
+          id: event.id,
+          name: event.name,
+          slug: event.slug || `event-${event.id}`,
+          date: event.date,
+          end_date: event.end_date ?? null,
+          description: event.description,
+          city: event.city,
+          ticket_url: event.ticket_url,
+          ...(projectsPosterUrl ? { poster_url: event.poster_url ?? null } : {}),
+          band_count: uniqueBandIds.size,
+          venue_count: uniqueVenueIds.size,
+          ...(projectsStatus ? { status: event.status } : {}),
+        };
+      });
 
     let paramIndex = 0;
     if (queryLower.includes("where city = ?") || queryLower.includes("lower(e.city) = lower(?)")) {

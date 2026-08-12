@@ -638,7 +638,6 @@ describe("Event API - handler integration", () => {
       name: "ArchivedEvent",
       slug: "archived-event",
       status: "archived",
-      is_published: 0,
     });
 
     const body = { publish: false };

@@ -23,9 +23,11 @@
 // `is_published` — the admin write paths that kept it in lockstep with
 // `status` (for rollback safety across #800) are gone, and the guard test in
 // functions/utils/__tests__/eventVisibility.test.js now scans the whole tree
-// with no admin exemption. The column itself still exists in the schema; the
-// migration that drops it, along with its two indexes, is the remaining half
-// of #799.
+// with no admin exemption. Migration 0059 dropped the column itself, along
+// with its two indexes (replaced by idx_events_status_date) — #799 is
+// complete. The guard test stays in the suite regardless: it is what makes a
+// reintroduction of `is_published` (a copy-pasted old query, a reverted
+// migration without reverted callers) fail CI instead of shipping.
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

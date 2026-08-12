@@ -84,19 +84,34 @@ Use it for well-specified work that would otherwise consume this session's conte
 Four rules, each learned by something breaking:
 
 1. **Always go through `relay.mjs`; never a raw `opencode run`.** Not for permissions — `opencode run` auto-approves by default, and a raw run *did* edit files headlessly in testing, so `--auto` is belt-and-braces rather than load-bearing. The relay earns its place for three other reasons: it feeds the brief over **stdin** (rule 3), it writes a structured `result.json` carrying `cost`, `touchedFiles` and the session id, and it never commits. A raw run gives up all three.
-2. **Always pass `--model` explicitly, from `opencode-go/*`.** That is the flat-rate subscription (18 models). **`opencode/*` is Zen and is metered per token** — and its `claude-*` entries are redundant with the orchestrator anyway.
-3. **The brief goes in a file (`--brief`), never on the command line.** Large content in argv hangs the CLI; the relay feeds it via stdin for exactly this reason. Measured: ~1.5 KB of argv hung past 180s, the identical text attached as a file returned in 11s.
-4. **`opencode.json` is the tooling surface** — it feeds OpenCode our `CLAUDE.md` plus 17 instruction files, 6 MCP servers (Cloudflare ×4, GitHub, Resend), four custom agents, and five commands. That is why a delegated diff can respect invariants nobody restated in the brief. Keep `model`/`small_model` pointing at *authenticated* providers: they named `anthropic/*` until 2026-08-12 while only OpenCode Zen and Go were authenticated, so every run that relied on the default failed.
+2. **Always pass `--model` explicitly, and pick from the flat-rate provider.** Not because a bare run fails — with a valid `model` in `opencode.json` it resolves and runs fine. Pass it for **reproducibility**: the config default can change under you, and a delegation you cannot attribute to a model is a cost figure you cannot learn from. **Which prefix is flat-rate vs metered is a lookup, not a memory** (see the staleness note below); routing paid work through a metered gateway by assumption is the mistake this rule prevents. A `claude-*` entry from any provider is redundant with the orchestrator regardless.
+3. **The brief goes in a file (`--brief`), never on the command line.** Large content in argv hangs the CLI; the relay feeds it via stdin for exactly this reason.
+4. **`opencode.json` is the tooling surface** — its `instructions` array feeds OpenCode this `CLAUDE.md` and the repo's instruction files, and it also declares the MCP servers, agents and commands a delegated run can reach. That is why a delegated diff can respect invariants nobody restated in the brief. **Read the file for the current inventory rather than trusting a count written here**, and keep `model`/`small_model` pointing at *authenticated* providers — a stale entry there fails every run that relies on the config default (see the dated anecdotes for the instance of this that actually happened).
 
-**Cost is the throughput constraint, and it does not track the tier name.** OpenCode Go is $10/month flat but capped in *usage dollars* — **$12 per 5 hours**, $30/week, $60/month — so an expensive model buys fewer delegations per afternoon, not a bigger bill. Measured, three runs:
+**Cost is the throughput constraint, not the bill.** The subscription is flat-rate but capped in usage-dollar terms, so an expensive model buys fewer delegations per window rather than a larger invoice. Read `result.json`'s `cost` after **every delegated run** — a raw `opencode run` writes no `result.json`, so it gives you no figure to track at all.
 
-| Task | Model | Cost |
-|---|---|---|
-| #797 — delete one meta tag (3 files) | `glm-5.2` | $0.65 |
-| #766 — schema loader (2 files) | `deepseek-v4-pro` | **$0.125** |
-| #766 — 14 fixture fixes (10 files) | `glm-5.2` | $2.14 |
+**Model names, prices and caps go stale — look them up rather than trusting this file.** Providers rename, deprecate and reprice constantly; a doctrine that caches those values becomes confidently wrong, which is the failure mode the guards in this file exist to prevent elsewhere. Re-derive:
 
-`deepseek-v4-pro` came in **5× cheaper than `glm-5.2` on a smaller task**, so do not assume a "pro" tier costs more — cost tracks tokens consumed, which tracks how much the model explores, not its rate card. At $2.14/run the 5-hour cap allows ~5 runs; at $0.125 it allows ~96. Default to `opencode-go/deepseek-v4-pro` and read the `cost` field in `result.json` after every run. Three data points is not a ranking; treat any other model as unmeasured until it is run.
+```bash
+opencode auth list    # which providers are actually authenticated here
+opencode models       # the live catalog, grouped by provider prefix
+```
+
+Then confirm from the vendor's current docs which prefix is the flat-rate subscription and which is metered. **Never infer it from the model name**, and ask rather than guess.
+
+The durable part is the method:
+
+- Cost is **tokens consumed × current price**. Tier labels predict neither: a "pro"/"max" model can consume fewer tokens by exploring less, and prices change independently of names. So never rank by tier label alone — and never ignore a price change either. Compare **token usage and reported cost together**.
+- The only trustworthy comparison is **the same brief, on the same repository state, run per model**. Different tasks produce different exploration, so their costs are not comparable at all.
+- Treat any model you have not run that way as unmeasured, and say so rather than implying a ranking.
+
+> **Dated anecdotes — 2026-08-12** (OpenCode CLI 1.18.16, `opencode-delegate` 0.4.2, this repo). Three delegations, each a *different* task: a 2-file task on `deepseek-v4-pro` reported $0.125; a 3-file task on `glm-5.2` reported $0.65; a 10-file task on `glm-5.2` reported $2.14.
+>
+> **These do not compare the models.** Different briefs, different repository states, no token counts captured — the numbers reflect task size at least as much as model choice. They are recorded only as order-of-magnitude evidence that delegation cost varies enough to matter, and as a reminder that a "pro" tier is not automatically the expensive one. A real comparison needs the same brief run per model; none has been done.
+>
+> Also environment-specific and dated to this same day, both measured on **raw `opencode run`**, not through the relay: a ~1.5 KB brief passed in argv hung past 180s, while the identical text attached with `opencode run -f <file>` returned in 11s; and `opencode.json` named `anthropic/*` models while only OpenCode's own providers were authenticated, so every run falling back to the config default failed (rule 4).
+>
+> Note the flags belong to different tools and are not interchangeable: `-f` is a raw `opencode run` flag, whereas the relay takes `--brief <file>` and feeds it over **stdin**. So the 11s figure shows that *getting the brief out of argv* fixes the hang — it is not a measurement of the relay's own path, which was never argv-based. Rule 3 holds either way; only the mechanism differs. Re-verify rather than assume.
 
 ---
 

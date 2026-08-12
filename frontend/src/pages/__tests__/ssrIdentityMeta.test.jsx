@@ -7,9 +7,10 @@
 // at once. That produced a real "Duplicate, Google chose different canonical
 // than user" Search Console error (see CLAUDE.md, "SSR owns identity meta").
 // The fix is ownership: on every SSR-injected route below, the page's own
-// <Helmet> was stripped of everything SSR emits. It may still declare tags SSR
-// does NOT emit (BandProfilePage's <meta name="keywords"> is the live case) --
-// deleting one of those would drop the tag rather than de-duplicate it. #790
+// <Helmet> was stripped of everything SSR emits. Deleting a tag this
+// page's <Helmet> legitimately owns (one SSR does NOT emit) would drop
+// the tag rather than de-duplicate it -- the ownership rule is "SSR owns
+// what SSR emits," never "the client may only own <title>." #790
 // extended the same fix (and this file's seed-then-mount-then-count pattern) to
 // JSON-LD on /band/:id and /venue/:id, whose client <Helmet> used to emit its
 // own MusicGroup/MusicVenue <script> block duplicating the one

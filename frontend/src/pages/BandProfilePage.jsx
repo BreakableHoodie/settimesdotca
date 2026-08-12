@@ -23,7 +23,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { renderMarkdownToSafeHtml } from '../utils/markdown'
 import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
-import { Helmet } from 'react-helmet-async'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import BandFacts from '../components/BandFacts'
 import BandStats from '../components/BandStats'
@@ -373,14 +372,8 @@ export default function BandProfilePage() {
           branded default fallback, unlike this component's old
           profile.photo_url-only conditionals, and with an untruncated
           MusicGroup.description -- #790). Declaring any of them here too
-          would duplicate them on mount instead of replacing them. keywords
-          has no SSR equivalent and stays client-only. */}
-      <Helmet>
-        <meta
-          name="keywords"
-          content={`${profile.name}, ${profile.genre || 'music'}, ${profile.origin || 'band'}, live music, SetTimes`}
-        />
-      </Helmet>
+          would duplicate them on mount instead of replacing them. The client
+          owns no identity meta on this route. */}
 
       {/* Sticky Navigation Header */}
       <header className="sticky top-0 z-50 border-b border-text-primary/10 bg-bg-navy/95 backdrop-blur-xs">

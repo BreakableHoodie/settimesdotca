@@ -106,10 +106,9 @@ Next: none currently open in this track. There remain deliberately two canonical
 The tracker is the source of truth. Every item from the previous (2026-07-07) list has since closed — #554, #555, #556, #542, #551, #550, #466, #510. The current queue is correctness debt plus Vol.-18 prep:
 
 1. **#766** — `functions/api/test-utils.js` hand-maintains a third, ungated copy of the schema.
-2. **#797** — drop the ignored `<meta name="keywords">` from `BandProfilePage`.
-3. **Vol. 18 prep** — publish event 37, then book and announce the lineup. Publishing is what re-populates every "upcoming" surface.
+2. **Vol. 18 prep** — publish event 37, then book and announce the lineup. Publishing is what re-populates every "upcoming" surface.
 
-Closed since the last revision: **#787** (recap gating, fixed by #802 — the sitemap, SSR and the JSON API now share one `concludedEventSql()` definition of "concluded", so a published-but-unarchived past event is no longer an indexable soft-404 when Vol. 18 ends); **#799** (dead `events.is_published` column retired — part 1 stopped every read/write, part 2 dropped the column and its two indexes via migration 0059, replacing them with `idx_events_status_date` on `(status, date)`); **#746** (the two private re-encodings of the 6 AM after-midnight threshold now import from the canonical server-side home instead).
+Closed since the last revision: **#787** (recap gating, fixed by #802 — the sitemap, SSR and the JSON API now share one `concludedEventSql()` definition of "concluded", so a published-but-unarchived past event is no longer an indexable soft-404 when Vol. 18 ends); **#799** (dead `events.is_published` column retired — part 1 stopped every read/write, part 2 dropped the column and its two indexes via migration 0059, replacing them with `idx_events_status_date` on `(status, date)`); **#746** (the two private re-encodings of the 6 AM after-midnight threshold now import from the canonical server-side home instead); **#797** (the ignored `<meta name="keywords">` is gone from `BandProfilePage`, taking its now-empty `<Helmet>` and `react-helmet-async` import with it).
 
 Parked (do not resurface unprompted): band photo drives (explicitly deprioritized).
 

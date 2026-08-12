@@ -434,18 +434,13 @@ export const eventsApi = {
       headers: getHeaders(),
       credentials: 'include',
     })
-    const data = await handleResponse(response)
-    if (data?.events?.length) {
-      data.events = data.events.map(event => {
-        const isPublished = Number(event.is_published) === 1
-        const normalizedStatus = event.status === 'archived' ? 'archived' : isPublished ? 'published' : 'draft'
-        return {
-          ...event,
-          status: normalizedStatus,
-        }
-      })
-    }
-    return data
+    // No status normalisation needed (#799). This used to re-derive `status`
+    // from the deprecated publish-boolean, which was not merely redundant --
+    // it was wrong whenever the two disagreed: a row with status='published'
+    // but a stale 0 boolean was reported to the admin UI as "draft". The list
+    // endpoint selects e.*, so `status` ('draft'|'published'|'archived') is
+    // always present and is the only source of truth.
+    return handleResponse(response)
   },
 
   async create(eventData) {

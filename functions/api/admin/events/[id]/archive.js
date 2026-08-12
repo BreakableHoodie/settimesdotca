@@ -73,16 +73,31 @@ export async function onRequestPost(context) {
     }
 
     // Archive event
+    // Re-check status at write time: if a concurrent request already
+    // archived (or otherwise changed) this row between the read above and
+    // this UPDATE, an unconditional write would silently re-archive it --
+    // clobbering archived_at and firing a duplicate audit log -- instead of
+    // the read-time check above catching it.
     const result = await DB.prepare(
       `
       UPDATE events
-      SET status = 'archived', archived_at = datetime('now'), is_published = 0, updated_by_user_id = ?
-      WHERE id = ?
+      SET status = 'archived', archived_at = datetime('now'), updated_by_user_id = ?
+      WHERE id = ? AND status IN ('draft', 'published')
       RETURNING *
     `,
     )
       .bind(currentUser.userId, eventId)
       .first();
+
+    if (!result) {
+      return new Response(
+        JSON.stringify({
+          error: "Conflict",
+          message: "Event status changed concurrently. Reload and try again.",
+        }),
+        { status: 409, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     // Read-path sanitize (#493): RETURNING * echoes the full row, so
     // social_links may reflect a pre-#483 (or otherwise legacy) value.

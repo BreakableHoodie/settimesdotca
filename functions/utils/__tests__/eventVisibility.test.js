@@ -95,12 +95,14 @@ describe("alias validation rejects non-strings", () => {
 // --- Durable guard: `is_published` must never be read on a public path -----
 //
 // `events.is_published` was deprecated in migration 0005 in favour of
-// `events.status`, but `functions/api/admin/events/[id]/archive.js` still
-// writes it (`is_published = 0`) to keep the eventual column-drop migration
-// safe. Archiving therefore UNPUBLISHES under the old column, so any public
-// read path still gated on bare `is_published = 1` silently returns zero
-// rows the moment an event is archived. See functions/utils/eventVisibility.js
-// for the full incident writeup.
+// `events.status`. Until #799, `functions/api/admin/events/[id]/archive.js`
+// also wrote it (`is_published = 0`) to keep the eventual column-drop
+// migration safe. Archiving therefore UNPUBLISHED under the old column, so any
+// public read path gated on bare `is_published = 1` silently returned zero
+// rows the moment an event was archived. Nothing writes the column now, but
+// the rows written before #799 still carry those stale values, so a read
+// reintroduced today would fail exactly the same way. See
+// functions/utils/eventVisibility.js for the full incident writeup.
 //
 // This is a source scan, not a runtime assertion (same technique as
 // frontend/src/admin/utils/__tests__/bandFields.test.js): the bug is a string
@@ -176,9 +178,6 @@ describe("is_published never read outside admin/test infrastructure", () => {
   const functionsRoot = path.join(path.dirname(currentFile), "../../");
 
   // Directories/files exempt from the scan:
-  //  - functions/api/admin/**  — admin write paths must keep writing
-  //    is_published in lockstep with status (rollback safety for the
-  //    eventual column-drop migration); not a public read path.
   //  - any __tests__/** path   — test fixtures legitimately seed/assert
   //    against the deprecated column (e.g. verifying archive.js's write, or
   //    an impossible-state regression guard).
@@ -188,11 +187,20 @@ describe("is_published never read outside admin/test infrastructure", () => {
   //  - functions/utils/eventVisibility.js — this predicate's own canonical
   //    home. Its header comment documents the deprecated column by name, so
   //    a literal string scan would otherwise flag itself.
+  //
+  // The functions/api/admin/** exemption is GONE as of #799. It existed so the
+  // admin write paths could keep the deprecated column in lockstep with status,
+  // which kept #800 rollback-able. Admin no longer writes it, so the whole of
+  // functions/ is in scope. Removing that exemption is what PROVES #799 is
+  // complete -- a missed admin write fails this test instead of passing
+  // silently. api/test-utils.js keeps the column only because production still
+  // has it; it goes when the drop migration lands.
   const EXEMPT_EXACT = new Set(["api/test-utils.js", "utils/eventVisibility.js"]);
 
   function isExempt(relPath) {
     const normalized = relPath.split(path.sep).join("/");
-    if (normalized.startsWith("api/admin/")) return true;
+    // No api/admin/** exemption since #799: admin stopped writing the column,
+    // so nothing in functions/ may name it outside the two allowlisted files.
     if (normalized.split("/").includes("__tests__")) return true;
     if (EXEMPT_EXACT.has(normalized)) return true;
     return false;
@@ -216,10 +224,12 @@ describe("is_published never read outside admin/test infrastructure", () => {
     expect(
       offenders,
       offenders.length > 0
-        ? `is_published must never be read on a public path (functions/utils/eventVisibility.js) — ` +
-            `found it in: ${offenders.join(", ")}. Use publicEventStatusSql()/archivedEventStatusSql() instead, ` +
-            `or add the file to functions/api/admin/**, a __tests__/** path, or the EXEMPT_EXACT allowlist ` +
-            `in this guard if it's genuinely test/schema infrastructure.`
+        ? `is_published is retired (#799) and must not be read OR written anywhere in functions/ — ` +
+            `found it in: ${offenders.join(", ")}. Use publicEventStatusSql()/archivedEventStatusSql()/` +
+            `publishedEventStatusSql() from functions/utils/eventVisibility.js instead. There is no admin ` +
+            `escape hatch: moving the file under functions/api/admin/** will NOT satisfy this guard, because ` +
+            `admin writing the column is exactly what took the public site dark on 2026-08-10. Only ` +
+            `__tests__/** and the EXEMPT_EXACT allowlist (genuine test/schema infrastructure) are exempt.`
         : undefined,
     ).toEqual([]);
   });

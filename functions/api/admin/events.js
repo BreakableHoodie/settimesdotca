@@ -222,7 +222,6 @@ export async function onRequestPost(context) {
         end_date,
         slug,
         status,
-        is_published,
         description,
         city,
         ticket_url,
@@ -233,7 +232,7 @@ export async function onRequestPost(context) {
         doors_json,
         created_by_user_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
@@ -243,7 +242,6 @@ export async function onRequestPost(context) {
         end_date,
         slug,
         status,
-        status === "published" ? 1 : 0,
         description,
         city,
         ticket_url,

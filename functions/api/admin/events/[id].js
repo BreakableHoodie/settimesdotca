@@ -213,10 +213,25 @@ export async function onRequestPatch(context) {
           },
         );
       }
+      // Archiving is one-way: once a row is archived, its status must never
+      // change via PATCH, including a request that targets draft/published.
+      // Without this guard, PATCH {status: "published"} on an archived event
+      // silently un-archives and republishes it -- the same resurrection bug
+      // the PUT toggle and the dedicated publish endpoint already reject.
+      if (event.status === "archived") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Archived events cannot change status",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
       updates.push("status = ?");
-      updates.push("is_published = ?");
       params.push(status);
-      params.push(status === "published" ? 1 : 0);
     }
 
     if (description !== undefined) {
@@ -451,10 +466,36 @@ export async function onRequestPatch(context) {
       );
     }
 
-    // Execute update
-    const result = await DB.prepare(`UPDATE events SET ${updates.join(", ")} WHERE id = ? RETURNING *`)
+    // When this PATCH writes `status`, re-check the status at write time for
+    // the same reason the PUT toggle, publish.js and archive.js do: the
+    // archived guard above read the row at the top of the handler, and a
+    // concurrent archive committing in that gap would otherwise be silently
+    // overwritten. The predicate is conditional because PATCHing an archived
+    // event's OTHER fields (description, poster, venue info) is legitimate and
+    // deliberately still allowed — only a status change is one-way.
+    const patchesStatus = status !== undefined;
+    const statusGuardSql = patchesStatus ? " AND status IN ('draft', 'published')" : "";
+    const result = await DB.prepare(`UPDATE events SET ${updates.join(", ")} WHERE id = ?${statusGuardSql} RETURNING *`)
       .bind(...params)
       .first();
+
+    // A null result is only reachable by concurrent mutation, and it must be
+    // handled: every line below dereferences `result`, so falling through
+    // would turn a lost race into a 500.
+    if (!result) {
+      return patchesStatus
+        ? new Response(
+            JSON.stringify({
+              error: "Conflict",
+              message: "Event status changed concurrently. Reload and try again.",
+            }),
+            { status: 409, headers: { "Content-Type": "application/json" } },
+          )
+        : new Response(JSON.stringify({ error: "Not found", message: "Event not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          });
+    }
 
     // Read-path sanitize (#493): RETURNING * echoes the full row, so
     // social_links may reflect a pre-#483 (or otherwise legacy) value even
@@ -558,19 +599,51 @@ export async function onRequestPut(context) {
         );
       }
 
-      // Toggle publish status
-      const newStatus = event.is_published === 1 ? 0 : 1;
-      const nextStatus = newStatus === 1 ? "published" : "draft";
+      // Toggle publish status. Previously this flipped on the deprecated
+      // publish-boolean column, which could disagree with status (e.g. an
+      // archived event always had that column cleared — see archive.js) and
+      // would silently RESURRECT an archived event as "published" the next
+      // time this toggle ran. status is now the only source of truth (#799),
+      // so archived is rejected outright, matching the dedicated POST
+      // .../publish endpoint's guard — an archived event must never become
+      // published through this toggle.
+      if (event.status === "archived") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Archived events cannot be published or unpublished",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      const nextStatus = event.status === "published" ? "draft" : "published";
+      // Re-check status at write time: if a concurrent request archived this
+      // event between the read above and this UPDATE, an unconditional write
+      // would silently resurrect it by publishing/unpublishing over
+      // 'archived' instead of the read-time check above catching it.
       const result = await DB.prepare(
         `
         UPDATE events
-        SET is_published = ?, status = ?, updated_by_user_id = ?
-        WHERE id = ?
+        SET status = ?, updated_by_user_id = ?
+        WHERE id = ? AND status IN ('draft', 'published')
         RETURNING *
       `,
       )
-        .bind(newStatus, nextStatus, currentUser.userId, eventId)
+        .bind(nextStatus, currentUser.userId, eventId)
         .first();
+
+      if (!result) {
+        return new Response(
+          JSON.stringify({
+            error: "Conflict",
+            message: "Event status changed concurrently. Reload and try again.",
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        );
+      }
 
       // Read-path sanitize (#493): see the PATCH handler above.
       result.social_links = safeReflectSocialLinksString(result.social_links, ["instagram", "x", "tiktok"]);
@@ -580,7 +653,7 @@ export async function onRequestPut(context) {
       await auditLog(
         env,
         currentUser.userId,
-        newStatus === 1 ? "event.published" : "event.unpublished",
+        nextStatus === "published" ? "event.published" : "event.unpublished",
         "event",
         eventId,
         {
@@ -593,7 +666,7 @@ export async function onRequestPut(context) {
         JSON.stringify({
           success: true,
           event: result,
-          message: newStatus === 1 ? "Event published" : "Event unpublished",
+          message: nextStatus === "published" ? "Event published" : "Event unpublished",
         }),
         {
           status: 200,

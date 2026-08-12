@@ -80,8 +80,9 @@ export default function HistoricalImportModal({ onClose, onImported }) {
         name: trimmedName,
         date: trimmedDate,
         slug,
+        // status alone (#799): the server no longer writes a publish-boolean,
+        // and 'archived' already carries this meaning.
         status: 'archived',
-        is_published: 0,
       })
       if (!data?.event?.id) {
         throw new Error('Server did not return a valid event. Please try again.')

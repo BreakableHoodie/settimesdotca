@@ -14,6 +14,14 @@ import Breadcrumbs from './components/Breadcrumbs'
 import MfaSettingsModal from './components/MfaSettingsModal'
 import { Button, Loading, Alert, ConfirmDialog, Modal } from '../components/ui'
 
+// events.status is the single source of truth for publish state (#799); the
+// deprecated boolean it replaced could only express two of these three.
+const EVENT_STATUS_LABEL = {
+  published: '(Published)',
+  draft: '(Draft)',
+  archived: '(Archived)',
+}
+
 const ADMIN_ACTIVE_TAB_KEY = 'adminActiveTab'
 const ADMIN_SELECTED_EVENT_ID_KEY = 'adminSelectedEventId'
 const ADMIN_EVENT_WIZARD_DRAFT_KEY = 'adminEventWizardDraft'
@@ -278,7 +286,10 @@ export default function AdminPanel({ currentUser, onLogout }) {
                     <option value="">All Venues/Bands (Global View)</option>
                     {events.map(event => (
                       <option key={event.id} value={event.id}>
-                        {event.name} {event.is_published ? '(Published)' : '(Draft)'}
+                        {/* Three states, not two (#799): the old boolean
+                            collapsed archived into "(Draft)", mislabelling
+                            every concluded edition in this picker. */}
+                        {event.name} {EVENT_STATUS_LABEL[event.status] ?? '(Draft)'}
                       </option>
                     ))}
                   </select>

@@ -86,6 +86,39 @@ describe('EventsTab — publish without a lineup (empty-lineup override)', () =>
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('Event published successfully!', 'success'))
   })
 
+  it('surfaces an error toast when the override retry itself fails', async () => {
+    // The retry has its own catch block, which nothing else exercises: the
+    // happy-path test resolves the retry and the decline test never reaches
+    // it. Without this, a broken retry error path would fail silently -- the
+    // admin would click through the confirm and see nothing at all happen.
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    eventsApi.setPublishState
+      .mockRejectedValueOnce(emptyLineupError())
+      .mockRejectedValueOnce(new Error('Network request failed'))
+
+    const showToast = vi.fn()
+    render(
+      <EventsTab
+        events={[DRAFT_EVENT_NO_BANDS]}
+        onEventsChange={vi.fn()}
+        showToast={showToast}
+        readOnly={false}
+        canArchiveEvents={true}
+      />
+    )
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Publish' })[0])
+
+    await waitFor(() => expect(eventsApi.setPublishState).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith('Failed to publish event: Network request failed', 'error')
+    )
+
+    // A failed retry must not also claim success, and must not loop.
+    expect(showToast).not.toHaveBeenCalledWith('Event published successfully!', 'success')
+    expect(eventsApi.setPublishState).toHaveBeenCalledTimes(2)
+  })
+
   it('declining the empty-lineup confirm leaves the event unpublished and does not retry', async () => {
     // First confirm ("Are you sure you want to publish this event?") says
     // yes; second confirm (the empty-lineup-specific one) says no.

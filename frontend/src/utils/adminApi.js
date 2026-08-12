@@ -473,12 +473,27 @@ export const eventsApi = {
     return handleResponse(response)
   },
 
-  async setPublishState(eventId, publish) {
+  async setPublishState(eventId, publish, { allowEmptyLineup } = {}) {
+    // Throw rather than coerce. A truthy non-boolean ('yes', 1) reaching the
+    // old `if (allowEmptyLineup)` was LAUNDERED into a literal `true` on the
+    // wire, so the server's own non-boolean rejection never saw the bad value
+    // and the empty-lineup guard opened on input it was written to refuse.
+    // Failing loudly here surfaces the caller bug; silently not-sending would
+    // hide it behind a confusing "no bands" error instead.
+    if (allowEmptyLineup !== undefined && typeof allowEmptyLineup !== 'boolean') {
+      throw new TypeError('allowEmptyLineup must be a boolean')
+    }
+    const body = { publish }
+    // Sent only when exactly true -- `false` is indistinguishable from
+    // omitting it server-side, so it stays off the request entirely.
+    if (allowEmptyLineup === true) {
+      body.allowEmptyLineup = true
+    }
     const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/publish`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
-      body: JSON.stringify({ publish }),
+      body: JSON.stringify(body),
     })
     return handleResponse(response)
   },

@@ -59,10 +59,25 @@ export async function onRequestPost(context) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { publish } = body;
+    const { publish, allowEmptyLineup } = body;
 
     if (typeof publish !== "boolean") {
       return new Response(JSON.stringify({ error: "Bad request", message: "publish must be a boolean" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // allowEmptyLineup is an explicit opt-in to publish an event with zero
+    // booked performances. "Lineup TBA" is a supported published state
+    // (EventTimeline.jsx renders it for exactly this case), and announcing
+    // an event before the lineup is booked -- to start accruing SEO runway,
+    // e.g. -- is an intentional workflow, not an oversight the guard below
+    // should categorically block. Validated the same way `publish` is
+    // validated above: reject a non-boolean rather than coercing a truthy
+    // string into an unlock.
+    if (allowEmptyLineup !== undefined && typeof allowEmptyLineup !== "boolean") {
+      return new Response(JSON.stringify({ error: "Bad request", message: "allowEmptyLineup must be a boolean" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
@@ -90,11 +105,16 @@ export async function onRequestPost(context) {
         .bind(eventId)
         .first();
 
-      if (bandCount.count === 0) {
+      if (bandCount.count === 0 && !allowEmptyLineup) {
+        // `code` is additive -- `error`/`message` stay byte-for-byte identical
+        // to the pre-override guard so existing callers see no behaviour
+        // change. It exists so the admin UI can detect this specific
+        // rejection and offer the override without string-matching `message`.
         return new Response(
           JSON.stringify({
             error: "Validation error",
             message: "Cannot publish event with no bands. Add at least one band first.",
+            code: "EMPTY_LINEUP",
           }),
           {
             status: 400,

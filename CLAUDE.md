@@ -66,6 +66,19 @@ Never be lazy about understanding, input validation, error handling that prevent
 
 When a task has a clear implementation spec, dispatch a Sonnet agent to build it; reserve Opus/Fable for the design up front and the review after. Always follow a Sonnet implementation with a big-brain review pass — that second perspective catches whole bug classes a to-spec implementer stops short of.
 
+### Delegating to OpenCode
+
+A third implementer, on a separate subscription: the `opencode-delegate` skill (`.agents/skills/`, from `amElnagdy/delegate-skills`). Use it for well-specified work that would otherwise consume this session's context. **The relay never commits — the orchestrator reviews the diff, re-runs `make gate`, and commits.** Same contract as a Sonnet agent, different process.
+
+Four rules, each learned by something breaking:
+
+1. **Always go through `relay.mjs`; never a raw `opencode run`.** The relay passes `--auto`, and `opencode.json` sets `edit`/`bash`/`read`/`task` to `ask` — a headless run without `--auto` blocks forever on a permission prompt nobody can answer.
+2. **Always pass `--model` explicitly, from `opencode-go/*`.** That is the flat-rate subscription (18 models). **`opencode/*` is Zen and is metered per token** — and its `claude-*` entries are redundant with the orchestrator anyway.
+3. **The brief goes in a file (`--brief`), never on the command line.** Large content in argv hangs the CLI; the relay feeds it via stdin for exactly this reason. Measured: ~1.5 KB of argv hung past 180s, the identical text attached as a file returned in 11s.
+4. **`opencode.json` is the tooling surface** — it feeds OpenCode our `CLAUDE.md` plus 17 instruction files, 6 MCP servers (Cloudflare ×4, GitHub, Resend), four custom agents, and five commands. That is why a delegated diff can respect invariants nobody restated in the brief. Keep `model`/`small_model` pointing at *authenticated* providers: they named `anthropic/*` until 2026-08-12 while only OpenCode Zen and Go were authenticated, so every run that relied on the default failed.
+
+Verified once (#797, `opencode-go/glm-5.2`, $0.65): the model list is otherwise unbenchmarked — match model to task and say so rather than implying a ranking that has not been measured.
+
 ---
 
 ## Mission & Scope

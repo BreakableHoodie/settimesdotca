@@ -7,6 +7,7 @@ import { FIELD_LIMITS } from '../utils/validation'
 import { buildDayOptions, enumerateFestivalDays, isMultiDayEvent } from './utils/dayOptions'
 import { formatFestivalDate } from '../utils/festivalDays'
 import { parseDoorsJsonToForm, serializeDoorsForm } from './utils/doorsFormData'
+import { publishWithLineupConfirm } from './utils/publishWithLineupConfirm'
 
 /**
  * EventFormModal - Modal for creating and editing events
@@ -300,11 +301,38 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         delete payload.status
       }
 
+      // #821: a draft -> published transition must go through
+      // POST .../publish, the only route that checks the lineup before making
+      // an event public. PATCH writes `status` with no such check, so saving
+      // this form with "Published" selected used to publish an empty event
+      // silently -- while the Events-list toggle asked first. Same transition,
+      // two different behaviours depending on which control you used.
+      //
+      // Only the TRANSITION is rerouted. Re-saving an already-published event
+      // still sends `status` through PATCH, which is a no-op status write and
+      // must stay allowed -- editing a live event's description or poster is
+      // routine.
+      const isPublishTransition = isEditing && formData.status === 'published' && event?.status !== 'published'
+      if (isPublishTransition) {
+        delete payload.status
+      }
+
       let data
       if (isEditing) {
         data = await eventsApi.update(event.id, payload)
       } else {
         data = await eventsApi.create(payload)
+      }
+
+      // Runs after the field update so a failed/declined publish still keeps
+      // the user's other edits, rather than discarding them.
+      if (isPublishTransition) {
+        const result = await publishWithLineupConfirm(eventsApi, { id: event.id, name: formData.name })
+        if (result.cancelled) {
+          setError('Event saved, but not published — you cancelled the empty-lineup confirmation.')
+          setLoading(false)
+          return
+        }
       }
 
       // Update reveal mode if it changed (editing only — new events default to off)

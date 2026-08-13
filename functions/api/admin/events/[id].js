@@ -230,6 +230,23 @@ export async function onRequestPatch(context) {
           },
         );
       }
+      // Deliberately no band-count check here, matching the PUT toggle below
+      // and for the same reason: adding one would make PATCH stricter than
+      // POST .../publish, whose own guard is bypassable via an explicit
+      // `allowEmptyLineup: true` (the supported "Lineup TBA" publish). A
+      // scripted caller that wants to publish an empty event may still do so.
+      //
+      // The gap this leaves is a UX one, and #821 closed it on the CLIENT:
+      // EventFormModal no longer sends `status: "published"` for a
+      // draft -> published transition. It strips the field and calls
+      // POST .../publish instead, so the empty-lineup confirmation appears
+      // whichever control the admin used. Fixing it there rather than here
+      // keeps the API permissive while making the UI consistent -- see
+      // frontend/src/admin/utils/publishWithLineupConfirm.js.
+      //
+      // Note this endpoint still legitimately writes `status` when an already
+      // published event is re-saved (a no-op status write), which is why the
+      // client only reroutes the transition, not every save.
       updates.push("status = ?");
       params.push(status);
     }

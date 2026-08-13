@@ -10,6 +10,7 @@ import ArchivedEventBanner from './components/ArchivedEventBanner'
 import HelpPanel from './components/HelpPanel'
 import { Copy, Link, Ticket } from 'lucide-react'
 import { formatTimeRange } from '../utils/timeFormat'
+import { publishWithLineupConfirm } from './utils/publishWithLineupConfirm'
 import {
   getEventState,
   isEventArchived,
@@ -579,32 +580,23 @@ export default function EventsTab({
     }
 
     try {
-      await eventsApi.setPublishState(event.id, publish)
+      if (publish) {
+        // Shared with EventFormModal's save path (#821) so the same
+        // draft -> published transition prompts identically whichever control
+        // the user reaches for. The empty-lineup detection and retry live in
+        // the helper; see utils/publishWithLineupConfirm.js.
+        const result = await publishWithLineupConfirm(eventsApi, event)
+        if (result.cancelled) {
+          return
+        }
+      } else {
+        await eventsApi.setPublishState(event.id, false)
+      }
 
       showToast(`Event ${action}ed successfully!`, 'success')
       refreshEvents()
       onEventsChange()
     } catch (err) {
-      // The publish endpoint reports this specific rejection via a
-      // machine-readable `code` (functions/api/admin/events/[id]/publish.js),
-      // not by matching `err.message` text -- so this stays correct even if
-      // the message copy changes later.
-      if (publish && err.details?.code === 'EMPTY_LINEUP') {
-        const confirmed = window.confirm(
-          `"${event.name}" has no bands yet. Publishing now will make the event page public immediately, showing "Lineup TBA" until a lineup is added. Continue?`
-        )
-        if (confirmed) {
-          try {
-            await eventsApi.setPublishState(event.id, true, { allowEmptyLineup: true })
-            showToast('Event published successfully!', 'success')
-            refreshEvents()
-            onEventsChange()
-          } catch (retryErr) {
-            showToast('Failed to publish event: ' + retryErr.message, 'error')
-          }
-        }
-        return
-      }
       showToast(`Failed to ${action} event: ` + err.message, 'error')
     }
   }

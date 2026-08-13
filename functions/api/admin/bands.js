@@ -312,29 +312,29 @@ export async function onRequestGet(context) {
           ) AS last_event_date
         FROM band_profiles bp
         ORDER BY bp.name
-        LIMIT ?
-        OFFSET ?
       `,
         )
-          .bind(today, today, today, today, today, today, limit, offset)
+          .bind(today, today, today, today, today, today)
           .all();
       }
     }
 
-    const bands = (result.results || []).map(unpackSocialLinks);
+    let bands = (result.results || []).map(unpackSocialLinks);
 
     // Re-derive the exact ordering in JS with the article-stripped sort key
     // (#587) — see the compareStartTimeNullsLast comment above. Pagination-
     // boundary guarantee: the eventId branch has no LIMIT/OFFSET (one event's
     // full lineup). The no-eventId branch has no join to `performances` at
     // its top level (#618/#710) — exactly one row per band_profile,
-    // structurally — so its row count is bounded by roster size, not by how
-    // many performances a band has; the JS re-sort below never has to worry
-    // about a truncated LIMIT window splitting a single band across pages.
+    // structurally. Sorting the full set in JS before applying LIMIT/OFFSET
+    // (#756) guarantees that pagination boundaries and presentation ordering
+    // agree on the article-stripped sortableName() collation, avoiding profile
+    // duplicates or omissions across page boundaries.
     if (eventId) {
       bands.sort((a, b) => compareStartTimeNullsLast(a, b) || sortableName(a.name).localeCompare(sortableName(b.name)));
     } else {
       bands.sort((a, b) => sortableName(a.name).localeCompare(sortableName(b.name)));
+      bands = bands.slice(offset, offset + limit);
     }
 
     return new Response(JSON.stringify({ success: true, bands }), {

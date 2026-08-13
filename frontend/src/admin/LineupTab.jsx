@@ -874,6 +874,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                               className="h-5 w-5 cursor-pointer"
                               onChange={e => handleSelectAll(e.target.checked)}
                               checked={selectedIds.size === filteredBands.length && filteredBands.length > 0}
+                              aria-label="Select all bands"
                             />
                           </th>
                         )}
@@ -970,6 +971,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                   className="h-5 w-5 cursor-pointer"
                                   checked={selectedIds.has(band.id)}
                                   onChange={e => handleSelect(band.id, e.target.checked)}
+                                  aria-label={`Select ${band.name}`}
                                 />
                               </td>
                             )}

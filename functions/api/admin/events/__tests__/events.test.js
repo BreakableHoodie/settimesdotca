@@ -104,6 +104,81 @@ describe("Event API - handler integration", () => {
     expect(data.event.slug).toBe("integration-event");
   });
 
+  // #804: publication has to go through POST .../publish, the only route that
+  // asks before putting a lineup-less event in front of the public. A created
+  // row has zero performances by construction, so create-as-published is always
+  // a silent empty-lineup publish.
+  //
+  // These assert on what the fix CHANGES -- whether the row reaches the DB --
+  // not merely on the status code. A test that only checked `res.status` would
+  // still pass if the handler returned 400 *after* inserting.
+  it("onRequestPost refuses to create an event already published, and writes nothing", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Sneaky Published Event",
+        slug: "sneaky-published-event",
+        date: "2099-10-11",
+        status: "published",
+      }),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.code).toBe("CREATE_AS_PUBLISHED");
+
+    // The real assertion: the event must not exist at all.
+    const stored = rawDb.prepare("SELECT id FROM events WHERE slug = ?").get("sneaky-published-event");
+    expect(stored).toBeUndefined();
+  });
+
+  it("onRequestPost still creates a draft event (the fix must not block the normal path)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Draft Event",
+        slug: "draft-event",
+        date: "2099-10-11",
+        status: "draft",
+      }),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(201);
+    const stored = rawDb.prepare("SELECT status FROM events WHERE slug = ?").get("draft-event");
+    expect(stored.status).toBe("draft");
+  });
+
+  // Guards the trap called out in #804: rejecting every non-draft status on
+  // create would silently break HistoricalImportModal, which back-fills past
+  // editions as `archived`. Archived carries no live-lineup requirement.
+  it("onRequestPost still creates an archived event for an admin (historical back-fill)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+      body: JSON.stringify({
+        name: "Historical Edition",
+        slug: "historical-edition",
+        date: "2020-08-02",
+        status: "archived",
+      }),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(201);
+    const stored = rawDb.prepare("SELECT status FROM events WHERE slug = ?").get("historical-edition");
+    expect(stored.status).toBe("archived");
+  });
+
   it("accepts an event dated the Toronto-local today even after UTC has rolled over", async () => {
     // Regression for the #568 bug class in the create path: the past-date guard
     // must use the events' Toronto-local day, not the Worker's UTC day. At

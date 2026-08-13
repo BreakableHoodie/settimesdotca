@@ -42,23 +42,10 @@
   "small_model": "opencode-go/deepseek-v4-flash",
   "instructions": [
     "CLAUDE.md",
-    "instructions/a11y.instructions.md",
-    "instructions/performance-optimization.instructions.md",
+    "CONTRIBUTING.md",
     "instructions/security-and-owasp.instructions.md",
     "instructions/nodejs-javascript-vitest.instructions.md",
-    "instructions/reactjs.instructions.md",
-    "instructions/playwright-typescript.instructions.md",
-    "instructions/self-explanatory-code-commenting.instructions.md",
-    "instructions/sql-sp-generation.instructions.md",
-    "CONTRIBUTING.md",
-    "docs/API_DOCUMENTATION.md",
-    "docs/SQL_SAFETY.md",
-    "docs/DATABASE.md",
-    "docs/DEPLOYMENT.md",
-    "docs/QUICK_START.md",
-    "docs/ADMIN_HANDBOOK.md",
-    "docs/BACKEND_FRAMEWORK.md",
-    "docs/PERFORMANCE_RECOMMENDATIONS.md"
+    "instructions/self-explanatory-code-commenting.instructions.md"
   ],
   "plugin": [
     "opencode-notify",

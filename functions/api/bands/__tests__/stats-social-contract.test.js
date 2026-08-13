@@ -53,7 +53,11 @@ describe("GET /api/bands/stats/:name - social key set equals the canonical eight
       social_links: JSON.stringify({
         website: "https://example.com/band",
         instagram: "the_band",
-        bandcamp: "theband.bandcamp.com",
+        // Path-bearing so `normalizeHttpUrl` is identity here (a bare origin
+        // gains a trailing slash, and a scheme-less host gets rewritten) —
+        // that keeps the whole-object assertion below about the CONTRACT
+        // rather than about URL normalization, which is tested elsewhere.
+        bandcamp: "https://theband.bandcamp.com/album/demo",
         facebook: "https://facebook.com/theband",
         youtube: "https://youtube.com/@theband",
         spotify: "https://open.spotify.com/artist/abc",
@@ -70,11 +74,22 @@ describe("GET /api/bands/stats/:name - social key set equals the canonical eight
     const payload = await response.json();
     expect(Object.keys(payload.social).sort()).toEqual(EXPECTED_SOCIAL_KEYS);
     expect(payload.social).not.toHaveProperty("myspace");
-    // The four platforms /api/bands/{name} used to drop must round-trip here too.
-    expect(payload.social.youtube).toBe("https://youtube.com/@theband");
-    expect(payload.social.spotify).toBe("https://open.spotify.com/artist/abc");
-    expect(payload.social.apple_music).toBe("https://music.apple.com/artist/abc");
-    expect(payload.social.linktree).toBe("https://linktr.ee/theband");
+    // Whole-object equality, not per-key spot checks. Set-equality above pins
+    // the KEYS; without this, a regression returning null or a wrong value for
+    // any platform still passes. Asserting the complete object covers all
+    // eight values at once and closes that class rather than four instances of
+    // it. (The key-set and myspace assertions are kept for the sharper failure
+    // message they give on a key drift specifically.)
+    expect(payload.social).toEqual({
+      website: "https://example.com/band",
+      instagram: "the_band",
+      bandcamp: "https://theband.bandcamp.com/album/demo",
+      facebook: "https://facebook.com/theband",
+      youtube: "https://youtube.com/@theband",
+      spotify: "https://open.spotify.com/artist/abc",
+      apple_music: "https://music.apple.com/artist/abc",
+      linktree: "https://linktr.ee/theband",
+    });
   });
 
   test("returns all eight keys with null where a platform is absent", async () => {

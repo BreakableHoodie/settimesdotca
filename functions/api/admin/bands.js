@@ -200,8 +200,13 @@ export async function onRequestGet(context) {
       // band with N performances produced N rows; combined with
       // `ORDER BY e.date DESC` + `LIMIT`, a profile whose only performances
       // were on older events could sort past the limit and vanish entirely —
-      // #618, Adelleda). LIMIT here bounds roster size (~218 active + a
-      // handful of inactive profiles in prod), never performance-row count.
+      // #618, Adelleda). This query is deliberately UNPAGINATED as of #756:
+      // it returns every profile (~218 active plus a handful of inactive in
+      // prod), and limit/offset are applied in JS below, after the
+      // article-stripped sort. Re-adding SQL LIMIT/OFFSET here would restore
+      // the bug: SQLite orders by raw `bp.name`, so "The Alpha" sorts after
+      // "Bravo" and a page boundary drawn in SQL disagrees with the order the
+      // client is shown — duplicating or dropping profiles across pages.
       //
       // Deliberately no `WHERE bp.is_active = 1` here (#619): the admin
       // roster is the tool that manages profiles, so it must be able to see

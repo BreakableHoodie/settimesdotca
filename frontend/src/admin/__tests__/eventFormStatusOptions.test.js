@@ -33,13 +33,17 @@ describe('EventFormModal status options — #804', () => {
     // the JSX and pass no matter what the markup does.
     const code = source.replace(/\/\*[\s\S]*?\*\//g, '')
 
-    const publishedOption = code.match(/.*<option value="published">.*/)
-    expect(publishedOption, 'expected a published <option> to exist for the edit form').not.toBeNull()
+    // Match ALL occurrences, not just the first. A non-global `.match()` reads
+    // only match #1, so a second, unconditional `<option value="published">`
+    // added later would sail past a guard that inspected just that one — the
+    // regression this test exists to catch, reintroduced silently.
+    const publishedOptions = [...code.matchAll(/.*<option value="published">.*/g)]
+    expect(publishedOptions, 'expected exactly one published <option>, for the edit form only').toHaveLength(1)
 
-    // The line must be conditional on isEditing. An unconditional
+    // That sole option must be conditional on isEditing. An unconditional
     // `<option value="published">` is the #804 regression.
     expect(
-      publishedOption[0],
+      publishedOptions[0][0],
       'the Published option must be gated on isEditing — an unconditional one lets the create form build a request the server now rejects (#804)'
     ).toMatch(/isEditing\s*&&/)
   })

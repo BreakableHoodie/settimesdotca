@@ -517,6 +517,17 @@ export default function EventsTab({
     setShowModal(false)
   }
 
+  // #821/#825: the field update succeeded but publishing did not (declined or
+  // failed). Refresh so the list shows the new values and the still-draft
+  // status, but deliberately do NOT close the modal and do NOT toast success --
+  // the modal is displaying the explanation of what did and did not happen, and
+  // handleEventSaved would both hide it and claim "Event updated successfully!"
+  // over a failed publish.
+  const handleEventPartiallySaved = _savedEvent => {
+    refreshEvents()
+    onEventsChange()
+  }
+
   const getPublicEventUrl = event => {
     if (!event?.slug) return ''
     return `${window.location.origin}/event/${event.slug}`
@@ -971,6 +982,7 @@ export default function EventsTab({
             }}
             event={editingEvent}
             onSave={handleEventSaved}
+            onPartialSave={handleEventPartiallySaved}
             canCreateArchived={canArchiveEvents}
           />
         )}
@@ -1112,6 +1124,7 @@ export default function EventsTab({
           }}
           event={editingEvent}
           onSave={handleEventSaved}
+          onPartialSave={handleEventPartiallySaved}
           canCreateArchived={canArchiveEvents}
         />
       )}

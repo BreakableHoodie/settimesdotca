@@ -23,10 +23,23 @@ import { publishWithLineupConfirm } from './utils/publishWithLineupConfirm'
  * @param {boolean} isOpen - Whether modal is visible
  * @param {function} onClose - Callback when modal closes
  * @param {object} event - Event object for editing (null for create)
- * @param {function} onSave - Callback when event is saved
+ * @param {function} onSave - Callback on full success. The parent treats this as
+ *   "done": it toasts success, refreshes, and CLOSES the modal.
+ * @param {function} onPartialSave - Callback when the field update succeeded but
+ *   publishing did not (declined or failed, #821/#825). Must refresh parent state
+ *   WITHOUT closing the modal or toasting success, so the explanatory message
+ *   stays on screen. Calling onSave here would close the modal and claim
+ *   "Event updated successfully!" over a failed publish.
  * @param {boolean} canCreateArchived - Allow creating archived events directly
  */
-export default function EventFormModal({ isOpen, onClose, event = null, onSave, canCreateArchived = false }) {
+export default function EventFormModal({
+  isOpen,
+  onClose,
+  event = null,
+  onSave,
+  onPartialSave,
+  canCreateArchived = false,
+}) {
   const isEditing = !!event
   // `status` is the only publication state this component reads (#799). The
   // deprecated publish-boolean it used to OR against still exists in the schema
@@ -339,13 +352,13 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
           result = await publishWithLineupConfirm(eventsApi, { id: event.id, name: formData.name })
         } catch (publishErr) {
           console.error('Error publishing event:', publishErr)
-          if (onSave) onSave(data.event)
+          if (onPartialSave) onPartialSave(data.event)
           setError(`Your changes were saved, but publishing failed: ${publishErr.message}. The event is still a draft.`)
           setLoading(false)
           return
         }
         if (result.cancelled) {
-          if (onSave) onSave(data.event)
+          if (onPartialSave) onPartialSave(data.event)
           setError('Your changes were saved. The event is still a draft — you cancelled the publish confirmation.')
           setLoading(false)
           return

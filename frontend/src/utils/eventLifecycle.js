@@ -73,15 +73,16 @@ export function isEventUpcoming(eventDate) {
  * Calculate days since event ended
  *
  * @param {string} eventDate - Event date in YYYY-MM-DD format
+ * @param {Date|string|number} referenceTime - Optional time to evaluate against
  * @returns {number} Days since event ended (0 if upcoming, negative if in future)
  */
-export function getDaysSinceEvent(eventDate) {
+export function getDaysSinceEvent(eventDate, referenceTime = new Date()) {
   if (!eventDate) return -1
 
-  const now = new Date()
+  const now = referenceTime instanceof Date ? referenceTime : new Date(referenceTime)
   const eventEnd = new Date(eventDate + 'T23:59:59')
   const diffMs = now.getTime() - eventEnd.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
 
   return diffDays
 }

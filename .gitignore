@@ -146,3 +146,6 @@ docs/SEO_IMPROVEMENTS.md
 
 # GitGuardian local scan cache
 .cache_ggshield
+
+# Lighthouse CI run output (uploaded as a CI artifact, never committed)
+frontend/.lighthouseci/

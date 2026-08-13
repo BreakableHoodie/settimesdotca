@@ -326,10 +326,27 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
 
       // Runs after the field update so a failed/declined publish still keeps
       // the user's other edits, rather than discarding them.
+      //
+      // That ordering makes the save partially succeed, so this cannot fall
+      // through to the outer catch: that reports "Failed to save event", which
+      // would be a lie -- the fields ARE saved, only publication failed. Both
+      // exits below therefore push the saved record to the parent (so the list
+      // reflects the new field values and the still-draft status) and leave the
+      // modal open with an accurate message.
       if (isPublishTransition) {
-        const result = await publishWithLineupConfirm(eventsApi, { id: event.id, name: formData.name })
+        let result
+        try {
+          result = await publishWithLineupConfirm(eventsApi, { id: event.id, name: formData.name })
+        } catch (publishErr) {
+          console.error('Error publishing event:', publishErr)
+          if (onSave) onSave(data.event)
+          setError(`Your changes were saved, but publishing failed: ${publishErr.message}. The event is still a draft.`)
+          setLoading(false)
+          return
+        }
         if (result.cancelled) {
-          setError('Event saved, but not published — you cancelled the empty-lineup confirmation.')
+          if (onSave) onSave(data.event)
+          setError('Your changes were saved. The event is still a draft — you cancelled the publish confirmation.')
           setLoading(false)
           return
         }

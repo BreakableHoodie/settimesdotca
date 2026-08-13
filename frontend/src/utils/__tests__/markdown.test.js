@@ -5,7 +5,7 @@
  * XSS tests are mandatory and must pass before any deploy.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import DOMPurify from 'dompurify'
 import { renderMarkdownToSafeHtml, stripMarkdownToText } from '../markdown'
 
@@ -186,6 +186,40 @@ describe('renderMarkdownToSafeHtml — XSS protection', () => {
 
   it('cleans up DOMPurify hooks after sanitization without leaking (#793)', () => {
     renderMarkdownToSafeHtml('[x](https://settimes.ca)')
+    const directSanitized = DOMPurify.sanitize('<a href="https://example.com">direct</a>', {
+      ALLOWED_TAGS: ['a'],
+      ALLOWED_ATTR: ['href', 'rel'],
+    })
+    expect(directSanitized).not.toContain('rel="noopener noreferrer"')
+  })
+
+  it('does not remove hooks registered by other consumers (#793)', () => {
+    const markSentinel = node => {
+      if (node.tagName === 'A') node.setAttribute('data-hook', 'sentinel')
+    }
+    DOMPurify.addHook('afterSanitizeAttributes', markSentinel)
+    try {
+      renderMarkdownToSafeHtml('[x](https://settimes.ca)')
+      const directSanitized = DOMPurify.sanitize('<a href="https://example.com">direct</a>', {
+        ALLOWED_TAGS: ['a'],
+        ALLOWED_ATTR: ['href', 'rel', 'data-hook'],
+      })
+      expect(directSanitized).toContain('data-hook="sentinel"')
+      expect(directSanitized).not.toContain('rel="noopener noreferrer"')
+    } finally {
+      DOMPurify.removeHook('afterSanitizeAttributes', markSentinel)
+    }
+  })
+
+  it('cleans up hooks even when sanitize throws (#793)', () => {
+    const sanitizeSpy = vi.spyOn(DOMPurify, 'sanitize').mockImplementation(() => {
+      throw new Error('sanitize failed')
+    })
+    try {
+      expect(() => renderMarkdownToSafeHtml('[x](https://settimes.ca)')).toThrow('sanitize failed')
+    } finally {
+      sanitizeSpy.mockRestore()
+    }
     const directSanitized = DOMPurify.sanitize('<a href="https://example.com">direct</a>', {
       ALLOWED_TAGS: ['a'],
       ALLOWED_ATTR: ['href', 'rel'],

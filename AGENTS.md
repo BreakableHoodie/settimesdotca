@@ -103,3 +103,51 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
   are required for ANY Playwright invocation, including `--list`). `make e2e` handles this.
 - E2E spec files are under the same prettier/eslint scope as `functions/`/`scripts/` (#622) —
   double quotes/semis, `eslint.config.js`'s `e2e/**` block covers Playwright + browser globals.
+
+## LSP — prefer it over grep for symbol navigation
+
+Both harnesses are wired for LSP-backed navigation. **Neither bundles the server**; one global
+install serves both, and it is a per-machine prerequisite a fresh clone will not have:
+
+```bash
+npm install -g typescript-language-server typescript@5
+```
+
+**The `@5` pin is load-bearing.** Bare `typescript` now resolves to 7.x, the native Go port,
+whose `lib/` ships only `getExePath.js` and `tsc.js` — there is no `tsserver.js`.
+`typescript-language-server` works by spawning exactly that file, so TS 7 fails every LSP call
+with `Could not find a valid TypeScript installation` while `tsc --version` reports a perfectly
+healthy 7.x. Verified 2026-08-13: TS 7.0.2 broke it, TS 5.9.3 is the working target.
+
+- Covers `.js .jsx .mjs .cjs .ts .tsx .mts .cts` — i.e. the whole repo (347 `.js` + 162 `.jsx`,
+  no TypeScript).
+- Claude Code: the `typescript-lsp` plugin plus `ENABLE_LSP_TOOL=1`, both in
+  `~/.claude/settings.json` (machine-local, not in this repo).
+- OpenCode: `"lsp": true` in `opencode.json` activates the built-in server definitions. Its
+  typescript entry is **not** on OpenCode's auto-download list, so it resolves the same global
+  binary — one install unblocks both.
+- **Verify by making an LSP call, never by reading config.** A missing binary fails at call
+  time with `ENOENT: typescript-language-server`, not at startup, so a green-looking config
+  proves nothing.
+
+**Use LSP for symbol questions, grep for textual ones.** `goToDefinition`, `findReferences`
+and `workspaceSymbol` resolve the symbol graph and answer "who calls this?" without the
+false positives a name-based grep returns. But this repo's source-scanning guards are
+deliberately textual — the Tailwind class literals in `bandFields.test.js`, the `is_published`
+scans, the after-midnight threshold check — and LSP cannot see a class name inside a string or
+a literal in a comment. Do not convert those to LSP; they are text scans on purpose.
+
+The split is measurable. `git grep AFTER_MIDNIGHT_THRESHOLD_HOUR` returns ~30 hits, mostly
+comments and strings inside the guard test; `findReferences` returns the 8 real bindings and
+correctly drops `functions/api/events/timeline.js`, which mentions the constant only in prose
+and actually imports the sibling `AFTER_MIDNIGHT_THRESHOLD_TIME`. Each tool is right about a
+different question.
+
+**`jsconfig.json` at the repo root is load-bearing — do not delete it.** It exists solely to
+give tsserver a project: nothing imports it and it emits nothing (`noEmit: true`). Without it,
+tsserver falls back to inferred-project mode, which indexes only files already opened — and
+then `findReferences` on `AFTER_MIDNIGHT_THRESHOLD_HOUR` reports "3 references across 1 files",
+silently omitting `functions/event/[slug].js` and the test that imports it. That is the sibling
+sweep's worst failure shape: not an error, but a confident and incomplete answer. With the
+project file the same query returns 8 across 3. Adding it was verified 2026-08-13 to leave
+`npm run build --prefix frontend` (exit 0) and the 1127-test backend suite green.

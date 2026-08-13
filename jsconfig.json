@@ -10,9 +10,14 @@
     "resolveJsonModule": true
   },
   "include": [
+    "*.js",
     "functions/**/*.js",
+    "frontend/*.js",
     "frontend/src/**/*.js",
     "frontend/src/**/*.jsx",
+    "frontend/public/sw.js",
+    "frontend/scripts/**/*.mjs",
+    "scripts/**/*.js",
     "scripts/**/*.mjs",
     "e2e/**/*.js"
   ],

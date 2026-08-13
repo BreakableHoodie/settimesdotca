@@ -119,13 +119,16 @@ whose `lib/` ships only `getExePath.js` and `tsc.js` — there is no `tsserver.j
 with `Could not find a valid TypeScript installation` while `tsc --version` reports a perfectly
 healthy 7.x. Verified 2026-08-13: TS 7.0.2 broke it, TS 5.9.3 is the working target.
 
-- Covers `.js .jsx .mjs .cjs .ts .tsx .mts .cts` — i.e. the whole repo (347 `.js` + 162 `.jsx`,
-  no TypeScript).
+- The server handles `.js .jsx .mjs .cjs .ts .tsx .mts .cts`. `jsconfig.json`'s `include`
+  globs cover every tracked `.js`/`.jsx`/`.mjs` under `functions/`, `frontend/`, `scripts/`
+  and `e2e/`, plus the root config files — the only exclusion is `.github/` skill assets.
 - Claude Code: the `typescript-lsp` plugin plus `ENABLE_LSP_TOOL=1`, both in
-  `~/.claude/settings.json` (machine-local, not in this repo).
-- OpenCode: `"lsp": true` in `opencode.json` activates the built-in server definitions. Its
-  typescript entry is **not** on OpenCode's auto-download list, so it resolves the same global
-  binary — one install unblocks both.
+  `~/.claude/settings.json` (machine-local, not in this repo). **Verified working.**
+- OpenCode: `"lsp": true` in `opencode.json` activates the built-in server definitions, and
+  its typescript entry is **not** on OpenCode's auto-download list. Whether it resolves the
+  global binary or insists on a local `node_modules/typescript` is **unverified** — this repo
+  declares no local `typescript`, so confirm on the first delegated run before relying on it
+  (#830). Claude Code's path does not depend on the answer.
 - **Verify by making an LSP call, never by reading config.** A missing binary fails at call
   time with `ENOENT: typescript-language-server`, not at startup, so a green-looking config
   proves nothing.

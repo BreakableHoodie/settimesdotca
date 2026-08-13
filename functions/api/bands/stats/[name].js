@@ -4,6 +4,7 @@ import { normalizeBandName } from "../../../utils/bandName.js";
 import { safeReflectSocialLinks } from "../../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../../utils/eventDay.js";
 import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
+import { BAND_LINK_FIELD_KEYS } from "../../../utils/bandLinkFields.js";
 
 /**
  * Public API: Get band profile with rich stats
@@ -236,16 +237,13 @@ export async function onRequestGet(context) {
       description: bandProfile.description,
       genre: bandProfile.genre,
       origin: formatOrigin(bandProfile),
-      social: {
-        website: socialLinks.website || null,
-        instagram: socialLinks.instagram || null,
-        bandcamp: socialLinks.bandcamp || null,
-        facebook: socialLinks.facebook || null,
-        youtube: socialLinks.youtube || null,
-        spotify: socialLinks.spotify || null,
-        apple_music: socialLinks.apple_music || null,
-        linktree: socialLinks.linktree || null,
-      },
+      // Built from the canonical platform list (#779): every documented key is
+      // always present, null where absent — that stable key set IS the public
+      // response contract. Never hand-list the keys here; iterate
+      // BAND_LINK_FIELD_KEYS so this endpoint and bands/[name].js cannot
+      // diverge again (functions/utils/__tests__/bandLinkFieldsGuard.test.js
+      // enforces it).
+      social: Object.fromEntries(BAND_LINK_FIELD_KEYS.map((key) => [key, socialLinks[key] || null])),
       stats: {
         total_performances: statsPerformances.length,
         unique_venues: uniqueVenues.length,

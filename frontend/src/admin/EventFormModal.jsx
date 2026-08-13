@@ -666,7 +666,15 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
                   className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 >
                   <option value="draft">Draft</option>
-                  <option value="published">Published</option>
+                  {/*
+                    Create offers no `Published`: the server rejects it (#804).
+                    A brand-new event has no performances yet, so creating it
+                    published would always be a silent empty-lineup publish,
+                    skipping the confirm that POST .../publish shows. Create as
+                    a draft, then publish -- that path still supports a
+                    "Lineup TBA" publish, it just asks first.
+                  */}
+                  {isEditing && <option value="published">Published</option>}
                   {!isEditing && canCreateArchived && <option value="archived">Archived</option>}
                 </select>
               )}

@@ -170,6 +170,37 @@ export async function onRequestPost(context) {
       );
     }
 
+    // Publication must go through POST /api/admin/events/:id/publish, which is
+    // the only route that asks before putting a lineup-less event in front of
+    // the public (400 EMPTY_LINEUP, overridable with an explicit
+    // `allowEmptyLineup: true` -- the supported "Lineup TBA" publish).
+    //
+    // Creating straight into `published` is the one path where that prompt can
+    // never fire: the row is born with zero performances, so a create-as-
+    // published is ALWAYS an empty-lineup publish, silently. The admin create
+    // form offered `Published` in a dropdown next to `Draft`, so one mis-click
+    // put a half-configured event on the public site and in the sitemap (#804).
+    //
+    // This is deliberately NOT the same as the "tighten every status writer"
+    // fix that `events/[id].js` rejects in its PUT-toggle comment. That comment
+    // argues against making the toggle STRICTER than its guarded sibling; this
+    // routes creation TOWARD that sibling. `draft` and `archived` stay allowed
+    // -- archived is historical back-fill (HistoricalImportModal) and carries
+    // no live-lineup requirement.
+    if (status === "published") {
+      return new Response(
+        JSON.stringify({
+          error: "Validation error",
+          message: "Create the event as a draft, then publish it. Publishing checks the lineup first.",
+          code: "CREATE_AS_PUBLISHED",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     // Validate date is not in past (unless status is archived for retroactive
     // events). "Today" must be the events' Toronto-local day, not the Worker's
     // UTC day: new Date() components on Cloudflare are UTC, which roll to

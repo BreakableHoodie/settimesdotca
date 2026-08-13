@@ -44,12 +44,12 @@ export function renderMarkdownToSafeHtml(md) {
 
   const html = marked.parse(md, { async: false })
   // Scope the rel-forcing hook to this call (add before, remove after) so there
-  // are no global DOMPurify side effects.
+  // are no global DOMPurify side effects (#793).
   DOMPurify.addHook('afterSanitizeAttributes', forceLinkRel)
   try {
     return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
   } finally {
-    DOMPurify.removeHook('afterSanitizeAttributes')
+    DOMPurify.removeAllHooks()
   }
 }
 

@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import DOMPurify from 'dompurify'
 import { renderMarkdownToSafeHtml, stripMarkdownToText } from '../markdown'
 
 // ---------------------------------------------------------------------------
@@ -181,6 +182,15 @@ describe('renderMarkdownToSafeHtml — XSS protection', () => {
 
   it('forces rel on markdown-syntax links too', () => {
     expect(renderMarkdownToSafeHtml('[x](https://settimes.ca)')).toContain('rel="noopener noreferrer"')
+  })
+
+  it('cleans up DOMPurify hooks after sanitization without leaking (#793)', () => {
+    renderMarkdownToSafeHtml('[x](https://settimes.ca)')
+    const directSanitized = DOMPurify.sanitize('<a href="https://example.com">direct</a>', {
+      ALLOWED_TAGS: ['a'],
+      ALLOWED_ATTR: ['href', 'rel'],
+    })
+    expect(directSanitized).not.toContain('rel="noopener noreferrer"')
   })
 })
 

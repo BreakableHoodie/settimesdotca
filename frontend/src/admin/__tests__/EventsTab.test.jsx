@@ -10,6 +10,10 @@ import EventsTab from '../EventsTab'
 vi.mock('../../utils/adminApi', () => ({
   eventsApi: {
     setPublishState: vi.fn(),
+    // EventFormModal's save path (#821/#825) goes through these.
+    update: vi.fn(),
+    create: vi.fn(),
+    setRevealMode: vi.fn(),
   },
   bandsApi: {
     getByEvent: vi.fn(),
@@ -158,5 +162,99 @@ describe('EventsTab — publish without a lineup (empty-lineup override)', () =>
     // The button still reads "Publish" (draft), not "Unpublish" -- the event
     // prop was never updated because the publish never went through.
     expect(screen.getAllByRole('button', { name: 'Publish' }).length).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * #825. EventFormModal saves fields first, then publishes, so a declined or
+ * failed publish leaves the save PARTIALLY done. Routing that through the
+ * normal onSave would close the modal and toast "Event updated successfully!"
+ * over a publish that never happened -- so it goes through onPartialSave, which
+ * refreshes the parent without closing or toasting.
+ *
+ * These render the real EventsTab + EventFormModal together, because the defect
+ * only exists in the seam between them: EventFormModal alone cannot know that
+ * the parent's onSave closes the modal.
+ */
+describe('EventsTab + EventFormModal — partial save when publishing fails (#825)', () => {
+  beforeEach(() => {
+    eventsApi.setPublishState.mockReset()
+    eventsApi.update.mockReset()
+    eventsApi.setRevealMode.mockReset()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const openEditAndSelectPublished = async () => {
+    const editButtons = screen.getAllByRole('button', { name: 'Edit' })
+    fireEvent.click(editButtons[0])
+
+    const statusSelect = await screen.findByLabelText('Status')
+    fireEvent.change(statusSelect, { target: { name: 'status', value: 'published' } })
+    return statusSelect
+  }
+
+  const submitForm = () => {
+    const saveButton = screen.getAllByRole('button', { name: /update event|save/i })[0]
+    fireEvent.click(saveButton)
+  }
+
+  it('keeps the modal open and does not toast success when the publish confirm is declined', async () => {
+    eventsApi.update.mockResolvedValue({ event: { ...DRAFT_EVENT_NO_BANDS } })
+    eventsApi.setPublishState.mockRejectedValueOnce(emptyLineupError())
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    const showToast = vi.fn()
+    render(
+      <EventsTab
+        events={[DRAFT_EVENT_NO_BANDS]}
+        onEventsChange={vi.fn()}
+        showToast={showToast}
+        readOnly={false}
+        canArchiveEvents={true}
+      />
+    )
+
+    await openEditAndSelectPublished()
+    submitForm()
+
+    // The explanatory message is on screen, which is only possible if the
+    // modal stayed open.
+    expect(await screen.findByText(/still a draft/i)).toBeInTheDocument()
+
+    // Never claim success for a publish that did not happen.
+    expect(showToast).not.toHaveBeenCalledWith('Event updated successfully!', 'success')
+    // And the override retry must not have fired.
+    expect(eventsApi.setPublishState).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the modal open and reports the reason when publishing throws', async () => {
+    eventsApi.update.mockResolvedValue({ event: { ...DRAFT_EVENT_NO_BANDS } })
+    eventsApi.setPublishState.mockRejectedValueOnce(new Error('Network request failed'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const showToast = vi.fn()
+    render(
+      <EventsTab
+        events={[DRAFT_EVENT_NO_BANDS]}
+        onEventsChange={vi.fn()}
+        showToast={showToast}
+        readOnly={false}
+        canArchiveEvents={true}
+      />
+    )
+
+    await openEditAndSelectPublished()
+    submitForm()
+
+    // Names the real cause rather than the misleading "Failed to save event",
+    // and says the fields were saved so the admin does not re-enter them.
+    const message = await screen.findByText(/publishing failed/i)
+    expect(message).toHaveTextContent('Network request failed')
+    expect(message).toHaveTextContent(/saved/i)
+
+    expect(showToast).not.toHaveBeenCalledWith('Event updated successfully!', 'success')
   })
 })

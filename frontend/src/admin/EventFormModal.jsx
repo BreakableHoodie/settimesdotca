@@ -7,6 +7,7 @@ import { FIELD_LIMITS } from '../utils/validation'
 import { buildDayOptions, enumerateFestivalDays, isMultiDayEvent } from './utils/dayOptions'
 import { formatFestivalDate } from '../utils/festivalDays'
 import { parseDoorsJsonToForm, serializeDoorsForm } from './utils/doorsFormData'
+import { publishWithLineupConfirm } from './utils/publishWithLineupConfirm'
 
 /**
  * EventFormModal - Modal for creating and editing events
@@ -22,10 +23,23 @@ import { parseDoorsJsonToForm, serializeDoorsForm } from './utils/doorsFormData'
  * @param {boolean} isOpen - Whether modal is visible
  * @param {function} onClose - Callback when modal closes
  * @param {object} event - Event object for editing (null for create)
- * @param {function} onSave - Callback when event is saved
+ * @param {function} onSave - Callback on full success. The parent treats this as
+ *   "done": it toasts success, refreshes, and CLOSES the modal.
+ * @param {function} onPartialSave - Callback when the field update succeeded but
+ *   publishing did not (declined or failed, #821/#825). Must refresh parent state
+ *   WITHOUT closing the modal or toasting success, so the explanatory message
+ *   stays on screen. Calling onSave here would close the modal and claim
+ *   "Event updated successfully!" over a failed publish.
  * @param {boolean} canCreateArchived - Allow creating archived events directly
  */
-export default function EventFormModal({ isOpen, onClose, event = null, onSave, canCreateArchived = false }) {
+export default function EventFormModal({
+  isOpen,
+  onClose,
+  event = null,
+  onSave,
+  onPartialSave,
+  canCreateArchived = false,
+}) {
   const isEditing = !!event
   // `status` is the only publication state this component reads (#799). The
   // deprecated publish-boolean it used to OR against still exists in the schema
@@ -300,11 +314,55 @@ export default function EventFormModal({ isOpen, onClose, event = null, onSave, 
         delete payload.status
       }
 
+      // #821: a draft -> published transition must go through
+      // POST .../publish, the only route that checks the lineup before making
+      // an event public. PATCH writes `status` with no such check, so saving
+      // this form with "Published" selected used to publish an empty event
+      // silently -- while the Events-list toggle asked first. Same transition,
+      // two different behaviours depending on which control you used.
+      //
+      // Only the TRANSITION is rerouted. Re-saving an already-published event
+      // still sends `status` through PATCH, which is a no-op status write and
+      // must stay allowed -- editing a live event's description or poster is
+      // routine.
+      const isPublishTransition = isEditing && formData.status === 'published' && event?.status !== 'published'
+      if (isPublishTransition) {
+        delete payload.status
+      }
+
       let data
       if (isEditing) {
         data = await eventsApi.update(event.id, payload)
       } else {
         data = await eventsApi.create(payload)
+      }
+
+      // Runs after the field update so a failed/declined publish still keeps
+      // the user's other edits, rather than discarding them.
+      //
+      // That ordering makes the save partially succeed, so this cannot fall
+      // through to the outer catch: that reports "Failed to save event", which
+      // would be a lie -- the fields ARE saved, only publication failed. Both
+      // exits below therefore push the saved record to the parent (so the list
+      // reflects the new field values and the still-draft status) and leave the
+      // modal open with an accurate message.
+      if (isPublishTransition) {
+        let result
+        try {
+          result = await publishWithLineupConfirm(eventsApi, { id: event.id, name: formData.name })
+        } catch (publishErr) {
+          console.error('Error publishing event:', publishErr)
+          if (onPartialSave) onPartialSave(data.event)
+          setError(`Your changes were saved, but publishing failed: ${publishErr.message}. The event is still a draft.`)
+          setLoading(false)
+          return
+        }
+        if (result.cancelled) {
+          if (onPartialSave) onPartialSave(data.event)
+          setError('Your changes were saved. The event is still a draft — you cancelled the publish confirmation.')
+          setLoading(false)
+          return
+        }
       }
 
       // Update reveal mode if it changed (editing only — new events default to off)

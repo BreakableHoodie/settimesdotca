@@ -5,6 +5,7 @@ import {
   buildIntervals,
   intervalsOverlap,
   computeNewEndTime,
+  checkConflicts,
   detectBulkConflicts,
 } from "../timeConflicts.js";
 import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../api/test-utils.js";
@@ -85,10 +86,174 @@ describe("computeNewEndTime", () => {
 });
 
 // ---------------------------------------------------------------------------
+// checkConflicts — single create/update conflict check (#540)
+//
+// Shared by the admin create (bands.js) and update (bands/[id].js) write
+// paths. Day-scoped since #540: same venue + clock time on different festival
+// days is a distinct slot, not a conflict.
+// ---------------------------------------------------------------------------
+
+describe("checkConflicts", () => {
+  function fixture() {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, {
+      name: "Conflict Check Event",
+      slug: "conflict-check-event",
+      date: "2026-08-01",
+    });
+    const venue = insertVenue(rawDb, { name: "Conflict Check Venue" });
+    return { env, rawDb, event, venue };
+  }
+
+  it("returns a conflict entry with type conflict for the exact same time", async () => {
+    const { env, rawDb, event, venue } = fixture();
+    insertBand(rawDb, {
+      name: "Existing Set",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+
+    const conflicts = await checkConflicts(env.DB, {
+      eventId: event.id,
+      venueId: venue.id,
+      startTime: "20:00",
+      endTime: "21:00",
+      eventDate: event.date,
+    });
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toMatchObject({
+      name: "Existing Set",
+      startTime: "20:00",
+      endTime: "21:00",
+      type: "conflict",
+    });
+    expect(conflicts[0].id).toBeTypeOf("number");
+  });
+
+  it("returns type overlap for a non-exact overlap", async () => {
+    const { env, rawDb, event, venue } = fixture();
+    insertBand(rawDb, {
+      name: "Existing Set",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+
+    const conflicts = await checkConflicts(env.DB, {
+      eventId: event.id,
+      venueId: venue.id,
+      startTime: "20:30",
+      endTime: "21:30",
+      eventDate: event.date,
+    });
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].type).toBe("overlap");
+  });
+
+  it("scopes to venue and event", async () => {
+    const { env, rawDb, event, venue } = fixture();
+    const otherVenue = insertVenue(rawDb, { name: "Other Venue" });
+    const otherEvent = insertEvent(rawDb, {
+      name: "Other Event",
+      slug: "other-event",
+      date: "2026-08-01",
+    });
+    insertBand(rawDb, {
+      name: "Elsewhere Set",
+      event_id: otherEvent.id,
+      venue_id: otherVenue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+
+    const conflicts = await checkConflicts(env.DB, {
+      eventId: event.id,
+      venueId: venue.id,
+      startTime: "20:00",
+      endTime: "21:00",
+      eventDate: event.date,
+    });
+
+    expect(conflicts).toEqual([]);
+  });
+
+  it("ignores the excluded performance (self during update)", async () => {
+    const { env, rawDb, event, venue } = fixture();
+    const existing = insertBand(rawDb, {
+      name: "Self",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+
+    const conflicts = await checkConflicts(env.DB, {
+      eventId: event.id,
+      venueId: venue.id,
+      startTime: "20:00",
+      endTime: "21:00",
+      excludePerformanceId: existing.id,
+      eventDate: event.date,
+    });
+
+    expect(conflicts).toEqual([]);
+  });
+
+  it("different festival days at the same venue and time do NOT conflict (#540)", async () => {
+    const { env, rawDb, event, venue } = fixture();
+    const day1 = insertBand(rawDb, {
+      name: "Day One Set",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run("2026-08-01", day1.id);
+
+    const conflicts = await checkConflicts(env.DB, {
+      eventId: event.id,
+      venueId: venue.id,
+      startTime: "20:00",
+      endTime: "21:00",
+      performanceDate: "2026-08-02",
+      eventDate: event.date,
+    });
+
+    expect(conflicts).toEqual([]);
+  });
+
+  it("NULL performance_date on both sides falls back to event date and still conflicts (single-day)", async () => {
+    const { env, rawDb, event, venue } = fixture();
+    insertBand(rawDb, {
+      name: "Single Day Set",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+
+    const conflicts = await checkConflicts(env.DB, {
+      eventId: event.id,
+      venueId: venue.id,
+      startTime: "20:00",
+      endTime: "21:00",
+      eventDate: event.date,
+    });
+
+    expect(conflicts).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // detectBulkConflicts — festival-day scoping (#551)
 //
-// #540 day-scoped the single create/update conflict check (checkConflicts in
-// functions/api/admin/bands.js). detectBulkConflicts (bulk move_venue /
+// #540 day-scoped the single create/update conflict check (checkConflicts, now
+// in this file). detectBulkConflicts (bulk move_venue /
 // change_time) was left out of that scope: it matched purely on
 // event_id + venue_id + clock overlap, so a multi-day event's bulk move/retime
 // would false-conflict against a different festival day. These tests cover

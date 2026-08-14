@@ -155,15 +155,16 @@ describe('VenuePage — performer cards (#742)', () => {
   // that evening, NOT the calendar date the clock happened to roll over to.
   it('groups an after-midnight set with the PREVIOUS evening, not the calendar date of its start time', async () => {
     // Pinned for the same reason as the multi-day test above, but here the
-    // exact date matters. Pin EARLIER than two weeks before the set and this
-    // test fails -- getTimeDescription's >2-weeks fallback branch renders the
-    // raw +1-day-offset timestamp ("Aug 8") instead of the festival day
-    // ("Aug 7"). That is the open bug #689 Finding 1, not a venue-page
-    // defect. Aug 1 keeps the set inside the window fans actually view it in,
-    // so this asserts THIS page's behaviour rather than re-failing on a known
-    // timeFilter bug.
+    // exact date matters. The clock is pinned EARLIER than two weeks before
+    // the set so getTimeDescription's date-fallback branch actually runs —
+    // inside the two-week window it renders time only and the /Aug 8/
+    // assertion below is vacuous. #689: the fallback once rendered the raw
+    // +1-day-offset timestamp ("Aug 8") instead of the festival day
+    // ("Aug 7") for exactly this set; this test is the component-level
+    // regression guard for that fix, and the negative assertion fails on a
+    // revert of timeFilter.js.
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    vi.setSystemTime(new Date(2026, 7, 1, 12, 0, 0)) // Aug 1 2026
+    vi.setSystemTime(new Date(2026, 6, 20, 12, 0, 0)) // Mon Jul 20 2026 — beyond the two-week window
     fetchPublicJson.mockReset()
     fetchPublicJson.mockResolvedValue({
       venue: { id: 3, name: 'Prohibition Warehouse', location: 'Waterloo, ON', address: null, website: null },

@@ -86,12 +86,15 @@ async function waitForPrivacyBannerSettled(page) {
 }
 
 /** Resolves the seeded upcoming event's slug from the homepage event card —
- * the same [data-testid="event-card"] locator public-timeline.spec.js uses. */
+ * the same [data-testid="event-card"] locator public-timeline.spec.js uses.
+ * Since #700 the card's single navigation link wraps the title heading
+ * (`<a><h3>…</h3></a>`), so target the link by its href instead of assuming
+ * the anchor sits inside the heading (`h3 a` matches nothing now). */
 async function resolveEventSlug(page) {
   await page.goto("/");
   const card = page.locator('[data-testid="event-card"]').first();
   await expect(card).toBeVisible();
-  const href = await card.locator("h3 a").first().getAttribute("href");
+  const href = await card.locator('a[href^="/event/"]:has(h3)').first().getAttribute("href");
   return href ? href.replace(/^\/event\//, "") : null;
 }
 

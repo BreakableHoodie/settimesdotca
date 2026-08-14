@@ -162,3 +162,11 @@ silently omitting `functions/event/[slug].js` and the test that imports it. That
 sweep's worst failure shape: not an error, but a confident and incomplete answer. With the
 project file the same query returns 8 across 3. Adding it was verified 2026-08-13 to leave
 `npm run build --prefix frontend` (exit 0) and the 1127-test backend suite green.
+
+<!-- Global instructions for all agents go above this line -->
+
+## Gemini Specific Instructions
+- When running as Gemini, your role is a "Draftsman".
+- Focus on drafting initial patches, fixing small bugs, and writing unit tests.
+- Always push your work to a new feature branch named `gemini/issue-[number]`.
+- Do not attempt to merge code directly into the `main` or `master` branches.

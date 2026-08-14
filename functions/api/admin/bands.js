@@ -14,7 +14,7 @@ import {
   sanitizeString,
   validatePerformanceDate,
 } from "../../utils/validation.js";
-import { buildIntervals, intervalsOverlap } from "../../utils/timeConflicts.js";
+import { checkConflicts } from "../../utils/timeConflicts.js";
 import { parseOrigin } from "../../utils/parseOrigin.js";
 import { normalizeBandName } from "../../utils/bandName.js";
 import { sortableName } from "../../utils/sortableName.js";
@@ -66,61 +66,6 @@ function unpackSocialLinks(band) {
     apple_music: social.apple_music || "",
     linktree: social.linktree || "",
   };
-}
-
-async function checkConflicts(
-  DB,
-  eventId,
-  venueId,
-  startTime,
-  endTime,
-  excludePerformanceId = null,
-  performanceDate = null,
-  eventDate = null,
-) {
-  let query = `
-    SELECT p.id, p.start_time, p.end_time, p.performance_date, bp.name
-    FROM performances p
-    JOIN band_profiles bp ON p.band_profile_id = bp.id
-    WHERE p.event_id = ? AND p.venue_id = ?
-  `;
-  const bindings = [eventId, venueId];
-  if (excludePerformanceId) {
-    query += ` AND p.id != ?`;
-    bindings.push(excludePerformanceId);
-  }
-
-  const { results: existingPerformances } = await DB.prepare(query)
-    .bind(...bindings)
-    .all();
-  const newIntervals = buildIntervals(startTime, endTime);
-  // Festival-day scoping (#540): two sets on different festival days never
-  // conflict, even at the same venue and clock time (a Day-1 8 PM and a Day-2
-  // 8 PM set at the same venue are distinct slots). Falls back to eventDate for
-  // NULL performance_date, so single-day events (both sides NULL → same day)
-  // keep conflicting exactly as before. Mirrors detectConflicts in
-  // frontend/src/admin/utils/timeUtils.js (#538).
-  const candidateDay = performanceDate || eventDate;
-  const conflicts = [];
-
-  for (const perf of existingPerformances) {
-    if (!perf.start_time || !perf.end_time) continue;
-    const otherDay = perf.performance_date || eventDate;
-    if (candidateDay && otherDay && candidateDay !== otherDay) continue;
-    const perfIntervals = buildIntervals(perf.start_time, perf.end_time);
-    const hasOverlap = perfIntervals.some((b) => newIntervals.some((a) => intervalsOverlap(a, b)));
-    if (hasOverlap) {
-      conflicts.push({
-        id: perf.id,
-        name: perf.name,
-        startTime: perf.start_time,
-        endTime: perf.end_time,
-        type: perf.start_time === startTime && perf.end_time === endTime ? "conflict" : "overlap",
-      });
-    }
-  }
-
-  return conflicts;
 }
 
 // GET - List bands for an event
@@ -520,16 +465,14 @@ export async function onRequestPost(context) {
 
     // Check for conflicts (only if times are provided)
     if (!isGlobalAdd && resolvedVenueId && startTime && endTime) {
-      const conflicts = await checkConflicts(
-        DB,
+      const conflicts = await checkConflicts(DB, {
         eventId,
-        resolvedVenueId,
+        venueId: resolvedVenueId,
         startTime,
         endTime,
-        null,
-        resolvedPerformanceDate,
-        event.date,
-      );
+        performanceDate: resolvedPerformanceDate,
+        eventDate: event.date,
+      });
       if (conflicts.length > 0) {
         return new Response(
           JSON.stringify({

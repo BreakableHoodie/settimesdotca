@@ -64,6 +64,53 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     expect(body.metrics.topSharedRoutes[0].view_count).toBe(5);
   });
 
+  test("top routes carry band_count and created_at, and zero-view shares are excluded (#702)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Route Fest", slug: "route-fest" });
+    // Two distinct bands
+    insertShareLink(rawDb, {
+      slug: "routeaa2",
+      event_id: event.id,
+      event_slug: "route-fest",
+      performance_ids: [1, 2],
+      band_names: ["A", "B"],
+      expires_at: "2026-08-20 00:00:00",
+    });
+    // One band played twice → distinct count is 1, not 2
+    insertShareLink(rawDb, {
+      slug: "routebb2",
+      event_id: event.id,
+      event_slug: "route-fest",
+      performance_ids: [3, 4],
+      band_names: ["C", "C"],
+      expires_at: "2026-08-20 00:00:00",
+    });
+    // Zero-view share must not appear in a "most-viewed" list
+    insertShareLink(rawDb, {
+      slug: "routezero",
+      event_id: event.id,
+      event_slug: "route-fest",
+      performance_ids: [5],
+      band_names: ["D"],
+      expires_at: "2026-08-20 00:00:00",
+    });
+    rawDb.prepare("UPDATE share_links SET view_count = ? WHERE slug = ?").run(5, "routeaa2");
+    rawDb.prepare("UPDATE share_links SET view_count = ? WHERE slug = ?").run(2, "routebb2");
+    rawDb.prepare("UPDATE share_links SET created_at = ? WHERE slug = ?").run("2026-07-16 07:02:00", "routeaa2");
+
+    const res = await call(env, event.id);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const routes = body.metrics.topSharedRoutes;
+    // Zero-view share filtered out
+    expect(routes.map((r) => r.slug)).toEqual(["routeaa2", "routebb2"]);
+    // Distinct band count, not performance count
+    expect(routes[0].band_count).toBe(2);
+    expect(routes[1].band_count).toBe(1);
+    // Creation date surfaced so age is visible
+    expect(routes[0].created_at).toBe("2026-07-16 07:02:00");
+  });
+
   test("includes share import totals -- the conversion signal beside shares/views (#703)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Fest", slug: "fest" });

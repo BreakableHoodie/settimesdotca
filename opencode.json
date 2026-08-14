@@ -137,15 +137,32 @@
     }
   },
   "permission": {
-    "edit": "ask",
-    "bash": "ask",
-    "webfetch": "allow",
-    "websearch": "allow",
-    "read": "ask",
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      ".dev.vars": "deny",
+      "**/.dev.vars": "deny"
+    },
+    "edit": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      ".dev.vars": "deny",
+      "**/.dev.vars": "deny"
+    },
     "glob": "allow",
     "grep": "allow",
-    "task": "ask",
-    "question": "allow"
+    "list": "allow",
+    "bash": "allow",
+    "task": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "question": "allow",
+    "todowrite": "allow",
+    "skill": "allow",
+    "lsp": "allow",
+    "external_directory": "deny"
   },
   "compaction": {
     "auto": true,

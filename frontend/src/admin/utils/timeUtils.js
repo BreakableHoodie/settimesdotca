@@ -25,7 +25,7 @@ const normalizeEndMinutes = (startMinutes, endMinutes) => {
   return endMinutes < startMinutes ? endMinutes + MINUTES_PER_DAY : endMinutes
 }
 
-export const buildTimeIntervals = (startTime, endTime) => {
+const buildTimeIntervals = (startTime, endTime) => {
   const startMinutes = parseTimeToMinutes(startTime)
   const endMinutes = parseTimeToMinutes(endTime)
   if (startMinutes == null || endMinutes == null) {
@@ -167,7 +167,7 @@ export const detectConflicts = (candidateBand, bands, eventDate = null) => {
   return { overlaps, conflicts }
 }
 
-export const formatTimeLabel = time => {
+const formatTimeLabel = time => {
   if (!time) return '—'
   const [hours, minutes] = time.split(':')
   const parsedHours = Number(hours)

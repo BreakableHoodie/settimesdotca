@@ -52,7 +52,7 @@ function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
   );
 }
 
-export function getCookieConfig(request, env = null) {
+function getCookieConfig(request, env = null) {
   const isDev = isDevRequest(request, env);
   return {
     httpOnly: false,
@@ -144,7 +144,7 @@ export function deleteCSRFCookie(request = null, env = null) {
   return `csrf_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${secure}SameSite=${sameSite}`;
 }
 
-export function validateCSRFToken(request, env = null) {
+function validateCSRFToken(request, env = null) {
   try {
     const req = buildRequestAdapter(request, env);
     return csrf.validateRequest(req);

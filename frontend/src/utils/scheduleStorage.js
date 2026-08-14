@@ -97,26 +97,3 @@ export function getScheduleEventSlug() {
     return null
   }
 }
-
-/**
- * Get a map of event slugs to their saved band count
- * Returns { slug: count, ... } for events with selections
- */
-export function getSelectedCountByEvent() {
-  if (typeof window === 'undefined') return {}
-  try {
-    const data = localStorage.getItem(SELECTED_BANDS_KEY)
-    if (!data) return {}
-    const parsed = JSON.parse(data)
-    if (!parsed || typeof parsed !== 'object') return {}
-    const counts = {}
-    for (const [slug, bands] of Object.entries(parsed)) {
-      if (Array.isArray(bands) && bands.length > 0) {
-        counts[slug] = bands.length
-      }
-    }
-    return counts
-  } catch {
-    return {}
-  }
-}

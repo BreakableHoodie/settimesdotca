@@ -150,8 +150,7 @@
     "todowrite": "allow",
     "skill": "allow",
     "lsp": "allow",
-    "external_directory": "allow",
-    "doom_loop": "allow"
+    "external_directory": "deny"
   },
   "compaction": {
     "auto": true,

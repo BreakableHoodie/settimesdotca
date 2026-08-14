@@ -27,7 +27,9 @@ export function buildDirectionsHref(name, address) {
 // payload (venue NAME + optional venue_lat/venue_lng — schedule.js never
 // joins the venue's address). Prefers exact coordinates, which opens the
 // device's native maps app rather than a Google web search; falls back to a
-// "<venue> Waterloo ON" name search when coordinates aren't available.
+// "<venue> <venue_city>" name search when coordinates aren't available, or a
+// bare venue-name search when the city is unknown (#767 — never a hardcoded
+// city, which is confidently wrong outside Waterloo Region).
 //
 // Consolidated from utils/nextMove.js's own copy of this exact function
 // (#754) — issue #754's correction confirmed there were two directions-URL
@@ -37,7 +39,7 @@ export function buildDirectionsHref(name, address) {
 // go through; do not reintroduce a third copy in a component file.
 export function buildDirectionsHrefForBand(band) {
   if (!band) return null
-  const { venue_lat: lat, venue_lng: lng, venue } = band
+  const { venue_lat: lat, venue_lng: lng, venue, venue_city: city } = band
   // Number.isFinite (not !Number.isNaN) — the latter accepts Infinity, which
   // would build a literal "destination=Infinity,Infinity" URL. Range-check to
   // WGS84 bounds too: an out-of-range pair is bad data, and a broken pin is
@@ -46,16 +48,15 @@ export function buildDirectionsHrefForBand(band) {
   if (hasUsableCoords) {
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
   }
-  // KNOWN LIMITATION: this fallback hardcodes "Waterloo ON", which is wrong
-  // for events outside Waterloo Region (Buddies Fest 2 is in Tillsonburg).
-  // It is currently unreachable in production -- every venue row has
-  // latitude/longitude (migrations 0043/0044) and schedule.js projects them
-  // as venue_lat/venue_lng, so the coordinate branch above always wins.
-  // Threading the event's own city through here is tracked in #767; until
-  // then, do NOT rely on this branch for a non-Waterloo event.
+  // Fallback for a venue without usable coordinates: search by name. Scope the
+  // search to the venue's own city when known (#767) — never a hardcoded city,
+  // which is confidently wrong for events outside Waterloo Region. When city is
+  // unknown, a bare venue-name search is vaguer but never wrong.
   const trimmedVenue = typeof venue === 'string' ? venue.trim() : ''
   if (trimmedVenue) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${trimmedVenue} Waterloo ON`)}`
+    const trimmedCity = typeof city === 'string' ? city.trim() : ''
+    const query = trimmedCity ? `${trimmedVenue} ${trimmedCity}` : trimmedVenue
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
   }
   return null
 }

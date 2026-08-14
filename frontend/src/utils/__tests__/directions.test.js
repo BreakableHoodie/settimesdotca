@@ -69,10 +69,22 @@ describe('buildDirectionsHrefForBand (#754)', () => {
     expect(href).toBe('https://www.google.com/maps/dir/?api=1&destination=43.46,-80.52')
   })
 
-  it('falls back to a name search when coords are missing', () => {
+  // Deliberately a NON-Waterloo city, asserted as a whole URL. With
+  // venue_city: 'Waterloo' and a toContain() assertion this test passed against
+  // the old hardcoded "<venue> Waterloo ON" implementation too — "The Roost
+  // Waterloo ON" contains "The Roost Waterloo" — so it proved nothing about
+  // #767. Buddies Fest 2 is in Tillsonburg, which is the case that was broken.
+  it('falls back to a name search scoped to the venue city when coords are missing', () => {
+    const href = buildDirectionsHrefForBand({ venue: 'The Roost', venue_city: 'Tillsonburg' })
+    expect(href).toBe(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('The Roost Tillsonburg')}`)
+    expect(href).not.toContain('Waterloo')
+  })
+
+  it('falls back to a bare venue-name search when coords AND city are missing', () => {
     const href = buildDirectionsHrefForBand({ venue: 'The Roost' })
     expect(href).toContain('/maps/search/')
-    expect(href).toContain(encodeURIComponent('The Roost Waterloo ON'))
+    expect(href).toContain(encodeURIComponent('The Roost'))
+    expect(href).not.toContain('Waterloo')
   })
 
   // Bad coordinates must degrade to the venue-name search, not build a pin
@@ -86,8 +98,18 @@ describe('buildDirectionsHrefForBand (#754)', () => {
     ['out-of-range longitude', 43.46, 181],
     ['string coords', '43.46', '-80.52'],
   ])('falls back to the name search for %s coords', (_label, lat, lng) => {
-    const href = buildDirectionsHrefForBand({ venue: 'Roost', venue_lat: lat, venue_lng: lng })
-    expect(href).toBe('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Roost Waterloo ON'))
+    const href = buildDirectionsHrefForBand({ venue: 'Roost', venue_city: 'Waterloo', venue_lat: lat, venue_lng: lng })
+    expect(href).toBe('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Roost Waterloo'))
+  })
+
+  it('trims surrounding whitespace from the city qualifier', () => {
+    const href = buildDirectionsHrefForBand({ venue: 'The Roost', venue_city: '  Waterloo, ON  ' })
+    expect(href).toBe('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('The Roost Waterloo, ON'))
+  })
+
+  it('ignores a non-string city and searches by venue name alone', () => {
+    const href = buildDirectionsHrefForBand({ venue: 'The Roost', venue_city: 42 })
+    expect(href).toBe('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('The Roost'))
   })
 
   it('returns null when coords are unusable and there is no venue name', () => {

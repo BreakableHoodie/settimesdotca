@@ -66,6 +66,25 @@ Never be lazy about understanding, input validation, error handling that prevent
 
 When a task has a clear implementation spec, dispatch a Sonnet agent to build it; reserve Opus/Fable for the design up front and the review after. Always follow a Sonnet implementation with a big-brain review pass — that second perspective catches whole bug classes a to-spec implementer stops short of.
 
+### Verifying any delegation — `scripts/delegate-verify.mjs`
+
+**A delegate's exit code and self-reported status are claims, not evidence. `git status` is the evidence.** Wrap every delegated run:
+
+```bash
+node scripts/delegate-verify.mjs -- <the delegation command>
+node scripts/delegate-verify.mjs --allow-empty -- <read-only command>   # research/digest tasks
+```
+
+Exit codes: `0` succeeded *and* changed files · `1` the command failed · `2` **reported success but changed nothing** · `3` the delegate committed · `4` usage.
+
+Code `2` is the one that pays for the script. Measured 2026-08-13: an agy delegation returned exit `0` and `AGY_USAGE {"status":"SUCCESS"}` having touched **zero files** — headless agy had no `write_file` grant, so it described the work instead of doing it and still "succeeded". 96,825 tokens, nothing on disk, and nothing in its own output said so. The tool behaved exactly as its README documents ("ungranted writes leave the workspace untouched but report success"); the mistake was trusting the status field.
+
+Code `3` enforces the other half of the contract below: **the delegate never commits.** The orchestrator reviews the diff, runs `make gate`, and commits. A delegate that moves HEAD has skipped review entirely.
+
+The check is deliberately tool-agnostic — it wraps agy, OpenCode's relay, or anything else, because the failure is about *permissions and silent refusals*, not about any one vendor. It uses `git status --porcelain`, so a brand-new untracked file counts as real work (a `git diff`-only check would call that a no-op).
+
+**Before the first real delegation on a new machine or after a tool upgrade, prove the write grant with a throwaway task** rather than discovering it on a task you cared about. One canary costs seconds; the failure above cost 96k tokens.
+
 ### Delegating to OpenCode
 
 A third implementer, on a separate subscription: the `opencode-delegate` skill.

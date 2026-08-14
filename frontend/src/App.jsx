@@ -21,6 +21,7 @@ import { validateBandsData } from './utils/validation'
 import { prepareBands } from './utils/bandUtils'
 import { orderedFestivalDays } from './utils/festivalDays'
 import { saveSelectedBands } from './utils/scheduleStorage'
+import { useSharedRouteImport } from './hooks/useSharedRouteImport'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 const TIME_FILTERS_STORAGE_KEY = 'timeFiltersByEvent'
@@ -446,42 +447,19 @@ function App() {
     }
   }, [bands, searchParams, setSearchParams, showScheduleToast, slug, trackScheduleBuilds])
 
-  useEffect(() => {
-    const shareSlug = searchParams.get('share')
-    if (!shareSlug || bands.length === 0) return
+  const handleShareData = useCallback(({ matchedIds, matchedNames }) => {
+    setPendingSharedBands(matchedIds)
+    setPendingSharedBandNames(matchedNames)
+    setSharedScheduleConfirmOpen(true)
+  }, [])
 
-    setSearchParams(
-      prev => {
-        const next = new URLSearchParams(prev)
-        next.delete('share')
-        return next
-      },
-      { replace: true }
-    )
-
-    // ?import=1 — this is the apply-the-route refetch after the preview already
-    // counted the view, so it must not inflate share view_count (see share/[slug].js).
-    fetch(`/api/schedule/share/${encodeURIComponent(shareSlug)}?import=1`)
-      .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then(data => {
-        const matchedBands = bands.filter(band => {
-          const parts = band.id.split('-')
-          const perfId = Number(parts[parts.length - 1])
-          return data.performance_ids.includes(perfId)
-        })
-        const matchedIds = matchedBands.map(band => band.id)
-        const matchedNames = matchedBands.map(band => band.name || '')
-
-        if (matchedIds.length === 0) return
-
-        setPendingSharedBands(matchedIds)
-        setPendingSharedBandNames(matchedNames)
-        setSharedScheduleConfirmOpen(true)
-      })
-      .catch(err => {
-        console.warn('[App] Failed to load share link', err)
-      })
-  }, [bands, searchParams, setSearchParams])
+  // Extracted from this file's inline effect so the exactly-once-per-slug claim
+  // is testable (see hooks/__tests__/useSharedRouteImport.test.jsx). Same
+  // behavior: the ?import=1 refetch must not inflate share_links.import_count
+  // (see share/[slug].js) — that is the per-fetch, undeduped counter, distinct
+  // from view_count, which is unique visitors recomputed from a ledger. #765
+  // guards it from re-firing per slug.
+  useSharedRouteImport({ searchParams, setSearchParams, bands, onShareData: handleShareData })
 
   const dismissHint = () => {
     setShowHint(false)

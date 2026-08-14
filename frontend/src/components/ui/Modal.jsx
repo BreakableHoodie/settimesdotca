@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import { X } from 'lucide-react'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 
 /**
  * Modal Component - Design System v2.0
@@ -139,18 +140,10 @@ export default function Modal({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, handleKeyDown])
 
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isOpen])
+  // Lock body scroll while open. The shared hook refcounts across stacked
+  // overlays (#657): closing THIS modal must not unlock the page while a
+  // lightbox or another overlay is still open above it.
+  useBodyScrollLock(isOpen)
 
   // Handle backdrop click
   const handleBackdropClick = e => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { X } from 'lucide-react'
 import PosterImage from '../PosterImage'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 
 /**
  * ImageLightbox — full-viewport click-to-enlarge image viewer (#655).
@@ -15,10 +16,13 @@ import PosterImage from '../PosterImage'
  * row (it's `position: fixed` but rendered *inside* the `role="dialog"` div
  * below, so it stays reachable by the focus trap and by assistive tech,
  * which treats everything outside that element as inert under
- * aria-modal="true"). The focus-trap / ESC / scroll-lock behavior below
- * mirrors the pattern already duplicated in Modal.jsx and ConfirmDialog.jsx
- * — there is no shared hook in this codebase to extend, so this follows the
- * same proven approach rather than introducing a third, different one.
+ * aria-modal="true"). The focus-trap / ESC behavior below
+ * mirrors the pattern duplicated in Modal.jsx and ConfirmDialog.jsx — there is
+ * no shared focus-trap hook in this codebase to extend, so this follows the
+ * same proven approach rather than introducing a third, different one. The
+ * scroll lock is NOT part of that duplication: it goes through the shared
+ * useBodyScrollLock() hook (#657) like Modal, so stacked overlays share one
+ * refcount and the lock survives until the last overlay closes.
  *
  * The close button uses `text-white` deliberately — it sits over a fixed
  * dark scrim (bg-black/90), one of the documented theme-token exceptions
@@ -96,18 +100,11 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, width = 1600 
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, handleKeyDown])
 
-  // Lock body scroll while open. The cleanup always restores it, even if the
-  // component unmounts while still open, so an unmount-while-open can never
-  // leave the page stuck unscrollable.
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    }
-
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isOpen])
+  // Lock body scroll while open. The shared hook refcounts across stacked
+  // overlays (#657): the cleanup must not release the lock while a modal below
+  // is still open, and unmounting while open must never leave the page stuck
+  // unscrollable — both are properties of the refcount, not this component.
+  useBodyScrollLock(isOpen)
 
   const handleBackdropClick = e => {
     if (e.target === e.currentTarget) {

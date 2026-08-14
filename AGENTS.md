@@ -103,3 +103,62 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
   are required for ANY Playwright invocation, including `--list`). `make e2e` handles this.
 - E2E spec files are under the same prettier/eslint scope as `functions/`/`scripts/` (#622) —
   double quotes/semis, `eslint.config.js`'s `e2e/**` block covers Playwright + browser globals.
+
+## LSP — prefer it over grep for symbol navigation
+
+Both harnesses navigate by LSP. Two **dependencies** must be installed, and separately each
+harness must be **configured** (both listed below) — all of it is required, and a missing
+piece fails silently rather than loudly.
+
+```bash
+npm install -g typescript-language-server   # 1. the server binary — per machine, not in this repo
+make install                                # 2. typescript@^5 — a devDependency, already declared
+```
+
+**`typescript` is a local devDependency on purpose, not an oversight in a repo with no `.ts`
+files.** OpenCode's built-in typescript server resolves `typescript/lib/tsserver.js` *from the
+project directory*, and node resolution never consults global `node_modules` — so with only a
+global install it hits `if (!Z) return` and the LSP is **silently off**, no error anywhere. The
+local copy also serves Claude Code, so the global `typescript` is unnecessary; only the server
+binary has to be global. Node resolution walks up, so the single root install covers
+`frontend/` too.
+
+**Never move that dependency to `typescript@7`.** TS 7 is the native Go port: its `lib/` ships
+only `getExePath.js` and `tsc.js` — no `tsserver.js`, which is exactly the file the language
+server spawns. It fails every LSP call with `Could not find a valid TypeScript installation`
+while `tsc --version` reports a perfectly healthy 7.x. Verified 2026-08-13: 7.0.2 breaks it,
+5.9.3 works. The `^5` caret is what keeps a routine bump from silently disabling navigation.
+
+- The server handles `.js .jsx .mjs .cjs .ts .tsx .mts .cts`. `jsconfig.json`'s `include`
+  globs cover every tracked `.js`/`.jsx`/`.mjs` under `functions/`, `frontend/`, `scripts/`
+  and `e2e/`, plus the root config files — the only exclusion is `.github/` skill assets.
+- Claude Code: the `typescript-lsp` plugin plus `ENABLE_LSP_TOOL=1`, both in
+  `~/.claude/settings.json` (machine-local, not in this repo).
+- OpenCode: `"lsp": true` in `opencode.json` activates the built-in definitions. Its typescript
+  entry is **not** on OpenCode's auto-download list, which is why both pieces above are on you.
+- **Verify by making an LSP call, never by reading config.** Every failure mode here is silent
+  or misleading at rest: a missing binary throws `ENOENT` only at call time, a missing local
+  `typescript` makes OpenCode skip the server without a word, and a wrong TS major still
+  reports a healthy `tsc --version`.
+
+**Use LSP for symbol questions, grep for textual ones.** `goToDefinition`, `findReferences`
+and `workspaceSymbol` resolve the symbol graph and answer "who calls this?" without the
+false positives a name-based grep returns. But this repo's source-scanning guards are
+deliberately textual — the Tailwind class literals in `bandFields.test.js`, the `is_published`
+scans, the after-midnight threshold check — and LSP cannot see a class name inside a string or
+a literal in a comment. Do not convert those to LSP; they are text scans on purpose.
+
+The split is measurable. `git grep AFTER_MIDNIGHT_THRESHOLD_HOUR` returns ~30 hits, mostly
+comments and strings inside the guard test; `findReferences` returns the 8 real bindings and
+correctly drops `functions/api/events/timeline.js`, which mentions the constant only in prose
+and actually imports the sibling `AFTER_MIDNIGHT_THRESHOLD_TIME`. Each tool is right about a
+different question.
+
+**`jsconfig.json` at the repo root is load-bearing — do not delete it.** It exists solely to
+give tsserver a project: nothing imports it and it emits nothing (`noEmit: true`). Without it,
+tsserver falls back to inferred-project mode, which indexes only files already opened — and
+then `findReferences` on `AFTER_MIDNIGHT_THRESHOLD_HOUR` reports "3 references across 1 files",
+silently omitting `functions/event/[slug].js` and the test that imports it. That is the sibling
+sweep's worst failure shape: not an error, but a confident and incomplete answer. With the
+project file the same query returns 8 across 3. Adding it was verified 2026-08-13 to leave
+`npm run build --prefix frontend` (exit 0) and the 1127-test backend suite green.

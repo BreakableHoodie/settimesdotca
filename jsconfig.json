@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "resolveJsonModule": true
+  },
+  "include": [
+    "*.js",
+    "functions/**/*.js",
+    "frontend/*.js",
+    "frontend/src/**/*.js",
+    "frontend/src/**/*.jsx",
+    "frontend/public/sw.js",
+    "frontend/scripts/**/*.mjs",
+    "scripts/**/*.js",
+    "scripts/**/*.mjs",
+    "e2e/**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "frontend/node_modules",
+    "frontend/dist",
+    ".wrangler",
+    "coverage",
+    "playwright-report",
+    "test-results"
+  ]
+}

@@ -29,10 +29,10 @@ export async function onRequest(context) {
 
   // Pin to the production host — preview deploys must not self-canonicalise.
   const url = `${CANONICAL_HOST}/venue/${id}`;
-  const locality = venue.city || "Waterloo";
+  const locality = venue.city;
   const description =
     [venue.name, venue.address].filter(Boolean).join(" — ") ||
-    `${venue.name} — a live music venue in ${locality}, ON on SetTimes.`;
+    `${venue.name} — a live music venue${locality ? ` in ${locality}, ON` : ""} on SetTimes.`;
 
   const metaTags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
@@ -68,7 +68,7 @@ export async function onRequest(context) {
     address: {
       "@type": "PostalAddress",
       ...(venue.address_line1 || venue.address ? { streetAddress: venue.address_line1 || venue.address } : {}),
-      addressLocality: locality,
+      ...(locality ? { addressLocality: locality } : {}),
       addressRegion: venue.region || "ON",
       ...(venue.postal_code ? { postalCode: venue.postal_code } : {}),
       addressCountry: "CA",
@@ -97,7 +97,7 @@ export async function onRequest(context) {
     ],
   };
 
-  const title = `${venue.name} — Live Music Venue in Waterloo, ON | SetTimes`;
+  const title = `${venue.name} — Live Music Venue${locality ? ` in ${locality}, ON` : ""} | SetTimes`;
 
   return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicVenue, breadcrumb] });
 }

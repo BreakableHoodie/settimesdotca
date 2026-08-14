@@ -455,7 +455,16 @@ change only ever makes the gate *stricter* and would re-introduce the flake (#72
 original proposed "fix" was exactly this, caught in the issue's own follow-up). A
 genuine regression must now push the best-of-3 below 0.80 — a sustained drop, not a
 contended runner. The other categories (accessibility, best-practices, seo) stay at
-0.90: they are deterministic and do not flake.
+0.90 and use the default aggregation: they have not been observed to flake here,
+being far less sensitive to runner contention than performance. That is an
+observation, not a guarantee — if one starts flaking, measure it before moving it.
+
+**This is the budget's SECOND reduction.** It was 0.90 until 4235c1b (#534,
+2026-07-05), which lowered it to 0.85 inside a commit whose own message still said
+"CI Lighthouse validates the category score against the 0.9 budget". Today's runs
+score 0.83–0.84. A budget that keeps chasing the score downward stops being a gate,
+so the real question — whether ~0.84 is itself a regression from ~0.90 — is tracked
+separately (#851). Do not lower this a third time without answering it.
 
 ### Before every commit — required checklist
 

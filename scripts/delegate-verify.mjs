@@ -67,11 +67,29 @@ function git(args) {
 /** Branches a delegate must never move. A commit anywhere else is reviewable. */
 const PROTECTED_BRANCHES = new Set(["main", "master"]);
 
+/**
+ * Every local branch tip, not just the checked-out one. Reading only the final
+ * checkout is unsound: a delegate can commit on main and then `git switch -c
+ * feature`, leaving the protected branch moved while the closing branch name
+ * looks innocent. Comparing refs catches that wherever it ends up.
+ */
+function branchRefs() {
+  const out = git(["for-each-ref", "--format=%(refname:short) %(objectname)", "refs/heads"]);
+  const refs = new Map();
+  for (const line of out.split("\n")) {
+    if (!line.trim()) continue;
+    const cut = line.lastIndexOf(" ");
+    refs.set(line.slice(0, cut), line.slice(cut + 1));
+  }
+  return refs;
+}
+
 function snapshot() {
   const status = git(["status", "--porcelain", "-uall"]);
   return {
     head: git(["rev-parse", "HEAD"]),
     branch: git(["rev-parse", "--abbrev-ref", "HEAD"]),
+    refs: branchRefs(),
     status,
     // Hashes MUST be read here, not when the snapshots are compared. Comparing
     // later would hash whatever is on disk at that moment, so both snapshots
@@ -160,25 +178,41 @@ function main() {
 
     console.error("\n─── delegate-verify ───");
 
-    // What must never happen is an UNREVIEWED change landing on the default
+    // What must never happen is an UNREVIEWED change landing on a protected
     // branch — not a commit as such. A delegate that branches, commits and
-    // opens a PR has not skipped review; it has routed the change through the
+    // opens a PR has not skipped review; it routed the change through the
     // ruleset (protected main, strict checks, threads resolved), which is a
-    // stronger gate than a human remembering to look. Only a commit that moves
-    // a protected branch bypasses that.
-    if (after.head !== before.head && PROTECTED_BRANCHES.has(after.branch)) {
-      console.error(
-        `FAIL: the delegate committed on ${after.branch} (HEAD ${before.head.slice(0, 7)} -> ${after.head.slice(0, 7)}).`,
-      );
+    // stronger gate than a human remembering to look.
+    //
+    // Compare REFS, not the closing checkout: committing on main and then
+    // `git switch -c feature` leaves after.branch innocent while main has
+    // already moved.
+    const movedRefs = [...after.refs].filter(([name, sha]) => before.refs.get(name) !== sha);
+    const movedProtected = movedRefs.filter(([name]) => PROTECTED_BRANCHES.has(name));
+
+    if (movedProtected.length > 0) {
+      console.error("FAIL: the delegate moved a protected branch.");
+      for (const [name, sha] of movedProtected) {
+        const from = before.refs.get(name);
+        console.error(`  ${name}: ${from ? from.slice(0, 7) : "(new)"} -> ${sha.slice(0, 7)}`);
+        if (from) console.error(`  Recover with: git branch -f ${name} ${from}`);
+      }
       console.error("Commits on a protected branch bypass PR review entirely.");
-      console.error(`Recover with: git reset --soft ${before.head}`);
       process.exit(3);
     }
 
-    if (after.head !== before.head) {
+    // A commit on a feature branch IS delegated work even when the tree ends up
+    // clean — committing everything leaves git status empty, and without this
+    // the no-change check below would report a successful delegation as exit 2.
+    const movedFeature = movedRefs.filter(([name]) => !PROTECTED_BRANCHES.has(name));
+
+    for (const [name, sha] of movedFeature) {
+      const from = before.refs.get(name);
       console.error(
-        `NOTE: the delegate committed on ${after.branch} (HEAD ${before.head.slice(0, 7)} -> ${after.head.slice(0, 7)}).`,
+        `NOTE: the delegate committed on ${name} (${from ? from.slice(0, 7) : "(new branch)"} -> ${sha.slice(0, 7)}).`,
       );
+    }
+    if (movedFeature.length > 0) {
       console.error("Allowed on a feature branch — review happens on the PR. Verify it before merging.");
     }
 
@@ -188,7 +222,7 @@ function main() {
       process.exit(1);
     }
 
-    if (changed.length === 0) {
+    if (changed.length === 0 && movedFeature.length === 0) {
       if (allowEmpty) {
         console.error("OK: no files changed, and --allow-empty was passed (read-only task).");
         process.exit(0);
@@ -200,11 +234,18 @@ function main() {
       process.exit(2);
     }
 
-    console.error(`OK: ${changed.length} file(s) changed.`);
-    for (const { path, code: c } of changed) {
-      console.error(`  ${c}  ${path}`);
+    // Report both shapes of work. A delegate that commits everything leaves an
+    // empty working tree, so "0 files changed" alongside a NOTE above would
+    // read like a failed run rather than a clean one.
+    if (changed.length > 0) {
+      console.error(`OK: ${changed.length} file(s) changed in the working tree.`);
+      for (const { path, code: c } of changed) {
+        console.error(`  ${c}  ${path}`);
+      }
+    } else {
+      console.error(`OK: no working-tree changes; work landed as ${movedFeature.length} branch commit(s) above.`);
     }
-    console.error("Review the diff and run the project gate before committing.");
+    console.error("Review the diff (or the PR) and run the project gate before merging.");
     process.exit(0);
   });
 }

@@ -485,7 +485,6 @@ function ScheduleView({
                     band={band}
                     isSelected={selectedBandsSet.has(band.id)}
                     onToggle={onToggleBand}
-                    clickable={canToggleBands}
                     showToggleButton={canToggleBands}
                     eventSlug={eventSlug}
                     showVenue={false}
@@ -519,7 +518,6 @@ function ScheduleView({
                     band={band}
                     isSelected={selectedBandsSet.has(band.id)}
                     onToggle={onToggleBand}
-                    clickable={canToggleBands}
                     showToggleButton={canToggleBands}
                     eventSlug={eventSlug}
                     showVenue={true}
@@ -561,7 +559,6 @@ function ScheduleView({
                             band={band}
                             isSelected={selectedBandsSet.has(band.id)}
                             onToggle={onToggleBand}
-                            clickable={canToggleBands}
                             showToggleButton={canToggleBands}
                             eventSlug={eventSlug}
                             showVenue={true}
@@ -607,7 +604,6 @@ function ScheduleView({
                             band={band}
                             isSelected={selectedBandsSet.has(band.id)}
                             onToggle={onToggleBand}
-                            clickable={canToggleBands}
                             showToggleButton={canToggleBands}
                             eventSlug={eventSlug}
                             showVenue={true}

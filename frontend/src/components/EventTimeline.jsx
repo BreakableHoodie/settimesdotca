@@ -629,9 +629,9 @@ function GenreDiscovery({ bands, eventSlug, eventDate }) {
               {groupBands.map(band => {
                 const isSelected = selectedIds.has(band.id)
                 // A cancelled band must never be added to a fan's schedule
-                // from this wall -- mirrors BandCard's isInteractive gate on
-                // the live schedule (#732), which freezes toggling entirely
-                // (not just hides a button) once a set is cancelled.
+                // from this wall -- mirrors BandCard on the live schedule
+                // (#732): cancelled sets render no add/remove toggle at all,
+                // so a set cannot be added once cancelled.
                 const isCancelled = Boolean(band.is_cancelled)
                 return (
                   <button

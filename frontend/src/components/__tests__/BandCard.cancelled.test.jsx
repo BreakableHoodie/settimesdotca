@@ -95,18 +95,11 @@ describe('BandCard — cancelled sets', () => {
   })
 
   it('does not fire onToggle when a cancelled card is clicked', () => {
-    // Deviation from the plan's literal test code: it clicked the band-name
-    // text, which lives inside a <Link> that already calls
-    // e.stopPropagation() on its own onClick (BandCard.jsx) for an unrelated
-    // reason (so the profile link doesn't also toggle the card). That click
-    // never reaches the wrapper div's onClick regardless of is_cancelled, so
-    // the assertion would pass identically whether or not the suppression
-    // below is implemented -- a vacuous test. Clicking the wrapper directly
-    // (`container.firstChild`) is the same target the pre-existing
-    // "click/keyboard toggle" describe block below already uses to prove
-    // toggle suppression (see the `clickable: false` case in
-    // BandCard.test.jsx), so this mirrors an established, non-vacuous
-    // pattern instead.
+    // Since #726 the card container is a labelled group, not a click target —
+    // the corner <button> is the only toggle, and cancelled cards render none
+    // (asserted above). This guards the #732 class: a cancelled set must
+    // never be togglable through ANY interaction path, even a future one that
+    // reintroduces a container handler.
     const onToggle = vi.fn()
     const { container } = renderCard({ is_cancelled: 1 }, onToggle)
     fireEvent.click(container.firstChild)

@@ -29,7 +29,7 @@ function VenuePerformerCard({ perf, venueName, currentTime }) {
     {
       id: perf.band_id,
       name: perf.band_name,
-      // Feeds BandCard's non-interactive aria-label (`${name} at ${venue}`) --
+      // Feeds BandCard's aria-label (`${name} at ${venue}`) --
       // showVenue={false} below only hides the *visible* venue line, not this.
       venue: venueName,
       photo_url: perf.photo_url,
@@ -54,7 +54,6 @@ function VenuePerformerCard({ perf, venueName, currentTime }) {
     <div>
       <BandCard
         band={band}
-        clickable={false}
         showToggleButton={false}
         showVenue={false}
         eventSlug={perf.event_slug}

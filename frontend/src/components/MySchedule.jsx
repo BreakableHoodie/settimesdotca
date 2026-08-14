@@ -697,7 +697,6 @@ function MySchedule({
                       onToggle={onToggleBand}
                       onRemove={onToggleBand}
                       showVenue={true}
-                      clickable={false}
                       eventSlug={eventSlug}
                       currentTime={effectiveNow}
                       warningType={hasConflict ? 'conflict' : hasOverlap ? 'overlap' : null}

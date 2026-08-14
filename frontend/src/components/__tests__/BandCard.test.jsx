@@ -63,64 +63,92 @@ describe('BandCard — genre chip', () => {
   })
 })
 
-// These document the CURRENT interaction model; they do not endorse it.
-// When `clickable`, the container is a focusable div with no role and no
-// accessible name (BandCard.jsx:66-67) wrapping a real <button> (add/remove)
-// and an <a> (profile link). That nesting is why it cannot simply become a
-// <button> — and why adding role="button" would be worse, not better: it would
-// announce as a control while containing focusable children.
-// Replacing it with a distinct native toggle is tracked in #726; update these
-// tests as part of that change rather than treating them as the spec.
-describe('BandCard — click/keyboard toggle (pre-existing behaviour)', () => {
-  it('is focusable via tabIndex=0 when clickable', () => {
-    const { container } = renderCard({ clickable: true })
-    expect(container.firstChild).toHaveAttribute('tabindex', '0')
+// #726 regression tests. The card container must never be a focusable
+// interactive target: it wraps a real <button> (corner add/remove) and an <a>
+// (profile link), so it cannot itself be a <button> (nested interactive
+// content is invalid), and a role="button" would announce as a control while
+// containing focusable children. The toggle is the distinct native <button>,
+// and the container is a labelled <div role="group"> — never a click target.
+// These assert the accessible NAME (what screen readers actually announce),
+// not just a role's presence.
+describe('BandCard — corner button is the toggle, container is a labelled group (#726)', () => {
+  it('renders the toggle as a button with an accessible name', () => {
+    renderCard({})
+
+    expect(screen.getByRole('button', { name: 'Add Band Test to my route' })).toBeInTheDocument()
   })
 
-  it('calls onToggle with the band id on click', () => {
+  it('calls onToggle with the band id via the corner button', () => {
     const onToggle = vi.fn()
-    const { container } = renderCard({ onToggle, clickable: true })
+    renderCard({ onToggle })
 
-    fireEvent.click(container.firstChild)
+    fireEvent.click(screen.getByRole('button', { name: 'Add Band Test to my route' }))
 
     expect(onToggle).toHaveBeenCalledWith(baseBand.id)
   })
 
-  it('calls onToggle on Enter key press', () => {
-    const onToggle = vi.fn()
-    const { container } = renderCard({ onToggle, clickable: true })
+  it('flips the button accessible name when selected', () => {
+    renderCard({ isSelected: true })
 
-    fireEvent.keyDown(container.firstChild, { key: 'Enter' })
-
-    expect(onToggle).toHaveBeenCalledWith(baseBand.id)
+    expect(screen.getByRole('button', { name: 'Remove Band Test from my route' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add Band Test to my route' })).toBeNull()
   })
 
-  it('calls onToggle on Space key press', () => {
-    const onToggle = vi.fn()
-    const { container } = renderCard({ onToggle, clickable: true })
+  it('hides the toggle button when showToggleButton is false', () => {
+    renderCard({ showToggleButton: false })
 
-    fireEvent.keyDown(container.firstChild, { key: ' ' })
-
-    expect(onToggle).toHaveBeenCalledWith(baseBand.id)
+    expect(screen.queryByRole('button', { name: /to my route/i })).toBeNull()
   })
 
-  it('ignores other key presses', () => {
-    const onToggle = vi.fn()
-    const { container } = renderCard({ onToggle, clickable: true })
+  it('labels the container as a group with an accessible name', () => {
+    const { container } = renderCard({})
 
-    fireEvent.keyDown(container.firstChild, { key: 'Tab' })
-
-    expect(onToggle).not.toHaveBeenCalled()
+    expect(container.firstChild).toHaveAttribute('role', 'group')
+    expect(container.firstChild).toHaveAttribute('aria-label', 'Band Test at Stage A')
   })
 
-  it('does not respond to click or keyboard when clickable is false', () => {
-    const onToggle = vi.fn()
-    const { container } = renderCard({ onToggle, clickable: false })
+  it('does not make the container focusable', () => {
+    const { container } = renderCard({})
 
     expect(container.firstChild).not.toHaveAttribute('tabindex')
+  })
+
+  it('does not toggle when the container itself is clicked', () => {
+    const onToggle = vi.fn()
+    const { container } = renderCard({ onToggle })
+
     fireEvent.click(container.firstChild)
-    fireEvent.keyDown(container.firstChild, { key: 'Enter' })
 
     expect(onToggle).not.toHaveBeenCalled()
+  })
+})
+
+// #726 follow-up — WCAG 2.5.3 (Label in Name): the accessible name must contain
+// the visible text. The visible "Unnamed Artist" fallback was a literal in the
+// markup while the labels interpolated band.name, so a nameless band rendered
+// "Unnamed Artist" and announced "undefined". Both now derive from displayName.
+describe('BandCard — band with no name', () => {
+  const nameless = { id: 9, venue: 'Stage A', startMs: 0, endMs: 0 }
+
+  it('announces the visible fallback, never "undefined"', () => {
+    const { container } = render(<BandCard band={nameless} isSelected={false} onToggle={() => {}} />)
+
+    expect(container.firstChild).toHaveAttribute('aria-label', 'Unnamed Artist at Stage A')
+    expect(container.firstChild.getAttribute('aria-label')).not.toContain('undefined')
+  })
+
+  it('uses the fallback in the toggle button name too', () => {
+    render(<BandCard band={nameless} isSelected={false} onToggle={() => {}} />)
+
+    expect(screen.getByRole('button', { name: 'Add Unnamed Artist to my route' })).toBeInTheDocument()
+  })
+
+  it('omits the venue clause when there is no venue', () => {
+    const { container } = render(
+      <BandCard band={{ id: 10, startMs: 0, endMs: 0 }} isSelected={false} onToggle={() => {}} />
+    )
+
+    expect(container.firstChild).toHaveAttribute('aria-label', 'Unnamed Artist')
+    expect(container.firstChild.getAttribute('aria-label')).not.toContain('undefined')
   })
 })

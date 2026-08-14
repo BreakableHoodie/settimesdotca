@@ -44,9 +44,9 @@
   "instructions": [
     "CLAUDE.md",
     "CONTRIBUTING.md",
-    "instructions/security-and-owasp.instructions.md",
-    "instructions/nodejs-javascript-vitest.instructions.md",
-    "instructions/self-explanatory-code-commenting.instructions.md"
+    ".github/instructions/security-and-owasp.instructions.md",
+    ".github/instructions/nodejs-javascript-vitest.instructions.md",
+    ".github/instructions/self-explanatory-code-commenting.instructions.md"
   ],
   "plugin": [
     "opencode-notify",

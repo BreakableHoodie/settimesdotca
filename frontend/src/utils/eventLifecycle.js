@@ -55,18 +55,8 @@ export function isEventArchived(eventDate) {
  * @param {string} eventDate - Event date in YYYY-MM-DD format
  * @returns {boolean}
  */
-export function isEventInGracePeriod(eventDate) {
+function isEventInGracePeriod(eventDate) {
   return getEventState(eventDate) === 'recently_completed'
-}
-
-/**
- * Check if event is upcoming (before event end)
- *
- * @param {string} eventDate - Event date in YYYY-MM-DD format
- * @returns {boolean}
- */
-export function isEventUpcoming(eventDate) {
-  return getEventState(eventDate) === 'upcoming'
 }
 
 /**
@@ -147,47 +137,6 @@ export function formatEventState(eventDate) {
   }
 
   return stateInfo[state]
-}
-
-/**
- * Validate if action is allowed on event based on state
- *
- * @param {string} eventDate - Event date in YYYY-MM-DD format
- * @param {string} action - Action type: 'edit', 'delete', 'publish', 'add_performance'
- * @returns {Object} { allowed: boolean, reason: string }
- */
-export function validateEventAction(eventDate, action) {
-  const state = getEventState(eventDate)
-
-  // Upcoming events: all actions allowed
-  if (state === 'upcoming') {
-    return { allowed: true, reason: '' }
-  }
-
-  // Grace period: edits allowed with warning
-  if (state === 'recently_completed') {
-    return {
-      allowed: true,
-      reason: `Grace period (${getGracePeriodHoursRemaining(eventDate)}h remaining)`,
-    }
-  }
-
-  // Archived: restricted actions
-  if (state === 'archived') {
-    const restrictedActions = ['edit', 'delete', 'add_performance']
-
-    if (restrictedActions.includes(action)) {
-      return {
-        allowed: false,
-        reason: `Event archived ${getDaysSinceEvent(eventDate)} days ago. Use "Copy as Template" instead.`,
-      }
-    }
-
-    // Publishing/unpublishing archived events is allowed (visibility control)
-    return { allowed: true, reason: '' }
-  }
-
-  return { allowed: true, reason: '' }
 }
 
 /**

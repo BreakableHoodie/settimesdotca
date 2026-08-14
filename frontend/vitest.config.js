@@ -1,6 +1,12 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
+// Pin the test timezone. Several suites assert DST behaviour (#770), and DST
+// does not exist in UTC — under a UTC runner those fixtures pass against the
+// broken implementation as readily as the fixed one, which is worse than no
+// test at all. America/Toronto is the zone the product actually runs in.
+process.env.TZ = 'America/Toronto'
+
 export default defineConfig({
   plugins: [react()],
   test: {

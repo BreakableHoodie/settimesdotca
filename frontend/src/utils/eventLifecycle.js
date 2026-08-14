@@ -70,20 +70,32 @@ export function isEventUpcoming(eventDate) {
 }
 
 /**
- * Calculate days since event ended
+ * Calculate whole calendar days since the event date
+ *
+ * Counts CALENDAR days in the local zone, not elapsed time: the event's own
+ * date is 0, the next date is 1, a future date is negative.
  *
  * @param {string} eventDate - Event date in YYYY-MM-DD format
- * @returns {number} Days since event ended (0 if upcoming, negative if in future)
+ * @param {Date|string|number} referenceTime - Optional time to evaluate against
+ * @returns {number} Calendar days since the event date (negative if future, -1 if no date)
  */
-export function getDaysSinceEvent(eventDate) {
+export function getDaysSinceEvent(eventDate, referenceTime = new Date()) {
   if (!eventDate) return -1
 
-  const now = new Date()
-  const eventEnd = new Date(eventDate + 'T23:59:59')
-  const diffMs = now.getTime() - eventEnd.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const now = referenceTime instanceof Date ? referenceTime : new Date(referenceTime)
+  const [year, month, day] = eventDate.split('-').map(Number)
 
-  return diffDays
+  // Both endpoints are projected onto UTC midnight, so their difference is
+  // always an exact multiple of 24h no matter what the local zone does in
+  // between. Dividing REAL elapsed milliseconds by 86400000 cannot work here
+  // (#770): a spring-forward day is only 23 wall-clock hours, so Math.floor
+  // reported 0 for a full calendar day. Math.round appears to fix that case
+  // but is worse — it rounds 12h up, so an event reads "1 day ago" at noon
+  // the morning after, and a future event yields -0 instead of a negative.
+  const eventDayUtc = Date.UTC(year, month - 1, day)
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+
+  return Math.round((todayUtc - eventDayUtc) / (1000 * 60 * 60 * 24))
 }
 
 /**

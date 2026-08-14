@@ -188,29 +188,46 @@ function main() {
     // Compare REFS, not the closing checkout: committing on main and then
     // `git switch -c feature` leaves after.branch innocent while main has
     // already moved.
-    const movedRefs = [...after.refs].filter(([name, sha]) => before.refs.get(name) !== sha);
-    const movedProtected = movedRefs.filter(([name]) => PROTECTED_BRANCHES.has(name));
+    // Walk the UNION of before and after. Iterating only `after` misses a
+    // deleted ref, and deleting main is at least as bad as moving it.
+    const refNames = new Set([...before.refs.keys(), ...after.refs.keys()]);
+    const refDelta = [];
+    for (const name of refNames) {
+      const from = before.refs.get(name);
+      const to = after.refs.get(name);
+      if (from === to) continue;
+      refDelta.push({ name, from, to, kind: !from ? "added" : !to ? "deleted" : "updated" });
+    }
 
-    if (movedProtected.length > 0) {
-      console.error("FAIL: the delegate moved a protected branch.");
-      for (const [name, sha] of movedProtected) {
-        const from = before.refs.get(name);
-        console.error(`  ${name}: ${from ? from.slice(0, 7) : "(new)"} -> ${sha.slice(0, 7)}`);
-        if (from) console.error(`  Recover with: git branch -f ${name} ${from}`);
+    const protectedDelta = refDelta.filter((d) => PROTECTED_BRANCHES.has(d.name));
+    if (protectedDelta.length > 0) {
+      console.error("FAIL: the delegate altered a protected branch.");
+      for (const { name, from, to, kind } of protectedDelta) {
+        console.error(
+          `  ${name} ${kind}: ${from ? from.slice(0, 7) : "(absent)"} -> ${to ? to.slice(0, 7) : "(deleted)"}`,
+        );
+        if (kind === "deleted") console.error(`  Recover with: git branch ${name} ${from}`);
+        else if (kind === "updated") console.error(`  Recover with: git branch -f ${name} ${from}`);
+        else console.error(`  Recover with: git branch -D ${name}`);
       }
-      console.error("Commits on a protected branch bypass PR review entirely.");
+      console.error("Protected branches must only change through a reviewed PR.");
       process.exit(3);
     }
 
     // A commit on a feature branch IS delegated work even when the tree ends up
     // clean — committing everything leaves git status empty, and without this
     // the no-change check below would report a successful delegation as exit 2.
-    const movedFeature = movedRefs.filter(([name]) => !PROTECTED_BRANCHES.has(name));
+    //
+    // But only a NEW COMMIT counts. `git switch -c feature` creates a ref at an
+    // existing commit; treating that as work would let a delegate that merely
+    // branched pass as a success, which is the silent no-op this script exists
+    // to catch. So compare against every commit the refs already pointed at.
+    const knownBefore = new Set([...before.refs.values(), before.head]);
+    const movedFeature = refDelta.filter((d) => !PROTECTED_BRANCHES.has(d.name) && d.to && !knownBefore.has(d.to));
 
-    for (const [name, sha] of movedFeature) {
-      const from = before.refs.get(name);
+    for (const { name, from, to } of movedFeature) {
       console.error(
-        `NOTE: the delegate committed on ${name} (${from ? from.slice(0, 7) : "(new branch)"} -> ${sha.slice(0, 7)}).`,
+        `NOTE: the delegate committed on ${name} (${from ? from.slice(0, 7) : "(new branch)"} -> ${to.slice(0, 7)}).`,
       );
     }
     if (movedFeature.length > 0) {

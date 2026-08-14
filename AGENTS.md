@@ -106,8 +106,11 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 
 ## Writing a delegation brief
 
-A delegated run sees only the brief plus the working tree. Two failures have
-already happened here, both the brief's fault rather than the delegate's.
+A delegated run has no memory of the conversation that produced it. It gets
+three things: the brief, the instructions `opencode.json` loads globally, and
+the working tree. Anything you worked out in chat and did not write down is
+invisible to it. Two failures have already happened here, both the brief's
+fault rather than the delegate's.
 
 **1. Name the domain instruction file — the loaded set is deliberately small.**
 `opencode.json`'s `instructions` array carries only what governs *every* diff.

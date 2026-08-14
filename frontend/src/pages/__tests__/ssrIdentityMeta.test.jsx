@@ -33,7 +33,7 @@
 // #790) turns its "exactly one" assertion below into "found 2" and fails —
 // see the PR description for the recorded run. That's what makes this a real
 // regression guard rather than a tautology that would pass either way.
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -69,7 +69,7 @@ vi.mock('../../utils/publicApi', () => ({ fetchPublicJson: vi.fn() }))
 // functions/events/__tests__/recap.test.js already prove THAT string is
 // correct and singular server-side; this file proves the client doesn't
 // re-add a second copy on top of it).
-function seedSsrHead(path) {
+function seedSsrHead(path, title) {
   const canonical = document.createElement('link')
   canonical.setAttribute('rel', 'canonical')
   canonical.setAttribute('href', `https://settimes.ca${path}`)
@@ -79,6 +79,18 @@ function seedSsrHead(path) {
   ogUrl.setAttribute('property', 'og:url')
   ogUrl.setAttribute('content', `https://settimes.ca${path}`)
   document.head.appendChild(ogUrl)
+
+  // #785: the SSR layer (functions/utils/ssrMeta.js serveWithInjectedMeta)
+  // swaps the route's <title> into the raw HTML response. Seed that title too
+  // and assert the client keeps it (never clobbers it with a loading/fallback
+  // title, and reproduces its exact string once data arrives). Marked with
+  // data-seeded so afterEach can remove exactly this node — a React-managed
+  // <title> (react-helmet-async renders one via React 19 head hoisting,
+  // carrying no data-rh) must be left for React's own unmount cleanup.
+  const titleTag = document.createElement('title')
+  titleTag.setAttribute('data-seeded', 'true')
+  titleTag.textContent = title
+  document.head.appendChild(titleTag)
 }
 
 function countIdentityTags() {
@@ -139,7 +151,9 @@ function countJsonLdByType() {
 // test starts from a clean head regardless of what a prior test left behind.
 afterEach(() => {
   document
-    .querySelectorAll('link[rel="canonical"], meta[property="og:url"], script[type="application/ld+json"]')
+    .querySelectorAll(
+      'link[rel="canonical"], meta[property="og:url"], script[type="application/ld+json"], title[data-seeded]'
+    )
     .forEach(el => el.remove())
 })
 
@@ -155,7 +169,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
   it('ArtistsPage (/artists)', async () => {
     fetchPublicJson.mockResolvedValue({ artists: [], hasMore: false })
-    seedSsrHead('/artists')
+    seedSsrHead('/artists', 'Artists – SetTimes')
 
     render(
       withProviders(
@@ -168,11 +182,12 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('searchbox', { name: /search artists/i })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('Artists – SetTimes'))
   })
 
   it('VenuesPage (/venues)', async () => {
     fetchPublicJson.mockResolvedValue({ venues: [], hasMore: false })
-    seedSsrHead('/venues')
+    seedSsrHead('/venues', 'Venues – SetTimes')
 
     render(
       withProviders(
@@ -185,10 +200,11 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1 })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('Venues – SetTimes'))
   })
 
   it('AboutPage (/about)', async () => {
-    seedSsrHead('/about')
+    seedSsrHead('/about', 'About | SetTimes')
 
     render(
       withProviders(
@@ -200,10 +216,11 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1 })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('About | SetTimes'))
   })
 
   it('ContactPage (/contact)', async () => {
-    seedSsrHead('/contact')
+    seedSsrHead('/contact', 'Contact | SetTimes')
 
     render(
       withProviders(
@@ -215,6 +232,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1 })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('Contact | SetTimes'))
   })
 
   it('StatsPage (/stats)', async () => {
@@ -229,7 +247,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       page_views: 500,
       top_bands: [],
     })
-    seedSsrHead('/stats')
+    seedSsrHead('/stats', 'Stats | SetTimes')
 
     render(
       withProviders(
@@ -242,10 +260,11 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByText(/22/)
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('Stats | SetTimes'))
   })
 
   it('PrivacyPage (/privacy)', async () => {
-    seedSsrHead('/privacy')
+    seedSsrHead('/privacy', 'Privacy Policy | SetTimes')
 
     render(
       withProviders(
@@ -257,10 +276,11 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('Privacy Policy | SetTimes'))
   })
 
   it('TermsPage (/terms)', async () => {
-    seedSsrHead('/terms')
+    seedSsrHead('/terms', 'Terms of Service | SetTimes')
 
     render(
       withProviders(
@@ -272,10 +292,11 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1, name: 'Terms of Service' })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('Terms of Service | SetTimes'))
   })
 
   it('SubscribePage (/subscribe)', async () => {
-    seedSsrHead('/subscribe')
+    seedSsrHead('/subscribe', 'Subscribe — Never Miss a Show | SetTimes')
 
     render(
       withProviders(
@@ -287,6 +308,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1, name: 'Never Miss a Show' })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('Subscribe — Never Miss a Show | SetTimes'))
   })
 
   it('EventRecapPage (/events/:slug/recap)', async () => {
@@ -295,7 +317,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       stats: { total_sets: 2, venue_count: 1, first_timers: 1, returning_acts: 1 },
       bands: [],
     })
-    seedSsrHead('/events/lwbc17/recap')
+    seedSsrHead('/events/lwbc17/recap', 'LWBC Vol17 — Event Recap | SetTimes.ca')
 
     render(
       withProviders(
@@ -309,15 +331,16 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByText('LWBC Vol17')
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('LWBC Vol17 — Event Recap | SetTimes.ca'))
   })
 
   it('VenuePage (/venue/:id)', async () => {
     fetchPublicJson.mockResolvedValue({
-      venue: { id: 3, name: 'Room 47', location: 'Waterloo, ON', address: null, website: null },
+      venue: { id: 3, name: 'Room 47', city: 'Waterloo', location: 'Waterloo, ON', address: null, website: null },
       upcoming: [],
       past: [],
     })
-    seedSsrHead('/venue/3')
+    seedSsrHead('/venue/3', 'Room 47 — Live Music Venue in Waterloo, ON | SetTimes')
     // Mirrors functions/venue/[id].js's jsonLd: [musicVenue, breadcrumb] (#790).
     seedSsrJsonLd([
       { '@context': 'https://schema.org', '@type': 'MusicVenue', name: 'Room 47', url: 'https://settimes.ca/venue/3' },
@@ -338,6 +361,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
     expect(countJsonLdByType()).toEqual({ MusicVenue: 1, BreadcrumbList: 1 })
+    await waitFor(() => expect(document.title).toBe('Room 47 — Live Music Venue in Waterloo, ON | SetTimes'))
   })
 
   it('BandProfilePage (/band/:id)', async () => {
@@ -354,7 +378,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       upcoming: [],
       past: [],
     })
-    seedSsrHead('/band/206')
+    seedSsrHead('/band/206', 'ALL — Punk in Waterloo Region | SetTimes')
     // Mirrors functions/band/[id].js's jsonLd: [musicGroup, breadcrumb] (#790).
     seedSsrJsonLd([
       { '@context': 'https://schema.org', '@type': 'MusicGroup', name: 'ALL', url: 'https://settimes.ca/band/206' },
@@ -375,6 +399,58 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
     expect(countJsonLdByType()).toEqual({ MusicGroup: 1, BreadcrumbList: 1 })
+    await waitFor(() => expect(document.title).toBe('ALL — Punk in Waterloo Region | SetTimes'))
+  })
+
+  // #785: the SSR <title> must survive the whole load — the fetch is still
+  // in flight when the component mounts, and the loading skeleton must not
+  // clobber the server-sent title with a generic placeholder.
+  it('BandProfilePage keeps the SSR <title> while the profile fetch is in flight', async () => {
+    let resolveFetch
+    fetchPublicJson.mockReturnValue(
+      new Promise(resolve => {
+        resolveFetch = resolve
+      })
+    )
+    seedSsrHead('/band/206', 'ALL — Punk in Waterloo Region | SetTimes')
+    // Mirrors functions/band/[id].js's jsonLd: [musicGroup, breadcrumb] (#790).
+    seedSsrJsonLd([
+      { '@context': 'https://schema.org', '@type': 'MusicGroup', name: 'ALL', url: 'https://settimes.ca/band/206' },
+      { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [] },
+    ])
+
+    render(
+      withProviders(
+        <MemoryRouter initialEntries={['/band/206']}>
+          <Routes>
+            <Route path="/band/:id" element={<BandProfilePage />} />
+          </Routes>
+        </MemoryRouter>,
+        { themed: true }
+      )
+    )
+
+    // Still loading: the title in the DOM is exactly what the server sent.
+    await waitFor(() => expect(document.title).toBe('ALL — Punk in Waterloo Region | SetTimes'))
+
+    resolveFetch({
+      id: 206,
+      name: 'ALL',
+      photo_url: null,
+      photo_alt_text: null,
+      description: null,
+      genre: 'Punk',
+      origin: null,
+      social: {},
+      stats: null,
+      upcoming: [],
+      past: [],
+    })
+    await screen.findByRole('heading', { level: 1, name: 'ALL' })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    expect(countJsonLdByType()).toEqual({ MusicGroup: 1, BreadcrumbList: 1 })
+    await waitFor(() => expect(document.title).toBe('ALL — Punk in Waterloo Region | SetTimes'))
   })
 
   // App.jsx is the /event/:slug route's own component (main.jsx routes it
@@ -387,10 +463,10 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       ok: true,
       json: async () => ({
         bands: [],
-        event: { id: 1, name: 'LWBC Vol17', slug: 'lwbc17', date: '2026-08-02', end_date: null },
+        event: { id: 1, name: 'LWBC Vol17', slug: 'lwbc17', date: '2026-08-02', end_date: null, city: 'Kitchener' },
       }),
     })
-    seedSsrHead('/event/lwbc17')
+    seedSsrHead('/event/lwbc17', 'LWBC Vol17 — Set Times & Lineup in Kitchener | SetTimes')
 
     try {
       render(
@@ -409,6 +485,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       await screen.findAllByText(/LWBC Vol17/, {}, { timeout: 3000 })
 
       expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+      await waitFor(() => expect(document.title).toBe('LWBC Vol17 — Set Times & Lineup in Kitchener | SetTimes'))
     } finally {
       global.fetch = originalFetch
     }

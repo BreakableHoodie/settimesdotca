@@ -127,6 +127,10 @@ export async function onRequestGet(context) {
         venue: {
           id: venue.id,
           name: venue.name,
+          // #785 — the client reproduces functions/venue/[id].js's SSR <title>
+          // verbatim, which interpolates venue.city; `location` alone can't
+          // (region may be absent, and the SSR title hardcodes ", ON").
+          city: venue.city ?? null,
           location: formatLocation(venue),
           address: formatAddress(venue),
           website: venue.website || null,

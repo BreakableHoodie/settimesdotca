@@ -176,13 +176,14 @@ export default function BandProfilePage() {
   const isPublishGateError = errorStatus === 503
   const isNotFoundError = errorStatus === 404 || (!error && !profile)
 
-  const pageTitle = loading
-    ? 'Band Profile | SetTimes'
-    : error || !profile
+  // Mirrors the <title> functions/band/[id].js injects server-side (#785):
+  // after hydration the DOM title must equal the one the server sent.
+  const pageTitle =
+    error || !profile
       ? isNotFoundError
         ? 'Band Not Found | SetTimes'
         : 'Band Profile | SetTimes'
-      : `${profile.name} - Band Profile | SetTimes`
+      : `${profile.name}${profile.genre ? ` — ${profile.genre}` : ''} in Waterloo Region | SetTimes`
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -283,8 +284,12 @@ export default function BandProfilePage() {
   )
 
   useEffect(() => {
-    document.title = pageTitle
-  }, [pageTitle])
+    // While the fetch is in flight, the SSR-injected <title> (already in the
+    // DOM) is correct — don't clobber it with a generic loading title (#785).
+    if (!loading) {
+      document.title = pageTitle
+    }
+  }, [pageTitle, loading])
 
   // Band-to-band navigation reuses this component instance: the follow form
   // (and the Turnstile container inside it) unmounts for the loading skeleton

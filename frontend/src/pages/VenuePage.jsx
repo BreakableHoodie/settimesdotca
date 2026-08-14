@@ -124,7 +124,11 @@ export default function VenuePage() {
         setVenue(data.venue)
         setUpcoming(data.upcoming || [])
         setPast(data.past || [])
-        document.title = `${data.venue?.name || 'Venue'} – SetTimes`
+        // Mirrors the <title> functions/venue/[id].js injects server-side
+        // (#785) — after hydration the DOM title must equal the server's.
+        document.title = `${data.venue?.name || 'Venue'} — Live Music Venue${
+          data.venue?.city ? ` in ${data.venue.city}, ON` : ''
+        } | SetTimes`
       })
       .catch(err => {
         if (active) setError(err)
@@ -149,13 +153,18 @@ export default function VenuePage() {
           for this route -- functions/venue/[id].js injects them server-side
           (with a structured PostalAddress and a broader sameAs than this
           component ever emitted). Declaring any of them here too would
-          duplicate them on mount instead of replacing them. <title> has no
-          SSR equivalent (SSR sets <title> on the raw HTML response only) and
-          stays client-owned, backed by the direct document.title assignment
-          in the effect above -- same React 19 Helmet-unreliability reasoning
-          as every other SSR-injected route. */}
+          duplicate them on mount instead of replacing them. <title> also has
+          an SSR counterpart (same function swaps it into the raw HTML
+          response), so this client <title> must reproduce that exact string
+          (#785), backed by the direct document.title assignment in the effect
+          above -- react-helmet-async does not reliably set document.title in
+          React 19, so the assignment, not Helmet, is load-bearing. */}
       <Helmet>
-        <title>{venue ? `${venue.name} – SetTimes` : 'Venue – SetTimes'}</title>
+        <title>
+          {venue
+            ? `${venue.name} — Live Music Venue${venue.city ? ` in ${venue.city}, ON` : ''} | SetTimes`
+            : 'Venue – SetTimes'}
+        </title>
       </Helmet>
 
       <header className="border-b border-accent-500/30 px-4 py-6">

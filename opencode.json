@@ -137,8 +137,20 @@
     }
   },
   "permission": {
-    "read": "allow",
-    "edit": "allow",
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      ".dev.vars": "deny",
+      "**/.dev.vars": "deny"
+    },
+    "edit": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      ".dev.vars": "deny",
+      "**/.dev.vars": "deny"
+    },
     "glob": "allow",
     "grep": "allow",
     "list": "allow",

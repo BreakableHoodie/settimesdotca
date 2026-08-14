@@ -421,6 +421,34 @@ describe("Admin bands API - GET without event_id returns one row per profile (#6
     expect(retired).toBeDefined();
     expect(retired.is_active).toBe(0);
   });
+
+  // #756 — roster pagination must sort by article-stripped sortableName()
+  // before slicing with limit/offset. When raw collation ("The Alpha" > "Bravo")
+  // disagrees with article-stripped collation ("The Alpha" < "Bravo"), page 1
+  // with limit=1 must return "The Alpha", not "Bravo".
+  it("roster pagination sorts article-stripped before applying limit/offset (#756)", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized, is_active) VALUES (?, ?, ?)")
+      .run("The Alpha", "thealpha", 1);
+    rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized, is_active) VALUES (?, ?, ?)")
+      .run("Bravo", "bravo", 1);
+
+    const page1Req = new Request("https://example.test/api/admin/bands?limit=1&offset=0", { headers });
+    const page1Res = await bandsHandler.onRequestGet({ request: page1Req, env, data: { user: { role: "editor" } } });
+    expect(page1Res.status).toBe(200);
+    const page1Data = await page1Res.json();
+    expect(page1Data.bands).toHaveLength(1);
+    expect(page1Data.bands[0].name).toBe("The Alpha");
+
+    const page2Req = new Request("https://example.test/api/admin/bands?limit=1&offset=1", { headers });
+    const page2Res = await bandsHandler.onRequestGet({ request: page2Req, env, data: { user: { role: "editor" } } });
+    expect(page2Res.status).toBe(200);
+    const page2Data = await page2Res.json();
+    expect(page2Data.bands).toHaveLength(1);
+    expect(page2Data.bands[0].name).toBe("Bravo");
+  });
 });
 
 describe("Admin bands API - Validation", () => {

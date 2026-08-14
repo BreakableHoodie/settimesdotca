@@ -174,11 +174,3 @@ export async function serveWithInjectedMeta(context, { title = null, metaTags = 
     return env.ASSETS.fetch(request);
   }
 }
-
-// Waterloo Region location block reused across event/venue structured data.
-export const WATERLOO_ADDRESS = {
-  "@type": "PostalAddress",
-  addressLocality: "Waterloo",
-  addressRegion: "ON",
-  addressCountry: "CA",
-};

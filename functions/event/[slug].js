@@ -2,14 +2,7 @@
 // JSON-LD for crawlers. See functions/utils/ssrMeta.js for rationale + fallback.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import {
-  escapeAttr,
-  toPlainText,
-  serveWithInjectedMeta,
-  WATERLOO_ADDRESS,
-  CANONICAL_HOST,
-  DEFAULT_OG_IMAGE,
-} from "../utils/ssrMeta.js";
+import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 import { torontoUtcOffset, AFTER_MIDNIGHT_THRESHOLD_HOUR } from "../utils/eventDay.js";
@@ -198,7 +191,7 @@ export async function onRequest(context) {
           address: {
             "@type": "PostalAddress",
             ...(v.address_line1 || v.address ? { streetAddress: v.address_line1 || v.address } : {}),
-            addressLocality: v.city || "Waterloo",
+            ...(v.city ? { addressLocality: v.city } : {}),
             addressRegion: v.region || "ON",
             ...(v.postal_code ? { postalCode: v.postal_code } : {}),
             addressCountry: "CA",
@@ -207,7 +200,12 @@ export async function onRequest(context) {
       : {
           "@type": "Place",
           name: event.city || "Waterloo Region, ON",
-          address: WATERLOO_ADDRESS,
+          address: {
+            "@type": "PostalAddress",
+            ...(event.city ? { addressLocality: event.city } : {}),
+            addressRegion: "ON",
+            addressCountry: "CA",
+          },
         };
 
   // Per-day subEvent (#542 PR-4): MULTI-DAY events only (end_date > date).
@@ -368,7 +366,7 @@ export async function onRequest(context) {
     ],
   };
 
-  const title = `${event.name} — Set Times & Lineup in Waterloo | SetTimes`;
+  const title = `${event.name} — Set Times & Lineup${event.city ? ` in ${event.city}` : ""} | SetTimes`;
 
   return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicEvent, breadcrumb] });
 }

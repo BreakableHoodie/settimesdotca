@@ -165,7 +165,7 @@ project file the same query returns 8 across 3. Adding it was verified 2026-08-1
 
 <!-- Global instructions for all agents go above this line -->
 
-## Gemini Specific Instructions
+## Gemini-Specific Instructions
 - When running as Gemini, your role is a "Draftsman".
 - Focus on drafting initial patches, fixing small bugs, and writing unit tests.
 - Always push your work to a new feature branch named `gemini/issue-[number]`.

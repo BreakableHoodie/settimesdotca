@@ -64,10 +64,14 @@ function git(args) {
  * untracked directory into a single `dir/` entry, and a file created inside an
  * already-untracked directory would leave the snapshot byte-identical.
  */
+/** Branches a delegate must never move. A commit anywhere else is reviewable. */
+const PROTECTED_BRANCHES = new Set(["main", "master"]);
+
 function snapshot() {
   const status = git(["status", "--porcelain", "-uall"]);
   return {
     head: git(["rev-parse", "HEAD"]),
+    branch: git(["rev-parse", "--abbrev-ref", "HEAD"]),
     status,
     // Hashes MUST be read here, not when the snapshots are compared. Comparing
     // later would hash whatever is on disk at that moment, so both snapshots
@@ -156,11 +160,26 @@ function main() {
 
     console.error("\n─── delegate-verify ───");
 
-    if (after.head !== before.head) {
-      console.error(`FAIL: the delegate committed (HEAD ${before.head.slice(0, 7)} -> ${after.head.slice(0, 7)}).`);
-      console.error("Delegates must never commit — the orchestrator reviews the diff and commits.");
+    // What must never happen is an UNREVIEWED change landing on the default
+    // branch — not a commit as such. A delegate that branches, commits and
+    // opens a PR has not skipped review; it has routed the change through the
+    // ruleset (protected main, strict checks, threads resolved), which is a
+    // stronger gate than a human remembering to look. Only a commit that moves
+    // a protected branch bypasses that.
+    if (after.head !== before.head && PROTECTED_BRANCHES.has(after.branch)) {
+      console.error(
+        `FAIL: the delegate committed on ${after.branch} (HEAD ${before.head.slice(0, 7)} -> ${after.head.slice(0, 7)}).`,
+      );
+      console.error("Commits on a protected branch bypass PR review entirely.");
       console.error(`Recover with: git reset --soft ${before.head}`);
       process.exit(3);
+    }
+
+    if (after.head !== before.head) {
+      console.error(
+        `NOTE: the delegate committed on ${after.branch} (HEAD ${before.head.slice(0, 7)} -> ${after.head.slice(0, 7)}).`,
+      );
+      console.error("Allowed on a feature branch — review happens on the PR. Verify it before merging.");
     }
 
     if (code !== 0) {

@@ -75,11 +75,11 @@ node scripts/delegate-verify.mjs -- <the delegation command>
 node scripts/delegate-verify.mjs --allow-empty -- <read-only command>   # research/digest tasks
 ```
 
-Exit codes: `0` succeeded *and* changed files · `1` the command failed · `2` **reported success but changed nothing** · `3` the delegate committed · `4` usage.
+Exit codes: `0` succeeded *and* changed files · `1` the command failed · `2` **reported success but changed nothing** · `3` the delegate committed on a protected branch · `4` usage.
 
 Code `2` is the one that pays for the script. Measured 2026-08-13: an agy delegation returned exit `0` and `AGY_USAGE {"status":"SUCCESS"}` having touched **zero files** — headless agy had no `write_file` grant, so it described the work instead of doing it and still "succeeded". 96,825 tokens, nothing on disk, and nothing in its own output said so. The tool behaved exactly as its README documents ("ungranted writes leave the workspace untouched but report success"); the mistake was trusting the status field.
 
-Code `3` enforces the other half of the contract below: **the delegate never commits.** The orchestrator reviews the diff, runs `make gate`, and commits. A delegate that moves HEAD has skipped review entirely.
+Code `3` enforces the other half of the contract below: **a delegate never moves `main`.** It may branch, commit and open a PR — that is the normal workflow now, and it routes the change through the ruleset (protected main, strict checks, threads resolved) rather than through someone remembering to look. What it must never do is commit on the default branch, which bypasses review entirely. A commit on a feature branch is reported, not failed.
 
 The check is deliberately tool-agnostic — it wraps agy, OpenCode's relay, or anything else, because the failure is about *permissions and silent refusals*, not about any one vendor. It uses `git status --porcelain`, so a brand-new untracked file counts as real work (a `git diff`-only check would call that a no-op).
 
@@ -98,7 +98,7 @@ npx skills add amElnagdy/delegate-skills --skill opencode-delegate
 
 It also needs the `opencode` CLI on PATH and an authenticated provider (`opencode auth list`).
 
-Use it for well-specified work that would otherwise consume this session's context. **The relay never commits — the orchestrator reviews the diff, re-runs `make gate`, and commits.** Same contract as a Sonnet agent, different process.
+Use it for well-specified work that would otherwise consume this session's context. **OpenCode works issues end to end: it branches, commits, and opens a PR.** The orchestrator reviews that PR, re-runs `make gate`, and merges. Review moved from "read the diff before committing" to "read the PR before merging" — a stronger gate, because the ruleset enforces it rather than habit. The invariant that survived unchanged: **nothing lands on `main` unreviewed.**
 
 Four rules, each learned by something breaking:
 

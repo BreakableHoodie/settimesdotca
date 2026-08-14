@@ -106,32 +106,38 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 
 ## LSP — prefer it over grep for symbol navigation
 
-Both harnesses are wired for LSP-backed navigation. **Neither bundles the server**; one global
-install serves both, and it is a per-machine prerequisite a fresh clone will not have:
+Both harnesses navigate by LSP. The setup has exactly **two** pieces, and both are required:
 
 ```bash
-npm install -g typescript-language-server typescript@5
+npm install -g typescript-language-server   # 1. the server binary — per machine, not in this repo
+make install                                # 2. typescript@^5 — a devDependency, already declared
 ```
 
-**The `@5` pin is load-bearing.** Bare `typescript` now resolves to 7.x, the native Go port,
-whose `lib/` ships only `getExePath.js` and `tsc.js` — there is no `tsserver.js`.
-`typescript-language-server` works by spawning exactly that file, so TS 7 fails every LSP call
-with `Could not find a valid TypeScript installation` while `tsc --version` reports a perfectly
-healthy 7.x. Verified 2026-08-13: TS 7.0.2 broke it, TS 5.9.3 is the working target.
+**`typescript` is a local devDependency on purpose, not an oversight in a repo with no `.ts`
+files.** OpenCode's built-in typescript server resolves `typescript/lib/tsserver.js` *from the
+project directory*, and node resolution never consults global `node_modules` — so with only a
+global install it hits `if (!Z) return` and the LSP is **silently off**, no error anywhere. The
+local copy also serves Claude Code, so the global `typescript` is unnecessary; only the server
+binary has to be global. Node resolution walks up, so the single root install covers
+`frontend/` too.
+
+**Never move that dependency to `typescript@7`.** TS 7 is the native Go port: its `lib/` ships
+only `getExePath.js` and `tsc.js` — no `tsserver.js`, which is exactly the file the language
+server spawns. It fails every LSP call with `Could not find a valid TypeScript installation`
+while `tsc --version` reports a perfectly healthy 7.x. Verified 2026-08-13: 7.0.2 breaks it,
+5.9.3 works. The `^5` caret is what keeps a routine bump from silently disabling navigation.
 
 - The server handles `.js .jsx .mjs .cjs .ts .tsx .mts .cts`. `jsconfig.json`'s `include`
   globs cover every tracked `.js`/`.jsx`/`.mjs` under `functions/`, `frontend/`, `scripts/`
   and `e2e/`, plus the root config files — the only exclusion is `.github/` skill assets.
 - Claude Code: the `typescript-lsp` plugin plus `ENABLE_LSP_TOOL=1`, both in
-  `~/.claude/settings.json` (machine-local, not in this repo). **Verified working.**
-- OpenCode: `"lsp": true` in `opencode.json` activates the built-in server definitions, and
-  its typescript entry is **not** on OpenCode's auto-download list. Whether it resolves the
-  global binary or insists on a local `node_modules/typescript` is **unverified** — this repo
-  declares no local `typescript`, so confirm on the first delegated run before relying on it
-  (#830). Claude Code's path does not depend on the answer.
-- **Verify by making an LSP call, never by reading config.** A missing binary fails at call
-  time with `ENOENT: typescript-language-server`, not at startup, so a green-looking config
-  proves nothing.
+  `~/.claude/settings.json` (machine-local, not in this repo).
+- OpenCode: `"lsp": true` in `opencode.json` activates the built-in definitions. Its typescript
+  entry is **not** on OpenCode's auto-download list, which is why both pieces above are on you.
+- **Verify by making an LSP call, never by reading config.** Every failure mode here is silent
+  or misleading at rest: a missing binary throws `ENOENT` only at call time, a missing local
+  `typescript` makes OpenCode skip the server without a word, and a wrong TS major still
+  reports a healthy `tsc --version`.
 
 **Use LSP for symbol questions, grep for textual ones.** `goToDefinition`, `findReferences`
 and `workspaceSymbol` resolve the symbol graph and answer "who calls this?" without the

@@ -106,7 +106,9 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 
 ## LSP — prefer it over grep for symbol navigation
 
-Both harnesses navigate by LSP. The setup has exactly **two** pieces, and both are required:
+Both harnesses navigate by LSP. Two **dependencies** must be installed, and separately each
+harness must be **configured** (both listed below) — all of it is required, and a missing
+piece fails silently rather than loudly.
 
 ```bash
 npm install -g typescript-language-server   # 1. the server binary — per machine, not in this repo

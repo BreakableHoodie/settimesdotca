@@ -104,6 +104,44 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 - E2E spec files are under the same prettier/eslint scope as `functions/`/`scripts/` (#622) —
   double quotes/semis, `eslint.config.js`'s `e2e/**` block covers Playwright + browser globals.
 
+## Writing a delegation brief
+
+A delegated run has no memory of the conversation that produced it. It gets
+three things: the brief, the instructions `opencode.json` loads globally, and
+the working tree. Anything you worked out in chat and did not write down is
+invisible to it. Two failures have already happened here, both the brief's
+fault rather than the delegate's.
+
+**1. Name the domain instruction file — the loaded set is deliberately small.**
+`opencode.json`'s `instructions` array carries only what governs *every* diff.
+Per-domain guidance is not loaded because `a11y.instructions.md` alone is
+~5.7k tokens on every delegation. So the brief must name what the task needs:
+
+| task touches | brief must name |
+|---|---|
+| `frontend/src/**` (UI) | `docs/design-system/DESIGN_SYSTEM.md`, `docs/design-system/COMPONENT_USAGE.md`, `.github/instructions/a11y.instructions.md` |
+| `e2e/**` | `.github/instructions/playwright-typescript.instructions.md` |
+| styling / Tailwind | `.github/instructions/tailwind-v4-vite.instructions.md` |
+| `migrations/**` | `make schema-check`, and the migration invariants in `CLAUDE.md` |
+
+A UI brief that names none of these gets a competent fix that never reaches for
+an existing `components/ui/` primitive. That has happened.
+
+**2. State the goal and the constraints, not the implementation.** The brief
+for #726 instructed "prefer a native `<button>`". That was wrong: `BandCard`
+contains both a `<button>` and an `<a>`, so a button container nests
+interactive content. The delegate reasoned past the instruction and used
+`role="group"` with an accessible name, which is correct. Had it complied
+literally, the brief would have produced invalid markup.
+
+The implementer can see the code; the brief writer is working from memory.
+Say *"the container must be reachable and announced"*, not *"make it a button"*.
+
+**Always include:** branch name, one PR per issue, `make gate` must exit 0,
+"STOP and report rather than weaken a test, lint rule or config to make a gate
+pass", and "confirm the new test FAILS against current code before calling it
+done". That last line is the one that keeps catching real defects.
+
 ## LSP — prefer it over grep for symbol navigation
 
 Both harnesses navigate by LSP. Two **dependencies** must be installed, and separately each

@@ -144,7 +144,7 @@ done". That last line is the one that keeps catching real defects.
 
 ### Running more than one agent at once
 
-Concurrency is normal here — a delegate and the orchestrator often work the
+Concurrency is normal here — a delegate and the orchestrator often work in the
 same repository at the same time. Two rules prevent the collisions that have
 actually happened, and they matter more than isolation does:
 
@@ -152,23 +152,33 @@ actually happened, and they matter more than isolation does:
    branch you created.** On 2026-08-14 a delegate committed onto whatever branch
    happened to be checked out — which belonged to another agent — and that
    agent's next `git add -u` swept the delegate's half-finished files into an
-   unrelated docs PR. Six CI checks failed on a one-file Markdown change. Never
-   commit without first confirming `git branch --show-current` is yours.
+   unrelated docs PR. Six CI checks failed on a one-file Markdown change.
+   `git branch --show-current` reports a name, not ownership, so check it
+   against the branch your brief assigned before staging anything —
+   `test "$(git branch --show-current)" = "<branch-from-brief>"` — and stop if
+   that fails instead of committing wherever you happen to be.
 
 2. **Never bare `git stash` or `git stash pop`.** The stash stack is shared
    across every worktree of a repository — a fresh worktree here immediately
    listed seven entries belonging to other sessions. Popping takes whichever is
    on top, which may be someone else's uncommitted work. Use
    `git stash push -u -m "<unique-tag>"`, capture the SHA from
-   `git stash list --format='%H %gs'`, restore with `git stash apply <sha>`, and
-   drop that entry by tag afterwards.
+   `git stash list --format='%H %gs'`, and restore with
+   `git stash apply <sha>`. To clean up, re-resolve the index from your tag —
+   `git stash list --format='%gd %gs' | grep <unique-tag>` — and drop that
+   `stash@{n}`. Verified 2026-08-14: `apply` accepts a raw SHA but `drop` does
+   **not** (`error: '<sha>' is not a stash reference`), and indices shift when
+   another agent pushes a stash, so `stash@{0}` is never safe to assume.
 
 **Worktrees help but do not solve this.** They isolate the filesystem, so a
 mid-edit file cannot be swept into someone else's commit — worth using. They do
 *not* isolate refs (branches, force-pushes, deletions) or the stash, which is how
-the incident above actually happened. A worktree also starts without
-`node_modules` or `.dev.vars`, so `make gate` cannot run until you install both
-(about two minutes) and copy the env file.
+the incident above actually happened. A worktree also starts empty of
+`node_modules`, so `make gate` cannot run until you `npm install` at the root
+and in `frontend/` — about two minutes. It also starts without `.dev.vars`;
+that file is *not* a `make gate` prerequisite (this section was written and
+gated from a worktree that never had one), but copy it across before anything
+that needs a live wrangler server, such as `make e2e`.
 
 **The strongest protection is the brief itself:** give each concurrent task a
 disjoint set of files, and tell it to STOP if it finds itself editing a file

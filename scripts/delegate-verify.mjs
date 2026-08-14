@@ -18,8 +18,9 @@
  *   A delegation that changed no files did not succeed, whatever it claims.
  *
  * It also enforces the other half of the delegation contract from CLAUDE.md:
- * the delegate never commits. The orchestrator reviews the diff and commits.
- * A delegate that moves HEAD has skipped the review step entirely.
+ * a delegate never moves a PROTECTED branch. Branching, committing and opening
+ * a PR is the normal workflow — review happens on the PR, enforced by the
+ * ruleset. Moving main directly is what bypasses review entirely.
  *
  * Usage
  * -----
@@ -31,10 +32,10 @@
  *   node scripts/delegate-verify.mjs -- node .agents/skills/opencode-delegate/relay.mjs --brief brief.md
  *
  * Exit codes:
- *   0  command succeeded AND the working tree changed
+ *   0  command succeeded AND changed the working tree or committed to a branch
  *   1  command itself failed (its exit code is reported)
  *   2  command "succeeded" but changed nothing  <- the silent-no-op case
- *   3  the delegate committed, which it must never do
+ *   3  the delegate moved a protected branch (main/master) — bypasses review
  *   4  usage error
  */
 

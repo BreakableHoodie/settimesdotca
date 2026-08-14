@@ -22,8 +22,8 @@ describe('MetricsDashboard', () => {
         totalShareViews: 42,
         totalShareImports: 5,
         topSharedRoutes: [
-          { slug: 'abc123', view_count: 30 },
-          { slug: 'def456', view_count: 12 },
+          { slug: 'abc123', view_count: 30, band_count: 4, created_at: '2026-07-16 07:02:00' },
+          { slug: 'def456', view_count: 1, band_count: 1, created_at: '2026-07-29 21:59:00' },
         ],
       },
     })
@@ -38,7 +38,22 @@ describe('MetricsDashboard', () => {
     expect(screen.getByText('5')).toBeInTheDocument()
     expect(screen.getByText('Most-Viewed Shared Routes')).toBeInTheDocument()
     expect(screen.getByText(/abc123/)).toBeInTheDocument()
-    expect(screen.getByText('30 views')).toBeInTheDocument()
+    // Band count + creation date surfaced so the slug is actionable (#702)
+    expect(screen.getByText(/4 bands/)).toBeInTheDocument()
+    expect(screen.getByText(/2026-07-16/)).toBeInTheDocument()
+    // Singular "view" pluralises correctly
+    expect(screen.getByText(/1 view/)).toBeInTheDocument()
+    expect(screen.getByText(/1 band/)).toBeInTheDocument()
+    // Plural "views" still renders within the compound row
+    expect(screen.getByText(/30 views/)).toBeInTheDocument()
+    // view_count and import_count are different units and get conflated
+    // (CLAUDE.md "Metrics & Analytics"): views are unique visitors recomputed
+    // from a ledger, imports are per-fetch and undeduped, so imports CAN exceed
+    // views. This caption is the only place a reader learns that — assert it
+    // survives, because silently dropping it makes the panel misleading rather
+    // than merely sparser.
+    expect(screen.getByText(/Views count unique visitors per link/)).toBeInTheDocument()
+    expect(screen.getByText(/Imports count per-fetch/)).toBeInTheDocument()
   })
 
   it('renders 0 for share imports when the field is absent (older data)', async () => {
@@ -59,5 +74,9 @@ describe('MetricsDashboard', () => {
     expect(await screen.findByText('Shares Imported')).toBeInTheDocument()
     const shareImportsLabel = screen.getByText('Shares Imported')
     expect(shareImportsLabel.parentElement.textContent).toContain('0')
+    // An empty topSharedRoutes must show the empty state, not a bare heading.
+    // The endpoint filters to view_count > 0, so "no rows" is the normal
+    // between-seasons case rather than an error — it needs to read that way.
+    expect(screen.getByText('No shared routes with views yet')).toBeInTheDocument()
   })
 })

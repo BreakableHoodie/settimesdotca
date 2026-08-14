@@ -95,13 +95,27 @@ export default function MetricsDashboard({ eventId }) {
                 <span className="text-white">
                   {idx + 1}. /s/{route.slug}
                 </span>
-                <span className="text-gray-400">{route.view_count} views</span>
+                <span className="text-gray-400">
+                  {route.band_count} {route.band_count === 1 ? 'band' : 'bands'}
+                  {route.created_at ? (
+                    <>
+                      {' · '}
+                      {route.created_at.slice(0, 10)}
+                    </>
+                  ) : null}
+                  {' · '}
+                  {route.view_count} {route.view_count === 1 ? 'view' : 'views'}
+                </span>
               </div>
             ))
           ) : (
-            <p className="text-gray-400 text-sm">No shared routes yet</p>
+            <p className="text-gray-400 text-sm">No shared routes with views yet</p>
           )}
         </div>
+        <p className="text-gray-400 text-xs mt-3">
+          Views count unique visitors per link — reloads and crawlers don&apos;t inflate them. Imports count per-fetch
+          adoptions.
+        </p>
       </div>
     </div>
   )

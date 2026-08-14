@@ -64,6 +64,91 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     expect(body.metrics.topSharedRoutes[0].view_count).toBe(5);
   });
 
+  test("top routes carry band_count and created_at, and zero-view shares are excluded (#702)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Route Fest", slug: "route-fest" });
+    // Two distinct bands
+    insertShareLink(rawDb, {
+      slug: "routeaa2",
+      event_id: event.id,
+      event_slug: "route-fest",
+      performance_ids: [1, 2],
+      band_names: ["A", "B"],
+      expires_at: "2026-08-20 00:00:00",
+    });
+    // One band played twice → distinct count is 1, not 2
+    insertShareLink(rawDb, {
+      slug: "routebb2",
+      event_id: event.id,
+      event_slug: "route-fest",
+      performance_ids: [3, 4],
+      band_names: ["C", "C"],
+      expires_at: "2026-08-20 00:00:00",
+    });
+    // Zero-view share must not appear in a "most-viewed" list
+    insertShareLink(rawDb, {
+      slug: "routezero",
+      event_id: event.id,
+      event_slug: "route-fest",
+      performance_ids: [5],
+      band_names: ["D"],
+      expires_at: "2026-08-20 00:00:00",
+    });
+    rawDb.prepare("UPDATE share_links SET view_count = ? WHERE slug = ?").run(5, "routeaa2");
+    rawDb.prepare("UPDATE share_links SET view_count = ? WHERE slug = ?").run(2, "routebb2");
+    rawDb.prepare("UPDATE share_links SET created_at = ? WHERE slug = ?").run("2026-07-16 07:02:00", "routeaa2");
+
+    const res = await call(env, event.id);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const routes = body.metrics.topSharedRoutes;
+    // Zero-view share filtered out
+    expect(routes.map((r) => r.slug)).toEqual(["routeaa2", "routebb2"]);
+    // Distinct band count, not performance count
+    expect(routes[0].band_count).toBe(2);
+    expect(routes[1].band_count).toBe(1);
+    // Creation date surfaced so age is visible
+    expect(routes[0].created_at).toBe("2026-07-16 07:02:00");
+  });
+
+  // band_names is a JSON snapshot written at share time, so a malformed value
+  // is a data-integrity question rather than a caller-input one — no validation
+  // on the read path can prevent it. The handler degrades that row to
+  // band_count 0 instead of throwing, because one bad snapshot must not take
+  // the whole metrics panel down for the event.
+  test("a malformed band_names snapshot degrades to 0 bands, not a 500", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "RouteFest", slug: "route-fest" });
+    insertShareLink(rawDb, {
+      slug: "routegood",
+      event_id: event.id,
+      event_slug: "route-fest",
+      band_names: ["A", "B"],
+      expires_at: "2026-08-20 00:00:00",
+    });
+    insertShareLink(rawDb, {
+      slug: "routebad",
+      event_id: event.id,
+      event_slug: "route-fest",
+      band_names: ["placeholder"],
+      expires_at: "2026-08-20 00:00:00",
+    });
+    rawDb.prepare("UPDATE share_links SET view_count = ? WHERE slug = ?").run(5, "routegood");
+    rawDb
+      .prepare("UPDATE share_links SET view_count = ?, band_names = ? WHERE slug = ?")
+      .run(3, "{invalid-json", "routebad");
+
+    const res = await call(env, event.id);
+
+    expect(res.status).toBe(200);
+    const routes = (await res.json()).metrics.topSharedRoutes;
+    // The bad row still appears, ranked by its real view_count — dropping it
+    // would hide a route the admin can see traffic for.
+    expect(routes.map((r) => r.slug)).toEqual(["routegood", "routebad"]);
+    expect(routes[0].band_count).toBe(2);
+    expect(routes[1].band_count).toBe(0);
+  });
+
   test("includes share import totals -- the conversion signal beside shares/views (#703)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Fest", slug: "fest" });

@@ -46,8 +46,8 @@ export async function onRequestGet(context) {
          FROM share_links WHERE event_id = ?`,
         ).bind(eventId),
         DB.prepare(
-          `SELECT slug, view_count FROM share_links
-         WHERE event_id = ?
+          `SELECT slug, view_count, band_names, created_at FROM share_links
+         WHERE event_id = ? AND view_count > 0
          ORDER BY view_count DESC, created_at DESC
          LIMIT 10`,
         ).bind(eventId),
@@ -91,7 +91,23 @@ export async function onRequestGet(context) {
     const metrics = metricsRes.results?.[0];
     const popularBands = popularBandsRes.results || [];
     const shareStats = shareStatsRes.results?.[0];
-    const topSharedRoutes = topRoutesRes.results || [];
+    const topSharedRoutes = (topRoutesRes.results || []).map((row) => {
+      // band_names is the JSON snapshot stored at share time; a band playing
+      // twice appears twice, so count DISTINCT names — the route size an admin
+      // actually cares about. Malformed JSON degrades to 0 bands, not a 500.
+      let bandCount;
+      try {
+        bandCount = new Set(JSON.parse(row.band_names)).size;
+      } catch {
+        bandCount = 0;
+      }
+      return {
+        slug: row.slug,
+        view_count: row.view_count,
+        created_at: row.created_at,
+        band_count: bandCount,
+      };
+    });
     const announcementPlanning = announcementPlanningRes.results || [];
     const telemetryStats = telemetryStatsRes.results?.[0];
     // bp.name is only the final tiebreaker here (after is_announced, then

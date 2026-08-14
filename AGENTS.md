@@ -114,7 +114,7 @@ fault rather than the delegate's.
 
 **1. Name the domain instruction file — the loaded set is deliberately small.**
 `opencode.json`'s `instructions` array carries only what governs *every* diff.
-Per-domain guidance is not loaded, because `a11y.instructions.md` alone is
+Per-domain guidance is not loaded because `a11y.instructions.md` alone is
 ~5.7k tokens on every delegation. So the brief must name what the task needs:
 
 | task touches | brief must name |

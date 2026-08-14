@@ -228,3 +228,61 @@ describe('getTimeDescription never names a weekday (#681)', () => {
     expect(getTimeDescription(nextWeekSet)).toBe(`Next week at ${expectedTime}`)
   })
 })
+
+describe('getTimeDescription date fallback renders the festival day (#689)', () => {
+  // #689 Finding 1: the >2-weeks fallback derived the date from the raw
+  // (post-prepareBands +1-day-offset) startMs, so an after-midnight set
+  // rendered the NEXT calendar day — "Aug 8" for a set whose festival day is
+  // Aug 7 — disagreeing with DayDivider for the same set. The this-week /
+  // next-week branches render time only, which is why this only ever showed
+  // for sets viewed more than two weeks out.
+  //
+  // Any test for this branch MUST pin the clock: left on the real clock the
+  // set falls inside the two-week window, the fallback never runs, and the
+  // assertion passes vacuously (#689 — the bug was concealed by the date
+  // until a pinned-clock test exposed it).
+  afterEach(() => {
+    delete globalThis.__debugScheduleTime
+  })
+
+  it('labels an after-midnight set with its festival day, not the +1-offset calendar day', () => {
+    // The real Where's Shane? set at Buddies Fest 2: performance_date
+    // 2026-08-07, start_time 00:25. prepareBands offsets startMs +1 day, so
+    // the raw Date reads Aug 8 00:25; the festival day — what DayDivider
+    // renders — is Aug 7.
+    globalThis.__debugScheduleTime = new Date(2026, 6, 13, 14, 0, 0) // Mon Jul 13, 2 PM — beyond next week
+    const offsetStart = new Date(2026, 7, 8, 0, 25, 0) // real startMs after the +1-day offset
+    const afterMidnightSet = { startMs: offsetStart.getTime() }
+
+    // Expected values derived with the same options the implementation uses,
+    // so the assertions stay locale- and timezone-independent in CI (same
+    // approach as the #681 tests above).
+    const expectedDate = new Date(2026, 7, 7, 0, 25, 0).toLocaleDateString([], {
+      month: 'short',
+      day: 'numeric',
+    })
+    const expectedTime = offsetStart.toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+
+    expect(getTimeDescription(afterMidnightSet)).toBe(`${expectedDate} ${expectedTime}`)
+  })
+
+  it("leaves an ordinary evening set's date unchanged in the fallback", () => {
+    // Guards against over-correcting: only sub-6AM sets belong to the
+    // previous festival day, so a normal evening set must keep its own date.
+    globalThis.__debugScheduleTime = new Date(2026, 6, 13, 14, 0, 0) // Mon Jul 13, 2 PM
+    const start = new Date(2026, 7, 7, 20, 0, 0) // Aug 7, 8 PM — no offset
+    const eveningSet = { startMs: start.getTime() }
+    const expectedDate = start.toLocaleDateString([], { month: 'short', day: 'numeric' })
+    const expectedTime = start.toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+
+    expect(getTimeDescription(eveningSet)).toBe(`${expectedDate} ${expectedTime}`)
+  })
+})

@@ -13,7 +13,12 @@ describe('getDaysSinceEvent', () => {
     expect(jan).not.toBe(jul)
   })
 
-  it('returns -1 for empty or missing event date', () => {
+  // `undefined` is the repo's convention for an absent optional value
+  // (instructions/nodejs-javascript-vitest.instructions.md), but `null` is
+  // what actually arrives at runtime: `event.date` is deserialized from D1,
+  // where a NULL column becomes JSON null. Both are asserted deliberately.
+  it('returns -1 for a missing or empty event date', () => {
+    expect(getDaysSinceEvent(undefined)).toBe(-1)
     expect(getDaysSinceEvent(null)).toBe(-1)
     expect(getDaysSinceEvent('')).toBe(-1)
   })

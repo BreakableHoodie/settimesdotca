@@ -444,6 +444,28 @@ npx playwright test
 ```
 Requires a running wrangler dev server or uses it automatically via `playwright.config.js`. Run `npm run build --prefix frontend` first.
 
+### Lighthouse CI performance assertion (#728)
+
+`frontend/lighthouserc.json` gates performance at **0.80** — deliberately below the
+observed CI noise floor (0.83–0.84). Lighthouse on shared GitHub runners fluctuates
+±2–3 points, so a floor at the observed ceiling flakes with no code cause. The
+assertion pins **`aggregationMethod: "optimistic"` (best of 3 runs)** — the most
+lenient option available. **Do not switch it to `median`:** median ≤ max, so that
+change only ever makes the gate *stricter* and would re-introduce the flake (#728's
+original proposed "fix" was exactly this, caught in the issue's own follow-up). A
+genuine regression must now push the best-of-3 below 0.80 — a sustained drop, not a
+contended runner. The other categories (accessibility, best-practices, seo) stay at
+0.90 and use the default aggregation: they have not been observed to flake here,
+being far less sensitive to runner contention than performance. That is an
+observation, not a guarantee — if one starts flaking, measure it before moving it.
+
+**This is the budget's SECOND reduction.** It was 0.90 until 4235c1b (#534,
+2026-07-05), which lowered it to 0.85 inside a commit whose own message still said
+"CI Lighthouse validates the category score against the 0.9 budget". Today's runs
+score 0.83–0.84. A budget that keeps chasing the score downward stops being a gate,
+so the real question — whether ~0.84 is itself a regression from ~0.90 — is tracked
+separately (#851). Do not lower this a third time without answering it.
+
 ### Before every commit — required checklist
 
 **Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.

@@ -69,10 +69,15 @@ describe('buildDirectionsHrefForBand (#754)', () => {
     expect(href).toBe('https://www.google.com/maps/dir/?api=1&destination=43.46,-80.52')
   })
 
+  // Deliberately a NON-Waterloo city, asserted as a whole URL. With
+  // venue_city: 'Waterloo' and a toContain() assertion this test passed against
+  // the old hardcoded "<venue> Waterloo ON" implementation too — "The Roost
+  // Waterloo ON" contains "The Roost Waterloo" — so it proved nothing about
+  // #767. Buddies Fest 2 is in Tillsonburg, which is the case that was broken.
   it('falls back to a name search scoped to the venue city when coords are missing', () => {
-    const href = buildDirectionsHrefForBand({ venue: 'The Roost', venue_city: 'Waterloo' })
-    expect(href).toContain('/maps/search/')
-    expect(href).toContain(encodeURIComponent('The Roost Waterloo'))
+    const href = buildDirectionsHrefForBand({ venue: 'The Roost', venue_city: 'Tillsonburg' })
+    expect(href).toBe(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('The Roost Tillsonburg')}`)
+    expect(href).not.toContain('Waterloo')
   })
 
   it('falls back to a bare venue-name search when coords AND city are missing', () => {

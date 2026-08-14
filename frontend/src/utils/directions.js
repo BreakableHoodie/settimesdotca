@@ -27,7 +27,9 @@ export function buildDirectionsHref(name, address) {
 // payload (venue NAME + optional venue_lat/venue_lng — schedule.js never
 // joins the venue's address). Prefers exact coordinates, which opens the
 // device's native maps app rather than a Google web search; falls back to a
-// "<venue> Waterloo ON" name search when coordinates aren't available.
+// "<venue> <venue_city>" name search when coordinates aren't available, or a
+// bare venue-name search when the city is unknown (#767 — never a hardcoded
+// city, which is confidently wrong outside Waterloo Region).
 //
 // Consolidated from utils/nextMove.js's own copy of this exact function
 // (#754) — issue #754's correction confirmed there were two directions-URL

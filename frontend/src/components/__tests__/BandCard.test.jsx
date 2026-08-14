@@ -63,6 +63,32 @@ describe('BandCard — genre chip', () => {
   })
 })
 
+// Root-cause regression guard for #729: the pill behind the artist name uses a
+// navy tint that blends into the card's own dark gradient when the card is
+// unselected (`bg-bg-navy/60` on `bg-gradient-card`), so the name-to-genre gap
+// reads as unexplained whitespace there while the identical geometry on a
+// selected (amber) card reads as deliberate padding around a visible pill.
+// The unselected pill now carries the same visible surface the genre chip
+// already uses (Option 1 in #729); the amber state keeps its faint navy tint.
+describe('BandCard — name pill (#729)', () => {
+  it('gives the unselected name pill a visible surface', () => {
+    const { container } = renderCard({})
+
+    const pill = container.querySelector('div.inline-block')
+    expect(pill.className).toMatch(/bg-surface/)
+    expect(pill.className).toMatch(/border-border/)
+    expect(pill.className).not.toMatch(/bg-bg-navy\/60/)
+  })
+
+  it('keeps the navy-tinted pill on the amber card', () => {
+    const { container } = renderCard({ isSelected: true })
+
+    const pill = container.querySelector('div.inline-block')
+    expect(pill.className).toMatch(/bg-bg-navy\/15/)
+    expect(pill.className).not.toMatch(/bg-surface/)
+  })
+})
+
 // #726 regression tests. The card container must never be a focusable
 // interactive target: it wraps a real <button> (corner add/remove) and an <a>
 // (profile link), so it cannot itself be a <button> (nested interactive

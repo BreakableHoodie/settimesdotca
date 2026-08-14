@@ -16,15 +16,7 @@ import {
   validateDate,
   validateDoorsJson,
 } from "../../../utils/validation.js";
-import { getClientIP } from "../../../utils/request.js";
-
-// Helper to extract event ID from path
-function getEventId(request) {
-  const url = new URL(request.url);
-  const parts = url.pathname.split("/");
-  const idIndex = parts.indexOf("events") + 1;
-  return parts[idIndex];
-}
+import { getClientIP, getUrlId } from "../../../utils/request.js";
 
 function parseJsonField(value, label) {
   if (value === undefined) {
@@ -69,9 +61,9 @@ export async function onRequestPatch(context) {
     }
 
     const currentUser = permCheck.user;
-    const eventId = getEventId(request);
+    const { valid, value: eventId } = getUrlId(request, "events");
 
-    if (!eventId || isNaN(eventId)) {
+    if (!valid) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -84,7 +76,6 @@ export async function onRequestPatch(context) {
       );
     }
 
-    // Get current event
     const event = await DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(eventId).first();
 
     if (!event) {
@@ -577,9 +568,9 @@ export async function onRequestPut(context) {
     }
 
     const currentUser = permCheck.user;
-    const eventId = getEventId(request);
+    const { valid, value: eventId } = getUrlId(request, "events");
 
-    if (!eventId || isNaN(eventId)) {
+    if (!valid) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -742,10 +733,9 @@ export async function onRequestDelete(context) {
     }
 
     const currentUser = permCheck.user;
-    const eventId = getEventId(request);
-    const eventIdNum = parseInt(eventId);
+    const { valid, value: eventIdNum } = getUrlId(request, "events");
 
-    if (isNaN(eventIdNum)) {
+    if (!valid) {
       return new Response(JSON.stringify({ error: "Invalid event ID" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },

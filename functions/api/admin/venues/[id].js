@@ -11,7 +11,7 @@ import {
   normalizePostalCode,
   sanitizeString,
 } from "../../../utils/validation.js";
-import { getClientIP } from "../../../utils/request.js";
+import { getClientIP, getUrlId } from "../../../utils/request.js";
 
 function formatVenueAddress(venue) {
   if (!venue) return "";
@@ -19,14 +19,6 @@ function formatVenueAddress(venue) {
   const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
   const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
   return [line1, line2, line3].filter(Boolean).join(", ");
-}
-
-// Helper to extract venue ID from path
-function getVenueId(request) {
-  const url = new URL(request.url);
-  const parts = url.pathname.split("/");
-  const idIndex = parts.indexOf("venues") + 1;
-  return parts[idIndex];
 }
 
 // PUT - Update venue
@@ -44,9 +36,9 @@ export async function onRequestPut(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const venueId = getVenueId(request);
+    const { valid, value: venueId } = getUrlId(request, "venues");
 
-    if (!venueId || isNaN(venueId)) {
+    if (!valid) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -321,9 +313,9 @@ export async function onRequestDelete(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const venueId = getVenueId(request);
+    const { valid, value: venueId } = getUrlId(request, "venues");
 
-    if (!venueId || isNaN(venueId)) {
+    if (!valid) {
       return new Response(
         JSON.stringify({
           error: "Bad request",

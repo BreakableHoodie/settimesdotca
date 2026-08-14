@@ -13,18 +13,10 @@ import {
   sanitizeString,
   validatePerformanceDate,
 } from "../../../utils/validation.js";
-import { getClientIP } from "../../../utils/request.js";
+import { getClientIP, getUrlId } from "../../../utils/request.js";
 import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
 import { parseOrigin } from "../../../utils/parseOrigin.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
-
-// Helper to extract band ID from path
-function getBandId(request) {
-  const url = new URL(request.url);
-  const parts = url.pathname.split("/");
-  const idIndex = parts.indexOf("bands") + 1;
-  return parts[idIndex];
-}
 
 async function getEventForPerformance(DB, performanceId) {
   if (!performanceId) return null;
@@ -110,12 +102,12 @@ export async function onRequestPut(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const performanceId = getBandId(request);
+    const { rawId: performanceId, valid } = getUrlId(request, "bands");
 
     // Check if ID is a profile ID (starts with "profile_")
     const isProfileUpdate = performanceId.toString().startsWith("profile_");
 
-    if ((!performanceId || isNaN(performanceId)) && !isProfileUpdate) {
+    if (!valid && !isProfileUpdate) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -704,8 +696,8 @@ export async function onRequestPatch(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const performanceId = getBandId(request);
-    if (!performanceId || isNaN(performanceId)) {
+    const { valid, value: performanceId } = getUrlId(request, "bands");
+    if (!valid) {
       return new Response(
         JSON.stringify({
           error: "Bad request",
@@ -947,12 +939,12 @@ export async function onRequestDelete(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const performanceId = getBandId(request);
+    const { rawId: performanceId, valid } = getUrlId(request, "bands");
 
     // Check if ID is a profile ID (starts with "profile_")
     const isProfileDelete = performanceId.toString().startsWith("profile_");
 
-    if ((!performanceId || isNaN(performanceId)) && !isProfileDelete) {
+    if (!valid && !isProfileDelete) {
       return new Response(
         JSON.stringify({
           error: "Bad request",

@@ -4,13 +4,14 @@
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
+import { validateId } from "../../../utils/validation.js";
 
 // PATCH - Update user (admin only, users can update own name)
 export async function onRequestPatch(context) {
   const { request, env, params } = context;
   const { DB } = env;
-  const userId = Number(params.id);
-  if (!Number.isInteger(userId) || userId < 1) {
+  const { valid, value: userId } = validateId(params.id);
+  if (!valid) {
     return new Response(JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -283,8 +284,8 @@ export async function onRequestPatch(context) {
 export async function onRequestDelete(context) {
   const { request, env, params } = context;
   const { DB } = env;
-  const userId = Number(params.id);
-  if (!Number.isInteger(userId) || userId < 1) {
+  const { valid, value: userId } = validateId(params.id);
+  if (!valid) {
     return new Response(JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },

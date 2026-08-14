@@ -364,6 +364,47 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await waitFor(() => expect(document.title).toBe('Room 47 — Live Music Venue in Waterloo, ON | SetTimes'))
   })
 
+  // #785 / #859 review: VenuePage is the one SSR-injected route with no
+  // loading early-return, so its <Helmet> renders on the very first paint.
+  // React 19 hoists that <title> into document.title, which beats the
+  // !loading guard on the effect — an ungated fallback here replaced the
+  // server-sent title with 'Venue – SetTimes' for the whole fetch window.
+  // The BandProfilePage deferred case below cannot catch this class: that
+  // page has no <Helmet> at all.
+  it('VenuePage keeps the SSR <title> while the venue fetch is in flight', async () => {
+    let resolveFetch
+    fetchPublicJson.mockReturnValue(
+      new Promise(resolve => {
+        resolveFetch = resolve
+      })
+    )
+    seedSsrHead('/venue/3', 'Room 47 — Live Music Venue in Waterloo, ON | SetTimes')
+
+    render(
+      withProviders(
+        <MemoryRouter initialEntries={['/venue/3']}>
+          <Routes>
+            <Route path="/venue/:id" element={<VenuePage />} />
+          </Routes>
+        </MemoryRouter>,
+        { themed: true }
+      )
+    )
+
+    // Still loading: the title in the DOM is exactly what the server sent.
+    await waitFor(() => expect(document.title).toBe('Room 47 — Live Music Venue in Waterloo, ON | SetTimes'))
+
+    resolveFetch({
+      venue: { id: 3, name: 'Room 47', city: 'Waterloo', location: 'Waterloo, ON', address: null, website: null },
+      upcoming: [],
+      past: [],
+    })
+    await screen.findByRole('heading', { level: 1, name: 'Room 47' })
+
+    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
+    await waitFor(() => expect(document.title).toBe('Room 47 — Live Music Venue in Waterloo, ON | SetTimes'))
+  })
+
   it('BandProfilePage (/band/:id)', async () => {
     fetchPublicJson.mockResolvedValue({
       id: 206,

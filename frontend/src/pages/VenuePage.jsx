@@ -159,13 +159,20 @@ export default function VenuePage() {
           (#785), backed by the direct document.title assignment in the effect
           above -- react-helmet-async does not reliably set document.title in
           React 19, so the assignment, not Helmet, is load-bearing. */}
-      <Helmet>
-        <title>
-          {venue
-            ? `${venue.name} — Live Music Venue${venue.city ? ` in ${venue.city}, ON` : ''} | SetTimes`
-            : 'Venue – SetTimes'}
-        </title>
-      </Helmet>
+      {/* Rendered only once the venue has loaded. This page has no loading
+          early-return (unlike App.jsx:604 and EventRecapPage.jsx:134, whose
+          skeletons happen to sit above their own <Helmet>), so an ungated
+          <title> here renders its fallback on the very first paint — and React
+          19 hoists it straight into document.title, beating the !loading guard
+          on the effect above. That silently replaced the server-sent title with
+          'Venue – SetTimes' for the whole fetch window (#785, caught in review
+          on #859). Emitting no <title> while loading leaves the SSR one intact,
+          which is exactly what it is there for. */}
+      {venue ? (
+        <Helmet>
+          <title>{`${venue.name} — Live Music Venue${venue.city ? ` in ${venue.city}, ON` : ''} | SetTimes`}</title>
+        </Helmet>
+      ) : null}
 
       <header className="border-b border-accent-500/30 px-4 py-6">
         <div className="container mx-auto flex max-w-5xl items-center justify-between gap-4">

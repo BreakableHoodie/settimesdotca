@@ -94,6 +94,17 @@
         "edit": "deny",
         "bash": "ask"
       }
+    },
+    "plan": {
+      "description": "Read-only review and diagnosis; never edits",
+      "mode": "primary",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "edit": "deny",
+        "bash": "deny"
+      }
     }
   },
   "command": {

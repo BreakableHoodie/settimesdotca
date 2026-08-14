@@ -11,7 +11,6 @@ function BandCard({
   isSelected,
   onToggle,
   showVenue = true,
-  clickable = true,
   showToggleButton = true,
   eventSlug,
   onRemove,
@@ -20,23 +19,10 @@ function BandCard({
   currentTime,
   dayLabel,
 }) {
-  const handleToggle = () => {
-    if (!isInteractive) return
-    onToggle?.(band.id)
-  }
-
   const handleRemove = e => {
     e.stopPropagation()
     const handler = onRemove || onToggle
     handler?.(band.id)
-  }
-
-  const handleKeyDown = e => {
-    if (!isInteractive) return
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      handleToggle()
-    }
   }
 
   // A cancelled set is never live, never "starting soon", and never
@@ -47,7 +33,6 @@ function BandCard({
   const nowMs = +currentTime
   const startingSoon = !isCancelled && isStartingSoon(band, currentTime)
   const minutesUntil = startingSoon ? Math.ceil((band.startMs - nowMs) / 60000) : 0
-  const isInteractive = clickable && !isCancelled
 
   // Both selected and playing states use the amber gradient — dark text required throughout
   const onAmber = isSelected || isPlaying
@@ -63,17 +48,13 @@ function BandCard({
   const labelBase = isSelected ? `Remove ${band.name} from my route` : `Add ${band.name} to my route`
   const bandProfileHref = band.name ? buildBandProfileHref(band.name, eventSlug) : null
 
+  // The card container is a labelled group, never a button or a click target:
+  // it wraps a real <button> (corner add/remove toggle) and an <a> (profile
+  // link), so making it interactive would either nest interactive content
+  // (invalid) or announce as a control while containing focusable children.
+  // The corner button is the sole toggle control (#726).
   return (
-    <div
-      className={`${baseClasses} ${
-        isInteractive ? 'cursor-pointer hover:brightness-110 active:scale-95' : 'cursor-default'
-      }`}
-      onClick={isInteractive ? handleToggle : undefined}
-      onKeyDown={isInteractive ? handleKeyDown : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
-      role={isInteractive ? undefined : 'group'}
-      aria-label={isInteractive ? undefined : `${band.name} at ${band.venue}`}
-    >
+    <div className={baseClasses} role="group" aria-label={`${band.name} at ${band.venue}`}>
       {showToggleButton && !isCancelled && (
         <button
           type="button"

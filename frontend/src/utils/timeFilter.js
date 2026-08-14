@@ -320,10 +320,12 @@ export function getTimeDescription(performance) {
   // prepareBands() (bandUtils.js), so the raw Date's date is one day ahead of
   // the evening the set belongs to — e.g. a set that started 00:25 on Aug 7
   // reads "Aug 8" here while DayDivider renders "Aug 7" for the same set.
-  // festivalDayStart() resolves the correct festival day (shifting back a
-  // calendar day for sub-6AM clock times, the same resolution the this-week /
-  // next-week branches use). The clock time itself is unaffected by the
-  // +1-day offset, so it comes from the raw timestamp.
+  // festivalDayStart() resolves the correct festival day, shifting back a
+  // calendar day for sub-6AM clock times. Note the this-week / next-week
+  // branches do NOT share this resolution: they compare raw startMs against
+  // week boundaries and render no date at all, so there is nothing for the
+  // +1-day offset to skew there. The clock time itself is likewise unaffected
+  // by the offset, so it comes from the raw timestamp.
   const rawStart = new Date(startTime)
   const festivalDay = festivalDayStart(startTime)
   return `${festivalDay.toLocaleDateString([], {

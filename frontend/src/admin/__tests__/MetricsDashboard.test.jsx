@@ -46,6 +46,14 @@ describe('MetricsDashboard', () => {
     expect(screen.getByText(/1 band/)).toBeInTheDocument()
     // Plural "views" still renders within the compound row
     expect(screen.getByText(/30 views/)).toBeInTheDocument()
+    // view_count and import_count are different units and get conflated
+    // (CLAUDE.md "Metrics & Analytics"): views are unique visitors recomputed
+    // from a ledger, imports are per-fetch and undeduped, so imports CAN exceed
+    // views. This caption is the only place a reader learns that — assert it
+    // survives, because silently dropping it makes the panel misleading rather
+    // than merely sparser.
+    expect(screen.getByText(/Views count unique visitors per link/)).toBeInTheDocument()
+    expect(screen.getByText(/Imports count per-fetch/)).toBeInTheDocument()
   })
 
   it('renders 0 for share imports when the field is absent (older data)', async () => {
@@ -66,5 +74,9 @@ describe('MetricsDashboard', () => {
     expect(await screen.findByText('Shares Imported')).toBeInTheDocument()
     const shareImportsLabel = screen.getByText('Shares Imported')
     expect(shareImportsLabel.parentElement.textContent).toContain('0')
+    // An empty topSharedRoutes must show the empty state, not a bare heading.
+    // The endpoint filters to view_count > 0, so "no rows" is the normal
+    // between-seasons case rather than an error — it needs to read that way.
+    expect(screen.getByText('No shared routes with views yet')).toBeInTheDocument()
   })
 })

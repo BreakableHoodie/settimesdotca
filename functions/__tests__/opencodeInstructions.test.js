@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // #818 — `opencode.json` is committed, but the `instructions/` tree it used to
 // point at is gitignored (`.gitignore: /instructions/`). So the config shipped
@@ -12,7 +13,11 @@ import { resolve } from "node:path";
 //
 // This scans for the class rather than the three paths that happened to be
 // wrong: EVERY path the config declares must be tracked in git.
-const REPO_ROOT = resolve(import.meta.dirname, "../..");
+// fileURLToPath rather than import.meta.dirname, matching the sibling guards
+// (staticPageMeta.test.js, afterMidnightThreshold.test.js). import.meta.dirname
+// needs Node >= 20.11; CI runs 22 so it would work, but nothing else in the
+// repo uses it and consistency beats novelty here.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function trackedFiles() {
   const out = execFileSync("git", ["ls-files"], { cwd: REPO_ROOT, encoding: "utf8" });

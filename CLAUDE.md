@@ -465,15 +465,21 @@ until 4235c1b (#534, 2026-07-05) — a squash whose second commit is an explicit
 measured CI variance of 0.72 / 0.89 / 0.88 in a single 3-run pass. Reading only the
 first commit of that squash makes the change look incidental; it was not.
 
-**0.90 was never achievable, not merely flaky.** Measured locally on 2026-08-14
-(#851, static serve + simulated throttling, 3 runs): **0.85 / 0.85 / 0.86**,
-deterministically — so a 0.90 budget would fail on a dev machine, not just on a
-contended runner. Retiring it was correct.
+**0.90 was not reached locally either, not merely missed by CI.** On 2026-08-14
+(#851, static build served by `npx serve dist`, Lighthouse CLI mobile with
+`--throttling-method=simulate`, 3 runs) the scores were **0.85 / 0.85 / 0.86**.
+Under that setup a 0.90 budget fails on a dev machine, not only on a contended
+runner — which is why retiring it was correct. One machine on one day is not
+proof it can never be reached; it is enough to stop treating 0.90 as a floor the
+current shell is quietly falling short of.
 
-There is real drift since July, and it is small: index chunk 338 → **354 kB**
-(+16 kB) and LCP 2.2 → **2.4 s**, both reproducible from a build. The larger score
-drag is **CLS at 0.20–0.23** (component score 0.61, one mount-time shift) — that
-fails Core Web Vitals outright and is tracked in #854, separate from the budget.
+Drift since July is real and small: index chunk 338 → **354 kB** (+16 kB), which
+the build alone reproduces, and LCP 2.2 → **2.4 s**, which needs that same serve
+and throttling setup to reproduce — a raw build says nothing about LCP. The
+larger score drag is **CLS at 0.20–0.23** (component score 0.61, one mount-time
+shift) — that fails Core Web Vitals outright and is tracked in #854, separate
+from the budget. All three figures come from that single measurement; re-measure
+rather than cite them as standing values.
 
 So the budget is not chasing an unmeasured regression. Still: **do not lower it a
 third time without re-measuring locally first** — that measurement is cheap and is

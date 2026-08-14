@@ -730,24 +730,46 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       expect(img).toHaveAttribute('alt', '')
     })
 
-    // #697: each poster links to its event, like the title does. The link must
-    // carry its own accessible name — never be aria-hidden, which would be an
-    // interactive element removed from the accessibility tree — and must stay
-    // out of the tab order so keyboard users get one stop per card, not two.
-    const names = ['Past Fest One', 'Past Fest Two', 'Past Fest Three']
+    // #700: poster and title are ONE labelled navigation link per card.
+    // Previously the poster was a second, aria-labelled link with
+    // tabindex="-1" beside the title link (#697), so a screen reader in
+    // browse mode announced the event name twice per card. The poster img
+    // must sit inside that single link; the link must carry no separate
+    // aria-label (the accessible name comes from the title text inside it)
+    // and no tabindex hack (it is the card's real, focusable link — one tab
+    // stop). aria-hidden on the link stays forbidden: that would remove an
+    // interactive element from the accessibility tree.
     posterImgs.forEach((img, i) => {
       const link = img.closest('a')
       expect(link).not.toBeNull()
       expect(link).toHaveAttribute('href', `/event/past-fest-${['one', 'two', 'three'][i]}`)
       expect(link).not.toHaveAttribute('aria-hidden')
-      expect(link).toHaveAttribute('aria-label', names[i])
-      expect(link).toHaveAttribute('tabindex', '-1')
+      expect(link).not.toHaveAttribute('aria-label')
+      expect(link).not.toHaveAttribute('tabindex')
     })
+
+    // Exactly one link TO the event named by the event itself per card — the
+    // poster+title link. The card also carries a "View Lineup"/"Build Your
+    // Schedule" primary CTA that navigates to the same page, but that button
+    // is labelled by its action, not by the event name, so it must not be
+    // counted here; the event name is announced as a link exactly once.
+    ;[
+      ['Past Fest One', 'past-fest-one'],
+      ['Past Fest Two', 'past-fest-two'],
+      ['Past Fest Three', 'past-fest-three'],
+    ].forEach(([name, slug]) => {
+      const nameLinks = [...container.querySelectorAll(`a[href="/event/${slug}"]`)].filter(a =>
+        a.textContent.includes(name)
+      )
+      expect(nameLinks).toHaveLength(1)
+    })
+    expect(screen.getAllByRole('link', { name: 'Past Fest One' })).toHaveLength(1)
   })
 
-  it('raises no axe violation for the labelled poster link', async () => {
-    // Guards the accessibility contract: a labelled, unfocusable link. Catches
-    // both a regression to aria-hidden-on-interactive and an unlabelled link.
+  it('raises no axe violation for the single event link', async () => {
+    // Guards the accessibility contract (#700): one labelled navigation link
+    // per card whose accessible name comes from visible text. Catches both a
+    // regression to aria-hidden-on-interactive and an unlabelled link.
     const { axe, toHaveNoViolations } = await import('jest-axe')
     expect.extend(toHaveNoViolations)
 

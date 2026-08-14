@@ -26,34 +26,6 @@ import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
 
 const POSTER_BOX_CLASS = 'w-28 sm:w-36 shrink-0 self-start overflow-hidden rounded-lg border border-border'
-
-/**
- * Wraps a listing poster so it links to the event, like the title does (#697).
- *
- * The link carries its own accessible name rather than being `aria-hidden`: an
- * interactive element removed from the accessibility tree is an invalid contract,
- * even when it is unfocusable. The image itself stays `alt=""` (decorative — the
- * name lives on the link).
- *
- * `tabIndex={-1}` keeps it out of the tab order, so keyboard users get one stop
- * per card via the title rather than two to the same destination.
- *
- * Renders a plain div when there is no slug, mirroring the title's own
- * `event.slug` guard; otherwise this would link to `/event/undefined`.
- */
-function PosterBox({ slug, name, children }) {
-  if (!slug) return <div className={POSTER_BOX_CLASS}>{children}</div>
-  return (
-    <Link
-      to={`/event/${slug}`}
-      aria-label={name}
-      tabIndex={-1}
-      className={`${POSTER_BOX_CLASS} block transition-opacity hover:opacity-90`}
-    >
-      {children}
-    </Link>
-  )
-}
 import PosterImage from './PosterImage'
 
 /**
@@ -772,104 +744,129 @@ function EventCard({
       {/* Event Header */}
       <div className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
-          <div className="flex flex-1 gap-4 min-w-0">
-            {/* Decorative: alt="" because the card's link text already names
-                the event. Do not make this open a lightbox — that would nest
-                a <button> inside the card's <a>, which is invalid and breaks
-                keyboard nav; the full-size view lives on the event page.
-                `self-start` stops the flex row's default align-items:stretch
-                from stretching this box to the height of the text column
-                beside it — without it, the box was taller than the poster's
-                real aspect ratio and the image (object-contain) letterboxed
-                inside the extra space, reading as "artificially and doubly
-                constrained" (#659 follow-up). No fixed aspect ratio either:
-                production posters range ~0.75-0.80 (3:4 to 4:5), so any
-                single ratio letterboxes most of them — `h-auto` lets the
-                image set its own height and letterboxes none. Trade-off:
-                this gives up the reserved layout space that guarded against
-                CLS; accepted because the image is loading="lazy" and the
-                past-section cards are additionally gated behind a collapsed
-                "Show History" toggle, so neither mounts until near-viewport
-                or explicitly expanded. */}
-            {event.poster_url && (
-              <PosterBox slug={event.slug} name={event.name}>
-                <PosterImage
-                  src={event.poster_url}
-                  width={200}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  /* aspect-[auto_3/4] is the TWO-VALUE aspect-ratio syntax:
-                     reserve a 3:4 box while the lazy image has no intrinsic
-                     dimensions, then let the real ratio take over once it
-                     loads. This is NOT the fixed-ratio box that caused
-                     letterboxing — that was a stretched container plus
-                     object-contain, which pinned the wrong ratio permanently.
-                     Nothing letterboxes after load here, and the reserved box
-                     stops expanding History from cascading layout shifts. */
-                  className="aspect-[auto_3/4] h-auto w-full"
-                />
-              </PosterBox>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-start gap-2 mb-2">
-                {event.slug ? (
-                  <h3 className="text-2xl font-bold text-accent-500 flex-1">
-                    <Link
-                      to={`/event/${event.slug}`}
-                      className="hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500/70 rounded-xs"
-                    >
-                      {event.name}
-                    </Link>
-                  </h3>
-                ) : (
-                  <h3 className="text-2xl font-bold text-accent-500 flex-1">{event.name}</h3>
-                )}
-                {isLive && (
-                  <Badge variant="error" size="md">
-                    LIVE NOW
-                  </Badge>
-                )}
-                {event.status === 'archived' && (
-                  <Badge variant="default" size="md">
-                    <Archive size={12} className="mr-1" aria-hidden="true" />
-                    Archived
-                  </Badge>
-                )}
-              </div>
+          {/* Poster + title are ONE link (#700): the listing card exposes a
+              single labelled navigation link to the event. Previously the
+              poster was its own aria-labelled link with tabIndex={-1} beside
+              the title link (#697), so a screen reader in browse mode
+              announced the event name twice per card. Wrapping both in one
+              <a> fixes the duplication: the poster image stays alt=""
+              (decorative — the name lives on the title text inside the link).
+              The badges/date/stats are SIBLINGS of the link, never children —
+              anything inside it joins its accessible name, so a "LIVE NOW"
+              badge must not extend the name to "Vol. 18 LIVE NOW". A
+              card-spanning stretched link was rejected (#699): the card nests
+              band-profile links and the ticket button, and an anchor cannot
+              wrap anchors. */}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-start gap-2 mb-2">
+              {event.slug ? (
+                <Link
+                  to={`/event/${event.slug}`}
+                  className="flex items-start gap-4 min-w-0 flex-1 rounded-xs hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500/70"
+                >
+                  {event.poster_url && (
+                    /* Decorative: alt="" because the link's title text already
+                        names the event. Do not make this open a lightbox — that
+                        would nest a <button> inside the card's <a>, which is
+                        invalid and breaks keyboard nav; the full-size view
+                        lives on the event page. `self-start` (via
+                        POSTER_BOX_CLASS) stops the flex row's default
+                        align-items:stretch from stretching this box to the
+                        height of the title beside it — without it, the box was
+                        taller than the poster's real aspect ratio and the image
+                        (object-contain) letterboxed inside the extra space,
+                        reading as "artificially and doubly constrained" (#659
+                        follow-up). No fixed aspect ratio either: production
+                        posters range ~0.75-0.80 (3:4 to 4:5), so any single
+                        ratio letterboxes most of them — `h-auto` lets the image
+                        set its own height and letterboxes none. Trade-off: this
+                        gives up the reserved layout space that guarded against
+                        CLS; accepted because the image is loading="lazy" and
+                        the past-section cards are additionally gated behind a
+                        collapsed "Show History" toggle, so neither mounts until
+                        near-viewport or explicitly expanded. */
+                    <div className={POSTER_BOX_CLASS}>
+                      <PosterImage
+                        src={event.poster_url}
+                        width={200}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        /* aspect-[auto_3/4] is the TWO-VALUE aspect-ratio syntax:
+                           reserve a 3:4 box while the lazy image has no intrinsic
+                           dimensions, then let the real ratio take over once it
+                           loads. This is NOT the fixed-ratio box that caused
+                           letterboxing — that was a stretched container plus
+                           object-contain, which pinned the wrong ratio permanently.
+                           Nothing letterboxes after load here, and the reserved box
+                           stops expanding History from cascading layout shifts. */
+                        className="aspect-[auto_3/4] h-auto w-full"
+                      />
+                    </div>
+                  )}
+                  <h3 className="text-2xl font-bold text-accent-500 flex-1 min-w-0">{event.name}</h3>
+                </Link>
+              ) : (
+                <div className="flex items-start gap-4 min-w-0 flex-1">
+                  {event.poster_url && (
+                    <div className={POSTER_BOX_CLASS}>
+                      <PosterImage
+                        src={event.poster_url}
+                        width={200}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="aspect-[auto_3/4] h-auto w-full"
+                      />
+                    </div>
+                  )}
+                  <h3 className="text-2xl font-bold text-accent-500 flex-1 min-w-0">{event.name}</h3>
+                </div>
+              )}
+              {isLive && (
+                <Badge variant="error" size="md">
+                  LIVE NOW
+                </Badge>
+              )}
+              {event.status === 'archived' && (
+                <Badge variant="default" size="md">
+                  <Archive size={12} className="mr-1" aria-hidden="true" />
+                  Archived
+                </Badge>
+              )}
+            </div>
 
-              <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
-                <CalendarDays size={12} />
-                {formatDate(event.date)}
-              </p>
+            <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
+              <CalendarDays size={12} />
+              {formatDate(event.date)}
+            </p>
 
-              {/* Event Stats */}
-              <div className="flex flex-wrap gap-6 text-sm">
-                {allBandCount > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-text-primary">{allBandCount}</span>
-                    <span className="text-text-tertiary">{allBandCount === 1 ? 'Band' : 'Bands'}</span>
-                  </div>
-                ) : (
-                  // A future event with an empty lineup isn't missing data —
-                  // it just hasn't been booked yet, so say so instead of
-                  // showing "0 Bands" (which reads as broken). A CONCLUDED
-                  // event with zero bands is a different situation: there's
-                  // no lineup still coming, just a historical gap (same as
-                  // the "0 Venues" case below), so "Lineup TBA" would be
-                  // nonsense there — omit the stat entirely instead.
-                  !isPast && <span className="text-text-tertiary">Lineup TBA</span>
-                )}
-                {/* Historical volumes have roster-only lineups with no venue
+            {/* Event Stats */}
+            <div className="flex flex-wrap gap-6 text-sm">
+              {allBandCount > 0 ? (
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-text-primary">{allBandCount}</span>
+                  <span className="text-text-tertiary">{allBandCount === 1 ? 'Band' : 'Bands'}</span>
+                </div>
+              ) : (
+                // A future event with an empty lineup isn't missing data —
+                // it just hasn't been booked yet, so say so instead of
+                // showing "0 Bands" (which reads as broken). A CONCLUDED
+                // event with zero bands is a different situation: there's
+                // no lineup still coming, just a historical gap (same as
+                // the "0 Venues" case below), so "Lineup TBA" would be
+                // nonsense there — omit the stat entirely instead.
+                !isPast && <span className="text-text-tertiary">Lineup TBA</span>
+              )}
+              {/* Historical volumes have roster-only lineups with no venue
                   assignments — "0 Venues" reads as missing data, so omit the
                   stat entirely rather than showing a zero. */}
-                {allVenueCount > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-text-primary">{allVenueCount}</span>
-                    <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
-                  </div>
-                )}
-              </div>
+              {allVenueCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-text-primary">{allVenueCount}</span>
+                  <span className="text-text-tertiary">{allVenueCount === 1 ? 'Venue' : 'Venues'}</span>
+                </div>
+              )}
             </div>
           </div>
 

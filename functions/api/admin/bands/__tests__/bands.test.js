@@ -2191,3 +2191,33 @@ describe("Admin bands API - performance_date multi-day validation (#540)", () =>
     expect(updated.band.performance_date).toBeNull();
   });
 });
+
+// #678/#837 — getUrlId() reads a path segment, so rawId is string | undefined.
+// Both the PUT and DELETE handlers tested the "profile_" prefix with
+// performanceId.toString() BEFORE consulting `valid`, so a request with no id
+// segment threw a TypeError and surfaced as 500 instead of the documented 400.
+describe("Admin bands API - malformed id returns 400, not 500 (#837)", () => {
+  it("PUT with no id segment returns the documented 400", async () => {
+    const { env, headers } = createTestEnv({ role: "editor" });
+    const request = new Request("https://example.test/api/admin/bands", {
+      method: "PUT",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Whatever" }),
+    });
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toBe("Invalid band ID");
+  });
+
+  it("DELETE with no id segment returns the documented 400", async () => {
+    const { env, headers } = createTestEnv({ role: "editor" });
+    const request = new Request("https://example.test/api/admin/bands", { method: "DELETE", headers });
+
+    const res = await bandIdHandler.onRequestDelete({ request, env, data: { user: { role: "editor" } } });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toBe("Invalid band ID");
+  });
+});

@@ -2,16 +2,8 @@
 // POST /api/admin/events/{id}/publish
 
 import { checkPermission, auditLog } from "../../_middleware.js";
-import { getClientIP } from "../../../../utils/request.js";
+import { getClientIP, getUrlId } from "../../../../utils/request.js";
 import { safeReflectSocialLinksString } from "../../../../utils/validation.js";
-
-// Helper to extract event ID from path
-function getEventId(request) {
-  const url = new URL(request.url);
-  const parts = url.pathname.split("/");
-  const idIndex = parts.indexOf("events") + 1;
-  return parts[idIndex];
-}
 
 // POST - Publish or unpublish event (editor and admin only)
 export async function onRequestPost(context) {
@@ -27,9 +19,9 @@ export async function onRequestPost(context) {
     }
 
     const currentUser = permCheck.user;
-    const eventId = getEventId(request);
+    const { valid, value: eventId } = getUrlId(request, "events");
 
-    if (!eventId || isNaN(eventId)) {
+    if (!valid) {
       return new Response(
         JSON.stringify({
           error: "Bad request",

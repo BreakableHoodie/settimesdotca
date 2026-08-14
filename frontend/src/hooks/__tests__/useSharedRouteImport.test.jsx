@@ -115,3 +115,37 @@ describe('useSharedRouteImport', () => {
     expect(next.get('keep')).toBe('1')
   })
 })
+
+// #765 follow-up — the claim was a single ref holding only the most recent
+// slug, so A -> B -> A re-imported A once B had overwritten it. That
+// double-counts share_links.import_count for the funnel step this hook exists
+// to count once, and it is reachable: a fan can open two shared routes and
+// navigate back to the first. A Set keeps every slug claimed for the hook's
+// lifetime.
+describe('useSharedRouteImport — returning to an earlier slug', () => {
+  it('does not re-import slug A after slug B (A -> B -> A)', async () => {
+    const fetchMock = makeFetchMock()
+    vi.stubGlobal('fetch', fetchMock)
+    const onShareData = vi.fn()
+    const setSearchParams = vi.fn()
+    const bands = [BAND_ONE, BAND_TWO]
+
+    const { rerender } = renderHook(props => useSharedRouteImport(props), {
+      initialProps: { searchParams: makeParams('slug-a'), setSearchParams, bands, onShareData },
+    })
+    await act(async () => {})
+
+    await act(async () => {
+      rerender({ searchParams: makeParams('slug-b'), setSearchParams, bands, onShareData })
+    })
+
+    await act(async () => {
+      rerender({ searchParams: makeParams('slug-a'), setSearchParams, bands, onShareData })
+    })
+
+    const importedSlugs = fetchMock.mock.calls.map(([url]) => url)
+    expect(importedSlugs).toHaveLength(2)
+    expect(importedSlugs.filter(u => u.includes('slug-a'))).toHaveLength(1)
+    expect(importedSlugs.filter(u => u.includes('slug-b'))).toHaveLength(1)
+  })
+})

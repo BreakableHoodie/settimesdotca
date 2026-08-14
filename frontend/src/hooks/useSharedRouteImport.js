@@ -10,15 +10,20 @@ import { useEffect, useRef } from 'react'
 // the same pre-update closure — the claim must happen synchronously, before any
 // async work. The claim is keyed on the slug so a DIFFERENT share link in the
 // same session still imports (#765).
+//
+// A Set, not a single ref: holding only the most recent slug means A -> B -> A
+// re-imports A, because B overwrote the claim. That double-counts the very
+// funnel step this hook exists to count once, and it is reachable — a fan can
+// open two shared routes and navigate back to the first.
 export function useSharedRouteImport({ searchParams, setSearchParams, bands, onShareData }) {
-  const importedShareSlugRef = useRef(null)
+  const importedShareSlugsRef = useRef(new Set())
 
   useEffect(() => {
     const shareSlug = searchParams.get('share')
     if (!shareSlug || bands.length === 0) return
 
-    if (importedShareSlugRef.current === shareSlug) return
-    importedShareSlugRef.current = shareSlug
+    if (importedShareSlugsRef.current.has(shareSlug)) return
+    importedShareSlugsRef.current.add(shareSlug)
 
     setSearchParams(
       prev => {

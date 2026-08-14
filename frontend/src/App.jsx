@@ -455,8 +455,10 @@ function App() {
 
   // Extracted from this file's inline effect so the exactly-once-per-slug claim
   // is testable (see hooks/__tests__/useSharedRouteImport.test.jsx). Same
-  // behavior: the ?import=1 refetch must not inflate share view_count (see
-  // share/[slug].js), and #765 guards it from re-firing per slug.
+  // behavior: the ?import=1 refetch must not inflate share_links.import_count
+  // (see share/[slug].js) — that is the per-fetch, undeduped counter, distinct
+  // from view_count, which is unique visitors recomputed from a ledger. #765
+  // guards it from re-firing per slug.
   useSharedRouteImport({ searchParams, setSearchParams, bands, onShareData: handleShareData })
 
   const dismissHint = () => {

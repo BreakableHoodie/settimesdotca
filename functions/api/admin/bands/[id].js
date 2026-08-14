@@ -104,8 +104,11 @@ export async function onRequestPut(context) {
   try {
     const { rawId: performanceId, valid } = getUrlId(request, "bands");
 
-    // Check if ID is a profile ID (starts with "profile_")
-    const isProfileUpdate = performanceId.toString().startsWith("profile_");
+    // Check if ID is a profile ID (starts with "profile_"). getUrlId() reads a
+    // path segment, so rawId is string | undefined — undefined whenever no id
+    // segment follows. The typeof guard replaces a .toString() that threw on
+    // that case, turning the documented 400 below into a 500.
+    const isProfileUpdate = typeof performanceId === "string" && performanceId.startsWith("profile_");
 
     if (!valid && !isProfileUpdate) {
       return new Response(
@@ -941,8 +944,9 @@ export async function onRequestDelete(context) {
   try {
     const { rawId: performanceId, valid } = getUrlId(request, "bands");
 
-    // Check if ID is a profile ID (starts with "profile_")
-    const isProfileDelete = performanceId.toString().startsWith("profile_");
+    // Same guard as the update handler above: rawId is string | undefined, and
+    // .toString() on undefined turned the documented 400 into a 500.
+    const isProfileDelete = typeof performanceId === "string" && performanceId.startsWith("profile_");
 
     if (!valid && !isProfileDelete) {
       return new Response(

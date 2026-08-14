@@ -94,7 +94,12 @@ function BandCard({
             Starts in {minutesUntil}m · {formatTime(band.startTime)}
           </span>
         )}
-        <div className={`inline-block px-3 py-1.5 rounded-lg mb-1 ${onAmber ? 'bg-bg-navy/15' : 'bg-bg-navy/60'}`}>
+        {/* Visible pill on the unselected card (#729): bg-bg-navy/60 blended
+            into the card's own gradient, so the name-to-genre gap read as
+            unexplained whitespace. Same pairing as the genre chip's. */}
+        <div
+          className={`inline-block px-3 py-1.5 rounded-lg mb-1 ${onAmber ? 'bg-bg-navy/15' : 'bg-surface border border-border'}`}
+        >
           {band.name ? (
             <Link
               to={bandProfileHref}

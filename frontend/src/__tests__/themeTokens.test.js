@@ -276,6 +276,41 @@ describe('theme token contrast (WCAG AA, 4.5:1)', () => {
       ).toBeGreaterThanOrEqual(MIN_CONTRAST)
     })
 
+    // BandCard's artist-name pill (#729). It carries `bg-surface`, which is
+    // rgba with 4-5% alpha in every theme — so it barely tints the card and
+    // the text effectively reads against gradient-card itself. #729 asked for
+    // this check explicitly because BandCard has already shipped one WCAG
+    // failure (#720, the selected-card gradient at 2.3:1), and nothing else
+    // covers the pairing: BandCard.test.jsx asserts the CLASSES are
+    // `bg-surface border-border`, which says nothing about whether the result
+    // is readable. Both gradient-card stops are checked and the worse ratio
+    // asserted, since the pill sits anywhere along the card.
+    it('BandCard name-pill text clears 4.5:1 against bg-surface composited over gradient-card', () => {
+      const surfaceRaw = resolveHex('--color-surface', theme)
+      const surfaceMatch = /rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\s*\)/.exec(surfaceRaw)
+      expect(surfaceMatch, `[${theme}] could not parse --color-surface: ${surfaceRaw}`).toBeTruthy()
+      const surfaceHex = rgbToHex([Number(surfaceMatch[1]), Number(surfaceMatch[2]), Number(surfaceMatch[3])])
+      const surfaceAlphaPercent = (surfaceMatch[4] === undefined ? 1 : Number(surfaceMatch[4])) * 100
+
+      const textColor = resolveHex('--color-text-primary', theme)
+      const cardStops = resolveGradientCardStops(theme)
+
+      const results = [cardStops.start, cardStops.end].map(stop => {
+        const cardBg = compositeCardStopOverPage(stop, bgNavy)
+        const pillBg = blend(surfaceHex, cardBg, surfaceAlphaPercent)
+        return { cardBg, pillBg, ratio: contrastRatio(textColor, pillBg) }
+      })
+      const worst = results[0].ratio <= results[1].ratio ? results[0] : results[1]
+
+      expect(
+        worst.ratio,
+        `[${theme}] BandCard name-pill text (--color-text-primary=${textColor}) against its composited pill ` +
+          `background (--color-surface=${surfaceRaw} over the gradient-card stop composited over ` +
+          `--color-bg-navy=${bgNavy} => ${worst.cardBg} => ${worst.pillBg}) computes to ` +
+          `${worst.ratio.toFixed(2)}:1, below the ${MIN_CONTRAST}:1 WCAG AA floor`
+      ).toBeGreaterThanOrEqual(MIN_CONTRAST)
+    })
+
     // Bonus guard: accent-500 is the token gradient-accent's stops are meant
     // to match (VenueStrip and BandCard both use it directly against
     // bg-navy/bg-purple) — same bug class, cheap to also pin down here.

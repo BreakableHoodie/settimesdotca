@@ -39,6 +39,8 @@
  */
 
 import { spawn, execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 const USAGE = `Usage: node scripts/delegate-verify.mjs [--allow-empty] -- <command> [args...]`;
 
@@ -50,12 +52,43 @@ function git(args) {
  * `git status --porcelain` covers tracked modifications AND untracked files,
  * which matters: a delegate that creates a brand-new file has done real work,
  * and a `git diff`-only check would call that a no-op.
+ *
+ * Status codes alone are NOT enough. If a path is already ` M` or `??` when the
+ * delegate starts and the delegate edits that same path, the code is identical
+ * in both snapshots, so the run would be reported as "changed nothing" — a
+ * false exit 2 in exactly the situation this script exists to catch. Real work
+ * on an already-dirty tree is the common case, not an edge case. So every entry
+ * carries a content hash alongside its status code.
+ *
+ * `-uall` lists untracked FILES individually. Without it git collapses an
+ * untracked directory into a single `dir/` entry, and a file created inside an
+ * already-untracked directory would leave the snapshot byte-identical.
  */
 function snapshot() {
+  const status = git(["status", "--porcelain", "-uall"]);
   return {
     head: git(["rev-parse", "HEAD"]),
-    status: git(["status", "--porcelain"]),
+    status,
+    // Hashes MUST be read here, not when the snapshots are compared. Comparing
+    // later would hash whatever is on disk at that moment, so both snapshots
+    // would see identical post-run content and the check would silently pass
+    // everything through as "unchanged".
+    entries: parseStatus(status),
   };
+}
+
+/**
+ * Content hash of a working-tree path. Unreadable paths (deleted, or a path git
+ * quoted because it contains control characters) return a constant, so they
+ * compare equal across snapshots and fall back to status-code comparison rather
+ * than reporting a spurious change.
+ */
+function hashPath(path) {
+  try {
+    return createHash("sha256").update(readFileSync(path)).digest("hex").slice(0, 16);
+  } catch {
+    return "unreadable";
+  }
 }
 
 function parseStatus(porcelain) {
@@ -66,17 +99,20 @@ function parseStatus(porcelain) {
     // "old -> new"; the destination is what matters for "what changed".
     const code = line.slice(0, 2);
     const path = line.slice(3).split(" -> ").pop();
-    entries.set(path, code);
+    entries.set(path, { code, hash: hashPath(path) });
   }
   return entries;
 }
 
 function diffSnapshots(before, after) {
-  const b = parseStatus(before.status);
-  const a = parseStatus(after.status);
+  const b = before.entries;
+  const a = after.entries;
   const changed = [];
-  for (const [path, code] of a) {
-    if (b.get(path) !== code) changed.push({ path, code });
+  for (const [path, entry] of a) {
+    const prev = b.get(path);
+    if (!prev || prev.code !== entry.code || prev.hash !== entry.hash) {
+      changed.push({ path, code: entry.code });
+    }
   }
   // A path that was dirty before and is clean now also counts as a change
   // (e.g. the delegate reverted something).

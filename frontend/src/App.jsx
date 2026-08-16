@@ -317,10 +317,18 @@ function App() {
   }, [selectedBands, slug, eventData?.end_date, eventData?.date])
 
   // react-helmet-async does not reliably set document.title in React 19 — set it
-  // directly. Mirrors the <Helmet> <title> below. See BandProfilePage.jsx.
+  // directly. Mirrors the <Helmet> <title> below AND the <title>
+  // functions/event/[slug].js injects server-side (#785) — after hydration the
+  // DOM title must equal the one the server sent. See BandProfilePage.jsx.
   useEffect(() => {
-    document.title = eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'
-  }, [eventData?.name])
+    // While the fetch is in flight, the SSR-injected <title> (already in the
+    // DOM) is correct — don't clobber it with the generic 'SetTimes' fallback.
+    if (!loading) {
+      document.title = eventData?.name
+        ? `${eventData.name} — Set Times & Lineup${eventData.city ? ` in ${eventData.city}` : ''} | SetTimes`
+        : 'SetTimes'
+    }
+  }, [loading, eventData?.name, eventData?.city])
 
   const clearScheduleToast = useCallback(({ clearUndoState = false } = {}) => {
     if (scheduleToastTimeoutRef.current) {
@@ -651,10 +659,18 @@ function App() {
           "summary_large_image" every other route uses, not this component's
           old "event"/"summary"). Declaring those tags here too would
           duplicate them on mount instead of replacing them (react-helmet-async
-          can't adopt tags it didn't create). <title> stays client-owned, same
-          as the direct document.title assignment above. */}
+          can't adopt tags it didn't create). <title> also has an SSR
+          counterpart (same function swaps it into the raw HTML response), so
+          this client <title> must reproduce that exact string (#785), backed
+          by the direct document.title assignment above -- react-helmet-async
+          does not reliably set document.title in React 19, so the assignment,
+          not Helmet, is load-bearing. */}
       <Helmet>
-        <title>{eventData?.name ? `${eventData.name} | SetTimes` : 'SetTimes'}</title>
+        <title>
+          {eventData?.name
+            ? `${eventData.name} — Set Times & Lineup${eventData.city ? ` in ${eventData.city}` : ''} | SetTimes`
+            : 'SetTimes'}
+        </title>
       </Helmet>
       <OfflineIndicator />
       {isArchived ? (

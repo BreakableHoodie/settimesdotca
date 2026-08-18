@@ -303,12 +303,12 @@ export default function EventTimeline() {
             <h2 className="text-4xl font-bold text-text-primary mb-2">Events</h2>
             {/* Between seasons (no now/upcoming events) the "Discover upcoming"
                 copy is simply false -- there's nothing upcoming to discover.
-                Swap to copy that's still true: past crawls are browsable and
+                Swap to copy that's still true: past events are browsable and
                 new dates land here. */}
             <p className="text-text-secondary">
               {hasNow || hasUpcoming
-                ? 'Discover upcoming band crawls and music events'
-                : 'Browse past band crawls — new dates will be announced here'}
+                ? 'Discover upcoming live music events'
+                : 'Browse past events — new dates will be announced here'}
             </p>
           </div>
 
@@ -470,7 +470,7 @@ export default function EventTimeline() {
                 <p className="text-text-secondary">
                   {hasActiveFilters
                     ? 'Try adjusting your filters to see more events'
-                    : 'Check back soon for upcoming band crawls!'}
+                    : 'Check back soon for upcoming events!'}
                 </p>
               </div>
             </Alert>
@@ -493,7 +493,7 @@ export default function EventTimeline() {
                 <p className="text-text-secondary mb-4">
                   {filtersHideFutureEvents
                     ? "Your filters are hiding every upcoming event. Clear them to see what's next."
-                    : "We're between seasons — browse past crawls below, or subscribe to hear about new dates first."}
+                    : "We're between seasons — browse past events below, or subscribe to hear about new dates first."}
                 </p>
                 {filtersHideFutureEvents ? (
                   <Button variant="secondary" size="sm" onClick={clearFilters} icon={<X size={14} />}>

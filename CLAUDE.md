@@ -466,8 +466,11 @@ Lighthouse 12.8.2, mobile, `--throttling-method=simulate`, 3 runs each:
 
 Three runs each. The `settimes.ca` row lists only two: its first run was a
 contended outlier (LCP 8.3 s, TBT 21 s) and is excluded rather than averaged in.
-The current row reports CI's uploaded median LHR, not raw runs — that is the
-number the gate actually saw.
+The current row reports CI's **uploaded median LHR** — which is what gets
+published for humans to read, and is *not* what the assertions compare against:
+performance aggregates `optimistic` (best run) and CLS `pessimistic` (worst),
+so neither gated value is the median. Read the median for a sense of the page;
+read the assert step's output for what actually passed or failed.
 
 The old column is the whole story: the one run recording **zero** shift scored
 **0.96**; the two recording 0.2011 scored 0.86. The shift and the ~0.10 deficit

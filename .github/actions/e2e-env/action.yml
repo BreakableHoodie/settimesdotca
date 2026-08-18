@@ -95,10 +95,6 @@ runs:
 
         - name: Initialize D1 database with schema
           shell: bash
-          env:
-              E2E_ADMIN_PASSWORD: ${{ inputs.e2e-admin-password }}
-              E2E_ADMIN_EMAIL: ${{ inputs.e2e-admin-email }}
-              SEED_ADMIN: ${{ inputs.seed-admin }}
           run: |
               printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\nENVIRONMENT="development"\n' > .dev.vars
 
@@ -108,24 +104,35 @@ runs:
               echo "Seeding test data (venues, events, bands)..."
               ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/seed-test-data.sql
 
+              echo "✓ Schema and test data loaded"
+
+        # Split out of the step above so the admin credentials are exposed ONLY
+        # to the step that needs them: a public-only consumer (seed-admin:
+        # 'false') never has them in its environment at all.
+        - name: Seed E2E admin user
+          if: inputs.seed-admin == 'true'
+          shell: bash
+          env:
+              E2E_ADMIN_PASSWORD: ${{ inputs.e2e-admin-password }}
+              E2E_ADMIN_EMAIL: ${{ inputs.e2e-admin-email }}
+          run: |
               # Fail closed rather than proceeding with whatever the seed files
               # happen to contain: "we deliberately want no admin" and "the
               # secret is missing" used to be indistinguishable, and the second
               # only surfaced later as a confusing auth failure.
-              if [ "$SEED_ADMIN" = "true" ]; then
-                  if [ -z "$E2E_ADMIN_PASSWORD" ] || [ -z "$E2E_ADMIN_EMAIL" ]; then
-                      echo "✗ seed-admin is 'true' but e2e-admin-email/e2e-admin-password are empty." >&2
-                      echo "  Pass both secrets, or set seed-admin: 'false' for public-only jobs." >&2
-                      exit 1
-                  fi
-                  echo "Creating E2E admin user..."
-                  SEED_SQL=$(node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL" --password "$E2E_ADMIN_PASSWORD")
-                  ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="$SEED_SQL"
-                  echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
-              else
-                  echo "• seed-admin='false' — no admin account seeded (public-only job)."
+              if [ -z "$E2E_ADMIN_PASSWORD" ] || [ -z "$E2E_ADMIN_EMAIL" ]; then
+                  echo "✗ seed-admin is 'true' but e2e-admin-email/e2e-admin-password are empty." >&2
+                  echo "  Pass both secrets, or set seed-admin: 'false' for public-only jobs." >&2
+                  exit 1
               fi
+              echo "Creating E2E admin user..."
+              SEED_SQL=$(node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL" --password "$E2E_ADMIN_PASSWORD")
+              ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="$SEED_SQL"
+              echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
 
+        - name: Report seeded database users
+          shell: bash
+          run: |
               echo "Database users:"
               ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="SELECT id, email, role FROM users;"
 

@@ -14,6 +14,16 @@ inputs:
         description: Whether to install Playwright browsers
         required: false
         default: 'true'
+    seed-admin:
+        description: >
+            Whether this consumer needs an admin account seeded. 'true' (the
+            default) requires e2e-admin-email/password and FAILS the job if
+            either is empty, so a misconfigured secret surfaces immediately
+            instead of silently producing a DB with no admin. Set to 'false'
+            for jobs that only exercise public pages and must not be handed
+            admin credentials (least privilege).
+        required: false
+        default: 'true'
 
 runs:
     using: composite
@@ -69,6 +79,7 @@ runs:
           env:
               E2E_ADMIN_PASSWORD: ${{ inputs.e2e-admin-password }}
               E2E_ADMIN_EMAIL: ${{ inputs.e2e-admin-email }}
+              SEED_ADMIN: ${{ inputs.seed-admin }}
           run: |
               printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\nENVIRONMENT="development"\n' > .dev.vars
 
@@ -78,13 +89,22 @@ runs:
               echo "Seeding test data (venues, events, bands)..."
               ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/seed-test-data.sql
 
-              if [ -n "$E2E_ADMIN_PASSWORD" ] && [ -n "$E2E_ADMIN_EMAIL" ]; then
+              # Fail closed rather than proceeding with whatever the seed files
+              # happen to contain: "we deliberately want no admin" and "the
+              # secret is missing" used to be indistinguishable, and the second
+              # only surfaced later as a confusing auth failure.
+              if [ "$SEED_ADMIN" = "true" ]; then
+                  if [ -z "$E2E_ADMIN_PASSWORD" ] || [ -z "$E2E_ADMIN_EMAIL" ]; then
+                      echo "✗ seed-admin is 'true' but e2e-admin-email/e2e-admin-password are empty." >&2
+                      echo "  Pass both secrets, or set seed-admin: 'false' for public-only jobs." >&2
+                      exit 1
+                  fi
                   echo "Creating E2E admin user..."
                   SEED_SQL=$(node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL" --password "$E2E_ADMIN_PASSWORD")
                   ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="$SEED_SQL"
                   echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
               else
-                  echo "⚠ E2E credentials not set, using default test accounts"
+                  echo "• seed-admin='false' — no admin account seeded (public-only job)."
               fi
 
               echo "Database users:"

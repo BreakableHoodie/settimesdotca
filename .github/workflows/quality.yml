@@ -218,6 +218,9 @@ jobs:
         uses: ./.github/actions/e2e-env
         with:
           install-playwright: 'false'
+          # Lighthouse only loads public pages and never authenticates, so this
+          # job is deliberately not handed admin credentials.
+          seed-admin: 'false'
 
       - name: Run Lighthouse CI
         working-directory: frontend

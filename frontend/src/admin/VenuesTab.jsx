@@ -391,7 +391,9 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                 />
                 <datalist id="venue-region-list">
                   {regionSuggestions.map(region => (
-                    <option key={region} value={region} />
+                    <option key={region} value={region}>
+                      {region}
+                    </option>
                   ))}
                 </datalist>
               </div>
@@ -431,7 +433,9 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                 />
                 <datalist id="venue-country-list">
                   {countrySuggestions.map(country => (
-                    <option key={country} value={country} />
+                    <option key={country} value={country}>
+                      {country}
+                    </option>
                   ))}
                 </datalist>
               </div>

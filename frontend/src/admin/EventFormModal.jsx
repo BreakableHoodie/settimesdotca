@@ -750,7 +750,7 @@ export default function EventFormModal({
             {isEditing && (
               <div className="flex items-center justify-between py-3 border-t border-white/10">
                 <div>
-                  <label className="text-sm font-medium text-text-primary" htmlFor="reveal-mode">
+                  <label id="reveal-mode-label" className="text-sm font-medium text-text-primary" htmlFor="reveal-mode">
                     Reveal mode
                   </label>
                   <p className="text-xs text-text-secondary mt-0.5">
@@ -761,6 +761,7 @@ export default function EventFormModal({
                   id="reveal-mode"
                   type="button"
                   role="switch"
+                  aria-labelledby="reveal-mode-label"
                   aria-checked={formData.reveal_mode}
                   onClick={() => setFormData(prev => ({ ...prev, reveal_mode: !prev.reveal_mode }))}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 ${

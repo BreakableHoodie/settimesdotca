@@ -1509,5 +1509,14 @@ describe('EventTimeline between-seasons filter copy accuracy', () => {
     expect(within(alertBox).getByText(/your filters are hiding every upcoming event/i)).toBeInTheDocument()
     expect(within(alertBox).getByRole('button', { name: /clear filters/i })).toBeInTheDocument()
     expect(within(alertBox).queryByRole('link', { name: /subscribe for updates/i })).not.toBeInTheDocument()
+
+    // Regression: the HEADER must agree with the alert above. hasNow/hasUpcoming
+    // read the FILTERED buckets, so both go false here even though Vol 18 exists
+    // and is merely hidden. Without filtersHideFutureEvents in the header
+    // condition the same screen says "new dates will be announced here" directly
+    // above an alert explaining that filters are hiding the upcoming events --
+    // two contradictory claims, one of them false.
+    expect(screen.getByText('Discover upcoming live music events')).toBeInTheDocument()
+    expect(screen.queryByText('Browse past events — new dates will be announced here')).not.toBeInTheDocument()
   })
 })

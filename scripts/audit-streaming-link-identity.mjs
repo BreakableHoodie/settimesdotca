@@ -117,6 +117,20 @@ function withoutArticle(s) {
   return s.replace(/^(the|a|an)\s+/, "");
 }
 
+/**
+ * Whole-token containment.
+ *
+ * Raw substring containment matches mid-word: a db name of "sun" is contained
+ * in "sunday blues", and "beat" in "beatles" — both genuinely wrong links, and
+ * both would land in REVIEW rather than MISMATCH and therefore pass with exit
+ * 0, inverting this file's whole point. Padding both sides forces a token
+ * boundary, while still resolving the documented billing case ("Scott
+ * Reynolds" inside "Scott Reynolds Band") to REVIEW.
+ */
+function containsTokens(haystack, needle) {
+  return ` ${haystack} `.includes(` ${needle} `);
+}
+
 function classify(dbName, platformName) {
   if (!platformName) return "UNRESOLVED";
   const a = withoutArticle(normalise(dbName));
@@ -125,34 +139,42 @@ function classify(dbName, platformName) {
   if (a === b) return "OK";
   // Billing variant: one name contains the other, e.g. Spotify lists
   // "Scott Reynolds" for our "Scott Reynolds Band". Related, not wrong.
-  if (a.includes(b) || b.includes(a)) return "REVIEW";
+  if (containsTokens(a, b) || containsTokens(b, a)) return "REVIEW";
   return "MISMATCH";
 }
 
 async function fetchJson(url) {
   try {
     const res = await fetch(url, { headers: { "User-Agent": "settimes-link-audit" } });
-    if (!res.ok) return null;
+    if (!res.ok) return undefined;
     return await res.json();
   } catch {
     // A transient network failure must not read as a wrong link. Returning
-    // null lands the row in UNRESOLVED, which is reported but never sets the
-    // failing exit code — only a positive MISMATCH does.
-    return null;
+    // undefined lands the row in UNRESOLVED, which is reported but never sets
+    // the failing exit code — only a positive MISMATCH does.
+    return undefined;
   }
 }
 
 async function spotifyName(url) {
   const data = await fetchJson(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
-  return data?.title ?? null;
+  return data?.title ?? undefined;
 }
 
 async function appleName(url) {
-  // .../artist/<slug>/<numeric id>[?query] — the numeric id is what lookup wants.
-  const id = url.match(/\/(\d+)(?:\?|$)/)?.[1];
-  if (!id) return null;
+  // .../artist/<slug>/<numeric id> — the id is the last path segment, and
+  // reading it off the parsed pathname survives a trailing slash, a query
+  // string and a #fragment. A regex anchored on "?-or-end-of-string" missed
+  // all three, dropping a perfectly resolvable link into UNRESOLVED.
+  let id;
+  try {
+    id = new URL(url).pathname.split("/").filter(Boolean).at(-1);
+  } catch {
+    return undefined;
+  }
+  if (!/^\d+$/.test(id ?? "")) return undefined;
   const data = await fetchJson(`https://itunes.apple.com/lookup?id=${id}`);
-  return data?.results?.[0]?.artistName ?? null;
+  return data?.results?.[0]?.artistName ?? undefined;
 }
 
 async function main() {

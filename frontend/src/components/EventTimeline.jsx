@@ -304,9 +304,17 @@ export default function EventTimeline() {
             {/* Between seasons (no now/upcoming events) the "Discover upcoming"
                 copy is simply false -- there's nothing upcoming to discover.
                 Swap to copy that's still true: past events are browsable and
-                new dates land here. */}
+                new dates land here.
+
+                filtersHideFutureEvents is in the condition because hasNow and
+                hasUpcoming read the FILTERED buckets. With a filter active that
+                hides every upcoming event, both go false while future events
+                still exist -- and the body below correctly says "No upcoming
+                events match your filters". Without this term the header would
+                simultaneously claim new dates are yet to be announced. Same
+                screen, two contradictory statements. */}
             <p className="text-text-secondary">
-              {hasNow || hasUpcoming
+              {hasNow || hasUpcoming || filtersHideFutureEvents
                 ? 'Discover upcoming live music events'
                 : 'Browse past events — new dates will be announced here'}
             </p>

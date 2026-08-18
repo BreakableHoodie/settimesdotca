@@ -261,10 +261,15 @@ export default function BandForm({
             )}
 
             <div className="sm:col-span-2">
-              <label htmlFor="band-description" className="block text-white mb-2 text-sm">
+              {/* Not a <label>: RichTextEditor renders a contenteditable, which
+                  is not a labelable element, so htmlFor could never bind to it
+                  (it was orphaned here for exactly that reason). The editor
+                  takes this id via aria-labelledby instead. */}
+              <span id="band-description-label" className="block text-white mb-2 text-sm">
                 Description <span className="text-gray-400 text-xs">(optional)</span>
-              </label>
+              </span>
               <RichTextEditor
+                ariaLabelledBy="band-description-label"
                 value={formData.description || ''}
                 onChange={value => {
                   onChange({ target: { name: 'description', value } })

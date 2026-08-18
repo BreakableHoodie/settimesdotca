@@ -37,6 +37,7 @@ export default function RichTextEditor({
   onChange,
   placeholder = 'Write a short description...',
   minHeight = 200,
+  ariaLabelledBy,
 }) {
   const editor = useEditor({
     extensions: [
@@ -60,7 +61,12 @@ export default function RichTextEditor({
       onChange(DOMPurify.sanitize(editor.getHTML(), SANITIZE_OPTIONS))
     },
     editorProps: {
-      attributes: { style: `min-height: ${minHeight}px` },
+      attributes: {
+        style: `min-height: ${minHeight}px`,
+        role: 'textbox',
+        'aria-multiline': 'true',
+        ...(ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : {}),
+      },
     },
   })
 

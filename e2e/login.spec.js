@@ -21,9 +21,13 @@ test.describe("Admin Login", () => {
     // Should redirect to admin panel
     await expect(page).toHaveURL(/\/admin$/);
 
-    // Should see the admin header
-    await expect(page.getByText("SetTimes")).toBeVisible();
-    await expect(page.getByText("Admin")).toBeVisible();
+    // Should see the admin header. Scope to the banner's <h1>: a bare
+    // getByText("Admin") also matched "Loading admin panel..." (getByText is
+    // substring + case-insensitive), a strict-mode violation that persisted
+    // for the whole initial-load window and flaked CI. See #865.
+    const adminHeading = page.getByRole("banner").getByRole("heading", { level: 1 });
+    await expect(adminHeading).toContainText("SetTimes");
+    await expect(adminHeading).toContainText("Admin");
   });
 
   test("should show error for invalid credentials", async ({ page }) => {

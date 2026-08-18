@@ -15,7 +15,15 @@ describe('MetricsDashboard', () => {
     eventsApi.getMetrics.mockResolvedValue({
       metrics: {
         totalScheduleBuilds: 10,
-        uniqueVisitors: 7,
+        routeBuilders: 7,
+        completionRate: 25,
+        routeSizeDistribution: [
+          { bucket: '1', route_count: 1 },
+          { bucket: '2-3', route_count: 2 },
+          { bucket: '4-6', route_count: 0 },
+          { bucket: '7-11', route_count: 0 },
+          { bucket: '12+', route_count: 0 },
+        ],
         lastUpdated: '2026-06-18 12:00:00',
         popularBands: [],
         totalShares: 3,
@@ -31,6 +39,10 @@ describe('MetricsDashboard', () => {
     render(<MetricsDashboard eventId={1} />)
 
     expect(await screen.findByText('Shares Created')).toBeInTheDocument()
+    expect(screen.getByText('Fans Who Built a Route')).toBeInTheDocument()
+    expect(screen.getByText('25.0%')).toBeInTheDocument()
+    expect(screen.getByText('Route Size Distribution')).toBeInTheDocument()
+    expect(screen.getByText(/Page-view history may be shorter/)).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
     expect(screen.getByText('Share Views')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
@@ -60,7 +72,9 @@ describe('MetricsDashboard', () => {
     eventsApi.getMetrics.mockResolvedValue({
       metrics: {
         totalScheduleBuilds: 0,
-        uniqueVisitors: 0,
+        routeBuilders: 0,
+        completionRate: undefined,
+        routeSizeDistribution: [],
         lastUpdated: null,
         popularBands: [],
         totalShares: 0,
@@ -72,11 +86,49 @@ describe('MetricsDashboard', () => {
     render(<MetricsDashboard eventId={1} />)
 
     expect(await screen.findByText('Shares Imported')).toBeInTheDocument()
+    expect(screen.getByText('Route Completion Rate')).toBeInTheDocument()
+    expect(screen.getByText('n/a')).toBeInTheDocument()
     const shareImportsLabel = screen.getByText('Shares Imported')
     expect(shareImportsLabel.parentElement.textContent).toContain('0')
     // An empty topSharedRoutes must show the empty state, not a bare heading.
     // The endpoint filters to view_count > 0, so "no rows" is the normal
     // between-seasons case rather than an error — it needs to read that way.
     expect(screen.getByText('No shared routes with views yet')).toBeInTheDocument()
+  })
+
+  // Not a hypothetical edge case — it is the state of live data. The
+  // denominator is event_daily_stats.event_views, which only began recording
+  // with #706, while schedule_builds goes back years. Measured in production
+  // 2026-08-18: event 1 (lwbc15) has 20 route builders against 2 recorded
+  // views, i.e. 1000%. The API deliberately returns the raw ratio (capping a
+  // stored metric would destroy information); the clamp is presentation-only,
+  // so it has to be asserted here or nothing covers it.
+  it('caps a completion rate above 100% for display', async () => {
+    eventsApi.getMetrics.mockResolvedValue({
+      metrics: {
+        totalScheduleBuilds: 40,
+        routeBuilders: 20,
+        completionRate: 1000,
+        routeSizeDistribution: [
+          { bucket: '1', route_count: 20 },
+          { bucket: '2-3', route_count: 0 },
+          { bucket: '4-6', route_count: 0 },
+          { bucket: '7-11', route_count: 0 },
+          { bucket: '12+', route_count: 0 },
+        ],
+        lastUpdated: '2026-08-18 12:00:00',
+        popularBands: [],
+        totalShares: 0,
+        totalShareViews: 0,
+        topSharedRoutes: [],
+      },
+    })
+
+    render(<MetricsDashboard eventId={1} />)
+
+    expect(await screen.findByText('Route Completion Rate')).toBeInTheDocument()
+    expect(screen.getByText('100.0%')).toBeInTheDocument()
+    // The uncapped figure must not reach the page.
+    expect(screen.queryByText('1000.0%')).not.toBeInTheDocument()
   })
 })

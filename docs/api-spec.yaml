@@ -3891,8 +3891,38 @@ components:
           properties:
             totalScheduleBuilds:
               type: integer
-            uniqueVisitors:
+              description: >-
+                Total sets picked across all fans. schedule_builds holds one
+                row per performance picked, so this counts picks, not routes.
+            routeBuilders:
               type: integer
+              description: >-
+                Distinct sessions that picked at least one set. Formerly
+                (mis)named uniqueVisitors, which implied it counted everyone
+                who viewed the page; it never did — a session only appears
+                here once it has already converted.
+            completionRate:
+              type: number
+              format: float
+              description: >-
+                routeBuilders divided by event page views, as a percentage.
+                Omitted entirely when there are no recorded views. The
+                denominator is event_daily_stats.event_views — page views,
+                NOT unique people — so the value can exceed 100 and is
+                capped for display.
+            routeSizeDistribution:
+              type: array
+              description: >-
+                Route sizes bucketed by sets per session. Always contains all
+                five buckets, zero-filled.
+              items:
+                type: object
+                properties:
+                  bucket:
+                    type: string
+                    enum: ["1", "2-3", "4-6", "7-11", "12+"]
+                  route_count:
+                    type: integer
             lastUpdated:
               type: string
               nullable: true

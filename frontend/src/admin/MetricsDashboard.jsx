@@ -27,16 +27,30 @@ export default function MetricsDashboard({ eventId }) {
       <h3 className="text-xl font-bold text-white">Event Metrics</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Schedule Builds */}
+        {/* Sets Picked */}
         <div className="bg-bg-purple rounded-lg p-4">
-          <div className="text-gray-400 text-sm">Schedule Builds</div>
+          <div className="text-gray-400 text-sm">Sets Picked</div>
           <div className="text-3xl font-bold text-white mt-2">{metrics.totalScheduleBuilds}</div>
         </div>
 
-        {/* Unique Visitors */}
+        {/* Route Builders */}
         <div className="bg-bg-purple rounded-lg p-4">
-          <div className="text-gray-400 text-sm">Unique Visitors</div>
-          <div className="text-3xl font-bold text-white mt-2">{metrics.uniqueVisitors}</div>
+          <div className="text-gray-400 text-sm">Fans Who Built a Route</div>
+          <div className="text-3xl font-bold text-white mt-2">{metrics.routeBuilders}</div>
+        </div>
+
+        {/* Route Completion Rate */}
+        <div className="bg-bg-purple rounded-lg p-4">
+          <div className="text-gray-400 text-sm">Route Completion Rate</div>
+          <div className="text-3xl font-bold text-white mt-2">
+            {typeof metrics.completionRate === 'number'
+              ? `${Math.min(metrics.completionRate, 100).toFixed(1)}%`
+              : 'n/a'}
+          </div>
+          <p className="text-gray-400 text-xs mt-2">
+            Routes built ÷ event page views, not unique visitors. Page-view history may be shorter than the event
+            page&apos;s full history.
+          </p>
         </div>
 
         {/* Last Updated */}
@@ -63,6 +77,23 @@ export default function MetricsDashboard({ eventId }) {
         <div className="bg-bg-purple rounded-lg p-4">
           <div className="text-gray-400 text-sm">Shares Imported</div>
           <div className="text-3xl font-bold text-white mt-2">{metrics.totalShareImports ?? 0}</div>
+        </div>
+      </div>
+
+      {/* Route-size distribution */}
+      <div className="bg-bg-purple rounded-lg p-4">
+        <h4 className="text-white font-semibold mb-3">Route Size Distribution</h4>
+        <div className="space-y-2">
+          {(metrics.routeSizeDistribution || []).map(route => (
+            <div key={route.bucket} className="flex justify-between text-sm">
+              <span className="text-white">
+                {route.bucket} {route.bucket === '1' ? 'set' : 'sets'}
+              </span>
+              <span className="text-gray-400">
+                {route.route_count} {route.route_count === 1 ? 'route' : 'routes'}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 

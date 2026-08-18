@@ -185,7 +185,7 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     expect(body.metrics.totalShareImports).toBe(0);
   });
 
-  test("popularBands is ordered by schedule_count desc and totalScheduleBuilds/uniqueVisitors reflect inserted rows", async () => {
+  test("returns set picks, route builders, completion rate, and route-size buckets", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Band Fest", slug: "band-fest" });
 
@@ -222,8 +222,60 @@ describe("GET /api/admin/events/[id]/metrics", () => {
 
     // totalScheduleBuilds: 4 rows inserted
     expect(body.metrics.totalScheduleBuilds).toBe(4);
-    // uniqueVisitors: 3 distinct sessions
-    expect(body.metrics.uniqueVisitors).toBe(3);
+    // Three distinct sessions built routes; no event page views were recorded.
+    expect(body.metrics.routeBuilders).toBe(3);
+    expect(body.metrics.completionRate).toBeUndefined();
+    expect(body.metrics.routeSizeDistribution).toEqual([
+      { bucket: "1", route_count: 2 },
+      { bucket: "2-3", route_count: 1 },
+      { bucket: "4-6", route_count: 0 },
+      { bucket: "7-11", route_count: 0 },
+      { bucket: "12+", route_count: 0 },
+    ]);
+  });
+
+  test("calculates completion rate from event page views and buckets a 12-set route", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Completion Fest", slug: "completion-fest" });
+    const performances = Array.from({ length: 12 }, (_, index) =>
+      insertBand(rawDb, { name: `Band ${index}`, event_id: event.id }),
+    );
+
+    const insertBuild = rawDb.prepare(
+      "INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)",
+    );
+    performances.forEach((performance) => insertBuild.run(event.id, performance.id, "large-route"));
+    insertBuild.run(event.id, performances[0].id, "small-route");
+    rawDb
+      .prepare("INSERT INTO event_daily_stats (event_id, date, event_views) VALUES (?, ?, ?)")
+      .run(event.id, "2026-08-18", 4);
+
+    const body = await (await call(env, event.id)).json();
+    expect(body.metrics.routeBuilders).toBe(2);
+    expect(body.metrics.completionRate).toBe(50);
+    expect(body.metrics.routeSizeDistribution).toEqual([
+      { bucket: "1", route_count: 1 },
+      { bucket: "2-3", route_count: 0 },
+      { bucket: "4-6", route_count: 0 },
+      { bucket: "7-11", route_count: 0 },
+      { bucket: "12+", route_count: 1 },
+    ]);
+  });
+
+  test("returns no completion rate for an event with zero views", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "No Views Fest", slug: "no-views-fest" });
+    const performance = insertBand(rawDb, { name: "Solo Band", event_id: event.id });
+    rawDb
+      .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
+      .run(event.id, performance.id, "builder");
+    rawDb
+      .prepare("INSERT INTO event_daily_stats (event_id, date, event_views) VALUES (?, ?, ?)")
+      .run(event.id, "2026-08-18", 0);
+
+    const body = await (await call(env, event.id)).json();
+    expect(body.metrics.routeBuilders).toBe(1);
+    expect(body.metrics.completionRate).toBeUndefined();
   });
 
   describe("telemetry-derived totals (#706)", () => {

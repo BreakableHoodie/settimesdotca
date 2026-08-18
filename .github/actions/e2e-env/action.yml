@@ -10,6 +10,10 @@ inputs:
         description: Admin email to seed
         required: false
         default: ''
+    install-playwright:
+        description: Whether to install Playwright browsers
+        required: false
+        default: 'true'
 
 runs:
     using: composite
@@ -33,6 +37,7 @@ runs:
           run: npm ci
 
         - name: Cache Playwright browsers
+          if: inputs.install-playwright == 'true'
           id: playwright-cache
           uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           with:
@@ -42,6 +47,7 @@ runs:
                   playwright-${{ runner.os }}-
 
         - name: Install Playwright browsers
+          if: inputs.install-playwright == 'true'
           shell: bash
           env:
               CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}

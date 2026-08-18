@@ -24,7 +24,7 @@ test.describe("Admin Login", () => {
     // Should see the admin header. Scope to the banner's <h1>: a bare
     // getByText("Admin") also matched "Loading admin panel..." (getByText is
     // substring + case-insensitive), a strict-mode violation that persisted
-    // for the whole initial-load window and flaked CI.
+    // for the whole initial-load window and flaked CI. See #865.
     const adminHeading = page.getByRole("banner").getByRole("heading", { level: 1 });
     await expect(adminHeading).toContainText("SetTimes");
     await expect(adminHeading).toContainText("Admin");

@@ -1,9 +1,8 @@
 {
   "ci": {
     "collect": {
-      "url": ["http://localhost:5000"],
+      "url": ["http://localhost:8788"],
       "numberOfRuns": 3,
-      "startServerCommand": "npx serve dist -l 5000",
       "wait": "3000"
     },
     "assert": {

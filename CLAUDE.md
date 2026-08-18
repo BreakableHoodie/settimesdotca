@@ -444,46 +444,56 @@ npx playwright test
 ```
 Requires a running wrangler dev server or uses it automatically via `playwright.config.js`. Run `npm run build --prefix frontend` first.
 
-### Lighthouse CI performance assertion (#728)
+### Lighthouse CI performance assertion (#728, #854, #851)
 
-`frontend/lighthouserc.json` gates performance at **0.80** — deliberately below the
-observed CI noise floor (0.83–0.84). Lighthouse on shared GitHub runners fluctuates
-±2–3 points, so a floor at the observed ceiling flakes with no code cause. The
-assertion pins **`aggregationMethod: "optimistic"` (best of 3 runs)** — the most
-lenient option available. **Do not switch it to `median`:** median ≤ max, so that
-change only ever makes the gate *stricter* and would re-introduce the flake (#728's
-original proposed "fix" was exactly this, caught in the issue's own follow-up). A
-genuine regression must now push the best-of-3 below 0.80 — a sustained drop, not a
-contended runner. The other categories (accessibility, best-practices, seo) stay at
-0.90 and use the default aggregation: they have not been observed to flake here,
-being far less sensitive to runner contention than performance. That is an
-observation, not a guarantee — if one starts flaking, measure it before moving it.
+**The harness measures a served app, not a static build (#869).** Until then,
+`lighthouserc.json` ran `npx serve dist` — static assets only, no Pages Functions,
+no D1 — so every homepage API call failed in CI. `EventTimeline` rendered its tall
+`EventsPageSkeleton`, the fetch failed fast, the skeleton collapsed into a short
+error state, and `<Footer />` (its sibling in `EventsPage`'s `<main>`) moved.
+Lighthouse scored that as a **0.2007 layout shift** that no user has ever seen.
 
-**This is the budget's second reduction, and both were deliberate.** It was 0.90
-until 4235c1b (#534, 2026-07-05) — a squash whose second commit is an explicit
-`perf(ci): right-size the Lighthouse performance budget to 0.85 (#532)`, citing
-measured CI variance of 0.72 / 0.89 / 0.88 in a single 3-run pass. Reading only the
-first commit of that squash makes the change look incidental; it was not.
+It now points at `http://localhost:8788`, served by `.github/actions/e2e-env`
+(wrangler + a seeded D1 — the same environment E2E uses). Measured 2026-08-18,
+Lighthouse 12.8.2, mobile, `--throttling-method=simulate`, 3 runs each:
 
-**0.90 was not reached locally either, not merely missed by CI.** On 2026-08-14
-(#851, static build served by `npx serve dist`, Lighthouse CLI mobile with
-`--throttling-method=simulate`, 3 runs) the scores were **0.85 / 0.85 / 0.86**.
-Under that setup a 0.90 budget fails on a dev machine, not only on a contended
-runner — which is why retiring it was correct. One machine on one day is not
-proof it can never be reached; it is enough to stop treating 0.90 as a floor the
-current shell is quietly falling short of.
+| harness | perf | CLS |
+|---|---|---|
+| static `dist` (old) | 0.86 / 0.86 / 0.96 | 0.2011 / 0.2011 / 0.0000 |
+| `https://settimes.ca` | 0.90 / 0.90 | 0.0004 |
+| wrangler + D1 (current) | CI median **0.94** | **0.0008** |
 
-Drift since July is real and small: index chunk 338 → **354 kB** (+16 kB), which
-the build alone reproduces, and LCP 2.2 → **2.4 s**, which needs that same serve
-and throttling setup to reproduce — a raw build says nothing about LCP. The
-larger score drag is **CLS at 0.20–0.23** (component score 0.61, one mount-time
-shift) — that fails Core Web Vitals outright and is tracked in #854, separate
-from the budget. All three figures come from that single measurement; re-measure
-rather than cite them as standing values.
+The old column is the whole story: the one run recording **zero** shift scored
+**0.96**; the two recording 0.2011 scored 0.86. The shift and the ~0.10 deficit
+were one phenomenon. **So #851's question is answered — ~0.84 was never a
+regression**, and CLS was never a real defect (#854).
 
-So the budget is not chasing an unmeasured regression. Still: **do not lower it a
-third time without re-measuring locally first** — that measurement is cheap and is
-what turns a budget change from erosion into a decision.
+**The budget is still 0.80, and raising it needs CI samples, not local ones.**
+Both past reductions (0.90 → 0.85 in #532/#534, → 0.80 in #728) were, on this
+evidence, absorbing that artifact. But **do not raise it from a local number**:
+`lhci` collects all four categories, while an ad-hoc
+`lighthouse --only-categories=performance` does not, so the two are not
+comparable. On 2026-08-18 the same commit measured **0.94–0.96** raw,
+**0.94** in CI, and **0.74 / 0.84** through local `lhci` on a busy machine.
+Collect several CI runs before moving the floor.
+
+**`cumulative-layout-shift` is asserted at ≤ 0.1** so the artifact cannot return
+silently — it sat at 2× the failing threshold for months with nothing going red,
+because only the four category scores were gated. Current value is 0.0008, so the
+margin is ~125×; a failure there means something real.
+
+The assertion pins **`aggregationMethod: "optimistic"` (best of 3)** — the most
+lenient option. **Do not switch it to `median`:** median ≤ max, so that only ever
+makes the gate stricter and would re-introduce the flake (#728's original proposed
+"fix" was exactly this, caught in the issue's own follow-up). Accessibility,
+best-practices and seo stay at 0.90 on default aggregation; they have not been
+observed to flake here. That is an observation, not a guarantee — if one starts
+flaking, measure it before moving it.
+
+**Performance numbers are contention-sensitive; CLS is not.** Across this
+session's measurements CLS was stable to 4 decimal places while the perf score
+swung 0.63 → 0.96 on identical code, purely with machine load. Measure perf on an
+idle host or take CI's number; never re-baseline it from a laptop doing other work.
 
 ### Before every commit — required checklist
 

@@ -496,7 +496,7 @@ performance assertion's `optimistic`.** `optimistic` picks the most favourable
 run *before* comparing, so against the old `0.2011 / 0.2011 / 0.0000` it would
 aggregate to `0.0000` and pass — the guard would not have caught the very
 artifact it exists to prevent. `pessimistic` takes the worst run, so any single
-shifting run fails the gate. That is safe here precisely because CLS is stable
+run above 0.1 fails the gate. That is safe here precisely because CLS is stable
 under load (see below); do **not** copy it onto the performance assertion.
 
 The assertion pins **`aggregationMethod: "optimistic"` (best of 3)** — the most
@@ -507,10 +507,13 @@ best-practices and seo stay at 0.90 on default aggregation; they have not been
 observed to flake here. That is an observation, not a guarantee — if one starts
 flaking, measure it before moving it.
 
-**Performance numbers are contention-sensitive; CLS is not.** Across this
-session's measurements CLS was stable to 4 decimal places while the perf score
-swung 0.63 → 0.96 on identical code, purely with machine load. Measure perf on an
-idle host or take CI's number; never re-baseline it from a laptop doing other work.
+**Performance numbers look contention-sensitive; CLS did not.** Across one
+session's measurements (2026-08-18) CLS stayed within 0.0000–0.0008 while the
+perf score ranged 0.63 → 0.96 on identical code, **correlating with** host load
+— the runs were not controlled for other variables, so treat this as an observed
+correlation rather than a demonstrated cause. It is still enough to act on:
+measure perf on an idle host or take CI's number, and never re-baseline it from
+a laptop doing other work.
 
 ### Before every commit — required checklist
 

@@ -280,6 +280,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <input
             type="text"
+            aria-label="Search venues"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search name, city, phone, email"
@@ -308,6 +309,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                   Venue Name *
                 </label>
                 <input
+                  id="venue-name"
                   type="text"
                   name="name"
                   value={formData.name}

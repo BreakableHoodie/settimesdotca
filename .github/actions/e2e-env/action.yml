@@ -81,11 +81,59 @@ runs:
           env:
               CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
           run: |
+              # Bounded because `install-deps` shells out to apt-get, which can
+              # block indefinitely on a dpkg lock or an unreachable mirror. On
+              # 2026-08-19 it hung 34m47s and consumed the job's entire 35-minute
+              # budget, leaving a step boundary as the only clue (#881). The boot
+              # loop below already learned this lesson in #625; this step had not.
+              #
+              # A timeout turns a 35-minute silent stall into a fast, obviously
+              # retryable failure. Exit 124 is timeout(1)'s signal, called out so
+              # the next reader does not have to look it up.
+              # NO retry here, deliberately -- one was tried and removed (#883).
+              # `timeout` kills the process it launched, which is the `npx playwright
+              # install-deps` wrapper; that wrapper has already re-exec'd apt-get as
+              # root, and the orphan keeps /var/lib/apt/lists/lock. A second attempt
+              # then dies in ~2s with "Could not get lock ... held by process N",
+              # turning a clear 124 into a confusing exit 1. Observed on the very run
+              # that introduced it. Retrying needs the process GROUP killed and the
+              # lock cleared first; that is a larger, root-touching change.
+              run_bounded() {
+                  local label="$1"
+                  shift
+                  # `local code=$?` would NOT work: `local` is itself a command and
+                  # resets $? before the assignment reads it, so every failure would
+                  # be captured as 0 and silently treated as success. Assign from the
+                  # failing command directly instead.
+                  local code=0
+                  # -k: `timeout` sends SIGTERM, which apt-get mid-dpkg can ignore
+                  # or block on -- leaving the process alive and the step still
+                  # hung, i.e. failing in exactly the case this bound exists for.
+                  # SIGKILL follows 30s later and cannot be ignored.
+                  local started=$SECONDS
+                  timeout -k 30s 300s "$@" || code=$?
+                  local elapsed=$(( SECONDS - started ))
+                  [ "$code" -eq 0 ] && return 0
+                  # 124 = killed by SIGTERM at the deadline; 137 = 128+9, killed by
+                  # the SIGKILL that -k sends when SIGTERM was ignored. Both mean the
+                  # bound fired -- but `timeout` also passes THROUGH a wrapped command
+                  # that exits 124 or 137 on its own, so the code alone cannot tell the
+                  # two apart. Require the elapsed time to corroborate it, or a genuine
+                  # apt failure returning 124 would be blamed on a hang it never had.
+                  if { [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; } && [ "$elapsed" -ge 300 ]; then
+                      echo "✗ $label exceeded 300s and was killed — usually apt-get" >&2
+                      echo "  blocked on a lock or a slow mirror. Re-running the job normally clears it." >&2
+                  else
+                      echo "✗ $label failed with exit $code" >&2
+                  fi
+                  return "$code"
+              }
+
               if [ "$CACHE_HIT" = "true" ]; then
-                  npx playwright install-deps chromium
-                  npx playwright install chromium
+                  run_bounded "playwright install-deps chromium" npx playwright install-deps chromium
+                  run_bounded "playwright install chromium" npx playwright install chromium
               else
-                  npx playwright install chromium --with-deps
+                  run_bounded "playwright install chromium --with-deps" npx playwright install chromium --with-deps
               fi
 
         - name: Build frontend

@@ -266,6 +266,29 @@ jobs:
             curl --connect-timeout 2 --max-time 5 -sS -o /dev/null \
               -w '  status=%{http_code} time=%{time_total}s\n' http://localhost:8788/ || echo "  no response within 5s"
             echo "::endgroup::"
+            # Three occurrences of #878 have now shown the same shape -- two clean
+            # Lighthouse runs, then a silent abort mid-asset-serving on the third,
+            # process gone and the port refused in ~0.2ms. That is an abort, not a
+            # hang, but the two candidate causes (kernel OOM kill vs a workerd
+            # crash) are indistinguishable from what this step captures today.
+            # These probes are what tells them apart. wrangler 4.124.0 did NOT
+            # fix it, so the version hypothesis is spent.
+            echo "::group::resources"
+            echo "memory:"
+            # Capture, then decide -- `free | sed || echo` takes the PIPELINE's
+            # status, which is sed's success, so the fallback never fires and the
+            # section prints nothing at all. Same trap as the listener check above.
+            mem=$(free -m 2>/dev/null || true)
+            if [ -n "$mem" ]; then printf '%s\n' "$mem" | sed 's/^/  /'; else echo "  (free unavailable)"; fi
+            echo "load average:"
+            sed 's/^/  /' /proc/loadavg 2>/dev/null || echo "  (unavailable)"
+            echo "kernel OOM kills (the question three runs have failed to answer):"
+            # dmesg is often restricted to root on hosted runners; sudo -n so a
+            # missing grant fails immediately instead of prompting and hanging.
+            oom=$( { sudo -n dmesg 2>/dev/null || dmesg 2>/dev/null; } \
+              | grep -iE 'out of memory|oom[-_]kill|killed process' | tail -20 || true )
+            if [ -n "$oom" ]; then printf '%s\n' "$oom" | sed 's/^/  /'; else echo "  none found (or dmesg not readable)"; fi
+            echo "::endgroup::"
 
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -229,6 +229,28 @@ jobs:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           CI: true
 
+      # The gate has failed with CHROME_INTERSTITIAL_ERROR mid-pass (#878): the
+      # server serves two Lighthouse runs and is unreachable for the third.
+      # wrangler's own output goes to /tmp/wrangler.log and was never surfaced,
+      # so diagnosing it needed a local reproduction instead of just reading the
+      # failure. Dump it — and say whether the process and port are still alive,
+      # which distinguishes "crashed" from "wedged" and points at different fixes.
+      - name: Wrangler diagnostics on failure
+        if: failure()
+        working-directory: .
+        run: |
+            echo "::group::wrangler.log"
+            if [ -f /tmp/wrangler.log ]; then tail -200 /tmp/wrangler.log; else echo "(no /tmp/wrangler.log)"; fi
+            echo "::endgroup::"
+            echo "::group::server liveness"
+            echo "listeners on :8788:"
+            (command -v ss >/dev/null && ss -lptn 'sport = :8788') || netstat -lptn 2>/dev/null | grep ':8788' || echo "  none"
+            echo "wrangler/workerd processes:"
+            pgrep -a -f 'wrangler|workerd' || echo "  none running"
+            echo "HTTP probe:"
+            curl -sS -o /dev/null -w '  status=%{http_code} time=%{time_total}s\n' http://localhost:8788/ || echo "  unreachable"
+            echo "::endgroup::"
+
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

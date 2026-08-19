@@ -33,6 +33,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import path from "node:path";
 
 const execFileAsync = promisify(execFile);
@@ -99,7 +100,7 @@ const HOMOGLYPHS = new Map([
   ["ß", "ss"],
 ]);
 
-function normalise(raw) {
+export function normalise(raw) {
   if (typeof raw !== "string") return "";
   let s = raw;
   for (const [from, to] of HOMOGLYPHS) s = s.split(from).join(to);
@@ -113,7 +114,7 @@ function normalise(raw) {
 }
 
 /** A leading article is billing, not identity ("The OBGMs" = "OBGMs"). */
-function withoutArticle(s) {
+export function withoutArticle(s) {
   return s.replace(/^(the|a|an)\s+/, "");
 }
 
@@ -127,16 +128,38 @@ function withoutArticle(s) {
  * boundary, while still resolving the documented billing case ("Scott
  * Reynolds" inside "Scott Reynolds Band") to REVIEW.
  */
-function containsTokens(haystack, needle) {
+export function containsTokens(haystack, needle) {
   return ` ${haystack} `.includes(` ${needle} `);
 }
 
-function classify(dbName, platformName) {
+/**
+ * Normalise with hyphens deleted rather than treated as separators, so
+ * "K-Man" and "Kman" agree. Covers the ASCII hyphen plus the Unicode dash
+ * range (U+2010-U+2015), which platform metadata does use.
+ */
+export function normaliseIgnoringHyphens(raw) {
+  if (typeof raw !== "string") return "";
+  return withoutArticle(normalise(raw.replace(/[-\u2010-\u2015]/g, "")));
+}
+
+export function classify(dbName, platformName) {
   if (!platformName) return "UNRESOLVED";
   const a = withoutArticle(normalise(dbName));
   const b = withoutArticle(normalise(platformName));
   if (!a || !b) return "UNRESOLVED";
   if (a === b) return "OK";
+  // Hyphenation variant. normalise() turns every non-alphanumeric run into a
+  // space, so intra-word punctuation splits a token ("K-Man" -> "k man") and
+  // stops equalling its unpunctuated twin ("Kman"). Real case, #171: our
+  // "Kman & the 45s" vs the platform's "K-Man & The 45s", whose Apple slug is
+  // literally k-man-the-45s.
+  //
+  // Deliberately narrow: strip ONLY hyphens from the raw name, then normalise
+  // as usual. The obvious shortcut -- comparing both sides with all spaces
+  // removed -- also erases genuine word boundaries, so "Sea Lion" and
+  // "Seal Ion" would both fold to "sealion" and be called the same artist.
+  // That would hide exactly the mismatch this script exists to find.
+  if (normaliseIgnoringHyphens(dbName) === normaliseIgnoringHyphens(platformName)) return "OK";
   // Billing variant: one name contains the other, e.g. Spotify lists
   // "Scott Reynolds" for our "Scott Reynolds Band". Related, not wrong.
   if (containsTokens(a, b) || containsTokens(b, a)) return "REVIEW";
@@ -232,7 +255,13 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err.message);
-  process.exit(2);
-});
+// `process.argv[1]` is undefined under `node --eval`, where pathToFileURL()
+// would throw during import. Check it before converting.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err.message);
+    if (err.stderr) console.error(err.stderr);
+    if (err.code !== undefined) console.error(`Code: ${err.code}`);
+    process.exit(2);
+  });
+}

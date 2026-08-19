@@ -36,6 +36,10 @@ export default defineConfig({
       include: ["functions/**/*.js"],
       reportsDirectory: "./coverage",
     },
-    include: ["functions/**/__tests__/**/*.test.js"],
+    // `scripts/` is included so repo tooling (e.g. the streaming-link identity
+    // audit) can be unit-tested. Coverage stays scoped to `functions/**` via
+    // coverage.include above, so a script entering the test set does not move
+    // the ratchet denominator.
+    include: ["functions/**/__tests__/**/*.test.js", "scripts/**/__tests__/**/*.test.js"],
   },
 });

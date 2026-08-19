@@ -90,7 +90,25 @@ runs:
               # A timeout turns a 35-minute silent stall into a fast, obviously
               # retryable failure. Exit 124 is timeout(1)'s signal, called out so
               # the next reader does not have to look it up.
+              # One retry, matching the server-boot loop's precedent (#625). Both of
+              # 2026-08-19's stalls were transient mirror failures that a re-run
+              # cleared, so a self-healing attempt is worth 300s of worst-case time.
+              # Retries ANY failure, not just a timeout: an apt mirror 404 mid-update
+              # is equally transient and equally cheap to re-attempt under the bound.
               run_bounded() {
+                  local label="$1"
+                  shift
+                  local attempt
+                  local code=0
+                  for attempt in 1 2; do
+                      run_bounded_once "$label (attempt $attempt/2)" "$@" && return 0
+                      code=$?
+                      [ "$attempt" -eq 1 ] && echo "  retrying once…" >&2
+                  done
+                  return "$code"
+              }
+
+              run_bounded_once() {
                   local label="$1"
                   shift
                   # `local code=$?` would NOT work: `local` is itself a command and

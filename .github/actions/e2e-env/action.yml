@@ -101,10 +101,15 @@ runs:
               run_bounded() {
                   local label="$1"
                   shift
-                  # `local code=$?` would NOT work: `local` is itself a command and
-                  # resets $? before the assignment reads it, so every failure would
-                  # be captured as 0 and silently treated as success. Assign from the
-                  # failing command directly instead.
+                  # Assign from the failing command directly. The original bug here
+                  # was `if timeout ...; then return 0; fi` followed by `code=$?`:
+                  # an `if` whose condition FAILS and has no else returns 0, so $?
+                  # was the if-statement's status, not the command's -- every failure
+                  # captured as 0 and silently treated as success.
+                  #
+                  # NOTE: `local` is not the culprit, contrary to what this comment
+                  # previously said. `false; local code=$?` correctly yields 1; the
+                  # form that does mask is `local code=$(cmd)`. Verified 2026-08-19.
                   local code=0
                   # -k: `timeout` sends SIGTERM, which apt-get mid-dpkg can ignore
                   # or block on -- leaving the process alive and the step still

@@ -33,13 +33,15 @@ function RouteDiffSection({ title, hint, bands, tone }) {
             // not fit beside a band name at 390px — it pushed 57px past the
             // modal edge and clipped the venue. Matches how MySchedule stacks.
             <li key={band.id}>
-              <span
-                className={`block text-sm ${isCancelled ? 'text-text-tertiary line-through' : 'text-text-primary'}`}
-              >
-                {band.name}
-                {isCancelled && (
-                  <span className="ml-2 text-[10px] font-semibold text-warning-500 no-underline">Cancelled</span>
-                )}
+              {/* The strike goes on the name alone. text-decoration inherits to
+                  descendants and a child cannot cancel an ancestor's — nesting
+                  the badge inside struck it through too, which `no-underline`
+                  was powerless to undo. The wrapper keeps them on one line. */}
+              <span className="block text-sm">
+                <span className={isCancelled ? 'text-text-tertiary line-through' : 'text-text-primary'}>
+                  {band.name}
+                </span>
+                {isCancelled && <span className="ml-2 text-[10px] font-semibold text-warning-500">Cancelled</span>}
               </span>
               <span className="block text-xs text-text-tertiary">
                 {formatTimeRange(band.startTime, band.endTime)}

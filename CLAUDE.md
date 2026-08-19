@@ -33,6 +33,49 @@ The mechanical form is usually one grep. "Which files select `p.start_time` but 
 
 Prefer a durable guard over a repeat audit: a source-scanning test (as `bandFields.test.js` does for Tailwind class literals) collapses a whole bug class into one failing test.
 
+### Verify guards against the failure they guard, not the success
+
+**Code whose only job runs when something breaks must be tested broken.** A
+guard, a diagnostic, a timeout, a retry, an error handler — none of it is
+exercised by the happy path, so a green run says nothing about whether it works.
+
+Five instances in one day (2026-08-19), all shipped after reading the code and
+all caught only by *running* the failure:
+
+| Guard | What it did on the failure path |
+|---|---|
+| `curl` probe in the Lighthouse diagnostics (#879) | Unbounded — would hang to the 15-minute job timeout in the *wedged* case it existed to detect, costing the artifact upload |
+| `ss` listener check (#879) | Printed nothing when nothing was listening — "no listener" is the crashed-vs-wedged signal, and silence reads as command failure |
+| `local code=$?` in the apt bound (#882) | `local` is itself a command and resets `$?`, so **every failure was captured as 0 and treated as success** |
+| `timeout` without `-k` (#882) | Sends SIGTERM, which apt-get can ignore — process survives, step still hangs |
+| Retry around the apt bound (#883) | Attempt 1's SIGKILLed apt-get orphan kept `/var/lib/apt/lists/lock`, so attempt 2 could never succeed |
+
+The pattern is identical every time: the happy path was written and verified;
+the failure path was written and *assumed*.
+
+**What actually catches these** is cheap — substitute the failing thing and run
+it:
+
+```bash
+# Prove the listener check reports "none" when ss returns an empty header
+ss() { return 0; }; run_listener_check          # -> "  none", not silence
+
+# Prove the bound kills a process that IGNORES SIGTERM
+run_bounded "stubborn" bash -c 'trap "" TERM; sleep 60'   # -> 137 in ~3s, not 60s
+
+# Prove a retry survives a KILLED predecessor, not just a cleanly-failed one
+```
+
+That last line is the one that cost the most: the retry was tested against a
+command that failed *cleanly*, never against one that had been *killed* — the
+only case the step actually produces.
+
+**Ask before shipping any guard: what does this print, and what does it return,
+when the thing it guards is actually broken?** If you cannot answer from a run
+rather than from reading, it is not verified. This is the same discipline as
+mutation-testing an assertion (see the vacuous-test class), applied to
+operational code instead of tests.
+
 ### The efficiency ladder — before you write
 
 Adapted from the [ponytail](https://github.com/DietrichGebert/ponytail) ruleset. Before writing code, stop at the first rung that applies:

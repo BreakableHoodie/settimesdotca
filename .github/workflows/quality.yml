@@ -244,7 +244,13 @@ jobs:
             echo "::endgroup::"
             echo "::group::server liveness"
             echo "listeners on :8788:"
-            (command -v ss >/dev/null && ss -lptn 'sport = :8788') || netstat -lptn 2>/dev/null | grep ':8788' || echo "  none"
+            # Capture, then decide. `ss` exits 0 with EMPTY output when nothing
+            # is listening, so an `|| echo none` chain prints nothing at all --
+            # and "no listener" is precisely the crashed-vs-wedged signal this
+            # step exists to report. Silence would be the wrong answer here.
+            listeners=$( { command -v ss >/dev/null && ss -lptn 'sport = :8788'; } 2>/dev/null \
+              || netstat -lptn 2>/dev/null | grep ':8788' || true )
+            if [ -n "$listeners" ]; then printf '%s\n' "$listeners"; else echo "  none"; fi
             echo "wrangler/workerd processes:"
             pgrep -a -f 'wrangler|workerd' || echo "  none running"
             echo "HTTP probe:"

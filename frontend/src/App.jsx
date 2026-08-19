@@ -21,6 +21,8 @@ import { validateBandsData } from './utils/validation'
 import { prepareBands } from './utils/bandUtils'
 import { orderedFestivalDays } from './utils/festivalDays'
 import { saveSelectedBands } from './utils/scheduleStorage'
+import { resolveRouteDiff } from './utils/routeDiff'
+import RouteDiffSection from './components/RouteDiffSection'
 import { useSharedRouteImport } from './hooks/useSharedRouteImport'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
@@ -174,7 +176,6 @@ function App() {
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [sharedScheduleConfirmOpen, setSharedScheduleConfirmOpen] = useState(false)
   const [pendingSharedBands, setPendingSharedBands] = useState([])
-  const [pendingSharedBandNames, setPendingSharedBandNames] = useState([])
   const [lastClearedBands, setLastClearedBands] = useState([])
   const [scheduleToast, setScheduleToast] = useState(null)
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
@@ -455,9 +456,8 @@ function App() {
     }
   }, [bands, searchParams, setSearchParams, showScheduleToast, slug, trackScheduleBuilds])
 
-  const handleShareData = useCallback(({ matchedIds, matchedNames }) => {
+  const handleShareData = useCallback(({ matchedIds }) => {
     setPendingSharedBands(matchedIds)
-    setPendingSharedBandNames(matchedNames)
     setSharedScheduleConfirmOpen(true)
   }, [])
 
@@ -490,7 +490,6 @@ function App() {
     setSelectedBands(nextSelectedBands)
     setView('mine')
     setPendingSharedBands([])
-    setPendingSharedBandNames([])
     showScheduleToast({
       type: 'success',
       message:
@@ -584,8 +583,13 @@ function App() {
   // comment in MySchedule.jsx for why deriving it from a selected-bands
   // subset would be wrong).
   const eventFestivalDays = useMemo(() => orderedFestivalDays(bands), [bands])
-  const sharedBandsAlreadySelectedCount = pendingSharedBands.filter(id => selectedBands.includes(id)).length
-  const sharedBandsNewCount = pendingSharedBands.length - sharedBandsAlreadySelectedCount
+  // Three-way comparison against the incoming shared route (#730). The old
+  // counts were incoming-centric and could not express what Replace would
+  // drop, which is the half a fan actually weighs.
+  const sharedRouteDiff = useMemo(
+    () => resolveRouteDiff(selectedBands, pendingSharedBands, bands),
+    [selectedBands, pendingSharedBands, bands]
+  )
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
   const effectiveNow = debugTime || currentTime
@@ -894,7 +898,6 @@ function App() {
         onClose={() => {
           setSharedScheduleConfirmOpen(false)
           setPendingSharedBands([])
-          setPendingSharedBandNames([])
         }}
         title="Load Shared Route"
         size="sm"
@@ -905,7 +908,6 @@ function App() {
               onClick={() => {
                 setSharedScheduleConfirmOpen(false)
                 setPendingSharedBands([])
-                setPendingSharedBandNames([])
               }}
               className="min-h-[44px] rounded-lg border border-border px-4 py-2 text-text-secondary transition-colors hover:bg-surface-hover"
             >
@@ -930,35 +932,36 @@ function App() {
       >
         <div className="space-y-4 text-sm text-text-secondary">
           <p>Choose how to apply this shared route to your current picks.</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-border bg-surface p-3">
-              <div className="text-xs uppercase tracking-wide text-text-tertiary">Incoming stops</div>
-              <div className="mt-1 text-2xl font-semibold text-text-primary">{pendingSharedBands.length}</div>
-            </div>
-            <div className="rounded-lg border border-border bg-surface p-3">
-              <div className="text-xs uppercase tracking-wide text-text-tertiary">Already in your route</div>
-              <div className="mt-1 text-2xl font-semibold text-text-primary">{sharedBandsAlreadySelectedCount}</div>
-            </div>
-            <div className="rounded-lg border border-border bg-surface p-3">
-              <div className="text-xs uppercase tracking-wide text-text-tertiary">New to add</div>
-              <div className="mt-1 text-2xl font-semibold text-text-primary">{sharedBandsNewCount}</div>
-            </div>
-          </div>
+          {sharedRouteDiff.gain.length === 0 && sharedRouteDiff.lose.length === 0 ? (
+            <p className="rounded-lg border border-border bg-surface p-3 text-text-primary">
+              You’re already on the same route — nothing to add or drop.
+            </p>
+          ) : null}
+          {/* Sections render only when populated: a fan with no route yet would
+              otherwise face two empty headers explaining nothing. */}
+          <RouteDiffSection
+            title="Together"
+            hint="You both have these"
+            bands={sharedRouteDiff.together}
+            tone="text-accent-400"
+          />
+          <RouteDiffSection
+            title="You’d add"
+            hint="Only on their route"
+            bands={sharedRouteDiff.gain}
+            tone="text-success-500"
+          />
+          <RouteDiffSection
+            title="Only yours"
+            hint="Replace would drop these — Merge keeps them"
+            bands={sharedRouteDiff.lose}
+            tone="text-warning-500"
+          />
           <p className="text-text-secondary">
             <span className="font-semibold text-text-primary">Merge</span> keeps your current route and adds only the
             new shared stops. <span className="font-semibold text-text-primary">Replace</span> swaps your route for the
             shared one.
           </p>
-          {pendingSharedBandNames.length > 0 && (
-            <ul className="space-y-1 rounded-lg border border-border bg-surface p-3 text-sm text-text-secondary list-none">
-              {pendingSharedBandNames.slice(0, 5).map((name, i) => (
-                <li key={i}>{name}</li>
-              ))}
-              {pendingSharedBandNames.length > 5 && (
-                <li className="text-text-tertiary">and {pendingSharedBandNames.length - 5} more…</li>
-              )}
-            </ul>
-          )}
         </div>
       </Modal>
       <ConfirmDialog

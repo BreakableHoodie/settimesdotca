@@ -239,8 +239,48 @@ jobs:
         if: failure()
         working-directory: .
         run: |
+            # Dump log text WITHOUT letting the runner parse it as workflow
+            # commands. A dumped line starting `::endgroup::` would close our
+            # group early and strand the rest of the diagnostics inside no
+            # group; `::error::` would forge an annotation. The `sed` indent
+            # further down is cosmetic and cannot be relied on as protection.
+            # The token must be unguessable from the log's own contents, so it
+            # is generated per call rather than fixed.
+            dump() {
+              local tok
+              tok="stop-$(date +%s%N)-${RANDOM}${RANDOM}"
+              echo "::stop-commands::${tok}"
+              # The resume marker MUST be emitted even if `cat` fails. While
+              # commands are stopped, every later ::group::/::endgroup:: and
+              # annotation in the JOB is inert -- so returning early here would
+              # silently disable the rest of the diagnostics output, not just
+              # this dump.
+              cat || true
+              echo "::${tok}::"
+            }
             echo "::group::wrangler.log"
-            if [ -f /tmp/wrangler.log ]; then tail -200 /tmp/wrangler.log; else echo "(no /tmp/wrangler.log)"; fi
+            if [ -f /tmp/wrangler.log ]; then tail -200 /tmp/wrangler.log | dump || true; else echo "(no /tmp/wrangler.log)"; fi
+            echo "::endgroup::"
+            echo "::group::wrangler internal log"
+            # When wrangler aborts (#878) it prints an [ERROR] with an EMPTY
+            # body to stdout, then names a log file it wrote the real detail
+            # to. Run 32295262333 captured exactly that: the banner, the
+            # "please file a bug" link, ~9 more successful requests, and then
+            # the process gone -- with the one field that explains it blank.
+            # /tmp/wrangler.log above is only our stdout redirect, so it has
+            # the same blank. This is the file that does not.
+            log=$(find "$HOME/.config/.wrangler/logs" -maxdepth 1 -type f -name '*.log' \
+                    -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)
+            if [ -n "$log" ]; then
+              echo "  file: $log"
+              # Both pipelines are best-effort: the step runs under `bash -e`,
+              # and a diagnostic that aborts the step would take the liveness
+              # and resource probes with it -- losing the evidence it exists to
+              # collect, on the one run where it matters.
+              tail -200 "$log" 2>/dev/null | sed 's/^/  /' | dump || true
+            else
+              echo "  (no log under $HOME/.config/.wrangler/logs)"
+            fi
             echo "::endgroup::"
             echo "::group::server liveness"
             echo "listeners on :8788:"

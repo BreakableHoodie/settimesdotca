@@ -251,10 +251,14 @@ jobs:
             # /tmp/wrangler.log above is only our stdout redirect, so it has
             # the same blank. This is the file that does not.
             log=$(find "$HOME/.config/.wrangler/logs" -maxdepth 1 -name '*.log' \
-                    -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+                    -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)
             if [ -n "$log" ]; then
               echo "  file: $log"
-              tail -200 "$log" | sed 's/^/  /'
+              # Both pipelines are best-effort: the step runs under `bash -e`,
+              # and a diagnostic that aborts the step would take the liveness
+              # and resource probes with it -- losing the evidence it exists to
+              # collect, on the one run where it matters.
+              tail -200 "$log" 2>/dev/null | sed 's/^/  /' || true
             else
               echo "  (no log under $HOME/.config/.wrangler/logs)"
             fi

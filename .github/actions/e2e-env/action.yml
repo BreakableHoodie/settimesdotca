@@ -98,9 +98,16 @@ runs:
                   # be captured as 0 and silently treated as success. Assign from the
                   # failing command directly instead.
                   local code=0
-                  timeout 300 "$@" || code=$?
+                  # -k: `timeout` sends SIGTERM, which apt-get mid-dpkg can ignore
+                  # or block on -- leaving the process alive and the step still
+                  # hung, i.e. failing in exactly the case this bound exists for.
+                  # SIGKILL follows 30s later and cannot be ignored.
+                  timeout -k 30s 300s "$@" || code=$?
                   [ "$code" -eq 0 ] && return 0
-                  if [ "$code" -eq 124 ]; then
+                  # 124 = killed by SIGTERM at the deadline; 137 = 128+9, killed by
+                  # the SIGKILL that -k sends when SIGTERM was ignored. Both mean the
+                  # bound fired, and both want the same hint.
+                  if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then
                       echo "✗ $label exceeded 300s and was killed — usually apt-get" >&2
                       echo "  blocked on a lock or a slow mirror. Re-running the job normally clears it." >&2
                   else

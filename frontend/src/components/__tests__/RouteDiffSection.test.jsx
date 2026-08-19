@@ -54,7 +54,10 @@ describe('RouteDiffSection', () => {
     const struck = screen.getByText('Openers')
     const badge = screen.getByText('Cancelled')
     expect(struck.className).toContain('line-through')
-    expect(struck.contains(badge)).toBe(false)
+    // Siblings, not merely "the badge is not inside the name". A `contains`
+    // check also passes if the badge escapes the wrapper entirely, which would
+    // drop it onto its own line and break the layout this markup exists to hold.
+    expect(badge.parentElement).toBe(struck.parentElement)
   })
 
   it('does not strike through a live set', () => {

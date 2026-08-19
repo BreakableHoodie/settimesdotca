@@ -239,8 +239,22 @@ jobs:
         if: failure()
         working-directory: .
         run: |
+            # Dump log text WITHOUT letting the runner parse it as workflow
+            # commands. A dumped line starting `::endgroup::` would close our
+            # group early and strand the rest of the diagnostics inside no
+            # group; `::error::` would forge an annotation. The `sed` indent
+            # further down is cosmetic and cannot be relied on as protection.
+            # The token must be unguessable from the log's own contents, so it
+            # is generated per call rather than fixed.
+            dump() {
+              local tok
+              tok="stop-$(date +%s%N)-${RANDOM}${RANDOM}"
+              echo "::stop-commands::${tok}"
+              cat
+              echo "::${tok}::"
+            }
             echo "::group::wrangler.log"
-            if [ -f /tmp/wrangler.log ]; then tail -200 /tmp/wrangler.log; else echo "(no /tmp/wrangler.log)"; fi
+            if [ -f /tmp/wrangler.log ]; then tail -200 /tmp/wrangler.log | dump; else echo "(no /tmp/wrangler.log)"; fi
             echo "::endgroup::"
             echo "::group::wrangler internal log"
             # When wrangler aborts (#878) it prints an [ERROR] with an EMPTY
@@ -258,7 +272,7 @@ jobs:
               # and a diagnostic that aborts the step would take the liveness
               # and resource probes with it -- losing the evidence it exists to
               # collect, on the one run where it matters.
-              tail -200 "$log" 2>/dev/null | sed 's/^/  /' || true
+              tail -200 "$log" 2>/dev/null | sed 's/^/  /' | dump || true
             else
               echo "  (no log under $HOME/.config/.wrangler/logs)"
             fi

@@ -33,6 +33,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import path from "node:path";
 
 const execFileAsync = promisify(execFile);
@@ -99,7 +100,7 @@ const HOMOGLYPHS = new Map([
   ["ß", "ss"],
 ]);
 
-function normalise(raw) {
+export function normalise(raw) {
   if (typeof raw !== "string") return "";
   let s = raw;
   for (const [from, to] of HOMOGLYPHS) s = s.split(from).join(to);
@@ -113,7 +114,7 @@ function normalise(raw) {
 }
 
 /** A leading article is billing, not identity ("The OBGMs" = "OBGMs"). */
-function withoutArticle(s) {
+export function withoutArticle(s) {
   return s.replace(/^(the|a|an)\s+/, "");
 }
 
@@ -127,16 +128,25 @@ function withoutArticle(s) {
  * boundary, while still resolving the documented billing case ("Scott
  * Reynolds" inside "Scott Reynolds Band") to REVIEW.
  */
-function containsTokens(haystack, needle) {
+export function containsTokens(haystack, needle) {
   return ` ${haystack} `.includes(` ${needle} `);
 }
 
-function classify(dbName, platformName) {
+export function classify(dbName, platformName) {
   if (!platformName) return "UNRESOLVED";
   const a = withoutArticle(normalise(dbName));
   const b = withoutArticle(normalise(platformName));
   if (!a || !b) return "UNRESOLVED";
   if (a === b) return "OK";
+  // Spacing-only difference: normalise() turns every non-alphanumeric run into
+  // a space, so intra-word punctuation splits a token ("K-Man" -> "k man") and
+  // no longer equals its unpunctuated twin ("Kman"). Real case, #171: our
+  // "Kman & the 45s" vs the platform's "K-Man & The 45s", whose Apple slug is
+  // literally k-man-the-45s. Equality-after-despacing (never containment,
+  // which would collapse genuinely different names) folds that back to OK, so
+  // it does not pollute MISMATCH — the one bucket that means fans are being
+  // sent to a stranger's music.
+  if (a.replace(/ /g, "") === b.replace(/ /g, "")) return "OK";
   // Billing variant: one name contains the other, e.g. Spotify lists
   // "Scott Reynolds" for our "Scott Reynolds Band". Related, not wrong.
   if (containsTokens(a, b) || containsTokens(b, a)) return "REVIEW";
@@ -232,7 +242,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err.message);
-  process.exit(2);
-});
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err.message);
+    if (err.stderr) console.error(err.stderr);
+    if (err.code !== undefined) console.error(`Code: ${err.code}`);
+    process.exit(2);
+  });
+}

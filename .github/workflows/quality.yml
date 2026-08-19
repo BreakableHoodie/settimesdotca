@@ -242,6 +242,23 @@ jobs:
             echo "::group::wrangler.log"
             if [ -f /tmp/wrangler.log ]; then tail -200 /tmp/wrangler.log; else echo "(no /tmp/wrangler.log)"; fi
             echo "::endgroup::"
+            echo "::group::wrangler internal log"
+            # When wrangler aborts (#878) it prints an [ERROR] with an EMPTY
+            # body to stdout, then names a log file it wrote the real detail
+            # to. Run 32295262333 captured exactly that: the banner, the
+            # "please file a bug" link, ~9 more successful requests, and then
+            # the process gone -- with the one field that explains it blank.
+            # /tmp/wrangler.log above is only our stdout redirect, so it has
+            # the same blank. This is the file that does not.
+            log=$(find "$HOME/.config/.wrangler/logs" -maxdepth 1 -name '*.log' \
+                    -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+            if [ -n "$log" ]; then
+              echo "  file: $log"
+              tail -200 "$log" | sed 's/^/  /'
+            else
+              echo "  (no log under $HOME/.config/.wrangler/logs)"
+            fi
+            echo "::endgroup::"
             echo "::group::server liveness"
             echo "listeners on :8788:"
             # Capture, then decide. `ss` exits 0 with EMPTY output when nothing

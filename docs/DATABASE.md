@@ -820,10 +820,26 @@ alongside `performances` and `band_profiles` in one `DB.batch()`:
 
 ```sql
 SELECT COUNT(*) as total_schedule_builds,
-       COUNT(DISTINCT user_session) as unique_visitors,
+       COUNT(DISTINCT user_session) as route_builders,
        MAX(created_at) as last_updated
 FROM schedule_builds WHERE event_id = ?;
 ```
+
+Note the two counters measure different things, and neither is a visitor
+count. `schedule_builds` holds **one row per performance picked**, so
+`COUNT(*)` is total picks while `COUNT(DISTINCT user_session)` is the number
+of fans who built a route. The latter was called `unique_visitors` until
+#704 — a misnomer, since a session only lands in this table once it has
+already picked a set, so every fan who viewed the page and bounced was
+excluded from a field named as though it counted them.
+
+The completion rate therefore draws its denominator from a different table,
+`event_daily_stats.event_views` (#706), which is event_id-keyed. Do **not**
+use `page_views_daily` for this: that table is path-keyed (`/event/<slug>`)
+and still holds legacy rows under a second synthetic key format (`event:20`)
+from the double-counting bug fixed in #445. `event_views` also counts views
+rather than distinct people, so the rate can exceed 100% and is capped for
+display.
 
 ## Schema drift protection
 

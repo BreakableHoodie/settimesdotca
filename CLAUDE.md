@@ -480,14 +480,22 @@ The old column is the whole story: the one run recording **zero** shift scored
 were one phenomenon. **So #851's question is answered — ~0.84 was never a
 regression**, and CLS was never a real defect (#854).
 
-**The budget is still 0.80, and raising it needs CI samples, not local ones.**
-Both past reductions (0.90 → 0.85 in #532/#534, → 0.80 in #728) were, on this
-evidence, absorbing that artifact. But **do not raise it from a local number**:
-`lhci` collects all four categories, while an ad-hoc
-`lighthouse --only-categories=performance` does not, so the two are not
-comparable. On 2026-08-18 the same commit measured **0.94–0.96** raw,
-**0.94** in CI, and **0.74 / 0.84** through local `lhci` on a busy machine.
-Collect several CI runs before moving the floor.
+**The budget is back to 0.90**, restored on 2026-08-18 from five CI runs on the
+fixed harness: **0.94 / 0.95 / 0.95 / 0.95 / 0.96** (median LHRs; the gate
+asserts `optimistic`, so the gated value is at or above these). Both past
+reductions — 0.90 → 0.85 in #532/#534, → 0.80 in #728 — were absorbing the
+static-build artifact, not a real regression, so this is a restoration rather
+than a raise.
+
+**0.90, not 0.95, is deliberate.** A floor at the observed ceiling flakes with
+no code cause; ~5 points of headroom matches the ±2–3 point runner noise
+documented below.
+
+**Never move this floor from a local number.** `lhci` collects all four
+categories, while an ad-hoc `lighthouse --only-categories=performance` does
+not, so the two are not comparable. On 2026-08-18 the same commit measured
+**0.94–0.96** raw, **0.94–0.96** in CI, and **0.74 / 0.84** through local
+`lhci` on a busy machine. Only CI samples count.
 
 **`cumulative-layout-shift` is asserted at ≤ 0.1 with
 `aggregationMethod: "pessimistic"`** so the artifact cannot return silently — it

@@ -452,7 +452,10 @@ no D1 — so every homepage API call failed in CI. `EventTimeline` rendered its 
 `EventsPageSkeleton`, the fetch failed fast, the skeleton collapsed into a short
 error state, and `<Footer />` (its sibling in `EventsPage`'s `<main>`) moved.
 Lighthouse scored that as a **total CLS of 0.2011**, of which **0.2007** was
-the footer element's own shift score — a shift no user has ever seen.
+the footer element's own shift score — an artefact of that static-build harness,
+not of the wrangler-served app. Production measured 0.0004 on 2026-08-18 (3 runs,
+same Lighthouse version and flags), so the shift did not reproduce there; that is
+one dated measurement of one page, not a claim about every user's experience.
 
 It now points at `http://localhost:8788`, served by `.github/actions/e2e-env`
 (wrangler + a seeded D1 — the same environment E2E uses). Measured 2026-08-18,

@@ -90,15 +90,77 @@ runs:
               # A timeout turns a 35-minute silent stall into a fast, obviously
               # retryable failure. Exit 124 is timeout(1)'s signal, called out so
               # the next reader does not have to look it up.
-              # NO retry here, deliberately -- one was tried and removed (#883).
-              # `timeout` kills the process it launched, which is the `npx playwright
-              # install-deps` wrapper; that wrapper has already re-exec'd apt-get as
-              # root, and the orphan keeps /var/lib/apt/lists/lock. A second attempt
-              # then dies in ~2s with "Could not get lock ... held by process N",
-              # turning a clear 124 into a confusing exit 1. Observed on the very run
-              # that introduced it. Retrying needs the process GROUP killed and the
-              # lock cleared first; that is a larger, root-touching change.
-              run_bounded() {
+              # Retry is gated on apt recovery (#883). `timeout` kills only the
+              # process it launched -- the `npx playwright install-deps` wrapper --
+              # while the apt-get it re-exec'd as root survives, holding
+              # /var/lib/apt/lists/lock. A naive retry therefore died in ~2s with
+              # "Could not get lock ... held by process N", turning a clear 124 into
+              # a confusing exit 1. The orphan must be killed and the locks cleared
+              # before re-attempting.
+              #
+              # Safe because hosted runners are single-use VMs: this only runs after
+              # the bound has already fired, and the state it touches is discarded
+              # with the job. Do NOT copy this anywhere long-lived.
+              # Returns 0 only if apt is genuinely usable again. The caller must
+              # NOT retry on a non-zero return: a retry into a still-locked apt
+              # burns another 300s and reports a confusing exit 1 instead of the
+              # clear timeout -- which is why the first attempt at this was reverted.
+              # Returns 0 only if apt is genuinely usable again. The caller must
+              # NOT retry on a non-zero return: a retry into a still-locked apt
+              # burns another 300s and reports a confusing exit 1 instead of the
+              # clear timeout -- which is why the first attempt at this was reverted.
+              APT_LOCKS="/var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend"
+
+              apt_recover() {
+                  echo "  recovering apt state (killing orphaned apt/dpkg)" >&2
+                  local SUDO=""
+                  [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo -n"
+
+                  # Kill the holders. Deliberately NOT `rm` the lock files: unlinking
+                  # a lock does not release it, and a retry would then create a FRESH
+                  # lock and run apt concurrently with the surviving holder, which is
+                  # how dpkg state actually gets corrupted. Killing the holder
+                  # releases its fcntl lock; that is the whole job.
+                  $SUDO pkill -9 -x apt-get 2>/dev/null || true
+                  $SUDO pkill -9 -x dpkg 2>/dev/null || true
+                  # fuser catches holders pgrep's exact-name match misses (apt,
+                  # unattended-upgrades, dpkg-deb ...). Absent on some images, so it
+                  # is best-effort here and only authoritative in the check below.
+                  if command -v fuser >/dev/null 2>&1; then
+                      # shellcheck disable=SC2086
+                      $SUDO fuser -k -9 $APT_LOCKS >/dev/null 2>&1 || true
+                  fi
+                  sleep 2
+
+                  # Repair a transaction interrupted by the kill. Unlike the kills,
+                  # this must SUCCEED -- a half-configured dpkg fails every later
+                  # install, so retrying on top of it is worse than not retrying.
+                  if ! $SUDO dpkg --configure -a >/dev/null 2>&1; then
+                      echo "  recovery FAILED: dpkg --configure -a could not repair state" >&2
+                      return 1
+                  fi
+
+                  # VERIFY, rather than assume. Every kill above is `|| true`, so a
+                  # missing sudo grant or an unmatched holder would otherwise pass
+                  # silently and doom the retry before it started.
+                  if command -v fuser >/dev/null 2>&1; then
+                      # shellcheck disable=SC2086
+                      if $SUDO fuser -s $APT_LOCKS 2>/dev/null; then
+                          echo "  recovery FAILED: an apt lock still has a holder — not retrying" >&2
+                          return 1
+                      fi
+                  elif pgrep -x apt-get >/dev/null 2>&1 || pgrep -x dpkg >/dev/null 2>&1; then
+                      echo "  recovery FAILED: apt-get/dpkg still running — not retrying" >&2
+                      return 1
+                  fi
+                  echo "  recovery ok: no holder on the apt locks" >&2
+                  return 0
+              }
+
+              # Returns 0, or the command's exit code. Prints why. Sets
+              # BOUNDED_TIMED_OUT=1 when the bound fired, so the caller can retry a
+              # timeout without re-deriving that from the exit code.
+              run_bounded_once() {
                   local label="$1"
                   shift
                   # Assign from the failing command directly. The original bug here
@@ -125,11 +187,31 @@ runs:
                   # that exits 124 or 137 on its own, so the code alone cannot tell the
                   # two apart. Require the elapsed time to corroborate it, or a genuine
                   # apt failure returning 124 would be blamed on a hang it never had.
+                  BOUNDED_TIMED_OUT=0
                   if { [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; } && [ "$elapsed" -ge 300 ]; then
+                      BOUNDED_TIMED_OUT=1
                       echo "✗ $label exceeded 300s and was killed — usually apt-get" >&2
-                      echo "  blocked on a lock or a slow mirror. Re-running the job normally clears it." >&2
+                      echo "  blocked on a lock or a slow mirror." >&2
                   else
                       echo "✗ $label failed with exit $code" >&2
+                  fi
+                  return "$code"
+              }
+
+              # One retry, and ONLY for a timeout. An ordinary failure (bad package,
+              # no network) reproduces identically and would burn another 300s for
+              # nothing.
+              run_bounded() {
+                  local label="$1"
+                  shift
+                  local code=0
+                  run_bounded_once "$label" "$@" || code=$?
+                  [ "$code" -eq 0 ] && return 0
+                  # Retry ONLY when the bound fired AND recovery verified itself.
+                  if [ "${BOUNDED_TIMED_OUT:-0}" -eq 1 ] && apt_recover; then
+                      echo "  retrying once after recovery…" >&2
+                      code=0
+                      run_bounded_once "$label (retry)" "$@" || code=$?
                   fi
                   return "$code"
               }

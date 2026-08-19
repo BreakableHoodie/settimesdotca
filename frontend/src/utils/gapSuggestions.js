@@ -50,7 +50,14 @@ export function suggestGapFillers({ cancelledBand, myBands, allBands, maxSuggest
     .sort((a, b) => {
       if (a.walkMinutes === null && b.walkMinutes !== null) return 1
       if (a.walkMinutes !== null && b.walkMinutes === null) return -1
-      return a.walkMinutes - b.walkMinutes || a.startsAtMs - b.startsAtMs
+      // id is the final tiebreak so the cap is deterministic: with equal walk
+      // time and equal start time, which candidates survive `slice` would
+      // otherwise depend on the order `allBands` happened to arrive in.
+      return (
+        a.walkMinutes - b.walkMinutes ||
+        a.startsAtMs - b.startsAtMs ||
+        String(a.band.id).localeCompare(String(b.band.id))
+      )
     })
 
   return suggestions.slice(0, limit)

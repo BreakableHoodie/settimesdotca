@@ -123,6 +123,34 @@ describe('suggestGapFillers', () => {
     expect(suggestions[1].walkMinutes).toBeNull()
   })
 
+  it('breaks a full tie on id so the cap is deterministic', () => {
+    // Equal walk time AND equal start time: without a final tiebreak, which two
+    // survive `maxSuggestions` would depend on the order allBands arrived in.
+    const venue = { venue_lat: 43.4824, venue_lng: -80.52 }
+    const [cancelledBand, charlie, alpha, bravo] = prepare(
+      makeBand('cancelled', '20:00', '23:00', { is_cancelled: 1, ...venue }),
+      makeBand('charlie', '21:00', '21:30', venue),
+      makeBand('alpha', '21:00', '21:30', venue),
+      makeBand('bravo', '21:00', '21:30', venue)
+    )
+
+    const forward = suggestGapFillers({
+      cancelledBand,
+      myBands: [cancelledBand],
+      allBands: [cancelledBand, charlie, alpha, bravo],
+      maxSuggestions: 2,
+    })
+    const reversed = suggestGapFillers({
+      cancelledBand,
+      myBands: [cancelledBand],
+      allBands: [cancelledBand, bravo, alpha, charlie],
+      maxSuggestions: 2,
+    })
+
+    expect(forward.map(s => s.band.id)).toEqual(['alpha', 'bravo'])
+    expect(reversed.map(s => s.band.id)).toEqual(forward.map(s => s.band.id))
+  })
+
   it('respects maxSuggestions', () => {
     const [cancelledBand, first, second] = prepare(
       makeBand('cancelled', '20:00', '23:00', { is_cancelled: 1 }),

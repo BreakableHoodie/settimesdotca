@@ -567,6 +567,10 @@ Requires the CodeRabbit CLI (`brew install --cask coderabbit`, then `coderabbit 
 
 **Run this before opening the PR, not after.** The same review runs automatically on the PR, so anything it finds post-open costs a fix plus a force-push round trip. Findings it has caught that the local gates did not: assertions that pass on the wrong branch's output, a spy recording statement *preparation* rather than *execution*, and a SQL guard that stayed inert for legacy rows after a write-side fix.
 
+**`make review` is a strict subset of the PR review, and the gap is structural — not flake.** The CLI does not load `.github/instructions/**`; the PR bot does. That is why `coderabbit review` has a `-c, --config <files...>` flag for "additional instructions" at all. Three findings on 2026-08-19 (#866, #873 ×2) appeared only post-open and every one cited *"As per coding guidelines"*, tracing to rules in that directory — e.g. `nodejs-javascript-vitest.instructions.md`'s "Write tests for all new features and bug fixes". **So a post-open `Minor` is expected, not a sign the pre-PR gate failed.** The CLI *does* read `.coderabbit.yaml` and the `knowledge_base.learnings` (its output says "Based on learnings"); only the instruction files are missing.
+
+**Passing `-c .github/instructions/*.md` was tried and is NOT adopted.** In the one run measured, it failed to reproduce the PR's actual finding and instead emitted a false **critical** — claiming Vitest could not parse a file that parsed and passed 3/3 — on a run whose log was full of `fetchWithRetry` errors. A gate that emits false criticals trains you to skim the actionable bucket, which is the same "signal drowns" failure the streaming-link audit hit in #871. One degraded trial is not proof the flag is broken; it is enough not to wire it into a standing gate unmeasured. Re-test properly (several runs, good network) before revisiting.
+
 `make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
 
 ### Before every push (including follow-up commits during PR review)

@@ -248,7 +248,12 @@ jobs:
             echo "wrangler/workerd processes:"
             pgrep -a -f 'wrangler|workerd' || echo "  none running"
             echo "HTTP probe:"
-            curl -sS -o /dev/null -w '  status=%{http_code} time=%{time_total}s\n' http://localhost:8788/ || echo "  unreachable"
+            # Bounded deliberately: the case this step exists to catch is a
+            # server that accepts the connection and never answers. An unbounded
+            # probe would hang there until the 15-minute job timeout and could
+            # cost the artifact upload -- the diagnostic making the failure worse.
+            curl --connect-timeout 2 --max-time 5 -sS -o /dev/null \
+              -w '  status=%{http_code} time=%{time_total}s\n' http://localhost:8788/ || echo "  no response within 5s"
             echo "::endgroup::"
 
       - name: Upload Lighthouse results

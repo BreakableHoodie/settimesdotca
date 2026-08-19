@@ -281,7 +281,13 @@ jobs:
             mem=$(free -m 2>/dev/null || true)
             if [ -n "$mem" ]; then printf '%s\n' "$mem" | sed 's/^/  /'; else echo "  (free unavailable)"; fi
             echo "load average:"
-            sed 's/^/  /' /proc/loadavg 2>/dev/null || echo "  (unavailable)"
+            # Same capture-then-decide as memory and OOM below. `sed` exits 0 on a
+            # file that exists but is EMPTY, so the `||` fallback never fires and
+            # the section prints blank -- and blank is the one output a diagnostic
+            # must never produce. I fixed two of the three probes in this block
+            # and left this one, which is exactly how the trap survives.
+            load=$(sed 's/^/  /' /proc/loadavg 2>/dev/null || true)
+            if [ -n "$load" ]; then printf '%s\n' "$load"; else echo "  (unavailable)"; fi
             echo "kernel OOM kills (the question three runs have failed to answer):"
             # dmesg is often restricted to root on hosted runners; sudo -n so a
             # missing grant fails immediately instead of prompting and hanging.

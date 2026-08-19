@@ -15,6 +15,7 @@
 
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from "../credentials";
 
 // Seeded by database/seed-test-data.sql and the only seeded event with
 // performances, so it is what makes the Lineup audit non-empty.
@@ -40,9 +41,25 @@ const getViolationSummary = (violations) =>
     targets: nodes.map(({ target }) => target),
   }));
 
-const openSurface = async (page, surface) => {
+// The saved storageState cannot be trusted. `lucia.invalidateUserSessions()`
+// runs on every re-authentication (CLAUDE.md), so login.spec.js logging in kills
+// the session auth.setup.js saved -- this spec then lands on the login form,
+// where there are no tabs. Every other admin spec carries the same defensive
+// helper for the same reason. Running this spec alone hides it completely.
+const ensureAdminSession = async (page) => {
   await page.goto("/admin");
-  await expect(page.getByRole("tab", { name: "Events", exact: true })).toBeVisible();
+  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
+  if (await page.locator('input[type="email"]').isVisible()) {
+    await page.fill('input[type="email"]', ADMIN_EMAIL);
+    await page.fill('input[type="password"]', ADMIN_PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
+  }
+};
+
+const openSurface = async (page, surface) => {
+  await ensureAdminSession(page);
+  await expect(page.getByRole("tab", { name: "Events", exact: true })).toBeVisible({ timeout: 15000 });
 
   if (surface.id === "lineup") {
     // Pick the seeded event by name, not by index: the selector's order comes

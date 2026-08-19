@@ -28,14 +28,22 @@ function RouteDiffSection({ title, hint, bands, tone }) {
           // nothing, whereas a struck-through row tells them what changed.
           const isCancelled = Boolean(band.is_cancelled)
           return (
-            <li key={band.id} className="flex items-baseline justify-between gap-3">
-              <span className={`text-sm ${isCancelled ? 'text-text-tertiary line-through' : 'text-text-primary'}`}>
-                {band.name}
-                {isCancelled && (
-                  <span className="ml-2 text-[10px] font-semibold text-warning-500 no-underline">Cancelled</span>
-                )}
+            // Stacked, not name-left/meta-right. A side-by-side row needs the
+            // meta to shrink, and "8:00 PM - 8:45 PM · Waterloo Music Hall" does
+            // not fit beside a band name at 390px — it pushed 57px past the
+            // modal edge and clipped the venue. Matches how MySchedule stacks.
+            <li key={band.id}>
+              {/* The strike goes on the name alone. text-decoration inherits to
+                  descendants and a child cannot cancel an ancestor's — nesting
+                  the badge inside struck it through too, which `no-underline`
+                  was powerless to undo. The wrapper keeps them on one line. */}
+              <span className="block text-sm">
+                <span className={isCancelled ? 'text-text-tertiary line-through' : 'text-text-primary'}>
+                  {band.name}
+                </span>
+                {isCancelled && <span className="ml-2 text-[10px] font-semibold text-warning-500">Cancelled</span>}
               </span>
-              <span className="shrink-0 text-xs text-text-tertiary">
+              <span className="block text-xs text-text-tertiary">
                 {formatTimeRange(band.startTime, band.endTime)}
                 {band.venue ? ` · ${band.venue}` : ''}
               </span>

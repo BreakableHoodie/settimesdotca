@@ -42,7 +42,22 @@ describe('RouteDiffSection', () => {
     // stay visible and marked, not silently disappear from the comparison.
     render(<RouteDiffSection title="You’d add" hint="h" bands={[band({ is_cancelled: 1 })]} />)
     expect(screen.getByText('Cancelled')).toBeInTheDocument()
-    expect(screen.getByText(/Openers/).className).toContain('line-through')
+    expect(screen.getByText('Openers').className).toContain('line-through')
+  })
+
+  it('keeps the Cancelled label outside the struck-through element', () => {
+    // text-decoration inherits to descendants and a child cannot cancel an
+    // ancestor's, so nesting the badge inside the struck name renders the badge
+    // struck too — `no-underline` on it is powerless. jsdom will not show that
+    // visually, but it can prove the badge is not a descendant.
+    render(<RouteDiffSection title="You’d add" hint="h" bands={[band({ is_cancelled: 1 })]} />)
+    const struck = screen.getByText('Openers')
+    const badge = screen.getByText('Cancelled')
+    expect(struck.className).toContain('line-through')
+    // Siblings, not merely "the badge is not inside the name". A `contains`
+    // check also passes if the badge escapes the wrapper entirely, which would
+    // drop it onto its own line and break the layout this markup exists to hold.
+    expect(badge.parentElement).toBe(struck.parentElement)
   })
 
   it('does not strike through a live set', () => {

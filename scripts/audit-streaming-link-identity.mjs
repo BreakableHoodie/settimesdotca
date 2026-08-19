@@ -242,7 +242,9 @@ async function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// `process.argv[1]` is undefined under `node --eval`, where pathToFileURL()
+// would throw during import. Check it before converting.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err.message);
     if (err.stderr) console.error(err.stderr);

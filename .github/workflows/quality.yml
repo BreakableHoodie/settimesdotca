@@ -229,6 +229,44 @@ jobs:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           CI: true
 
+      # The gate has failed with CHROME_INTERSTITIAL_ERROR mid-pass (#878): the
+      # server serves two Lighthouse runs and is unreachable for the third.
+      # wrangler's own output goes to /tmp/wrangler.log and was never surfaced,
+      # so diagnosing it needed a local reproduction instead of just reading the
+      # failure. Dump it — and say whether the process and port are still alive,
+      # which distinguishes "crashed" from "wedged" and points at different fixes.
+      - name: Wrangler diagnostics on failure
+        if: failure()
+        working-directory: .
+        run: |
+            echo "::group::wrangler.log"
+            if [ -f /tmp/wrangler.log ]; then tail -200 /tmp/wrangler.log; else echo "(no /tmp/wrangler.log)"; fi
+            echo "::endgroup::"
+            echo "::group::server liveness"
+            echo "listeners on :8788:"
+            # Capture, then decide. `ss` exits 0 with EMPTY output when nothing
+            # is listening, so an `|| echo none` chain prints nothing at all --
+            # and "no listener" is precisely the crashed-vs-wedged signal this
+            # step exists to report. Silence would be the wrong answer here.
+            # -H suppresses ss's header. Without it a no-listener result is a
+            # header row with zero entries -- non-empty, so it printed as though
+            # something WAS listening. Observed in run 32266757116.
+            # netstat's grep is field-bounded so ':8788' cannot match ':87880'.
+            listeners=$( { command -v ss >/dev/null && ss -H -lptn 'sport = :8788'; } 2>/dev/null \
+              || netstat -lptn 2>/dev/null \
+                | grep -E '(^|[[:space:]])[^[:space:]]*:8788([[:space:]]|$)' || true )
+            if [ -n "$listeners" ]; then printf '%s\n' "$listeners"; else echo "  none"; fi
+            echo "wrangler/workerd processes:"
+            pgrep -a -f 'wrangler|workerd' || echo "  none running"
+            echo "HTTP probe:"
+            # Bounded deliberately: the case this step exists to catch is a
+            # server that accepts the connection and never answers. An unbounded
+            # probe would hang there until the 15-minute job timeout and could
+            # cost the artifact upload -- the diagnostic making the failure worse.
+            curl --connect-timeout 2 --max-time 5 -sS -o /dev/null \
+              -w '  status=%{http_code} time=%{time_total}s\n' http://localhost:8788/ || echo "  no response within 5s"
+            echo "::endgroup::"
+
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

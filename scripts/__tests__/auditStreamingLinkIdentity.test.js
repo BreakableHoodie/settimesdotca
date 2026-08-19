@@ -27,6 +27,10 @@ describe("classify", () => {
     ["A Dallas Welcome", "Dead Karma"],
     ["Sun", "Sunday Blues"],
     ["Beat", "Beatles"],
+    // Guards the hyphen rule from being widened into "ignore all spaces":
+    // both of these fold to "sealion" if word boundaries are erased, but they
+    // are different names and must stay MISMATCH.
+    ["Sea Lion", "Seal Ion"],
   ])("classifies %j and %j as MISMATCH", (dbName, platformName) => {
     expect(classify(dbName, platformName)).toBe("MISMATCH");
   });

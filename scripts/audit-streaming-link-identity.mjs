@@ -132,21 +132,34 @@ export function containsTokens(haystack, needle) {
   return ` ${haystack} `.includes(` ${needle} `);
 }
 
+/**
+ * Normalise with hyphens deleted rather than treated as separators, so
+ * "K-Man" and "Kman" agree. Covers the ASCII hyphen plus the Unicode dash
+ * range (U+2010-U+2015), which platform metadata does use.
+ */
+export function normaliseIgnoringHyphens(raw) {
+  if (typeof raw !== "string") return "";
+  return withoutArticle(normalise(raw.replace(/[-\u2010-\u2015]/g, "")));
+}
+
 export function classify(dbName, platformName) {
   if (!platformName) return "UNRESOLVED";
   const a = withoutArticle(normalise(dbName));
   const b = withoutArticle(normalise(platformName));
   if (!a || !b) return "UNRESOLVED";
   if (a === b) return "OK";
-  // Spacing-only difference: normalise() turns every non-alphanumeric run into
-  // a space, so intra-word punctuation splits a token ("K-Man" -> "k man") and
-  // no longer equals its unpunctuated twin ("Kman"). Real case, #171: our
+  // Hyphenation variant. normalise() turns every non-alphanumeric run into a
+  // space, so intra-word punctuation splits a token ("K-Man" -> "k man") and
+  // stops equalling its unpunctuated twin ("Kman"). Real case, #171: our
   // "Kman & the 45s" vs the platform's "K-Man & The 45s", whose Apple slug is
-  // literally k-man-the-45s. Equality-after-despacing (never containment,
-  // which would collapse genuinely different names) folds that back to OK, so
-  // it does not pollute MISMATCH — the one bucket that means fans are being
-  // sent to a stranger's music.
-  if (a.replace(/ /g, "") === b.replace(/ /g, "")) return "OK";
+  // literally k-man-the-45s.
+  //
+  // Deliberately narrow: strip ONLY hyphens from the raw name, then normalise
+  // as usual. The obvious shortcut -- comparing both sides with all spaces
+  // removed -- also erases genuine word boundaries, so "Sea Lion" and
+  // "Seal Ion" would both fold to "sealion" and be called the same artist.
+  // That would hide exactly the mismatch this script exists to find.
+  if (normaliseIgnoringHyphens(dbName) === normaliseIgnoringHyphens(platformName)) return "OK";
   // Billing variant: one name contains the other, e.g. Spotify lists
   // "Scott Reynolds" for our "Scott Reynolds Band". Related, not wrong.
   if (containsTokens(a, b) || containsTokens(b, a)) return "REVIEW";

@@ -932,7 +932,7 @@ function App() {
       >
         <div className="space-y-4 text-sm text-text-secondary">
           <p>Choose how to apply this shared route to your current picks.</p>
-          {sharedRouteDiff.gain.length === 0 && sharedRouteDiff.lose.length === 0 ? (
+          {!sharedRouteDiff.hasRouteChanges ? (
             <p className="rounded-lg border border-border bg-surface p-3 text-text-primary">
               You’re already on the same route — nothing to add or drop.
             </p>

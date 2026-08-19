@@ -116,4 +116,30 @@ describe('resolveRouteDiff', () => {
   it('does not throw when the band list is missing', () => {
     expect(() => resolveRouteDiff(['a'], ['b'], undefined)).not.toThrow()
   })
+
+  describe('hasRouteChanges', () => {
+    it('is false for genuinely identical routes', () => {
+      expect(resolveRouteDiff(['early', 'mid'], ['mid', 'early'], bands).hasRouteChanges).toBe(false)
+    })
+
+    it('is true when a stored id names a performance that no longer exists', () => {
+      // The stale id resolves to no band, so it disappears from the rendered
+      // `lose` rows — but Replace still drops it from storage, so the routes
+      // are not identical and the dialog must not claim they are.
+      const result = resolveRouteDiff(['early', 'mid', 'deleted-perf'], ['early', 'mid'], bands)
+      expect(result.lose).toEqual([])
+      expect(result.hasRouteChanges).toBe(true)
+    })
+
+    it('is true when the incoming route names a deleted performance', () => {
+      const result = resolveRouteDiff(['early'], ['early', 'deleted-perf'], bands)
+      expect(result.gain).toEqual([])
+      expect(result.hasRouteChanges).toBe(true)
+    })
+
+    it('is true whenever there is a visible gain or loss', () => {
+      expect(resolveRouteDiff(['early'], ['early', 'mid'], bands).hasRouteChanges).toBe(true)
+      expect(resolveRouteDiff(['early', 'mid'], ['early'], bands).hasRouteChanges).toBe(true)
+    })
+  })
 })

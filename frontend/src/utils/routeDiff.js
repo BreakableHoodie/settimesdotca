@@ -57,6 +57,18 @@ export function resolveRouteDiff(mineIds, theirsIds, bands) {
       .filter(Boolean)
       .sort((a, b) => a.startMs - b.startMs)
 
-  const { together, gain, lose } = diffRoutes(mineIds, theirsIds)
-  return { together: resolve(together), gain: resolve(gain), lose: resolve(lose) }
+  const diff = diffRoutes(mineIds, theirsIds)
+  return {
+    // Computed from the UNFILTERED diff, unlike the arrays below. A stored id
+    // whose performance was since deleted resolves to no band, so it vanishes
+    // from `lose` — and if it were the only difference, a check on the resolved
+    // arrays would claim the routes are identical while Replace still drops it
+    // from storage. The difference is invisible to the fan (a deleted set
+    // renders nothing either way), but "identical" should mean identical
+    // rather than happen to be true.
+    hasRouteChanges: diff.gain.length > 0 || diff.lose.length > 0,
+    together: resolve(diff.together),
+    gain: resolve(diff.gain),
+    lose: resolve(diff.lose),
+  }
 }

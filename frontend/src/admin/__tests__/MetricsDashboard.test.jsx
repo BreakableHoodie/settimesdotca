@@ -42,6 +42,16 @@ describe('MetricsDashboard', () => {
     expect(screen.getByText('Fans Who Built a Route')).toBeInTheDocument()
     expect(screen.getByText('25.0%')).toBeInTheDocument()
     expect(screen.getByText('Route Size Distribution')).toBeInTheDocument()
+    // Assert the rows, not just the heading: a heading-only check still passes
+    // if the buckets stop rendering or `route_count` is read wrongly. These
+    // also exercise both pluralisation branches ('set'/'sets', 'route'/'routes')
+    // and the ELSE bucket, so a broken ternary or a dropped bucket goes red.
+    expect(screen.getByText('1 set')).toBeInTheDocument()
+    expect(screen.getByText('1 route')).toBeInTheDocument()
+    expect(screen.getByText('2-3 sets')).toBeInTheDocument()
+    expect(screen.getByText('2 routes')).toBeInTheDocument()
+    expect(screen.getByText('12+ sets')).toBeInTheDocument()
+    expect(screen.getAllByText('0 routes')).toHaveLength(3)
     expect(screen.getByText(/Page-view history may be shorter/)).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
     expect(screen.getByText('Share Views')).toBeInTheDocument()

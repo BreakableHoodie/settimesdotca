@@ -102,12 +102,17 @@ runs:
                   # or block on -- leaving the process alive and the step still
                   # hung, i.e. failing in exactly the case this bound exists for.
                   # SIGKILL follows 30s later and cannot be ignored.
+                  local started=$SECONDS
                   timeout -k 30s 300s "$@" || code=$?
+                  local elapsed=$(( SECONDS - started ))
                   [ "$code" -eq 0 ] && return 0
                   # 124 = killed by SIGTERM at the deadline; 137 = 128+9, killed by
                   # the SIGKILL that -k sends when SIGTERM was ignored. Both mean the
-                  # bound fired, and both want the same hint.
-                  if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then
+                  # bound fired -- but `timeout` also passes THROUGH a wrapped command
+                  # that exits 124 or 137 on its own, so the code alone cannot tell the
+                  # two apart. Require the elapsed time to corroborate it, or a genuine
+                  # apt failure returning 124 would be blamed on a hang it never had.
+                  if { [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; } && [ "$elapsed" -ge 300 ]; then
                       echo "✗ $label exceeded 300s and was killed — usually apt-get" >&2
                       echo "  blocked on a lock or a slow mirror. Re-running the job normally clears it." >&2
                   else

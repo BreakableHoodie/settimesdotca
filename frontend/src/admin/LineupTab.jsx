@@ -823,6 +823,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
               className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-56"
             />
             <select
+              aria-label="Filter performers by venue"
               value={venueFilter}
               onChange={e => setVenueFilter(e.target.value)}
               className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"
@@ -836,6 +837,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
             </select>
             {isMultiDay && (
               <select
+                aria-label="Filter performers by day"
                 value={dayFilter}
                 onChange={e => setDayFilter(e.target.value)}
                 className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden"

@@ -30,6 +30,12 @@ Then give an overall grade and a one-paragraph summary of the biggest risk in th
 
 Rank all issues found by impact-to-effort ratio. Then actually fix the ones that are safe: no breaking changes, no unrequested architecture rewrites, no guessing at business logic you don't have context for. For anything riskier, leave it as a recommendation instead of touching it — flag why you're not fixing it.
 
+**File every deferred finding as a GitHub issue and reference it from the PR.** A
+recommendation that lives only in the report card is lost the moment the session ends —
+which is the failure this whole review exists to catch, reproduced by the review itself.
+Search existing issues first: the first run found a stalled tracking issue where three of
+eight items were already done or no longer reproducible.
+
 Show your work: what you changed and why, file by file.
 
 ## Step 3: Re-grade
@@ -49,6 +55,15 @@ Run the real gates before grading anything: `make gate`, `npm run test:coverage`
 in both stacks, `npm audit` in **both** root and `frontend/`, `node
 scripts/check-schema-drift.mjs`, `npm run validate:openapi`. A grade for "test
 coverage" that never ran the suite is a vibe.
+
+**The schema gate is the raw script here, deliberately — not `make schema-check`.**
+That target regenerates `setup-complete.sql` *before* drift-checking it, so it
+compares a freshly generated file against the migrations that just generated it.
+It is the right command when you have edited `migrations/` and want the file
+brought back in step; it is the wrong one for an audit, because it repairs the
+drift instead of reporting it. Measured on artificial drift (a removed index):
+the raw check exits **1**, `make schema-check` exits **0**. Do not "fix" this to
+use the Make target.
 
 ### Grade against this repo's own invariants, not generic best practice
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { eventsApi } from '../utils/adminApi'
 import EventsTab from './EventsTab'
 import VenuesTab from './VenuesTab'
@@ -217,17 +217,22 @@ export default function AdminPanel({ currentUser, onLogout }) {
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
 
-  // Dynamic Tabs Configuration
-  const tabs = [
-    { id: 'events', label: 'Events' },
-    // Only show Lineup if an event is selected
-    ...(selectedEventId ? [{ id: 'lineup', label: 'Lineup' }] : []),
-    { id: 'roster', label: 'Roster' },
-    { id: 'venues', label: 'Venues' },
-    ...(canManageUsers ? [{ id: 'users', label: 'Users' }] : []),
-    { id: 'settings', label: 'Settings' },
-    ...(isAdmin ? [{ id: 'platform', label: 'Platform' }] : []),
-  ]
+  // Dynamic Tabs Configuration. Memoized because the effect below depends on
+  // `tabs`: rebuilt inline it is a fresh array every render, so the effect
+  // re-ran on every render instead of only when the tab set actually changes.
+  const tabs = useMemo(
+    () => [
+      { id: 'events', label: 'Events' },
+      // Only show Lineup if an event is selected
+      ...(selectedEventId ? [{ id: 'lineup', label: 'Lineup' }] : []),
+      { id: 'roster', label: 'Roster' },
+      { id: 'venues', label: 'Venues' },
+      ...(canManageUsers ? [{ id: 'users', label: 'Users' }] : []),
+      { id: 'settings', label: 'Settings' },
+      ...(isAdmin ? [{ id: 'platform', label: 'Platform' }] : []),
+    ],
+    [selectedEventId, canManageUsers, isAdmin]
+  )
 
   useEffect(() => {
     if (tabs.some(tab => tab.id === activeTab)) {

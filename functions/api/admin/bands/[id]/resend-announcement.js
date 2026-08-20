@@ -77,7 +77,7 @@ export async function onRequestPost(context) {
     performanceId,
     { sent, failed, band_name: perf.band_name },
     ipAddress,
-  ).catch(() => {});
+  );
 
   return json({ success: true, sent, failed });
 }

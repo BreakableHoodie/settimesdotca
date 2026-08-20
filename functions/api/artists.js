@@ -6,6 +6,7 @@
 // PUBLIC_DATA_PUBLISH_ENABLED switch as the rest of the public data.
 
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
+import { CACHE_BROWSE } from "../utils/cacheHeaders.js";
 import { safeReflectSocialLinks } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 import { publicEventStatusSql } from "../utils/eventVisibility.js";
@@ -101,7 +102,7 @@ export async function onRequestGet(context) {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=300",
+        "Cache-Control": CACHE_BROWSE,
       },
     });
   } catch (error) {

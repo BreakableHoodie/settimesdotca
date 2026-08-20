@@ -3,6 +3,7 @@
 // Rate limited to prevent abuse
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+import { CACHE_BROWSE } from "../../utils/cacheHeaders.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
@@ -114,7 +115,7 @@ export async function onRequestGet(context) {
           // Intentional wildcard: this is a public, credential-free, read-only endpoint.
           // Do NOT add Access-Control-Allow-Credentials: true here.
           "Access-Control-Allow-Origin": "*",
-          "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+          "Cache-Control": CACHE_BROWSE,
         },
       },
     );

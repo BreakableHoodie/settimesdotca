@@ -25,7 +25,8 @@ describe("GET /api/feeds/ical — cancelled sets", () => {
     });
     rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(cancelledPerf.id);
 
-    const scheduledPerf = insertBand(rawDb, {
+    // Inserted for its side effect only — the assertions below find it by name.
+    insertBand(rawDb, {
       name: "Sam Nabi",
       event_id: event.id,
       venue_id: venue.id,

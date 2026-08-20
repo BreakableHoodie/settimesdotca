@@ -41,7 +41,7 @@ export async function onRequestPost(context) {
     null,
     { sent, failed, skipped },
     getClientIP(request),
-  ).catch(() => {});
+  );
 
   return json({ success: true, sent, failed, skipped });
 }

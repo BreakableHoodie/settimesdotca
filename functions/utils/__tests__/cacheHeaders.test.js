@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { CACHE_BROWSE, CACHE_SHOW_CRITICAL } from "../cacheHeaders.js";
 
 /**
@@ -19,7 +20,10 @@ import { CACHE_BROWSE, CACHE_SHOW_CRITICAL } from "../cacheHeaders.js";
  * via the constant (which the literal scan cannot see).
  */
 
-const API_ROOT = join(import.meta.dirname, "../../api");
+// fileURLToPath rather than import.meta.dirname, matching the sibling guards
+// (opencodeInstructions.test.js, staticPageMeta.test.js). import.meta.dirname
+// needs Node >= 20.11 and the repo documents a Node 20+ baseline.
+const API_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../api");
 
 function collectJsFiles(dir) {
   const out = [];

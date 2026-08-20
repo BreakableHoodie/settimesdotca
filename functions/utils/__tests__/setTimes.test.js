@@ -30,10 +30,18 @@ describe("validateSetTimes", () => {
     expect(validateSetTimes("23:30", "00:30").valid).toBe(true);
   });
 
+  // Both null and undefined are covered deliberately. `null` is what actually
+  // arrives at runtime -- D1/SQLite returns null for a NULL column, and 175
+  // production rows have no end_time -- so dropping it would stop testing the
+  // only absent-value shape the database produces. `undefined` is what a
+  // caller omitting the argument passes. The rule must accept either.
   it.each([
-    ["both absent", null, null],
-    ["no end time", "21:00", null],
-    ["no start time", null, "22:00"],
+    ["both null (DB shape)", null, null],
+    ["no end time, null (DB shape)", "21:00", null],
+    ["no start time, null", null, "22:00"],
+    ["both undefined (omitted argument)", undefined, undefined],
+    ["no end time, undefined", "21:00", undefined],
+    ["no start time, undefined", undefined, "22:00"],
     ["empty strings", "", ""],
   ])("allows %s — the rule applies only when both are present", (_label, start, end) => {
     expect(validateSetTimes(start, end).valid).toBe(true);

@@ -395,20 +395,38 @@ describe("POST /api/admin/bands/bulk – zero-length set guard", () => {
     expect(JSON.stringify(body)).toMatch(/cannot be the same/i);
   });
 
-  test("still accepts an add that crosses midnight", async () => {
+  test("still accepts an add that crosses midnight, and persists both times", async () => {
     const { env, rawDb } = createTestEnv();
-    const event = insertEvent(rawDb, { name: "Fest", slug: "fest-bulk-midnight" });
+    const targetEvent = insertEvent(rawDb, { name: "Fest", slug: "fest-bulk-midnight" });
+    // The profile must NOT already have a performance in the target event, or
+    // the add loop short-circuits it through `alreadyInEvent` and never reaches
+    // the INSERT. The first version of this test seeded the band into the
+    // target event and asserted only `status < 400`; it passed with
+    // `added: [], skipped: ["Night Band"]` and zero rows written, proving
+    // nothing about midnight-crossing times. Hence the other event here, and
+    // the assertions on the persisted row below.
+    const otherEvent = insertEvent(rawDb, { name: "Other", slug: "fest-bulk-other" });
     const venue = insertVenue(rawDb, { name: "Hall" });
-    const perf = insertBand(rawDb, { name: "Night Band", event_id: event.id, venue_id: venue.id });
+    const perf = insertBand(rawDb, { name: "Night Band", event_id: otherEvent.id, venue_id: venue.id });
 
     const res = await bulkAdd(env, {
       band_profile_ids: [perf.band_profile_id],
-      event_id: event.id,
+      event_id: targetEvent.id,
       venue_id: venue.id,
       start_time: "23:30",
       end_time: "00:30",
     });
 
-    expect(res.status).toBeLessThan(400);
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.added).toEqual(["Night Band"]);
+    expect(body.skipped ?? []).toHaveLength(0);
+
+    const row = rawDb
+      .prepare("SELECT start_time, end_time FROM performances WHERE event_id = ? AND band_profile_id = ?")
+      .get(targetEvent.id, perf.band_profile_id);
+    expect(row).toBeDefined();
+    expect(row.start_time).toBe("23:30");
+    expect(row.end_time).toBe("00:30");
   });
 });

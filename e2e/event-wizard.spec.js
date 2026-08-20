@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
+import { loginAsAdmin } from "./utils/session";
 
 const uniqueSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
@@ -8,17 +8,6 @@ const futureDate = () => {
   const d = new Date();
   d.setDate(d.getDate() + 90);
   return d.toISOString().slice(0, 10);
-};
-
-const loginAsAdmin = async (page) => {
-  await page.goto("/admin");
-  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
-  if (await page.locator('input[type="email"]').isVisible()) {
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
-  }
 };
 
 const getCsrfToken = async (page) => {

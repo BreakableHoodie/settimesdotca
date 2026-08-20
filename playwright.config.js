@@ -31,7 +31,10 @@ export default defineConfig({
     },
     {
       name: 'chromium',
-      testIgnore: /.*login\.spec\.js/,
+      testIgnore: [
+        /.*login\.spec\.js/,
+        ...(skipA11yVisual ? [/accessibility\//, /visual-regression\.spec\.js/] : []),
+      ],
       use: { ...devices['Desktop Chrome'], storageState: storageStatePath },
       dependencies: ['setup'],
     },

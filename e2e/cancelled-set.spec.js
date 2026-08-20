@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
+import { loginAsAdmin } from "./utils/session";
 
 /**
  * Cancellation feature — E2E rendering + accessibility coverage (#732).
@@ -19,23 +19,6 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
 
 const THEME_STORAGE_KEY = "settimes-theme";
 const THEMES = ["midnight-ember", "arctic-night", "daybreak", "silver-lining"];
-
-// Idempotent, matching e2e/band-management.spec.js. The chromium project
-// loads a saved storageState (playwright.config.js), so the context usually
-// arrives ALREADY authenticated -- navigating to /admin/login then redirects
-// straight to /admin and there is no form to fill. An unconditional login
-// therefore hangs on `page.fill` until the 30s test timeout. Wait for either
-// outcome and only log in when the form is actually present.
-const loginAsAdmin = async (page) => {
-  await page.goto("/admin");
-  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
-  if (await page.locator('input[type="email"]').isVisible()) {
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
-  }
-};
 
 const getCsrfToken = async (page) => {
   const cookies = await page.context().cookies();

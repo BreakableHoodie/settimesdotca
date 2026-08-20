@@ -17,24 +17,24 @@ import { test, expect } from "@playwright/test";
 // reliably collapsed; naming it removes the whole class rather than filtering
 // around it.
 //
-// Playwright locators are lazy/live, not snapshots: a `.filter({ has: ... })`
-// locator re-runs its condition on every query. Once the returned card is
-// clicked open, its button flips to "Hide Details" and it stops matching the
-// "View Details" filter — a later `firstEvent.getByRole(...)` would silently
-// re-resolve to a *different* card. So resolve the filter once to a stable
-// DOM index and hand back an `nth()` locator, which stays pinned to that
-// card's position regardless of its later expanded/collapsed state.
+// Returns the live filter, deliberately NOT an `nth()` index.
+//
+// The previous helper resolved to a DOM index on purpose: its filter matched
+// the "View Details" button, which STOPS matching the moment the card is
+// clicked open, so a lazy locator would have re-resolved to a different card.
+// Filtering on the event NAME has no such problem — the name stays in the card
+// whether it is collapsed or expanded — which makes the index dance obsolete.
+//
+// It is also now the riskier of the two. EventTimeline re-polls every 60s, and
+// a card moving between the now/upcoming/past buckets shifts positions; a
+// pinned `nth(index)` would then address whatever had moved into that slot,
+// while the name filter still finds the right card.
 const SEEDED_EVENT = "Future Fest E2E";
 
 async function seededEventCard(page) {
-  const allCards = page.locator('[data-testid="event-card"]');
-  const target = allCards.filter({ hasText: SEEDED_EVENT }).first();
-  await expect(target).toBeVisible();
-  const index = await target.evaluate(
-    (el, testid) => Array.from(document.querySelectorAll(`[data-testid="${testid}"]`)).indexOf(el),
-    "event-card",
-  );
-  return allCards.nth(index);
+  const card = page.locator('[data-testid="event-card"]').filter({ hasText: SEEDED_EVENT }).first();
+  await expect(card).toBeVisible();
+  return card;
 }
 
 test.describe("Public Timeline Viewing", () => {

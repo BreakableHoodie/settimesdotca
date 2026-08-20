@@ -308,20 +308,20 @@ test.describe("Band Profile Viewing", () => {
     await expect(bandLink).toBeVisible();
     await bandLink.click();
 
-    // Look for event listings in band profile
-    const eventCard = page.locator('[data-testid="event-card"]').or(page.locator(".event-card")).first();
+    await page.waitForURL(/\/band(s)?\//);
 
-    if (await eventCard.isVisible()) {
-      const eventTitle = ((await eventCard.locator('h3, h2, [class*="title"]').first().textContent()) ?? "").trim();
-      // An empty title matched EVERY heading through the old RegExp, and a title
-      // containing `[` made the RegExp constructor throw outright.
-      expect(eventTitle).not.toBe("");
-      await eventCard.click();
+    // BandProfilePage links each performance with `<Link to={`/event/${slug}`}>`,
+    // which renders a plain anchor. It renders NO [data-testid="event-card"] and
+    // no .event-card, so the guard this replaces could never match and the whole
+    // test skipped every run -- vacuity one level below the one #898 removed.
+    const eventLink = page.locator('main a[href^="/event/"]').first();
+    await expect(eventLink).toBeVisible();
+    await eventLink.click();
 
-      // exact: true -- a string role name is substring-matched by default, so a
-      // short title would match a longer unrelated heading.
-      await expect(page.getByRole("heading", { name: eventTitle, exact: true })).toBeVisible();
-    }
+    // The navigation is the assertion: this test exists to prove a fan can get
+    // from an artist to the event they are playing.
+    await expect(page).toHaveURL(/\/event\//);
+    await expect(page.locator("main h1")).toBeVisible();
   });
 
   test("should display band member information if available", async ({ page }) => {

@@ -8,12 +8,20 @@ test.describe("Band Profile Viewing", () => {
     // Click on first band link (may be in event card or band list)
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
 
-    if (await bandLink.isVisible()) {
+    // Unconditional, for the same reason as public-timeline.spec.js: an
+    // `if (await bandLink.isVisible())` wrapper turns "no band link on the page"
+    // into a silent pass instead of a failure (#895). Seed data always has bands.
+    await expect(bandLink).toBeVisible();
+    {
       const bandName = await bandLink.textContent();
       await bandLink.click();
 
-      // Verify band profile page loads
-      await expect(page.getByRole("heading", { name: new RegExp(bandName || "", "i") })).toBeVisible();
+      // Scope to the main h1: the Header carries its own "SetTimes" h1, and the
+      // page can show the band name in more than one heading, so an unscoped
+      // match is a strict-mode violation waiting for a second element (#895).
+      // toContainText takes a STRING, so a band name containing regex
+      // metacharacters cannot corrupt the pattern the way `new RegExp(name)` did.
+      await expect(page.locator("main h1")).toContainText((bandName || "").trim());
 
       // Should NOT redirect to login
       await expect(page).not.toHaveURL(/\/admin\/login/);

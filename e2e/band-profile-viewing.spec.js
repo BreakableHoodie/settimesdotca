@@ -42,23 +42,22 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Verify bio/description is displayed
-      const bioText = page
-        .locator('[data-testid="band-bio"]')
-        .or(page.locator('[class*="bio"]').or(page.locator("p, div").filter({ hasText: /\w{20,}/ })));
+    // Verify bio/description is displayed
+    const bioText = page
+      .locator('[data-testid="band-bio"]')
+      .or(page.locator('[class*="bio"]').or(page.locator("p, div").filter({ hasText: /\w{20,}/ })));
 
-      if (await bioText.first().isVisible()) {
-        await expect(bioText.first()).toBeVisible();
-      }
+    if (await bioText.first().isVisible()) {
+      await expect(bioText.first()).toBeVisible();
+    }
 
-      // Verify genre information
-      const genreInfo = page.locator('[data-testid="band-genre"]').or(page.locator('[class*="genre"]'));
-      if (await genreInfo.first().isVisible()) {
-        await expect(genreInfo.first()).toBeVisible();
-      }
+    // Verify genre information
+    const genreInfo = page.locator('[data-testid="band-genre"]').or(page.locator('[class*="genre"]'));
+    if (await genreInfo.first().isVisible()) {
+      await expect(genreInfo.first()).toBeVisible();
     }
   });
 
@@ -67,25 +66,24 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Check for social media links
-      const socialLinks = page.locator(
-        'a[href*="instagram.com"], a[href*="facebook.com"], a[href*="spotify.com"], a[href*="youtube.com"], a[href*="bandcamp.com"], a[href*="soundcloud.com"]',
-      );
+    // Check for social media links
+    const socialLinks = page.locator(
+      'a[href*="instagram.com"], a[href*="facebook.com"], a[href*="spotify.com"], a[href*="youtube.com"], a[href*="bandcamp.com"], a[href*="soundcloud.com"]',
+    );
 
-      const linkCount = await socialLinks.count();
-      if (linkCount > 0) {
-        // Verify at least one social link is visible
-        await expect(socialLinks.first()).toBeVisible();
+    const linkCount = await socialLinks.count();
+    if (linkCount > 0) {
+      // Verify at least one social link is visible
+      await expect(socialLinks.first()).toBeVisible();
 
-        // Verify links open in new tab (external links)
-        const firstLink = socialLinks.first();
-        const target = await firstLink.getAttribute("target");
-        if (target) {
-          expect(target).toBe("_blank");
-        }
+      // Verify links open in new tab (external links)
+      const firstLink = socialLinks.first();
+      const target = await firstLink.getAttribute("target");
+      if (target) {
+        expect(target).toBe("_blank");
       }
     }
   });
@@ -95,21 +93,20 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for official website link
-      const websiteLink = page
-        .locator('a[data-testid="band-website"]')
-        .or(page.locator('a:has-text("Website")').or(page.locator('a[class*="website"]')));
+    // Look for official website link
+    const websiteLink = page
+      .locator('a[data-testid="band-website"]')
+      .or(page.locator('a:has-text("Website")').or(page.locator('a[class*="website"]')));
 
-      if (await websiteLink.isVisible()) {
-        await expect(websiteLink).toBeVisible();
+    if (await websiteLink.isVisible()) {
+      await expect(websiteLink).toBeVisible();
 
-        // Verify link has valid URL
-        const href = await websiteLink.getAttribute("href");
-        expect(href).toMatch(/^https?:\/\//);
-      }
+      // Verify link has valid URL
+      const href = await websiteLink.getAttribute("href");
+      expect(href).toMatch(/^https?:\/\//);
     }
   });
 
@@ -118,31 +115,30 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for upcoming events section
-      const upcomingSection = page
-        .locator('[data-testid="upcoming-events"]')
-        .or(page.getByRole("heading", { name: /upcoming|shows|events|performances/i }));
+    // Look for upcoming events section
+    const upcomingSection = page
+      .locator('[data-testid="upcoming-events"]')
+      .or(page.getByRole("heading", { name: /upcoming|shows|events|performances/i }));
 
-      if (await upcomingSection.isVisible()) {
-        await expect(upcomingSection).toBeVisible();
+    if (await upcomingSection.isVisible()) {
+      await expect(upcomingSection).toBeVisible();
 
-        // Verify event listings
-        const eventList = page.locator('[data-testid="event-card"]').or(page.locator(".event-card"));
-        const eventCount = await eventList.count();
+      // Verify event listings
+      const eventList = page.locator('[data-testid="event-card"]').or(page.locator(".event-card"));
+      const eventCount = await eventList.count();
 
-        if (eventCount > 0) {
-          // Verify first event has date and venue
-          const firstEvent = eventList.first();
-          await expect(firstEvent).toBeVisible();
+      if (eventCount > 0) {
+        // Verify first event has date and venue
+        const firstEvent = eventList.first();
+        await expect(firstEvent).toBeVisible();
 
-          // Check for date information
-          const dateInfo = firstEvent.locator("text=/\\d{1,2}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i");
-          if (await dateInfo.isVisible()) {
-            await expect(dateInfo).toBeVisible();
-          }
+        // Check for date information
+        const dateInfo = firstEvent.locator("text=/\\d{1,2}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i");
+        if (await dateInfo.isVisible()) {
+          await expect(dateInfo).toBeVisible();
         }
       }
     }
@@ -153,17 +149,16 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for past performances section
-      const pastSection = page
-        .locator('[data-testid="past-events"]')
-        .or(page.getByRole("heading", { name: /past|previous|history/i }));
+    // Look for past performances section
+    const pastSection = page
+      .locator('[data-testid="past-events"]')
+      .or(page.getByRole("heading", { name: /past|previous|history/i }));
 
-      if (await pastSection.isVisible()) {
-        await expect(pastSection).toBeVisible();
-      }
+    if (await pastSection.isVisible()) {
+      await expect(pastSection).toBeVisible();
     }
   });
 
@@ -172,22 +167,21 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for band photo/image
-      const bandPhoto = page
-        .locator('[data-testid="band-photo"]')
-        .or(page.locator('img[alt*="band"]').or(page.locator('[class*="photo"], [class*="image"]').locator("img")));
+    // Look for band photo/image
+    const bandPhoto = page
+      .locator('[data-testid="band-photo"]')
+      .or(page.locator('img[alt*="band"]').or(page.locator('[class*="photo"], [class*="image"]').locator("img")));
 
-      if (await bandPhoto.first().isVisible()) {
-        await expect(bandPhoto.first()).toBeVisible();
+    if (await bandPhoto.first().isVisible()) {
+      await expect(bandPhoto.first()).toBeVisible();
 
-        // Verify image has proper alt text for accessibility
-        const altText = await bandPhoto.first().getAttribute("alt");
-        if (altText) {
-          expect(altText.length).toBeGreaterThan(0);
-        }
+      // Verify image has proper alt text for accessibility
+      const altText = await bandPhoto.first().getAttribute("alt");
+      if (altText) {
+        expect(altText.length).toBeGreaterThan(0);
       }
     }
   });
@@ -199,25 +193,24 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      const bandName = (await bandLink.textContent())?.trim() || "";
-      await bandLink.click();
-      await page.waitForURL(/\/band(s)?\//);
+    await expect(bandLink).toBeVisible();
+    const bandName = (await bandLink.textContent())?.trim() || "";
+    await bandLink.click();
+    await page.waitForURL(/\/band(s)?\//);
 
-      // Verify the band profile heading renders on mobile. Wait generously: the
-      // profile route is lazy-loaded and fetches its data, which can exceed the
-      // default 5s timeout on a cold CI mobile run. Match the band name robustly
-      // (regex-escaped), and allow multiple headings via .first().
-      const headingName = bandName ? new RegExp(bandName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : /.+/;
-      await expect(page.getByRole("heading", { name: headingName }).first()).toBeVisible({
-        timeout: 15000,
-      });
+    // Verify the band profile heading renders on mobile. Wait generously: the
+    // profile route is lazy-loaded and fetches its data, which can exceed the
+    // default 5s timeout on a cold CI mobile run. Match the band name robustly
+    // (regex-escaped), and allow multiple headings via .first().
+    const headingName = bandName ? new RegExp(bandName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : /.+/;
+    await expect(page.getByRole("heading", { name: headingName }).first()).toBeVisible({
+      timeout: 15000,
+    });
 
-      // Verify content is readable on mobile
-      const contentArea = page.locator('main, [role="main"], article').first();
-      if (await contentArea.isVisible()) {
-        await expect(contentArea).toBeVisible();
-      }
+    // Verify content is readable on mobile
+    const contentArea = page.locator('main, [role="main"], article').first();
+    if (await contentArea.isVisible()) {
+      await expect(contentArea).toBeVisible();
     }
   });
 
@@ -226,22 +219,21 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for back button or home link
-      const backButton = page
-        .locator('button:has-text("Back")')
-        .or(
-          page.locator('a[href="/"]').or(page.locator('a:has-text("Home")').or(page.locator('a:has-text("Schedule")'))),
-        );
+    // Look for back button or home link
+    const backButton = page
+      .locator('button:has-text("Back")')
+      .or(
+        page.locator('a[href="/"]').or(page.locator('a:has-text("Home")').or(page.locator('a:has-text("Schedule")'))),
+      );
 
-      if (await backButton.first().isVisible()) {
-        await backButton.first().click();
+    if (await backButton.first().isVisible()) {
+      await backButton.first().click();
 
-        // Verify we're back on timeline
-        await expect(page.getByRole("heading", { name: /schedule/i })).toBeVisible();
-      }
+      // Verify we're back on timeline
+      await expect(page.getByRole("heading", { name: /schedule/i })).toBeVisible();
     }
   });
 
@@ -269,17 +261,16 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for contact information
-      const contactInfo = page
-        .locator('[data-testid="band-contact"]')
-        .or(page.locator("text=/contact|booking|management|email/i"));
+    // Look for contact information
+    const contactInfo = page
+      .locator('[data-testid="band-contact"]')
+      .or(page.locator("text=/contact|booking|management|email/i"));
 
-      if (await contactInfo.first().isVisible()) {
-        await expect(contactInfo.first()).toBeVisible();
-      }
+    if (await contactInfo.first().isVisible()) {
+      await expect(contactInfo.first()).toBeVisible();
     }
   });
 
@@ -288,17 +279,16 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for formation year or history information
-      const historyInfo = page
-        .locator('[data-testid="band-formed"]')
-        .or(page.locator("text=/formed|since|est\\.|established|\\d{4}/i"));
+    // Look for formation year or history information
+    const historyInfo = page
+      .locator('[data-testid="band-formed"]')
+      .or(page.locator("text=/formed|since|est\\.|established|\\d{4}/i"));
 
-      if (await historyInfo.first().isVisible()) {
-        await expect(historyInfo.first()).toBeVisible();
-      }
+    if (await historyInfo.first().isVisible()) {
+      await expect(historyInfo.first()).toBeVisible();
     }
   });
 
@@ -307,19 +297,18 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for event listings in band profile
-      const eventCard = page.locator('[data-testid="event-card"]').or(page.locator(".event-card")).first();
+    // Look for event listings in band profile
+    const eventCard = page.locator('[data-testid="event-card"]').or(page.locator(".event-card")).first();
 
-      if (await eventCard.isVisible()) {
-        const eventTitle = await eventCard.locator('h3, h2, [class*="title"]').first().textContent();
-        await eventCard.click();
+    if (await eventCard.isVisible()) {
+      const eventTitle = await eventCard.locator('h3, h2, [class*="title"]').first().textContent();
+      await eventCard.click();
 
-        // Verify event details page/modal opens
-        await expect(page.getByRole("heading", { name: new RegExp(eventTitle || "", "i") })).toBeVisible();
-      }
+      // Verify event details page/modal opens
+      await expect(page.getByRole("heading", { name: new RegExp(eventTitle || "", "i") })).toBeVisible();
     }
   });
 
@@ -328,17 +317,16 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    await bandLink.click();
 
-      // Look for band members section
-      const membersSection = page
-        .locator('[data-testid="band-members"]')
-        .or(page.getByRole("heading", { name: /members|lineup|artists/i }));
+    // Look for band members section
+    const membersSection = page
+      .locator('[data-testid="band-members"]')
+      .or(page.getByRole("heading", { name: /members|lineup|artists/i }));
 
-      if (await membersSection.isVisible()) {
-        await expect(membersSection).toBeVisible();
-      }
+    if (await membersSection.isVisible()) {
+      await expect(membersSection).toBeVisible();
     }
   });
 
@@ -347,18 +335,17 @@ test.describe("Band Profile Viewing", () => {
 
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    if (await bandLink.isVisible()) {
-      const bandName = await bandLink.textContent();
-      await bandLink.click();
+    await expect(bandLink).toBeVisible();
+    const bandName = await bandLink.textContent();
+    await bandLink.click();
 
-      // Wait for page to fully load
-      await page.waitForLoadState("networkidle");
+    // Wait for page to fully load
+    await page.waitForLoadState("networkidle");
 
-      // Verify page title includes band name (SEO)
-      const title = await page.title();
-      if (bandName && title) {
-        expect(title.toLowerCase()).toContain(bandName.toLowerCase());
-      }
+    // Verify page title includes band name (SEO)
+    const title = await page.title();
+    if (bandName && title) {
+      expect(title.toLowerCase()).toContain(bandName.toLowerCase());
     }
   });
 });

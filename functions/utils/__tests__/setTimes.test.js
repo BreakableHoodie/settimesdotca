@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { validateSetTimes } from "../validation.js";
 import { normalizeEndMinutes, toMinutes } from "../timeConflicts.js";
 
@@ -56,7 +57,10 @@ describe("every write path taking a user start+end uses the shared rule", () => 
   // that forgets the check, which no request-level test can see. `import.js`
   // was exactly that — it validated each time individually and never compared
   // them, so it accepted zero-length sets the other paths rejected.
-  const ROOT = join(import.meta.dirname, "../..");
+  // fileURLToPath rather than import.meta.dirname, matching the sibling guards
+  // (opencodeInstructions.test.js, staticPageMeta.test.js). import.meta.dirname
+  // needs Node >= 20.11 and the repo documents a Node 20+ baseline.
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
   const WRITE_PATHS = [
     "api/admin/bands.js",
     "api/admin/bands/[id].js",

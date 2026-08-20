@@ -119,9 +119,8 @@ test.describe("Band Profile Viewing", () => {
   test("should list upcoming band events", async ({ page }) => {
     await page.goto("/");
 
-    // Enter through the SEEDED event's card, so the artist is deterministic --
-    // the same reason public-timeline.spec.js pins by name (#895). Taking any
-    // band link couples this test to whichever events happen to exist.
+    // Enter through the seeded event's card: that fixes WHICH artist this test
+    // opens, and guarantees they have an upcoming performance to list.
     const seededCard = page.locator('[data-testid="event-card"]').filter({ hasText: SEEDED_EVENT }).first();
     await expect(seededCard).toBeVisible();
     await seededCard.getByRole("button", { name: /view details/i }).click();
@@ -131,15 +130,8 @@ test.describe("Band Profile Viewing", () => {
     await bandLink.click();
     await page.waitForURL(/\/band(s)?\//);
 
-    // Unconditional, and it can be: this test entered through the SEEDED event's
-    // card, so the artist provably plays an upcoming event. The old form guarded
-    // on a loose heading match (/upcoming|shows|events|performances/i) after
-    // entering via whatever band link happened to be first -- so which artist it
-    // landed on depended on what events existed, and a miss silently skipped.
-    //
-    // The listing is a set of performance links. BandProfilePage renders no
-    // [data-testid="event-card"] and no .event-card, so the locator this replaces
-    // counted zero every run and everything nested under it never executed.
+    // BandProfilePage lists performances as `<Link to={`/event/${slug}`}>` and
+    // renders no [data-testid="event-card"] -- do not reach for one here.
     const eventList = page.locator('main a[href^="/event/"]');
     await expect(eventList.first()).toBeVisible();
     await expect(eventList.first()).toHaveText(/\S/);

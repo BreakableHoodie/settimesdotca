@@ -633,7 +633,7 @@ export function isValidTime(time) {
     return { valid: false, error: "Minutes must be between 00 and 59" };
   }
 
-  return { valid: true, error: null };
+  return { valid: true, error: undefined };
 }
 
 /**
@@ -668,12 +668,12 @@ export function isValidTime(time) {
  */
 export function validateSetTimes(startTime, endTime) {
   if (!startTime || !endTime) {
-    return { valid: true, error: null };
+    return { valid: true, error: undefined };
   }
   if (startTime === endTime) {
     return { valid: false, error: "Start and end time cannot be the same" };
   }
-  return { valid: true, error: null };
+  return { valid: true, error: undefined };
 }
 
 /**
@@ -719,7 +719,7 @@ export function validateDate(dateString) {
   }
 
   const date = new Date(dateString);
-  return { valid: true, error: null, date };
+  return { valid: true, error: undefined, date };
 }
 
 /**
@@ -742,7 +742,7 @@ export function validateDate(dateString) {
  */
 export function validatePerformanceDate(performanceDate, event) {
   if (performanceDate === undefined || performanceDate === null || performanceDate === "") {
-    return { valid: true, error: null, value: null };
+    return { valid: true, error: undefined, value: null };
   }
 
   if (typeof performanceDate !== "string") {
@@ -765,7 +765,7 @@ export function validatePerformanceDate(performanceDate, event) {
     };
   }
 
-  return { valid: true, error: null, value: performanceDate };
+  return { valid: true, error: undefined, value: performanceDate };
 }
 
 /**
@@ -785,7 +785,7 @@ export function validatePerformanceDate(performanceDate, event) {
  */
 export function validateDoorsJson(doorsJson, event) {
   if (doorsJson === undefined || doorsJson === null || doorsJson === "") {
-    return { valid: true, error: null, value: null };
+    return { valid: true, error: undefined, value: null };
   }
 
   let parsed;
@@ -814,7 +814,7 @@ export function validateDoorsJson(doorsJson, event) {
 
   const entries = Object.entries(parsed);
   if (entries.length === 0) {
-    return { valid: true, error: null, value: null };
+    return { valid: true, error: undefined, value: null };
   }
 
   const minDate = event?.date || null;
@@ -848,7 +848,7 @@ export function validateDoorsJson(doorsJson, event) {
     };
   }
 
-  return { valid: true, error: null, value: serialized };
+  return { valid: true, error: undefined, value: serialized };
 }
 
 /**
@@ -866,7 +866,7 @@ export function validateId(id) {
     return { valid: false, value: null, error: "ID must be a positive integer" };
   }
 
-  return { valid: true, value: numId, error: null };
+  return { valid: true, value: numId, error: undefined };
 }
 
 /**
@@ -914,7 +914,7 @@ export function validateIdArray(ids, options = {}) {
     return { valid: false, values: null, error: "Array contains duplicate IDs" };
   }
 
-  return { valid: true, values, error: null };
+  return { valid: true, values, error: undefined };
 }
 
 /**

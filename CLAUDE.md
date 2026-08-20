@@ -18,10 +18,45 @@ Invoke these without being asked — don't wait for the user to request them:
 | After editing `frontend/src/` public pages (outside `admin/`) | Scan for `text-white`/`bg-white` theme violations before finishing |
 | After adding/editing anything in `migrations/` | Run `node scripts/regenerate-setup-complete.mjs` then `node scripts/check-schema-drift.mjs` — `setup-complete.sql`'s schema section is generated, never hand-edit it (CI enforces via quality.yml) |
 | When SEO-relevant pages change (band pages, event pages, venue pages) | Check structured data and `document.title` assignments |
+| **Start of a release cycle, or ~quarterly** | Run the codebase report card — `docs/REPORT_CARD_REVIEW.md` (see below) |
 
 The `hooks` in `.claude/settings.local.json` automate the mechanical parts (prettier, ESLint, pre-PR gate). The triggers above require judgment — apply them proactively.
 
 **CodeRabbit is the standing gate; the code-reviewer agent is trigger-only.** CodeRabbit is diff-scoped and reliably catches convention breaks, unscoped test selectors, dead code, and latent time-bombs — and it runs on the PR regardless, so `make review` beforehand only saves a force-push cycle. The code-reviewer agent reads across files and earns its cost when the question is "does this violate an invariant or drift from the architecture." Don't block on Copilot; in practice it duplicates CodeRabbit.
+
+### The codebase report card — run it on a cadence
+
+`docs/REPORT_CARD_REVIEW.md` grades the whole repo across nine
+categories, fixes what is safe, and re-grades. It is **tracked in this repo on
+purpose**: the original lived outside the working tree, where a fresh clone,
+CI, or a delegated run would never find it — the same failure as the untracked
+`instructions/` tree in #818.
+
+**Cadence: at the start of a release cycle, or roughly quarterly — whichever
+comes first.** It is deliberately not a per-PR gate. It reads the whole tree and
+runs every gate, so it costs real time; CodeRabbit and the trigger-based agents
+above cover the per-change surface. Run it when the question is *"what has
+drifted while we were shipping?"*, not *"is this diff correct?"*.
+
+**Run it after a season ends, before the next edition's build-out starts.** That
+is when accumulated drift is cheapest to fix and least likely to collide with
+event-critical work.
+
+**What it is for, and what it is not.** It catches the class of problem no
+diff-scoped reviewer can see: a coverage ratchet that drifted ten points below
+actual and would have passed a double-digit regression; a two-tier cache module
+whose second tier was exported and imported by nothing while five endpoints
+copy-pasted its value; a dependency override pinned *inside* its own vulnerable
+range; a security control with zero test coverage because every fixture in ten
+files seeded the passing case. None of those appear in any single diff. All four
+were found by the first run (2026-08-20, #900–#917).
+
+**Its findings are claims until verified.** That first run also produced three
+wrong assertions that reached filed issues — "nothing validates zero-length
+sets" (three of five write paths did), "these components have no tests" (a bad
+`find`), "the roster query is unbounded" (capped at 500) — and three vacuous
+tests of its own. Treat the output as a lead list to check, not a verdict, and
+correct the record on the issue when a lead does not survive contact.
 
 ### Sweep for siblings
 

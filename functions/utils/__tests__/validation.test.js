@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 // Tests for validation utilities
 import { describe, it, expect } from "vitest";
 import {
@@ -238,9 +241,9 @@ describe("validateDoorsJson (#569)", () => {
   const multiDayEvent = { date: "2026-07-10", end_date: "2026-07-11" };
 
   it("absent/null/empty doors_json is valid (no doors info)", () => {
-    expect(validateDoorsJson(undefined, singleDayEvent)).toEqual({ valid: true, error: null, value: null });
-    expect(validateDoorsJson(null, singleDayEvent)).toEqual({ valid: true, error: null, value: null });
-    expect(validateDoorsJson("", singleDayEvent)).toEqual({ valid: true, error: null, value: null });
+    expect(validateDoorsJson(undefined, singleDayEvent)).toEqual({ valid: true, error: undefined, value: null });
+    expect(validateDoorsJson(null, singleDayEvent)).toEqual({ valid: true, error: undefined, value: null });
+    expect(validateDoorsJson("", singleDayEvent)).toEqual({ valid: true, error: undefined, value: null });
   });
 
   it("accepts a valid single-day map", () => {
@@ -303,7 +306,7 @@ describe("validateDoorsJson (#569)", () => {
   });
 
   it("normalizes an empty object to null", () => {
-    expect(validateDoorsJson("{}", singleDayEvent)).toEqual({ valid: true, error: null, value: null });
+    expect(validateDoorsJson("{}", singleDayEvent)).toEqual({ valid: true, error: undefined, value: null });
   });
 
   it("rejects oversize input (cap ~2000 chars)", () => {
@@ -454,5 +457,41 @@ describe("sanitizeOptionalHandle write-path scheme guard (#483, via sanitizeBand
   it("still accepts a normal @handle", () => {
     const result = sanitizeBandSocialLinks({ instagram: "@ok_handle" });
     expect(JSON.parse(result).instagram).toBe("@ok_handle");
+  });
+});
+
+describe("validator results use undefined, not null, for an absent error (#917)", () => {
+  // Source scan. `.github/instructions/nodejs-javascript-vitest.instructions.md`
+  // says never use `null` for an optional value, and validation.js contradicted
+  // it in 11 places -- which surfaced as a repeat review finding on three
+  // separate PRs before anyone fixed it.
+  //
+  // Scoped to the `error:` key deliberately. The 16 `value: null` returns in the
+  // same file are NOT the same case: several are a NULL bound straight into a
+  // nullable column, and D1 round-trips `null`, not `undefined`. Widening this
+  // scan to `value` would demand a change that breaks writes.
+  const FUNCTIONS_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
+
+  function collectJsFiles(dir) {
+    const out = [];
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        if (entry === "__tests__" || entry === "node_modules") continue;
+        out.push(...collectJsFiles(full));
+      } else if (entry.endsWith(".js")) {
+        out.push(full);
+      }
+    }
+    return out;
+  }
+
+  it("no file in functions/ returns `error: null`", () => {
+    const offenders = collectJsFiles(FUNCTIONS_ROOT)
+      .map((full) => ({ rel: full.slice(FUNCTIONS_ROOT.length + 1), source: readFileSync(full, "utf-8") }))
+      .filter((f) => /\berror:\s*null\b/.test(f.source))
+      .map((f) => f.rel);
+
+    expect(offenders, `use \`error: undefined\` — see #917:\n${offenders.join("\n")}`).toEqual([]);
   });
 });

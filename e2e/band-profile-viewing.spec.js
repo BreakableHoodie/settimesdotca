@@ -13,11 +13,11 @@ test.describe("Band Profile Viewing", () => {
     // into a silent pass instead of a failure (#895). Seed data always has bands.
     await expect(bandLink).toBeVisible();
     {
-      const bandName = ((await bandLink.textContent()) ?? "").trim();
-      // Reject an empty name before it is used as an assertion: toContainText("")
-      // passes against any heading, which would quietly restore the vacuity this
-      // test was just fixed for.
-      expect(bandName).not.toBe("");
+      // The anchor can wrap a whole card (name + venue + time + genre), so this
+      // is not necessarily just the name -- hence the containment direction used
+      // below. Empty is rejected because it would make that check vacuous.
+      const linkText = ((await bandLink.textContent()) ?? "").trim();
+      expect(linkText).not.toBe("");
       await bandLink.click();
 
       // Scope to the main h1: the Header carries its own "SetTimes" h1, and the
@@ -25,7 +25,11 @@ test.describe("Band Profile Viewing", () => {
       // match is a strict-mode violation waiting for a second element (#895).
       // toContainText takes a STRING, so a band name containing regex
       // metacharacters cannot corrupt the pattern the way `new RegExp(name)` did.
-      await expect(page.locator("main h1")).toContainText(bandName);
+      const heading = page.locator("main h1");
+      await expect(heading).toBeVisible();
+      const headingText = ((await heading.textContent()) ?? "").trim();
+      expect(headingText).not.toBe("");
+      expect(linkText).toContain(headingText);
 
       // Should NOT redirect to login
       await expect(page).not.toHaveURL(/\/admin\/login/);

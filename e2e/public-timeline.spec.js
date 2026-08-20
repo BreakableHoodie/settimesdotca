@@ -106,11 +106,14 @@ test.describe("Public Timeline Viewing", () => {
     const bandLink = firstEvent.locator('a[href*="/band/"]').first();
     await expect(bandLink).toBeVisible();
     // Captured BEFORE navigating, so the profile can be checked to be the one
-    // that was clicked rather than merely "a band profile".
-    const bandName = ((await bandLink.textContent()) ?? "").trim();
-    // An empty name would make the `main h1` assertion below vacuous —
-    // toContainText("") passes against any heading at all.
-    expect(bandName).not.toBe("");
+    // that was clicked rather than merely "a band profile". This is the whole
+    // CARD's text, not just the name -- the anchor wraps venue, time and genre
+    // too ("The Time TravellersWaterloo Music Hall7:00 PM - 7:45 PMIndie Rock"),
+    // which is why the comparison below runs link-contains-heading rather than
+    // the other way round.
+    const linkText = ((await bandLink.textContent()) ?? "").trim();
+    // An empty capture would make the comparison below vacuous.
+    expect(linkText).not.toBe("");
     await bandLink.click();
     await expect(page).toHaveURL(/\/band\//);
     // The LOADED title, not the pre-load fallback. BandProfilePage sets
@@ -121,9 +124,15 @@ test.describe("Public Timeline Viewing", () => {
     // the "wait until settled" this line is here to do.
     await expect(page).toHaveTitle(/ in Waterloo Region \| SetTimes$/);
     // Scoping to main h1 avoids the Header's "SetTimes" h1 (strict mode violation).
-    // Asserting the NAME, not just visibility: a generic "a profile rendered"
-    // check passes even if the wrong link were followed.
-    await expect(page.locator("main h1")).toContainText(bandName);
+    const heading = page.locator("main h1");
+    await expect(heading).toBeVisible();
+    const headingText = ((await heading.textContent()) ?? "").trim();
+    // Guard both sides: an empty heading would make the containment check pass
+    // against anything, which is the vacuity this test was just fixed for.
+    expect(headingText).not.toBe("");
+    // Identity, not just "a profile rendered" -- that passes even if the wrong
+    // link were followed.
+    expect(linkText).toContain(headingText);
   });
 
   test("should display timeline content", async ({ page }) => {

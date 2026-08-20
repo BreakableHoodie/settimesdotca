@@ -138,3 +138,37 @@ export function torontoUtcOffset(dateStr) {
   const gmt = TORONTO_OFFSET.formatToParts(probe).find((p) => p.type === "timeZoneName")?.value;
   return gmt ? gmt.replace("GMT", "") : "-05:00";
 }
+
+/**
+ * YYYY-MM-DD → the following calendar day.
+ *
+ * DST-proof because the input is a date *literal*, not a moment in time: it is
+ * read at UTC midnight and stepped with UTC math, so it never crosses a Toronto
+ * DST boundary and gains or loses an hour. `torontoUtcOffset` above is the tool
+ * for the opposite question — where a real instant falls.
+ *
+ * Lived in `api/feeds/ical.js` and `event/[slug].js` as byte-identical copies,
+ * the second carrying a "mirrors the other one" comment. Unlike `parseOrigin`
+ * and `sortableName`, nothing forced that split — both callers are inside
+ * `functions/`, so no build boundary separates them.
+ *
+ * @param {string} dateStr - YYYY-MM-DD
+ * @returns {string} YYYY-MM-DD
+ */
+export function nextCalendarDay(dateStr) {
+  const next = new Date(`${dateStr}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
+/**
+ * YYYY-MM-DD → the preceding calendar day. See {@link nextCalendarDay}.
+ *
+ * @param {string} dateStr - YYYY-MM-DD
+ * @returns {string} YYYY-MM-DD
+ */
+export function previousCalendarDay(dateStr) {
+  const prev = new Date(`${dateStr}T00:00:00Z`);
+  prev.setUTCDate(prev.getUTCDate() - 1);
+  return prev.toISOString().slice(0, 10);
+}

@@ -14,6 +14,7 @@
 // Bands/venues/events are public data, so their names/counts are fine.
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
+import { CACHE_BROWSE } from "../../utils/cacheHeaders.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 
 const TOP_BANDS_LIMIT = 8;
@@ -93,7 +94,7 @@ export async function onRequestGet(context) {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=300",
+        "Cache-Control": CACHE_BROWSE,
       },
     });
   } catch (error) {

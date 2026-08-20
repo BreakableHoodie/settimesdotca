@@ -222,8 +222,18 @@ export async function auditLog(env, userId, action, resourceType, resourceId, de
       .run();
   } catch (error) {
     // Never throws: audit logging must not fail the request it records.
-    const l = log ?? logger;
-    l.warn("Audit log write failed", { action, resourceType, resourceId, error });
+    //
+    // The inner guard makes that unconditional rather than merely intended.
+    // Every call site awaits this with no `.catch()`, so anything the catch
+    // block throws would surface as a 500 on a request whose work already
+    // succeeded — an email sent, a digest flushed — and invite a retry of it.
+    try {
+      const l = log ?? logger;
+      l.warn("Audit log write failed", { action, resourceType, resourceId, error });
+    } catch {
+      // The reporting channel is what failed; there is nothing left to report
+      // with. Swallowing is the contract.
+    }
   }
 }
 

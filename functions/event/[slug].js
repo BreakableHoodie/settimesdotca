@@ -5,7 +5,12 @@ import { isPublicDataEnabled } from "../utils/publicGate.js";
 import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
-import { torontoUtcOffset, AFTER_MIDNIGHT_THRESHOLD_HOUR } from "../utils/eventDay.js";
+import {
+  torontoUtcOffset,
+  AFTER_MIDNIGHT_THRESHOLD_HOUR,
+  nextCalendarDay,
+  previousCalendarDay,
+} from "../utils/eventDay.js";
 import { publicEventStatusSql } from "../utils/eventVisibility.js";
 
 // Sets starting before 06:00 are after-midnight sets that belong to the
@@ -23,24 +28,6 @@ function startHour(startTime) {
   const timePart = startTime.includes(" ") ? startTime.split(" ")[1] : startTime;
   const hour = Number.parseInt((timePart ?? "").slice(0, 2), 10);
   return Number.isFinite(hour) ? hour : null;
-}
-
-/**
- * YYYY-MM-DD -> the following calendar day, DST-proof via UTC math (the
- * string is a date literal, not a moment in time). Mirrors nextCalendarDay in
- * functions/api/feeds/ical.js.
- */
-function nextCalendarDay(dateStr) {
-  const next = new Date(`${dateStr}T00:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
-  return next.toISOString().slice(0, 10);
-}
-
-/** YYYY-MM-DD -> the preceding calendar day. See nextCalendarDay. */
-function previousCalendarDay(dateStr) {
-  const prev = new Date(`${dateStr}T00:00:00Z`);
-  prev.setUTCDate(prev.getUTCDate() - 1);
-  return prev.toISOString().slice(0, 10);
 }
 
 /**

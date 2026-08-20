@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * The Lighthouse gate retries itself when wrangler vanishes mid-run (#891, for
@@ -21,7 +22,10 @@ import { join } from "node:path";
  * wrong thing. Drift fails closed only if something checks.
  */
 
-const repoRoot = join(import.meta.dirname, "..", "..");
+// fileURLToPath rather than import.meta.dirname, matching the sibling guards
+// (opencodeInstructions.test.js, staticPageMeta.test.js). import.meta.dirname
+// needs Node 20.11+, and this repo supports Node 20.
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const readRepoFile = (relativePath) => readFileSync(join(repoRoot, relativePath), "utf8");
 

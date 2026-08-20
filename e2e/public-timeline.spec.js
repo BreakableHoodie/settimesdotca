@@ -105,6 +105,12 @@ test.describe("Public Timeline Viewing", () => {
     // has performers, so absence is a failure, not a reason to skip.
     const bandLink = firstEvent.locator('a[href*="/band/"]').first();
     await expect(bandLink).toBeVisible();
+    // Captured BEFORE navigating, so the profile can be checked to be the one
+    // that was clicked rather than merely "a band profile".
+    const bandName = ((await bandLink.textContent()) ?? "").trim();
+    // An empty name would make the `main h1` assertion below vacuous —
+    // toContainText("") passes against any heading at all.
+    expect(bandName).not.toBe("");
     await bandLink.click();
     await expect(page).toHaveURL(/\/band\//);
     // The LOADED title, not the pre-load fallback. BandProfilePage sets
@@ -115,7 +121,9 @@ test.describe("Public Timeline Viewing", () => {
     // the "wait until settled" this line is here to do.
     await expect(page).toHaveTitle(/ in Waterloo Region \| SetTimes$/);
     // Scoping to main h1 avoids the Header's "SetTimes" h1 (strict mode violation).
-    await expect(page.locator("main h1")).toBeVisible();
+    // Asserting the NAME, not just visibility: a generic "a profile rendered"
+    // check passes even if the wrong link were followed.
+    await expect(page.locator("main h1")).toContainText(bandName);
   });
 
   test("should display timeline content", async ({ page }) => {

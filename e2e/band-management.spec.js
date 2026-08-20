@@ -1,17 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
-
-const loginAsAdmin = async (page) => {
-  await page.goto("/admin");
-  // Wait for either admin tab buttons (valid session) or login form (session expired/invalidated)
-  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
-  if (await page.locator('input[type="email"]').isVisible()) {
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
-  }
-};
+import { loginAsAdmin } from "./utils/session";
 
 const openRosterTab = async (page) => {
   await page.click('button:has-text("Roster")');

@@ -1,20 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from "./credentials";
-
-// Re-establish the admin session in THIS context. The shared storageState
-// session (from auth.setup) is invalidated whenever another spec logs in —
-// lucia.invalidateUserSessions() kills all other sessions on re-auth — so
-// admin-mutating specs must log in themselves. Mirrors event-creation.spec.js.
-const loginAsAdmin = async (page) => {
-  await page.goto("/admin");
-  await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
-  if (await page.locator('input[type="email"]').isVisible()) {
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
-  }
-};
+import { loginAsAdmin } from "./utils/session";
 
 /**
  * Offline resilience (#578, #554).

@@ -637,6 +637,46 @@ export function isValidTime(time) {
 }
 
 /**
+ * Reject a zero-length set — a performance whose end time equals its start.
+ *
+ * This is the canonical home for that rule. It existed inline, worded
+ * differently, on two of the four write paths that accept a user-supplied
+ * start AND end time, and not at all on the other two (`bands/import.js`, and
+ * the PATCH in `bands/[id].js` — the path an operator actually uses to move a
+ * set time during a show).
+ *
+ * The rule matters because a zero-length set is read two incompatible ways.
+ * `normalizeEndMinutes` in `functions/utils/timeConflicts.js` treated
+ * `end <= start` as a midnight crossing and added 24 hours, making the set
+ * conflict with everything at its venue; the frontend's copy in
+ * `frontend/src/admin/utils/timeUtils.js` used `end < start`, leaving a
+ * zero-width interval that `intervalsOverlap` (strict `<`) matches against
+ * nothing. Server and admin UI therefore disagreed about the same row.
+ *
+ * Rejecting the input is the fix rather than picking a side: a band plays
+ * neither 0 minutes nor 24 hours, so both readings were wrong. With the input
+ * impossible, the two comparisons cannot disagree — they are aligned anyway so
+ * they cannot drift apart again.
+ *
+ * `end < start` stays legal: that is a real after-midnight set (23:30–00:30),
+ * and 5 exist in production. A missing `end_time` also stays legal — 175 rows
+ * have one, so the rule applies only when BOTH values are present.
+ *
+ * @param {string|null|undefined} startTime - HH:MM, or absent
+ * @param {string|null|undefined} endTime - HH:MM, or absent
+ * @returns {{valid: boolean, error: string|null}}
+ */
+export function validateSetTimes(startTime, endTime) {
+  if (!startTime || !endTime) {
+    return { valid: true, error: null };
+  }
+  if (startTime === endTime) {
+    return { valid: false, error: "Start and end time cannot be the same" };
+  }
+  return { valid: true, error: null };
+}
+
+/**
  * Validate date string and check if it's a valid calendar date
  * @param {string} dateString - Date string in YYYY-MM-DD format
  * @returns {Object} { valid: boolean, error: string|null, date: Date|null }

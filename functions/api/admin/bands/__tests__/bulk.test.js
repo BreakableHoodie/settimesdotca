@@ -20,7 +20,7 @@ vi.mock("../../_middleware.js", () => ({
   auditLog: vi.fn(async () => {}),
 }));
 
-import { onRequestDelete, onRequestPatch } from "../bulk.js";
+import { onRequestDelete, onRequestPatch, onRequestPost } from "../bulk.js";
 import { createTestEnv, insertBand, insertVenue, insertEvent } from "../../../test-utils.js";
 
 // ---------------------------------------------------------------------------
@@ -355,5 +355,75 @@ describe("PATCH /api/admin/bands/bulk – delete action", () => {
 
     const row = rawDb.prepare("SELECT id FROM performances WHERE id = ?").get(band.id);
     expect(row).toBeUndefined();
+  });
+});
+
+describe("POST /api/admin/bands/bulk – zero-length set guard", () => {
+  // This action takes BOTH start_time and end_time straight from the request
+  // body and inserts them, but had no zero-length check while bands.js,
+  // bands/[id].js, wizard.js and import.js all did. The hand-written
+  // write-path list in setTimes.test.js never named it, so nothing failed;
+  // deriving that inventory from source is what surfaced it.
+  function bulkAdd(env, body) {
+    return onRequestPost({
+      request: new Request("https://example.test/api/admin/bands/bulk", {
+        method: "POST",
+        headers: { "x-test-role": "editor", "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+      data: { user: { userId: 1, email: "a@b.c", role: "editor" } },
+    });
+  }
+
+  test("rejects an add whose end_time equals its start_time", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Fest", slug: "fest-bulk-zero" });
+    const venue = insertVenue(rawDb, { name: "Hall" });
+    const perf = insertBand(rawDb, { name: "Some Band", event_id: event.id, venue_id: venue.id });
+
+    const res = await bulkAdd(env, {
+      band_profile_ids: [perf.band_profile_id],
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "21:00",
+      end_time: "21:00",
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(JSON.stringify(body)).toMatch(/cannot be the same/i);
+  });
+
+  test("still accepts an add that crosses midnight, and persists both times", async () => {
+    const { env, rawDb } = createTestEnv();
+    const targetEvent = insertEvent(rawDb, { name: "Fest", slug: "fest-bulk-midnight" });
+    // #900: the profile must not already have a performance in the TARGET
+    // event. The add loop short-circuits those through `alreadyInEvent` and
+    // returns before the INSERT, so a same-event fixture makes this test pass
+    // having written nothing.
+    const otherEvent = insertEvent(rawDb, { name: "Other", slug: "fest-bulk-other" });
+    const venue = insertVenue(rawDb, { name: "Hall" });
+    const perf = insertBand(rawDb, { name: "Night Band", event_id: otherEvent.id, venue_id: venue.id });
+
+    const res = await bulkAdd(env, {
+      band_profile_ids: [perf.band_profile_id],
+      event_id: targetEvent.id,
+      venue_id: venue.id,
+      start_time: "23:30",
+      end_time: "00:30",
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.added).toEqual(["Night Band"]);
+    expect(body.skipped ?? []).toHaveLength(0);
+
+    const row = rawDb
+      .prepare("SELECT start_time, end_time FROM performances WHERE event_id = ? AND band_profile_id = ?")
+      .get(targetEvent.id, perf.band_profile_id);
+    expect(row).toBeDefined();
+    expect(row.start_time).toBe("23:30");
+    expect(row.end_time).toBe("00:30");
   });
 });

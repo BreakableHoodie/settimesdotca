@@ -24,12 +24,23 @@ describe("normalizeEndMinutes", () => {
     expect(normalizeEndMinutes(60, 120)).toBe(120);
   });
 
-  it("adds 24h when end <= start (midnight crossing)", () => {
+  it("adds 24h when end < start (midnight crossing)", () => {
     expect(normalizeEndMinutes(toMinutes("23:30"), toMinutes("00:30"))).toBe(toMinutes("00:30") + 24 * 60);
   });
 
-  it("handles exact same start and end as midnight crossing", () => {
-    expect(normalizeEndMinutes(60, 60)).toBe(60 + 24 * 60);
+  // Behaviour change, deliberate. This previously asserted that start === end
+  // is a midnight crossing (60 -> 1500), matching the old `<=`. The frontend's
+  // copy in `frontend/src/admin/utils/timeUtils.js` has always used `<`, so the
+  // two sides disagreed about the same row: the server made a zero-length set
+  // conflict with everything at its venue, the admin UI with nothing.
+  //
+  // `validateSetTimes` now rejects start === end on every write path, so this
+  // input cannot reach here from an API call, and production held zero such
+  // rows when the rule shipped (283 performances audited). The comparison is
+  // aligned anyway so the two implementations cannot drift apart again — which
+  // is the actual defect, not either individual reading.
+  it("leaves a zero-length span unchanged, matching the frontend", () => {
+    expect(normalizeEndMinutes(60, 60)).toBe(60);
   });
 });
 

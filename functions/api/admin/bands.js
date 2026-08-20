@@ -13,6 +13,7 @@ import {
   sanitizeOptionalText,
   sanitizeString,
   validatePerformanceDate,
+  validateSetTimes,
 } from "../../utils/validation.js";
 import { checkConflicts } from "../../utils/timeConflicts.js";
 import { parseOrigin } from "../../utils/parseOrigin.js";
@@ -432,11 +433,12 @@ export async function onRequestPost(context) {
     }
 
     // Validate time order (only if schedule is provided)
-    if (startTime && endTime && startTime === endTime) {
+    const setTimesCheck = validateSetTimes(startTime, endTime);
+    if (!setTimesCheck.valid) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
-          message: "Start and end time cannot be the same",
+          message: setTimesCheck.error,
         }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );

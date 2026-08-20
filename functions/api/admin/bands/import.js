@@ -8,7 +8,7 @@
 // created, so a lineup is never left half-imported.
 import { auditLog, checkPermission } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
-import { isValidTime } from "../../../utils/validation.js";
+import { isValidTime, validateSetTimes } from "../../../utils/validation.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 
 const MAX_IMPORT_ROWS = 200;
@@ -81,6 +81,11 @@ export async function onRequestPost(context) {
     }
     if (endTime && !isValidTime(endTime).valid) {
       errors.push(`Row ${rowNum}: invalid end_time "${endTime}"`);
+      return null;
+    }
+    const setTimesCheck = validateSetTimes(startTime, endTime);
+    if (!setTimesCheck.valid) {
+      errors.push(`Row ${rowNum}: ${setTimesCheck.error.toLowerCase()}`);
       return null;
     }
     let venueId = null;

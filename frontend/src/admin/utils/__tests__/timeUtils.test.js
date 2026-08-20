@@ -162,6 +162,21 @@ describe('detectConflicts — overlaps vs exact conflicts', () => {
     expect(result.overlaps).toEqual(['Band 2'])
     expect(result.conflicts).toHaveLength(0)
   })
+
+  // Pins this side of a cross-boundary divergence. `normalizeEndMinutes` here
+  // uses `end < start`; functions/utils/timeConflicts.js used `end <= start`,
+  // which turned a zero-length set into a 24-hour interval conflicting with
+  // everything at its venue while this side matched nothing. `validateSetTimes`
+  // now rejects the input server-side and both comparisons use `<`, so this
+  // asserts the agreed semantics rather than tolerating the old drift.
+  it('treats a zero-length set as zero minutes, not a 24-hour span', () => {
+    const zeroLength = band(1, '21:00', '21:00')
+    const laterSet = band(2, '23:00', '23:30')
+    const result = detectConflicts(zeroLength, [zeroLength, laterSet])
+    // A 24h reading would sweep up every other set at the venue.
+    expect(result.conflicts).toHaveLength(0)
+    expect(result.overlaps).toHaveLength(0)
+  })
 })
 
 describe('detectConflicts — after-midnight sets', () => {

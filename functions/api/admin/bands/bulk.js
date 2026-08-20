@@ -1,7 +1,7 @@
 import { auditLog, checkPermission } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
 import { computeNewEndTime, detectBulkConflicts } from "../../../utils/timeConflicts.js";
-import { isValidTime, validateIdArray } from "../../../utils/validation.js";
+import { isValidTime, validateIdArray, validateSetTimes } from "../../../utils/validation.js";
 
 const MAX_BULK_BAND_IDS = 200;
 
@@ -272,6 +272,21 @@ export async function onRequestPost(context) {
       JSON.stringify({
         error: "Bad request",
         message: "A venue is required when setting a start or end time",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // This action takes BOTH times straight from the body and inserts them
+  // below, so it needs the same zero-length guard as every other write path.
+  // The `change_time` action further down does not: it derives end_time via
+  // computeNewEndTime, which preserves duration and so cannot manufacture one.
+  const setTimesCheck = validateSetTimes(start_time, end_time);
+  if (!setTimesCheck.valid) {
+    return new Response(
+      JSON.stringify({
+        error: "Validation error",
+        message: setTimesCheck.error,
       }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );

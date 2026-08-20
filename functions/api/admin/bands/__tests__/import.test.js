@@ -35,6 +35,45 @@ function importRequest(env, payload) {
 }
 
 describe("POST /api/admin/bands/import", () => {
+  // import.js validated start_time and end_time individually but never compared
+  // them, so it accepted zero-length sets that bands.js, bands/[id].js and
+  // wizard.js all rejected. It was the only one of the four write paths missing
+  // the rule; the import is all-or-nothing, so one bad row writes nothing.
+  test("rejects a row whose end_time equals its start_time, writing nothing", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Fest", slug: "fest-zero-length" });
+    insertVenue(rawDb, { name: "The Hall" });
+
+    const res = await importRequest(env, {
+      event_id: event.id,
+      bands: [
+        { name: "Good Band", start_time: "20:00", end_time: "21:00", venue: "The Hall" },
+        { name: "Zero Length", start_time: "21:00", end_time: "21:00", venue: "The Hall" },
+      ],
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(JSON.stringify(body.errors ?? body)).toMatch(/cannot be the same/i);
+
+    // All-or-nothing: the valid row must not have landed either.
+    const perfCount = rawDb.prepare("SELECT COUNT(*) AS c FROM performances WHERE event_id = ?").get(event.id);
+    expect(perfCount.c).toBe(0);
+  });
+
+  test("still accepts a row that crosses midnight", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Fest", slug: "fest-crosses-midnight" });
+    insertVenue(rawDb, { name: "The Hall" });
+
+    const res = await importRequest(env, {
+      event_id: event.id,
+      bands: [{ name: "After Midnight", start_time: "23:30", end_time: "00:30", venue: "The Hall" }],
+    });
+
+    expect(res.status).toBe(201);
+  });
+
   test("imports new bands as performances for the event", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Fest", slug: "fest" });

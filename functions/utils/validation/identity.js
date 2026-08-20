@@ -32,7 +32,7 @@ export function isValidEmail(email) {
  * Validate password strength
  * @param {string} password - Password to validate
  * @param {Object} options - Validation options
- * @param {number} options.minLength - Minimum length (default: 8)
+ * @param {number} options.minLength - Minimum length (default: FIELD_LIMITS.password.min)
  * @param {boolean} options.requireUppercase - Require uppercase letter (default: false)
  * @param {boolean} options.requireLowercase - Require lowercase letter (default: false)
  * @param {boolean} options.requireNumber - Require number (default: false)

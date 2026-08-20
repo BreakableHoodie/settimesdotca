@@ -1,6 +1,12 @@
 # Codebase Report Card
 
-Read this repo's AGENTS.md or CLAUDE.md first — use it for stack, conventions, and any stated priorities. Then review the codebase and grade it like a report card, using the categories below. Ground every grade in specific files/lines, not vibes.
+Read **both** `AGENTS.md` and `CLAUDE.md` first — this repo has both and they are not
+interchangeable. `AGENTS.md` is the short entry point and defers to `CLAUDE.md` in three
+places, including for this review's own cadence and caveats; `CLAUDE.md` holds the full
+invariant catalogue you are grading against. Reading only one skips the constraints that
+make the grade meaningful. Use them for stack, conventions, and stated priorities. Then
+review the codebase and grade it like a report card, using the categories below. Ground
+every grade in specific files/lines, not vibes.
 
 ## Categories (grade each A–F)
 

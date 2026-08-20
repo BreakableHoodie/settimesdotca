@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Key, Pencil, Plus, Trash, UserCheck, UserX } from 'lucide-react'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
@@ -94,7 +94,10 @@ export default function UserManagement({ showToast }) {
     }))
   }
 
-  const fetchUsers = async () => {
+  // useCallback so the mount effect can declare it as a dependency without
+  // re-running every render. `showToast` is itself useCallback-wrapped by
+  // AdminPanel, so this identity is stable.
+  const fetchUsers = useCallback(async () => {
     try {
       const data = await usersApi.getAll()
       setUsers(data.users)
@@ -104,11 +107,11 @@ export default function UserManagement({ showToast }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [showToast])
 
   useEffect(() => {
     fetchUsers()
-  }, [])
+  }, [fetchUsers])
 
   const handleCreateUser = async userData => {
     setActionLoading(true)

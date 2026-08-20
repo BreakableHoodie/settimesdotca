@@ -127,23 +127,18 @@ test.describe("Band Profile Viewing", () => {
       .first();
 
     if (await upcomingSection.isVisible()) {
-      await expect(upcomingSection).toBeVisible();
+      // The listing is a set of performance links. BandProfilePage renders no
+      // [data-testid="event-card"] and no .event-card, so the locator this
+      // replaces counted zero on every run and everything nested under it --
+      // including the date check -- never executed.
+      const eventList = page.locator('main a[href^="/event/"]');
+      await expect(eventList.first()).toBeVisible();
 
-      // Verify event listings
-      const eventList = page.locator('[data-testid="event-card"]').or(page.locator(".event-card"));
-      const eventCount = await eventList.count();
-
-      if (eventCount > 0) {
-        // Verify first event has date and venue
-        const firstEvent = eventList.first();
-        await expect(firstEvent).toBeVisible();
-
-        // Check for date information
-        const dateInfo = firstEvent.locator("text=/\\d{1,2}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i");
-        if (await dateInfo.isVisible()) {
-          await expect(dateInfo).toBeVisible();
-        }
-      }
+      // The row names the event it links to. Asserting it is non-empty is a
+      // deliberately smaller claim than the date pattern it replaces, which
+      // matched any single digit anywhere in the row and would have passed on
+      // almost any content had it ever run.
+      await expect(eventList.first()).not.toBeEmpty();
     }
   });
 

@@ -73,9 +73,11 @@ describe('filterVenues', () => {
   })
 
   it('matches the COMPOSED address, not just raw columns', () => {
-    // An operator types what the table shows. "10 King St N" only exists in the
-    // composed form for venue 3 — a filter reading raw columns would miss it.
-    expect(filterVenues(venues, '10 king').map(v => v.id)).toEqual([3])
+    // An operator types what the table shows. This query SPANS two structured
+    // fields and includes the display separator, so it exists only in the
+    // composed string — a filter reading raw columns matches nothing.
+    // (A query like "10 king" would not prove this: it lives in address_line1.)
+    expect(filterVenues(venues, '10 king st n, on').map(v => v.id)).toEqual([3])
   })
 
   it('does not throw on venues with missing optional fields', () => {

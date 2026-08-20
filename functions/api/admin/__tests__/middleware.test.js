@@ -62,4 +62,23 @@ describe("auditLog (#671)", () => {
       warnSpy.mockRestore();
     }
   });
+
+  test("resolves even when the logger itself throws — the contract is unconditional", async () => {
+    const { env } = createTestEnv({ role: "admin" });
+    const throwingLogger = {
+      warn: () => {
+        throw new Error("logger exploded");
+      },
+    };
+
+    // user_id 99999 doesn't exist, so the FK-constrained INSERT throws, which
+    // drives execution into the catch block and then into the logger.
+    //
+    // This matters because all 38 call sites await auditLog with no .catch().
+    // A throw from the catch block would 500 a request whose work already
+    // succeeded (an email sent, a digest flushed) and invite a retry of it.
+    await expect(
+      auditLog(env, 99999, "test.action", "test_resource", 1, null, "127.0.0.1", throwingLogger),
+    ).resolves.toBeUndefined();
+  });
 });

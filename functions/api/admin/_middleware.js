@@ -222,8 +222,21 @@ export async function auditLog(env, userId, action, resourceType, resourceId, de
       .run();
   } catch (error) {
     // Never throws: audit logging must not fail the request it records.
-    const l = log ?? logger;
-    l.warn("Audit log write failed", { action, resourceType, resourceId, error });
+    //
+    // The inner guard makes that unconditional rather than merely intended.
+    // All 38 call sites `await auditLog(...)` with no `.catch()`, so anything
+    // this catch block throws would surface as a 500 on a request whose work
+    // already succeeded — an email sent, a digest flushed — and invite a retry
+    // of work that is already done. The logger is circular-safe today
+    // (serializeMetadata falls back to "[Unserializable]"), so this is defence
+    // against a future logger, not a live bug.
+    try {
+      const l = log ?? logger;
+      l.warn("Audit log write failed", { action, resourceType, resourceId, error });
+    } catch {
+      // The reporting channel is what failed; there is nothing left to report
+      // with. Swallowing is the contract.
+    }
   }
 }
 

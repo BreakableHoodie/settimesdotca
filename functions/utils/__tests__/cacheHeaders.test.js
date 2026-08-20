@@ -47,6 +47,18 @@ const apiFiles = collectJsFiles(API_ROOT).map((path) => ({
 
 // Both tiers state a max-age; a route hardcoding either value has bypassed the
 // module. Derived from the constants so bumping a TTL cannot silently un-guard.
+/**
+ * True only when the file ASSIGNS the tier to a Cache-Control header.
+ *
+ * Occurrence alone is not enough: a comment naming the tier, or an import kept
+ * after the assignment changed, would satisfy a substring check while the route
+ * served a different value entirely. That is the vacuous-guard class -- an
+ * assertion that survives both the correct and the broken implementation.
+ */
+function assignsTier(source, constant) {
+  return new RegExp(`["']Cache-Control["']\\s*[:,]\\s*${constant}\\b`).test(source);
+}
+
 const TIER_MAX_AGES = [CACHE_BROWSE, CACHE_SHOW_CRITICAL].map((value) => value.match(/max-age=(\d+)/)[1]);
 
 describe("cache tier constants are the single source of truth", () => {
@@ -56,10 +68,14 @@ describe("cache tier constants are the single source of truth", () => {
     expect(showCritical).toBeLessThan(browse);
   });
 
-  it("both tiers are imported by at least one route", () => {
+  it("both tiers are actually ASSIGNED to a Cache-Control by at least one route", () => {
+    // `source.includes(constant)` was the first version and was vacuous: a
+    // comment naming the tier, or an import left behind after the assignment
+    // changed, satisfied it. Match the assignment instead — that is the only
+    // form that proves the constant reaches a response header.
     for (const constant of ["CACHE_BROWSE", "CACHE_SHOW_CRITICAL"]) {
-      const importers = apiFiles.filter((f) => f.source.includes(constant));
-      expect(importers.length, `${constant} is exported but no route imports it`).toBeGreaterThan(0);
+      const users = apiFiles.filter((f) => assignsTier(f.source, constant));
+      expect(users.length, `${constant} is exported but no route assigns it to a Cache-Control`).toBeGreaterThan(0);
     }
   });
 
@@ -101,7 +117,7 @@ describe("cache tier constants are the single source of truth", () => {
     const offenders = apiFiles
       .filter((f) => LIVE_STATE_COLUMNS.test(f.source))
       .filter((f) => f.source.includes("Cache-Control"))
-      .filter((f) => !f.source.includes("CACHE_SHOW_CRITICAL"))
+      .filter((f) => !assignsTier(f.source, "CACHE_SHOW_CRITICAL"))
       .map((f) => f.rel)
       .filter((rel) => !EXEMPT.has(rel));
 

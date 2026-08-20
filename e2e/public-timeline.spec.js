@@ -17,18 +17,11 @@ import { test, expect } from "@playwright/test";
 // reliably collapsed; naming it removes the whole class rather than filtering
 // around it.
 //
-// Returns the live filter, deliberately NOT an `nth()` index.
-//
-// The previous helper resolved to a DOM index on purpose: its filter matched
-// the "View Details" button, which STOPS matching the moment the card is
-// clicked open, so a lazy locator would have re-resolved to a different card.
-// Filtering on the event NAME has no such problem — the name stays in the card
-// whether it is collapsed or expanded — which makes the index dance obsolete.
-//
-// It is also now the riskier of the two. EventTimeline re-polls every 60s, and
-// a card moving between the now/upcoming/past buckets shifts positions; a
-// pinned `nth(index)` would then address whatever had moved into that slot,
-// while the name filter still finds the right card.
+// Return the live name filter, never a resolved `nth()` index: EventTimeline
+// re-polls every 60s and a card moving between the now/upcoming/past buckets
+// shifts positions, so a pinned index can end up addressing a different event.
+// The name filter is safe to keep live because the name stays in the card
+// whether it is collapsed or expanded.
 const SEEDED_EVENT = "Future Fest E2E";
 
 async function seededEventCard(page) {

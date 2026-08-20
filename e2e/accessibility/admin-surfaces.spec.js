@@ -21,13 +21,31 @@ import { loginAsAdmin } from "../utils/session";
 // performances, so it is what makes the Lineup audit non-empty.
 const SEEDED_EVENT = "Future Fest E2E";
 
+// A two-day event (end_date > date), which is the ONLY way LineupTab renders its
+// day filter -- `isMultiDayEvent()` gates it. Seeded by #886 for exactly this.
+const SEEDED_MULTIDAY_EVENT = "Multi-Day Fest E2E";
+
 const surfaces = [
   { id: "events", label: "Events", heading: "Events" },
   {
     id: "lineup",
     label: "Lineup",
     heading: "Event Lineup",
+    eventName: SEEDED_EVENT,
     readyLocator: (page) => page.locator("#main-content table tbody tr").first(),
+  },
+  {
+    id: "lineup",
+    title: "Lineup (multi-day)",
+    label: "Lineup",
+    heading: "Event Lineup",
+    eventName: SEEDED_MULTIDAY_EVENT,
+    readyLocator: (page) => page.locator("#main-content table tbody tr").first(),
+    // The day filter is the whole point of this case. Asserting it is present
+    // BEFORE analyze() is what stops the test going vacuous: if the fixture
+    // regressed to single-day the control would simply not render, and axe
+    // would report a clean pass for a control it never saw.
+    requiresDayFilter: true,
   },
   { id: "roster", label: "Roster", heading: "Global Artist Roster" },
   { id: "venues", label: "Venues", heading: "Venues" },
@@ -54,7 +72,7 @@ const openSurface = async (page, surface) => {
     // Select by VALUE, resolved from the option text. The option label is
     // `{name} {status}` (e.g. "Future Fest E2E (Published)"), so an exact-label
     // match fails and a status change would silently break it.
-    const option = eventSelector.locator("option", { hasText: SEEDED_EVENT }).first();
+    const option = eventSelector.locator("option", { hasText: surface.eventName ?? SEEDED_EVENT }).first();
     await expect(option).toBeAttached({ timeout: 15000 });
     await eventSelector.selectOption(await option.getAttribute("value"));
   }
@@ -71,11 +89,15 @@ const openSurface = async (page, surface) => {
   if (surface.readyLocator) {
     await expect(surface.readyLocator(page)).toBeVisible({ timeout: 15000 });
   }
+
+  if (surface.requiresDayFilter) {
+    await expect(page.getByLabel("Filter performers by day")).toBeVisible({ timeout: 15000 });
+  }
 };
 
 test.describe("Admin Surfaces - Accessibility", () => {
   for (const surface of surfaces) {
-    test(`${surface.label} tab has no targeted axe violations`, async ({ page }) => {
+    test(`${surface.title ?? surface.label} tab has no targeted axe violations`, async ({ page }) => {
       await openSurface(page, surface);
 
       const results = await new AxeBuilder({ page })

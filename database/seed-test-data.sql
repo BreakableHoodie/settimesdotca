@@ -97,6 +97,32 @@ INSERT OR REPLACE INTO performances (id, event_id, band_profile_id, venue_id, st
 (3, 28, 3, 2, '21:00', '22:00'),
 (4, 28, 4, 2, '22:00', '23:00');
 
+-- ============================================
+-- MULTI-DAY EVENT (Event 29) — reaches LineupTab's day filter
+-- LineupTab renders its "Filter performers by day" control only when
+-- `isMultiDayEvent(event)` is true, i.e. `end_date > date`. Every other seeded
+-- event is single-day by construction, so before this the admin axe audit could
+-- not reach that control at all (#886).
+--
+-- Dated AFTER Future Fest E2E (+14 days) deliberately. public-timeline.spec.js
+-- asserts against the FIRST collapsed upcoming card and requires it to have
+-- venues and performers; event 28 is that card, and an earlier date here would
+-- silently take its place. This event carries its own venues and performances
+-- anyway, so those assertions would still hold if the ordering ever changed.
+-- ============================================
+
+INSERT OR REPLACE INTO events (id, name, date, end_date, slug, status, description, city, ticket_url) VALUES
+(29, 'Multi-Day Fest E2E', date('now', '+21 days'), date('now', '+22 days'), 'multi-day-fest-e2e', 'published', 'A two-day multi-venue festival used by E2E tests to exercise day-scoped lineup UI.', 'Waterloo', NULL);
+
+-- `performance_date` is what places a set on a specific festival day. Without
+-- it every set renders on the event's start date -- the recurring bug class of
+-- #739/#741/#743 -- and the day filter would have nothing to distinguish.
+INSERT OR REPLACE INTO performances (id, event_id, band_profile_id, venue_id, start_time, end_time, performance_date) VALUES
+(5, 29, 1, 1, '19:00', '19:45', date('now', '+21 days')),
+(6, 29, 2, 1, '20:00', '20:45', date('now', '+21 days')),
+(7, 29, 3, 2, '19:30', '20:15', date('now', '+22 days')),
+(8, 29, 4, 2, '21:00', '22:00', date('now', '+22 days'));
+
 -- Update sqlite_sequence if needed
 DELETE FROM sqlite_sequence WHERE name IN ('venues', 'events', 'band_profiles', 'performances');
-INSERT INTO sqlite_sequence (name, seq) VALUES ('venues', 20), ('events', 28), ('band_profiles', 4), ('performances', 4);
+INSERT INTO sqlite_sequence (name, seq) VALUES ('venues', 20), ('events', 29), ('band_profiles', 4), ('performances', 8);

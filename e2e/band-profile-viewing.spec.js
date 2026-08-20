@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 
+// The seeded upcoming event (database/seed-test-data.sql). Entering through its
+// card makes "which artist" deterministic instead of order-dependent.
+const SEEDED_EVENT = "Future Fest E2E";
+
 test.describe("Band Profile Viewing", () => {
   test("should display band profile without authentication", async ({ page }) => {
     // Navigate to public homepage first to get a band
@@ -115,31 +119,30 @@ test.describe("Band Profile Viewing", () => {
   test("should list upcoming band events", async ({ page }) => {
     await page.goto("/");
 
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
+    // Enter through the SEEDED event's card, so the artist is deterministic --
+    // the same reason public-timeline.spec.js pins by name (#895). Taking any
+    // band link couples this test to whichever events happen to exist.
+    const seededCard = page.locator('[data-testid="event-card"]').filter({ hasText: SEEDED_EVENT }).first();
+    await expect(seededCard).toBeVisible();
+    await seededCard.getByRole("button", { name: /view details/i }).click();
+
+    const bandLink = seededCard.locator('a[href*="/band/"]').first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await page.waitForURL(/\/band(s)?\//);
 
-    // Look for upcoming events section
-    const upcomingSection = page
-      .locator('[data-testid="upcoming-events"]')
-      .or(page.getByRole("heading", { name: /upcoming|shows|events|performances/i }))
-      .first();
-
-    if (await upcomingSection.isVisible()) {
-      // The listing is a set of performance links. BandProfilePage renders no
-      // [data-testid="event-card"] and no .event-card, so the locator this
-      // replaces counted zero on every run and everything nested under it --
-      // including the date check -- never executed.
-      const eventList = page.locator('main a[href^="/event/"]');
-      await expect(eventList.first()).toBeVisible();
-
-      // The row names the event it links to. Asserting it is non-empty is a
-      // deliberately smaller claim than the date pattern it replaces, which
-      // matched any single digit anywhere in the row and would have passed on
-      // almost any content had it ever run.
-      await expect(eventList.first()).not.toBeEmpty();
-    }
+    // Unconditional, and it can be: this test entered through the SEEDED event's
+    // card, so the artist provably plays an upcoming event. The old form guarded
+    // on a loose heading match (/upcoming|shows|events|performances/i) after
+    // entering via whatever band link happened to be first -- so which artist it
+    // landed on depended on what events existed, and a miss silently skipped.
+    //
+    // The listing is a set of performance links. BandProfilePage renders no
+    // [data-testid="event-card"] and no .event-card, so the locator this replaces
+    // counted zero every run and everything nested under it never executed.
+    const eventList = page.locator('main a[href^="/event/"]');
+    await expect(eventList.first()).toBeVisible();
+    await expect(eventList.first()).toHaveText(/\S/);
   });
 
   test("should show past performance history", async ({ page }) => {

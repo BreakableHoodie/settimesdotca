@@ -32,6 +32,13 @@ purpose**: the original lived outside the working tree, where a fresh clone,
 CI, or a delegated run would never find it — the same failure as the untracked
 `instructions/` tree in #818.
 
+**Tracked in git, deliberately excluded from the published site** (owner decision,
+2026-08-20). `docs/*.md` is published to docs.settimes.ca regardless of the mkdocs
+`nav`, so the exclusion is what keeps it internal — it is listed in `mkdocs.yml`'s
+`exclude_docs` block. The doc names past security gaps by name, which is what makes
+it useful to us and not something to serve publicly. Do not "fix" the missing nav
+entry by adding one; the file is meant to be absent from the site, not unlinked in it.
+
 **Cadence: at the start of a release cycle, or roughly quarterly — whichever
 comes first.** It is deliberately not a per-PR gate. It reads the whole tree and
 runs every gate, so it costs real time; CodeRabbit and the trigger-based agents

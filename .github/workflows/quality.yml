@@ -222,9 +222,73 @@ jobs:
           # job is deliberately not handed admin credentials.
           seed-admin: 'false'
 
+      # Retries ONCE, and only when wrangler has vanished (#878 /
+      # cloudflare/workers-sdk#14926). That upstream bug exits the dev server on a
+      # RECOVERABLE runtime blip -- wrangler does not implement miniflare's
+      # `unsafeHandleRuntimeRestart` hook -- so a gate failing on it is failing for
+      # a reason unrelated to the PR. Measured: 5 occurrences in ~2 weeks, and a
+      # plain re-run of the identical commit passes.
+      #
+      # A score regression must still fail. The discriminator is NOT the exit code
+      # (identical either way) but the SERVER: after the abort there is no listener
+      # and no process, whereas a failed assertion leaves it healthy.
       - name: Run Lighthouse CI
-        working-directory: frontend
-        run: npm run lighthouse
+        working-directory: .
+        run: |
+          set -u
+
+          run_lighthouse() { ( cd frontend && npm run lighthouse ); }
+
+          # True only when BOTH signals agree the server is gone. Requiring both
+          # keeps a merely-slow server (still listening) out of the retry path.
+          server_gone() {
+              listeners=$( { command -v ss >/dev/null && ss -H -lptn 'sport = :8788'; } 2>/dev/null \
+                || netstat -lptn 2>/dev/null \
+                  | grep -E '(^|[[:space:]])[^[:space:]]*:8788([[:space:]]|$)' || true )
+              procs=$(pgrep -f 'wrangler|workerd' 2>/dev/null || true)
+              [ -z "$listeners" ] && [ -z "$procs" ]
+          }
+
+          # Same invocation as .github/actions/e2e-env, enforced by
+          # functions/__tests__/wranglerDevCommand.test.js -- drift there means the
+          # retry would serve something different from the run it is retrying.
+          restart_wrangler() {
+              echo "  restarting wrangler..." >&2
+              ./frontend/node_modules/.bin/wrangler pages dev frontend/dist --port 8788 --persist-to .wrangler/state > /tmp/wrangler-retry.log 2>&1 &
+              i=1
+              while [ $i -le 60 ]; do
+                  if curl -sf -o /dev/null --max-time 2 http://localhost:8788/; then
+                      echo "  server back after $((i * 2))s" >&2
+                      return 0
+                  fi
+                  sleep 2
+                  i=$((i + 1))
+              done
+              echo "  x server did not come back within 120s -- not retrying" >&2
+              tail -50 /tmp/wrangler-retry.log >&2 || true
+              return 1
+          }
+
+          code=0
+          run_lighthouse || code=$?
+          if [ "$code" -eq 0 ]; then exit 0; fi
+
+          if ! server_gone; then
+              echo "x Lighthouse failed with the server still up -- a real failure, not #878." >&2
+              exit "$code"
+          fi
+
+          echo "x Lighthouse failed AND wrangler is gone: the #878 signature." >&2
+          # Preserve the first run's log before the restart overwrites the picture,
+          # so the diagnostics step still shows the abort that started this.
+          cp /tmp/wrangler.log /tmp/wrangler-first-run.log 2>/dev/null || true
+          restart_wrangler || exit "$code"
+
+          echo "  retrying Lighthouse once..." >&2
+          code=0
+          run_lighthouse || code=$?
+          if [ "$code" -eq 0 ]; then echo "+ passed on retry after a #878 abort" >&2; fi
+          exit "$code"
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           CI: true

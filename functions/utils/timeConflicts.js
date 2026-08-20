@@ -6,8 +6,21 @@ export function toMinutes(time) {
   return hours * 60 + minutes;
 }
 
+/**
+ * A set whose end time is before its start crosses midnight, so its end belongs
+ * to the next day. Strict `<`, matching `normalizeEndMinutes` in
+ * `frontend/src/admin/utils/timeUtils.js`.
+ *
+ * This used `<=`, which also swept up the equal case and turned a zero-length
+ * set into a 24-hour interval conflicting with everything at its venue, while
+ * the frontend's `<` left a zero-width interval that `intervalsOverlap`
+ * (strict `<`) matched against nothing. Server and admin UI disagreed about the
+ * same row. `validateSetTimes` now rejects `start === end` on every write path,
+ * so the equal case cannot reach here; the two comparisons are aligned anyway
+ * so they cannot drift apart again.
+ */
 export function normalizeEndMinutes(startMinutes, endMinutes) {
-  return endMinutes <= startMinutes ? endMinutes + 24 * 60 : endMinutes;
+  return endMinutes < startMinutes ? endMinutes + 24 * 60 : endMinutes;
 }
 
 export function buildIntervals(start, end) {

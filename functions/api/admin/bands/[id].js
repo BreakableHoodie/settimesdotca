@@ -12,6 +12,7 @@ import {
   sanitizeOptionalText,
   sanitizeString,
   validatePerformanceDate,
+  validateSetTimes,
 } from "../../../utils/validation.js";
 import { getClientIP, getUrlId } from "../../../utils/request.js";
 import { checkConflicts } from "../../../utils/timeConflicts.js";
@@ -290,12 +291,15 @@ export async function onRequestPut(context) {
     const actualEndTime = endTime !== undefined ? endTime : performance.end_time;
     const actualVenueId = normalizedVenueId !== undefined ? normalizedVenueId : performance.venue_id;
 
-    // Validate times (allow sets that cross midnight; prevent zero-length sets)
-    if (actualStartTime && actualEndTime && actualStartTime === actualEndTime) {
+    // Validate times (allow sets that cross midnight; prevent zero-length sets).
+    // Checked against the MERGED values, not the body: a PATCH that touches only
+    // end_time can still land it on the stored start_time.
+    const setTimesCheck = validateSetTimes(actualStartTime, actualEndTime);
+    if (!setTimesCheck.valid) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
-          message: "Start and end time cannot be the same",
+          message: setTimesCheck.error,
         }),
         {
           status: 400,

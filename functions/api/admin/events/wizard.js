@@ -16,6 +16,7 @@ import {
   sanitizeOptionalHttpUrl,
   isValidTime,
   FIELD_LIMITS,
+  validateSetTimes,
 } from "../../../utils/validation.js";
 import { getClientIP } from "../../../utils/request.js";
 import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
@@ -138,8 +139,9 @@ export async function onRequestPost(context) {
       const endCheck = isValidTime(b.endTime);
       if (!endCheck.valid) throw new Error(`Band ${i + 1}: ${endCheck.error}`);
       if (b.startTime && b.endTime) {
-        if (b.startTime === b.endTime) {
-          throw new Error(`Band ${i + 1}: start and end time cannot be the same`);
+        const setTimesCheck = validateSetTimes(b.startTime, b.endTime);
+        if (!setTimesCheck.valid) {
+          throw new Error(`Band ${i + 1}: ${setTimesCheck.error.toLowerCase()}`);
         }
         const [sh, sm] = b.startTime.split(":").map(Number);
         const [eh, em] = b.endTime.split(":").map(Number);

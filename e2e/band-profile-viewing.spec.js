@@ -97,13 +97,15 @@ test.describe("Band Profile Viewing", () => {
     await bandLink.click();
 
     // Look for official website link
+    // .first() on the union: `or()` can resolve to several elements, and
+    // isVisible() on a multi-match locator raises a strict-mode error rather
+    // than returning false.
     const websiteLink = page
       .locator('a[data-testid="band-website"]')
-      .or(page.locator('a:has-text("Website")').or(page.locator('a[class*="website"]')));
+      .or(page.locator('a:has-text("Website")').or(page.locator('a[class*="website"]')))
+      .first();
 
     if (await websiteLink.isVisible()) {
-      await expect(websiteLink).toBeVisible();
-
       // Verify link has valid URL
       const href = await websiteLink.getAttribute("href");
       expect(href).toMatch(/^https?:\/\//);
@@ -121,7 +123,8 @@ test.describe("Band Profile Viewing", () => {
     // Look for upcoming events section
     const upcomingSection = page
       .locator('[data-testid="upcoming-events"]')
-      .or(page.getByRole("heading", { name: /upcoming|shows|events|performances/i }));
+      .or(page.getByRole("heading", { name: /upcoming|shows|events|performances/i }))
+      .first();
 
     if (await upcomingSection.isVisible()) {
       await expect(upcomingSection).toBeVisible();
@@ -155,7 +158,8 @@ test.describe("Band Profile Viewing", () => {
     // Look for past performances section
     const pastSection = page
       .locator('[data-testid="past-events"]')
-      .or(page.getByRole("heading", { name: /past|previous|history/i }));
+      .or(page.getByRole("heading", { name: /past|previous|history/i }))
+      .first();
 
     if (await pastSection.isVisible()) {
       await expect(pastSection).toBeVisible();
@@ -178,11 +182,10 @@ test.describe("Band Profile Viewing", () => {
     if (await bandPhoto.first().isVisible()) {
       await expect(bandPhoto.first()).toBeVisible();
 
-      // Verify image has proper alt text for accessibility
-      const altText = await bandPhoto.first().getAttribute("alt");
-      if (altText) {
-        expect(altText.length).toBeGreaterThan(0);
-      }
+      // A missing alt returns null and an empty alt returns "", and the previous
+      // `if (altText)` skipped BOTH -- the two cases the check exists to catch.
+      // \S requires at least one non-whitespace character.
+      await expect(bandPhoto.first()).toHaveAttribute("alt", /\S/);
     }
   });
 
@@ -194,18 +197,23 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    const bandName = (await bandLink.textContent())?.trim() || "";
+    // The anchor wraps the whole card, so this is name + venue + time + genre --
+    // never just the name. Hence the containment direction used below.
+    const linkText = ((await bandLink.textContent()) ?? "").trim();
+    expect(linkText).not.toBe("");
     await bandLink.click();
     await page.waitForURL(/\/band(s)?\//);
 
-    // Verify the band profile heading renders on mobile. Wait generously: the
-    // profile route is lazy-loaded and fetches its data, which can exceed the
-    // default 5s timeout on a cold CI mobile run. Match the band name robustly
-    // (regex-escaped), and allow multiple headings via .first().
-    const headingName = bandName ? new RegExp(bandName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : /.+/;
-    await expect(page.getByRole("heading", { name: headingName }).first()).toBeVisible({
-      timeout: 15000,
-    });
+    // Wait generously: the profile route is lazy-loaded and fetches its data,
+    // which can exceed the default 5s timeout on a cold CI mobile run.
+    const heading = page.locator("main h1");
+    await expect(heading).toBeVisible({ timeout: 15000 });
+    const headingText = ((await heading.textContent()) ?? "").trim();
+    expect(headingText).not.toBe("");
+    // Identity of the profile that opened, matching the pattern the first test
+    // uses. The old form built a RegExp out of the full card text, which could
+    // not match the heading and threw on titles containing metacharacters.
+    expect(linkText).toContain(headingText);
 
     // Verify content is readable on mobile
     const contentArea = page.locator('main, [role="main"], article').first();
@@ -304,11 +312,15 @@ test.describe("Band Profile Viewing", () => {
     const eventCard = page.locator('[data-testid="event-card"]').or(page.locator(".event-card")).first();
 
     if (await eventCard.isVisible()) {
-      const eventTitle = await eventCard.locator('h3, h2, [class*="title"]').first().textContent();
+      const eventTitle = ((await eventCard.locator('h3, h2, [class*="title"]').first().textContent()) ?? "").trim();
+      // An empty title matched EVERY heading through the old RegExp, and a title
+      // containing `[` made the RegExp constructor throw outright.
+      expect(eventTitle).not.toBe("");
       await eventCard.click();
 
-      // Verify event details page/modal opens
-      await expect(page.getByRole("heading", { name: new RegExp(eventTitle || "", "i") })).toBeVisible();
+      // exact: true -- a string role name is substring-matched by default, so a
+      // short title would match a longer unrelated heading.
+      await expect(page.getByRole("heading", { name: eventTitle, exact: true })).toBeVisible();
     }
   });
 
@@ -323,7 +335,8 @@ test.describe("Band Profile Viewing", () => {
     // Look for band members section
     const membersSection = page
       .locator('[data-testid="band-members"]')
-      .or(page.getByRole("heading", { name: /members|lineup|artists/i }));
+      .or(page.getByRole("heading", { name: /members|lineup|artists/i }))
+      .first();
 
     if (await membersSection.isVisible()) {
       await expect(membersSection).toBeVisible();
@@ -336,16 +349,19 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    const bandName = await bandLink.textContent();
     await bandLink.click();
 
     // Wait for page to fully load
     await page.waitForLoadState("networkidle");
 
-    // Verify page title includes band name (SEO)
-    const title = await page.title();
-    if (bandName && title) {
-      expect(title.toLowerCase()).toContain(bandName.toLowerCase());
-    }
+    // Compare the title against the profile's OWN h1, not the anchor text: the
+    // anchor carries venue, time and genre too, so the old check could only ever
+    // pass by accident. The `if (bandName && title)` around it also made a blank
+    // title a silent pass -- on the one assertion here that is SEO-critical.
+    const heading = page.locator("main h1");
+    await expect(heading).toBeVisible({ timeout: 15000 });
+    const headingText = ((await heading.textContent()) ?? "").trim();
+    expect(headingText).not.toBe("");
+    expect((await page.title()).toLowerCase()).toContain(headingText.toLowerCase());
   });
 });

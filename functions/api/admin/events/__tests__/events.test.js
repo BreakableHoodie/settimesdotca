@@ -58,20 +58,23 @@ describe("Event API - smoke tests", () => {
     expect(event.slug).toBe("test-event");
   });
 
-  // TODO: Replace the following placeholder tests with real endpoint tests.
-  // Option A (recommended): Export handler functions from your worker files
-  // so they accept an object `{ request, env }` and call them here with a mocked request + env.DB = db
-
-  // Example placeholder structure:
-  // import { onRequestPost as createEventHandler } from '../../../../functions/api/admin/events.js'
-  // it('POST /api/admin/events - creates event', async () => { ... })
-
-  it.todo("POST /api/admin/events - should create event with valid data");
-  it.todo("POST /api/admin/events - should validate required fields");
-  it.todo("PATCH /api/admin/events/:id - should update event fields");
-  it.todo("POST /api/admin/events/:id/publish - should publish when bands >= 1");
-  it.todo("POST /api/admin/events/:id/archive - should archive only for admin");
-  it.todo("DELETE /api/admin/events/:id - should delete event and orphan bands");
+  // Six `it.todo` stubs lived here. They were stale scaffolding, not gaps --
+  // every one was already covered by a real test in the "handler integration"
+  // block below, written later without anyone clearing the placeholders:
+  //
+  //   create with valid data  -> "onRequestPost creates an event and returns 201"
+  //   validate required fields -> "create validation fails when required fields missing"
+  //   PATCH update fields      -> "onRequestPatch updates event name"
+  //   publish when bands >= 1  -> "publish endpoint requires >=1 band and publishes event"
+  //   archive admin-only       -> "archive requires admin role" + "archive endpoint
+  //                               requires admin and archives the event"
+  //   DELETE event             -> "delete endpoint requires admin and deletes event" +
+  //                               "delete cascades performances for the event"
+  //
+  // The last one was actively misleading: it said "orphan bands", but deletion
+  // CASCADES -- the covering test asserts the performance row is gone. A stub
+  // describing behaviour the code does not have is worse than no stub, because
+  // it reads as a known gap rather than a stale note.
 });
 
 describe("Event API - handler integration", () => {

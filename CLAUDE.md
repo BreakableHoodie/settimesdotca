@@ -421,6 +421,33 @@ All interactions go through `frontend/src/utils/scheduleStorage.js`. Do not writ
 
 ---
 
+## Public cache TTLs — two tiers, one home
+
+`functions/utils/cacheHeaders.js` owns both public-GET cache values, split by one
+question: **can this change while a show is running?** `CACHE_SHOW_CRITICAL`
+(60s) is for anything rendering live show state — set times, cancellations,
+venue assignments; `CACHE_BROWSE` (300s) is for aggregate-only browse surfaces.
+Deliberately no `stale-while-revalidate`: inside the SWR window a cache serves
+the *stale* body, so a fan opening the page once still reads a cancelled set as
+playing — see the module header for the full rationale.
+
+**Judge the projection, not the route name.** `api/bands/stats/[name].js` is
+named for its aggregates but returns per-performance rows, so it is
+show-critical. Its sibling `api/bands/[name].js` was the same shape and sat at a
+hardcoded 300s until the tiers were wired up — a cancelled set read as playing
+for up to five minutes.
+
+That drift was possible because `CACHE_BROWSE` was **exported and imported by
+nothing** while five endpoints hardcoded its exact string. The constant existed;
+the callers copy-pasted the value. `functions/utils/__tests__/cacheHeaders.test.js`
+now scans source for both halves: no API route may hardcode a `max-age` a tier
+already names, and any route projecting `p.start_time`/`p.is_cancelled` must
+import `CACHE_SHOW_CRITICAL`. Three routes are exempt **by name, with reasons**
+in the test — `schedule.js` (env-tunable, already defaults to 60s), `ical.js`
+(a subscribed feed; clients poll on their own schedule and cancellations travel
+as RFC 5545 `STATUS:CANCELLED`), and `events/[id]/recap.js` (gated by
+`concludedEventSql()`, so it can only serve an event that already ended).
+
 ## Metrics & Analytics
 
 Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_stats`) via `POST /api/metrics`, plus an optional Cloudflare Analytics Engine sink (`env.ANALYTICS`, configured in `wrangler.toml`). Ingestion is best-effort and fire-and-forget; failures must not surface to users.
@@ -477,6 +504,8 @@ The human-facing version of this, plus what to do when a set time changes or som
 ## Band Announcements
 
 Band follows are **double opt-in**: `POST /api/bands/:name/follow` creates the row `verified = 0` with a `verification_token` and sends only a confirmation email. Clicking the link hits `GET /api/bands/:name/confirm-follow?token=…`, which sets `verified = 1` and clears the token (idempotent). Announcement emails target `verified = 1` followers **only** (the `WHERE … verified = 1` filter in `admin/bands/[id].js` and `resend-announcement.js`), so an address the submitter doesn't control can never be enrolled in the announcement stream — it receives at most one confirmation email. **Do not revert follow to auto-verify (`verified = 1` on insert)** — it reopens the email-bombing vector.
+
+**The gate is now guarded by `functions/api/admin/bands/__tests__/announce-double-opt-in.test.js`, and it was previously unguarded.** Until that file existed, deleting `AND verified = 1` from *either* recipient query left all 1,169 backend tests green: ten announce-related test files seed followers, and every one of them wrote `verified = 1`, so no fixture could ever distinguish a gated query from an ungated one. The suite looked thorough and proved nothing about the property it most needed to prove. The new tests seed an **unverified** follower and assert they are never queued or emailed, one case per call site — verified by mutation, not by passing. **A third sender means a third case here**; a fixture-only suite is how this went unnoticed for so long.
 
 When a performance is announced (`is_announced` 0→1), verified followers of that band are emailed once. Delivery is tracked **per-follower** in `band_follow_notifications (performance_id, band_follow_id)`: the announce records each *successful* send. Failed sends leave no row, so `POST /api/admin/bands/:id/resend-announcement` recovers them by emailing only followers without a notification row (never double-sending). Shared send+record logic lives in `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking** — it silently drops fans whose first send failed (the bug this replaced).
 

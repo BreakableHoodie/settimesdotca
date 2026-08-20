@@ -13,16 +13,21 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      // Ratchet baseline measured 2026-07-04 (stmts 70.1 / branch 60.5 /
-      // funcs 79.7 / lines 70.8). Thresholds are set to actuals minus a
+      // Ratchet re-measured 2026-08-20 (stmts 77.7 / branch 70.7 /
+      // funcs 86.8 / lines 78.5). Thresholds are set to actuals minus a
       // margin for run-to-run variance. This blocks regressions without
       // being an aspiration — raise deliberately, never lower silently
       // (#478 item 9).
+      //
+      // The previous baseline (68/58/77/68, measured 2026-07-04) had drifted
+      // ~10 points below actual, so it would have passed a ten-point
+      // regression in silence. A ratchet only ratchets if it is re-measured
+      // when coverage rises; treat re-measuring as part of adding tests.
       thresholds: {
-        statements: 68,
-        branches: 58,
-        functions: 77,
-        lines: 68,
+        statements: 75,
+        branches: 68,
+        functions: 84,
+        lines: 76,
       },
       exclude: [
         "node_modules/",

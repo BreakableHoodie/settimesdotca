@@ -5,6 +5,7 @@
 // so venues are discoverable. Gated by PUBLIC_DATA_PUBLISH_ENABLED.
 
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
+import { CACHE_BROWSE } from "../utils/cacheHeaders.js";
 import { publicEventStatusSql } from "../utils/eventVisibility.js";
 
 const DEFAULT_LIMIT = 24;
@@ -75,7 +76,7 @@ export async function onRequestGet(context) {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=300",
+        "Cache-Control": CACHE_BROWSE,
       },
     });
   } catch (error) {

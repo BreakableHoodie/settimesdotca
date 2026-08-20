@@ -44,5 +44,16 @@ export const CACHE_SHOW_CRITICAL = "public, max-age=60";
  * aggregates but also returns upcoming and past performances, cancellations and
  * venue assignments, so it belongs to CACHE_SHOW_CRITICAL. Any response that
  * carries live performance state does, whatever it is called.
+ *
+ * Its sibling `api/bands/[name].js` sat at a hardcoded 300s for the same
+ * reason the stats route once did — the name says "band profile", but the
+ * projection includes `p.start_time`, `p.end_time`, `p.is_cancelled` and the
+ * venue name. Both now use CACHE_SHOW_CRITICAL. Judge the projection, not the
+ * route name.
+ *
+ * `cacheHeaders.test.js` enforces this by scanning source: a public GET may not
+ * hardcode a `max-age` matching either tier's value, and any route projecting
+ * per-performance columns must import CACHE_SHOW_CRITICAL. Copy-pasting the
+ * literal is what let the two tiers drift apart in the first place.
  */
 export const CACHE_BROWSE = "public, max-age=300";

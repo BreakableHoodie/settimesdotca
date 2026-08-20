@@ -4,6 +4,7 @@
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { nextCalendarDay } from "../../utils/eventDay.js";
 
 function sanitizeFilenamePart(value) {
   return (
@@ -156,16 +157,6 @@ function generateICal(bands, city, genre) {
   ical.push("END:VCALENDAR");
 
   return ical.join("\r\n");
-}
-
-/**
- * YYYY-MM-DD → the following calendar day, DST-proof via UTC math (the
- * string is a date literal, not a moment in time).
- */
-function nextCalendarDay(dateStr) {
-  const next = new Date(`${dateStr}T00:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
-  return next.toISOString().slice(0, 10);
 }
 
 function escapeIcal(text) {

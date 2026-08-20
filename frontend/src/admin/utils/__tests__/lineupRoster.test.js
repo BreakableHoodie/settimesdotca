@@ -57,6 +57,18 @@ describe('filterRosterBands', () => {
     expect(result.map(b => b.id)).toEqual([2, 3])
   })
 
+  it('matches a NULL performance_date against day 1 via the fallback', () => {
+    // On a multi-day event a set with no explicit date belongs to the event's
+    // start day, so filtering to day 1 must INCLUDE it. Without this, the pair
+    // of day tests only proves the filter excludes things.
+    const result = filterRosterBands([band(1), band(2, { performance_date: '2026-10-12' })], {
+      isMultiDay: true,
+      dayFilter: '2026-10-11',
+      bandFestivalDate: festivalDate('2026-10-11'),
+    })
+    expect(result.map(b => b.id)).toEqual([1])
+  })
+
   it('IGNORES dayFilter on a single-day event, where performance_date is NULL', () => {
     // Applying it would drop every set — single-day events never render the
     // selector and leave performance_date NULL (#540).

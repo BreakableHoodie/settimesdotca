@@ -60,7 +60,7 @@ coverage" that never ran the suite is a vibe.
 That target regenerates `setup-complete.sql` *before* drift-checking it, so it
 compares a freshly generated file against the migrations that just generated it.
 It is the right command when you have edited `migrations/` and want the file
-brought back in step; it is the wrong one for an audit, because it repairs the
+brought back in step; it is the wrong one for an audit because it repairs the
 drift instead of reporting it. Measured on artificial drift (a removed index):
 the raw check exits **1**, `make schema-check` exits **0**. Do not "fix" this to
 use the Make target.

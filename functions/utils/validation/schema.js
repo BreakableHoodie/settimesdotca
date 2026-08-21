@@ -6,7 +6,7 @@
 import { FIELD_LIMITS } from "./fieldLimits.js";
 import { sanitizeString } from "./strings.js";
 import { isValidEmail, validatePassword, VALID_ROLES } from "./identity.js";
-import { isValidURL } from "./urls.js";
+import { isValidURL, normalizeHttpUrl } from "./urls.js";
 import { isValidTime, validateDate } from "./datetime.js";
 import { validateId } from "./ids.js";
 import { POSTAL_CODE_REGEX, PHONE_REGEX } from "./contact.js";
@@ -105,7 +105,11 @@ export function validateEntity(data, schema) {
         errors[field] = `${rules.label || field} must be no more than ${rules.max} characters`;
         continue;
       }
-      sanitized[field] = trimmedUrl || null;
+      // Through the normaliser, not stored raw: this path previously kept
+      // tracking params that sanitizeBandSocialLinks strips, so the clean-links
+      // doctrine held for band links and failed silently for every generic URL
+      // field (ticket links, venue maps, event sites).
+      sanitized[field] = trimmedUrl ? normalizeHttpUrl(trimmedUrl) : null;
     } else if (rules.type === "time") {
       const timeResult = isValidTime(value);
       if (!timeResult.valid) {

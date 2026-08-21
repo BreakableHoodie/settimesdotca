@@ -37,13 +37,22 @@ describe("clean-links doctrine is implemented, not just documented", () => {
     const documented = [...line.matchAll(/`([a-z_*]+)=?`/g)].map((m) => m[1]);
     expect(documented.length).toBeGreaterThanOrEqual(5);
 
-    for (const name of documented) {
-      if (name.endsWith("*")) {
-        expect(TRACKING_PARAM_PREFIXES, `AGENTS.md names ${name}`).toContain(name.slice(0, -1));
-      } else {
-        expect(TRACKING_PARAMS.has(name), `AGENTS.md names \`${name}\` but it is not stripped`).toBe(true);
-      }
-    }
+    // Compared BOTH ways. Asserting only that every documented param is
+    // stripped leaves the other direction open: an undocumented addition to
+    // TRACKING_PARAMS would pass while silently removing legitimate URL state.
+    // The doctrine is the spec, so the implementation must match it exactly —
+    // adding a param means editing AGENTS.md first.
+    const documentedPrefixes = documented.filter((n) => n.endsWith("*")).map((n) => n.slice(0, -1));
+    const documentedExact = documented.filter((n) => !n.endsWith("*"));
+
+    expect(
+      [...TRACKING_PARAMS].sort(),
+      "TRACKING_PARAMS and AGENTS.md's list have diverged — update the doctrine or the code, not just one",
+    ).toEqual(documentedExact.sort());
+
+    expect([...TRACKING_PARAM_PREFIXES].sort(), "prefix list has diverged from AGENTS.md").toEqual(
+      documentedPrefixes.sort(),
+    );
   });
 
   it.each([

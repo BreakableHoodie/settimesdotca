@@ -35,6 +35,32 @@ async function getEventForPerformance(DB, performanceId) {
 }
 
 // PUT - Update band
+/**
+ * Parse a `profile_<n>` id, or return null if it is not one.
+ *
+ * Anchored on the WHOLE string. `split("_")[1]` read only the second segment,
+ * so "profile_1_extra" resolved to profile 1 — a malformed identifier silently
+ * addressing a real record. On the DELETE path that meant deleting it.
+ *
+ * isSafeInteger, not isInteger: Number("9007199254740993") silently becomes
+ * ...992, so past 2^53 an id resolves to a DIFFERENT record while still looking
+ * like a valid integer.
+ *
+ * One implementation because there are two call sites (PUT and DELETE) and they
+ * had already drifted — PUT was fixed first and DELETE kept the unsafe parse.
+ *
+ * @param {unknown} rawId
+ * @returns {number|null}
+ */
+function parseProfileId(rawId) {
+  const match = /^profile_([1-9]\d*)$/.exec(String(rawId ?? ""));
+  if (!match) {
+    return null;
+  }
+  const parsed = Number(match[1]);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 export async function onRequestPut(context) {
   const { request, env } = context;
   const { DB } = env;
@@ -113,12 +139,8 @@ export async function onRequestPut(context) {
     let bandProfileId = null;
 
     if (isProfileUpdate) {
-      // Anchored, matching the WHOLE id. `split("_")[1]` read only the second
-      // segment, so "profile_1_extra" resolved to profile 1 and would have
-      // edited it — a malformed identifier silently targeting a real record.
-      const match = /^profile_([1-9]\d*)$/.exec(performanceId.toString());
-      const parsed = match ? Number(match[1]) : NaN;
-      if (!Number.isInteger(parsed) || parsed <= 0) {
+      const parsed = parseProfileId(performanceId);
+      if (parsed === null) {
         return new Response(
           JSON.stringify({
             error: "Bad request",
@@ -917,8 +939,8 @@ export async function onRequestDelete(context) {
     }
 
     if (isProfileDelete) {
-      const bandProfileId = Number(performanceId.toString().split("_")[1]);
-      if (!Number.isInteger(bandProfileId) || bandProfileId <= 0) {
+      const bandProfileId = parseProfileId(performanceId);
+      if (bandProfileId === null) {
         return new Response(
           JSON.stringify({
             error: "Bad request",

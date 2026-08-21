@@ -38,8 +38,46 @@ function isRetryableRequest(options) {
   return method === 'GET'
 }
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+// Abortable. A plain setTimeout keeps waiting after the caller has given up, so
+// a 5xx followed by an unmount during RETRY_DELAY_MS still woke up and fired the
+// retry — measured at 2 calls and ~600ms. The listener is always removed, so an
+// abort long after a completed delay cannot reject a settled promise.
+function delay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    // Declared before onAbort, not after. An already-aborted signal calls
+    // onAbort synchronously below, and a `const timer` declared afterwards
+    // would still be in its temporal dead zone — clearTimeout(timer) then threw
+    // a ReferenceError instead of rejecting with the abort reason, which is a
+    // different error type than every caller branches on.
+    let timer
+
+    const onAbort = () => {
+      clearTimeout(timer)
+      // Reject with the signal's own reason whenever it has one. A default
+      // abort supplies a DOMException already named AbortError; an explicit
+      // `controller.abort('user navigated')` supplies a string, and discarding
+      // that loses the only information the caller provided. Do NOT reassign
+      // `.name` on a DOMException — it is a getter, and assigning throws.
+      if (signal?.reason !== undefined) {
+        reject(signal.reason)
+        return
+      }
+      const error = new Error('Request aborted')
+      error.name = 'AbortError'
+      reject(error)
+    }
+
+    if (signal?.aborted) {
+      onAbort()
+      return
+    }
+
+    timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 // Retries a single time on transient failures (network error or 5xx) for GET
@@ -56,15 +94,24 @@ export async function fetchPublicJson(url, options = {}, fallbackMessage = 'API 
     try {
       response = await fetch(url, options)
     } catch (networkError) {
+      // An abort is a deliberate cancellation, not a transient failure. Retrying
+      // one means a component that unmounted mid-flight waits RETRY_DELAY_MS and
+      // fires a second request that can only fail again — measured at 2 calls and
+      // ~600ms before this guard. Checked by name AND by the signal, because a
+      // signal aborted between attempts produces a plain rejection on some
+      // runtimes rather than a named AbortError.
+      if (networkError?.name === 'AbortError' || options.signal?.aborted) {
+        throw networkError
+      }
       if (canRetry && !isFinalAttempt) {
-        await delay(RETRY_DELAY_MS)
+        await delay(RETRY_DELAY_MS, options.signal)
         continue
       }
       throw networkError
     }
 
     if (canRetry && !isFinalAttempt && response.status >= 500) {
-      await delay(RETRY_DELAY_MS)
+      await delay(RETRY_DELAY_MS, options.signal)
       continue
     }
 

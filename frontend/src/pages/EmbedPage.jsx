@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import ScheduleView from '../components/ScheduleView'
 import { validateBandsData } from '../utils/validation'
 import { prepareBands } from '../utils/bandUtils'
+import { fetchPublicJson } from '../utils/publicApi'
 
 export default function EmbedPage() {
   const { slug } = useParams()
@@ -27,15 +28,12 @@ export default function EmbedPage() {
         setLoading(true)
 
         // Try to load event data by slug
-        const response = await fetch(`/api/schedule?event=${encodeURIComponent(slug)}`, {
-          signal: controller.signal,
-        })
+        const data = await fetchPublicJson(
+          `/api/schedule?event=${encodeURIComponent(slug)}`,
+          { signal: controller.signal },
+          `Event not found: ${slug}`
+        )
 
-        if (!response.ok) {
-          throw new Error(`Event not found: ${slug}`)
-        }
-
-        const data = await response.json()
         const bandsData = Array.isArray(data) ? data : data?.bands
         const validation = validateBandsData(bandsData)
         if (!validation.valid) {

@@ -50,10 +50,17 @@ const mockBands = [
   },
 ]
 
-// Mock fetch for /api/schedule
+// Mock fetch for /api/schedule.
+//
+// `headers` is required, not optional: App.jsx loads through fetchPublicJson,
+// which reads `response.headers.get('content-type')` before parsing. A mock
+// without it throws inside the helper, the load fails, and the page renders its
+// error state with no images — which the length guard below catches.
 global.fetch = vi.fn(() =>
   Promise.resolve({
     ok: true,
+    status: 200,
+    headers: { get: () => 'application/json' },
     json: () => Promise.resolve({ event: mockEvent, bands: mockBands }),
   })
 )

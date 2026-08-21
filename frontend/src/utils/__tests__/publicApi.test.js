@@ -155,3 +155,221 @@ describe('fetchPublicJson', () => {
     })
   })
 })
+
+describe('fetchPublicJson — abort is not a transient failure', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does NOT retry an aborted request', async () => {
+    // Before this guard: 2 fetch calls and a ~600ms delay. A component that
+    // unmounted mid-flight fired a second request that could only fail again.
+    // App.jsx's schedule load passes an AbortSignal, so this is the real path.
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      const error = new Error('The operation was aborted.')
+      error.name = 'AbortError'
+      throw error
+    })
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(fetchPublicJson('/api/x', { signal: controller.signal })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+
+  it('does NOT retry when the signal aborted without a named AbortError', async () => {
+    // Some runtimes reject with a plain error when a signal aborts between
+    // attempts, so the guard checks the signal as well as the name.
+    let calls = 0
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      controller.abort()
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/x', { signal: controller.signal })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+
+  it('STILL retries a genuine network error — the guard must not disable retry', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/x')).rejects.toThrow()
+    expect(calls).toBe(2)
+  })
+
+  it('STILL retries a 5xx', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      // Plain stub rather than `new Response` — the frontend ESLint env does not
+      // declare it, and only these four members are read.
+      return {
+        ok: false,
+        status: 503,
+        headers: { get: () => 'application/json' },
+        json: async () => ({}),
+      }
+    })
+
+    await expect(fetchPublicJson('/api/x')).rejects.toThrow()
+    expect(calls).toBe(2)
+  })
+
+  it('never retries a mutation, aborted or not', async () => {
+    // A retried POST can double a side effect. This was already true; asserting
+    // it so the abort guard cannot be "simplified" into changing it.
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/x', { method: 'POST' })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+})
+
+describe('fetchPublicJson preserves the error TYPE its callers branch on', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('rethrows a network failure as a TypeError, not a wrapped Error', async () => {
+    // App.jsx decides between the branded offline card and the generic error
+    // card with `err instanceof TypeError` (#595) — a fetch that never reached
+    // the server surfaces as TypeError, an HTTP error does not. Wrapping the
+    // network error here would silently turn every offline case into a generic
+    // failure card.
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/schedule?event=current')).rejects.toBeInstanceOf(TypeError)
+  })
+
+  it('throws a plain Error (NOT a TypeError) for an HTTP failure', async () => {
+    // The other half of the same branch: a 404 must not be mistaken for offline.
+    vi.stubGlobal('fetch', async () => ({
+      ok: false,
+      status: 404,
+      headers: { get: () => 'application/json' },
+      json: async () => ({ message: 'Not found' }),
+    }))
+
+    const error = await fetchPublicJson('/api/schedule?event=nope').catch(e => e)
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(TypeError)
+    expect(error.status).toBe(404)
+  })
+})
+
+describe('fetchPublicJson — aborting DURING the retry delay', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does not fire the retry when the signal aborts mid-delay after a 5xx', async () => {
+    // The gap the first abort fix missed: guarding the fetch-throws path left
+    // the delay itself unguarded. A 5xx starts a 600ms wait, the component
+    // unmounts, and the retry fired anyway — measured at 2 calls / ~600ms.
+    let calls = 0
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      setTimeout(() => controller.abort(), 20)
+      return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+    })
+
+    await expect(fetchPublicJson('/api/x', { signal: controller.signal })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+
+  it('does not fire the retry when the signal aborts mid-delay after a network error', async () => {
+    let calls = 0
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      setTimeout(() => controller.abort(), 20)
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/x', { signal: controller.signal })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+
+  it('STILL retries a 5xx when nothing aborts', async () => {
+    // The abortable delay must not disable retry for the normal case.
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+    })
+
+    await expect(fetchPublicJson('/api/x')).rejects.toThrow()
+    expect(calls).toBe(2)
+  })
+
+  it('does not reject a delay that already completed', async () => {
+    // The abort listener is removed once the timer fires, so a late abort
+    // cannot reject an already-settled promise and turn a success into a throw.
+    const controller = new AbortController()
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      if (calls === 1) {
+        return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+      }
+      return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: 1 }) }
+    })
+
+    const result = await fetchPublicJson('/api/x', { signal: controller.signal })
+    controller.abort()
+    expect(result).toEqual({ ok: 1 })
+    expect(calls).toBe(2)
+  })
+})
+
+describe('fetchPublicJson — delay() edge cases', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('rejects with AbortError when the signal is ALREADY aborted as the delay starts', async () => {
+    // Regression: `timer` was declared after onAbort, so an already-aborted
+    // signal hit clearTimeout(timer) in its temporal dead zone and threw a
+    // ReferenceError — a different error type than every caller branches on.
+    let calls = 0
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      controller.abort() // aborted before delay() is reached
+      return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+    })
+
+    const error = await fetchPublicJson('/api/x', { signal: controller.signal }).catch(e => e)
+    expect(error).not.toBeInstanceOf(ReferenceError)
+    expect(error.name).toBe('AbortError')
+    expect(calls).toBe(1)
+  })
+
+  it('preserves a custom abort reason instead of replacing it', async () => {
+    // `controller.abort('user navigated')` sets a non-Error reason. Discarding
+    // it throws away the only context the caller supplied.
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      setTimeout(() => controller.abort('user navigated'), 10)
+      return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+    })
+
+    const reason = await fetchPublicJson('/api/x', { signal: controller.signal }).catch(e => e)
+    expect(reason).toBe('user navigated')
+  })
+})

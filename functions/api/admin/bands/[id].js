@@ -188,13 +188,15 @@ export async function onRequestPut(context) {
           { status: 404, headers: { "Content-Type": "application/json" } },
         );
       }
-      // Mock performance object with profile data for downstream logic
-      performance = {
-        band_profile_id: bandProfileId,
-        name: profile.name,
-        social_links: profile.social_links,
-        // other fields null
-      };
+      // Deliberately leaves `performance` null. This used to assign a
+      // fabricated performance-shaped object here so shared downstream code
+      // would run — but its `name` and `social_links` were never read, and its
+      // only live field duplicated `bandProfileId`, which is already set above.
+      // The remaining reads are optional-chained, because several of them DO
+      // run on this path — computing actualStartTime/actualEndTime/actualVenueId
+      // and the conflict check. On a profile edit there is no performance, so
+      // those resolve to undefined and the conflict check short-circuits, which
+      // is what the mock's null fields were simulating all along.
     }
 
     // Validation - only validate provided fields
@@ -220,7 +222,7 @@ export async function onRequestPut(context) {
 
       const nameNormalized = normalizeBandName(name);
       const existingProfile = await DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? AND id != ?`)
-        .bind(nameNormalized, performance.band_profile_id)
+        .bind(nameNormalized, bandProfileId)
         .first();
 
       if (existingProfile) {
@@ -287,9 +289,9 @@ export async function onRequestPut(context) {
     }
 
     // Determine actual times to use (provided or existing)
-    const actualStartTime = startTime !== undefined ? startTime : performance.start_time;
-    const actualEndTime = endTime !== undefined ? endTime : performance.end_time;
-    const actualVenueId = normalizedVenueId !== undefined ? normalizedVenueId : performance.venue_id;
+    const actualStartTime = startTime !== undefined ? startTime : performance?.start_time;
+    const actualEndTime = endTime !== undefined ? endTime : performance?.end_time;
+    const actualVenueId = normalizedVenueId !== undefined ? normalizedVenueId : performance?.venue_id;
 
     // Validate times (allow sets that cross midnight; prevent zero-length sets).
     // Checked against the MERGED values, not the body: a PATCH that touches only
@@ -334,16 +336,16 @@ export async function onRequestPut(context) {
 
     // Check for conflicts only if we have all required scheduling fields
     let conflicts = [];
-    if (actualVenueId && actualStartTime && actualEndTime && performance.event_id) {
+    if (actualVenueId && actualStartTime && actualEndTime && performance?.event_id) {
       conflicts = await checkConflicts(DB, {
-        eventId: performance.event_id,
+        eventId: performance?.event_id,
         venueId: actualVenueId,
         startTime: actualStartTime,
         endTime: actualEndTime,
         excludePerformanceId: performanceId,
         // The performance's festival day after this update: the newly supplied
         // day if it's being changed, otherwise the day it already had.
-        performanceDate: performanceDate !== undefined ? resolvedPerformanceDate : performance.performance_date,
+        performanceDate: performanceDate !== undefined ? resolvedPerformanceDate : performance?.performance_date,
         eventDate: linkedEvent.date,
       });
     }
@@ -461,7 +463,7 @@ export async function onRequestPut(context) {
         let existingLinks = {};
         try {
           const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?")
-            .bind(performance.band_profile_id)
+            .bind(bandProfileId)
             .first();
           existingLinks = JSON.parse(profile.social_links || "{}");
         } catch (_e) {
@@ -487,7 +489,7 @@ export async function onRequestPut(context) {
       }
 
       if (profileUpdates.length > 0) {
-        profileParams.push(performance.band_profile_id);
+        profileParams.push(bandProfileId);
         await DB.prepare(`UPDATE band_profiles SET ${profileUpdates.join(", ")} WHERE id = ?`)
           .bind(...profileParams)
           .run();

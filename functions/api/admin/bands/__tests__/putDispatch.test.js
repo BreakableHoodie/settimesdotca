@@ -134,9 +134,12 @@ describe("PUT /api/admin/bands/:id — profile_ vs numeric dispatch", () => {
   });
 
   it("404s a profile_ id for a profile that does not exist", async () => {
+    // Exactly 404, not ">= 400". The loose form also accepted a 500, so the test
+    // passed if the handler CRASHED on a missing profile — and 400 would mean it
+    // had mistaken a well-formed id for a malformed one.
     const { env } = seed();
     const res = await put(env, "profile_99999", { genre: "punk" });
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBe(404);
   });
 
   it("404s a numeric id for a performance that does not exist", async () => {

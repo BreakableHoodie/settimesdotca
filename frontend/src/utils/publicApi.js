@@ -38,8 +38,38 @@ function isRetryableRequest(options) {
   return method === 'GET'
 }
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+// Abortable. A plain setTimeout keeps waiting after the caller has given up, so
+// a 5xx followed by an unmount during RETRY_DELAY_MS still woke up and fired the
+// retry — measured at 2 calls and ~600ms. The listener is always removed, so an
+// abort long after a completed delay cannot reject a settled promise.
+function delay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      // Reject with the signal's own reason when it has one — a default abort
+      // supplies a DOMException already named AbortError. Do NOT reassign
+      // `.name` on it: DOMException exposes name as a getter only, and
+      // assigning throws in strict mode.
+      if (signal?.reason instanceof Error) {
+        reject(signal.reason)
+        return
+      }
+      const error = new Error('Request aborted')
+      error.name = 'AbortError'
+      reject(error)
+    }
+
+    if (signal?.aborted) {
+      onAbort()
+      return
+    }
+
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 // Retries a single time on transient failures (network error or 5xx) for GET
@@ -66,14 +96,14 @@ export async function fetchPublicJson(url, options = {}, fallbackMessage = 'API 
         throw networkError
       }
       if (canRetry && !isFinalAttempt) {
-        await delay(RETRY_DELAY_MS)
+        await delay(RETRY_DELAY_MS, options.signal)
         continue
       }
       throw networkError
     }
 
     if (canRetry && !isFinalAttempt && response.status >= 500) {
-      await delay(RETRY_DELAY_MS)
+      await delay(RETRY_DELAY_MS, options.signal)
       continue
     }
 

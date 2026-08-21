@@ -270,3 +270,69 @@ describe('fetchPublicJson preserves the error TYPE its callers branch on', () =>
     expect(error.status).toBe(404)
   })
 })
+
+describe('fetchPublicJson — aborting DURING the retry delay', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does not fire the retry when the signal aborts mid-delay after a 5xx', async () => {
+    // The gap the first abort fix missed: guarding the fetch-throws path left
+    // the delay itself unguarded. A 5xx starts a 600ms wait, the component
+    // unmounts, and the retry fired anyway — measured at 2 calls / ~600ms.
+    let calls = 0
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      setTimeout(() => controller.abort(), 20)
+      return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+    })
+
+    await expect(fetchPublicJson('/api/x', { signal: controller.signal })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+
+  it('does not fire the retry when the signal aborts mid-delay after a network error', async () => {
+    let calls = 0
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      setTimeout(() => controller.abort(), 20)
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/x', { signal: controller.signal })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+
+  it('STILL retries a 5xx when nothing aborts', async () => {
+    // The abortable delay must not disable retry for the normal case.
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+    })
+
+    await expect(fetchPublicJson('/api/x')).rejects.toThrow()
+    expect(calls).toBe(2)
+  })
+
+  it('does not reject a delay that already completed', async () => {
+    // The abort listener is removed once the timer fires, so a late abort
+    // cannot reject an already-settled promise and turn a success into a throw.
+    const controller = new AbortController()
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      if (calls === 1) {
+        return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+      }
+      return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: 1 }) }
+    })
+
+    const result = await fetchPublicJson('/api/x', { signal: controller.signal })
+    controller.abort()
+    expect(result).toEqual({ ok: 1 })
+    expect(calls).toBe(2)
+  })
+})

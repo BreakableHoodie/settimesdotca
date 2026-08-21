@@ -33,6 +33,20 @@ describe('formatVenueAddress', () => {
     expect(formatVenueAddress(venue({ city: 'Kitchener', address: '123 Old Format Rd' }))).toBe('Kitchener')
   })
 
+  it('treats whitespace-only structured fields as empty', () => {
+    // VenuesTab stores raw form input. Untrimmed, this renders a blank-looking
+    // address AND blocks the legacy fallback, so the venue looks address-less.
+    expect(formatVenueAddress(venue({ city: '   ', region: '\t' }))).toBe('')
+  })
+
+  it('falls back to the legacy address when structured fields are whitespace-only', () => {
+    expect(formatVenueAddress(venue({ city: '   ', address: '123 Old Format Rd' }))).toBe('123 Old Format Rd')
+  })
+
+  it('trims a whitespace-padded structured value rather than rendering the padding', () => {
+    expect(formatVenueAddress(venue({ city: '  Waterloo  ', region: ' ON ' }))).toBe('Waterloo, ON')
+  })
+
   it('returns empty string for a venue with no address at all', () => {
     expect(formatVenueAddress(venue())).toBe('')
   })

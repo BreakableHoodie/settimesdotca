@@ -19,10 +19,15 @@
  */
 export function formatVenueAddress(venue) {
   if (!venue) return ''
-  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(', ')
-  const line2 = [venue.city, venue.region].filter(Boolean).join(', ')
-  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(' ').trim()
-  return [line1, line2, line3].filter(Boolean).join(', ') || venue.address || ''
+  // Trim before testing emptiness. VenuesTab stores raw form input, so a field
+  // left as spaces is stored as spaces — untrimmed, `city: '   '` counts as
+  // content, renders a blank-looking address, AND suppresses the fallback to
+  // the legacy `address`, so the venue appears to have no address at all.
+  const clean = value => value?.trim()
+  const line1 = [venue.address_line1, venue.address_line2].map(clean).filter(Boolean).join(', ')
+  const line2 = [venue.city, venue.region].map(clean).filter(Boolean).join(', ')
+  const line3 = [venue.postal_code, venue.country].map(clean).filter(Boolean).join(' ')
+  return [line1, line2, line3].filter(Boolean).join(', ') || clean(venue.address) || ''
 }
 
 /**

@@ -336,3 +336,40 @@ describe('fetchPublicJson — aborting DURING the retry delay', () => {
     expect(calls).toBe(2)
   })
 })
+
+describe('fetchPublicJson — delay() edge cases', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('rejects with AbortError when the signal is ALREADY aborted as the delay starts', async () => {
+    // Regression: `timer` was declared after onAbort, so an already-aborted
+    // signal hit clearTimeout(timer) in its temporal dead zone and threw a
+    // ReferenceError — a different error type than every caller branches on.
+    let calls = 0
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      controller.abort() // aborted before delay() is reached
+      return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+    })
+
+    const error = await fetchPublicJson('/api/x', { signal: controller.signal }).catch(e => e)
+    expect(error).not.toBeInstanceOf(ReferenceError)
+    expect(error.name).toBe('AbortError')
+    expect(calls).toBe(1)
+  })
+
+  it('preserves a custom abort reason instead of replacing it', async () => {
+    // `controller.abort('user navigated')` sets a non-Error reason. Discarding
+    // it throws away the only context the caller supplied.
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      setTimeout(() => controller.abort('user navigated'), 10)
+      return { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({}) }
+    })
+
+    const reason = await fetchPublicJson('/api/x', { signal: controller.signal }).catch(e => e)
+    expect(reason).toBe('user navigated')
+  })
+})

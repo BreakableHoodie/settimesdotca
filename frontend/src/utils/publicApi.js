@@ -44,13 +44,21 @@ function isRetryableRequest(options) {
 // abort long after a completed delay cannot reject a settled promise.
 function delay(ms, signal) {
   return new Promise((resolve, reject) => {
+    // Declared before onAbort, not after. An already-aborted signal calls
+    // onAbort synchronously below, and a `const timer` declared afterwards
+    // would still be in its temporal dead zone — clearTimeout(timer) then threw
+    // a ReferenceError instead of rejecting with the abort reason, which is a
+    // different error type than every caller branches on.
+    let timer
+
     const onAbort = () => {
       clearTimeout(timer)
-      // Reject with the signal's own reason when it has one — a default abort
-      // supplies a DOMException already named AbortError. Do NOT reassign
-      // `.name` on it: DOMException exposes name as a getter only, and
-      // assigning throws in strict mode.
-      if (signal?.reason instanceof Error) {
+      // Reject with the signal's own reason whenever it has one. A default
+      // abort supplies a DOMException already named AbortError; an explicit
+      // `controller.abort('user navigated')` supplies a string, and discarding
+      // that loses the only information the caller provided. Do NOT reassign
+      // `.name` on a DOMException — it is a getter, and assigning throws.
+      if (signal?.reason !== undefined) {
         reject(signal.reason)
         return
       }
@@ -64,7 +72,7 @@ function delay(ms, signal) {
       return
     }
 
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort)
       resolve()
     }, ms)

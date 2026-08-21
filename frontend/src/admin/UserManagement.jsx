@@ -4,6 +4,7 @@ import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { usersApi } from '../utils/adminApi'
+import { filterUsers, resolveUserDisplayName, sortUsers } from './utils/userRoster'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -30,62 +31,14 @@ export default function UserManagement({ showToast }) {
   const [pendingToggle, setPendingToggle] = useState(null)
   const [pendingInviteUrl, setPendingInviteUrl] = useState(null)
 
-  const resolveDisplayName = user => {
-    if (user?.firstName || user?.lastName) {
-      return [user.firstName, user.lastName].filter(Boolean).join(' ')
-    }
-    return user?.name || ''
-  }
+  const resolveDisplayName = resolveUserDisplayName
 
-  const filteredUsers = useMemo(() => {
-    let list = users
-    if (searchTerm.trim()) {
-      const query = searchTerm.trim().toLowerCase()
-      list = list.filter(user => {
-        const name = resolveDisplayName(user).toLowerCase()
-        const email = (user.email || '').toLowerCase()
-        return name.includes(query) || email.includes(query)
-      })
-    }
-    if (roleFilter !== 'all') {
-      list = list.filter(user => user.role === roleFilter)
-    }
-    if (statusFilter !== 'all') {
-      const shouldBeActive = statusFilter === 'active'
-      list = list.filter(user => Boolean(user.isActive) === shouldBeActive)
-    }
-    return list
-  }, [users, searchTerm, roleFilter, statusFilter])
+  const filteredUsers = useMemo(
+    () => filterUsers(users, { searchTerm, roleFilter, statusFilter }),
+    [users, searchTerm, roleFilter, statusFilter]
+  )
 
-  const sortedUsers = useMemo(() => {
-    if (!sortConfig.key) return filteredUsers
-    const direction = sortConfig.direction === 'asc' ? 1 : -1
-    return [...filteredUsers].sort((a, b) => {
-      if (sortConfig.key === 'status') {
-        const aVal = a.isActive ? 1 : 0
-        const bVal = b.isActive ? 1 : 0
-        return (aVal - bVal) * direction
-      }
-      if (sortConfig.key === 'last_login') {
-        const aVal = a.last_login ? new Date(a.last_login).getTime() : 0
-        const bVal = b.last_login ? new Date(b.last_login).getTime() : 0
-        return (aVal - bVal) * direction
-      }
-      if (sortConfig.key === 'role') {
-        const order = { admin: 3, editor: 2, viewer: 1 }
-        const aVal = order[a.role] || 0
-        const bVal = order[b.role] || 0
-        return (aVal - bVal) * direction
-      }
-      if (sortConfig.key === 'email') {
-        return (a.email || '').localeCompare(b.email || '') * direction
-      }
-
-      const aVal = resolveDisplayName(a).toLowerCase()
-      const bVal = resolveDisplayName(b).toLowerCase()
-      return aVal.localeCompare(bVal) * direction
-    })
-  }, [filteredUsers, sortConfig])
+  const sortedUsers = useMemo(() => sortUsers(filteredUsers, sortConfig), [filteredUsers, sortConfig])
 
   const handleSort = key => {
     setSortConfig(prev => ({

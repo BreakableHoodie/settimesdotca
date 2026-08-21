@@ -84,8 +84,10 @@ describe('filterUsers', () => {
 
   it('does not mutate the input', () => {
     const input = [...users]
+    // Length alone misses reordering and in-place object mutation.
+    const snapshot = input.map(item => ({ ...item }))
     filterUsers(input, { searchTerm: 'jamie' })
-    expect(input).toHaveLength(3)
+    expect(input).toEqual(snapshot)
   })
 
   it('does not throw on users with missing optional fields', () => {
@@ -160,8 +162,11 @@ describe('sortUsers', () => {
 
   it('does not mutate the input array', () => {
     const users = [user(2, { firstName: 'Zebra' }), user(1, { firstName: 'Alpha' })]
+    // Full contents, not just id order: an id check misses a sort that reorders
+    // correctly while mutating an element in place.
+    const snapshot = users.map(item => ({ ...item }))
     sortUsers(users, { key: 'name', direction: 'asc' })
-    expect(users.map(u => u.id)).toEqual([2, 1])
+    expect(users).toEqual(snapshot)
   })
 
   it('does not throw on users with missing optional fields', () => {

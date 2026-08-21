@@ -236,3 +236,37 @@ describe('fetchPublicJson — abort is not a transient failure', () => {
     expect(calls).toBe(1)
   })
 })
+
+describe('fetchPublicJson preserves the error TYPE its callers branch on', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('rethrows a network failure as a TypeError, not a wrapped Error', async () => {
+    // App.jsx decides between the branded offline card and the generic error
+    // card with `err instanceof TypeError` (#595) — a fetch that never reached
+    // the server surfaces as TypeError, an HTTP error does not. Wrapping the
+    // network error here would silently turn every offline case into a generic
+    // failure card.
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/schedule?event=current')).rejects.toBeInstanceOf(TypeError)
+  })
+
+  it('throws a plain Error (NOT a TypeError) for an HTTP failure', async () => {
+    // The other half of the same branch: a 404 must not be mistaken for offline.
+    vi.stubGlobal('fetch', async () => ({
+      ok: false,
+      status: 404,
+      headers: { get: () => 'application/json' },
+      json: async () => ({ message: 'Not found' }),
+    }))
+
+    const error = await fetchPublicJson('/api/schedule?event=nope').catch(e => e)
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(TypeError)
+    expect(error.status).toBe(404)
+  })
+})

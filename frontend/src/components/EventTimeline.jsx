@@ -154,11 +154,7 @@ export default function EventTimeline() {
 
     try {
       setDetailsLoading(prev => ({ ...prev, [eventId]: true }))
-      const response = await fetch(`/api/events/${eventId}/details`)
-      if (!response.ok) {
-        throw new Error('Failed to load event details')
-      }
-      const data = await response.json()
+      const data = await fetchPublicJson(`/api/events/${eventId}/details`, {}, 'Failed to load event details')
 
       // Mark as loaded
       detailsStateRef.current[eventId] = { loading: false, loaded: true }

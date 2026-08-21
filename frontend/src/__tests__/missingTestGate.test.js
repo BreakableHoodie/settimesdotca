@@ -41,6 +41,8 @@ const MAX_UNTESTED_LINES = 400
  * Do not add to this list to make a build pass. Adding an entry means shipping
  * a large untested file, which is the thing being prevented.
  */
+const MAX_ALLOWED = 7
+
 const ALLOWED = new Set([
   'App.jsx',
   'admin/AdminPanel.jsx',
@@ -75,8 +77,8 @@ function collectTestBasenames() {
       const full = join(dir, entry.name)
       if (entry.isDirectory()) {
         visit(full)
-      } else if (/\.test\.jsx?$/.test(entry.name)) {
-        names.add(entry.name.replace(/\.test\.jsx?$/, ''))
+      } else if (/\.(test|spec)\.jsx?$/.test(entry.name)) {
+        names.add(entry.name.replace(/\.(test|spec)\.jsx?$/, ''))
       }
     }
   }
@@ -87,7 +89,7 @@ function collectTestBasenames() {
 function collectSourceFiles() {
   const files = []
   walk(SRC_ROOT, (full, name) => {
-    if (!/\.jsx?$/.test(name) || /\.test\.jsx?$/.test(name)) return
+    if (!/\.jsx?$/.test(name) || /\.(test|spec)\.jsx?$/.test(name)) return
     files.push({
       rel: relative(SRC_ROOT, full).split('\\').join('/'),
       base: name.replace(/\.jsx?$/, ''),
@@ -102,6 +104,25 @@ const sourceFiles = collectSourceFiles()
 const untestedLargeFiles = sourceFiles.filter(f => f.lines > MAX_UNTESTED_LINES && !testNames.has(f.base))
 
 describe(`no new source file over ${MAX_UNTESTED_LINES} lines ships without a test`, () => {
+  it('the allowlist cannot GROW — it is a debt register, not a bypass', () => {
+    // The hole this closes: without a cap, an author could add a new untested
+    // file to ALLOWED and both other checks pass. The unlisted-file check skips
+    // it because it IS listed, and the stale-entry check accepts it because it
+    // genuinely is still an offender. "ALLOWED can only shrink" was therefore
+    // false as originally written.
+    //
+    // MAX_ALLOWED must be lowered whenever an entry is removed, which is the
+    // same discipline as the coverage ratchets in vitest.config.js. Raising it
+    // means shipping another large untested file — do that deliberately, in a
+    // commit that says so, or not at all.
+    expect(
+      ALLOWED.size,
+      `ALLOWED has ${ALLOWED.size} entries but MAX_ALLOWED is ${MAX_ALLOWED}.\n` +
+        `Removing an entry? Lower MAX_ALLOWED to match.\n` +
+        `Adding one? Don't — write a test instead.`
+    ).toBeLessThanOrEqual(MAX_ALLOWED)
+  })
+
   it('the scan finds source and test files at all', () => {
     // Guards the guard. A walk that silently matched nothing would make every
     // assertion below pass while checking nothing.

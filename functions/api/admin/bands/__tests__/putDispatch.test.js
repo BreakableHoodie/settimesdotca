@@ -127,7 +127,10 @@ describe("PUT /api/admin/bands/:id — profile_ vs numeric dispatch", () => {
 
   it("rejects a malformed profile_ id rather than treating it as a performance", async () => {
     const { env } = seed();
-    for (const bad of ["profile_abc", "profile_0", "profile_-1", "profile_"]) {
+    // "profile_1_extra" is the one that mattered: the old parser read only the
+    // second underscore-delimited segment, so it resolved to profile 1 and would
+    // have edited a real record under a malformed id.
+    for (const bad of ["profile_abc", "profile_0", "profile_-1", "profile_", "profile_1_extra", "profile_01"]) {
       const res = await put(env, bad, { genre: "punk" });
       expect(res.status, `expected 400 for ${bad}`).toBe(400);
     }

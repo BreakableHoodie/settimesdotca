@@ -113,7 +113,11 @@ export async function onRequestPut(context) {
     let bandProfileId = null;
 
     if (isProfileUpdate) {
-      const parsed = Number(performanceId.toString().split("_")[1]);
+      // Anchored, matching the WHOLE id. `split("_")[1]` read only the second
+      // segment, so "profile_1_extra" resolved to profile 1 and would have
+      // edited it — a malformed identifier silently targeting a real record.
+      const match = /^profile_([1-9]\d*)$/.exec(performanceId.toString());
+      const parsed = match ? Number(match[1]) : NaN;
       if (!Number.isInteger(parsed) || parsed <= 0) {
         return new Response(
           JSON.stringify({

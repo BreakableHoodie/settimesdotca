@@ -65,13 +65,23 @@ export function isValidISODate(dateString) {
     return false;
   }
 
-  // Format alone is not enough: new Date('2025-02-29') rolls over to March 1
-  // rather than failing, so a parse check accepts dates that do not exist.
+  // BOTH checks are required, and they catch different things.
   //
-  // Only the leading YYYY-MM-DD is examined. ISO_DATE_REGEX also accepts a full
-  // datetime, and splitting the whole string on "-" yields NaN for the day of
-  // "2025-11-18T14:00:00Z" — which would reject every timestamp this function
-  // has always accepted.
+  // The parse rejects an impossible TIME: ISO_DATE_REGEX matches \d{2}:\d{2}
+  // shapes, so "2025-11-18T99:99:99Z" and "T14:60:00" satisfy the pattern and
+  // only Date.parse refuses them.
+  //
+  // The calendar check rejects an impossible DATE, which the parse does not:
+  // new Date('2025-02-29') rolls over to March 1 and reports itself valid.
+  //
+  // Replacing one with the other trades one bug for the other — an earlier
+  // version of this fix dropped the parse and let T99:99:99 through.
+  if (isNaN(new Date(dateString).getTime())) {
+    return false;
+  }
+
+  // Only the leading YYYY-MM-DD is examined: splitting the whole string on "-"
+  // yields NaN for the day of a full datetime.
   const [year, month, day] = dateString.slice(0, 10).split("-").map(Number);
   return isRealCalendarDate(year, month, day);
 }

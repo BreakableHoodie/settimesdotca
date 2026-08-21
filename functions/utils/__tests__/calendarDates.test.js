@@ -74,6 +74,20 @@ describe("impossible calendar dates are rejected", () => {
     expect(isValidISODate("2025-02-29T14:00:00Z")).toBe(false);
   });
 
+  it.each([
+    ["hour 99", "2025-11-18T99:99:99Z"],
+    ["minute 60", "2025-11-18T14:60:00Z"],
+    ["hour 25", "2025-11-18T25:00:00Z"],
+    ["offset +99:99", "2025-11-18T14:00:00+99:99"],
+  ])("rejects an impossible TIME: %s", (_label, value) => {
+    // Regression guard. ISO_DATE_REGEX matches the \d{2}:\d{2} shape, so these
+    // satisfy the pattern and only the parse refuses them. An earlier version of
+    // the calendar fix REPLACED the parse rather than adding to it, which fixed
+    // impossible dates and let impossible times through — one bug traded for
+    // another. Both checks are load-bearing and neither subsumes the other.
+    expect(isValidISODate(value)).toBe(false);
+  });
+
   it("still rejects malformed input rather than throwing", () => {
     for (const bad of ["", null, undefined, "not-a-date", "2025-6-15", "20250615", 20250615]) {
       expect(isValidISODate(bad)).toBe(false);

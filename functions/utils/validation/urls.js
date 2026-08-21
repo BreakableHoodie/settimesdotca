@@ -65,6 +65,42 @@ function sanitizeOptionalHandleOrUrl(value, maxLength, label) {
   return sanitizeOptionalHandle(text, maxLength, label);
 }
 
+/**
+ * Query params stripped from every stored URL.
+ *
+ * From AGENTS.md's clean-links doctrine, which names this exact list:
+ * `si`, `dlsi`, `nd`, `utm_*`, `from`. Exported so the guard test can assert
+ * the implementation against the doctrine rather than against a copy of it.
+ *
+ * `si` is what Spotify's and YouTube's own share buttons append, so this fires
+ * on the DEFAULT paste, not an edge case.
+ *
+ * Anything not listed is preserved deliberately — `?t=120` on a YouTube link is
+ * a timestamp the artist chose, not tracking.
+ */
+export const TRACKING_PARAMS = new Set(["si", "dlsi", "nd", "from"]);
+
+/** `utm_source`, `utm_medium`, and friends — matched by prefix, not enumerated. */
+export const TRACKING_PARAM_PREFIXES = ["utm_"];
+
+function isTrackingParam(name) {
+  const key = name.toLowerCase();
+  return TRACKING_PARAMS.has(key) || TRACKING_PARAM_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+/**
+ * Remove tracking params in place. Mutating the URL's own searchParams keeps
+ * every other part of the URL — path, hash, remaining query order — untouched.
+ */
+function stripTrackingParams(parsed) {
+  for (const name of [...parsed.searchParams.keys()]) {
+    if (isTrackingParam(name)) {
+      parsed.searchParams.delete(name);
+    }
+  }
+  return parsed;
+}
+
 export function normalizeHttpUrl(url) {
   if (!url || typeof url !== "string") {
     return null;
@@ -80,7 +116,7 @@ export function normalizeHttpUrl(url) {
     if (!ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
       return null;
     }
-    return parsed.toString();
+    return stripTrackingParams(parsed).toString();
   } catch {
     return null;
   }

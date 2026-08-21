@@ -21,6 +21,40 @@ const DOORS_TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
  * @param {string} dateString - Date string to validate
  * @returns {boolean} True if valid ISO date format
  */
+/**
+ * True when a YYYY-MM-DD string names a date that actually exists.
+ *
+ * The trap this exists for: `new Date('2025-02-29')` does not fail, it rolls
+ * over to March 1 and reports itself valid. So a format check plus a parse
+ * check accepts 2025-02-29 and 2025-04-31 — the value is then stored as typed
+ * while meaning a different day, and never matches a real event date under this
+ * repo's lexicographic YYYY-MM-DD comparisons.
+ *
+ * `new Date(year, month, 0).getDate()` gives the last day of `month` (month is
+ * 1-based here because day 0 rolls back from the following month), which is
+ * leap-year correct without a hand-written February rule.
+ *
+ * Shared so `isValidISODate` and `validateDate` cannot disagree about which
+ * dates exist — they did: validateDate rejected 2025-02-29 while isValidISODate
+ * accepted it.
+ *
+ * @param {number} year
+ * @param {number} month - 1-12
+ * @param {number} day
+ * @returns {boolean}
+ */
+export function isRealCalendarDate(year, month, day) {
+  if (month < 1 || month > 12) {
+    return false;
+  }
+  // setFullYear rather than the Date constructor: `new Date(year, ...)` remaps
+  // years 0-99 to 1900-1999, so year 0 was evaluated as 1900 — which is not a
+  // leap year, while year 0 is (divisible by 400). That rejected 0000-02-29.
+  const probe = new Date(0);
+  probe.setFullYear(year, month, 0);
+  return day >= 1 && day <= probe.getDate();
+}
+
 export function isValidISODate(dateString) {
   if (!dateString || typeof dateString !== "string") {
     return false;
@@ -31,9 +65,25 @@ export function isValidISODate(dateString) {
     return false;
   }
 
-  // Then verify it's a valid date that can be parsed
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
+  // BOTH checks are required, and they catch different things.
+  //
+  // The parse rejects an impossible TIME: ISO_DATE_REGEX matches \d{2}:\d{2}
+  // shapes, so "2025-11-18T99:99:99Z" and "T14:60:00" satisfy the pattern and
+  // only Date.parse refuses them.
+  //
+  // The calendar check rejects an impossible DATE, which the parse does not:
+  // new Date('2025-02-29') rolls over to March 1 and reports itself valid.
+  //
+  // Replacing one with the other trades one bug for the other — an earlier
+  // version of this fix dropped the parse and let T99:99:99 through.
+  if (isNaN(new Date(dateString).getTime())) {
+    return false;
+  }
+
+  // Only the leading YYYY-MM-DD is examined: splitting the whole string on "-"
+  // yields NaN for the day of a full datetime.
+  const [year, month, day] = dateString.slice(0, 10).split("-").map(Number);
+  return isRealCalendarDate(year, month, day);
 }
 
 /**
@@ -135,12 +185,15 @@ export function validateDate(dateString) {
     return { valid: false, error: "Month must be between 01 and 12", date: null };
   }
 
-  // Check day (accounting for month lengths and leap years)
-  const daysInMonth = new Date(year, month, 0).getDate();
-  if (day < 1 || day > daysInMonth) {
+  // Check day. Shares isRealCalendarDate with isValidISODate so the two cannot
+  // disagree about which dates exist; the specific day count is recomputed here
+  // only to name it in the error message.
+  if (!isRealCalendarDate(year, month, day)) {
+    const probe = new Date(0);
+    probe.setFullYear(year, month, 0);
     return {
       valid: false,
-      error: `Day must be between 01 and ${daysInMonth} for this month`,
+      error: `Day must be between 01 and ${probe.getDate()} for this month`,
       date: null,
     };
   }

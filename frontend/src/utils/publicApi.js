@@ -56,6 +56,15 @@ export async function fetchPublicJson(url, options = {}, fallbackMessage = 'API 
     try {
       response = await fetch(url, options)
     } catch (networkError) {
+      // An abort is a deliberate cancellation, not a transient failure. Retrying
+      // one means a component that unmounted mid-flight waits RETRY_DELAY_MS and
+      // fires a second request that can only fail again — measured at 2 calls and
+      // ~600ms before this guard. Checked by name AND by the signal, because a
+      // signal aborted between attempts produces a plain rejection on some
+      // runtimes rather than a named AbortError.
+      if (networkError?.name === 'AbortError' || options.signal?.aborted) {
+        throw networkError
+      }
       if (canRetry && !isFinalAttempt) {
         await delay(RETRY_DELAY_MS)
         continue

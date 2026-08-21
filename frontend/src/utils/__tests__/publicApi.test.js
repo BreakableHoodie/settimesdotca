@@ -155,3 +155,84 @@ describe('fetchPublicJson', () => {
     })
   })
 })
+
+describe('fetchPublicJson — abort is not a transient failure', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does NOT retry an aborted request', async () => {
+    // Before this guard: 2 fetch calls and a ~600ms delay. A component that
+    // unmounted mid-flight fired a second request that could only fail again.
+    // App.jsx's schedule load passes an AbortSignal, so this is the real path.
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      const error = new Error('The operation was aborted.')
+      error.name = 'AbortError'
+      throw error
+    })
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(fetchPublicJson('/api/x', { signal: controller.signal })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+
+  it('does NOT retry when the signal aborted without a named AbortError', async () => {
+    // Some runtimes reject with a plain error when a signal aborts between
+    // attempts, so the guard checks the signal as well as the name.
+    let calls = 0
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      controller.abort()
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/x', { signal: controller.signal })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+
+  it('STILL retries a genuine network error — the guard must not disable retry', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/x')).rejects.toThrow()
+    expect(calls).toBe(2)
+  })
+
+  it('STILL retries a 5xx', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      // Plain stub rather than `new Response` — the frontend ESLint env does not
+      // declare it, and only these four members are read.
+      return {
+        ok: false,
+        status: 503,
+        headers: { get: () => 'application/json' },
+        json: async () => ({}),
+      }
+    })
+
+    await expect(fetchPublicJson('/api/x')).rejects.toThrow()
+    expect(calls).toBe(2)
+  })
+
+  it('never retries a mutation, aborted or not', async () => {
+    // A retried POST can double a side effect. This was already true; asserting
+    // it so the abort guard cannot be "simplified" into changing it.
+    let calls = 0
+    vi.stubGlobal('fetch', async () => {
+      calls++
+      throw new TypeError('Failed to fetch')
+    })
+
+    await expect(fetchPublicJson('/api/x', { method: 'POST' })).rejects.toThrow()
+    expect(calls).toBe(1)
+  })
+})

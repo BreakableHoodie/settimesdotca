@@ -24,6 +24,7 @@ import { saveSelectedBands } from './utils/scheduleStorage'
 import { resolveRouteDiff } from './utils/routeDiff'
 import RouteDiffSection from './components/RouteDiffSection'
 import { useSharedRouteImport } from './hooks/useSharedRouteImport'
+import { fetchPublicJson } from './utils/publicApi'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 const TIME_FILTERS_STORAGE_KEY = 'timeFiltersByEvent'
@@ -189,15 +190,16 @@ function App() {
       try {
         // Try API endpoint first - use slug from URL or 'current' for default
         const eventParam = slug || 'current'
-        const apiRes = await fetch(`/api/schedule?event=${eventParam}`, {
-          signal: controller.signal,
-        })
-
-        if (!apiRes.ok) {
-          throw new Error(`Failed to load schedule (HTTP ${apiRes.status})`)
-        }
-
-        const data = await apiRes.json()
+        // fetchPublicJson retries once on a transient network error or 5xx,
+        // and rethrows the original error otherwise — so the TypeError that the
+        // offline check below depends on still arrives as a TypeError. Aborts
+        // are never retried, which matters here because this effect aborts on
+        // unmount and on every slug change.
+        const data = await fetchPublicJson(
+          `/api/schedule?event=${eventParam}`,
+          { signal: controller.signal },
+          'Failed to load schedule'
+        )
         // API response can be { bands: [...], event: {...} } or just [...]
         const bandsData = Array.isArray(data) ? data : data.bands
         const eventInfo = data.event || null

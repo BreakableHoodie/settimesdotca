@@ -499,13 +499,21 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
   // fetch(), not fetchPublicJson, so it gets its own minimal mock rather than
   // the shared fetchPublicJson mock above.
   it('App (/event/:slug)', async () => {
+    // App loads the schedule through fetchPublicJson, which this file mocks at
+    // the module level and resets in beforeEach — so the payload must be set
+    // here, not on a raw global.fetch stub. The stub is kept as well: other
+    // components mounted by this route still call fetch directly.
+    const schedulePayload = {
+      bands: [],
+      event: { id: 1, name: 'LWBC Vol17', slug: 'lwbc17', date: '2026-08-02', end_date: null, city: 'Kitchener' },
+    }
+    fetchPublicJson.mockResolvedValue(schedulePayload)
     const originalFetch = global.fetch
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({
-        bands: [],
-        event: { id: 1, name: 'LWBC Vol17', slug: 'lwbc17', date: '2026-08-02', end_date: null, city: 'Kitchener' },
-      }),
+      status: 200,
+      headers: { get: () => 'application/json' },
+      json: async () => schedulePayload,
     })
     seedSsrHead('/event/lwbc17', 'LWBC Vol17 — Set Times & Lineup in Kitchener | SetTimes')
 

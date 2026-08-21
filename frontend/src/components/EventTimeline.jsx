@@ -51,6 +51,12 @@ export default function EventTimeline() {
   const pollRef = useRef(null)
   // Track loading/loaded state to prevent duplicate fetches
   const detailsStateRef = useRef({})
+  // In-flight detail requests, so unmount can cancel them. Needed because
+  // fetchPublicJson retries a transient failure: without a signal, a retry
+  // fires after unmount and calls setDetailsLoading/setDetailsById on a dead
+  // component. Raw fetch could not retry, so adoption is what made this
+  // reachable.
+  const detailControllersRef = useRef(new Map())
 
   useEffect(() => {
     const fetchTimeline = async (isSilent = false) => {
@@ -104,9 +110,14 @@ export default function EventTimeline() {
     startPolling()
     document.addEventListener('visibilitychange', handleVisibility)
 
+    const detailControllers = detailControllersRef.current
     return () => {
       stopPolling()
       document.removeEventListener('visibilitychange', handleVisibility)
+      for (const controller of detailControllers.values()) {
+        controller.abort()
+      }
+      detailControllers.clear()
     }
   }, [])
 
@@ -154,11 +165,13 @@ export default function EventTimeline() {
 
     try {
       setDetailsLoading(prev => ({ ...prev, [eventId]: true }))
-      const response = await fetch(`/api/events/${eventId}/details`)
-      if (!response.ok) {
-        throw new Error('Failed to load event details')
-      }
-      const data = await response.json()
+      const controller = new AbortController()
+      detailControllersRef.current.set(eventId, controller)
+      const data = await fetchPublicJson(
+        `/api/events/${eventId}/details`,
+        { signal: controller.signal },
+        'Failed to load event details'
+      )
 
       // Mark as loaded
       detailsStateRef.current[eventId] = { loading: false, loaded: true }
@@ -171,10 +184,20 @@ export default function EventTimeline() {
         setDetailsById(prev => ({ ...prev, [eventId]: data }))
       })
     } catch (err) {
+      // An abort is this component unmounting, not a failure. Logging it and
+      // calling setState here would be noise on a dead component — the exact
+      // thing the controller exists to prevent.
+      if (err?.name === 'AbortError') {
+        return
+      }
       console.error('Error fetching event details:', err)
       // Reset loading state on error to allow retry
       detailsStateRef.current[eventId] = { loading: false, loaded: false }
       setDetailsLoading(prev => ({ ...prev, [eventId]: false }))
+    } finally {
+      // Settled either way — drop the controller so the map does not grow with
+      // one entry per expanded event for the life of the page.
+      detailControllersRef.current.delete(eventId)
     }
   }, [])
 

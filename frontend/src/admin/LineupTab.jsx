@@ -8,23 +8,25 @@ import BulkPreviewModal from './BulkPreviewModal'
 import BulkBandImport from './BulkBandImport'
 import ArtistPicker from './components/ArtistPicker'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
 import { parseOrigin } from '../utils/parseOrigin'
-import { sortableName } from '../utils/sortableName'
 import {
-  adjustForMidnight,
   calculateEndTimeFromDuration,
   calculateStartTimeFromDuration,
   deriveDurationMinutes,
   detectConflicts,
   formatDurationLabel,
   formatTimeRangeLabel,
-  parseTimeToMinutes,
   resolveFestivalDay,
-  sortBandsByStart,
 } from './utils/timeUtils'
 import { buildPickerFormData, buildEmptyPickerFormData } from './utils/pickerFormData'
 import { buildDayOptions, isMultiDayEvent } from './utils/dayOptions'
+import {
+  buildDayNumberMap,
+  deriveGenreSuggestions,
+  deriveOriginSuggestions,
+  filterRosterBands,
+  sortRosterBands,
+} from './utils/lineupRoster'
 import { formatFestivalDate } from '../utils/festivalDays'
 
 function SortIcon({ col, sortConfig }) {
@@ -137,42 +139,9 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     [allBands]
   )
 
-  const originCitySuggestions = useMemo(() => {
-    const values = new Set()
-    allBands.forEach(band => {
-      if (band.origin_city) values.add(band.origin_city)
-      if (!band.origin_city && band.origin) {
-        const parsed = parseOrigin(band.origin)
-        if (parsed.city) values.add(parsed.city)
-      }
-    })
-    return Array.from(values).sort((a, b) => a.localeCompare(b))
-  }, [allBands])
-
-  const originRegionSuggestions = useMemo(() => {
-    const values = new Set()
-    allBands.forEach(band => {
-      if (band.origin_region) values.add(band.origin_region)
-      if (!band.origin_region && band.origin) {
-        const parsed = parseOrigin(band.origin)
-        if (parsed.region) values.add(parsed.region)
-      }
-    })
-    return Array.from(values).sort((a, b) => a.localeCompare(b))
-  }, [allBands])
-
-  const genreSuggestions = useMemo(() => {
-    const values = []
-    allBands.forEach(band => {
-      if (!band.genre) return
-      band.genre
-        .split(',')
-        .map(entry => entry.trim())
-        .filter(Boolean)
-        .forEach(entry => values.push(entry))
-    })
-    return getNormalizedGenreSuggestions(values, DEFAULT_GENRES)
-  }, [allBands])
+  const originCitySuggestions = useMemo(() => deriveOriginSuggestions(allBands, 'city'), [allBands])
+  const originRegionSuggestions = useMemo(() => deriveOriginSuggestions(allBands, 'region'), [allBands])
+  const genreSuggestions = useMemo(() => deriveGenreSuggestions(allBands), [allBands])
 
   // Multi-day events (#540): the per-set day selector is shown only when the
   // event spans more than one calendar day (string comparison — never
@@ -502,68 +471,18 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   // interior festival day has no performances yet (mid-setup). A
   // performance_date outside the event's [date, end_date] range has no
   // calendar day number; render '?' rather than "Day undefined".
-  const dayNumberMap = useMemo(() => new Map(dayOptions.map((opt, index) => [opt.value, index + 1])), [dayOptions])
+  const dayNumberMap = useMemo(() => buildDayNumberMap(dayOptions), [dayOptions])
   const dayNumberLabel = useCallback(date => dayNumberMap.get(date) ?? '?', [dayNumberMap])
 
-  const filteredBands = useMemo(() => {
-    let next = bands
-    if (searchTerm.trim()) {
-      const query = searchTerm.trim().toLowerCase()
-      next = next.filter(band => band.name?.toLowerCase().includes(query))
-    }
-    if (venueFilter !== 'all') {
-      next = next.filter(band => String(band.venue_id) === String(venueFilter))
-    }
-    if (isMultiDay && dayFilter !== 'all') {
-      next = next.filter(band => bandFestivalDate(band) === dayFilter)
-    }
-    return next
-  }, [bands, searchTerm, venueFilter, isMultiDay, dayFilter, bandFestivalDate])
+  const filteredBands = useMemo(
+    () => filterRosterBands(bands, { searchTerm, venueFilter, dayFilter, isMultiDay, bandFestivalDate }),
+    [bands, searchTerm, venueFilter, isMultiDay, dayFilter, bandFestivalDate]
+  )
 
-  const sortedBands = useMemo(() => {
-    if (!sortConfig.key) {
-      return sortBandsByStart(filteredBands)
-    }
-
-    const direction = sortConfig.direction === 'asc' ? 1 : -1
-
-    return [...filteredBands].sort((a, b) => {
-      if (sortConfig.key === 'name') {
-        // Article-stripped alphabetization (#587) — "The Anti-Queens" sorts under A.
-        const aVal = sortableName(a.name)
-        const bVal = sortableName(b.name)
-        return aVal.localeCompare(bVal) * direction
-      }
-      if (sortConfig.key === 'venue') {
-        const aVal = getVenueName(a.venue_id).toLowerCase()
-        const bVal = getVenueName(b.venue_id).toLowerCase()
-        return aVal.localeCompare(bVal) * direction
-      }
-      if (sortConfig.key === 'duration') {
-        const aVal = deriveDurationMinutes(a.start_time, a.end_time) || 0
-        const bVal = deriveDurationMinutes(b.start_time, b.end_time) || 0
-        return (aVal - bVal) * direction
-      }
-      if (sortConfig.key === 'performance_date') {
-        // Plain YYYY-MM-DD string comparison sorts chronologically (#588) —
-        // same convention as festivalDays.js's orderedFestivalDays. NULL
-        // performance_date resolves to the event start date via
-        // bandFestivalDate, never re-deriving the fallback locally.
-        const aVal = bandFestivalDate(a) || ''
-        const bVal = bandFestivalDate(b) || ''
-        return aVal.localeCompare(bVal) * direction
-      }
-
-      const aMin = parseTimeToMinutes(a.start_time)
-      const bMin = parseTimeToMinutes(b.start_time)
-      if (aMin == null && bMin == null) return 0
-      if (aMin == null) return 1
-      if (bMin == null) return -1
-      const aAdj = adjustForMidnight(aMin)
-      const bAdj = adjustForMidnight(bMin)
-      return (aAdj - bAdj) * direction
-    })
-  }, [filteredBands, sortConfig, getVenueName, bandFestivalDate])
+  const sortedBands = useMemo(
+    () => sortRosterBands(filteredBands, sortConfig, { getVenueName, bandFestivalDate }),
+    [filteredBands, sortConfig, getVenueName, bandFestivalDate]
+  )
 
   const handleSort = key => {
     setSortConfig(prev => ({

@@ -201,8 +201,47 @@ export async function onRequestGet(context) {
       // RosterTab and LineupTab's ArtistPicker key off `band_profile_id`).
       {
         const today = eventLocalFestivalToday();
+        // #907 — next_event_*/last_event_* used to be six correlated
+        // subqueries (three identical trios differing only in the projected
+        // column), each building its own TEMP B-TREE FOR ORDER BY per row —
+        // up to ~4,000 subquery executions at the 500-row cap. Rewritten as
+        // two window-function passes: next_ev/last_ev each rank a band's
+        // events once (ROW_NUMBER() OVER PARTITION BY band_profile_id), and
+        // the outer query just LEFT JOINs the rn = 1 row per side. Same
+        // predicates, same tie-break ordering, same NULL-when-absent
+        // behaviour (LEFT JOIN with no match leaves every next_ev.*/last_ev.*
+        // column NULL) — only the execution shape changed, not the result.
+        // `today` is now bound twice (once per CTE) instead of six times.
         result = await DB.prepare(
           `
+        WITH next_ev AS (
+          SELECT
+            perf.band_profile_id AS band_profile_id,
+            e.id AS event_id,
+            e.name AS event_name,
+            e.date AS event_date,
+            ROW_NUMBER() OVER (
+              PARTITION BY perf.band_profile_id
+              ORDER BY e.date ASC, e.id ASC
+            ) AS rn
+          FROM performances perf
+          JOIN events e ON perf.event_id = e.id
+          WHERE COALESCE(e.end_date, e.date) >= ?
+        ),
+        last_ev AS (
+          SELECT
+            perf.band_profile_id AS band_profile_id,
+            e.id AS event_id,
+            e.name AS event_name,
+            e.date AS event_date,
+            ROW_NUMBER() OVER (
+              PARTITION BY perf.band_profile_id
+              ORDER BY COALESCE(e.end_date, e.date) DESC, e.id DESC
+            ) AS rn
+          FROM performances perf
+          JOIN events e ON perf.event_id = e.id
+          WHERE COALESCE(e.end_date, e.date) < ?
+        )
         SELECT
           'profile_' || bp.id as id,
           bp.id as band_profile_id,
@@ -219,53 +258,19 @@ export async function onRequestGet(context) {
           bp.social_links,
           (SELECT COUNT(*) FROM band_follows bf WHERE bf.band_profile_id = bp.id AND bf.verified = 1) AS follower_count,
           (SELECT GROUP_CONCAT(DISTINCT perf.event_id) FROM performances perf WHERE perf.band_profile_id = bp.id) AS event_ids,
-          (
-            SELECT e.id FROM events e
-            JOIN performances perf ON perf.event_id = e.id
-            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) >= ?
-            ORDER BY e.date ASC, e.id ASC
-            LIMIT 1
-          ) AS next_event_id,
-          (
-            SELECT e.name FROM events e
-            JOIN performances perf ON perf.event_id = e.id
-            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) >= ?
-            ORDER BY e.date ASC, e.id ASC
-            LIMIT 1
-          ) AS next_event_name,
-          (
-            SELECT e.date FROM events e
-            JOIN performances perf ON perf.event_id = e.id
-            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) >= ?
-            ORDER BY e.date ASC, e.id ASC
-            LIMIT 1
-          ) AS next_event_date,
-          (
-            SELECT e.id FROM events e
-            JOIN performances perf ON perf.event_id = e.id
-            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) < ?
-            ORDER BY COALESCE(e.end_date, e.date) DESC, e.id DESC
-            LIMIT 1
-          ) AS last_event_id,
-          (
-            SELECT e.name FROM events e
-            JOIN performances perf ON perf.event_id = e.id
-            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) < ?
-            ORDER BY COALESCE(e.end_date, e.date) DESC, e.id DESC
-            LIMIT 1
-          ) AS last_event_name,
-          (
-            SELECT e.date FROM events e
-            JOIN performances perf ON perf.event_id = e.id
-            WHERE perf.band_profile_id = bp.id AND COALESCE(e.end_date, e.date) < ?
-            ORDER BY COALESCE(e.end_date, e.date) DESC, e.id DESC
-            LIMIT 1
-          ) AS last_event_date
+          next_ev.event_id AS next_event_id,
+          next_ev.event_name AS next_event_name,
+          next_ev.event_date AS next_event_date,
+          last_ev.event_id AS last_event_id,
+          last_ev.event_name AS last_event_name,
+          last_ev.event_date AS last_event_date
         FROM band_profiles bp
+        LEFT JOIN next_ev ON next_ev.band_profile_id = bp.id AND next_ev.rn = 1
+        LEFT JOIN last_ev ON last_ev.band_profile_id = bp.id AND last_ev.rn = 1
         ORDER BY bp.name
       `,
         )
-          .bind(today, today, today, today, today, today)
+          .bind(today, today)
           .all();
       }
     }

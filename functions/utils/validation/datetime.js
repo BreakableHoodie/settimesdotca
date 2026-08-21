@@ -47,8 +47,12 @@ export function isRealCalendarDate(year, month, day) {
   if (month < 1 || month > 12) {
     return false;
   }
-  const daysInMonth = new Date(year, month, 0).getDate();
-  return day >= 1 && day <= daysInMonth;
+  // setFullYear rather than the Date constructor: `new Date(year, ...)` remaps
+  // years 0-99 to 1900-1999, so year 0 was evaluated as 1900 — which is not a
+  // leap year, while year 0 is (divisible by 400). That rejected 0000-02-29.
+  const probe = new Date(0);
+  probe.setFullYear(year, month, 0);
+  return day >= 1 && day <= probe.getDate();
 }
 
 export function isValidISODate(dateString) {
@@ -175,10 +179,11 @@ export function validateDate(dateString) {
   // disagree about which dates exist; the specific day count is recomputed here
   // only to name it in the error message.
   if (!isRealCalendarDate(year, month, day)) {
-    const daysInMonth = new Date(year, month, 0).getDate();
+    const probe = new Date(0);
+    probe.setFullYear(year, month, 0);
     return {
       valid: false,
-      error: `Day must be between 01 and ${daysInMonth} for this month`,
+      error: `Day must be between 01 and ${probe.getDate()} for this month`,
       date: null,
     };
   }

@@ -40,6 +40,15 @@ describe("impossible calendar dates are rejected", () => {
     expect(isValidISODate(date)).toBe(true);
   });
 
+  it("handles ISO years 0000-0099 without Date remapping them to 1900-1999", () => {
+    // `new Date(year, month, 0)` maps year 0 to 1900, which is NOT a leap year
+    // while year 0 IS (divisible by 400) — so 0000-02-29 was wrongly rejected.
+    // setFullYear sets the literal year instead.
+    expect(isValidISODate("0000-02-29")).toBe(true);
+    expect(isValidISODate("0099-02-29")).toBe(false);
+    expect(isValidISODate("0004-02-29")).toBe(true);
+  });
+
   it("rejects a century year that is NOT a leap year", () => {
     // 1900 is divisible by 4 but not a leap year — the case a hand-written
     // `year % 4 === 0` rule gets wrong.

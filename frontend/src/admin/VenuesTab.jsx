@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { venuesApi } from '../utils/adminApi'
 import { FIELD_LIMITS } from '../utils/validation'
+import { filterVenues, formatVenueAddress, sortVenues } from './utils/venueRoster'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -144,13 +145,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const formatAddress = venue => {
-    if (!venue) return ''
-    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(', ')
-    const line2 = [venue.city, venue.region].filter(Boolean).join(', ')
-    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(' ').trim()
-    return [line1, line2, line3].filter(Boolean).join(', ') || venue.address || ''
-  }
+  const formatAddress = formatVenueAddress
 
   const regionSuggestions = [
     'AB',
@@ -220,39 +215,9 @@ export default function VenuesTab({ showToast, readOnly = false }) {
 
   const countrySuggestions = ['Canada', 'United States']
 
-  const filteredVenues = useMemo(() => {
-    if (!searchTerm.trim()) return venues
-    const query = searchTerm.trim().toLowerCase()
-    return venues.filter(venue => {
-      const addressText = formatAddress(venue).toLowerCase()
-      return (
-        venue.name?.toLowerCase().includes(query) ||
-        addressText.includes(query) ||
-        venue.city?.toLowerCase().includes(query) ||
-        venue.region?.toLowerCase().includes(query) ||
-        venue.contact_email?.toLowerCase().includes(query) ||
-        venue.phone?.toLowerCase().includes(query)
-      )
-    })
-  }, [venues, searchTerm])
+  const filteredVenues = useMemo(() => filterVenues(venues, searchTerm), [venues, searchTerm])
 
-  const sortedVenues = useMemo(() => {
-    if (!sortConfig.key) return filteredVenues
-    const direction = sortConfig.direction === 'asc' ? 1 : -1
-    return [...filteredVenues].sort((a, b) => {
-      if (sortConfig.key === 'band_count') {
-        return ((a.band_count || 0) - (b.band_count || 0)) * direction
-      }
-      if (sortConfig.key === 'address') {
-        const aVal = formatAddress(a).toLowerCase()
-        const bVal = formatAddress(b).toLowerCase()
-        return aVal.localeCompare(bVal) * direction
-      }
-      const aVal = (a[sortConfig.key] || '').toLowerCase()
-      const bVal = (b[sortConfig.key] || '').toLowerCase()
-      return aVal.localeCompare(bVal) * direction
-    })
-  }, [filteredVenues, sortConfig])
+  const sortedVenues = useMemo(() => sortVenues(filteredVenues, sortConfig), [filteredVenues, sortConfig])
 
   const handleSort = key => {
     setSortConfig(prev => ({

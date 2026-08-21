@@ -75,6 +75,58 @@ async function fetchRoster(env) {
   return res.json();
 }
 
+describe("admin roster ordering mechanics (#907)", () => {
+  it("uses COALESCE(end_date, date), so a multi-day event still running counts as NEXT", async () => {
+    // The distinguishing case. This event STARTED in the past but ends far in
+    // the future. Under COALESCE(end_date, date) >= today it is upcoming; under
+    // a plain `date >= today` it would be classified as past instead.
+    //
+    // Without this fixture the CTE could drop the COALESCE entirely and every
+    // other assertion would still pass, because every other event has a NULL
+    // end_date where the two expressions agree.
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const spanning = insertEvent(rawDb, {
+      name: "Still Running",
+      slug: "still-running",
+      date: "2020-01-01",
+      end_date: "2099-01-01",
+    });
+    const venue = insertVenue(rawDb, { name: "Hall" });
+    insertBand(rawDb, { name: "Spanning Band", event_id: spanning.id, venue_id: venue.id });
+
+    const body = await fetchRoster(env);
+    const row = body.bands.find((b) => b.name === "Spanning Band");
+
+    expect(row.next_event_name).toBe("Still Running");
+    expect(row.last_event_id).toBeNull();
+  });
+
+  it("breaks a same-date tie by event id — lowest for next, highest for last", async () => {
+    // Every other fixture uses unique dates, so the ORDER BY's second term
+    // (e.id ASC / e.id DESC) is never exercised. Two events sharing a date make
+    // the tie-break the only thing deciding the answer.
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const venue = insertVenue(rawDb, { name: "Hall" });
+
+    const futureLow = insertEvent(rawDb, { name: "Future A", slug: "future-a", date: "2099-05-05" });
+    const futureHigh = insertEvent(rawDb, { name: "Future B", slug: "future-b", date: "2099-05-05" });
+    const pastLow = insertEvent(rawDb, { name: "Past A", slug: "past-a", date: "2020-05-05" });
+    const pastHigh = insertEvent(rawDb, { name: "Past B", slug: "past-b", date: "2020-05-05" });
+
+    for (const ev of [futureLow, futureHigh, pastLow, pastHigh]) {
+      insertBand(rawDb, { name: "Tied Band", event_id: ev.id, venue_id: venue.id });
+    }
+
+    const body = await fetchRoster(env);
+    const row = body.bands.find((b) => b.name === "Tied Band");
+
+    // Ascending for next: the lower id wins.
+    expect(row.next_event_id).toBe(Math.min(futureLow.id, futureHigh.id));
+    // Descending for last: the higher id wins.
+    expect(row.last_event_id).toBe(Math.max(pastLow.id, pastHigh.id));
+  });
+});
+
 describe("admin roster response shape (#907 rewrite guard)", () => {
   it("returns one row per band profile, not one per performance", async () => {
     // The LIMIT+JOIN truncation class: a join-multiplied roster once hid 47 of

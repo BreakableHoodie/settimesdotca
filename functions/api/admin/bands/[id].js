@@ -362,6 +362,7 @@ export async function onRequestPut(context) {
     // Build dynamic update query based on provided fields
     const updates = [];
     const params = [];
+    const writeStatements = [];
 
     // Handle profile updates (name, url, and other profile fields)
     if (
@@ -488,9 +489,9 @@ export async function onRequestPut(context) {
 
       if (profileUpdates.length > 0) {
         profileParams.push(performance.band_profile_id);
-        await DB.prepare(`UPDATE band_profiles SET ${profileUpdates.join(", ")} WHERE id = ?`)
-          .bind(...profileParams)
-          .run();
+        writeStatements.push(
+          DB.prepare(`UPDATE band_profiles SET ${profileUpdates.join(", ")} WHERE id = ?`).bind(...profileParams),
+        );
       }
     }
 
@@ -522,22 +523,25 @@ export async function onRequestPut(context) {
         // Add performance ID as final parameter
         params.push(realPerformanceId);
 
-        // Update performance
-        await DB.prepare(
-          `
+        writeStatements.push(
+          DB.prepare(
+            `
             UPDATE performances
             SET ${updates.join(", ")}
             WHERE id = ?
             `,
-        )
-          .bind(...params)
-          .run();
+          ).bind(...params),
+        );
       }
     } else {
       // If we are updating a profile-only entry, we might be trying to convert it to a performance?
       // But this PUT endpoint usually just updates fields.
       // The BandForm doesn't support "assigning to event" from the Edit modal easily yet.
       // So we ignore performance fields here if it's a profile update (for safety).
+    }
+
+    if (writeStatements.length > 0) {
+      await DB.batch(writeStatements);
     }
 
     // Fetch updated result

@@ -161,10 +161,8 @@ describe("PUT /api/admin/bands/:id — profile_ vs numeric dispatch", () => {
 });
 
 describe("DELETE /api/admin/bands/:id — the same parser, the same trap", () => {
-  // PUT and DELETE parse `profile_<n>` independently and had DRIFTED: PUT was
-  // fixed first while DELETE kept `split("_")[1]`. On this path the consequence
-  // is worse than a wrong edit — "profile_1_extra" resolved to profile 1 and
-  // would have DELETED it. Both now share parseProfileId.
+  // DELETE shares PUT's profile-id parser, and must: an unanchored parse here
+  // resolves "profile_1_extra" to profile 1 and deletes it (#935).
   function del(env, id) {
     return onRequestDelete({
       request: new Request(`https://example.test/api/admin/bands/${id}`, { method: "DELETE" }),

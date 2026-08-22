@@ -36,21 +36,17 @@ async function getEventForPerformance(DB, performanceId) {
 
 // PUT - Update band
 /**
- * Parse a `profile_<n>` id, or return null if it is not one.
+ * Parse a `profile_<n>` id, or return null if it is not one (#935).
  *
- * Anchored on the WHOLE string. `split("_")[1]` read only the second segment,
- * so "profile_1_extra" resolved to profile 1 — a malformed identifier silently
- * addressing a real record. On the DELETE path that meant deleting it.
+ * Anchored on the WHOLE string: an unanchored parse lets "profile_1_extra"
+ * resolve to profile 1, addressing a real record under a malformed id — on the
+ * DELETE path, deleting it.
  *
- * isSafeInteger, not isInteger: Number("9007199254740993") silently becomes
- * ...992, so past 2^53 an id resolves to a DIFFERENT record while still looking
- * like a valid integer.
+ * isSafeInteger, not isInteger: past 2^53 Number() aliases a value onto a
+ * different integer, so the id would resolve to a different record while still
+ * looking valid.
  *
- * One implementation because there are two call sites (PUT and DELETE) and they
- * had already drifted — PUT was fixed first and DELETE kept the unsafe parse.
- *
- * @param {unknown} rawId
- * @returns {number|null}
+ * Shared by PUT and DELETE; both must use it.
  */
 function parseProfileId(rawId) {
   const match = /^profile_([1-9]\d*)$/.exec(String(rawId ?? ""));
@@ -214,15 +210,11 @@ export async function onRequestPut(context) {
           { status: 404, headers: { "Content-Type": "application/json" } },
         );
       }
-      // Deliberately leaves `performance` null. This used to assign a
-      // fabricated performance-shaped object here so shared downstream code
-      // would run — but its `name` and `social_links` were never read, and its
-      // only live field duplicated `bandProfileId`, which is already set above.
-      // The remaining reads are optional-chained, because several of them DO
-      // run on this path — computing actualStartTime/actualEndTime/actualVenueId
-      // and the conflict check. On a profile edit there is no performance, so
-      // those resolve to undefined and the conflict check short-circuits, which
-      // is what the mock's null fields were simulating all along.
+      // Leaves `performance` null: there is no performance on a profile edit.
+      // Downstream reads of it are optional-chained for that reason — several
+      // run on this path (actualStartTime/actualEndTime/actualVenueId and the
+      // conflict check) and must resolve to undefined so the check
+      // short-circuits.
     }
 
     // Validation - only validate provided fields

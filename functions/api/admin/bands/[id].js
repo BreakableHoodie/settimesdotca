@@ -35,6 +35,28 @@ async function getEventForPerformance(DB, performanceId) {
 }
 
 // PUT - Update band
+/**
+ * Parse a `profile_<n>` id, or return null if it is not one (#935).
+ *
+ * Anchored on the WHOLE string: an unanchored parse lets "profile_1_extra"
+ * resolve to profile 1, addressing a real record under a malformed id — on the
+ * DELETE path, deleting it.
+ *
+ * isSafeInteger, not isInteger: past 2^53 Number() aliases a value onto a
+ * different integer, so the id would resolve to a different record while still
+ * looking valid.
+ *
+ * Shared by PUT and DELETE; both must use it.
+ */
+function parseProfileId(rawId) {
+  const match = /^profile_([1-9]\d*)$/.exec(String(rawId ?? ""));
+  if (!match) {
+    return null;
+  }
+  const parsed = Number(match[1]);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 export async function onRequestPut(context) {
   const { request, env } = context;
   const { DB } = env;
@@ -113,8 +135,8 @@ export async function onRequestPut(context) {
     let bandProfileId = null;
 
     if (isProfileUpdate) {
-      const parsed = Number(performanceId.toString().split("_")[1]);
-      if (!Number.isInteger(parsed) || parsed <= 0) {
+      const parsed = parseProfileId(performanceId);
+      if (parsed === null) {
         return new Response(
           JSON.stringify({
             error: "Bad request",
@@ -188,13 +210,11 @@ export async function onRequestPut(context) {
           { status: 404, headers: { "Content-Type": "application/json" } },
         );
       }
-      // Mock performance object with profile data for downstream logic
-      performance = {
-        band_profile_id: bandProfileId,
-        name: profile.name,
-        social_links: profile.social_links,
-        // other fields null
-      };
+      // Leaves `performance` null: there is no performance on a profile edit.
+      // Downstream reads of it are optional-chained for that reason — several
+      // run on this path (actualStartTime/actualEndTime/actualVenueId and the
+      // conflict check) and must resolve to undefined so the check
+      // short-circuits.
     }
 
     // Validation - only validate provided fields
@@ -220,7 +240,7 @@ export async function onRequestPut(context) {
 
       const nameNormalized = normalizeBandName(name);
       const existingProfile = await DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? AND id != ?`)
-        .bind(nameNormalized, performance.band_profile_id)
+        .bind(nameNormalized, bandProfileId)
         .first();
 
       if (existingProfile) {
@@ -287,9 +307,9 @@ export async function onRequestPut(context) {
     }
 
     // Determine actual times to use (provided or existing)
-    const actualStartTime = startTime !== undefined ? startTime : performance.start_time;
-    const actualEndTime = endTime !== undefined ? endTime : performance.end_time;
-    const actualVenueId = normalizedVenueId !== undefined ? normalizedVenueId : performance.venue_id;
+    const actualStartTime = startTime !== undefined ? startTime : performance?.start_time;
+    const actualEndTime = endTime !== undefined ? endTime : performance?.end_time;
+    const actualVenueId = normalizedVenueId !== undefined ? normalizedVenueId : performance?.venue_id;
 
     // Validate times (allow sets that cross midnight; prevent zero-length sets).
     // Checked against the MERGED values, not the body: a PATCH that touches only
@@ -334,16 +354,16 @@ export async function onRequestPut(context) {
 
     // Check for conflicts only if we have all required scheduling fields
     let conflicts = [];
-    if (actualVenueId && actualStartTime && actualEndTime && performance.event_id) {
+    if (actualVenueId && actualStartTime && actualEndTime && performance?.event_id) {
       conflicts = await checkConflicts(DB, {
-        eventId: performance.event_id,
+        eventId: performance?.event_id,
         venueId: actualVenueId,
         startTime: actualStartTime,
         endTime: actualEndTime,
         excludePerformanceId: performanceId,
         // The performance's festival day after this update: the newly supplied
         // day if it's being changed, otherwise the day it already had.
-        performanceDate: performanceDate !== undefined ? resolvedPerformanceDate : performance.performance_date,
+        performanceDate: performanceDate !== undefined ? resolvedPerformanceDate : performance?.performance_date,
         eventDate: linkedEvent.date,
       });
     }
@@ -462,7 +482,7 @@ export async function onRequestPut(context) {
         let existingLinks = {};
         try {
           const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?")
-            .bind(performance.band_profile_id)
+            .bind(bandProfileId)
             .first();
           existingLinks = JSON.parse(profile.social_links || "{}");
         } catch (_e) {
@@ -488,7 +508,7 @@ export async function onRequestPut(context) {
       }
 
       if (profileUpdates.length > 0) {
-        profileParams.push(performance.band_profile_id);
+        profileParams.push(bandProfileId);
         writeStatements.push(
           DB.prepare(`UPDATE band_profiles SET ${profileUpdates.join(", ")} WHERE id = ?`).bind(...profileParams),
         );
@@ -915,8 +935,8 @@ export async function onRequestDelete(context) {
     }
 
     if (isProfileDelete) {
-      const bandProfileId = Number(performanceId.toString().split("_")[1]);
-      if (!Number.isInteger(bandProfileId) || bandProfileId <= 0) {
+      const bandProfileId = parseProfileId(performanceId);
+      if (bandProfileId === null) {
         return new Response(
           JSON.stringify({
             error: "Bad request",

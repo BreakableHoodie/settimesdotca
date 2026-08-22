@@ -5,7 +5,7 @@ vi.mock("../../_middleware.js", () => ({
   auditLog: vi.fn(async () => {}),
 }));
 
-import { onRequestPut } from "../[id].js";
+import { onRequestDelete, onRequestPut } from "../[id].js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
 
 /**
@@ -127,7 +127,18 @@ describe("PUT /api/admin/bands/:id — profile_ vs numeric dispatch", () => {
 
   it("rejects a malformed profile_ id rather than treating it as a performance", async () => {
     const { env } = seed();
-    for (const bad of ["profile_abc", "profile_0", "profile_-1", "profile_"]) {
+    // "profile_1_extra" is the one that mattered: the old parser read only the
+    // second underscore-delimited segment, so it resolved to profile 1 and would
+    // have edited a real record under a malformed id.
+    for (const bad of [
+      "profile_abc",
+      "profile_0",
+      "profile_-1",
+      "profile_",
+      "profile_1_extra",
+      "profile_01",
+      "profile_9007199254740993",
+    ]) {
       const res = await put(env, bad, { genre: "punk" });
       expect(res.status, `expected 400 for ${bad}`).toBe(400);
     }
@@ -146,5 +157,37 @@ describe("PUT /api/admin/bands/:id — profile_ vs numeric dispatch", () => {
     const { env } = seed();
     const res = await put(env, 99999, { startTime: "22:00" });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("DELETE /api/admin/bands/:id — the same parser, the same trap", () => {
+  // DELETE shares PUT's profile-id parser, and must: an unanchored parse here
+  // resolves "profile_1_extra" to profile 1 and deletes it (#935).
+  function del(env, id) {
+    return onRequestDelete({
+      request: new Request(`https://example.test/api/admin/bands/${id}`, { method: "DELETE" }),
+      env,
+      data: { user: { role: "admin", id: 1 } },
+    });
+  }
+
+  it.each([
+    ["extra segment", "profile_1_extra"],
+    ["leading zero", "profile_01"],
+    ["past 2^53", "profile_9007199254740993"],
+    ["non-numeric", "profile_abc"],
+    ["zero", "profile_0"],
+    ["empty", "profile_"],
+  ])("rejects %s rather than resolving it to a real profile", async (_label, bad) => {
+    const { env, rawDb, perf } = seed();
+    const before = rawDb.prepare("SELECT COUNT(*) AS n FROM band_profiles").get().n;
+
+    const res = await del(env, bad);
+    expect(res.status).toBe(400);
+
+    // The assertion that matters: nothing was deleted.
+    const after = rawDb.prepare("SELECT COUNT(*) AS n FROM band_profiles").get().n;
+    expect(after).toBe(before);
+    expect(rawDb.prepare("SELECT id FROM band_profiles WHERE id = ?").get(perf.band_profile_id)).toBeDefined();
   });
 });

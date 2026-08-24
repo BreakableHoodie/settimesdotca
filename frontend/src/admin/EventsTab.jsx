@@ -974,7 +974,7 @@ export default function EventsTab({
         </div>
 
         {/* Modals */}
-        {!readOnly && (
+        {!readOnly && showModal && (
           <EventFormModal
             isOpen={showModal}
             onClose={() => {
@@ -1117,7 +1117,7 @@ export default function EventsTab({
       )}
 
       {/* Event Form Modal */}
-      {!readOnly && (
+      {!readOnly && showModal && (
         <EventFormModal
           isOpen={showModal}
           onClose={() => {

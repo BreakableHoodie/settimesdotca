@@ -26,6 +26,15 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
   const [errors, setErrors] = useState({})
   const [inviteCopy, setInviteCopy] = useState('idle')
 
+  // UserManagement renders this modal unconditionally and it early-returns on
+  // !isOpen, so closing hides it without unmounting and the copy result would
+  // survive into the NEXT invite. A stale "Invite link copied." is the same
+  // false success this component was just fixed to stop producing — the new
+  // link is not on the clipboard.
+  useEffect(() => {
+    setInviteCopy('idle')
+  }, [inviteUrl, isOpen])
+
   // This link is the only way the new user can activate their account, so a copy
   // that quietly fails costs an onboarding round trip nobody knows to make. The
   // result must reach the admin either way.

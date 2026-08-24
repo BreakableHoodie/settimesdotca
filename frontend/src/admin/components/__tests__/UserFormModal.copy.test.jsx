@@ -57,6 +57,32 @@ describe('UserFormModal invite-link copy', () => {
     expect(status).toHaveAttribute('aria-live', 'polite')
   })
 
+  // The parent renders this modal unconditionally, so closing it does not
+  // unmount and state persists. Without a reset the previous invite's result is
+  // still on screen when the next one opens.
+  it('clears the previous result when a new invite arrives', async () => {
+    copyToClipboard.mockResolvedValue(true)
+    const { rerender } = render(<UserFormModal {...props} />)
+    clickCopy()
+    expect(await screen.findByText(/invite link copied/i)).toBeInTheDocument()
+
+    rerender(<UserFormModal {...props} inviteUrl="https://settimes.ca/admin/signup?code=different" />)
+
+    expect(screen.queryByText(/invite link copied/i)).not.toBeInTheDocument()
+  })
+
+  it('clears the previous result when the modal is closed and reopened', async () => {
+    copyToClipboard.mockResolvedValue(true)
+    const { rerender } = render(<UserFormModal {...props} />)
+    clickCopy()
+    expect(await screen.findByText(/invite link copied/i)).toBeInTheDocument()
+
+    rerender(<UserFormModal {...props} isOpen={false} />)
+    rerender(<UserFormModal {...props} isOpen={true} />)
+
+    expect(screen.queryByText(/invite link copied/i)).not.toBeInTheDocument()
+  })
+
   it('announces failure when the helper rejects outright', async () => {
     copyToClipboard.mockRejectedValue(new Error('denied'))
     render(<UserFormModal {...props} />)

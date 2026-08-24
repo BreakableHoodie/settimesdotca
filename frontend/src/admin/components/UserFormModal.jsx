@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react'
 import { FIELD_LIMITS } from '../../utils/validation'
 import Modal from '../../components/ui/Modal'
+import { copyToClipboard } from '../../utils/clipboard'
 
 export default function UserFormModal({ isOpen, onClose, user, onSave, loading, inviteUrl }) {
   const isEditMode = Boolean(user)
@@ -23,6 +24,22 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
   })
 
   const [errors, setErrors] = useState({})
+  const [inviteCopy, setInviteCopy] = useState('idle')
+
+  // Was a bare fire-and-forget navigator.clipboard.writeText with no await, no
+  // catch and no feedback: an unhandled rejection, and an admin who believes an
+  // invite link is on their clipboard when it may not be. That link is the only
+  // way the new user can activate, so a silent miss is expensive.
+  const handleCopyInvite = async () => {
+    // copyToClipboard is written to report false rather than reject, but a
+    // handler whose only failure path depends on that promise is one refactor
+    // away from silently doing nothing. Treat a throw as a failed copy.
+    try {
+      setInviteCopy((await copyToClipboard(inviteUrl)) ? 'copied' : 'error')
+    } catch {
+      setInviteCopy('error')
+    }
+  }
 
   useEffect(() => {
     if (user) {
@@ -120,11 +137,15 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => navigator.clipboard.writeText(inviteUrl)}
+            onClick={handleCopyInvite}
             className="flex-1 min-h-[44px] bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-2 px-4 rounded-lg transition"
           >
             Copy Link
           </button>
+          <p aria-live="polite" className="sr-only">
+            {inviteCopy === 'copied' && 'Invite link copied.'}
+            {inviteCopy === 'error' && 'Could not copy the invite link.'}
+          </p>
           <button
             type="button"
             onClick={onClose}

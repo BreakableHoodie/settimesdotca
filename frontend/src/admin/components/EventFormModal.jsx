@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
-import EventStatusBadge from './components/EventStatusBadge'
-import PhotoUpload from './components/PhotoUpload'
-import { Button } from '../components/ui'
-import { eventsApi } from '../utils/adminApi'
-import { FIELD_LIMITS } from '../utils/validation'
-import { buildDayOptions, enumerateFestivalDays, isMultiDayEvent } from './utils/dayOptions'
-import { formatFestivalDate } from '../utils/festivalDays'
-import { parseDoorsJsonToForm, serializeDoorsForm } from './utils/doorsFormData'
-import { publishWithLineupConfirm } from './utils/publishWithLineupConfirm'
+import EventStatusBadge from './EventStatusBadge'
+import PhotoUpload from './PhotoUpload'
+import { Button } from '../../components/ui'
+import { eventsApi } from '../../utils/adminApi'
+import { FIELD_LIMITS } from '../../utils/validation'
+import { buildDayOptions, enumerateFestivalDays, isMultiDayEvent } from '../utils/dayOptions'
+import { formatFestivalDate } from '../../utils/festivalDays'
+import { parseDoorsJsonToForm, serializeDoorsForm } from '../utils/doorsFormData'
+import { publishWithLineupConfirm } from '../utils/publishWithLineupConfirm'
 
 /**
  * EventFormModal - Modal for creating and editing events

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import BulkActionBar from '../BulkActionBar'
+import BulkActionBar from '../components/BulkActionBar'
 
 const venues = [
   { id: 1, name: 'Stage A' },

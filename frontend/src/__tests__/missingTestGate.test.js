@@ -46,8 +46,8 @@ const MAX_ALLOWED = 7
 const ALLOWED = new Set([
   'App.jsx',
   'admin/AdminPanel.jsx',
-  'admin/BandForm.jsx',
-  'admin/EventFormModal.jsx',
+  'admin/components/BandForm.jsx',
+  'admin/components/EventFormModal.jsx',
   'admin/LineupTab.jsx',
   'admin/UserManagement.jsx',
   'admin/VenuesTab.jsx',

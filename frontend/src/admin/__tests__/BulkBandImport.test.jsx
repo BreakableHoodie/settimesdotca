@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import BulkBandImport from '../BulkBandImport'
+import BulkBandImport from '../components/BulkBandImport'
 
 vi.mock('../../utils/adminApi', () => ({
   bandsApi: { bulkImport: vi.fn() },

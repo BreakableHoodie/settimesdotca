@@ -1,12 +1,12 @@
 import PropTypes from 'prop-types'
-import PhotoUpload from './components/PhotoUpload'
-import RichTextEditor from './components/RichTextEditor'
-import { Input, Button, Tooltip } from '../components/ui'
-import Combobox from '../components/ui/Combobox'
-import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
+import PhotoUpload from './PhotoUpload'
+import RichTextEditor from './RichTextEditor'
+import { Input, Button, Tooltip } from '../../components/ui'
+import Combobox from '../../components/ui/Combobox'
+import { BAND_PHOTO_CROP } from '../../utils/bandPhoto'
 import { Info } from 'lucide-react'
-import { FIELD_LIMITS } from '../utils/validation'
-import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../utils/genres'
+import { FIELD_LIMITS } from '../../utils/validation'
+import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../../utils/genres'
 
 export default function BandForm({
   events,

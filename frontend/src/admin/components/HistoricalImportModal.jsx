@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { eventsApi, bandsApi } from '../utils/adminApi'
+import { eventsApi, bandsApi } from '../../utils/adminApi'
 
 /**
  * HistoricalImportModal - Two-step wizard to back-fill archived events with band lineups

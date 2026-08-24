@@ -24,7 +24,7 @@ describe('EventFormModal status options — #804', () => {
   const currentFile = fileURLToPath(import.meta.url)
   // Resolved via node:path rather than `new URL(relative, import.meta.url)`,
   // matching bandFields.test.js.
-  const modalPath = path.join(path.dirname(currentFile), '../EventFormModal.jsx')
+  const modalPath = path.join(path.dirname(currentFile), '../components/EventFormModal.jsx')
   const source = readFileSync(modalPath, 'utf8')
 
   it('gates the Published option on isEditing so create cannot offer it', () => {

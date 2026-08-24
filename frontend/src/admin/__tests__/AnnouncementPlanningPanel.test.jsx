@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import AnnouncementPlanningPanel from '../AnnouncementPlanningPanel'
+import AnnouncementPlanningPanel from '../components/AnnouncementPlanningPanel'
 
 // Announcement-planning panel (#556). Tested directly (not through LineupTab)
 // so the test doesn't pull the whole 1000-line LineupTab tree into the

@@ -7,7 +7,7 @@
 // - loading: boolean
 // - inviteUrl: string|null — when set, switches to invite-link copy view (email delivery failed)
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FIELD_LIMITS } from '../../utils/validation'
 import Modal from '../../components/ui/Modal'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -31,7 +31,15 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
   // survive into the NEXT invite. A stale "Invite link copied." is the same
   // false success this component was just fixed to stop producing — the new
   // link is not on the clipboard.
+  //
+  // Resetting the state is not sufficient on its own: copyToClipboard is async,
+  // so a copy still in flight when the invite changes would settle afterwards
+  // and write its result over the reset. The token makes a result apply only if
+  // the context it was started in is still current.
+  const copyAttemptRef = useRef(0)
+
   useEffect(() => {
+    copyAttemptRef.current += 1
     setInviteCopy('idle')
   }, [inviteUrl, isOpen])
 
@@ -39,14 +47,23 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
   // that quietly fails costs an onboarding round trip nobody knows to make. The
   // result must reach the admin either way.
   const handleCopyInvite = async () => {
+    const attempt = ++copyAttemptRef.current
+
     // copyToClipboard is written to report false rather than reject, but a
     // handler whose only failure path depends on that promise is one refactor
     // away from silently doing nothing. Treat a throw as a failed copy.
+    let copied
     try {
-      setInviteCopy((await copyToClipboard(inviteUrl)) ? 'copied' : 'error')
+      copied = await copyToClipboard(inviteUrl)
     } catch {
-      setInviteCopy('error')
+      copied = false
     }
+
+    // A newer invite (or a newer copy) superseded this one while it was in
+    // flight. Reporting now would attribute this result to the wrong link.
+    if (copyAttemptRef.current !== attempt) return
+
+    setInviteCopy(copied ? 'copied' : 'error')
   }
 
   useEffect(() => {

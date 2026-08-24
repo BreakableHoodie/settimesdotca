@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UserFormModal from '../UserFormModal'
 import { copyToClipboard } from '../../../utils/clipboard'
@@ -79,6 +79,32 @@ describe('UserFormModal invite-link copy', () => {
 
     rerender(<UserFormModal {...props} isOpen={false} />)
     rerender(<UserFormModal {...props} isOpen={true} />)
+
+    expect(screen.queryByText(/invite link copied/i)).not.toBeInTheDocument()
+  })
+
+  // The reset effect alone does not close this: copyToClipboard is async, so a
+  // copy still in flight when the invite changes settles AFTERWARDS and would
+  // write its result over the reset — attributing the old link's success to the
+  // new one. The attempt token is what makes a superseded result inert.
+  it('ignores an in-flight copy that settles after the invite changed', async () => {
+    let settle
+    copyToClipboard.mockReturnValue(
+      new Promise(resolve => {
+        settle = resolve
+      })
+    )
+
+    const { rerender } = render(<UserFormModal {...props} />)
+    clickCopy()
+
+    // The invite changes while the copy is still pending.
+    rerender(<UserFormModal {...props} inviteUrl="https://settimes.ca/admin/signup?code=newer" />)
+
+    // Now the OLD copy succeeds.
+    await act(async () => {
+      settle(true)
+    })
 
     expect(screen.queryByText(/invite link copied/i)).not.toBeInTheDocument()
   })

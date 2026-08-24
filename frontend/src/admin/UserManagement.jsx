@@ -436,19 +436,23 @@ export default function UserManagement({ showToast }) {
         </div>
       </div>
 
-      {/* User Form Modal */}
-      <UserFormModal
-        isOpen={showUserModal}
-        onClose={() => {
-          setShowUserModal(false)
-          setEditingUser(null)
-          setPendingInviteUrl(null)
-        }}
-        user={editingUser}
-        onSave={handleSaveUser}
-        loading={actionLoading}
-        inviteUrl={pendingInviteUrl}
-      />
+      {/* User Form Modal — mounted only while open, so closing DISCARDS its state
+          rather than leaving a hidden instance whose every field needs a manual
+          reset. The Password Reset Modal below has always done this. */}
+      {showUserModal && (
+        <UserFormModal
+          isOpen={showUserModal}
+          onClose={() => {
+            setShowUserModal(false)
+            setEditingUser(null)
+            setPendingInviteUrl(null)
+          }}
+          user={editingUser}
+          onSave={handleSaveUser}
+          loading={actionLoading}
+          inviteUrl={pendingInviteUrl}
+        />
+      )}
 
       {/* Password Reset Modal */}
       {showResetModal && (

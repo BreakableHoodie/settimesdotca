@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { eventsApi } from '../utils/adminApi'
+import { eventsApi } from '../../utils/adminApi'
 
 export default function MetricsDashboard({ eventId }) {
   const [metrics, setMetrics] = useState(null)

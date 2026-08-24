@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import BulkPreviewModal from '../BulkPreviewModal'
+import BulkPreviewModal from '../components/BulkPreviewModal'
 
 const makePreview = ({ conflicts = [], changes = [] } = {}) => ({
   changes: changes.length

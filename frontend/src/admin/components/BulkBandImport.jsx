@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { bandsApi } from '../utils/adminApi'
-import { parseBandRows } from './utils/parseBandRows'
+import { bandsApi } from '../../utils/adminApi'
+import { parseBandRows } from '../utils/parseBandRows'
 
 // Paste-to-import UI for a lineup. One band per line:
 // name, start_time, end_time, venue, genre. Posts to the bulk-import endpoint,

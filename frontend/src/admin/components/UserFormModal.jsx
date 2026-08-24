@@ -26,10 +26,9 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
   const [errors, setErrors] = useState({})
   const [inviteCopy, setInviteCopy] = useState('idle')
 
-  // Was a bare fire-and-forget navigator.clipboard.writeText with no await, no
-  // catch and no feedback: an unhandled rejection, and an admin who believes an
-  // invite link is on their clipboard when it may not be. That link is the only
-  // way the new user can activate, so a silent miss is expensive.
+  // This link is the only way the new user can activate their account, so a copy
+  // that quietly fails costs an onboarding round trip nobody knows to make. The
+  // result must reach the admin either way.
   const handleCopyInvite = async () => {
     // copyToClipboard is written to report false rather than reject, but a
     // handler whose only failure path depends on that promise is one refactor
@@ -142,10 +141,6 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
           >
             Copy Link
           </button>
-          <p aria-live="polite" className="sr-only">
-            {inviteCopy === 'copied' && 'Invite link copied.'}
-            {inviteCopy === 'error' && 'Could not copy the invite link.'}
-          </p>
           <button
             type="button"
             onClick={onClose}
@@ -154,6 +149,12 @@ export default function UserFormModal({ isOpen, onClose, user, onSave, loading, 
             Close
           </button>
         </div>
+        <p aria-live="polite" className="mt-2 text-sm min-h-[1.25rem]">
+          {inviteCopy === 'copied' && <span className="text-green-300">Invite link copied.</span>}
+          {inviteCopy === 'error' && (
+            <span className="text-red-300">Could not copy the invite link — select it above and copy manually.</span>
+          )}
+        </p>
       </Modal>
     )
   }

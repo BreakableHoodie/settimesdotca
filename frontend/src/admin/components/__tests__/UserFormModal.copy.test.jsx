@@ -42,6 +42,21 @@ describe('UserFormModal invite-link copy', () => {
     expect(await screen.findByText(/could not copy/i)).toBeInTheDocument()
   })
 
+  // The failure message was sr-only once, so a SIGHTED admin got no feedback at
+  // all — the exact silence this fix exists to remove. getByText finds sr-only
+  // nodes and Tailwind's sr-only (1px + clip) still reads as visible to jsdom,
+  // so neither queries nor toBeVisible catch a regression here. Asserting the
+  // class is absent is the only check that goes red if it is re-hidden.
+  it('shows the failure to sighted users, not only to screen readers', async () => {
+    copyToClipboard.mockResolvedValue(false)
+    render(<UserFormModal {...props} />)
+    clickCopy()
+
+    const status = (await screen.findByText(/could not copy/i)).closest('p')
+    expect(status).not.toHaveClass('sr-only')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+  })
+
   it('announces failure when the helper rejects outright', async () => {
     copyToClipboard.mockRejectedValue(new Error('denied'))
     render(<UserFormModal {...props} />)

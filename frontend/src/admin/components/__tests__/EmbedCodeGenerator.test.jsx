@@ -75,8 +75,10 @@ describe('EmbedCodeGenerator', () => {
     expect(screen.queryByText(/copied\./i)).not.toBeInTheDocument()
   })
 
-  // copyToClipboard also returns false when it rejects internally; the component
-  // must treat that identically to an explicit false.
+  // copyToClipboard is not expected to reject: it catches a Clipboard API
+  // rejection and then tries the textarea fallback, which can still return true.
+  // This covers an UNEXPECTED rejection escaping it, which is distinct from its
+  // normal false result — the component must treat both as a failed copy.
   it('does NOT claim success when the copy helper rejects', async () => {
     copyToClipboard.mockRejectedValue(new Error('denied'))
     render(<EmbedCodeGenerator event={EVENT} />)

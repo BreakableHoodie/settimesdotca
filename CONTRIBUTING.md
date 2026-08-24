@@ -30,7 +30,7 @@ npm run pages:dev
 The admin panel is at `http://localhost:8788/admin`. Create a first admin user with:
 
 ```bash
-node scripts/seed-e2e-admin.mjs --email you@example.com --password yourpassword \
+E2E_ADMIN_PASSWORD="$YOUR_CHOSEN_PASSWORD" node scripts/seed-e2e-admin.mjs --email you@example.com \
   | xargs -I{} npx wrangler d1 execute settimes-production-db --local --command="{}"
 ```
 

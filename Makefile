@@ -8,6 +8,12 @@ E2E_STATE := .wrangler/e2e-state
 E2E_PID := .wrangler/e2e-state/wrangler.pid
 E2E_ADMIN_EMAIL ?= e2e-admin@test.local
 E2E_ADMIN_PASSWORD ?= e2e-test-password-Xk9
+# Exported, never interpolated: make echoes recipe text, so a $(VAR) in a
+# recipe prints the secret to the terminal and into CI logs. Exporting puts
+# the value in the child environment instead, where $$VAR reads it at run
+# time and the recipe text never contains it. Verify with `make -n e2e-setup`.
+export E2E_ADMIN_EMAIL
+export E2E_ADMIN_PASSWORD
 
 .PHONY: help install build dev format format-check lint test test-backend test-frontend \
 	gate review review-wip validate-openapi schema-check e2e e2e-setup e2e-serve e2e-run e2e-clean
@@ -87,7 +93,7 @@ e2e-setup: build ## Init + seed an isolated local D1 for E2E (safe to re-run)
 	rm -rf $(E2E_STATE)
 	$(WRANGLER) d1 execute settimes-production-db --local --persist-to $(E2E_STATE) --file=database/setup-complete.sql
 	$(WRANGLER) d1 execute settimes-production-db --local --persist-to $(E2E_STATE) --file=database/seed-test-data.sql
-	SEED_SQL=$$(node scripts/seed-e2e-admin.mjs --email "$(E2E_ADMIN_EMAIL)" --password "$(E2E_ADMIN_PASSWORD)"); \
+	SEED_SQL=$$(node scripts/seed-e2e-admin.mjs --email "$$E2E_ADMIN_EMAIL"); \
 	$(WRANGLER) d1 execute settimes-production-db --local --persist-to $(E2E_STATE) --command="$$SEED_SQL"
 
 e2e-serve: ## Start wrangler for E2E in the background (writes pidfile); retries boot once, never test failures (mirrors e2e-env action.yml, #625)
@@ -111,14 +117,14 @@ e2e-serve: ## Start wrangler for E2E in the background (writes pidfile); retries
 	echo "wrangler failed to start after 2 attempts"; exit 1
 
 e2e-run: ## Run Playwright (server must be up; credentials required even for --list)
-	ADMIN_EMAIL="$(E2E_ADMIN_EMAIL)" ADMIN_PASSWORD="$(E2E_ADMIN_PASSWORD)" npx playwright test $(SPEC) --reporter=list
+	ADMIN_EMAIL="$$E2E_ADMIN_EMAIL" ADMIN_PASSWORD="$$E2E_ADMIN_PASSWORD" npx playwright test $(SPEC) --reporter=list
 
 e2e-clean: ## Kill the E2E server by pidfile and remove isolated state
 	-[ -f $(E2E_PID) ] && kill $$(cat $(E2E_PID)) 2>/dev/null || true
 	rm -rf $(E2E_STATE)
 
 e2e: e2e-setup e2e-serve ## Full local E2E: setup, serve, run, always clean up
-	ADMIN_EMAIL="$(E2E_ADMIN_EMAIL)" ADMIN_PASSWORD="$(E2E_ADMIN_PASSWORD)" npx playwright test $(SPEC) --reporter=list; \
+	ADMIN_EMAIL="$$E2E_ADMIN_EMAIL" ADMIN_PASSWORD="$$E2E_ADMIN_PASSWORD" npx playwright test $(SPEC) --reporter=list; \
 	status=$$?; \
 	$(MAKE) e2e-clean; \
 	exit $$status

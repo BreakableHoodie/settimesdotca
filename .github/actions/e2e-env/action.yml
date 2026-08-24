@@ -271,7 +271,7 @@ runs:
                   exit 1
               fi
               echo "Creating E2E admin user..."
-              SEED_SQL=$(node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL" --password "$E2E_ADMIN_PASSWORD")
+              SEED_SQL=$(E2E_ADMIN_PASSWORD="$E2E_ADMIN_PASSWORD" node scripts/seed-e2e-admin.mjs --email "$E2E_ADMIN_EMAIL")
               ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --command="$SEED_SQL"
               echo "✓ E2E admin user created: $E2E_ADMIN_EMAIL"
 

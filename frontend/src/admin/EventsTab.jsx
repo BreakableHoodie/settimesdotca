@@ -5,6 +5,7 @@ import EventFormModal from './components/EventFormModal'
 import HistoricalImportModal from './components/HistoricalImportModal'
 import EventStatusBadge from './components/EventStatusBadge'
 import EmbedCodeGenerator from './components/EmbedCodeGenerator'
+import { copyToClipboard } from '../utils/clipboard'
 import MetricsDashboard from './components/MetricsDashboard'
 import ArchivedEventBanner from './components/ArchivedEventBanner'
 import HelpPanel from './components/HelpPanel'
@@ -244,8 +245,8 @@ const EventRow = memo(function EventRow({
             </button>
             <button
               onClick={async () => {
-                await navigator.clipboard.writeText(ticketLink)
-                showToast('Ticket link copied!', 'success')
+                const ok = await copyToClipboard(ticketLink)
+                showToast(ok ? 'Ticket link copied!' : 'Could not copy the ticket link.', ok ? 'success' : 'error')
               }}
               className={`px-3 py-1 bg-amber-700 hover:bg-amber-800 text-white rounded text-xs font-medium transition-colors ${buttonFocusClass}`}
               title="Copy ticket link"

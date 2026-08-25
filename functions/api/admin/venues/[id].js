@@ -3,6 +3,7 @@
 // DELETE /api/admin/venues/{id} - Delete venue
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import {
   FIELD_LIMITS,
   isValidEmail,
@@ -372,28 +373,25 @@ export async function onRequestDelete(context) {
       );
     }
 
-    // Audit log before deletion
-    await auditLog(
-      env,
-      user.userId,
-      "venue.deleted",
-      "venue",
-      venueId,
-      {
-        venueName: venue.name,
-        address: venue.address,
-      },
-      ipAddress,
-    );
-
-    // Delete venue
-    await DB.prepare(
-      `
-      DELETE FROM venues WHERE id = ?
-    `,
-    )
-      .bind(venueId)
-      .run();
+    await DB.batch([
+      DB.prepare(
+        `
+        DELETE FROM venues WHERE id = ?
+      `,
+      ).bind(venueId),
+      auditLogStatement(
+        env,
+        user.userId,
+        "venue.deleted",
+        "venue",
+        venueId,
+        {
+          venueName: venue.name,
+          address: venue.address,
+        },
+        ipAddress,
+      ),
+    ]);
 
     return new Response(
       JSON.stringify({

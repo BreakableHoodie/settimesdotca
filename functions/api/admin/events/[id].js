@@ -5,6 +5,7 @@
 // DELETE /api/admin/events/{id} - Delete event
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import {
   FIELD_LIMITS,
   isValidURL,
@@ -776,22 +777,21 @@ export async function onRequestDelete(context) {
       );
     }
 
-    // Delete the event (performance records are removed automatically via ON DELETE CASCADE)
-    await DB.prepare("DELETE FROM events WHERE id = ?").bind(eventIdNum).run();
-
-    // Audit log
-    await auditLog(
-      env,
-      currentUser.userId,
-      "event.deleted",
-      "event",
-      eventIdNum,
-      {
-        name: event.name,
-        performanceCount: performanceCount.count,
-      },
-      ipAddress,
-    );
+    await DB.batch([
+      DB.prepare("DELETE FROM events WHERE id = ?").bind(eventIdNum),
+      auditLogStatement(
+        env,
+        currentUser.userId,
+        "event.deleted",
+        "event",
+        eventIdNum,
+        {
+          name: event.name,
+          performanceCount: performanceCount.count,
+        },
+        ipAddress,
+      ),
+    ]);
 
     return new Response(
       JSON.stringify({

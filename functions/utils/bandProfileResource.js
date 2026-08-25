@@ -1,4 +1,5 @@
 import { auditLog } from "../api/admin/_middleware.js";
+import { auditLogStatement } from "./auditLogStatement.js";
 import {
   FIELD_LIMITS,
   isValidEmail,
@@ -291,17 +292,18 @@ export async function onRequestProfileDelete(context, { performanceId: _performa
       );
     }
 
-    await auditLog(
-      env,
-      user.userId,
-      "band_profile.deleted",
-      "band_profile",
-      bandProfileId,
-      { deletedBy: user.email },
-      ipAddress,
-    );
-
-    await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(bandProfileId).run();
+    await DB.batch([
+      DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(bandProfileId),
+      auditLogStatement(
+        env,
+        user.userId,
+        "band_profile.deleted",
+        "band_profile",
+        bandProfileId,
+        { deletedBy: user.email },
+        ipAddress,
+      ),
+    ]);
 
     return new Response(
       JSON.stringify({

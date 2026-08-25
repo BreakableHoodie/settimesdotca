@@ -1,4 +1,5 @@
 import { auditLog, checkPermission } from "../_middleware.js";
+import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import { getClientIP } from "../../../utils/request.js";
 import { computeNewEndTime, detectBulkConflicts } from "../../../utils/timeConflicts.js";
 import { isValidTime, validateIdArray, validateSetTimes } from "../../../utils/validation.js";
@@ -157,30 +158,34 @@ export async function onRequestDelete(context) {
             continue;
           }
 
-          await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(profileId).run();
-          await auditLog(
-            env,
-            user.userId,
-            "band_profile.deleted",
-            "band_profile",
-            profileId,
-            { deletedBy: user.email, bulk: true },
-            ipAddress,
-          );
+          await DB.batch([
+            DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(profileId),
+            auditLogStatement(
+              env,
+              user.userId,
+              "band_profile.deleted",
+              "band_profile",
+              profileId,
+              { deletedBy: user.email, bulk: true },
+              ipAddress,
+            ),
+          ]);
           deletedCount++;
         } else {
           const performance = performanceMap.get(Number(id));
           if (performance) {
-            await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
-            await auditLog(
-              env,
-              user.userId,
-              "band.deleted",
-              "band",
-              id,
-              { bandName: performance.name, bulk: true },
-              ipAddress,
-            );
+            await DB.batch([
+              DB.prepare("DELETE FROM performances WHERE id = ?").bind(id),
+              auditLogStatement(
+                env,
+                user.userId,
+                "band.deleted",
+                "band",
+                id,
+                { bandName: performance.name, bulk: true },
+                ipAddress,
+              ),
+            ]);
             deletedCount++;
           }
         }

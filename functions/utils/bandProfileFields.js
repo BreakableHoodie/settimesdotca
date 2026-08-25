@@ -55,6 +55,17 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
   }
   const parsedOrigin = origin !== undefined ? parseOrigin(origin) : { city: null, region: null };
 
+  // Precedence when a request carries BOTH `origin` and a component: the
+  // component wins for its own column, and `origin` wins for the composite.
+  // That looks backwards until you see what the admin UI sends — it always
+  // posts all three, deriving `origin` from the components
+  // ([city, region].filter(Boolean).join(", ")). Deriving the columns back out
+  // of `origin` instead loses data: a region-only profile posts
+  // { origin: "ON", origin_city: "", origin_region: "ON" }, and parseOrigin("ON")
+  // yields city "ON" with a null region — flipping the region into the city
+  // column. The components are authoritative because they are the source the
+  // composite was built from. Flagged as an inconsistency by review twice now;
+  // it is deliberate.
   const isPartialOriginUpdate = origin === undefined && (origin_city !== undefined) !== (origin_region !== undefined);
   const resolvedOriginCity = origin_city !== undefined ? origin_city : parsedOrigin.city;
   const resolvedOriginRegion = origin_region !== undefined ? origin_region : parsedOrigin.region;

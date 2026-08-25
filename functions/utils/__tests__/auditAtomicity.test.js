@@ -59,37 +59,107 @@ describe("auditLogStatement", () => {
 });
 
 /**
- * Source scan. The runtime tests above cover the statement builder; this covers
- * the property that matters at each call site — that the destructive path uses
- * the STATEMENT form (which can only reach D1 inside a batch) rather than the
- * fire-and-forget `auditLog`, which executes on its own and swallows failures.
+ * Source scan. The runtime tests above cover the statement builder; this proves
+ * the property that matters at each call site: the audit statement and its
+ * DELETE are entries in the SAME `DB.batch(...)` call.
  *
- * Deliberately not asserting the shape of the batch call: two of these build a
- * statement array in a variable and pass it (`DB.batch(cleanupStmts)`), so a
- * regex for the inline `DB.batch([...])` form reports a false negative. It did,
- * on users/[id].js, before this was rewritten.
+ * Checking for `auditLogStatement` and `DB.batch` independently is not enough —
+ * `auditLogStatement(...).run()` after a delete-only batch would satisfy that
+ * while restoring the split exactly. So the batch payload is extracted and both
+ * markers must appear inside it.
+ *
+ * Two shapes exist and both must be handled: an inline `DB.batch([...])`, and a
+ * statement array built in a variable and passed as `DB.batch(cleanupStmts)`.
+ * An inline-only regex reports a false negative on the latter — it did, on
+ * users/[id].js.
  */
-describe("destructive admin handlers audit via a batched statement", () => {
+function batchPayloads(source) {
+  const payloads = [];
+
+  const balancedFrom = (openIndex) => {
+    let depth = 0;
+    for (let i = openIndex; i < source.length; i += 1) {
+      const c = source[i];
+      if (c === "[") depth += 1;
+      else if (c === "]") {
+        depth -= 1;
+        if (depth === 0) return source.slice(openIndex, i + 1);
+      }
+    }
+    return "";
+  };
+
+  for (const match of source.matchAll(/DB\.batch\(\s*(\[|[A-Za-z_$][\w$]*)/g)) {
+    const token = match[1];
+    if (token === "[") {
+      payloads.push(balancedFrom(match.index + match[0].lastIndexOf("[")));
+      continue;
+    }
+    // Variable form: find the array literal assigned to that identifier.
+    const decl = source.indexOf(`${token} = [`);
+    if (decl !== -1) payloads.push(balancedFrom(source.indexOf("[", decl)));
+  }
+
+  return payloads;
+}
+
+/**
+ * The scanner is itself guard code, so it is exercised against sources it must
+ * REJECT as well as ones it must accept. Synthetic strings rather than mutating
+ * a real handler: the bypass shape is what matters, not which file wears it.
+ */
+describe("the batch scanner", () => {
+  const AUDIT = 'auditLogStatement(env, 1, "venue.deleted", "venue", id, {}, ip)';
+
+  it("accepts an inline batch holding both statements", () => {
+    const src = `await DB.batch([DB.prepare("DELETE FROM venues WHERE id = ?").bind(id), ${AUDIT}]);`;
+    const ok = batchPayloads(src).some(
+      (p) => p.includes("venue.deleted") && p.includes("auditLogStatement") && /DELETE FROM/i.test(p),
+    );
+    expect(ok).toBe(true);
+  });
+
+  it("accepts the variable form, which an inline-only regex misses", () => {
+    const src = `const stmts = [DB.prepare("DELETE FROM venues WHERE id = ?").bind(id), ${AUDIT}];\nawait DB.batch(stmts);`;
+    const ok = batchPayloads(src).some(
+      (p) => p.includes("venue.deleted") && p.includes("auditLogStatement") && /DELETE FROM/i.test(p),
+    );
+    expect(ok).toBe(true);
+  });
+
+  // The bypass: both symbols are present in the file, but the audit runs on its
+  // own after a delete-only batch — the split this whole change removes.
+  it("REJECTS a delete-only batch with the audit executed separately", () => {
+    const src = `await DB.batch([DB.prepare("DELETE FROM venues WHERE id = ?").bind(id)]);\nawait ${AUDIT}.run();`;
+
+    expect(src).toContain("auditLogStatement");
+    expect(src).toContain("DB.batch(");
+
+    const ok = batchPayloads(src).some(
+      (p) => p.includes("venue.deleted") && p.includes("auditLogStatement") && /DELETE FROM/i.test(p),
+    );
+    expect(ok, "a delete-only batch with a separate audit must not pass").toBe(false);
+  });
+});
+
+describe("destructive admin handlers batch their audit row", () => {
   const sites = [
     ["functions/utils/bandProfileResource.js", "band_profile.deleted"],
     ["functions/api/admin/bands/[id].js", "band.deleted"],
+    ["functions/api/admin/bands/bulk.js", "band_profile.deleted"],
+    ["functions/api/admin/bands/bulk.js", "band.deleted"],
     ["functions/api/admin/events/[id].js", "event.deleted"],
     ["functions/api/admin/users/[id].js", "user.deleted"],
     ["functions/api/admin/venues/[id].js", "venue.deleted"],
   ];
 
-  it.each(sites)("%s audits %s as a statement, not a bare call", (file, action) => {
+  it.each(sites)("%s puts %s in the same batch as its DELETE", (file, action) => {
     const source = readFileSync(join(repoRoot, file), "utf8");
 
-    expect(source, `${file} should import auditLogStatement`).toContain("auditLogStatement");
-    expect(source, `${file} should batch its writes`).toContain("DB.batch(");
+    const together = batchPayloads(source).some(
+      (payload) => payload.includes(action) && payload.includes("auditLogStatement") && /DELETE FROM/i.test(payload),
+    );
 
-    // The executing form must not be used for this action: a bare auditLog runs
-    // on its own and cannot roll back with the delete.
-    const bare = new RegExp(`auditLog\\([^)]*?${action.replace(".", "\\.")}`, "s");
-    expect(
-      bare.test(source.replace(/auditLogStatement\(/g, "STATEMENT(")),
-      `${file}: "${action}" still uses the bare auditLog`,
-    ).toBe(false);
+    expect(together, `${file}: "${action}" is not in the same DB.batch(...) as its DELETE`).toBe(true);
   });
 });

@@ -1,21 +1,44 @@
 import { createPortal } from 'react-dom'
+import Modal from '../../components/ui/Modal'
 
 function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
   const { changes, conflicts } = previewData
   const hasConflicts = conflicts && conflicts.length > 0
   const hasExactConflicts = hasConflicts && conflicts.some(c => c.type === 'conflict')
 
+  // The shared Modal already provides role="dialog", aria-modal, a focus trap,
+  // focus restoration on close, Escape-to-close and a body scroll lock. This
+  // component hand-rolled an overlay with none of it. Still portalled to body so
+  // the fixed positioning cannot be broken by an ancestor's stacking context.
   return createPortal(
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-bg-navy rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-700">
-          <h3 className="text-xl font-bold text-white">Preview Changes</h3>
-          <p className="text-gray-400 mt-1">Review what will change before applying</p>
-        </div>
+    <Modal
+      isOpen
+      onClose={isProcessing ? () => {} : onCancel}
+      title="Preview Changes"
+      size="md"
+      closeOnBackdropClick={!isProcessing}
+      showCloseButton={!isProcessing}
+      footer={
+        <div className="flex gap-3 justify-end">
+          <button onClick={onCancel} className="btn-secondary" disabled={isProcessing}>
+            Cancel
+          </button>
 
-        {/* Changes list */}
-        <div className="p-6">
+          {hasExactConflicts ? (
+            <button onClick={() => onConfirm(true)} className="btn-danger" disabled={isProcessing}>
+              {isProcessing ? 'Processing...' : 'Apply Anyway (Override Conflicts)'}
+            </button>
+          ) : (
+            <button onClick={() => onConfirm(false)} className="btn-primary" disabled={isProcessing}>
+              {isProcessing ? 'Processing...' : 'Apply Changes'}
+            </button>
+          )}
+        </div>
+      }
+    >
+      <div>
+        <p className="text-gray-400 mb-4">Review what will change before applying</p>
+        <div>
           <h4 className="text-white font-semibold mb-3">
             ✓ {changes.length} performance{changes.length !== 1 ? 's' : ''} will be updated
           </h4>
@@ -88,25 +111,8 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
             </div>
           )}
         </div>
-
-        {/* Actions */}
-        <div className="p-6 border-t border-gray-700 flex gap-3 justify-end">
-          <button onClick={onCancel} className="btn-secondary" disabled={isProcessing}>
-            Cancel
-          </button>
-
-          {hasExactConflicts ? (
-            <button onClick={() => onConfirm(true)} className="btn-danger" disabled={isProcessing}>
-              {isProcessing ? 'Processing...' : 'Apply Anyway (Override Conflicts)'}
-            </button>
-          ) : (
-            <button onClick={() => onConfirm(false)} className="btn-primary" disabled={isProcessing}>
-              {isProcessing ? 'Processing...' : 'Apply Changes'}
-            </button>
-          )}
-        </div>
       </div>
-    </div>,
+    </Modal>,
     document.body
   )
 }

@@ -108,6 +108,16 @@ export default function Modal({
     [getFocusableElements, isEditableElement, onClose]
   )
 
+  // One-shot: nulls the ref so a later unmount cannot yank focus back after it
+  // has already been restored and the user has moved on.
+  const restorePreviousFocus = useCallback(() => {
+    const previous = previousActiveElement.current
+    previousActiveElement.current = null
+    if (previous && typeof previous.focus === 'function' && document.contains(previous)) {
+      previous.focus()
+    }
+  }, [])
+
   // Save previous focus and set initial focus when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -125,12 +135,16 @@ export default function Modal({
         modalRef.current.focus()
       }
     } else {
-      // Restore focus when modal closes
-      if (previousActiveElement.current && typeof previousActiveElement.current.focus === 'function') {
-        previousActiveElement.current.focus()
-      }
+      restorePreviousFocus()
     }
-  }, [isOpen, getFocusableElements])
+  }, [isOpen, getFocusableElements, restorePreviousFocus])
+
+  // Restoring only in the branch above assumes the modal stays mounted through
+  // an isOpen -> false transition. A consumer that is UNMOUNTED instead (its
+  // parent stops rendering it) never reaches that branch, so focus was left on
+  // the removed control or on document.body. BulkPreviewModal is exactly that
+  // shape: it hardcodes isOpen and LineupTab drops it when the preview clears.
+  useEffect(() => restorePreviousFocus, [restorePreviousFocus])
 
   // Add keyboard event listener
   useEffect(() => {

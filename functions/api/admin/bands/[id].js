@@ -7,17 +7,15 @@ import {
   FIELD_LIMITS,
   isValidEmail,
   safeReflectSocialLinks,
-  sanitizeBandSocialLinks,
   sanitizeOptionalHttpUrl,
   sanitizeOptionalText,
-  sanitizeString,
   validatePerformanceDate,
   validateSetTimes,
 } from "../../../utils/validation.js";
 import { getClientIP, getUrlId } from "../../../utils/request.js";
 import { checkConflicts } from "../../../utils/timeConflicts.js";
-import { parseOrigin } from "../../../utils/parseOrigin.js";
-import { normalizeBandName } from "../../../utils/bandName.js";
+import { onRequestProfileDelete, onRequestProfilePut } from "../../../utils/bandProfileResource.js";
+import { findDuplicateBandProfile, findVenue, prepareBandProfileFields } from "../../../utils/bandProfileFields.js";
 
 async function getEventForPerformance(DB, performanceId) {
   if (!performanceId) return null;
@@ -113,6 +111,13 @@ export async function onRequestPut(context) {
       notes,
     } = body;
 
+    if (isProfileUpdate) {
+      return onRequestProfilePut(
+        { ...context, user, ipAddress },
+        { performanceId, body, bandProfileId: parseProfileId(performanceId) },
+      );
+    }
+
     // Normalize venueId: treat "", 0, "0" as null (no venue assigned).
     // Guards against the frontend sending Number("") = 0 when no venue is selected,
     // which would otherwise pass the !== null check and then 404 on "Venue not found".
@@ -131,28 +136,13 @@ export async function onRequestPut(context) {
         headers: { "Content-Type": "application/json" },
       });
     }
-    let realPerformanceId = performanceId;
-    let bandProfileId = null;
-
-    if (isProfileUpdate) {
-      const parsed = parseProfileId(performanceId);
-      if (parsed === null) {
-        return new Response(
-          JSON.stringify({
-            error: "Bad request",
-            message: "Invalid profile ID",
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      bandProfileId = parsed;
-      realPerformanceId = null;
-    }
+    const realPerformanceId = performanceId;
+    let bandProfileId;
 
     let performance = null;
     let linkedEvent = null;
 
-    if (!isProfileUpdate) {
+    {
       // Check if performance exists
       performance = await DB.prepare(
         `
@@ -197,24 +187,6 @@ export async function onRequestPut(context) {
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
-    } else {
-      // Fetch profile directly
-      const profile = await DB.prepare("SELECT * FROM band_profiles WHERE id = ?").bind(bandProfileId).first();
-
-      if (!profile) {
-        return new Response(
-          JSON.stringify({
-            error: "Not found",
-            message: "Band profile not found",
-          }),
-          { status: 404, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      // Leaves `performance` null: there is no performance on a profile edit.
-      // Downstream reads of it are optional-chained for that reason — several
-      // run on this path (actualStartTime/actualEndTime/actualVenueId and the
-      // conflict check) and must resolve to undefined so the check
-      // short-circuits.
     }
 
     // Validation - only validate provided fields
@@ -238,10 +210,7 @@ export async function onRequestPut(context) {
       // Or maybe we just switch profile?
       // For now, let's just update the profile name if it's unique, or switch if it exists.
 
-      const nameNormalized = normalizeBandName(name);
-      const existingProfile = await DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? AND id != ?`)
-        .bind(nameNormalized, bandProfileId)
-        .first();
+      const existingProfile = await findDuplicateBandProfile(DB, name, bandProfileId);
 
       if (existingProfile) {
         // Renaming updates the shared profile globally — all performances of this band reflect the change.
@@ -292,7 +261,7 @@ export async function onRequestPut(context) {
     // festival-day span [event.date, event.end_date]. Only applies to real
     // performances — profile-only rows have no event/performance to date.
     let resolvedPerformanceDate;
-    if (!isProfileUpdate && performanceDate !== undefined) {
+    if (performanceDate !== undefined) {
       const performanceDateCheck = validatePerformanceDate(performanceDate, linkedEvent);
       if (!performanceDateCheck.valid) {
         return new Response(
@@ -330,13 +299,7 @@ export async function onRequestPut(context) {
 
     // Check if venue exists (only when a specific positive venue id was provided)
     if (normalizedVenueId != null) {
-      const venue = await DB.prepare(
-        `
-        SELECT id FROM venues WHERE id = ?
-      `,
-      )
-        .bind(normalizedVenueId)
-        .first();
+      const venue = await findVenue(DB, normalizedVenueId);
 
       if (!venue) {
         return new Response(
@@ -399,124 +362,29 @@ export async function onRequestPut(context) {
       photo_alt_text !== undefined ||
       social_links !== undefined
     ) {
-      const profileUpdates = [];
-      const profileParams = [];
-
-      if (name !== undefined) {
-        profileUpdates.push("name = ?");
-        profileUpdates.push("name_normalized = ?");
-        const sanitizedName = sanitizeString(name);
-        profileParams.push(sanitizedName);
-        profileParams.push(normalizeBandName(sanitizedName));
-      }
-
-      // Update other profile fields
-      if (description !== undefined) {
-        profileUpdates.push("description = ?");
-        profileParams.push(sanitizeString(description) || null);
-      }
-      if (genre !== undefined) {
-        profileUpdates.push("genre = ?");
-        profileParams.push(sanitizeString(genre) || null);
-      }
-      const parsedOrigin = origin !== undefined ? parseOrigin(origin) : { city: null, region: null };
-      const resolvedOriginCity = origin_city !== undefined ? origin_city : parsedOrigin.city;
-      const resolvedOriginRegion = origin_region !== undefined ? origin_region : parsedOrigin.region;
-      const computedOrigin =
-        origin !== undefined
-          ? origin
-          : [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ") || undefined;
-
-      if (origin !== undefined || origin_city !== undefined) {
-        profileUpdates.push("origin_city = ?");
-        profileParams.push(resolvedOriginCity || null);
-      }
-      if (origin !== undefined || origin_region !== undefined) {
-        profileUpdates.push("origin_region = ?");
-        profileParams.push(resolvedOriginRegion || null);
-      }
-      if (computedOrigin !== undefined) {
-        profileUpdates.push("origin = ?");
-        profileParams.push(computedOrigin || null);
-      }
-      if (contact_email !== undefined) {
-        profileUpdates.push("contact_email = ?");
-        profileParams.push(contact_email || null);
-      }
-      if (is_active !== undefined) {
-        profileUpdates.push("is_active = ?");
-        profileParams.push(Number(is_active) === 1 ? 1 : 0);
-      }
-      if (photo_url !== undefined) {
-        profileUpdates.push("photo_url = ?");
-        profileParams.push(resolvedPhotoUrl || null);
-      }
-      if (photo_alt_text !== undefined) {
-        profileUpdates.push("photo_alt_text = ?");
-        const cleanedAlt = sanitizeString(photo_alt_text);
-        profileParams.push(cleanedAlt ? cleanedAlt.slice(0, 250) : null);
-      }
-
-      // Handle Social Links (merge or overwrite?)
-      // The frontend sends a JSON string for social_links usually.
-      // Or if 'url' is sent legacy style, we merge it.
-
-      let newSocialLinks = null;
-      let shouldUpdateSocialLinks = false;
-      if (social_links !== undefined) {
-        shouldUpdateSocialLinks = true;
-        try {
-          newSocialLinks = sanitizeBandSocialLinks(social_links);
-        } catch (error) {
-          return new Response(
-            JSON.stringify({
-              error: "Validation error",
-              message: error.message,
-            }),
-            { status: 400, headers: { "Content-Type": "application/json" } },
-          );
-        }
-      } else if (url !== undefined) {
-        shouldUpdateSocialLinks = true;
-        // Legacy update of just website
-        let existingLinks = {};
-        try {
-          const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?")
-            .bind(bandProfileId)
-            .first();
-          existingLinks = JSON.parse(profile.social_links || "{}");
-        } catch (_e) {
-          /* ignore malformed JSON — existingLinks stays {} */
-        }
-        try {
-          existingLinks.website = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
-          newSocialLinks = sanitizeBandSocialLinks(existingLinks);
-        } catch (error) {
-          return new Response(
-            JSON.stringify({
-              error: "Validation error",
-              message: error.message,
-            }),
-            { status: 400, headers: { "Content-Type": "application/json" } },
-          );
-        }
-      }
-
-      if (shouldUpdateSocialLinks) {
-        profileUpdates.push("social_links = ?");
-        profileParams.push(newSocialLinks);
-      }
-
-      if (profileUpdates.length > 0) {
-        profileParams.push(bandProfileId);
-        writeStatements.push(
-          DB.prepare(`UPDATE band_profiles SET ${profileUpdates.join(", ")} WHERE id = ?`).bind(...profileParams),
+      const { profileStatement, error: profileFieldsError } = await prepareBandProfileFields(
+        DB,
+        body,
+        bandProfileId,
+        resolvedPhotoUrl,
+      );
+      if (profileFieldsError) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: profileFieldsError.message,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
         );
+      }
+
+      if (profileStatement) {
+        writeStatements.push(profileStatement);
       }
     }
 
-    // Handle performance updates (ONLY if it's a real performance)
-    if (!isProfileUpdate) {
+    // Handle performance updates
+    {
       if (normalizedVenueId !== undefined) {
         updates.push("venue_id = ?");
         params.push(normalizedVenueId);
@@ -553,11 +421,6 @@ export async function onRequestPut(context) {
           ).bind(...params),
         );
       }
-    } else {
-      // If we are updating a profile-only entry, we might be trying to convert it to a performance?
-      // But this PUT endpoint usually just updates fields.
-      // The BandForm doesn't support "assigning to event" from the Edit modal easily yet.
-      // So we ignore performance fields here if it's a profile update (for safety).
     }
 
     if (writeStatements.length > 0) {
@@ -565,10 +428,8 @@ export async function onRequestPut(context) {
     }
 
     // Fetch updated result
-    let result;
-    if (!isProfileUpdate) {
-      result = await DB.prepare(
-        `
+    const result = await DB.prepare(
+      `
         SELECT
           p.*,
           bp.name,
@@ -582,23 +443,9 @@ export async function onRequestPut(context) {
         JOIN band_profiles bp ON p.band_profile_id = bp.id
         WHERE p.id = ?
         `,
-      )
-        .bind(realPerformanceId)
-        .first();
-    } else {
-      const profile = await DB.prepare("SELECT * FROM band_profiles WHERE id = ?").bind(bandProfileId).first();
-      result = {
-        id: `profile_${profile.id}`,
-        name: profile.name,
-        origin: profile.origin,
-        origin_city: profile.origin_city,
-        origin_region: profile.origin_region,
-        contact_email: profile.contact_email,
-        is_active: profile.is_active,
-        social_links: profile.social_links,
-        // ... map other fields if needed by frontend ...
-      };
-    }
+    )
+      .bind(realPerformanceId)
+      .first();
 
     // Unpack social links for response compatibility. Read-path sanitize
     // (#493): `result.social_links` may reflect a pre-#483 (or otherwise
@@ -935,54 +782,9 @@ export async function onRequestDelete(context) {
     }
 
     if (isProfileDelete) {
-      const bandProfileId = parseProfileId(performanceId);
-      if (bandProfileId === null) {
-        return new Response(
-          JSON.stringify({
-            error: "Bad request",
-            message: "Invalid profile ID",
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      // Check if any performances exist
-      const perfCount = await DB.prepare("SELECT COUNT(*) as count FROM performances WHERE band_profile_id = ?")
-        .bind(bandProfileId)
-        .first();
-
-      if (perfCount.count > 0) {
-        return new Response(
-          JSON.stringify({
-            error: "Conflict",
-            message: "Cannot delete band profile because it has associated performances. Delete performances first.",
-          }),
-          {
-            status: 409,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      // Audit log
-      await auditLog(
-        env,
-        user.userId,
-        "band_profile.deleted",
-        "band_profile",
-        bandProfileId,
-        { deletedBy: user.email },
-        ipAddress,
-      );
-
-      // Delete profile
-      await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(bandProfileId).run();
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Band profile deleted successfully",
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
+      return onRequestProfileDelete(
+        { ...context, user, ipAddress },
+        { performanceId, valid, bandProfileId: parseProfileId(performanceId) },
       );
     }
 

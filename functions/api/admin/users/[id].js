@@ -3,6 +3,7 @@
 // DELETE /api/admin/users/:id - Delete user (soft delete)
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import { getClientIP } from "../../../utils/request.js";
 import { validateId } from "../../../utils/validation.js";
 
@@ -389,23 +390,21 @@ export async function onRequestDelete(context) {
 
       // Delete the user - this will trigger ON DELETE CASCADE for sessions/tokens
       DB.prepare("DELETE FROM users WHERE id = ?").bind(userId),
+      auditLogStatement(
+        env,
+        currentUser.userId,
+        "user.deleted",
+        "user",
+        userId,
+        {
+          email: user.email,
+          role: user.role,
+        },
+        ipAddress,
+      ),
     ];
 
     await DB.batch(cleanupStmts);
-
-    // Audit log
-    await auditLog(
-      env,
-      currentUser.userId,
-      "user.deleted",
-      "user",
-      userId,
-      {
-        email: user.email,
-        role: user.role,
-      },
-      ipAddress,
-    );
 
     return new Response(
       JSON.stringify({

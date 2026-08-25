@@ -7,6 +7,9 @@ import { getClientIP } from "../../utils/request.js";
 import { initializeLucia, SESSION_CONFIG } from "../../utils/auth.js";
 import { fromSqliteDateTime } from "../../utils/authAttempts.js";
 import { createRequestLogger, logger } from "../../utils/logger.js";
+import { auditLogStatement } from "../../utils/auditLogStatement.js";
+
+export { auditLogStatement } from "../../utils/auditLogStatement.js";
 
 function normalizeUser(user) {
   if (!user) return null;
@@ -205,21 +208,7 @@ export async function checkPermission(context, requiredRole) {
 // Audit log function - logs all admin actions
 export async function auditLog(env, userId, action, resourceType, resourceId, details, ipAddress, log = null) {
   try {
-    await env.DB.prepare(
-      `
-      INSERT INTO audit_log (user_id, action, resource_type, resource_id, details, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `,
-    )
-      .bind(
-        userId,
-        action,
-        resourceType || null,
-        resourceId || null,
-        details ? JSON.stringify(details) : null,
-        ipAddress || "unknown",
-      )
-      .run();
+    await auditLogStatement(env, userId, action, resourceType, resourceId, details, ipAddress).run();
   } catch (error) {
     // Never throws: audit logging must not fail the request it records.
     //

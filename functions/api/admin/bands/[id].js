@@ -3,6 +3,7 @@
 // DELETE /api/admin/bands/{id} - Delete band
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import {
   FIELD_LIMITS,
   isValidEmail,
@@ -827,31 +828,28 @@ export async function onRequestDelete(context) {
       );
     }
 
-    // Audit log before deletion
-    await auditLog(
-      env,
-      user.userId,
-      "band.deleted",
-      "band",
-      performanceId,
-      {
-        bandName: performance.name,
-        eventId: performance.event_id,
-        venueId: performance.venue_id,
-        startTime: performance.start_time,
-        endTime: performance.end_time,
-      },
-      ipAddress,
-    );
-
-    // Delete performance
-    await DB.prepare(
-      `
-      DELETE FROM performances WHERE id = ?
-    `,
-    )
-      .bind(performanceId)
-      .run();
+    await DB.batch([
+      DB.prepare(
+        `
+        DELETE FROM performances WHERE id = ?
+      `,
+      ).bind(performanceId),
+      auditLogStatement(
+        env,
+        user.userId,
+        "band.deleted",
+        "band",
+        performanceId,
+        {
+          bandName: performance.name,
+          eventId: performance.event_id,
+          venueId: performance.venue_id,
+          startTime: performance.start_time,
+          endTime: performance.end_time,
+        },
+        ipAddress,
+      ),
+    ]);
 
     return new Response(
       JSON.stringify({

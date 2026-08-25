@@ -30,6 +30,7 @@ function BulkActionBar({
           <div className="flex gap-2 w-full md:w-auto">
             {!isGlobalView && (
               <select
+                aria-label="Bulk action for the selected performances"
                 className="bg-bg-navy text-white px-4 py-2 min-h-[44px] rounded-lg flex-1 md:w-auto"
                 onChange={e => onActionChange(e.target.value)}
                 value=""
@@ -52,6 +53,7 @@ function BulkActionBar({
         {/* Action-specific forms (Step 2) */}
         {action === 'move_venue' && (
           <select
+            aria-label="Venue to move the selected performances to"
             className="bg-bg-navy text-white px-4 py-2 min-h-[44px] rounded-lg w-full md:w-auto"
             value={params.venue_id || ''}
             onChange={e => onParamsChange({ venue_id: parseInt(e.target.value) })}
@@ -68,6 +70,7 @@ function BulkActionBar({
         {action === 'change_time' && (
           <input
             type="time"
+            aria-label="New start time for the selected performances"
             className="bg-bg-navy text-white px-4 py-2 min-h-[44px] rounded-lg w-full md:w-auto"
             value={params.start_time || ''}
             onChange={e => onParamsChange({ start_time: e.target.value })}

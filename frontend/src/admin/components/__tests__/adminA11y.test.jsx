@@ -88,6 +88,38 @@ describe('BulkPreviewModal dialog semantics', () => {
     expect(onCancel).not.toHaveBeenCalled()
   })
 
+  // Modal's close button is enabled by default. With a no-op onClose during a
+  // bulk write it would be a focusable control that does nothing — worse than
+  // absent, because it invites the click that will not work.
+  it('hides the close button while a bulk write is in flight', () => {
+    const { rerender } = render(<BulkPreviewModal {...previewProps} />)
+    expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument()
+
+    rerender(<BulkPreviewModal {...previewProps} isProcessing />)
+    expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument()
+  })
+
+  // Modal restores focus in the else-branch of its isOpen effect, which a
+  // consumer that UNMOUNTS never reaches. BulkPreviewModal hardcodes isOpen and
+  // LineupTab drops it when the preview clears, so without an unmount cleanup
+  // focus was left on a removed node or on document.body.
+  it('returns focus to the trigger when it is unmounted rather than closed', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = 'Preview Changes'
+    document.body.appendChild(trigger)
+    trigger.focus()
+    expect(document.activeElement).toBe(trigger)
+
+    const { unmount } = render(<BulkPreviewModal {...previewProps} />)
+    await new Promise(r => requestAnimationFrame(r))
+    expect(document.activeElement).not.toBe(trigger)
+
+    unmount()
+
+    expect(document.activeElement).toBe(trigger)
+    trigger.remove()
+  })
+
   it('still renders the confirm and cancel actions', () => {
     render(<BulkPreviewModal {...previewProps} />)
     expect(screen.getByRole('button', { name: /apply changes/i })).toBeInTheDocument()

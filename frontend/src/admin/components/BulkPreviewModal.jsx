@@ -17,6 +17,7 @@ function BulkPreviewModal({ previewData, isProcessing, onConfirm, onCancel }) {
       title="Preview Changes"
       size="md"
       closeOnBackdropClick={!isProcessing}
+      showCloseButton={!isProcessing}
       footer={
         <div className="flex gap-3 justify-end">
           <button onClick={onCancel} className="btn-secondary" disabled={isProcessing}>

@@ -54,8 +54,24 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
     profileParams.push(sanitizeString(genre) || null);
   }
   const parsedOrigin = origin !== undefined ? parseOrigin(origin) : { city: null, region: null };
-  const resolvedOriginCity = origin_city !== undefined ? origin_city : parsedOrigin.city;
-  const resolvedOriginRegion = origin_region !== undefined ? origin_region : parsedOrigin.region;
+
+  // A PARTIAL component update has to fall back to what is stored, not to null.
+  // Sending only { origin_city: "" } while the row holds origin_region "ON"
+  // would otherwise recompose origin from city alone — writing origin = NULL
+  // while leaving origin_region = "ON" untouched, so the composite disagrees
+  // with the column beside it. One read, and only on component updates.
+  let fallbackCity = parsedOrigin.city;
+  let fallbackRegion = parsedOrigin.region;
+  if (origin === undefined && (origin_city !== undefined || origin_region !== undefined)) {
+    const stored = await DB.prepare("SELECT origin_city, origin_region FROM band_profiles WHERE id = ?")
+      .bind(bandProfileId)
+      .first();
+    fallbackCity = stored?.origin_city ?? null;
+    fallbackRegion = stored?.origin_region ?? null;
+  }
+
+  const resolvedOriginCity = origin_city !== undefined ? origin_city : fallbackCity;
+  const resolvedOriginRegion = origin_region !== undefined ? origin_region : fallbackRegion;
   // Recompose `origin` whenever a COMPONENT field is supplied, not only when the
   // recomposition is non-empty. Clearing both components sends "" for each, the
   // join is "", and a trailing `|| undefined` would make this read as "nothing

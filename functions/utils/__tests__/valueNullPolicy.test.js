@@ -40,10 +40,17 @@ describe("validation result value policy", () => {
     expect(Object.hasOwn(bad, "value")).toBe(false);
   });
 
-  // Source scan: a runtime test only reaches the paths it exercises, and these
-  // modules have many rejection branches.
+  // Source scan, because a runtime test only reaches the paths it exercises and
+  // these modules have many rejection branches.
+  //
+  // Matches whole `return { ... };` literals rather than physical lines. A
+  // line-based scan misses the shape that actually occurs in these files —
+  // rejections are routinely formatted across several lines, so `valid: false`
+  // and `value:` land on different lines and a per-line check reports nothing
+  // while the policy is violated.
   it("no rejection anywhere in validation/ carries a value key", () => {
     const offenders = [];
+
     for (const file of ["datetime.js", "ids.js", "strings.js", "urls.js", "contact.js", "identity.js", "schema.js"]) {
       let source;
       try {
@@ -51,12 +58,16 @@ describe("validation result value policy", () => {
       } catch {
         continue;
       }
-      source.split("\n").forEach((line, i) => {
-        if (line.includes("valid: false") && line.includes("value:")) {
-          offenders.push(`${file}:${i + 1}`);
-        }
-      });
+
+      for (const match of source.matchAll(/return\s*\{[\s\S]*?\};/g)) {
+        const literal = match[0];
+        if (!/valid:\s*false/.test(literal)) continue;
+        if (!/\bvalue\s*:/.test(literal)) continue;
+        const line = source.slice(0, match.index).split("\n").length;
+        offenders.push(`${file}:${line}`);
+      }
     }
+
     expect(offenders).toEqual([]);
   });
 });

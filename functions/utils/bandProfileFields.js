@@ -55,47 +55,51 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
   }
   const parsedOrigin = origin !== undefined ? parseOrigin(origin) : { city: null, region: null };
 
-  // A PARTIAL component update has to fall back to what is stored, not to null.
-  // Sending only { origin_city: "" } while the row holds origin_region "ON"
-  // would otherwise recompose origin from city alone — writing origin = NULL
-  // while leaving origin_region = "ON" untouched, so the composite disagrees
-  // with the column beside it. One read, and only on component updates.
-  let fallbackCity = parsedOrigin.city;
-  let fallbackRegion = parsedOrigin.region;
-  if (origin === undefined && (origin_city !== undefined || origin_region !== undefined)) {
-    const stored = await DB.prepare("SELECT origin_city, origin_region FROM band_profiles WHERE id = ?")
-      .bind(bandProfileId)
-      .first();
-    fallbackCity = stored?.origin_city ?? null;
-    fallbackRegion = stored?.origin_region ?? null;
-  }
-
-  const resolvedOriginCity = origin_city !== undefined ? origin_city : fallbackCity;
-  const resolvedOriginRegion = origin_region !== undefined ? origin_region : fallbackRegion;
+  const isPartialOriginUpdate = origin === undefined && (origin_city !== undefined) !== (origin_region !== undefined);
+  const resolvedOriginCity = origin_city !== undefined ? origin_city : parsedOrigin.city;
+  const resolvedOriginRegion = origin_region !== undefined ? origin_region : parsedOrigin.region;
   // Recompose `origin` whenever a COMPONENT field is supplied, not only when the
   // recomposition is non-empty. Clearing both components sends "" for each, the
   // join is "", and a trailing `|| undefined` would make this read as "nothing
   // supplied" — skipping the `origin = ?` update while origin_city and
   // origin_region are set to NULL, so the composite column keeps the value the
   // admin just deleted and the UI shows it again (#954).
-  const computedOrigin =
-    origin !== undefined
-      ? origin
-      : origin_city !== undefined || origin_region !== undefined
-        ? [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ")
-        : undefined;
+  if (isPartialOriginUpdate) {
+    if (origin_city !== undefined) {
+      profileUpdates.push("origin_city = ?");
+      profileParams.push(origin_city || null);
+      profileUpdates.push(
+        "origin = NULLIF(TRIM(COALESCE(?, '') || CASE WHEN COALESCE(?, '') <> '' AND COALESCE(origin_region, '') <> '' THEN ', ' ELSE '' END || COALESCE(origin_region, '')), '')",
+      );
+      profileParams.push(origin_city, origin_city);
+    } else {
+      profileUpdates.push("origin_region = ?");
+      profileParams.push(origin_region || null);
+      profileUpdates.push(
+        "origin = NULLIF(TRIM(COALESCE(origin_city, '') || CASE WHEN COALESCE(origin_city, '') <> '' AND COALESCE(?, '') <> '' THEN ', ' ELSE '' END || COALESCE(?, '')), '')",
+      );
+      profileParams.push(origin_region, origin_region);
+    }
+  } else {
+    const computedOrigin =
+      origin !== undefined
+        ? origin
+        : origin_city !== undefined || origin_region !== undefined
+          ? [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ")
+          : undefined;
 
-  if (origin !== undefined || origin_city !== undefined) {
-    profileUpdates.push("origin_city = ?");
-    profileParams.push(resolvedOriginCity || null);
-  }
-  if (origin !== undefined || origin_region !== undefined) {
-    profileUpdates.push("origin_region = ?");
-    profileParams.push(resolvedOriginRegion || null);
-  }
-  if (computedOrigin !== undefined) {
-    profileUpdates.push("origin = ?");
-    profileParams.push(computedOrigin || null);
+    if (origin !== undefined || origin_city !== undefined) {
+      profileUpdates.push("origin_city = ?");
+      profileParams.push(resolvedOriginCity || null);
+    }
+    if (origin !== undefined || origin_region !== undefined) {
+      profileUpdates.push("origin_region = ?");
+      profileParams.push(resolvedOriginRegion || null);
+    }
+    if (computedOrigin !== undefined) {
+      profileUpdates.push("origin = ?");
+      profileParams.push(computedOrigin || null);
+    }
   }
   if (contact_email !== undefined) {
     profileUpdates.push("contact_email = ?");

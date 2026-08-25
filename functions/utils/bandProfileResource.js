@@ -259,7 +259,12 @@ export async function onRequestProfileDelete(context, { performanceId: _performa
   const user = context.user;
   const ipAddress = context.ipAddress;
   try {
-    if (!valid && bandProfileId === null) {
+    // Unconditional, as it was before this module existed (#935). Gating it on
+    // `!valid` would make a security check depend on a coincidence: a
+    // `profile_`-prefixed id always fails validateId today, so `!valid` is
+    // always true here — but the guard's job is to reject a malformed profile
+    // id, and that must not rely on a separate validator's current behaviour.
+    if (bandProfileId === null) {
       return new Response(
         JSON.stringify({
           error: "Bad request",

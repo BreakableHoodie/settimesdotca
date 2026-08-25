@@ -483,7 +483,7 @@ export async function onRequestPatch(context) {
   }
 
   try {
-    let result;
+    let statements;
     let rowsAffected = 0;
 
     if (action === "move_venue") {
@@ -515,12 +515,9 @@ export async function onRequestPatch(context) {
       }
 
       // Build batch update statements (ATOMIC - all or nothing)
-      const statements = validatedBandIds.map((id) =>
+      statements = validatedBandIds.map((id) =>
         env.DB.prepare("UPDATE performances SET venue_id = ? WHERE id = ?").bind(venue_id, id),
       );
-
-      result = await env.DB.batch(statements);
-      rowsAffected = result.reduce((total, res) => total + (res.meta?.changes ?? 0), 0);
     } else if (action === "change_time") {
       const { start_time } = params;
 
@@ -557,7 +554,7 @@ export async function onRequestPatch(context) {
         .bind(...validatedBandIds)
         .all();
 
-      const statements = currentPerfs.map((perf) => {
+      statements = currentPerfs.map((perf) => {
         const newEnd =
           perf.start_time && perf.end_time ? computeNewEndTime(perf.start_time, perf.end_time, start_time) : null;
         return env.DB.prepare("UPDATE performances SET start_time = ?, end_time = ? WHERE id = ?").bind(
@@ -566,32 +563,31 @@ export async function onRequestPatch(context) {
           perf.id,
         );
       });
-
-      result = await env.DB.batch(statements);
-      rowsAffected = result.reduce((total, res) => total + (res.meta?.changes ?? 0), 0);
     } else if (action === "delete") {
       const placeholders = validatedBandIds.map(() => "?").join(",");
-      result = await env.DB.prepare(`DELETE FROM performances WHERE id IN (${placeholders})`)
-        .bind(...validatedBandIds)
-        .run();
-      rowsAffected = result.meta?.changes ?? 0;
+      statements = [env.DB.prepare(`DELETE FROM performances WHERE id IN (${placeholders})`).bind(...validatedBandIds)];
     }
 
-    // Audit log the bulk operation
-    await auditLog(
-      env,
-      user.userId,
-      `band.bulk_${action}`,
-      "band",
-      null,
-      {
-        action,
-        bandIds: validatedBandIds,
-        bandCount: validatedBandIds.length,
-        params,
-      },
-      ipAddress,
+    const dataStatementCount = statements.length;
+    statements.push(
+      auditLogStatement(
+        env,
+        user.userId,
+        `band.bulk_${action}`,
+        "band",
+        null,
+        {
+          action,
+          bandIds: validatedBandIds,
+          bandCount: validatedBandIds.length,
+          params,
+        },
+        ipAddress,
+      ),
     );
+
+    const result = await env.DB.batch(statements);
+    rowsAffected = result.slice(0, dataStatementCount).reduce((total, res) => total + (res.meta?.changes ?? 0), 0);
 
     return new Response(
       JSON.stringify({

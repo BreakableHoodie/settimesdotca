@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { auditLogStatement } from "../auditLogStatement.js";
+import { onRequestPatch } from "../../api/admin/bands/bulk.js";
+import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../api/test-utils.js";
 
 // __tests__ -> utils -> functions -> repo root (four levels, not three: the
 // first dirname strips the filename itself).
@@ -76,12 +78,12 @@ describe("auditLogStatement", () => {
 function batchPayloads(source) {
   const payloads = [];
 
-  const balancedFrom = (openIndex) => {
+  const balancedFrom = (openIndex, open = "[", close = "]") => {
     let depth = 0;
     for (let i = openIndex; i < source.length; i += 1) {
       const c = source[i];
-      if (c === "[") depth += 1;
-      else if (c === "]") {
+      if (c === open) depth += 1;
+      else if (c === close) {
         depth -= 1;
         if (depth === 0) return source.slice(openIndex, i + 1);
       }
@@ -95,9 +97,21 @@ function batchPayloads(source) {
       payloads.push(balancedFrom(match.index + match[0].lastIndexOf("[")));
       continue;
     }
-    // Variable form: find the array literal assigned to that identifier.
+    // Variable form: the payload is what actually lands in the array — its
+    // literal contents PLUS anything pushed onto it before the batch call.
+    // A raw text slice from the declaration to the batch is not equivalent and
+    // was a live bypass: it also swallows statements executed on their own in
+    // that window, so a sequential `.run()` delete written after the
+    // declaration read as batched. Verified by mutation, 2026-08-25.
     const decl = source.indexOf(`${token} = [`);
-    if (decl !== -1) payloads.push(balancedFrom(source.indexOf("[", decl)));
+    if (decl === -1) continue;
+    let payload = balancedFrom(source.indexOf("[", decl));
+    const pushToken = `${token}.push(`;
+    for (let at = source.indexOf(pushToken, decl); at !== -1 && at < match.index;) {
+      payload += balancedFrom(at + pushToken.length - 1, "(", ")");
+      at = source.indexOf(pushToken, at + pushToken.length);
+    }
+    payloads.push(payload);
   }
 
   return payloads;
@@ -140,6 +154,28 @@ describe("the batch scanner", () => {
     );
     expect(ok, "a delete-only batch with a separate audit must not pass").toBe(false);
   });
+
+  const passes = (src) =>
+    batchPayloads(src).some(
+      (p) => p.includes("venue.deleted") && p.includes("auditLogStatement") && /DELETE FROM/i.test(p),
+    );
+
+  it("accepts the variable form with the audit pushed on after the literal", () => {
+    const src = `let stmts;\nstmts = [DB.prepare("DELETE FROM venues WHERE id = ?").bind(id)];\nstmts.push(${AUDIT});\nawait DB.batch(stmts);`;
+    expect(passes(src)).toBe(true);
+  });
+
+  // The second bypass, found by mutation. Both symbols are present AND a batch
+  // exists, but the delete runs on its own between the declaration and the
+  // batch — so only the audit is ever batched.
+  it("REJECTS a delete executed separately after the array is declared", () => {
+    const src = `let stmts;\nstmts = [];\nawait DB.prepare("DELETE FROM venues WHERE id = ?").bind(id).run();\nstmts.push(${AUDIT});\nawait DB.batch(stmts);`;
+
+    expect(src).toContain("auditLogStatement");
+    expect(src).toContain("DB.batch(");
+
+    expect(passes(src), "a separately-executed delete must not read as batched").toBe(false);
+  });
 });
 
 describe("destructive admin handlers batch their audit row", () => {
@@ -152,6 +188,7 @@ describe("destructive admin handlers batch their audit row", () => {
     ["functions/api/admin/bands/[id].js", "band.deleted", /DELETE\s+FROM\s+performances\b/i],
     ["functions/api/admin/bands/bulk.js", "band_profile.deleted", /DELETE\s+FROM\s+band_profiles\b/i],
     ["functions/api/admin/bands/bulk.js", "band.deleted", /DELETE\s+FROM\s+performances\b/i],
+    ["functions/api/admin/bands/bulk.js", "band.bulk_${action}", /DELETE\s+FROM\s+performances\b/i],
     ["functions/api/admin/events/[id].js", "event.deleted", /DELETE\s+FROM\s+events\b/i],
     ["functions/api/admin/users/[id].js", "user.deleted", /DELETE\s+FROM\s+users\b/i],
     ["functions/api/admin/venues/[id].js", "venue.deleted", /DELETE\s+FROM\s+venues\b/i],
@@ -165,5 +202,108 @@ describe("destructive admin handlers batch their audit row", () => {
     );
 
     expect(together, `${file}: "${action}" is not in the same DB.batch(...) as ${deletePattern}`).toBe(true);
+  });
+});
+
+function patchRequest(env, body) {
+  return onRequestPatch({
+    request: new Request("https://example.test/api/admin/bands/bulk", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    env,
+    data: { user: { userId: 1, email: "admin@test", role: "editor" } },
+  });
+}
+
+function useTransactionalBatch(env, rawDb) {
+  const batch = vi.fn(async (statements) => rawDb.transaction(() => statements.map((statement) => statement.run()))());
+  env.DB.batch = batch;
+  return batch;
+}
+
+function makePerformanceFixture() {
+  const { env, rawDb } = createTestEnv({ role: "editor" });
+  const event = insertEvent(rawDb, { name: "Atomic Event", slug: "atomic-event" });
+  const venue = insertVenue(rawDb, { name: "Atomic Venue" });
+  const performance = insertBand(rawDb, {
+    name: "Atomic Band",
+    event_id: event.id,
+    venue_id: venue.id,
+    start_time: "18:00",
+    end_time: "19:00",
+  });
+  return { env, rawDb, event, venue, performance };
+}
+
+describe("bulk PATCH audit atomicity", () => {
+  it("rolls back the audit row when the DELETE fails", async () => {
+    const { env, rawDb, performance } = makePerformanceFixture();
+    rawDb.exec(`
+      CREATE TRIGGER fail_bulk_delete
+      BEFORE DELETE ON performances
+      BEGIN
+        SELECT RAISE(ABORT, 'forced bulk delete failure');
+      END
+    `);
+    const batch = useTransactionalBatch(env, rawDb);
+
+    const response = await patchRequest(env, { band_ids: [performance.id], action: "delete" });
+
+    expect(response.status).toBe(500);
+    expect(batch).toHaveBeenCalledOnce();
+    expect(rawDb.prepare("SELECT id FROM performances WHERE id = ?").get(performance.id)).toBeTruthy();
+    expect(rawDb.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE action = 'band.bulk_delete'").get().count).toBe(
+      0,
+    );
+  });
+
+  it("rolls back the DELETE when the audit INSERT fails", async () => {
+    const { env, rawDb, performance } = makePerformanceFixture();
+    rawDb.exec(`
+      CREATE TRIGGER fail_bulk_audit
+      BEFORE INSERT ON audit_log
+      BEGIN
+        SELECT RAISE(ABORT, 'forced bulk audit failure');
+      END
+    `);
+    useTransactionalBatch(env, rawDb);
+
+    const response = await patchRequest(env, { band_ids: [performance.id], action: "delete" });
+
+    expect(response.status).toBe(500);
+    expect(rawDb.prepare("SELECT id FROM performances WHERE id = ?").get(performance.id)).toBeTruthy();
+  });
+
+  it("reports only deleted performances in updated", async () => {
+    const { env, rawDb, event, venue, performance } = makePerformanceFixture();
+    const second = insertBand(rawDb, {
+      name: "Second Atomic Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    useTransactionalBatch(env, rawDb);
+
+    const response = await patchRequest(env, { band_ids: [performance.id, second.id], action: "delete" });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).updated).toBe(2);
+  });
+
+  it("reports only updated performances in updated", async () => {
+    const { env, rawDb, performance } = makePerformanceFixture();
+    useTransactionalBatch(env, rawDb);
+
+    const response = await patchRequest(env, {
+      band_ids: [performance.id],
+      action: "change_time",
+      start_time: "20:00",
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).updated).toBe(1);
   });
 });

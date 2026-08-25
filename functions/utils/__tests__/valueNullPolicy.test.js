@@ -52,12 +52,11 @@ describe("validation result value policy", () => {
     const offenders = [];
 
     for (const file of ["datetime.js", "ids.js", "strings.js", "urls.js", "contact.js", "identity.js", "schema.js"]) {
-      let source;
-      try {
-        source = readFileSync(join(validationDir, file), "utf8");
-      } catch {
-        continue;
-      }
+      // Fail closed. Swallowing a read error would let this guard quietly stop
+      // checking a module that was renamed, moved or deleted — a scan that
+      // silently covers less than it claims is worse than no scan, because the
+      // green tick still says the policy holds.
+      const source = readFileSync(join(validationDir, file), "utf8");
 
       for (const match of source.matchAll(/return\s*\{[\s\S]*?\};/g)) {
         const literal = match[0];

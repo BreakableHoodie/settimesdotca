@@ -143,23 +143,27 @@ describe("the batch scanner", () => {
 });
 
 describe("destructive admin handlers batch their audit row", () => {
+  // The table is named per site rather than checking for a generic DELETE: these
+  // handlers delete from several tables, so a generic check can be satisfied by
+  // the WRONG one. `bands/[id].js` also issues DELETE FROM band_announce_queue,
+  // which would let "band.deleted" pass with its performances delete removed.
   const sites = [
-    ["functions/utils/bandProfileResource.js", "band_profile.deleted"],
-    ["functions/api/admin/bands/[id].js", "band.deleted"],
-    ["functions/api/admin/bands/bulk.js", "band_profile.deleted"],
-    ["functions/api/admin/bands/bulk.js", "band.deleted"],
-    ["functions/api/admin/events/[id].js", "event.deleted"],
-    ["functions/api/admin/users/[id].js", "user.deleted"],
-    ["functions/api/admin/venues/[id].js", "venue.deleted"],
+    ["functions/utils/bandProfileResource.js", "band_profile.deleted", /DELETE\s+FROM\s+band_profiles\b/i],
+    ["functions/api/admin/bands/[id].js", "band.deleted", /DELETE\s+FROM\s+performances\b/i],
+    ["functions/api/admin/bands/bulk.js", "band_profile.deleted", /DELETE\s+FROM\s+band_profiles\b/i],
+    ["functions/api/admin/bands/bulk.js", "band.deleted", /DELETE\s+FROM\s+performances\b/i],
+    ["functions/api/admin/events/[id].js", "event.deleted", /DELETE\s+FROM\s+events\b/i],
+    ["functions/api/admin/users/[id].js", "user.deleted", /DELETE\s+FROM\s+users\b/i],
+    ["functions/api/admin/venues/[id].js", "venue.deleted", /DELETE\s+FROM\s+venues\b/i],
   ];
 
-  it.each(sites)("%s puts %s in the same batch as its DELETE", (file, action) => {
+  it.each(sites)("%s puts %s in the same batch as its own DELETE", (file, action, deletePattern) => {
     const source = readFileSync(join(repoRoot, file), "utf8");
 
     const together = batchPayloads(source).some(
-      (payload) => payload.includes(action) && payload.includes("auditLogStatement") && /DELETE FROM/i.test(payload),
+      (payload) => payload.includes(action) && payload.includes("auditLogStatement") && deletePattern.test(payload),
     );
 
-    expect(together, `${file}: "${action}" is not in the same DB.batch(...) as its DELETE`).toBe(true);
+    expect(together, `${file}: "${action}" is not in the same DB.batch(...) as ${deletePattern}`).toBe(true);
   });
 });

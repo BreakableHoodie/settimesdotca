@@ -8,12 +8,12 @@
  */
 export function validateId(id) {
   if (id === undefined || id === null || id === "") {
-    return { valid: false, value: null, error: "ID is required" };
+    return { valid: false, error: "ID is required" };
   }
 
   const numId = Number(id);
   if (!Number.isInteger(numId) || numId < 1) {
-    return { valid: false, value: null, error: "ID must be a positive integer" };
+    return { valid: false, error: "ID must be a positive integer" };
   }
 
   return { valid: true, value: numId, error: undefined };

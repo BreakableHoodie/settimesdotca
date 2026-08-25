@@ -222,16 +222,21 @@ export function validateDate(dateString) {
  */
 export function validatePerformanceDate(performanceDate, event) {
   if (performanceDate === undefined || performanceDate === null || performanceDate === "") {
+    // `null`, NOT `undefined`. This is a VALID result whose value is legitimately
+    // absent, and callers bind it straight into D1 — bands.js binds it as
+    // performance_date, events.js as doors_json. D1's .bind() rejects undefined
+    // outright, so the guideline's "prefer undefined for optional values" does
+    // not apply here: this null IS the value written to a nullable column.
     return { valid: true, error: undefined, value: null };
   }
 
   if (typeof performanceDate !== "string") {
-    return { valid: false, error: "performance_date must be a YYYY-MM-DD string", value: null };
+    return { valid: false, error: "performance_date must be a YYYY-MM-DD string" };
   }
 
   const dateCheck = validateDate(performanceDate);
   if (!dateCheck.valid) {
-    return { valid: false, error: dateCheck.error, value: null };
+    return { valid: false, error: dateCheck.error };
   }
 
   const minDate = event?.date || null;
@@ -241,7 +246,6 @@ export function validatePerformanceDate(performanceDate, event) {
     return {
       valid: false,
       error: `performance_date must be between ${minDate || "the event start"} and ${maxDate || "the event end"}`,
-      value: null,
     };
   }
 
@@ -265,6 +269,11 @@ export function validatePerformanceDate(performanceDate, event) {
  */
 export function validateDoorsJson(doorsJson, event) {
   if (doorsJson === undefined || doorsJson === null || doorsJson === "") {
+    // `null`, NOT `undefined`. This is a VALID result whose value is legitimately
+    // absent, and callers bind it straight into D1 — bands.js binds it as
+    // performance_date, events.js as doors_json. D1's .bind() rejects undefined
+    // outright, so the guideline's "prefer undefined for optional values" does
+    // not apply here: this null IS the value written to a nullable column.
     return { valid: true, error: undefined, value: null };
   }
 
@@ -274,26 +283,30 @@ export function validateDoorsJson(doorsJson, event) {
       return {
         valid: false,
         error: `Doors times must be no more than ${FIELD_LIMITS.eventDoorsJson.max} characters`,
-        value: null,
       };
     }
     try {
       parsed = JSON.parse(doorsJson);
     } catch {
-      return { valid: false, error: "Doors times must be valid JSON", value: null };
+      return { valid: false, error: "Doors times must be valid JSON" };
     }
   } else if (typeof doorsJson === "object") {
     parsed = doorsJson;
   } else {
-    return { valid: false, error: "Doors times must be a JSON object", value: null };
+    return { valid: false, error: "Doors times must be a JSON object" };
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { valid: false, error: "Doors times must be a JSON object", value: null };
+    return { valid: false, error: "Doors times must be a JSON object" };
   }
 
   const entries = Object.entries(parsed);
   if (entries.length === 0) {
+    // `null`, NOT `undefined`. This is a VALID result whose value is legitimately
+    // absent, and callers bind it straight into D1 — bands.js binds it as
+    // performance_date, events.js as doors_json. D1's .bind() rejects undefined
+    // outright, so the guideline's "prefer undefined for optional values" does
+    // not apply here: this null IS the value written to a nullable column.
     return { valid: true, error: undefined, value: null };
   }
 
@@ -303,19 +316,18 @@ export function validateDoorsJson(doorsJson, event) {
   for (const [dateKey, timeValue] of entries) {
     const dateCheck = validateDate(dateKey);
     if (!dateCheck.valid) {
-      return { valid: false, error: `Doors times key "${dateKey}" must be a valid YYYY-MM-DD date`, value: null };
+      return { valid: false, error: `Doors times key "${dateKey}" must be a valid YYYY-MM-DD date` };
     }
 
     if (!minDate || dateKey < minDate || dateKey > maxDate) {
       return {
         valid: false,
         error: `Doors times date "${dateKey}" must be between ${minDate || "the event start"} and ${maxDate || "the event end"}`,
-        value: null,
       };
     }
 
     if (typeof timeValue !== "string" || !DOORS_TIME_REGEX.test(timeValue)) {
-      return { valid: false, error: `Doors time for "${dateKey}" must be in 24-hour HH:MM format`, value: null };
+      return { valid: false, error: `Doors time for "${dateKey}" must be in 24-hour HH:MM format` };
     }
   }
 
@@ -324,7 +336,6 @@ export function validateDoorsJson(doorsJson, event) {
     return {
       valid: false,
       error: `Doors times must be no more than ${FIELD_LIMITS.eventDoorsJson.max} characters`,
-      value: null,
     };
   }
 

@@ -56,8 +56,18 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
   const parsedOrigin = origin !== undefined ? parseOrigin(origin) : { city: null, region: null };
   const resolvedOriginCity = origin_city !== undefined ? origin_city : parsedOrigin.city;
   const resolvedOriginRegion = origin_region !== undefined ? origin_region : parsedOrigin.region;
+  // Recompose `origin` whenever a COMPONENT field is supplied, not only when the
+  // recomposition is non-empty. Clearing both components sends "" for each, the
+  // join is "", and a trailing `|| undefined` would make this read as "nothing
+  // supplied" — skipping the `origin = ?` update while origin_city and
+  // origin_region are set to NULL, so the composite column keeps the value the
+  // admin just deleted and the UI shows it again (#954).
   const computedOrigin =
-    origin !== undefined ? origin : [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ") || undefined;
+    origin !== undefined
+      ? origin
+      : origin_city !== undefined || origin_region !== undefined
+        ? [resolvedOriginCity, resolvedOriginRegion].filter(Boolean).join(", ")
+        : undefined;
 
   if (origin !== undefined || origin_city !== undefined) {
     profileUpdates.push("origin_city = ?");

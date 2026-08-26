@@ -142,10 +142,11 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
   } else if (url !== undefined) {
     shouldUpdateSocialLinks = true;
     let existingLinks = {};
+    const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?").bind(bandProfileId).first();
+    if (!profile) {
+      throw new Error("Band profile not found");
+    }
     try {
-      const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?")
-        .bind(bandProfileId)
-        .first();
       existingLinks = JSON.parse(profile.social_links || "{}");
     } catch (_e) {
       /* ignore malformed JSON — existingLinks stays {} */

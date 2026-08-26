@@ -72,13 +72,14 @@ export async function onRequestGet(context) {
       ).bind(eventId),
       DB.prepare(
         `SELECT COUNT(*) AS total_shares,
-                COALESCE(SUM(view_count), 0) AS total_share_views,
-                COALESCE(SUM(import_count), 0) AS total_share_imports
+                 COALESCE(SUM(view_count), 0) AS total_share_views,
+                 COALESCE(SUM(view_count_legacy), 0) AS total_share_views_legacy,
+                 COALESCE(SUM(import_count), 0) AS total_share_imports
          FROM share_links WHERE event_id = ?`,
       ).bind(eventId),
       DB.prepare(
-        `SELECT slug, view_count, band_names, created_at FROM share_links
-         WHERE event_id = ? AND view_count > 0
+        `SELECT slug, view_count, view_count_legacy, band_names, created_at FROM share_links
+         WHERE event_id = ? AND (view_count > 0 OR view_count_legacy > 0)
          ORDER BY view_count DESC, created_at DESC
          LIMIT 10`,
       ).bind(eventId),
@@ -143,6 +144,7 @@ export async function onRequestGet(context) {
       return {
         slug: row.slug,
         view_count: row.view_count,
+        view_count_legacy: row.view_count_legacy,
         created_at: row.created_at,
         band_count: bandCount,
       };
@@ -176,6 +178,7 @@ export async function onRequestGet(context) {
           popularBands: popularBands,
           totalShares: shareStats?.total_shares || 0,
           totalShareViews: shareStats?.total_share_views || 0,
+          totalShareViewsLegacy: shareStats?.total_share_views_legacy || 0,
           totalShareImports: shareStats?.total_share_imports || 0,
           topSharedRoutes: topSharedRoutes,
           announcementPlanning: announcementPlanning,

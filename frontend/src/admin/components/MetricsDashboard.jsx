@@ -69,8 +69,13 @@ export default function MetricsDashboard({ eventId }) {
 
         {/* Share Views */}
         <div className="bg-bg-purple rounded-lg p-4">
-          <div className="text-gray-400 text-sm">Share Views</div>
+          <div className="text-gray-400 text-sm">Share Views (unique visitors, all-time)</div>
           <div className="text-3xl font-bold text-white mt-2">{metrics.totalShareViews ?? 0}</div>
+          {!!metrics.totalShareViewsLegacy && (
+            <div className="mt-1 text-sm font-normal text-gray-400">
+              {metrics.totalShareViewsLegacy} pre-cutover raw fetches
+            </div>
+          )}
         </div>
 
         {/* Shares Imported — the conversion signal: a fan adopted someone else's route */}
@@ -135,7 +140,13 @@ export default function MetricsDashboard({ eventId }) {
                     </>
                   ) : null}
                   {' · '}
-                  {route.view_count} {route.view_count === 1 ? 'view' : 'views'}
+                  {route.view_count} unique {route.view_count === 1 ? 'visitor' : 'visitors'}
+                  {!!route.view_count_legacy && (
+                    <span className="text-gray-500">
+                      {' · '}
+                      {route.view_count_legacy} pre-cutover raw fetches
+                    </span>
+                  )}
                 </span>
               </div>
             ))
@@ -144,8 +155,8 @@ export default function MetricsDashboard({ eventId }) {
           )}
         </div>
         <p className="text-gray-400 text-xs mt-3">
-          Views count unique visitors per link — reloads and crawlers don&apos;t inflate them. Imports count per-fetch
-          adoptions.
+          Unique visitors are deduplicated per link; pre-cutover raw fetches are undeduplicated per-fetch. Imports count
+          per-fetch adoptions.
         </p>
       </div>
     </div>

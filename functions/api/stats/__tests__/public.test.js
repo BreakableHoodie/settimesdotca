@@ -74,6 +74,7 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
     expect(body.performances).toBe(2); // only performances on the published event
     expect(body.routes_shared).toBe(2);
     expect(body.route_views).toBe(15);
+    expect(body.route_views_legacy).toBe(0);
     expect(body.fans_following).toBe(1); // only the verified follow
     expect(body.page_views).toBe(125);
 
@@ -88,6 +89,24 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
       expect(Object.keys(band).sort()).toEqual(["name", "score", "slug"]);
       expect(band).not.toHaveProperty("id");
     }
+  });
+
+  it("keeps unique visitor and legacy raw-fetch totals separate", async () => {
+    const { env, rawDb } = seedEnv();
+    const event = insertEvent(rawDb, { name: "Legacy Fest", slug: "legacy-fest" });
+    publish(rawDb, event.id);
+    insertShareLink(rawDb, { slug: "share-legacy", event_id: event.id, event_slug: "legacy-fest" });
+    rawDb
+      .prepare("UPDATE share_links SET view_count = ?, view_count_legacy = ? WHERE slug = ?")
+      .run(2, 9, "share-legacy");
+
+    const res = await getStats(env);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.route_views).toBe(2);
+    expect(body.route_views_legacy).toBe(9);
+    expect(body.route_views).not.toBe(11);
+    expect(body.route_views_legacy).not.toBe(11);
   });
 
   it("never leaks PII-shaped fields anywhere in the response body", async () => {
@@ -158,6 +177,7 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
     expect(body.performances).toBe(0);
     expect(body.routes_shared).toBe(0);
     expect(body.route_views).toBe(0);
+    expect(body.route_views_legacy).toBe(0);
     expect(body.fans_following).toBe(0);
     expect(body.page_views).toBe(0);
     expect(body.top_bands).toEqual([]);

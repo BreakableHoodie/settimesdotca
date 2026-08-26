@@ -9,7 +9,8 @@
 // individual/PII/joinable-to-a-person field:
 //   - band_follows has email, verification_token, unsubscribe_token, consent_ip.
 //     Only ever `COUNT(*) WHERE verified = 1` against it — never SELECT those columns.
-//   - share_links: COUNT and SUM(view_count) only — never slug/band_names/performance_ids.
+//   - share_links: COUNT and separate SUMs of view_count and view_count_legacy —
+//     never slug/band_names/performance_ids.
 //   - No IPs, emails, session IDs, tokens, or raw rows anywhere in the response.
 // Bands/venues/events are public data, so their names/counts are fine.
 
@@ -55,8 +56,14 @@ export async function onRequestGet(context) {
            JOIN events e ON e.id = p.event_id
            WHERE ${publicEventStatusSql("e")}`,
         ),
-        // share_links: aggregate only — count of rows + sum of view_count.
-        DB.prepare(`SELECT COUNT(*) AS count, COALESCE(SUM(view_count), 0) AS total_views FROM share_links`),
+        // Keep the two share-view units separate: unique visitors versus
+        // pre-cutover, undeduplicated raw fetches.
+        DB.prepare(
+          `SELECT COUNT(*) AS count,
+                  COALESCE(SUM(view_count), 0) AS total_views,
+                  COALESCE(SUM(view_count_legacy), 0) AS total_views_legacy
+           FROM share_links`,
+        ),
         // band_follows: verified-only count. Never select email/tokens/consent_ip.
         DB.prepare(`SELECT COUNT(*) AS count FROM band_follows WHERE verified = 1`),
         DB.prepare(`SELECT COALESCE(SUM(views), 0) AS total_views FROM page_views_daily`),
@@ -85,6 +92,7 @@ export async function onRequestGet(context) {
       performances: performancesRes.results?.[0]?.count || 0,
       routes_shared: shareRes.results?.[0]?.count || 0,
       route_views: shareRes.results?.[0]?.total_views || 0,
+      route_views_legacy: shareRes.results?.[0]?.total_views_legacy || 0,
       fans_following: followsRes.results?.[0]?.count || 0,
       page_views: pageViewsRes.results?.[0]?.total_views || 0,
       top_bands: topBands,

@@ -152,11 +152,18 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
     try {
       const sanitizedUrl = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
       profileUpdates.push(
+        // Nested rather than `json_valid(...) AND json_type(...)`: SQLite does
+        // short-circuit that AND for a column reference, but the same
+        // expression over bound parameters evaluates both operands and
+        // json_type raises "malformed JSON" on unparseable input. Nesting
+        // costs two lines and does not depend on an ordering guarantee this
+        // write path should not rest on.
         `social_links = (
           WITH merged(value) AS (
             SELECT json_set(
               CASE
-                WHEN json_valid(social_links) AND json_type(social_links) = 'object' THEN social_links
+                WHEN json_valid(social_links) THEN
+                  CASE WHEN json_type(social_links) = 'object' THEN social_links ELSE '{}' END
                 ELSE '{}'
               END,
               '$.website', ?

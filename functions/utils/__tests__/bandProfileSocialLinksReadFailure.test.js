@@ -121,11 +121,11 @@ describe("band profile social-links URL updates", () => {
     });
   });
 
-  it.each([
-    ["null", null],
-    ["42", 42],
-    ['"hello"', "hello"],
-  ])("recovers from a non-object stored JSON value: %s", async (storedValue) => {
+  // Each row is the raw JSON TEXT stored in the column, not a JS value: the
+  // callback takes one parameter, so it.each binds the first element. "[]" is
+  // the only case that reaches the Array.isArray clause -- an array parses as a
+  // truthy typeof "object" and passes every other check in the guard.
+  it.each(["null", "42", '"hello"', "[]"])("recovers from a non-object stored JSON value: %s", async (storedValue) => {
     const profile = createProfile({ instagram: "https://instagram.com/test-band" });
     profile.rawDb.prepare("UPDATE band_profiles SET social_links = ? WHERE id = ?").run(storedValue, profile.id);
 

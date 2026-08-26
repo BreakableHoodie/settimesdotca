@@ -2,6 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { BAND_LINK_FIELD_KEYS } from "../bandLinkFields.js";
+import { sanitizeBandSocialLinks } from "../validation/urls.js";
 
 // --- Durable guard: no private hand-listing of band link-platform keys --------
 //
@@ -37,7 +39,9 @@ import { describe, expect, it } from "vitest";
 //   - `sanitizeBandSocialLinks` / `sanitizeEventSocialLinks`
 //     (functions/utils/validation.js) — the WRITE-path sanitizers — enumerate
 //     per-field validators, but they read `parsed.website`, `parsed.instagram`,
-//     etc., NOT `socialLinks.website`. Not flagged.
+//     etc., NOT `socialLinks.website`. Not flagged. The source scan cannot cover
+//     this deliberate per-field list; the runtime set-equality test below
+//     guards `sanitizeBandSocialLinks` instead.
 //   - The canonical home itself (bandLinkFields.js) declares the keys as
 //     string literals in an array, never as a property access on a
 //     `socialLinks` object. Not flagged.
@@ -140,5 +144,21 @@ describe("no hand-listed band link-platform keys outside bandLinkFields.js", () 
             `"two canonical homes" pattern and issue #779.`
         : undefined,
     ).toEqual([]);
+  });
+
+  it("keeps the band-link sanitizer keys equal to the server registry", () => {
+    const sanitized = JSON.parse(sanitizeBandSocialLinks({ website: "https://example.com" }));
+    const sanitizedKeys = Object.keys(sanitized);
+    const registryKeys = new Set(BAND_LINK_FIELD_KEYS);
+    const sanitizedKeySet = new Set(sanitizedKeys);
+    const missing = BAND_LINK_FIELD_KEYS.filter((key) => !sanitizedKeySet.has(key));
+    const unexpected = sanitizedKeys.filter((key) => !registryKeys.has(key));
+
+    expect(
+      { missing, unexpected },
+      `Band-link registry and sanitizer drifted: missing from sanitizer: ${
+        missing.join(", ") || "none"
+      }; unexpected in sanitizer: ${unexpected.join(", ") || "none"}`,
+    ).toEqual({ missing: [], unexpected: [] });
   });
 });

@@ -6,13 +6,22 @@
 // be brute-forced at any practical hash speed. PBKDF2 remains mandatory for
 // human-chosen passwords; fast hashing is appropriate for this high-entropy
 // secret.
+//
+// The digest is deterministic and UNSALTED by design: verification looks a key
+// up with WHERE key_hash = ?, so a per-row salt would make that lookup
+// impossible. That is safe here for the same reason the fast hash is -- there
+// is no dictionary to precompute against a 256-bit random space.
 
 import { fromSqliteDateTime, toSqliteDateTime } from "./authAttempts.js";
 
 const API_KEY_PREFIX = "st_";
 const KEY_BYTES = 32;
 const DISPLAY_PREFIX_LENGTH = 8;
-const DEFAULT_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
+// #744 calls for a short default and forced rotation. A bearer credential
+// bypasses CSRF, MFA and the cookie boundary, so a default set here is what
+// every endpoint built on this inherits.
+const DEFAULT_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
+const MAX_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
 
 function encodeBase64Url(bytes) {
   return btoa(String.fromCharCode(...bytes))
@@ -27,6 +36,22 @@ async function digestApiKey(plaintext) {
 }
 
 export async function generateApiKey(expiresAt = new Date(Date.now() + DEFAULT_LIFETIME_MS)) {
+  // Rejected rather than clamped: silently shortening a lifetime the caller
+  // asked for produces a key that stops working at a time nobody recorded.
+  // toSqliteDateTime also slices at 19 chars, so an out-of-range Date would
+  // store a truncated value that verifies as valid forever -- this closes
+  // that path too.
+  const requested = expiresAt instanceof Date ? expiresAt.getTime() : Number.NaN;
+  if (!Number.isFinite(requested)) {
+    throw new Error("expiresAt must be a valid Date");
+  }
+  if (requested <= Date.now()) {
+    throw new Error("expiresAt must be in the future");
+  }
+  if (requested - Date.now() > MAX_LIFETIME_MS) {
+    throw new Error("expiresAt exceeds the maximum key lifetime");
+  }
+
   const randomBytes = crypto.getRandomValues(new Uint8Array(KEY_BYTES));
   const plaintext = `${API_KEY_PREFIX}${encodeBase64Url(randomBytes)}`;
 

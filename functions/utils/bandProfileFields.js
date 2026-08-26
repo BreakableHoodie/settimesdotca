@@ -141,21 +141,30 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
     }
   } else if (url !== undefined) {
     shouldUpdateSocialLinks = true;
-    let existingLinks = {};
+    let existingLinks;
+    const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?").bind(bandProfileId).first();
+    if (!profile) {
+      throw new Error("Band profile not found");
+    }
+    // Only the parse belongs inside this try. Resetting to {} is the right
+    // recovery for corrupt stored data and the wrong one for anything else,
+    // because shouldUpdateSocialLinks is already set — so whatever reaches this
+    // catch gets written over the row. Widening it to cover the read above is
+    // what discarded every other platform link on a single failed SELECT (#962).
     try {
-      const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?")
-        .bind(bandProfileId)
-        .first();
       existingLinks = JSON.parse(profile.social_links || "{}");
-    } catch (_e) {
-      /* ignore malformed JSON — existingLinks stays {} */
+      if (!existingLinks || typeof existingLinks !== "object" || Array.isArray(existingLinks)) {
+        existingLinks = {};
+      }
+    } catch {
+      existingLinks = {};
     }
     try {
       existingLinks.website = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
-      newSocialLinks = sanitizeBandSocialLinks(existingLinks);
     } catch (error) {
       return { error };
     }
+    newSocialLinks = sanitizeBandSocialLinks(existingLinks);
   }
 
   if (shouldUpdateSocialLinks) {

@@ -508,6 +508,23 @@ CREATE INDEX IF NOT EXISTS idx_share_link_views_slug ON share_link_views(slug);
 
 CREATE INDEX IF NOT EXISTS idx_events_status_date ON events (status, date);
 
+CREATE TABLE IF NOT EXISTS api_keys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  key_prefix TEXT NOT NULL,
+  key_hash TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL CHECK(role IN ('viewer','editor','admin')),
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL,
+  last_used_at TEXT,
+  revoked_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys (key_hash);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_created_by ON api_keys (created_by);
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

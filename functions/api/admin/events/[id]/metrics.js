@@ -80,7 +80,12 @@ export async function onRequestGet(context) {
       DB.prepare(
         `SELECT slug, view_count, view_count_legacy, band_names, created_at FROM share_links
          WHERE event_id = ? AND (view_count > 0 OR view_count_legacy > 0)
-         ORDER BY view_count DESC, created_at DESC
+         -- Unique visitors stay the primary unit; legacy raw fetches only break
+         -- ties. Legacy-only rows all have view_count = 0, so without the second
+         -- key created_at would decide which of them survive LIMIT 10 -- letting
+         -- a 2-fetch route displace a 500-fetch one. The two are never compared
+         -- across units: this only orders within the zero-visitor group.
+         ORDER BY view_count DESC, COALESCE(view_count_legacy, 0) DESC, created_at DESC
          LIMIT 10`,
       ).bind(eventId),
       // Announcement planning: per-performance follower engagement signals for

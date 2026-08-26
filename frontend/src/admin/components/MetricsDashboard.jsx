@@ -69,7 +69,7 @@ export default function MetricsDashboard({ eventId }) {
 
         {/* Share Views */}
         <div className="bg-bg-purple rounded-lg p-4">
-          <div className="text-gray-400 text-sm">Share Views (unique visitors, all-time)</div>
+          <div className="text-gray-400 text-sm">Share Views (unique visitors per link, all-time)</div>
           <div className="text-3xl font-bold text-white mt-2">{metrics.totalShareViews ?? 0}</div>
           {!!metrics.totalShareViewsLegacy && (
             <div className="mt-1 text-sm font-normal text-gray-400">

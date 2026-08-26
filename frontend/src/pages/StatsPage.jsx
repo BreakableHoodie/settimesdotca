@@ -10,7 +10,7 @@ const STAT_DEFS = [
   { key: 'events', label: 'Events' },
   { key: 'performances', label: 'Sets played' },
   { key: 'routes_shared', label: 'Routes shared' },
-  { key: 'route_views', label: 'Route views (unique visitors, all-time)', legacyKey: 'route_views_legacy' },
+  { key: 'route_views', label: 'Route views (unique visitors per link, all-time)', legacyKey: 'route_views_legacy' },
   { key: 'fans_following', label: 'Fans following bands' },
   { key: 'page_views', label: 'Page views' },
 ]

@@ -52,7 +52,7 @@ describe('MetricsDashboard', () => {
     expect(screen.getAllByText('0 routes')).toHaveLength(3)
     expect(screen.getByText(/Page-view history may be shorter/)).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
-    expect(screen.getByText('Share Views (unique visitors, all-time)')).toBeInTheDocument()
+    expect(screen.getByText('Share Views (unique visitors per link, all-time)')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('Shares Imported')).toBeInTheDocument()
     expect(screen.getByText('5')).toBeInTheDocument()
@@ -95,9 +95,13 @@ describe('MetricsDashboard', () => {
 
     render(<MetricsDashboard eventId={1} />)
 
-    expect(await screen.findByText('Share Views (unique visitors, all-time)')).toBeInTheDocument()
+    expect(await screen.findByText('Share Views (unique visitors per link, all-time)')).toBeInTheDocument()
     expect(screen.getByText('2')).toBeInTheDocument()
-    expect(screen.getByText('9 pre-cutover raw fetches')).toBeInTheDocument()
+    // Two renders: the aggregate card and the route row. An exact-string
+    // getByText matched only the card, because the row's node reads
+    // " · 9 pre-cutover raw fetches" -- so the route-level indicator this
+    // feature exists to show was never actually asserted.
+    expect(screen.getAllByText(/9 pre-cutover raw fetches/)).toHaveLength(2)
     expect(screen.queryByText('11')).not.toBeInTheDocument()
   })
 
@@ -120,8 +124,11 @@ describe('MetricsDashboard', () => {
 
     render(<MetricsDashboard eventId={1} />)
 
-    expect(await screen.findByText('Share Views (unique visitors, all-time)')).toBeInTheDocument()
-    expect(screen.queryByText(/\d+ pre-cutover raw fetches \(per-fetch\)/)).not.toBeInTheDocument()
+    expect(await screen.findByText('Share Views (unique visitors per link, all-time)')).toBeInTheDocument()
+    // Anchored on the leading count: the explanatory caption below the cards
+    // also contains "pre-cutover raw fetches" and renders unconditionally, so
+    // an unanchored regex matches it and the assertion proves nothing.
+    expect(screen.queryByText(/\d+ pre-cutover raw fetches/)).not.toBeInTheDocument()
   })
 
   it('renders 0 for share imports when the field is absent (older data)', async () => {

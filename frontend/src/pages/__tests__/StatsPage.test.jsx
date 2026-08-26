@@ -101,7 +101,7 @@ describe('StatsPage', () => {
 
     renderPage()
 
-    expect(await screen.findByText('Route views (unique visitors, all-time)')).toBeInTheDocument()
+    expect(await screen.findByText('Route views (unique visitors per link, all-time)')).toBeInTheDocument()
     expect(screen.getByText('9 pre-cutover raw fetches')).toBeInTheDocument()
     expect(screen.queryByText('11')).not.toBeInTheDocument()
   })
@@ -122,7 +122,7 @@ describe('StatsPage', () => {
 
     renderPage()
 
-    expect(await screen.findByText('Route views (unique visitors, all-time)')).toBeInTheDocument()
+    expect(await screen.findByText('Route views (unique visitors per link, all-time)')).toBeInTheDocument()
     expect(screen.queryByText(/pre-cutover raw fetches/)).not.toBeInTheDocument()
   })
 

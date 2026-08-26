@@ -6,6 +6,16 @@ import EventTimeline from '../EventTimeline'
 import { POSTER_IMAGE_HOST } from '../../utils/posterImage'
 import { formatPerformanceDayLabel } from '../../utils/timeFormat'
 
+// EventTimeline expands details inside a React transition
+// (`useTransition` in EventTimeline.jsx, ~line 48). React deliberately
+// DEPRIORITISES transition work, so these waits are the ones that lose the CPU
+// first when the full suite contends — the same tests pass 26/26 on an idle
+// host in 1.5s. That deferral is the component's design, not a slow render to
+// optimise away, which is why the fix is a scoped timeout rather than smaller
+// fixtures. Scoped deliberately: raising the global default would hide a real
+// regression anywhere else in the suite (#868).
+const DETAILS_RENDER_TIMEOUT = 5000
+
 function jsonResponse(data) {
   return {
     ok: true,
@@ -91,8 +101,8 @@ describe('EventTimeline', () => {
     )
 
     // Band One now appears in both the genre discovery wall and the All Performers grid
-    expect((await screen.findAllByText('Band One'))[0]).toBeInTheDocument()
-    expect(await screen.findByText('Stage A')).toBeInTheDocument()
+    expect((await screen.findAllByText('Band One', {}, { timeout: DETAILS_RENDER_TIMEOUT }))[0]).toBeInTheDocument()
+    expect(await screen.findByText('Stage A', {}, { timeout: DETAILS_RENDER_TIMEOUT })).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()
     })
@@ -210,7 +220,11 @@ describe('EventTimeline duplicate performer chips (#605)', () => {
 
     // GenreDiscovery wall: one photo-tile button per ACT — the two-set band
     // must be deduped to a single tile, not one per performance.
-    const genreTiles = await screen.findAllByRole('button', { name: /Two Set Band/i })
+    const genreTiles = await screen.findAllByRole(
+      'button',
+      { name: /Two Set Band/i },
+      { timeout: DETAILS_RENDER_TIMEOUT }
+    )
     expect(genreTiles).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: /Solo Band/i })).toHaveLength(1)
 
@@ -384,8 +398,8 @@ describe('EventTimeline performance day labels (#743)', () => {
       event_end_date: '2026-08-09',
     })
 
-    expect(await screen.findByText(day1Label)).toBeInTheDocument()
-    expect(await screen.findByText(day3Label)).toBeInTheDocument()
+    expect(await screen.findByText(day1Label, {}, { timeout: DETAILS_RENDER_TIMEOUT })).toBeInTheDocument()
+    expect(await screen.findByText(day3Label, {}, { timeout: DETAILS_RENDER_TIMEOUT })).toBeInTheDocument()
   })
 
   it('shows no day label at all for a single-day event', async () => {
@@ -464,7 +478,7 @@ describe('EventTimeline performance day labels (#743)', () => {
       expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()
     })
     // Appears in both the GenreDiscovery wall and the All Performers grid.
-    expect((await screen.findAllByText('Only Band'))[0]).toBeInTheDocument()
+    expect((await screen.findAllByText('Only Band', {}, { timeout: DETAILS_RENDER_TIMEOUT }))[0]).toBeInTheDocument()
 
     // A single-day event must not show a redundant date on every set (#540/#541).
     const soleDayLabel = formatPerformanceDayLabel({
@@ -958,7 +972,7 @@ describe('EventTimeline Venues grid directions (#754)', () => {
 
     expect(await screen.findByText('Test Event')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /view details/i }))
-    expect(await screen.findByText('The Mill')).toBeInTheDocument()
+    expect(await screen.findByText('The Mill', {}, { timeout: DETAILS_RENDER_TIMEOUT })).toBeInTheDocument()
 
     const link = screen.getByRole('link', { name: 'Directions to The Mill' })
     expect(link).toBeInTheDocument()
@@ -982,7 +996,7 @@ describe('EventTimeline Venues grid directions (#754)', () => {
 
     expect(await screen.findByText('Test Event')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /view details/i }))
-    expect(await screen.findByText('Roost')).toBeInTheDocument()
+    expect(await screen.findByText('Roost', {}, { timeout: DETAILS_RENDER_TIMEOUT })).toBeInTheDocument()
 
     expect(screen.queryByRole('link', { name: /directions to roost/i })).not.toBeInTheDocument()
 

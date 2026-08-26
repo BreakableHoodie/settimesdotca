@@ -287,7 +287,30 @@ jobs:
           echo "  retrying Lighthouse once..." >&2
           code=0
           run_lighthouse || code=$?
-          if [ "$code" -eq 0 ]; then echo "+ passed on retry after a #878 abort" >&2; fi
+          if [ "$code" -eq 0 ]; then echo "+ passed on retry after a #878 abort" >&2; exit 0; fi
+
+          # The retry ALSO failed. Ask the same discriminator again: if the server
+          # is gone a second time, this is #878 twice over, not a score
+          # regression -- the assertions never got to run against a live server.
+          # Warn and pass rather than spend a human triage on a failure whose
+          # cause is already known and is not in this PR.
+          #
+          # Observed 2026-08-25/26 on #961 and #964: wrangler died, the restart
+          # succeeded in ~4s, and the retry hit CHROME_INTERSTITIAL_ERROR again.
+          # Two of three PRs that day, both green on a manual re-run, and the job
+          # is not a required check -- so its only effect was a red X that had to
+          # be read to be dismissed. That is signal erosion: a check that is
+          # usually-wrong trains you to wave past the time it is right.
+          #
+          # A real regression still fails, because it leaves the server HEALTHY
+          # and takes the branch above. Do not replace this with
+          # continue-on-error -- that would swallow score regressions too.
+          if server_gone; then
+              echo "::warning title=Lighthouse skipped::Lighthouse aborted twice with wrangler gone (#878). Scores were never measured against a live server, so this is not a score regression. See #925." >&2
+              exit 0
+          fi
+
+          echo "x Lighthouse failed on retry with the server up -- a real failure." >&2
           exit "$code"
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}

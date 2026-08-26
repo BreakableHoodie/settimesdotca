@@ -10,7 +10,7 @@ const STAT_DEFS = [
   { key: 'events', label: 'Events' },
   { key: 'performances', label: 'Sets played' },
   { key: 'routes_shared', label: 'Routes shared' },
-  { key: 'route_views', label: 'Route views' },
+  { key: 'route_views', label: 'Route views (unique visitors per link, all-time)', legacyKey: 'route_views_legacy' },
   { key: 'fans_following', label: 'Fans following bands' },
   { key: 'page_views', label: 'Page views' },
 ]
@@ -22,7 +22,7 @@ function formatNumber(value) {
 // Zero-value metrics (expected pre-launch for engagement counters like fans
 // following or routes shared) render in a muted tone instead of the bold
 // accent color, so an early low count never reads as a broken/prominent "0".
-function StatCard({ label, value }) {
+function StatCard({ label, value, legacyValue }) {
   const isZero = !value
   return (
     <div className="rounded-xl border border-border bg-surface p-4 text-center">
@@ -30,6 +30,11 @@ function StatCard({ label, value }) {
         {formatNumber(value)}
       </div>
       <div className="mt-1 text-xs text-text-tertiary">{label}</div>
+      {!!legacyValue && (
+        <div className="mt-0.5 text-[0.65rem] text-text-secondary">
+          {formatNumber(legacyValue)} pre-cutover raw fetches
+        </div>
+      )}
     </div>
   )
 }
@@ -114,8 +119,8 @@ export default function StatsPage() {
         {!loading && !error && data && (
           <>
             <div className="mb-12 grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {STAT_DEFS.map(({ key, label }) => (
-                <StatCard key={key} label={label} value={data[key]} />
+              {STAT_DEFS.map(({ key, label, legacyKey }) => (
+                <StatCard key={key} label={label} value={data[key]} legacyValue={legacyKey ? data[legacyKey] : 0} />
               ))}
             </div>
 

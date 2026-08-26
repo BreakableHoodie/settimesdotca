@@ -64,6 +64,93 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     expect(body.metrics.topSharedRoutes[0].view_count).toBe(5);
   });
 
+  test("keeps current unique visitors and legacy raw fetches separate", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Legacy Fest", slug: "legacy-fest" });
+    insertShareLink(rawDb, {
+      slug: "legacyroute",
+      event_id: event.id,
+      event_slug: "legacy-fest",
+      performance_ids: [1],
+      band_names: ["A"],
+    });
+    rawDb
+      .prepare("UPDATE share_links SET view_count = ?, view_count_legacy = ? WHERE slug = ?")
+      .run(2, 9, "legacyroute");
+
+    const res = await call(env, event.id);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.metrics.totalShareViews).toBe(2);
+    expect(body.metrics.totalShareViewsLegacy).toBe(9);
+    expect(body.metrics.totalShareViews).not.toBe(11);
+    expect(body.metrics.totalShareViewsLegacy).not.toBe(11);
+    expect(body.metrics.topSharedRoutes[0].view_count).toBe(2);
+    expect(body.metrics.topSharedRoutes[0].view_count_legacy).toBe(9);
+  });
+
+  test("includes a legacy-only route and returns zero legacy totals for fresh links", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Mixed Fest", slug: "mixed-fest" });
+    insertShareLink(rawDb, {
+      slug: "legacy-only",
+      event_id: event.id,
+      event_slug: "mixed-fest",
+      performance_ids: [1],
+      band_names: ["A"],
+    });
+    insertShareLink(rawDb, {
+      slug: "fresh-route",
+      event_id: event.id,
+      event_slug: "mixed-fest",
+      performance_ids: [1],
+      band_names: ["A"],
+    });
+    rawDb.prepare("UPDATE share_links SET view_count_legacy = ? WHERE slug = ?").run(9, "legacy-only");
+
+    const res = await call(env, event.id);
+    const body = await res.json();
+    expect(body.metrics.totalShareViewsLegacy).toBe(9);
+    expect(body.metrics.topSharedRoutes.map((route) => route.slug)).toEqual(["legacy-only"]);
+    expect(body.metrics.topSharedRoutes[0].view_count).toBe(0);
+  });
+
+  test("orders legacy-only routes by raw fetches, not by which was created last", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Order Fest", slug: "order-fest" });
+    // Inserted in this order, so created_at DESC alone would put "recent-few"
+    // first. Both have view_count = 0, which is what makes the tie-break the
+    // only thing deciding the order -- and with LIMIT 10 on a busier event,
+    // what decides which rows survive at all.
+    insertShareLink(rawDb, {
+      slug: "older-many",
+      event_id: event.id,
+      event_slug: "order-fest",
+      performance_ids: [1],
+      band_names: ["A"],
+    });
+    insertShareLink(rawDb, {
+      slug: "recent-few",
+      event_id: event.id,
+      event_slug: "order-fest",
+      performance_ids: [1],
+      band_names: ["A"],
+    });
+    // created_at must actually DIFFER, or the bug cannot be reproduced: both
+    // rows are inserted in the same second, so created_at DESC leaves them in
+    // insertion order and the broken query passes by accident.
+    rawDb
+      .prepare("UPDATE share_links SET view_count_legacy = ?, created_at = ? WHERE slug = ?")
+      .run(500, "2026-08-01 10:00:00", "older-many");
+    rawDb
+      .prepare("UPDATE share_links SET view_count_legacy = ?, created_at = ? WHERE slug = ?")
+      .run(2, "2026-08-20 10:00:00", "recent-few");
+
+    const res = await call(env, event.id);
+    const body = await res.json();
+    expect(body.metrics.topSharedRoutes.map((route) => route.slug)).toEqual(["older-many", "recent-few"]);
+  });
+
   test("top routes carry band_count and created_at, and zero-view shares are excluded (#702)", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Route Fest", slug: "route-fest" });

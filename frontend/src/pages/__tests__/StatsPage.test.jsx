@@ -34,6 +34,7 @@ describe('StatsPage', () => {
       performances: 23,
       routes_shared: 14,
       route_views: 40,
+      route_views_legacy: 0,
       fans_following: 8,
       page_views: 500,
       top_bands: [
@@ -67,6 +68,7 @@ describe('StatsPage', () => {
       performances: 22,
       routes_shared: 0,
       route_views: 0,
+      route_views_legacy: 0,
       fans_following: 0,
       page_views: 0,
       top_bands: [],
@@ -81,6 +83,47 @@ describe('StatsPage', () => {
 
     // No top bands at all -> section is omitted entirely.
     expect(screen.queryByText('Top bands')).not.toBeInTheDocument()
+  })
+
+  it('shows legacy raw fetches separately from unique visitor route views', async () => {
+    fetchPublicJson.mockResolvedValue({
+      bands: 22,
+      venues: 6,
+      events: 1,
+      performances: 23,
+      routes_shared: 14,
+      route_views: 2,
+      route_views_legacy: 9,
+      fans_following: 8,
+      page_views: 500,
+      top_bands: [],
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('Route views (unique visitors per link, all-time)')).toBeInTheDocument()
+    expect(screen.getByText('9 pre-cutover raw fetches')).toBeInTheDocument()
+    expect(screen.queryByText('11')).not.toBeInTheDocument()
+  })
+
+  it('omits legacy raw fetches when the legacy count is zero or null', async () => {
+    fetchPublicJson.mockResolvedValue({
+      bands: 22,
+      venues: 6,
+      events: 1,
+      performances: 23,
+      routes_shared: 14,
+      route_views: 40,
+      route_views_legacy: null,
+      fans_following: 8,
+      page_views: 500,
+      top_bands: [],
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('Route views (unique visitors per link, all-time)')).toBeInTheDocument()
+    expect(screen.queryByText(/pre-cutover raw fetches/)).not.toBeInTheDocument()
   })
 
   it('shows a friendly error message when the fetch fails', async () => {

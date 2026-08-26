@@ -52,7 +52,7 @@ describe('MetricsDashboard', () => {
     expect(screen.getAllByText('0 routes')).toHaveLength(3)
     expect(screen.getByText(/Page-view history may be shorter/)).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
-    expect(screen.getByText('Share Views')).toBeInTheDocument()
+    expect(screen.getByText('Share Views (unique visitors per link, all-time)')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('Shares Imported')).toBeInTheDocument()
     expect(screen.getByText('5')).toBeInTheDocument()
@@ -62,18 +62,73 @@ describe('MetricsDashboard', () => {
     expect(screen.getByText(/4 bands/)).toBeInTheDocument()
     expect(screen.getByText(/2026-07-16/)).toBeInTheDocument()
     // Singular "view" pluralises correctly
-    expect(screen.getByText(/1 view/)).toBeInTheDocument()
+    expect(screen.getByText(/1 unique visitor/)).toBeInTheDocument()
     expect(screen.getByText(/1 band/)).toBeInTheDocument()
     // Plural "views" still renders within the compound row
-    expect(screen.getByText(/30 views/)).toBeInTheDocument()
+    expect(screen.getByText(/30 unique visitors/)).toBeInTheDocument()
     // view_count and import_count are different units and get conflated
     // (CLAUDE.md "Metrics & Analytics"): views are unique visitors recomputed
     // from a ledger, imports are per-fetch and undeduped, so imports CAN exceed
     // views. This caption is the only place a reader learns that — assert it
     // survives, because silently dropping it makes the panel misleading rather
     // than merely sparser.
-    expect(screen.getByText(/Views count unique visitors per link/)).toBeInTheDocument()
+    expect(screen.getByText(/Unique visitors are deduplicated per link/)).toBeInTheDocument()
     expect(screen.getByText(/Imports count per-fetch/)).toBeInTheDocument()
+  })
+
+  it('shows legacy raw fetches separately from unique visitors', async () => {
+    eventsApi.getMetrics.mockResolvedValue({
+      metrics: {
+        totalScheduleBuilds: 0,
+        routeBuilders: 0,
+        completionRate: undefined,
+        routeSizeDistribution: [],
+        lastUpdated: null,
+        popularBands: [],
+        totalShares: 1,
+        totalShareViews: 2,
+        totalShareViewsLegacy: 9,
+        totalShareImports: 0,
+        topSharedRoutes: [{ slug: 'legacy', view_count: 2, view_count_legacy: 9, band_count: 1 }],
+      },
+    })
+
+    render(<MetricsDashboard eventId={1} />)
+
+    expect(await screen.findByText('Share Views (unique visitors per link, all-time)')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
+    // Two renders: the aggregate card and the route row. An exact-string
+    // getByText matched only the card, because the row's node reads
+    // " · 9 pre-cutover raw fetches" -- so the route-level indicator this
+    // feature exists to show was never actually asserted.
+    expect(screen.getAllByText(/9 pre-cutover raw fetches/)).toHaveLength(2)
+    expect(screen.queryByText('11')).not.toBeInTheDocument()
+  })
+
+  it('omits legacy raw fetches when the legacy count is zero or null', async () => {
+    eventsApi.getMetrics.mockResolvedValue({
+      metrics: {
+        totalScheduleBuilds: 0,
+        routeBuilders: 0,
+        completionRate: undefined,
+        routeSizeDistribution: [],
+        lastUpdated: null,
+        popularBands: [],
+        totalShares: 1,
+        totalShareViews: 3,
+        totalShareViewsLegacy: 0,
+        totalShareImports: 0,
+        topSharedRoutes: [{ slug: 'fresh', view_count: 3, view_count_legacy: null, band_count: 1 }],
+      },
+    })
+
+    render(<MetricsDashboard eventId={1} />)
+
+    expect(await screen.findByText('Share Views (unique visitors per link, all-time)')).toBeInTheDocument()
+    // Anchored on the leading count: the explanatory caption below the cards
+    // also contains "pre-cutover raw fetches" and renders unconditionally, so
+    // an unanchored regex matches it and the assertion proves nothing.
+    expect(screen.queryByText(/\d+ pre-cutover raw fetches/)).not.toBeInTheDocument()
   })
 
   it('renders 0 for share imports when the field is absent (older data)', async () => {

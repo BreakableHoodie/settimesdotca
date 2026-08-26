@@ -77,7 +77,10 @@ describe("apiKeys", () => {
 
   it("refuses to mint a key that is already dead, unbounded, or nonsense", async () => {
     await expect(generateApiKey(new Date(Date.now() - 1000))).rejects.toThrow(/future/i);
-    await expect(generateApiKey(new Date(Date.now() + 400 * 24 * 60 * 60 * 1000))).rejects.toThrow(/maximum/i);
+    // Just inside and just outside the 180-day ceiling, so the bound itself is
+    // pinned rather than merely "some large number is refused".
+    await expect(generateApiKey(new Date(Date.now() + 179 * 24 * 60 * 60 * 1000))).resolves.toBeDefined();
+    await expect(generateApiKey(new Date(Date.now() + 181 * 24 * 60 * 60 * 1000))).rejects.toThrow(/maximum/i);
     await expect(generateApiKey(new Date("nonsense"))).rejects.toThrow(/valid Date/i);
     await expect(generateApiKey("2027-01-01")).rejects.toThrow(/valid Date/i);
     // Sub-second expiry: passes the "in the future" check, then truncates to

@@ -21,7 +21,13 @@ const DISPLAY_PREFIX_LENGTH = 8;
 // bypasses CSRF, MFA and the cookie boundary, so a default set here is what
 // every endpoint built on this inherits.
 const DEFAULT_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
-const MAX_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
+// The ceiling is a policy, not an inherited default -- 365 was simply the old
+// default and picking it as the maximum decided nothing. #744 asks for forced
+// rotation, and this credential bypasses CSRF, MFA and the cookie boundary, so
+// the escape hatch is half a year rather than a full one. Anything longer
+// should be a conscious product decision made when a real consumer needs it,
+// not a limit nobody chose.
+const MAX_LIFETIME_MS = 180 * 24 * 60 * 60 * 1000;
 
 function encodeBase64Url(bytes) {
   return btoa(String.fromCharCode(...bytes))

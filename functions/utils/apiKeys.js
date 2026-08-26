@@ -52,6 +52,17 @@ export async function generateApiKey(expiresAt = new Date(Date.now() + DEFAULT_L
     throw new Error("expiresAt exceeds the maximum key lifetime");
   }
 
+  // Validate what gets STORED, not what was handed in. toSqliteDateTime drops
+  // sub-second precision, so an expiry a few hundred milliseconds out passes
+  // the future check above and then serialises to the current second -- a key
+  // born already dead. Round-tripping through the stored form is the only
+  // check that sees what verification will later see.
+  const sqliteExpiresAt = toSqliteDateTime(expiresAt);
+  const storedExpiresAt = fromSqliteDateTime(sqliteExpiresAt);
+  if (!storedExpiresAt || storedExpiresAt.getTime() <= Date.now()) {
+    throw new Error("expiresAt must still be in the future once stored");
+  }
+
   const randomBytes = crypto.getRandomValues(new Uint8Array(KEY_BYTES));
   const plaintext = `${API_KEY_PREFIX}${encodeBase64Url(randomBytes)}`;
 
@@ -59,7 +70,7 @@ export async function generateApiKey(expiresAt = new Date(Date.now() + DEFAULT_L
     plaintext,
     keyPrefix: plaintext.slice(0, DISPLAY_PREFIX_LENGTH),
     keyHash: await digestApiKey(plaintext),
-    expiresAt: toSqliteDateTime(expiresAt),
+    expiresAt: sqliteExpiresAt,
   };
 }
 

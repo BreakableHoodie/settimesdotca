@@ -80,6 +80,9 @@ describe("apiKeys", () => {
     await expect(generateApiKey(new Date(Date.now() + 400 * 24 * 60 * 60 * 1000))).rejects.toThrow(/maximum/i);
     await expect(generateApiKey(new Date("nonsense"))).rejects.toThrow(/valid Date/i);
     await expect(generateApiKey("2027-01-01")).rejects.toThrow(/valid Date/i);
+    // Sub-second expiry: passes the "in the future" check, then truncates to
+    // the current second on the way to storage -- a key born already dead.
+    await expect(generateApiKey(new Date(Date.now() + 200))).rejects.toThrow(/once stored/i);
   });
 
   it("rejects anything that is not a plausible key, without throwing", async () => {

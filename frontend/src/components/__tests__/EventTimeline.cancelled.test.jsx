@@ -4,6 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import EventTimeline from '../EventTimeline'
 
+// EventTimeline expands details inside a React transition
+// (`useTransition` in EventTimeline.jsx, ~line 48). React deliberately
+// DEPRIORITISES transition work, so these waits are the ones that lose the CPU
+// first when the full suite contends — the same tests pass 26/26 on an idle
+// host in 1.5s. That deferral is the component's design, not a slow render to
+// optimise away, which is why the fix is a scoped timeout rather than smaller
+// fixtures. Scoped deliberately: raising the global default would hide a real
+// regression anywhere else in the suite (#868).
+const DETAILS_RENDER_TIMEOUT = 5000
+
 function jsonResponse(data) {
   return {
     ok: true,
@@ -174,9 +184,12 @@ describe('EventTimeline expanded details render cancellation on every band-list 
     expect(await screen.findByText('Cancel Coverage Fest')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /view details/i }))
 
-    await waitFor(() => {
-      expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()
-    })
+    await waitFor(
+      () => {
+        expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()
+      },
+      { timeout: DETAILS_RENDER_TIMEOUT }
+    )
   }
 
   it('strikes through a cancelled performer with a Cancelled pill in the "All Performers" grid, leaving a scheduled one untouched', async () => {
@@ -184,14 +197,22 @@ describe('EventTimeline expanded details render cancellation on every band-list 
 
     // Card is a Link -- accessible name is its full text content, so a regex
     // anchored on the band name is enough to find the one card.
-    const cancelledCard = await screen.findByRole('link', { name: /Pulled Openers/i })
+    const cancelledCard = await screen.findByRole(
+      'link',
+      { name: /Pulled Openers/i },
+      { timeout: DETAILS_RENDER_TIMEOUT }
+    )
     // Structural, not just text-presence: the NAME must be inside a real <s>
     // element. A CSS-only line-through (no <s>) would render identical
     // visible text but is invisible to a screen reader.
     expect(cancelledCard.querySelector('s')).toHaveTextContent('Pulled Openers')
     expect(cancelledCard).toHaveTextContent('Cancelled')
 
-    const scheduledCard = await screen.findByRole('link', { name: /Playing Headliner/i })
+    const scheduledCard = await screen.findByRole(
+      'link',
+      { name: /Playing Headliner/i },
+      { timeout: DETAILS_RENDER_TIMEOUT }
+    )
     expect(scheduledCard.querySelector('s')).toBeNull()
     expect(scheduledCard).not.toHaveTextContent('Cancelled')
   })
@@ -202,7 +223,11 @@ describe('EventTimeline expanded details render cancellation on every band-list 
     // GenreDiscovery renders a <button> per act -- the cancelled tile's
     // aria-label states its status rather than an Add/Remove instruction,
     // since tapping it must do nothing.
-    const cancelledTile = await screen.findByRole('button', { name: /Pulled Openers/i })
+    const cancelledTile = await screen.findByRole(
+      'button',
+      { name: /Pulled Openers/i },
+      { timeout: DETAILS_RENDER_TIMEOUT }
+    )
     expect(cancelledTile).toBeDisabled()
     expect(cancelledTile.querySelector('s')).toHaveTextContent('Pulled Openers')
     expect(cancelledTile).toHaveTextContent('Cancelled')
@@ -211,7 +236,11 @@ describe('EventTimeline expanded details render cancellation on every band-list 
     // clickable and still flips its own Add/Remove aria-label, proving the
     // suppression is scoped to is_cancelled rather than a global regression
     // that freezes every tile.
-    const scheduledTile = await screen.findByRole('button', { name: /Add Playing Headliner to my schedule/i })
+    const scheduledTile = await screen.findByRole(
+      'button',
+      { name: /Add Playing Headliner to my schedule/i },
+      { timeout: DETAILS_RENDER_TIMEOUT }
+    )
     expect(scheduledTile).not.toBeDisabled()
     fireEvent.click(scheduledTile)
     expect(screen.getByRole('button', { name: /Remove Playing Headliner from my schedule/i })).toBeInTheDocument()

@@ -24,7 +24,8 @@ import { HIGHLIGHTED_BANDS, getHighlightMessage } from '../config/highlights.jsx
 import { copyToClipboard } from '../utils/clipboard'
 import { dayNumberMapFromDays, formatFestivalDate, orderedFestivalDays } from '../utils/festivalDays'
 import { prepareBands } from '../utils/bandUtils'
-import { formatTimeRange } from '../utils/timeFormat'
+import { suggestGapFillers } from '../utils/gapSuggestions'
+import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
 import LockInLineupPanel from './LockInLineupPanel'
@@ -88,8 +89,45 @@ function ForkCard({ band1, band2, onToggleBand }) {
   )
 }
 
+function GapSuggestions({ cancelledBand, myBands, allBands, onToggleBand }) {
+  const suggestions = suggestGapFillers({ cancelledBand, myBands, allBands })
+  if (suggestions.length === 0) return null
+
+  // role="group" is load-bearing: aria-label on a generic div is not reliably
+  // exposed, so without a role the label never reaches assistive tech. Grouping
+  // also keeps these announced as belonging to the cancelled set above them
+  // rather than as loose buttons adrift in the schedule list.
+  return (
+    <div
+      role="group"
+      className="rounded-lg border border-info-500/40 bg-info-500/10 p-3 sm:p-4"
+      aria-label={`Suggestions after ${cancelledBand.name} was cancelled`}
+    >
+      <p className="text-sm font-semibold text-text-primary">Try filling this gap:</p>
+      <ul className="mt-2 space-y-2">
+        {suggestions.map(({ band, walkMinutes }) => (
+          <li key={band.id}>
+            <button
+              type="button"
+              onClick={() => onToggleBand(band.id)}
+              className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-text-primary transition-colors hover:bg-surface-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500"
+            >
+              <span>
+                Try {band.name} at {band.venue}, starting at {formatTime(band.startTime)}
+                {walkMinutes !== null && `, ${walkMinutes} min walk`}
+              </span>
+              <span className="shrink-0 text-xs font-semibold text-accent-400">Add</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function MySchedule({
   bands,
+  allBands = bands,
   onToggleBand,
   onClearSchedule,
   showPast,
@@ -738,6 +776,14 @@ function MySchedule({
                       </div>
                     )
                   })()}
+                  {band.is_cancelled && (
+                    <GapSuggestions
+                      cancelledBand={band}
+                      myBands={bands}
+                      allBands={allBands}
+                      onToggleBand={onToggleBand}
+                    />
+                  )}
                 </div>
               </div>
             </Fragment>

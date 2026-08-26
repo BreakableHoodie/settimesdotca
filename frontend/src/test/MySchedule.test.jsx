@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import MySchedule from '../components/MySchedule'
+import * as gapSuggestions from '../utils/gapSuggestions'
 
 const makeMs = (timeStr, date = '2026-05-17') => new Date(`${date}T${timeStr}:00`).getTime()
 
@@ -302,5 +303,65 @@ describe('MySchedule — genre chip on the route-list card', () => {
     const chip = screen.getByText('Punk')
     expect(chip.className).toMatch(/bg-bg-navy\/15/)
     expect(chip.className).toMatch(/text-bg-navy/)
+  })
+})
+
+describe('MySchedule — cancelled set gap suggestions', () => {
+  const cancelledBand = { ...makeBand(1, 'Cancelled Act', 'Room 47', '20:00', '22:00'), is_cancelled: 1 }
+  const candidateBand = makeBand(2, 'Replacement Act', 'Princess Cafe', '21:00', '21:30')
+  const bands = [cancelledBand]
+  const allBands = [cancelledBand, candidateBand]
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('suggests an artist, venue, and start time for a cancelled saved set', () => {
+    renderSchedule({ bands, allBands })
+
+    expect(
+      screen.getByRole('button', { name: /Try Replacement Act at Princess Cafe, starting at 9:00 PM/i })
+    ).toBeInTheDocument()
+  })
+
+  it('renders nothing when the engine returns no suggestions', () => {
+    vi.spyOn(gapSuggestions, 'suggestGapFillers').mockReturnValue([])
+
+    renderSchedule({ bands, allBands })
+
+    expect(screen.queryByText('Try filling this gap:')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Try Replacement Act at Princess Cafe/i)).not.toBeInTheDocument()
+  })
+
+  it('omits distance text when the walk time is unknown', () => {
+    renderSchedule({ bands, allBands })
+
+    const suggestion = screen.getByRole('button', { name: /Try Replacement Act/i })
+    expect(suggestion).toHaveTextContent('Try Replacement Act at Princess Cafe, starting at 9:00 PM')
+    expect(suggestion).not.toHaveTextContent(/walk|null/i)
+  })
+
+  it('does not suggest alternatives for a non-cancelled saved set', () => {
+    const savedBand = makeBand(1, 'Saved Act', 'Room 47', '20:00', '22:00')
+    vi.spyOn(gapSuggestions, 'suggestGapFillers').mockReturnValue([
+      { band: candidateBand, walkMinutes: null, startsAtMs: candidateBand.startMs },
+    ])
+
+    renderSchedule({ bands: [savedBand], allBands: [savedBand, candidateBand] })
+
+    expect(screen.queryByText(/Try Replacement Act/i)).not.toBeInTheDocument()
+  })
+
+  it('adds a suggestion only through onToggleBand', () => {
+    const onToggleBand = vi.fn()
+    const selectedBands = [...bands]
+
+    renderSchedule({ bands: selectedBands, allBands, onToggleBand })
+    fireEvent.click(screen.getByRole('button', { name: /Try Replacement Act/i }))
+
+    expect(onToggleBand).toHaveBeenCalledWith(candidateBand.id)
+    expect(onToggleBand).toHaveBeenCalledTimes(1)
+    expect(selectedBands).toEqual(bands)
+    expect(selectedBands).not.toContain(candidateBand)
   })
 })

@@ -868,6 +868,7 @@ function App() {
           >
             <MySchedule
               bands={myBands}
+              allBands={bands}
               onToggleBand={toggleBand}
               onClearSchedule={clearSchedule}
               showPast={showPast}

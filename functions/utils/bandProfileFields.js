@@ -148,15 +148,18 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
     }
     try {
       existingLinks = JSON.parse(profile.social_links || "{}");
+      if (!existingLinks || typeof existingLinks !== "object" || Array.isArray(existingLinks)) {
+        existingLinks = {};
+      }
     } catch (_e) {
       /* ignore malformed JSON — existingLinks stays {} */
     }
     try {
       existingLinks.website = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
-      newSocialLinks = sanitizeBandSocialLinks(existingLinks);
     } catch (error) {
       return { error };
     }
+    newSocialLinks = sanitizeBandSocialLinks(existingLinks);
   }
 
   if (shouldUpdateSocialLinks) {

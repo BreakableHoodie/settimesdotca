@@ -14,7 +14,7 @@ function readSocialLinks(rawDb, profileId) {
   return rawDb.prepare("SELECT social_links FROM band_profiles WHERE id = ?").get(profileId).social_links;
 }
 
-async function runUrlUpdate(DB, profileId) {
+async function runUrlUpdateOutcome(DB, profileId) {
   let result;
   let error;
   try {
@@ -25,7 +25,11 @@ async function runUrlUpdate(DB, profileId) {
   } catch (caughtError) {
     error = caughtError;
   }
-  return error;
+  return { error: error || result?.error, threw: Boolean(error) };
+}
+
+async function runUrlUpdate(DB, profileId) {
+  return (await runUrlUpdateOutcome(DB, profileId)).error;
 }
 
 describe("band profile social-links URL updates", () => {
@@ -53,17 +57,56 @@ describe("band profile social-links URL updates", () => {
     });
   });
 
+  it("surfaces a rejected social-links read without wiping existing links", async () => {
+    const profile = createProfile({
+      instagram: "https://instagram.com/test-band",
+      bandcamp: "https://test-band.bandcamp.com",
+    });
+    const failingDB = {
+      ...profile.DB,
+      prepare(sql) {
+        if (!sql.startsWith("SELECT social_links")) {
+          return profile.DB.prepare(sql);
+        }
+        return {
+          bind(...params) {
+            const statement = profile.DB.prepare(sql).bind(...params);
+            return { ...statement, first: () => Promise.reject(new Error("simulated rejected D1 failure")) };
+          },
+        };
+      },
+    };
+
+    const error = await runUrlUpdate(failingDB, profile.id);
+
+    expect(error).toHaveProperty("message", "simulated rejected D1 failure");
+    expect(JSON.parse(readSocialLinks(profile.rawDb, profile.id))).toEqual({
+      instagram: "https://instagram.com/test-band",
+      bandcamp: "https://test-band.bandcamp.com",
+    });
+  });
+
   it("surfaces a missing profile without preparing a replacement social-links blob", async () => {
     const profile = createProfile({
       instagram: "https://instagram.com/test-band",
       bandcamp: "https://test-band.bandcamp.com",
     });
     profile.rawDb.prepare("DELETE FROM band_profiles WHERE id = ?").run(profile.id);
+    let updatePrepared = false;
+    const trackingDB = {
+      ...profile.DB,
+      prepare(sql) {
+        if (sql.startsWith("UPDATE band_profiles")) {
+          updatePrepared = true;
+        }
+        return profile.DB.prepare(sql);
+      },
+    };
 
-    const error = await runUrlUpdate(profile.DB, profile.id);
+    const error = await runUrlUpdate(trackingDB, profile.id);
 
     expect(error).toHaveProperty("message", "Band profile not found");
-    expect(profile.rawDb.prepare("SELECT id FROM band_profiles WHERE id = ?").get(profile.id)).toBeUndefined();
+    expect(updatePrepared).toBe(false);
   });
 
   it("recovers from malformed stored JSON and updates the website", async () => {
@@ -76,6 +119,39 @@ describe("band profile social-links URL updates", () => {
     expect(JSON.parse(readSocialLinks(profile.rawDb, profile.id))).toMatchObject({
       website: "https://example.com/",
     });
+  });
+
+  it.each([
+    ["null", null],
+    ["42", 42],
+    ['"hello"', "hello"],
+  ])("recovers from a non-object stored JSON value: %s", async (storedValue) => {
+    const profile = createProfile({ instagram: "https://instagram.com/test-band" });
+    profile.rawDb.prepare("UPDATE band_profiles SET social_links = ? WHERE id = ?").run(storedValue, profile.id);
+
+    const error = await runUrlUpdate(profile.DB, profile.id);
+
+    expect(error).toBeUndefined();
+    expect(JSON.parse(readSocialLinks(profile.rawDb, profile.id))).toMatchObject({
+      website: "https://example.com/",
+    });
+  });
+
+  it.each([
+    ["an unsafe scheme", '{"bandcamp":"ftp://x.com"}', "Bandcamp URL must start with http:// or https://"],
+    [
+      "an overlong URL",
+      `{"bandcamp":"https://x.com/${"a".repeat(501)}"}`,
+      "Bandcamp URL must be no more than 500 characters",
+    ],
+  ])("surfaces stored-data sanitisation failure for %s as a server fault", async (_caseName, storedValue, message) => {
+    const profile = createProfile({ instagram: "https://instagram.com/test-band" });
+    profile.rawDb.prepare("UPDATE band_profiles SET social_links = ? WHERE id = ?").run(storedValue, profile.id);
+
+    const outcome = await runUrlUpdateOutcome(profile.DB, profile.id);
+
+    expect(outcome).toMatchObject({ threw: true, error: { message } });
+    expect(readSocialLinks(profile.rawDb, profile.id)).toBe(storedValue);
   });
 
   it("merges the website with existing social links", async () => {

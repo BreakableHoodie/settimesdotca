@@ -1,4 +1,5 @@
 import { FIELD_LIMITS, sanitizeBandSocialLinks, sanitizeOptionalHttpUrl, sanitizeString } from "./validation.js";
+import { BAND_LINK_FIELD_KEYS } from "./bandLinkFields.js";
 import { normalizeBandName } from "./bandName.js";
 import { parseOrigin } from "./parseOrigin.js";
 
@@ -18,6 +19,14 @@ export async function findVenue(DB, venueId) {
     .bind(venueId)
     .first();
 }
+
+// Derived from the canonical registry, never hand-listed. These keys are module
+// constants, not caller input, so interpolating them is safe — and it is the
+// only way the SQL below cannot drift: a ninth platform missing from this
+// filter would make a profile whose sole link is that platform collapse to
+// NULL, wiping it. That is #963's bug class expressed in SQL, where the
+// runtime guard on sanitizeBandSocialLinks cannot see it.
+const CANONICAL_LINK_KEY_SQL = BAND_LINK_FIELD_KEYS.map((key) => `'${key}'`).join(", ");
 
 export async function prepareBandProfileFields(DB, body, bandProfileId, resolvedPhotoUrl) {
   const {
@@ -140,31 +149,39 @@ export async function prepareBandProfileFields(DB, body, bandProfileId, resolved
       return { error };
     }
   } else if (url !== undefined) {
-    shouldUpdateSocialLinks = true;
-    let existingLinks;
-    const profile = await DB.prepare("SELECT social_links FROM band_profiles WHERE id = ?").bind(bandProfileId).first();
-    if (!profile) {
-      throw new Error("Band profile not found");
-    }
-    // Only the parse belongs inside this try. Resetting to {} is the right
-    // recovery for corrupt stored data and the wrong one for anything else,
-    // because shouldUpdateSocialLinks is already set — so whatever reaches this
-    // catch gets written over the row. Widening it to cover the read above is
-    // what discarded every other platform link on a single failed SELECT (#962).
     try {
-      existingLinks = JSON.parse(profile.social_links || "{}");
-      if (!existingLinks || typeof existingLinks !== "object" || Array.isArray(existingLinks)) {
-        existingLinks = {};
-      }
-    } catch {
-      existingLinks = {};
-    }
-    try {
-      existingLinks.website = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
+      const sanitizedUrl = sanitizeOptionalHttpUrl(url, FIELD_LIMITS.bandUrl.max, "Website URL");
+      profileUpdates.push(
+        `social_links = (
+          WITH merged(value) AS (
+            SELECT json_set(
+              CASE
+                WHEN json_valid(social_links) AND json_type(social_links) = 'object' THEN social_links
+                ELSE '{}'
+              END,
+              '$.website', ?
+            )
+          )
+          SELECT CASE
+            WHEN EXISTS (
+              SELECT 1 FROM json_each(merged.value)
+              WHERE key IN (${CANONICAL_LINK_KEY_SQL})
+                AND value IS NOT NULL
+                AND value <> ''
+            ) THEN merged.value
+            ELSE NULL
+          END
+          FROM merged
+        )`,
+      );
+      profileParams.push(sanitizedUrl);
     } catch (error) {
       return { error };
     }
-    newSocialLinks = sanitizeBandSocialLinks(existingLinks);
+
+    // The SQL merge deliberately does not revalidate unrelated stored links.
+    // Validation belongs on the way in; revalidating legacy data here can wedge
+    // an otherwise unrelated website edit.
   }
 
   if (shouldUpdateSocialLinks) {

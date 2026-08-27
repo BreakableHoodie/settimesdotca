@@ -2480,6 +2480,11 @@ paths:
       tags:
         - Admin - Users
       summary: Delete a user
+      description: >-
+        Refused with 409 (code USER_OWNS_API_KEYS) while the user owns any API keys.
+        Revoking does not clear this -- the foreign key is ON DELETE RESTRICT, which
+        fires on the existence of the row rather than its state. Deactivate the user
+        instead: that revokes their keys and preserves both records.
       security:
         - AdminSessionCookie: []
           CsrfToken: []
@@ -2494,6 +2499,8 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -2623,6 +2630,92 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/api-keys:
+    get:
+      tags:
+        - Admin - API Keys
+      summary: List API keys
+      description: >-
+        Returns metadata only. The stored hash is never projected and the plaintext
+        key is never recoverable after creation.
+      security:
+        - AdminSessionCookie: []
+      responses:
+        "200":
+          description: API key list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeysResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      tags:
+        - Admin - API Keys
+      summary: Create an API key
+      description: >-
+        Returns the plaintext key exactly once, in this response. It is not stored and
+        there is no endpoint that can reveal it again.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyCreateRequest"
+      responses:
+        "201":
+          description: API key created; contains the only copy of the plaintext key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/api-keys/{id}:
+    delete:
+      tags:
+        - Admin - API Keys
+      summary: Revoke an API key
+      description: >-
+        Sets revoked_at and takes effect immediately; the row is kept so the audit
+        trail retains it. Revoking is one-way and a second revoke returns 409.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: API key revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -4398,6 +4491,83 @@ components:
           type: boolean
         inviteCode:
           $ref: "#/components/schemas/GenericRecord"
+
+    ApiKeyCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        role:
+          type: string
+          enum:
+            - viewer
+            - editor
+            - admin
+          default: viewer
+          description: Defaults to the least privilege that is useful, not to the creator's role.
+        expiresAt:
+          type: string
+          format: date-time
+          description: >-
+            Must be in the future and no more than 180 days out. Omit for the 90-day
+            default.
+
+    ApiKey:
+      type: object
+      description: API key metadata. Never carries the stored hash.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        key_prefix:
+          type: string
+          description: The first 8 characters of the key, for identifying it in a list.
+        role:
+          type: string
+          enum:
+            - viewer
+            - editor
+            - admin
+        created_by:
+          type: integer
+        created_at:
+          type: string
+        expires_at:
+          type: string
+        last_used_at:
+          type: string
+          nullable: true
+        revoked_at:
+          type: string
+          nullable: true
+
+    ApiKeysResponse:
+      type: object
+      properties:
+        apiKeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKey"
+
+    ApiKeyCreateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        apiKey:
+          allOf:
+            - $ref: "#/components/schemas/ApiKey"
+            - type: object
+              properties:
+                plaintext:
+                  type: string
+                  description: >-
+                    The only copy of the secret. Returned once here and never again.
 
     AuditLogResponse:
       type: object

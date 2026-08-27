@@ -85,7 +85,19 @@ describe("apiKeys", () => {
     await expect(generateApiKey("2027-01-01")).rejects.toThrow(/valid Date/i);
     // Sub-second expiry: passes the "in the future" check, then truncates to
     // the current second on the way to storage -- a key born already dead.
-    await expect(generateApiKey(new Date(Date.now() + 200))).rejects.toThrow(/once stored/i);
+    //
+    // The clock is pinned to a whole second because otherwise this test IS the
+    // truncation it describes: run in the last 200ms of a second, now+200ms
+    // crosses into the NEXT second, truncation lands in the future, and the key
+    // is legitimately valid. Measured before pinning: it failed on 200 of 1000
+    // millisecond offsets, so roughly one run in five.
+    const wholeSecond = new Date("2026-08-26T12:00:00.000Z").getTime();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(wholeSecond);
+    try {
+      await expect(generateApiKey(new Date(wholeSecond + 200))).rejects.toThrow(/once stored/i);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("rejects anything that is not a plausible key, without throwing", async () => {

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { auditLogStatement } from "../auditLogStatement.js";
+import { auditLogStatement, auditLogStatementForInsertedRow } from "../auditLogStatement.js";
 import { onRequestPatch } from "../../api/admin/bands/bulk.js";
 import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../api/test-utils.js";
 
@@ -305,5 +305,76 @@ describe("bulk PATCH audit atomicity", () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).updated).toBe(1);
+  });
+});
+
+describe("auditLogStatementForInsertedRow", () => {
+  it("resolves resource_id by lookup and binds every other value", () => {
+    const bind = vi.fn(() => ({ run: vi.fn() }));
+    const env = { DB: { prepare: vi.fn(() => ({ bind })) } };
+
+    auditLogStatementForInsertedRow(
+      env,
+      7,
+      "api_key.created",
+      "api_key",
+      { table: "api_keys", where: { key_hash: "HASH" } },
+      { role: "viewer" },
+      "1.2.3.4",
+    );
+
+    const sql = env.DB.prepare.mock.calls[0][0];
+    expect(sql).toContain("FROM api_keys WHERE key_hash = ?");
+    expect(sql).toContain("SELECT ?, ?, ?, id, ?, ?");
+    // The match value is bound LAST: SQLite numbers anonymous placeholders in
+    // textual order, and the lookup's `?` sits after the five in the SELECT list.
+    expect(bind).toHaveBeenCalledWith(
+      7,
+      "api_key.created",
+      "api_key",
+      JSON.stringify({ role: "viewer" }),
+      "1.2.3.4",
+      "HASH",
+    );
+  });
+
+  // Table and column names cannot be bound, so they are interpolated. A caller that
+  // ever passes a variable there must fail loudly rather than build the injection.
+  it("renders a null value as IS NULL and leaves it unbound", () => {
+    const bind = vi.fn(() => ({ run: vi.fn() }));
+    const env = { DB: { prepare: vi.fn(() => ({ bind })) } };
+
+    auditLogStatementForInsertedRow(
+      env,
+      7,
+      "api_key.revoked",
+      "api_key",
+      { table: "api_keys", where: { id: 42, revoked_at: null } },
+      {},
+      "1.2.3.4",
+    );
+
+    // The IS NULL half must NOT consume a placeholder -- binding null instead would
+    // render `revoked_at = NULL`, which is never true in SQL and would silently
+    // suppress every audit row this path is supposed to write.
+    expect(env.DB.prepare.mock.calls[0][0]).toContain("WHERE id = ? AND revoked_at IS NULL");
+    expect(bind).toHaveBeenCalledWith(7, "api_key.revoked", "api_key", JSON.stringify({}), "1.2.3.4", 42);
+  });
+
+  // Table and column names cannot be bound, so they are interpolated. A caller that
+  // ever passes a variable there must fail loudly rather than build the injection.
+  it.each([
+    ["api_keys; DROP TABLE users --", { key_hash: "x" }],
+    ["api_keys", { "key_hash = '' OR 1=1 --": "x" }],
+    ["", { key_hash: "x" }],
+    [undefined, { key_hash: "x" }],
+    ["api_keys", {}],
+    ["api_keys", undefined],
+  ])("refuses a non-identifier table=%s where=%s", (table, where) => {
+    const env = { DB: { prepare: vi.fn() } };
+    expect(() => auditLogStatementForInsertedRow(env, 7, "a", "t", { table, where }, null, "ip")).toThrow(
+      /bare SQL identifiers/,
+    );
+    expect(env.DB.prepare).not.toHaveBeenCalled();
   });
 });

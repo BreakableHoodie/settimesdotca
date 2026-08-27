@@ -108,6 +108,71 @@ describe("Admin API keys API", () => {
     expect(second.status).toBe(409);
   });
 
+  // The precondition read is advisory: two concurrent revokes both see revoked_at
+  // IS NULL and both reach the batch. Simulated deterministically by revoking the row
+  // between that read and the batch -- exactly what the losing request observes.
+  it("returns 409 and writes no audit row when it loses a concurrent revoke", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const created = await createKey(env, headers);
+    const keyId = created.body.apiKey.id;
+
+    const originalBatch = env.DB.batch.bind(env.DB);
+    env.DB.batch = (statements) => {
+      // The other request won while this one was between its read and its write.
+      rawDb.prepare("UPDATE api_keys SET revoked_at = datetime('now') WHERE id = ?").run(keyId);
+      return originalBatch(statements);
+    };
+
+    const response = await itemHandler.onRequestDelete({
+      request: new Request(`https://example.test/api/admin/api-keys/${keyId}`, { method: "DELETE", headers }),
+      env,
+      params: { id: String(keyId) },
+    });
+
+    expect(response.status).toBe(409);
+    // The loser must not claim a revocation it did not perform.
+    expect(rawDb.prepare("SELECT COUNT(*) as c FROM audit_log WHERE action = 'api_key.revoked'").get().c).toBe(0);
+  });
+
+  it("writes exactly one audit row for a revoke that wins", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const created = await createKey(env, headers);
+    const keyId = created.body.apiKey.id;
+
+    const response = await itemHandler.onRequestDelete({
+      request: new Request(`https://example.test/api/admin/api-keys/${keyId}`, { method: "DELETE", headers }),
+      env,
+      params: { id: String(keyId) },
+    });
+
+    expect(response.status).toBe(200);
+    const audit = rawDb
+      .prepare("SELECT resource_id FROM audit_log WHERE action = 'api_key.revoked' AND resource_type = 'api_key'")
+      .all();
+    expect(audit).toHaveLength(1);
+    expect(audit[0].resource_id).toBe(keyId);
+  });
+
+  // `.catch(() => ({}))` only catches a PARSE error. `null` and arrays parse fine.
+  it.each([
+    ["null", "null"],
+    ["an array", '["name"]'],
+    ["a bare string", '"hello"'],
+  ])("returns 400 rather than 500 for a body that is %s", async (_label, raw) => {
+    const { env, headers } = createTestEnv({ role: "admin" });
+
+    const response = await collectionHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: raw,
+      }),
+      env,
+    });
+
+    expect(response.status).toBe(400);
+  });
+
   it("rejects an invalid id without querying api_keys", async () => {
     const { env, headers } = createTestEnv({ role: "admin" });
     const originalPrepare = env.DB.prepare;

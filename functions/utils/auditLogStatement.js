@@ -31,35 +31,46 @@ const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const isIdentifier = (value) => typeof value === "string" && IDENTIFIER.test(value);
 
 /**
- * Audit a row whose id does not exist until the INSERT ahead of it in the same batch
- * has run, by resolving `resource_id` with a lookup instead of a literal.
+ * Audit a row by looking its id up in `table` rather than passing a literal, so the
+ * record can be written in the SAME batch as the change it describes. Two cases need
+ * this, and they are the same shape:
  *
- * Deliberately takes an identifier and a bound value rather than a SQL string: a
+ * - **Creation**, where the id does not exist until the INSERT ahead of it has run:
+ *   `{ table: "api_keys", where: { key_hash: hash } }`
+ * - **A conditional change**, where the audit row must appear only if the change
+ *   actually applied. Give the audit row the SAME predicate as the UPDATE and put it
+ *   FIRST in the batch, so a request that loses a race writes neither:
+ *   `{ table: "api_keys", where: { id, revoked_at: null } }`
+ *
+ * Deliberately takes identifiers and bound values rather than a SQL string: a
  * `sql`-shaped parameter on a shared helper is the signature a future caller reaches
- * for with a table name off a request body.
+ * for with a table name off a request body. A `null` value renders as `IS NULL`.
  *
- * `matchColumn` must be UNIQUE, or the lookup can resolve to a different row. Note
- * that `INSERT ... SELECT` over zero rows inserts nothing and does NOT error, so a
- * value that matches no row silently produces no audit record -- pass the value the
- * preceding INSERT just wrote, never one that might be absent.
+ * `where` must select at most one row, or the lookup can resolve to a different one.
+ * Note that `INSERT ... SELECT` over zero rows inserts nothing and does NOT error --
+ * that silence is the point in the conditional case and a hazard in the creation
+ * case, where you must pass a value the preceding INSERT just wrote.
  */
 export function auditLogStatementForInsertedRow(
   env,
   userId,
   action,
   resourceType,
-  { table, matchColumn, matchValue },
+  { table, where },
   details,
   ipAddress,
 ) {
-  if (!isIdentifier(table) || !isIdentifier(matchColumn)) {
-    throw new Error("auditLogStatementForInsertedRow: table and matchColumn must be bare SQL identifiers");
+  const columns = Object.keys(where || {});
+  if (!isIdentifier(table) || columns.length === 0 || !columns.every(isIdentifier)) {
+    throw new Error("auditLogStatementForInsertedRow: table and where keys must be bare SQL identifiers");
   }
+  const predicate = columns.map((c) => (where[c] === null ? `${c} IS NULL` : `${c} = ?`)).join(" AND ");
+  const values = columns.filter((c) => where[c] !== null).map((c) => where[c]);
   const [type, , detailsJson, ip] = normalize(resourceType, null, details, ipAddress);
   return env.DB.prepare(
     `
     INSERT INTO audit_log (${AUDIT_LOG_COLUMNS})
-    SELECT ?, ?, ?, id, ?, ? FROM ${table} WHERE ${matchColumn} = ?
+    SELECT ?, ?, ?, id, ?, ? FROM ${table} WHERE ${predicate}
   `,
-  ).bind(userId, action, type, detailsJson, ip, matchValue);
+  ).bind(userId, action, type, detailsJson, ip, ...values);
 }

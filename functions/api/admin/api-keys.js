@@ -46,7 +46,15 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const body = await request.json().catch(() => ({}));
+    // `.catch(() => ({}))` only covers a PARSE failure. A body of literal `null`
+    // parses fine and resolves to null, so reading a field off it throws a
+    // TypeError that surfaces as an opaque 500 instead of a 400. Arrays parse
+    // fine too. Neither is an object we can read a name from.
+    const parsed = await request.json().catch(() => ({}));
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return validationErrorResponse("Request body must be a JSON object");
+    }
+    const body = parsed;
     const name = sanitizeString(body.name || "");
     const role = body.role || "viewer";
 
@@ -86,7 +94,7 @@ export async function onRequestPost(context) {
         user.userId,
         "api_key.created",
         "api_key",
-        { table: "api_keys", matchColumn: "key_hash", matchValue: generated.keyHash },
+        { table: "api_keys", where: { key_hash: generated.keyHash } },
         { role },
         ipAddress,
       ),

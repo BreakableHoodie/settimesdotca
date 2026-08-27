@@ -4,7 +4,7 @@
 
 import { deleteCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
-import { initializeLucia } from "../../../utils/auth.js";
+import { initializeLucia, isDevRequest } from "../../../utils/auth.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -17,7 +17,11 @@ export async function onRequestPost(context) {
     // (handles __Host-session_token in production vs session_token in dev).
     // SECURITY: Bearer token auth is for non-production environments only.
     const lucia = initializeLucia(DB, request, env);
-    const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
+    // isDevRequest, not a raw `!== "production"`: that comparison passes for
+    // "Production", " production" and "PRODUCTION", and this is the switch deciding
+    // whether `Authorization: Bearer <session-id>` is a valid credential at all.
+    // isDevRequest allowlists known dev values and fails closed on every variant (#425).
+    const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true" && isDevRequest(request, env);
     const sessionToken =
       lucia.readSessionCookie(request.headers.get("Cookie") ?? "") ||
       (allowHeaderAuth ? request.headers.get("Authorization")?.replace("Bearer ", "") : null);

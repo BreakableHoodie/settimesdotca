@@ -5,20 +5,30 @@
 // point: a split write leaves either a change with no record or a record with no
 // change, which this repo fixed across seven sites.
 
-const AUDIT_LOG_COLUMNS = "user_id, action, resource_type, resource_id, details, ip_address";
+// api_key_id is NULL for a cookie-authenticated action and carries the key id for a
+// bearer-authenticated one -- "which credential did this" is the first question in an
+// incident. Both builders below render from this one list; a hand-written INSERT
+// elsewhere is a third copy waiting to drift.
+const AUDIT_LOG_COLUMNS = "user_id, action, resource_type, resource_id, details, ip_address, api_key_id";
 
-function normalize(resourceType, resourceId, details, ipAddress) {
-  return [resourceType || null, resourceId || null, details ? JSON.stringify(details) : null, ipAddress || "unknown"];
+function normalize(resourceType, resourceId, details, ipAddress, apiKeyId) {
+  return [
+    resourceType || null,
+    resourceId || null,
+    details ? JSON.stringify(details) : null,
+    ipAddress || "unknown",
+    apiKeyId ?? null,
+  ];
 }
 
-export function auditLogStatement(env, userId, action, resourceType, resourceId, details, ipAddress) {
-  const [type, id, detailsJson, ip] = normalize(resourceType, resourceId, details, ipAddress);
+export function auditLogStatement(env, userId, action, resourceType, resourceId, details, ipAddress, apiKeyId) {
+  const [type, id, detailsJson, ip, keyId] = normalize(resourceType, resourceId, details, ipAddress, apiKeyId);
   return env.DB.prepare(
     `
     INSERT INTO audit_log (${AUDIT_LOG_COLUMNS})
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `,
-  ).bind(userId, action, type, id, detailsJson, ip);
+  ).bind(userId, action, type, id, detailsJson, ip, keyId);
 }
 
 // Bare SQL identifier. Table and column names cannot be bound as parameters, so they
@@ -59,6 +69,7 @@ export function auditLogStatementForInsertedRow(
   { table, where },
   details,
   ipAddress,
+  apiKeyId,
 ) {
   const columns = Object.keys(where || {});
   if (!isIdentifier(table) || columns.length === 0 || !columns.every(isIdentifier)) {
@@ -66,11 +77,11 @@ export function auditLogStatementForInsertedRow(
   }
   const predicate = columns.map((c) => (where[c] === null ? `${c} IS NULL` : `${c} = ?`)).join(" AND ");
   const values = columns.filter((c) => where[c] !== null).map((c) => where[c]);
-  const [type, , detailsJson, ip] = normalize(resourceType, null, details, ipAddress);
+  const [type, , detailsJson, ip, keyId] = normalize(resourceType, null, details, ipAddress, apiKeyId);
   return env.DB.prepare(
     `
     INSERT INTO audit_log (${AUDIT_LOG_COLUMNS})
-    SELECT ?, ?, ?, id, ?, ? FROM ${table} WHERE ${predicate}
+    SELECT ?, ?, ?, id, ?, ?, ? FROM ${table} WHERE ${predicate}
   `,
-  ).bind(userId, action, type, detailsJson, ip, ...values);
+  ).bind(userId, action, type, detailsJson, ip, keyId, ...values);
 }

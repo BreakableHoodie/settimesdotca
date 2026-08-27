@@ -2846,6 +2846,26 @@ components:
       in: header
       name: X-CSRF-Token
       description: Echo the `csrf_token` cookie for authenticated POST, PUT, PATCH, and DELETE admin requests.
+    AdminApiKey:
+      type: http
+      scheme: bearer
+      description: >-
+        Machine-to-machine alternative to the session cookie, for callers that cannot
+        hold a browser session. Present the key issued by `POST /api/admin/api-keys` as
+        `Authorization: Bearer st_...`.
+
+
+        The key authorises at ITS OWN role, which may be lower than its creator's — a
+        `viewer` key minted by an admin gets 403 from an admin-only route.
+
+
+        CSRF is not required on this path and no `X-CSRF-Token` is expected: a bearer
+        credential is not attached ambiently by a browser. Because of that, sending a
+        key AND a session cookie on the same request is rejected outright with 400
+        `AMBIGUOUS_AUTH` rather than one being preferred — neither credential is
+        honoured. Requests are rate limited per key, independently of the per-IP
+        limits, and a revoked or expired key stops working on the very next request
+        with no cache window.
 
   parameters:
     NumericId:

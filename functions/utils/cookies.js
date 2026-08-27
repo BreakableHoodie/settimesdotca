@@ -12,7 +12,15 @@ export function parseCookies(cookieHeader) {
   }
 
   return cookieHeader.split(";").reduce((cookies, cookie) => {
-    const [name, value] = cookie.trim().split("=");
+    // The NAME is trimmed, not just the pair. Trimming only the pair leaves interior
+    // whitespace on the name -- `__Host-session_token =abc` keyed the map on
+    // "__Host-session_token " (trailing space), so getCookie returned undefined while
+    // lucia.readSessionCookie, which compares k.trim(), returned "abc". Two parsers
+    // disagreeing about whether a session cookie is present is how a credential slips
+    // past a presence check; RFC 6265 does not permit that whitespace anyway.
+    const [rawName, ...rest] = cookie.split("=");
+    const name = rawName.trim();
+    const value = rest.join("=").trim();
     if (name && value) {
       cookies[name] = decodeURIComponent(value);
     }

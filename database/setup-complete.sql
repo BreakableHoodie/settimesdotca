@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
   resource_id INTEGER,                     -- ID of the affected resource
   details TEXT,                            -- JSON string with additional context
   ip_address TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
+  created_at TEXT DEFAULT (datetime('now')), api_key_id INTEGER REFERENCES api_keys(id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -531,6 +531,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_created_by ON api_keys (created_by);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_api_key ON audit_log (api_key_id);
 
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)

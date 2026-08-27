@@ -24,9 +24,17 @@ function serializeCookie(name, value, { secure, sameSite, maxAge }) {
   return parts.join("; ");
 }
 
+// Both names are exported because callers outside session handling need to detect
+// the presence of a session cookie WITHOUT knowing which environment they are in --
+// the admin middleware's dual-auth rejection checks for either. A private literal
+// here plus a copy at that call site is how the two drift apart.
+export const SESSION_COOKIE_NAME_DEV = "session_token";
+export const SESSION_COOKIE_NAME_PROD = "__Host-session_token";
+export const SESSION_COOKIE_NAMES = [SESSION_COOKIE_NAME_DEV, SESSION_COOKIE_NAME_PROD];
+
 export function initializeLucia(DB, request = null, env = null) {
   const isDev = request ? isDevRequest(request, env) : false;
-  const cookieName = isDev ? "session_token" : "__Host-session_token";
+  const cookieName = isDev ? SESSION_COOKIE_NAME_DEV : SESSION_COOKIE_NAME_PROD;
   const cookieOpts = {
     secure: !isDev,
     sameSite: isDev ? "Lax" : "Strict",

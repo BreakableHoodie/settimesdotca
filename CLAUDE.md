@@ -542,7 +542,52 @@ Three traps here, each of which was live:
 
 **Deleting a user who owns keys is refused with 409 `USER_OWNS_API_KEYS`, and revoking does not unblock it.** `created_by` is `ON DELETE RESTRICT`, which fires on the **existence** of a referencing row, not its state — so a revoked key blocks deletion exactly as an active one does. There is deliberately no endpoint that deletes an `api_keys` row: that would destroy the attribution RESTRICT exists to protect. Deactivation is the supported answer, and the 409's message says so. Detect it by `code`, never by matching the message.
 
-Audit rows go in the **same `DB.batch`** as the change. Creation is the awkward case — the key's id does not exist until the INSERT runs — so `auditLogStatementForInsertedRow()` (`functions/utils/auditLogStatement.js`) resolves `resource_id` with an `INSERT … SELECT … FROM <table> WHERE <col> = ?`. It takes a table and column **identifier**, not a SQL string, and validates both with an explicit `typeof value === "string"` check: `RegExp.prototype.test` coerces its argument, so a bare `/^[A-Za-z_]\w*$/.test(undefined)` tests the string `"undefined"` and **passes**. Note also that `INSERT … SELECT` over zero rows inserts nothing and does not error — only ever pass a value the preceding INSERT just wrote.
+### The request path — a key borrows a person's identity, and that is the whole risk
+
+`functions/api/admin/_middleware.js`'s `onRequest` gained an API-key branch. Its order is not stylistic:
+
+1. A request is key-authenticated **iff** `Authorization: Bearer <v>` and `v` starts with `API_KEY_PREFIX` (`st_`). That prefix test is the discriminator because `resolveSession` **already** reads `Authorization: Bearer …` as a *Lucia session id* under `ALLOW_HEADER_AUTH` (non-production only). Both meanings coexist; the prefix separates them. Import `API_KEY_PREFIX` from `utils/apiKeys.js` — never retype `"st_"`.
+2. **Key + any session cookie → 400 `AMBIGUOUS_AUTH`, before either credential is validated.**
+3. The key branch `return next()`s early, which **structurally skips `validateCSRFMiddleware`**.
+
+**What makes step 3 safe is that `Authorization` is not an ambient header** — a browser never attaches it cross-origin without a successful preflight, and `functions/_middleware.js` emits `Access-Control-Allow-Headers: …Authorization` only for an origin already on the allowlist, which an attacker does not control. That is a property of the platform, not of code anyone can edit here. **Step 2 is defence-in-depth against privilege confusion, not the load-bearing control** — an earlier draft of this section said it was, which was wrong twice over: it made the skip look one edit from a CSRF bypass, and it demanded an exactness the check did not have. `parseCookies` split on `=` without trimming the resulting *name*, so `__Host-session_token =abc` keyed the map on `"__Host-session_token "` and `getCookie` returned undefined while `lucia.readSessionCookie` (which compares `k.trim()`) read it fine. Fixed in `cookies.js` — which also stopped it truncating any value containing `=`.
+
+`context.data.user.role` is **the key's role, never its creator's**. A `viewer` key minted by an admin authorises as `viewer`; getting this backwards makes every key an admin key. `context.data.apiKey` carries `{ id, keyPrefix, role }`. Endpoints need no changes — `checkPermission` already short-circuits on `context.data.user`.
+
+**But `context.data.user.userId` is the creator's, and that is the sharp edge.** It has to be — audit attribution and every ownership check need a real user id. The consequence is that any endpoint reading `data.user.userId` as *"the human holding this browser session"* will act on the **creator's own account** when a key calls it. A security review of this branch found five such endpoints live:
+
+| Route | Gate it had | What a `viewer` key got |
+|---|---|---|
+| `mfa/setup.js` + `mfa/enable.js` | `viewer` | planted an attacker-controlled TOTP secret **and backup codes on its admin creator** |
+| `sessions.js` (GET) | **none** | the admin's live sessions, with IPs and user agents |
+| `sessions/revoke-all.js` (POST) | **none** | invalidates every session and **mints a new one**; only failed because `data.lucia` is undefined on the key path |
+| `trusted-devices.js` | **none** | device inventory with IPs; revokes them |
+
+`KEY_FORBIDDEN_PREFIXES` in `_middleware.js` now 403s these families (`KEY_NOT_PERMITTED`), **checked before the key is verified** — the refusal is a property of the credential type and the path, so a forged key and a valid one are refused identically at zero D1 cost. **The role hierarchy is the wrong axis here: no key role belongs on these routes, including one minted `admin`.** `/api/admin/me` is deliberately *not* listed — a decision, not an omission.
+
+`revoke-all.js` also got its own `checkPermission(context, "viewer")`. **`viewer`, not `admin`:** revoking your own sessions is legitimate self-service at every role, and raising the tier would break a viewer logging out everywhere. The point is that an endpoint which mints sessions must state its own requirement rather than inherit safety from middleware shape.
+
+`functions/api/admin/__tests__/apiKeySelfService.test.js` keeps it closed: any admin route exporting an `onRequest*` handler with **no `checkPermission` call** must be covered by the denylist or recorded in `REVIEWED_UNGATED_ROUTES` with a reason. **Its scope is honest and partial** — it catches the *ungated* shape, not the MFA shape (viewer-gated, then acting on self), because nothing textual separates that from a viewer-gated route acting on `params.id`. The MFA family is covered by name instead. A sixth self-service family outside these prefixes still needs a human to notice.
+
+**`ALLOW_HEADER_AUTH`'s production guard must use `isDevRequest`, not `!== "production"`.** The raw comparison passes for `"Production"`, `" production"` and `"PRODUCTION"` — and it is the switch deciding whether `Authorization: Bearer <session-id>` is a credential at all, which is now the *other* meaning of the header the `st_` prefix discriminates against. There were **two** copies (`_middleware.js` and `auth/logout.js`); both now use `isDevRequest`, which allowlists known dev values and fails closed (#425). Session ids are `crypto.randomUUID()` and can never begin with `st_`, so no single value satisfies both discriminators.
+
+**An API key must never become CSRF HMAC input.** `csrf.js`'s `getSessionIdentifier` falls back to the `Authorization` bearer value for the `ALLOW_HEADER_AUTH` dev path; it now ignores anything starting with `API_KEY_PREFIX`. Not a leak — the identifier is only ever hashed — but a live 256-bit secret has no business flowing into a second subsystem.
+
+Failure logging records `bearerValue.slice(0, DISPLAY_PREFIX_LENGTH)` — the non-secret display prefix — so brute force is visible without the presented secret reaching a log sink.
+
+### Never use numbered `?N` SQL placeholders anywhere in `functions/`
+
+D1 accepts them; **better-sqlite3, which backs the entire unit-test harness, does not** — it treats `?1`/`?2` as *named* parameters and refuses positional binding outright (`RangeError: Too many parameter values were provided`).
+
+The failure is silent where it matters. `checkRateLimitByKey` catches its own errors and **fails closed**, so while `rateLimit.js` used numbered placeholders its success path had *never once executed under test* — every test reaching it got a 429 from the catch. The module sits on the auth, subscriptions, band-follow and `/api/metrics` paths. It was found only because a new caller's tests all came back 429 for no visible reason.
+
+Repeat the value positionally instead. `functions/utils/__tests__/rateLimitPlaceholders.test.js` scans `functions/` for `?N` and separately asserts the limiter actually counts (`remaining` decrements) rather than returning the fail-closed shape — that second assertion is the one that catches a regression the scan cannot see.
+
+`audit_log.api_key_id` (migration 0061) records which credential acted; NULL means cookie-authenticated. Both builders in `auditLogStatement.js` take it as a trailing optional argument, so existing call sites are unchanged and write NULL. The middleware also writes one `api_key.request` row per key-authenticated **mutating** request — that, correlated with the per-action rows sharing its `user_id`, is how "which credential did this" gets answered. Threading `api_key_id` through all ~15 per-action call sites was considered and deliberately not done.
+
+**`api_key.request` is the one audit row not written in a batch, and it has its own retention tier.** It records a *request*, not a change, and is written before `next()` runs — so there is nothing to batch it with, and it captures requests that then 403 or 404. Do not read it as precedent for writing audit rows standalone. Because it is one row per mutating key request against a 60/min ceiling (~31.5M rows/year from a single saturated key), `retention.js` prunes `action = 'api_key.request'` at **90 days** while the rest of `audit_log` stays at 1 year; the two predicates are deliberately disjoint (`=` vs `!=`) so they cannot double-count.
+
+Audit rows otherwise go in the **same `DB.batch`** as the change. Creation is the awkward case — the key's id does not exist until the INSERT runs — so `auditLogStatementForInsertedRow()` (`functions/utils/auditLogStatement.js`) resolves `resource_id` with an `INSERT … SELECT … FROM <table> WHERE <col> = ?`. It takes a table and column **identifier**, not a SQL string, and validates both with an explicit `typeof value === "string"` check: `RegExp.prototype.test` coerces its argument, so a bare `/^[A-Za-z_]\w*$/.test(undefined)` tests the string `"undefined"` and **passes**. Note also that `INSERT … SELECT` over zero rows inserts nothing and does not error — only ever pass a value the preceding INSERT just wrote.
 
 ---
 

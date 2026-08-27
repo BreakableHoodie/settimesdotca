@@ -3,6 +3,7 @@
 
 import { doubleCsrf } from "csrf-csrf";
 import { isDevRequest } from "./auth.js";
+import { API_KEY_PREFIX } from "./apiKeys.js";
 function parseCookies(cookieHeader) {
   if (!cookieHeader) return {};
   return cookieHeader.split(";").reduce((acc, cookie) => {
@@ -43,10 +44,21 @@ function getSessionIdentifier(request, cookies, sessionIdentifierOverride) {
     return sessionIdentifierOverride;
   }
   // Check __Host- prefixed name (production) then plain name (dev).
+  //
+  // The Bearer fallback exists for the ALLOW_HEADER_AUTH dev path, where the header
+  // carries a Lucia SESSION ID. Since #744 it can instead carry an API key, and an
+  // API key must never become HMAC input here: it is a live 256-bit secret whose whole
+  // value is that it appears in exactly one place. Not a leak (the identifier is only
+  // ever hashed), but a secret flowing into a second subsystem for no reason at all.
+  // Key-authenticated requests skip CSRF entirely, so there is nothing to lose by
+  // ignoring it -- this only stops the value being read on a path that reaches here.
+  const bearer = request.headers.get("Authorization")?.replace("Bearer ", "");
+  const sessionBearer = bearer && !bearer.startsWith(API_KEY_PREFIX) ? bearer : null;
+
   return (
     cookies["__Host-session_token"] ||
     cookies.session_token ||
-    request.headers.get("Authorization")?.replace("Bearer ", "") ||
+    sessionBearer ||
     cookies.csrf_token ||
     "csrf-missing-session"
   );

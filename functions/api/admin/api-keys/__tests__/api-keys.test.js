@@ -194,6 +194,16 @@ describe("Admin API keys API", () => {
     expect(queries.filter((sql) => sql.includes("api_keys"))).toEqual([]);
   });
 
+  // Least privilege, and deliberately NOT the creator's role -- every key is minted
+  // by an admin, so inheriting would make every key an admin key.
+  it("defaults an omitted role to viewer rather than the creator's admin", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { body } = await createKey(env, headers, { name: "No role given" });
+
+    expect(body.apiKey.role).toBe("viewer");
+    expect(rawDb.prepare("SELECT role FROM api_keys WHERE id = ?").get(body.apiKey.id).role).toBe("viewer");
+  });
+
   it("rejects creating a key with an invalid role", async () => {
     const { env, headers } = createTestEnv({ role: "admin" });
     const { response } = await createKey(env, headers, { name: "Bad role", role: "superuser" });

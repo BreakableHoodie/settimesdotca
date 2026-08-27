@@ -14,9 +14,9 @@
 
 import { fromSqliteDateTime, toSqliteDateTime } from "./authAttempts.js";
 
-const API_KEY_PREFIX = "st_";
+export const API_KEY_PREFIX = "st_";
 const KEY_BYTES = 32;
-const DISPLAY_PREFIX_LENGTH = 8;
+export const DISPLAY_PREFIX_LENGTH = 8;
 // #744 calls for a short default and forced rotation. A bearer credential
 // bypasses CSRF, MFA and the cookie boundary, so a default set here is what
 // every endpoint built on this inherits.
@@ -104,10 +104,16 @@ export async function verifyApiKey(DB, presentedKey) {
   // their sessions for months while leaving their keys live, because it is a
   // separate endpoint from the PATCH one. A key is only ever as revoked as the
   // least careful path that can deactivate its owner; this makes that irrelevant.
-  // Note nothing is projected from users: only api_keys columns cross the boundary.
+  // The creator's display fields ARE projected, aliased creator_*: the middleware needs
+  // them to populate context.data.user, and this JOIN is already running. A second
+  // SELECT for the same row was a fourth D1 round-trip per key-authenticated request
+  // buying nothing. Still no credential column crosses the boundary -- key_hash is
+  // absent above and users' secrets are never named here.
   const row = await DB.prepare(
     `SELECT k.id, k.name, k.key_prefix, k.role, k.created_by, k.created_at,
-            k.expires_at, k.last_used_at, k.revoked_at
+            k.expires_at, k.last_used_at, k.revoked_at,
+            u.email AS creator_email, u.name AS creator_name,
+            u.first_name AS creator_first_name, u.last_name AS creator_last_name
      FROM api_keys k
      JOIN users u ON u.id = k.created_by
      WHERE k.key_hash = ? AND u.is_active = 1`,

@@ -4,12 +4,49 @@
 import { getCookie } from "../../utils/cookies.js";
 import { generateCSRFToken, setCSRFCookie, validateCSRFMiddleware } from "../../utils/csrf.js";
 import { getClientIP } from "../../utils/request.js";
-import { initializeLucia, SESSION_CONFIG } from "../../utils/auth.js";
-import { fromSqliteDateTime } from "../../utils/authAttempts.js";
+import { initializeLucia, isDevRequest, SESSION_CONFIG, SESSION_COOKIE_NAMES } from "../../utils/auth.js";
+import { fromSqliteDateTime, toSqliteDateTime } from "../../utils/authAttempts.js";
 import { createRequestLogger, logger } from "../../utils/logger.js";
 import { auditLogStatement } from "../../utils/auditLogStatement.js";
+import { API_KEY_PREFIX, DISPLAY_PREFIX_LENGTH, verifyApiKey } from "../../utils/apiKeys.js";
+import { apiKeyRateLimitKey, checkRateLimitByKey, rateLimitResponse } from "../../utils/rateLimit.js";
 
 export { auditLogStatement } from "../../utils/auditLogStatement.js";
+
+// 60/min: high enough for a scheduled import or a dashboard poll, low enough that a
+// leaked key cannot be used to walk the whole dataset before anyone notices. Keyed on
+// the key id, independent of the per-IP limits, so a credential that moves between
+// addresses is still bounded.
+const API_KEY_RATE_LIMIT = { requests: 60, window: 60 };
+const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
+
+// A bearer key authenticates a MACHINE, but it necessarily borrows a PERSON's
+// identity: context.data.user.userId below is the key's creator, because that is
+// what audit attribution and every ownership check need. Account self-service
+// endpoints read that same field as "the human holding this browser session" and
+// act on their credentials -- so a key reaching one of them edits its creator's
+// account, at whatever role the key carries.
+//
+// That is not theoretical. Before this list existed, a `viewer` key could POST
+// /api/admin/mfa/setup + /mfa/enable and plant an attacker-controlled TOTP secret
+// and backup codes on its admin creator (both gate at "viewer" and act on
+// auth.user.userId), read that admin's live sessions and device inventory with IPs
+// (no role check at all), and revoke their trusted devices. The role hierarchy is
+// the wrong axis: NO key role belongs here, including one minted `admin`.
+//
+// Matched with startsWith, so the slash-less entries also cover their children
+// (/sessions and /sessions/revoke-all). Enforced by apiKeySelfService.test.js,
+// which fails when an admin route with no checkPermission call is not covered here.
+//
+// /api/admin/me is deliberately NOT listed: it is a read that returns the identity
+// the key holder already obtained from the admin who minted the key, and a machine
+// client discovering its own role is a legitimate use. A decision, not an omission.
+const KEY_FORBIDDEN_PREFIXES = [
+  "/api/admin/auth/",
+  "/api/admin/mfa/",
+  "/api/admin/sessions",
+  "/api/admin/trusted-devices",
+];
 
 function normalizeUser(user) {
   if (!user) return null;
@@ -29,7 +66,11 @@ async function resolveSession(request, env) {
   const lucia = initializeLucia(env.DB, request, env);
   // SECURITY: Bearer token auth is for non-production environments only.
   // In production, only cookie-based sessions are accepted.
-  const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true" && env?.ENVIRONMENT !== "production";
+  // isDevRequest, not a raw `!== "production"`: that comparison passes for
+  // "Production", " production" and "PRODUCTION", and this is the switch deciding
+  // whether `Authorization: Bearer <session-id>` is a valid credential at all.
+  // isDevRequest allowlists known dev values and fails closed on every variant (#425).
+  const allowHeaderAuth = env?.ALLOW_HEADER_AUTH === "true" && isDevRequest(request, env);
   const sessionId =
     lucia.readSessionCookie(request.headers.get("Cookie") ?? "") ||
     (allowHeaderAuth ? request.headers.get("Authorization")?.replace("Bearer ", "") : null);
@@ -231,7 +272,143 @@ export async function onRequest(context) {
   const { pathname } = new URL(request.url);
   const log = createRequestLogger(context);
 
-  // Skip auth check for auth endpoints
+  const authHeader = request.headers.get("Authorization");
+  const bearerValue = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const isApiKeyRequest = bearerValue !== null && bearerValue.startsWith(API_KEY_PREFIX);
+
+  // Both names, not the environment-appropriate one: this only asks "is a session
+  // cookie present at all", and guessing wrong would silently disable the rejection
+  // below. This agrees with the session layer's own reader only because parseCookies
+  // now trims the cookie NAME (see cookies.js) -- it did not, so a header of
+  // `__Host-session_token =abc` keyed the map on "__Host-session_token " and returned
+  // undefined here while lucia.readSessionCookie, which compares k.trim(), returned
+  // "abc". A cookie shape that carries a readable session id past this check is
+  // exactly what this check must not have.
+  const hasSessionCookie = SESSION_COOKIE_NAMES.some((name) => Boolean(getCookie(request, name)));
+
+  // Fail closed on ambiguous auth, BEFORE validating either credential. Two
+  // credentials on one request is where privilege-confusion bugs live.
+  if (isApiKeyRequest && hasSessionCookie) {
+    return new Response(JSON.stringify({ error: "Ambiguous authentication", code: "AMBIGUOUS_AUTH" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // The API-key path returns before reaching validateCSRFMiddleware below, and that is
+  // the CSRF skip. An API client has no csrf_token cookie to echo, so leaving the check
+  // on would fail every key-authenticated mutation.
+  //
+  // What makes the skip safe is that `Authorization` is NOT an ambient header: a
+  // browser never attaches it cross-origin without a successful preflight, and
+  // functions/_middleware.js only emits `Access-Control-Allow-Headers: …Authorization`
+  // for an origin already on the allowlist -- which an attacker does not control. That
+  // is the primary control, and it is a property of the platform rather than of code
+  // anyone can edit here.
+  //
+  // The AMBIGUOUS_AUTH rejection above is defence-in-depth against privilege confusion
+  // (two credentials, one request), NOT the thing holding this up. Stating it as the
+  // sole control was wrong twice over: it made the skip look one edit away from a CSRF
+  // bypass, and it demanded an exactness the check did not have -- a cookie-name
+  // whitespace variant slipped past it until parseCookies was fixed to trim the name.
+  if (isApiKeyRequest) {
+    const ipAddress = getClientIP(request);
+
+    // Before verification, deliberately: this is a property of the credential TYPE and
+    // the path, not of any particular key, so a valid key and a forged one are refused
+    // identically. It also costs zero D1 round-trips, which is the right posture for a
+    // path an attacker can hammer for free.
+    if (KEY_FORBIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+      log.warn("API key blocked from account self-service route", {
+        keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
+        path: pathname,
+        ipAddress,
+      });
+      return new Response(
+        JSON.stringify({
+          error: "Not available to API keys",
+          code: "KEY_NOT_PERMITTED",
+          message: "This endpoint acts on the account behind the key and is reachable only with a session.",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const key = await verifyApiKey(env.DB, bearerValue);
+    if (!key) {
+      log.warn("API key authentication failed", {
+        // The non-secret display prefix ONLY, so brute-force attempts are visible
+        // without the presented secret ever reaching a log sink.
+        keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
+        ipAddress,
+      });
+      return new Response(JSON.stringify({ error: "Invalid API key", code: "INVALID_API_KEY" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const rateResult = await checkRateLimitByKey(env.DB, apiKeyRateLimitKey(key.id, pathname), API_KEY_RATE_LIMIT, {
+      apiKeyId: key.id,
+    });
+    if (!rateResult.allowed) {
+      return rateLimitResponse(rateResult);
+    }
+
+    const cutoff = toSqliteDateTime(new Date(Date.now() - LAST_USED_THROTTLE_MS));
+    try {
+      await env.DB.prepare(
+        "UPDATE api_keys SET last_used_at = datetime('now') WHERE id = ? AND (last_used_at IS NULL OR last_used_at < ?)",
+      )
+        .bind(key.id, cutoff)
+        .run();
+    } catch (lastUsedError) {
+      logger.warn("last_used_at update failed", { keyId: key.id, error: lastUsedError });
+    }
+
+    // No second SELECT: verifyApiKey's JOIN on users already returned these as creator_*.
+    // created_by is ON DELETE RESTRICT and the JOIN requires is_active = 1, so the row
+    // provably exists -- these fields are absent only if the column itself is NULL.
+    const displayName =
+      key.creator_name || [key.creator_first_name, key.creator_last_name].filter(Boolean).join(" ") || null;
+
+    context.data = {
+      ...context.data,
+      authenticated: true,
+      user: {
+        userId: key.created_by,
+        email: key.creator_email ?? null,
+        role: key.role,
+        name: displayName,
+        firstName: key.creator_first_name ?? null,
+        lastName: key.creator_last_name ?? null,
+        isActive: true,
+      },
+      apiKey: { id: key.id, keyPrefix: key.key_prefix, role: key.role },
+      ipAddress,
+    };
+
+    const method = request.method.toUpperCase();
+    if (method !== "GET" && method !== "HEAD") {
+      try {
+        await auditLogStatement(
+          env,
+          key.created_by,
+          "api_key.request",
+          "api_key",
+          key.id,
+          { method, path: pathname },
+          ipAddress,
+          key.id,
+        ).run();
+      } catch (auditError) {
+        logger.warn("api_key.request audit log failed", { keyId: key.id, error: auditError });
+      }
+    }
+
+    return next();
+  }
+
   if (pathname.startsWith("/api/admin/auth/")) {
     const csrfError = validateCSRFMiddleware(request, env);
     if (csrfError) {
@@ -240,7 +417,6 @@ export async function onRequest(context) {
     return next();
   }
 
-  // SECURITY: Validate CSRF token for state-changing requests
   const csrfError = validateCSRFMiddleware(request, env);
   if (csrfError) {
     return csrfError;

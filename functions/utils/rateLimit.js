@@ -124,27 +124,50 @@ function getRateLimitKey(ip, pathname) {
  * D1-backed rate limit check for security-sensitive endpoints.
  * Globally consistent across all Cloudflare PoPs.
  */
-async function checkRateLimitD1(DB, ip, pathname, config) {
+/**
+ * Rate-limit key for an API key, sharing getRateLimitKey's path-collapsing so one hot
+ * endpoint cannot starve the others. Keyed on the key id rather than the IP: a bearer
+ * credential is the thing being limited, and it can move between addresses.
+ */
+export function apiKeyRateLimitKey(keyId, pathname) {
+  const basePath = pathname.split("/").slice(0, 4).join("/");
+  return `apikey:${keyId}:${basePath}`;
+}
+
+/**
+ * The counter itself, taking a pre-built key. Callers that limit per-IP go through
+ * checkRateLimitD1; callers that limit per-API-key build their key with
+ * apiKeyRateLimitKey. One implementation either way -- the SQL below is subtle enough
+ * (a CASE-driven window reset, a RETURNING upsert) that a second copy is a liability.
+ */
+export async function checkRateLimitByKey(DB, key, config, logContext = {}) {
   const now = Math.floor(Date.now() / 1000);
-  const key = getRateLimitKey(ip, pathname);
 
   try {
     // Single round trip: the upsert and the post-write read are combined via RETURNING,
     // instead of a separate .run() + SELECT .first(). This halves D1 cost on the hot
     // fail-closed path (auth, subscriptions, band follows, /api/metrics — #492).
     // The CASE expression resets the window when it has expired.
+    //
+    // Bare `?` placeholders with each value repeated, NOT numbered `?1/?2/?3`.
+    // D1 accepts either, but better-sqlite3 -- which backs the whole unit-test
+    // harness -- treats `?N` as NAMED parameters and refuses to bind them
+    // positionally at all ("Too many parameter values were provided"). While this
+    // used numbered params, every test that reached here fell into the fail-closed
+    // catch below and got a 429, so the success path had never once been executed
+    // under test. Repetition is the price of a limiter that can actually be tested.
     const row = await DB.prepare(
       `
       INSERT INTO rate_limits (key, count, window_start, updated_at)
-      VALUES (?1, 1, ?2, ?2)
+      VALUES (?, 1, ?, ?)
       ON CONFLICT(key) DO UPDATE SET
-        count = CASE WHEN (?2 - window_start) >= ?3 THEN 1 ELSE count + 1 END,
-        window_start = CASE WHEN (?2 - window_start) >= ?3 THEN ?2 ELSE window_start END,
-        updated_at = ?2
+        count = CASE WHEN (? - window_start) >= ? THEN 1 ELSE count + 1 END,
+        window_start = CASE WHEN (? - window_start) >= ? THEN ? ELSE window_start END,
+        updated_at = ?
       RETURNING count, window_start
     `,
     )
-      .bind(key, now, config.window)
+      .bind(key, now, now, now, config.window, now, config.window, now, now)
       .first();
 
     // A RETURNING upsert always yields a row; these fallbacks guard shim/driver
@@ -163,8 +186,8 @@ async function checkRateLimitD1(DB, ip, pathname, config) {
   } catch (error) {
     logger.error("D1 rate limit check failed on sensitive endpoint", {
       error,
-      ip,
-      pathname,
+      key,
+      ...logContext,
     });
     // Fail closed: block the request when the counter is unavailable.
     return {
@@ -174,6 +197,10 @@ async function checkRateLimitD1(DB, ip, pathname, config) {
       limit: config.requests,
     };
   }
+}
+
+function checkRateLimitD1(DB, ip, pathname, config) {
+  return checkRateLimitByKey(DB, getRateLimitKey(ip, pathname), config, { ip, pathname });
 }
 
 /**

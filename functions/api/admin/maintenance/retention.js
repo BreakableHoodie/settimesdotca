@@ -9,6 +9,13 @@
 //   auth_attempts:   30 days  (rate-limit counters; contains IPs/emails)
 //   auth_audit:      90 days  (short-lived security telemetry; contains IPs)
 //   audit_log:       1 year   (admin action history; longer legitimate interest)
+//                    EXCEPT action='api_key.request', at 90 days: that row is a
+//                    REQUEST log wearing the audit-log schema — one per mutating
+//                    key-authenticated request, written before the handler runs, so
+//                    it records 403s and 404s too. At the 60/min ceiling a single key
+//                    yields ~31.5M rows/year. The two predicates are deliberately
+//                    disjoint (= vs !=) so they cannot double-count a row and the
+//                    reported figures stay correct regardless of execution order.
 //   rate_limits:     30 min (1800s) — stale fixed-window counters. The largest
 //                    configured window is 300s so this is intentionally 6× to
 //                    give a buffer against races. Uses unixepoch() because the
@@ -27,6 +34,7 @@ export async function runRetentionCleanup(env) {
     authAttempts,
     authAudit,
     adminAudit,
+    apiKeyRequests,
     rateLimits,
   ] = await Promise.all([
     DB.prepare("DELETE FROM lucia_sessions WHERE expires_at < ?").bind(nowUnix).run(),
@@ -36,7 +44,12 @@ export async function runRetentionCleanup(env) {
     DB.prepare("DELETE FROM trusted_devices WHERE expires_at <= datetime('now')").run(),
     DB.prepare("DELETE FROM auth_attempts WHERE created_at < datetime('now', '-30 days')").run(),
     DB.prepare("DELETE FROM auth_audit WHERE timestamp < datetime('now', '-90 days')").run(),
-    DB.prepare("DELETE FROM audit_log WHERE created_at < datetime('now', '-1 year')").run(),
+    DB.prepare(
+      "DELETE FROM audit_log WHERE action != 'api_key.request' AND created_at < datetime('now', '-1 year')",
+    ).run(),
+    DB.prepare(
+      "DELETE FROM audit_log WHERE action = 'api_key.request' AND created_at < datetime('now', '-90 days')",
+    ).run(),
     DB.prepare("DELETE FROM rate_limits WHERE updated_at < unixepoch() - 1800").run(),
   ]);
 
@@ -49,6 +62,7 @@ export async function runRetentionCleanup(env) {
     auth_attempts_deleted: authAttempts.meta.changes,
     auth_audit_deleted: authAudit.meta.changes,
     audit_log_deleted: adminAudit.meta.changes,
+    api_key_requests_deleted: apiKeyRequests.meta.changes,
     rate_limits_deleted: rateLimits.meta.changes,
   };
 }

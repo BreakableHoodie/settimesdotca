@@ -47,6 +47,9 @@ describe("auditLogStatement", () => {
       9,
       JSON.stringify({ venueName: "Blue Room" }),
       "unknown",
+      // api_key_id: null when the action came from a cookie-authenticated session,
+      // which is every caller that omits the argument.
+      null,
     );
   });
 
@@ -325,15 +328,17 @@ describe("auditLogStatementForInsertedRow", () => {
 
     const sql = env.DB.prepare.mock.calls[0][0];
     expect(sql).toContain("FROM api_keys WHERE key_hash = ?");
-    expect(sql).toContain("SELECT ?, ?, ?, id, ?, ?");
+    expect(sql).toContain("SELECT ?, ?, ?, id, ?, ?, ?");
     // The match value is bound LAST: SQLite numbers anonymous placeholders in
-    // textual order, and the lookup's `?` sits after the five in the SELECT list.
+    // textual order, and the lookup's `?` sits after the six in the SELECT list.
+    // api_key_id is null here -- this call site is cookie-authenticated.
     expect(bind).toHaveBeenCalledWith(
       7,
       "api_key.created",
       "api_key",
       JSON.stringify({ role: "viewer" }),
       "1.2.3.4",
+      null,
       "HASH",
     );
   });
@@ -358,7 +363,7 @@ describe("auditLogStatementForInsertedRow", () => {
     // render `revoked_at = NULL`, which is never true in SQL and would silently
     // suppress every audit row this path is supposed to write.
     expect(env.DB.prepare.mock.calls[0][0]).toContain("WHERE id = ? AND revoked_at IS NULL");
-    expect(bind).toHaveBeenCalledWith(7, "api_key.revoked", "api_key", JSON.stringify({}), "1.2.3.4", 42);
+    expect(bind).toHaveBeenCalledWith(7, "api_key.revoked", "api_key", JSON.stringify({}), "1.2.3.4", null, 42);
   });
 
   // Table and column names cannot be bound, so they are interpolated. A caller that

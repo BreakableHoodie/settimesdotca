@@ -1,3 +1,5 @@
+import { parseCookies } from "./cookies.js";
+
 export const SESSION_CONFIG = {
   absoluteTimeout: 30 * 24 * 60 * 60 * 1000,
   idleTimeout: 30 * 60 * 1000,
@@ -24,22 +26,28 @@ function serializeCookie(name, value, { secure, sameSite, maxAge }) {
   return parts.join("; ");
 }
 
+// Both names are exported because callers outside session handling need to detect
+// the presence of a session cookie WITHOUT knowing which environment they are in --
+// the admin middleware's dual-auth rejection checks for either. A private literal
+// here plus a copy at that call site is how the two drift apart.
+export const SESSION_COOKIE_NAME_DEV = "session_token";
+export const SESSION_COOKIE_NAME_PROD = "__Host-session_token";
+export const SESSION_COOKIE_NAMES = [SESSION_COOKIE_NAME_DEV, SESSION_COOKIE_NAME_PROD];
+
 export function initializeLucia(DB, request = null, env = null) {
   const isDev = request ? isDevRequest(request, env) : false;
-  const cookieName = isDev ? "session_token" : "__Host-session_token";
+  const cookieName = isDev ? SESSION_COOKIE_NAME_DEV : SESSION_COOKIE_NAME_PROD;
   const cookieOpts = {
     secure: !isDev,
     sameSite: isDev ? "Lax" : "Strict",
   };
 
   return {
+    // Delegates to the shared parser rather than keeping a correct-but-separate copy.
+    // This one was already right; that is exactly why it was dangerous -- being right
+    // while three others were wrong is what let the divergence go unnoticed for so long.
     readSessionCookie(cookieHeader) {
-      if (!cookieHeader) return null;
-      for (const part of cookieHeader.split(";")) {
-        const [k, ...rest] = part.trim().split("=");
-        if (k.trim() === cookieName) return rest.join("=").trim() || null;
-      }
-      return null;
+      return parseCookies(cookieHeader)[cookieName] || null;
     },
 
     async validateSession(sessionId) {

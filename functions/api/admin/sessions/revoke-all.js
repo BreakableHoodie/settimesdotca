@@ -2,9 +2,26 @@
 // POST /api/admin/sessions/revoke-all
 
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
+import { checkPermission } from "../_middleware.js";
 
 export async function onRequestPost(context) {
   const { env, data, request } = context;
+
+  // This endpoint MINTS a session, and until now it had no permission check at all --
+  // it read `data` and trusted that the middleware had filled it. That made its safety
+  // a property of middleware shape rather than of anything stated here, and the API-key
+  // branch does not populate `data.lucia`, so a key reaching it crashed on undefined
+  // instead of being refused. Keys are blocked by KEY_FORBIDDEN_PREFIXES now; this is
+  // the second lock, so the route states its own requirement.
+  //
+  // "viewer", not "admin": revoking your OWN sessions is legitimate self-service at
+  // every role. The check is here to guarantee an authenticated human, not to gate a
+  // privilege -- raising the tier would break a viewer logging out everywhere.
+  const permCheck = await checkPermission(context, "viewer");
+  if (permCheck.error) {
+    return permCheck.response;
+  }
+
   const { lucia, user } = data;
 
   await lucia.invalidateUserSessions(user.userId);

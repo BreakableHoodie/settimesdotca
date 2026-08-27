@@ -4654,5 +4654,13 @@ components:
           type: integer
         audit_log_deleted:
           type: integer
+        api_key_requests_deleted:
+          type: integer
+          description: >-
+            Rows pruned from audit_log where action = 'api_key.request'. Tracked
+            separately from audit_log_deleted because that row is a request log on the
+            audit-log schema -- one per mutating key-authenticated request -- and prunes
+            at 90 days rather than 1 year. The two delete predicates are disjoint, so
+            these counts never overlap.
         rate_limits_deleted:
           type: integer

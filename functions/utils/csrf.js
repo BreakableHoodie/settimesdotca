@@ -4,17 +4,10 @@
 import { doubleCsrf } from "csrf-csrf";
 import { isDevRequest } from "./auth.js";
 import { API_KEY_PREFIX } from "./apiKeys.js";
-function parseCookies(cookieHeader) {
-  if (!cookieHeader) return {};
-  return cookieHeader.split(";").reduce((acc, cookie) => {
-    const [name, value] = cookie.trim().split("=");
-    if (name && value) {
-      acc[name] = value;
-    }
-    return acc;
-  }, {});
-}
-
+// The shared parser, not a private copy. This file had its own, which neither trimmed
+// the cookie name nor preserved "=" in a value -- so CSRF validation and session
+// validation could derive DIFFERENT session identifiers from one header.
+import { parseCookies } from "./cookies.js";
 function getHeaderToken(request) {
   return request.headers.get("X-CSRF-Token") || "";
 }

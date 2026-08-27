@@ -2,6 +2,7 @@
 import { isDevRequest } from "./auth.js";
 import { toSqliteDateTime } from "./authAttempts.js";
 import { logger } from "./logger.js";
+import { getCookie } from "./cookies.js";
 
 // __Host- prefix enforces Secure + Path=/ + no Domain, preventing subdomain injection.
 // Must align with the name used in getTrustedDeviceToken's cookie parsing.
@@ -184,16 +185,8 @@ export function createTrustedDeviceCookie(token, request, env) {
  * Get trusted device token from request cookies
  */
 export function getTrustedDeviceToken(request) {
-  const cookieHeader = request.headers.get("Cookie");
-  if (!cookieHeader) return null;
-
-  const cookies = cookieHeader.split(";");
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split("=");
-    if (name === TRUSTED_DEVICE_COOKIE_NAME_SECURE || name === TRUSTED_DEVICE_COOKIE_NAME_DEV) {
-      return value;
-    }
-  }
-
-  return null;
+  // getCookie, not a fourth inline parser. The hand-rolled loop this replaces did not
+  // trim the cookie name and truncated any value containing "=", so a token was
+  // silently unreadable for shapes the session layer handled fine.
+  return getCookie(request, TRUSTED_DEVICE_COOKIE_NAME_SECURE) || getCookie(request, TRUSTED_DEVICE_COOKIE_NAME_DEV);
 }

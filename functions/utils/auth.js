@@ -1,3 +1,5 @@
+import { parseCookies } from "./cookies.js";
+
 export const SESSION_CONFIG = {
   absoluteTimeout: 30 * 24 * 60 * 60 * 1000,
   idleTimeout: 30 * 60 * 1000,
@@ -41,13 +43,11 @@ export function initializeLucia(DB, request = null, env = null) {
   };
 
   return {
+    // Delegates to the shared parser rather than keeping a correct-but-separate copy.
+    // This one was already right; that is exactly why it was dangerous -- being right
+    // while three others were wrong is what let the divergence go unnoticed for so long.
     readSessionCookie(cookieHeader) {
-      if (!cookieHeader) return null;
-      for (const part of cookieHeader.split(";")) {
-        const [k, ...rest] = part.trim().split("=");
-        if (k.trim() === cookieName) return rest.join("=").trim() || null;
-      }
-      return null;
+      return parseCookies(cookieHeader)[cookieName] || null;
     },
 
     async validateSession(sessionId) {

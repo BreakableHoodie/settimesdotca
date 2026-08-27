@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { auditLogStatement } from "../auditLogStatement.js";
+import { auditLogStatement, auditLogStatementForInsertedRow } from "../auditLogStatement.js";
 import { onRequestPatch } from "../../api/admin/bands/bulk.js";
 import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../api/test-utils.js";
 
@@ -305,5 +305,51 @@ describe("bulk PATCH audit atomicity", () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).updated).toBe(1);
+  });
+});
+
+describe("auditLogStatementForInsertedRow", () => {
+  it("resolves resource_id by lookup and binds every other value", () => {
+    const bind = vi.fn(() => ({ run: vi.fn() }));
+    const env = { DB: { prepare: vi.fn(() => ({ bind })) } };
+
+    auditLogStatementForInsertedRow(
+      env,
+      7,
+      "api_key.created",
+      "api_key",
+      { table: "api_keys", matchColumn: "key_hash", matchValue: "HASH" },
+      { role: "viewer" },
+      "1.2.3.4",
+    );
+
+    const sql = env.DB.prepare.mock.calls[0][0];
+    expect(sql).toContain("FROM api_keys WHERE key_hash = ?");
+    expect(sql).toContain("SELECT ?, ?, ?, id, ?, ?");
+    // The match value is bound LAST: SQLite numbers anonymous placeholders in
+    // textual order, and the lookup's `?` sits after the five in the SELECT list.
+    expect(bind).toHaveBeenCalledWith(
+      7,
+      "api_key.created",
+      "api_key",
+      JSON.stringify({ role: "viewer" }),
+      "1.2.3.4",
+      "HASH",
+    );
+  });
+
+  // Table and column names cannot be bound, so they are interpolated. A caller that
+  // ever passes a variable there must fail loudly rather than build the injection.
+  it.each([
+    ["api_keys; DROP TABLE users --", "key_hash"],
+    ["api_keys", "key_hash = '' OR 1=1 --"],
+    ["", "key_hash"],
+    [undefined, "key_hash"],
+  ])("refuses a non-identifier table=%s column=%s", (table, matchColumn) => {
+    const env = { DB: { prepare: vi.fn() } };
+    expect(() =>
+      auditLogStatementForInsertedRow(env, 7, "a", "t", { table, matchColumn, matchValue: "x" }, null, "ip"),
+    ).toThrow(/bare SQL identifiers/);
+    expect(env.DB.prepare).not.toHaveBeenCalled();
   });
 });

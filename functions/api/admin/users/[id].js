@@ -2,7 +2,7 @@
 // PATCH /api/admin/users/:id - Update user
 // DELETE /api/admin/users/:id - Delete user (soft delete)
 
-import { checkPermission, auditLog } from "../_middleware.js";
+import { checkPermission } from "../_middleware.js";
 import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import { getClientIP } from "../../../utils/request.js";
 import { validateId } from "../../../utils/validation.js";
@@ -224,29 +224,58 @@ export async function onRequestPatch(context) {
     // Add user ID to values
     values.push(userId);
 
-    // Execute update
-    await DB.prepare(
-      `
-      UPDATE users
-      SET ${updates.join(", ")}
-      WHERE id = ?
-    `,
-    )
-      .bind(...values)
-      .run();
+    const mutationStatements = [
+      DB.prepare(
+        `
+        UPDATE users
+        SET ${updates.join(", ")}
+        WHERE id = ?
+      `,
+      ).bind(...values),
+    ];
 
-    // Audit log
-    await auditLog(
-      env,
-      currentUser.userId,
-      "user.updated",
-      "user",
-      userId,
-      {
-        changes: { role, name, firstName, lastName, isActive },
-      },
-      ipAddress,
+    // Truthiness, not `=== false`, to match the three sites above (the last-admin
+    // guard, the is_active write, and the deactivated_at stamp). A body of
+    // `{"isActive": 0}` deactivates the user at every one of them, so it must
+    // revoke their keys here too or the departed account keeps a live credential.
+    const deactivating = isActive !== undefined && !isActive;
+    // api_keys.role is frozen at creation and never reconciled against its creator's
+    // current role, so a demotion would otherwise leave a bearer credential still
+    // carrying the role the user just lost -- letting them re-promote themselves with
+    // it once the Bearer path exists. Any role change revokes, not just a demotion:
+    // deciding which direction is "safe" needs the rank hierarchy, and over-revoking
+    // is the fail-safe error. Reissuing a key is cheap; an un-demotable admin is not.
+    const roleChanged = role !== undefined && role !== user.role;
+    if (deactivating || roleChanged) {
+      mutationStatements.push(
+        DB.prepare("UPDATE api_keys SET revoked_at = datetime('now') WHERE created_by = ? AND revoked_at IS NULL").bind(
+          userId,
+        ),
+      );
+    }
+    if (deactivating) {
+      // Matches users/[id]/toggle-status.js, the other endpoint that deactivates.
+      // enforceSession already rejects an inactive user, so this is tidiness rather
+      // than a live hole -- but two deactivation paths doing different amounts of
+      // work is precisely the shape of the bug this change exists to fix.
+      mutationStatements.push(DB.prepare("DELETE FROM lucia_sessions WHERE user_id = ?").bind(userId));
+    }
+
+    mutationStatements.push(
+      auditLogStatement(
+        env,
+        currentUser.userId,
+        "user.updated",
+        "user",
+        userId,
+        {
+          changes: { role, name, firstName, lastName, isActive },
+        },
+        ipAddress,
+      ),
     );
+
+    await DB.batch(mutationStatements);
 
     // Fetch updated user
     const updatedUser = await DB.prepare(
@@ -361,6 +390,29 @@ export async function onRequestDelete(context) {
           },
         );
       }
+    }
+
+    // api_keys.created_by is ON DELETE RESTRICT, and RESTRICT fires on the EXISTENCE
+    // of a referencing row, not its state -- so revoking a key does NOT unblock this,
+    // and there is deliberately no endpoint that deletes the row (that would destroy
+    // the attribution RESTRICT exists to protect). Deactivation is the supported path:
+    // it revokes every active key and leaves both records intact.
+    const apiKeyCount = await DB.prepare("SELECT COUNT(*) as count FROM api_keys WHERE created_by = ?")
+      .bind(userId)
+      .first();
+    if (apiKeyCount.count > 0) {
+      const plural = apiKeyCount.count === 1 ? "" : "s";
+      return new Response(
+        JSON.stringify({
+          error: "Cannot delete user",
+          code: "USER_OWNS_API_KEYS",
+          message: `User owns ${apiKeyCount.count} API key${plural}, which must keep their creator for attribution. Deactivate the user instead -- that revokes their key${plural} and preserves both records.`,
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Hard delete with cleanup of references

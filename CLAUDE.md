@@ -521,6 +521,31 @@ Enforced via `checkPermission(context, "viewer"|"editor"|"admin")` in `functions
 
 ---
 
+## API keys (#744) — a credential's life is tied to its creator's
+
+`api_keys` rows are bearer credentials minted by an admin (`POST /api/admin/api-keys`, plaintext returned **exactly once**; there is no reveal endpoint and never will be). `functions/utils/apiKeys.js` owns generation and verification; the digest is deliberately **SHA-256, fast and unsalted** — read that file's header before "fixing" it to PBKDF2. The secret is 256 bits of `getRandomValues`, so there is no dictionary to slow down, and `WHERE key_hash = ?` cannot work against a per-row salt.
+
+**Anything that changes a user's standing must revoke their keys, and there is more than one such endpoint.** `api_keys.role` is frozen at creation and never reconciled against its creator's current role, so an unrevoked key keeps whatever privilege it was minted with:
+
+| Path | Must revoke |
+|---|---|
+| `PATCH /api/admin/users/:id` with a falsy `isActive` | yes |
+| `PATCH /api/admin/users/:id` with a **changed `role`** | yes — otherwise a demoted admin keeps an admin-scoped key and can re-promote themselves |
+| `POST /api/admin/users/:id/toggle-status` (deactivating) | yes |
+| Reactivation, or a PATCH re-sending the role the user already has | **no** — revocation is one-way |
+
+Three traps here, each of which was live:
+
+- **`toggle-status.js` is a second, separate deactivation endpoint.** It is not a thin wrapper over the PATCH path — it has its own handler, and it deactivated accounts and deleted their sessions for months while leaving keys untouched. Grep `is_active =` rather than assuming one path — four hits, three of which write `users`: the two above plus `api/auth/activate.js`, which only ever writes `1`. The fourth, `utils/bandProfileFields.js`, writes `band_profiles.is_active` and is unrelated.
+- **`isActive` is read by truthiness at every other site in `users/[id].js`** — the last-admin guard, the `is_active` write, and the `deactivated_at` stamp all use `!isActive`. A revocation gated on `isActive === false` therefore misses `{"isActive": 0}`, which deactivates the user everywhere else. Match the surrounding convention.
+- **`verifyApiKey` INNER JOINs `users` and requires `is_active = 1`.** That is a backstop for a fourth path nobody has written yet, not the primary control — the explicit revocations above are. Do not delete it as redundant; it exists precisely because "every path remembers" was already false once.
+
+**Deleting a user who owns keys is refused with 409 `USER_OWNS_API_KEYS`, and revoking does not unblock it.** `created_by` is `ON DELETE RESTRICT`, which fires on the **existence** of a referencing row, not its state — so a revoked key blocks deletion exactly as an active one does. There is deliberately no endpoint that deletes an `api_keys` row: that would destroy the attribution RESTRICT exists to protect. Deactivation is the supported answer, and the 409's message says so. Detect it by `code`, never by matching the message.
+
+Audit rows go in the **same `DB.batch`** as the change. Creation is the awkward case — the key's id does not exist until the INSERT runs — so `auditLogStatementForInsertedRow()` (`functions/utils/auditLogStatement.js`) resolves `resource_id` with an `INSERT … SELECT … FROM <table> WHERE <col> = ?`. It takes a table and column **identifier**, not a SQL string, and validates both with an explicit `typeof value === "string"` check: `RegExp.prototype.test` coerces its argument, so a bare `/^[A-Za-z_]\w*$/.test(undefined)` tests the string `"undefined"` and **passes**. Note also that `INSERT … SELECT` over zero rows inserts nothing and does not error — only ever pass a value the preceding INSERT just wrote.
+
+---
+
 ## Pulling a band from a live lineup
 
 **Use the cancel toggle (`is_cancelled = 1`). Do not un-announce, and do not delete the row.**

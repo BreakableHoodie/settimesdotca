@@ -96,9 +96,21 @@ export async function verifyApiKey(DB, presentedKey) {
   // The hash equality check lives in the WHERE clause -- an exact comparison
   // performed by SQLite -- so re-comparing the column in JS would prove nothing
   // that the lookup has not already established.
+  //
+  // The INNER JOIN on users is a backstop, not the primary control: every
+  // deactivation path already revokes the account's keys explicitly, so this only
+  // matters if a future path forgets to. It is here because forgetting is exactly
+  // what happened -- users/[id]/toggle-status.js deactivated accounts and killed
+  // their sessions for months while leaving their keys live, because it is a
+  // separate endpoint from the PATCH one. A key is only ever as revoked as the
+  // least careful path that can deactivate its owner; this makes that irrelevant.
+  // Note nothing is projected from users: only api_keys columns cross the boundary.
   const row = await DB.prepare(
-    `SELECT id, name, key_prefix, role, created_by, created_at, expires_at, last_used_at, revoked_at
-     FROM api_keys WHERE key_hash = ?`,
+    `SELECT k.id, k.name, k.key_prefix, k.role, k.created_by, k.created_at,
+            k.expires_at, k.last_used_at, k.revoked_at
+     FROM api_keys k
+     JOIN users u ON u.id = k.created_by
+     WHERE k.key_hash = ? AND u.is_active = 1`,
   )
     .bind(presentedHash)
     .first();

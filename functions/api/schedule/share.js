@@ -4,6 +4,7 @@
 
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { parseJsonObjectBody } from "../../utils/request.js";
 
 const MAX_PERFORMANCE_IDS = 50;
 const MAX_BAND_NAME_LENGTH = 100;
@@ -26,7 +27,10 @@ export async function onRequestPost(context) {
     const { request, env } = context;
     const { DB } = env;
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return json({ error: "Invalid request body" }, 400);
+    }
     const { event_id, event_slug, performance_ids, band_names } = body;
 
     if (typeof event_id !== "number" || !Number.isFinite(event_id)) {

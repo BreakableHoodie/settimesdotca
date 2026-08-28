@@ -6,7 +6,7 @@
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { generatePasswordResetToken } from "../../../../utils/tokens.js";
 import { sanitizeString, validateId } from "../../../../utils/validation.js";
-import { getClientIP } from "../../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
 import { sendEmail, isEmailConfigured } from "../../../../utils/email.js";
 import { buildResetPasswordEmail } from "../../../../utils/emailTemplates.js";
 import { revokeAllTrustedDevices } from "../../../../utils/trustedDevice.js";
@@ -34,7 +34,14 @@ export async function onRequestPost(context) {
       });
     }
     const userId = idValidation.value;
-    const { reason } = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Bad request", message: "Request body must be a JSON object" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const { reason } = body;
     const sanitizedReason = reason ? sanitizeString(reason).slice(0, 500) : null;
 
     // Get target user

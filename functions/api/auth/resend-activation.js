@@ -3,18 +3,14 @@ import { isEmailConfigured, sendEmail } from "../../utils/email.js";
 import { buildActivationEmail } from "../../utils/emailTemplates.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
+import { parseJsonObjectBody } from "../../utils/request.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
 
-  let email;
-  try {
-    const body = await request.json();
-    email = body?.email;
-  } catch (_error) {
-    email = null;
-  }
+  const body = await parseJsonObjectBody(request);
+  const email = body?.email;
 
   if (!email || typeof email !== "string") {
     return new Response(

@@ -9,7 +9,7 @@ import {
   validationErrorResponse,
   normalizePostalCode,
 } from "../../utils/validation.js";
-import { getClientIP } from "../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 
 function formatVenueAddress(venue) {
   if (!venue) return "";
@@ -90,7 +90,10 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return validationErrorResponse("Request body must be a JSON object");
+    }
 
     // Validate input using schema
     const validation = validateEntity(body, VALIDATION_SCHEMAS.venue);

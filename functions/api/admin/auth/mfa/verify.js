@@ -4,7 +4,7 @@
 
 import { generateCSRFToken, setCSRFCookie } from "../../../../utils/csrf.js";
 import { verifyTotp, verifyBackupCode } from "../../../../utils/totp.js";
-import { getClientIP } from "../../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
 import { initializeLucia } from "../../../../utils/auth.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../../utils/authAttempts.js";
 import { loadTotpSecret } from "../../../../utils/mfaSecrets.js";
@@ -28,7 +28,13 @@ export async function onRequestPost(context) {
   const userAgent = request.headers.get("User-Agent") || "unknown";
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Bad request", message: "MFA token and code are required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const { mfaToken, code, rememberDevice } = body;
 
     if (!mfaToken || !code) {

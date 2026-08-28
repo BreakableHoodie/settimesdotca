@@ -6,6 +6,7 @@ import { normalizeBandName } from "../../../utils/bandName.js";
 
 import { escapeHtml } from "../../../utils/html.js";
 import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
+import { parseJsonObjectBody } from "../../../utils/request.js";
 
 const MAX_EMAIL_LENGTH = 320;
 
@@ -14,7 +15,13 @@ export async function onRequestPost(context) {
   const { DB } = env;
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const turnstileToken = body.turnstileToken;
 

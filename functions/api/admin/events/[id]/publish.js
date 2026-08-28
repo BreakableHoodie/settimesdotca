@@ -2,7 +2,7 @@
 // POST /api/admin/events/{id}/publish
 
 import { checkPermission, auditLog } from "../../_middleware.js";
-import { getClientIP, getUrlId } from "../../../../utils/request.js";
+import { getClientIP, getUrlId, parseJsonObjectBody } from "../../../../utils/request.js";
 import { safeReflectSocialLinksString } from "../../../../utils/validation.js";
 
 // POST - Publish or unpublish event (editor and admin only)
@@ -50,7 +50,13 @@ export async function onRequestPost(context) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Bad request", message: "publish must be a boolean" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const { publish, allowEmptyLineup } = body;
 
     if (typeof publish !== "boolean") {

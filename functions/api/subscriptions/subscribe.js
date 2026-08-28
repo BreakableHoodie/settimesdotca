@@ -7,6 +7,7 @@ import { isValidEmail } from "../../utils/validation.js";
 import { verifyTurnstile } from "../../utils/turnstile.js";
 import { escapeHtml } from "../../utils/html.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
+import { parseJsonObjectBody } from "../../utils/request.js";
 
 const FREQUENCY_OPTIONS = new Set(["daily", "weekly", "monthly"]);
 const MAX_EMAIL_LENGTH = 320;
@@ -31,7 +32,13 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const email = typeof body.email === "string" ? body.email.trim() : "";
     const city = typeof body.city === "string" ? body.city.trim() : "";
     const genre = typeof body.genre === "string" ? body.genre.trim() : "";

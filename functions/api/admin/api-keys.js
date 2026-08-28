@@ -7,7 +7,7 @@ import { auditLogStatementForInsertedRow } from "../../utils/auditLogStatement.j
 import { generateApiKey } from "../../utils/apiKeys.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
 import { FIELD_LIMITS, isValidRole, sanitizeString, validationErrorResponse } from "../../utils/validation.js";
-import { getClientIP } from "../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 
 const API_KEY_COLUMNS = "id, name, key_prefix, role, created_by, created_at, expires_at, last_used_at, revoked_at";
 
@@ -46,12 +46,8 @@ export async function onRequestPost(context) {
   }
 
   try {
-    // `.catch(() => ({}))` only covers a PARSE failure. A body of literal `null`
-    // parses fine and resolves to null, so reading a field off it throws a
-    // TypeError that surfaces as an opaque 500 instead of a 400. Arrays parse
-    // fine too. Neither is an object we can read a name from.
-    const parsed = await request.json().catch(() => ({}));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    const parsed = await parseJsonObjectBody(request);
+    if (parsed === null) {
       return validationErrorResponse("Request body must be a JSON object");
     }
     const body = parsed;

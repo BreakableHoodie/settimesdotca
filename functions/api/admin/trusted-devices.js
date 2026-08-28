@@ -2,6 +2,8 @@
 // GET  /api/admin/trusted-devices — list current user's trusted devices
 // DELETE /api/admin/trusted-devices — revoke a specific device by ID (body: { deviceId })
 
+import { parseJsonObjectBody } from "../../utils/request.js";
+
 export async function onRequestGet(context) {
   const { env, data } = context;
   const { user } = data;
@@ -40,16 +42,14 @@ export async function onRequestDelete(context) {
   const { request, env, data } = context;
   const { user } = data;
 
-  let deviceId;
-  try {
-    const body = await request.json();
-    deviceId = body?.deviceId;
-  } catch (_error) {
+  const body = await parseJsonObjectBody(request);
+  if (body === null) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
+  const deviceId = body.deviceId;
 
   if (!deviceId || !Number.isInteger(Number(deviceId))) {
     return new Response(JSON.stringify({ error: "deviceId is required" }), {

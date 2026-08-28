@@ -12,7 +12,7 @@ import {
   normalizePostalCode,
   sanitizeString,
 } from "../../../utils/validation.js";
-import { getClientIP, getUrlId } from "../../../utils/request.js";
+import { getClientIP, getUrlId, parseJsonObjectBody } from "../../../utils/request.js";
 
 function formatVenueAddress(venue) {
   if (!venue) return "";
@@ -52,7 +52,16 @@ export async function onRequestPut(context) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: "Request body must be a JSON object" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
     const { name, address, address_line1, address_line2, city, region, postal_code, country, phone, contact_email } =
       body;
 

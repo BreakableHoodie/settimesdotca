@@ -20,6 +20,7 @@ import { parseOrigin } from "../../utils/parseOrigin.js";
 import { normalizeBandName } from "../../utils/bandName.js";
 import { sortableName } from "../../utils/sortableName.js";
 import { eventLocalFestivalToday } from "../../utils/eventDay.js";
+import { parseJsonObjectBody } from "../../utils/request.js";
 
 // SQLite `ORDER BY` can't strip a leading article inline (#587), so the SQL
 // in onRequestGet below is a coarse pre-sort (correct on start_time, raw-byte
@@ -317,7 +318,13 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const body = await request.json();
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const {
       eventId,
       venueId,

@@ -5,7 +5,7 @@
 
 import { hashPassword, verifyPassword } from "../../utils/crypto.js";
 import { validatePassword, FIELD_LIMITS } from "../../utils/validation.js";
-import { getClientIP } from "../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../utils/trustedDevice.js";
 import { fromSqliteDateTime } from "../../utils/authAttempts.js";
 
@@ -44,7 +44,14 @@ export async function onRequestPost(context) {
   };
 
   try {
-    const { token, newPassword } = await request.json();
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(
+        JSON.stringify(withDebug({ error: "Token and new password are required", code: "MISSING_FIELDS" })),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    const { token, newPassword } = body;
 
     if (!token || !newPassword) {
       logDebug("missing_fields", { hasToken: Boolean(token) });

@@ -5,7 +5,7 @@
 
 import { checkPermission, auditLog } from "./_middleware.js";
 import { isValidEmail, isValidRole, validationErrorResponse, FIELD_LIMITS } from "../../utils/validation.js";
-import { getClientIP } from "../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
 
 // GET - List all invite codes
@@ -75,7 +75,10 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return validationErrorResponse("Request body must be a JSON object");
+    }
     const { email = null, role = "editor", expiresInDays = 7 } = body;
 
     // Validation using centralized utilities

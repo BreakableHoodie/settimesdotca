@@ -6,7 +6,7 @@ import { checkPermission, auditLog } from "../_middleware.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { verifyTotp, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
-import { getClientIP } from "../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
 
 export async function onRequestPost(context) {
@@ -20,7 +20,13 @@ export async function onRequestPost(context) {
   }
 
   const userId = auth.user.userId;
-  const body = await request.json().catch(() => ({}));
+  const body = await parseJsonObjectBody(request);
+  if (body === null) {
+    return new Response(JSON.stringify({ error: "Bad request", message: "Authentication code is required" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const { code } = body;
 
   if (!code) {

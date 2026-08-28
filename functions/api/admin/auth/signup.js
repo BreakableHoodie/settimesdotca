@@ -1,6 +1,6 @@
 import { hashPassword } from "../../../utils/crypto.js";
 import { isValidEmail, validatePassword, FIELD_LIMITS } from "../../../utils/validation.js";
-import { getClientIP } from "../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { isEmailConfigured, sendEmail } from "../../../utils/email.js";
 import { buildActivationEmail } from "../../../utils/emailTemplates.js";
 import {
@@ -18,7 +18,17 @@ export async function onRequestPost(context) {
   const ipAddress = getClientIP(request);
 
   try {
-    const { email, password, name, firstName, lastName, role, inviteCode } = await request.json();
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: "Invite code is required for signup" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+    const { email, password, name, firstName, lastName, role, inviteCode } = body;
 
     // SECURITY: Require invite code for all signups
     if (!inviteCode) {

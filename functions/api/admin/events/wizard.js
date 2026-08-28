@@ -18,7 +18,7 @@ import {
   FIELD_LIMITS,
   validateSetTimes,
 } from "../../../utils/validation.js";
-import { getClientIP } from "../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 
@@ -54,10 +54,8 @@ export async function onRequestPost(context) {
   if (permCheck.error) return permCheck.response;
   const currentUser = permCheck.user;
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
+  const body = await parseJsonObjectBody(request);
+  if (body === null) {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },

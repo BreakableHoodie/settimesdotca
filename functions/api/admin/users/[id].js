@@ -4,7 +4,7 @@
 
 import { checkPermission } from "../_middleware.js";
 import { auditLogStatement } from "../../../utils/auditLogStatement.js";
-import { getClientIP } from "../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { validateId } from "../../../utils/validation.js";
 
 // PATCH - Update user (admin only, users can update own name)
@@ -30,7 +30,13 @@ export async function onRequestPatch(context) {
     const currentUser = permCheck.user;
 
     // Parse request body
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Bad request", message: "Request body must be a JSON object" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const { role, name, firstName, lastName, isActive } = body;
     const allowedFields = new Set(["role", "name", "firstName", "lastName", "isActive"]);
     const unknownFields = Object.keys(body || {}).filter((key) => !allowedFields.has(key));

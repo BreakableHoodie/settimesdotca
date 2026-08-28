@@ -4,6 +4,7 @@
 
 import { logger } from "../utils/logger.js";
 import { eventLocalToday } from "../utils/eventDay.js";
+import { parseJsonObjectBody } from "../utils/request.js";
 
 const MAX_BATCH_STATEMENTS = 20;
 
@@ -54,7 +55,10 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    const payload = await request.json().catch(() => null);
+    const payload = await parseJsonObjectBody(request);
+    if (payload === null) {
+      return new Response("Invalid request body", { status: 400 });
+    }
     const rawEvents = Array.isArray(payload?.events) ? payload.events : [];
 
     if (rawEvents.length === 0) {

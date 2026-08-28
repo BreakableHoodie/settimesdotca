@@ -1,6 +1,7 @@
 import { checkPermission } from "../_middleware.js";
 import { detectBulkConflicts } from "../../../utils/timeConflicts.js";
 import { validateIdArray, isValidTime } from "../../../utils/validation.js";
+import { parseJsonObjectBody } from "../../../utils/request.js";
 
 const MAX_BULK_PREVIEW_IDS = 200;
 
@@ -13,15 +14,14 @@ export async function onRequestPost(context) {
     return permCheck.response;
   }
 
-  let band_ids, action, params;
-  try {
-    ({ band_ids, action, ...params } = await request.json());
-  } catch {
+  const body = await parseJsonObjectBody(request);
+  if (body === null) {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
+  const { band_ids, action, ...params } = body;
 
   // Validate inputs
   if (!Array.isArray(band_ids) || band_ids.length === 0) {

@@ -68,6 +68,44 @@ export async function parseJsonObjectBodyStrict(request) {
 }
 
 /**
+ * For an endpoint whose body is OPTIONAL but, if sent, must be valid.
+ *
+ * The distinction the other two helpers cannot make: `{}` means "no body was sent",
+ * and that is different from "a body was sent and it is garbage". Both of the others
+ * collapse those together -- request.json() throws identically on an empty body and on
+ * `{oops`, so the lenient helper answers `{}` to both and the strict one answers null
+ * to both. Neither is right here: rejecting the empty case breaks every DELETE that
+ * legitimately sends no body, and accepting the malformed case means a destructive
+ * request proceeds while silently ignoring a client error.
+ *
+ * That second half is #978. `DELETE /api/admin/events/:id` takes its cascade
+ * confirmation from the body OR the query string, so `?confirmCascade=true` with an
+ * unparseable body deleted the event and its performances while discarding the body
+ * without a word. The confirmation itself is fine -- a client that puts it in the URL
+ * has confirmed -- but a malformed body is a bug in the caller, and the answer to a
+ * caller bug on a destructive path is 400, not "proceed and hope".
+ *
+ * @param {Request} request - the request whose body is read and CONSUMED (read-once)
+ * @returns {Promise<object|null>} `{}` when no body was sent (or only whitespace); the
+ *   object for a valid object body; `null` when a body WAS sent and is malformed, or
+ *   parses to a JSON `null`, an array, or a bare scalar
+ */
+export async function parseOptionalJsonObjectBody(request) {
+  // request.text() rather than request.json(), because an empty body is the case that
+  // has to be told apart from a broken one, and json() throws the same way for both.
+  const raw = await request.text();
+  if (raw.trim() === "") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Extract the id segment that follows a path segment and run it through
  * validateId(). Returns the validateId() result plus the raw segment so
  * callers that special-case non-numeric ids (e.g. "profile_" band ids)

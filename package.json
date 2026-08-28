@@ -27,6 +27,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@vitest/coverage-v8": "^4.1.11",
+    "acorn": "^8.17.0",
     "baseline-browser-mapping": "^2.11.16",
     "better-sqlite3": "^13.0.3",
     "eslint": "^10.9.0",

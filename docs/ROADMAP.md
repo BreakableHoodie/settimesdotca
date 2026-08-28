@@ -29,7 +29,7 @@ Build SetTimes.ca into the best multi-venue and multi-artist event platform for 
 - Preserve after-midnight sorting from `frontend/src/utils/bandUtils.js` (`AFTER_MIDNIGHT_THRESHOLD_HOUR = 6`, never remove/lower).
 - Multi-day: single-day events stay byte-identical (NULL `performance_date`); never show a "Day 1" label on single-day events (gate on `isMultiDay`).
 
-## Status Summary (2026-08-11)
+## Status Summary (2026-08-28)
 
 **Two editions shipped in August 2026, and Vol. 18 is now published.** Vol. 17 ran 2026-08-02 and Buddies Fest 2 ran 2026-08-07→09 — the latter proving the multi-day epic (#543) in production. Both are archived. Vol. 18 (event 37) went `published` on 2026-08-28 with **zero performances**.
 

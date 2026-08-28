@@ -23,10 +23,19 @@
 // So this uses a real JavaScript parser. acorn resolves the string/template/comment
 // question by construction, because it is the same problem a parser already solved.
 //
-// SCOPE, stated honestly: this matches a CallExpression on `<something>.request.json()`
-// or `request.json()`. It does NOT follow aliases -- `const r = request; r.json()` slips
-// past, and would need scope analysis to catch. It catches the idiom the codebase
-// actually writes.
+// Version 3 was wrong too, in a quieter way: it read only `property.name`, so the SAME
+// access spelled `request["json"]()` -- which acorn stores in `property.value` -- walked
+// straight past. Review named two such shapes; sweeping the class myself found a third,
+// ``request[`json`]()``. staticKey() now resolves all three spellings.
+//
+// SCOPE, stated honestly. It matches `.json()` on something named `request`, however the
+// access is spelled (dot, computed string, substitution-free template, optional chaining,
+// optional call, `this.request`). Two things are deliberately out of reach because both
+// need scope analysis rather than a syntactic match:
+//   - aliases: `const r = request; r.json()`
+//   - runtime-computed keys: `const k = "json"; request[k]()`
+// Both are asserted as non-matches below, so the limit is pinned rather than assumed. It
+// catches the idiom the codebase actually writes.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -54,20 +63,56 @@ function sourceFiles(dir) {
   });
 }
 
-// True for `request.json(...)` and `ctx.request.json(...)`, false for the same text
-// appearing in a string, a comment, or a template's literal half.
+/**
+ * The STATICALLY KNOWN key of a member access, or undefined when it cannot be known
+ * without evaluating code. `a.json`, `a["json"]` and ``a[`json`]`` are all the same
+ * access written three ways, and acorn represents them three different ways -- as an
+ * Identifier `name`, a Literal `value`, and a TemplateLiteral quasi. Reading only
+ * `.name` (as the first version of this did) sees the first and misses the other two.
+ *
+ * @param {object} node - a MemberExpression
+ * @returns {string|undefined} the key, or undefined if it is computed at runtime
+ */
+function staticKey(node) {
+  const prop = node?.property;
+  if (!prop) return undefined;
+  if (!node.computed) return prop.name;
+  if (prop.type === "Literal") return typeof prop.value === "string" ? prop.value : undefined;
+  // A template with no ${...} is a constant string; one with substitutions is not.
+  if (prop.type === "TemplateLiteral" && prop.expressions.length === 0) {
+    return prop.quasis[0]?.value?.cooked;
+  }
+  return undefined;
+}
+
+/**
+ * True for a call to `.json()` on something named `request`, however that access is
+ * spelled: `request.json()`, `context.request.json()`, `request["json"]()`,
+ * ``context[`request`].json()``, `request?.json()`, `request.json?.()`.
+ *
+ * @param {object} node - any AST node
+ * @returns {boolean}
+ */
 function isRequestJsonCall(node) {
   if (node.type !== "CallExpression") return false;
   const callee = node.callee;
   if (callee?.type !== "MemberExpression") return false;
-  if (callee.property?.name !== "json") return false;
+  if (staticKey(callee) !== "json") return false;
   const obj = callee.object;
-  return obj?.name === "request" || obj?.property?.name === "request";
+  return obj?.name === "request" || (obj?.type === "MemberExpression" && staticKey(obj) === "request");
 }
 
+/**
+ * Whether a JavaScript source string contains a direct `request.json()` call.
+ *
+ * @param {string} source - JavaScript source text (ES modules, latest syntax)
+ * @returns {boolean} true if a direct call is present in CODE -- never for the same
+ *   text inside a string, a template's literal half, or a comment
+ * @throws {SyntaxError} if `source` does not parse. Deliberate and fail-closed: a file
+ *   this guard cannot read is a file whose violations it cannot see, so it must break
+ *   the build rather than quietly report "clean".
+ */
 export function callsRequestJson(source) {
-  // A parse failure must THROW rather than return false: silently skipping an
-  // unparseable file would hide exactly the violation this exists to find.
   const ast = parse(source, { ecmaVersion: "latest", sourceType: "module", allowAwaitOutsideFunction: true });
 
   let found = false;
@@ -97,12 +142,20 @@ describe("JSON request parsing has a single entry point", () => {
     ['const u = "https://example.test"; await request.json();', true, "a URL literal does not hide the call"],
     ["const x = `${await request.json()}`;", true, "a template substitution is code, not literal text"],
     ["await context.request.json();", true, "member-access form"],
+    ['await request["json"]();', true, "computed access with a string literal"],
+    ['await context["request"].json();', true, "computed access on the object side"],
+    ["await request[`json`]();", true, "computed access with a substitution-free template"],
+    ["await request?.json();", true, "optional chaining on the object"],
+    ["await request.json?.();", true, "optional call"],
+    ["await this.request.json();", true, "this.request"],
     ['const doc = "call request.json() to parse";', false, "a mention inside a string is not a call"],
     ["// await request.json();\nconst a = 1;", false, "a line comment is not a call"],
     ["/* await request.json(); */ const a = 1;", false, "a block comment is not a call"],
     ["const t = `see request.json() docs`;", false, "a mention in a template's literal half is not a call"],
     ["const s = 'a\\'b request.json()';", false, "an escaped quote does not end the literal early"],
     ["await request.text();", false, "a different method is not a match"],
+    ["await other.json();", false, "json() on something else is not a match"],
+    ['const k = "json"; await request[k]();', false, "a RUNTIME-computed key is out of scope, by design"],
   ])("%s -> %s (%s)", (source, expected) => {
     expect(callsRequestJson(source)).toBe(expected);
   });

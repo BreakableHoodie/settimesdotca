@@ -9,7 +9,7 @@
 // so it needs a dedicated [id]/duplicate.js (mirrors publish.js / archive.js).
 
 import { checkPermission, auditLog } from "../../_middleware.js";
-import { getClientIP } from "../../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
 import { normalizeHttpUrl, safeReflectSocialLinksString, validateId } from "../../../../utils/validation.js";
 
 function json(body, status = 200) {
@@ -37,7 +37,13 @@ export async function onRequestPost(context) {
       return json({ error: "Bad request", message: idError }, 400);
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Bad request", message: "Request body must be a JSON object" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const { name, date, slug } = body;
 
     if (!name || !date || !slug) {

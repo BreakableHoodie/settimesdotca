@@ -7,7 +7,7 @@
 // unexpected failure triggers a compensating delete of everything this request
 // created, so a lineup is never left half-imported.
 import { auditLog, checkPermission } from "../_middleware.js";
-import { getClientIP } from "../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { isValidTime, validateSetTimes } from "../../../utils/validation.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 
@@ -31,10 +31,8 @@ export async function onRequestPost(context) {
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
+  const body = await parseJsonObjectBody(request);
+  if (body === null) {
     return json({ error: "Invalid JSON body" }, 400);
   }
 

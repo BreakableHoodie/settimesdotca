@@ -2,6 +2,8 @@
 // POST /api/schedule/build
 // Body: { event_id: number, band_ids?: number[], performance_ids?: number[], user_session: string }
 
+import { parseJsonObjectBody } from "../../utils/request.js";
+
 const MAX_USER_SESSION_LENGTH = 128;
 const MAX_PERFORMANCE_IDS = 50;
 
@@ -15,7 +17,13 @@ export async function onRequestPost(context) {
   const { DB } = env;
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const eventId = Number(body.event_id);
     const userSession = typeof body.user_session === "string" ? body.user_session.trim() : "";
     const performanceIdsInput = Array.isArray(body.performance_ids)

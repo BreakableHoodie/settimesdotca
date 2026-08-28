@@ -1,6 +1,6 @@
 import { auditLog, checkPermission } from "../_middleware.js";
 import { auditLogStatement } from "../../../utils/auditLogStatement.js";
-import { getClientIP } from "../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody, parseJsonObjectBodyStrict } from "../../../utils/request.js";
 import { computeNewEndTime, detectBulkConflicts } from "../../../utils/timeConflicts.js";
 import { isValidTime, validateIdArray, validateSetTimes } from "../../../utils/validation.js";
 
@@ -40,10 +40,11 @@ export async function onRequestDelete(context) {
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
+  // Strict: malformed, null, array and scalar all answer "Invalid JSON body" here, which
+  // is exactly what the hand-rolled try/catch plus shape check did. Using the shared
+  // helper means this file no longer needs an exception in requestBodyGuard.test.js.
+  const body = await parseJsonObjectBodyStrict(request);
+  if (body === null) {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -233,10 +234,8 @@ export async function onRequestPost(context) {
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
+  const body = await parseJsonObjectBody(request);
+  if (body === null) {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -414,10 +413,8 @@ export async function onRequestPatch(context) {
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
+  const body = await parseJsonObjectBody(request);
+  if (body === null) {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },

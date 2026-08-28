@@ -4,7 +4,7 @@
 
 import { checkPermission, auditLog } from "./_middleware.js";
 import { validateEntity, VALIDATION_SCHEMAS, validationErrorResponse } from "../../utils/validation.js";
-import { getClientIP } from "../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { buildInviteEmail } from "../../utils/emailTemplates.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
@@ -81,7 +81,10 @@ export async function onRequestPost(context) {
     const currentUser = permCheck.user;
 
     // Parse request body
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return validationErrorResponse("Request body must be a JSON object");
+    }
 
     // Validate input using schema
     const validation = validateEntity(body, VALIDATION_SCHEMAS.userInvite);

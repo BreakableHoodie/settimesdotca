@@ -13,7 +13,7 @@ import {
   sanitizeVenueInfo,
   validateDoorsJson,
 } from "../../utils/validation.js";
-import { getClientIP } from "../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { eventLocalToday } from "../../utils/eventDay.js";
 
 // GET - List all events (all authenticated users can view)
@@ -113,7 +113,10 @@ export async function onRequestPost(context) {
 
     const currentUser = permCheck.user;
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return validationErrorResponse("Request body must be a JSON object");
+    }
     if (body.ticketLink && !body.ticket_url) {
       body.ticket_url = body.ticketLink;
     }

@@ -13,7 +13,7 @@ import {
   validatePerformanceDate,
   validateSetTimes,
 } from "../../../utils/validation.js";
-import { getClientIP, getUrlId } from "../../../utils/request.js";
+import { getClientIP, getUrlId, parseJsonObjectBody } from "../../../utils/request.js";
 import { checkConflicts } from "../../../utils/timeConflicts.js";
 import { onRequestProfileDelete, onRequestProfilePut } from "../../../utils/bandProfileResource.js";
 import { findDuplicateBandProfile, findVenue, prepareBandProfileFields } from "../../../utils/bandProfileFields.js";
@@ -91,7 +91,16 @@ export async function onRequestPut(context) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: "Request body must be a JSON object" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
     const {
       venueId,
       name,
@@ -531,7 +540,13 @@ export async function onRequestPatch(context) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Bad request", message: "Request body must be a JSON object" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const hasAnnounced = body.is_announced !== undefined;
     const hasCancelled = body.is_cancelled !== undefined;
 

@@ -4,7 +4,7 @@
 // Returns: { success: true, event: {...} } or error
 
 import { checkPermission, auditLog } from "../../_middleware.js";
-import { getClientIP } from "../../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
 import { safeReflectSocialLinksString, validateId } from "../../../../utils/validation.js";
 
 export async function onRequestPut(context) {
@@ -25,7 +25,16 @@ export async function onRequestPut(context) {
       return auth.response;
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: "Request body must be a JSON object" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
     const { name, date, slug, ticket_url } = body;
 
     // Validation

@@ -1,16 +1,18 @@
 import { fromSqliteDateTime } from "../../utils/authAttempts.js";
+import { parseJsonObjectBody } from "../../utils/request.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
 
-  let token;
-  try {
-    const body = await request.json();
-    token = body?.token;
-  } catch (_error) {
-    token = null;
+  const body = await parseJsonObjectBody(request);
+  if (body === null) {
+    return new Response(JSON.stringify({ error: "Invalid token", message: "Activation token is required" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
+  const token = body.token;
 
   if (!token || typeof token !== "string") {
     return new Response(

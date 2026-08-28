@@ -17,7 +17,7 @@ import {
   validateDate,
   validateDoorsJson,
 } from "../../../utils/validation.js";
-import { getClientIP, getUrlId } from "../../../utils/request.js";
+import { getClientIP, getUrlId, parseJsonObjectBody } from "../../../utils/request.js";
 
 function parseJsonField(value, label) {
   if (value === undefined) {
@@ -92,7 +92,16 @@ export async function onRequestPatch(context) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: "Request body must be a JSON object" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
     if (body.ticketLink && !body.ticket_url) {
       body.ticket_url = body.ticketLink;
     }
@@ -758,7 +767,13 @@ export async function onRequestDelete(context) {
       .bind(eventIdNum)
       .first();
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Bad request", message: "Request body must be a JSON object" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const url = new URL(request.url);
     const confirmCascade = body?.confirmCascade === true || url.searchParams.get("confirmCascade") === "true";
 

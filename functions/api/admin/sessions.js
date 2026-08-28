@@ -2,6 +2,8 @@
 // GET /api/admin/sessions
 // DELETE /api/admin/sessions
 
+import { parseJsonObjectBody } from "../../utils/request.js";
+
 // Derive a stable, opaque revocation handle from a raw Lucia session id.
 // The raw id is an auth credential and must never leave the server; returning
 // SHA-256(id) lets clients target a specific session for deletion without
@@ -69,7 +71,13 @@ export async function onRequestDelete(context) {
   const { lucia, user } = data;
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Revocation token is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const revocationToken = body.revocationToken;
 
     if (!revocationToken) {

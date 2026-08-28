@@ -5,7 +5,7 @@
 
 import { hashPassword, verifyPassword } from "../../utils/crypto.js";
 import { validatePassword, FIELD_LIMITS } from "../../utils/validation.js";
-import { getClientIP } from "../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../utils/trustedDevice.js";
 import { fromSqliteDateTime } from "../../utils/authAttempts.js";
 
@@ -44,7 +44,22 @@ export async function onRequestPost(context) {
   };
 
   try {
-    const { token, newPassword } = await request.json();
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      // Audit before returning. This branch answers with the SAME MISSING_FIELDS response
+      // as the token/password check below, so it must leave the same auth_audit trail --
+      // otherwise a null, array or scalar body is the one way to attempt a password reset
+      // that writes no failure record at all, which is a blind spot in exactly the log
+      // someone reads after an incident. hasToken is false by construction here; the body
+      // itself is never logged.
+      logDebug("missing_fields", { hasToken: false });
+      await logFailure("MISSING_FIELDS", { hasToken: false });
+      return new Response(
+        JSON.stringify(withDebug({ error: "Token and new password are required", code: "MISSING_FIELDS" })),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    const { token, newPassword } = body;
 
     if (!token || !newPassword) {
       logDebug("missing_fields", { hasToken: Boolean(token) });

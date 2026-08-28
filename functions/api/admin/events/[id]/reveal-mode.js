@@ -4,7 +4,7 @@
 // Returns: { success: true, event: { id, reveal_mode } }
 
 import { checkPermission, auditLog } from "../../_middleware.js";
-import { getClientIP } from "../../../../utils/request.js";
+import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
 import { validateId } from "../../../../utils/validation.js";
 
 export async function onRequestPost(context) {
@@ -27,7 +27,13 @@ export async function onRequestPost(context) {
 
     const currentUser = auth.user;
 
-    const body = await request.json().catch(() => ({}));
+    const body = await parseJsonObjectBody(request);
+    if (body === null) {
+      return new Response(JSON.stringify({ error: "Bad request", message: "reveal_mode (boolean) is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (typeof body.reveal_mode !== "boolean") {
       return new Response(JSON.stringify({ error: "Bad request", message: "reveal_mode (boolean) is required" }), {
         status: 400,

@@ -28,9 +28,14 @@ export function getClientIP(request) {
  * accepts `?confirmCascade=true` from the QUERY STRING, so a malformed body reaches
  * the delete exactly as it did before this helper existed.
  *
- * Returns: the object for a valid object body; `{}` for a malformed body; `null` for
- * a JSON `null`, an array, or a bare scalar. (`null`, not `undefined`: this repo
- * returns null from functions/ by a 63-to-3 margin.)
+ * `null`, not `undefined`, as the invalid-body sentinel: this repo returns null from
+ * functions/ by a 63-to-3 margin, so undefined would make this helper the odd one out.
+ *
+ * @param {Request} request - the request whose body is read and CONSUMED; a Request body
+ *   can only be read once, so a caller that needs it again must clone beforehand
+ * @returns {Promise<object|null>} the object for a valid object body; `{}` for a
+ *   MALFORMED body (not rejected -- see above); `null` for a JSON `null`, an array, or
+ *   a bare scalar. Use parseJsonObjectBodyStrict if a malformed body must be rejected.
  */
 export async function parseJsonObjectBody(request) {
   const parsed = await request.json().catch(() => ({}));
@@ -41,8 +46,9 @@ export async function parseJsonObjectBody(request) {
  * The strict sibling of parseJsonObjectBody: returns null for a MALFORMED body as well
  * as for a JSON `null`, an array or a scalar. Only a real object comes back.
  *
- * @param {Request} request - the request whose body is read and consumed
- * @returns {Promise<object|null>} the parsed object, or null for any body that is not one
+ * @param {Request} request - the request whose body is read and CONSUMED (read-once)
+ * @returns {Promise<object|null>} the parsed object, or null for any body that is not
+ *   one -- INCLUDING a malformed body, which is the sole difference from the lenient helper
  *
  * Use this where the endpoint already answered a malformed body with its own explicit
  * 400 rather than letting it fall through to field validation. Those endpoints exist --

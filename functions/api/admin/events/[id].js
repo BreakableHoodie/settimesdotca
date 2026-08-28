@@ -17,7 +17,7 @@ import {
   validateDate,
   validateDoorsJson,
 } from "../../../utils/validation.js";
-import { getClientIP, getUrlId, parseJsonObjectBody } from "../../../utils/request.js";
+import { getClientIP, getUrlId, parseJsonObjectBody, parseOptionalJsonObjectBody } from "../../../utils/request.js";
 
 function parseJsonField(value, label) {
   if (value === undefined) {
@@ -767,15 +767,29 @@ export async function onRequestDelete(context) {
       .bind(eventIdNum)
       .first();
 
-    const body = await parseJsonObjectBody(request);
+    // Optional, not lenient (#978). This DELETE takes its cascade confirmation from the
+    // body OR the query string, and the admin UI sends NO body when it is not confirming
+    // -- so an empty body has to stay legal. What must not stay legal is a body that was
+    // sent and is unparseable: the lenient helper answered {} to that, identically to no
+    // body at all, so `?confirmCascade=true` with a broken body deleted the event and
+    // every performance under it while discarding the body without a word.
+    //
+    // The query-string channel is NOT the problem and is deliberately kept: a caller that
+    // puts confirmCascade in the URL has confirmed. The problem was proceeding with an
+    // irreversible delete while silently swallowing a caller bug.
+    const body = await parseOptionalJsonObjectBody(request);
     if (body === null) {
-      return new Response(JSON.stringify({ error: "Bad request", message: "Request body must be a JSON object" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Bad request",
+          code: "INVALID_BODY",
+          message: "Request body must be a JSON object. Send no body, or valid JSON.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
     }
     const url = new URL(request.url);
-    const confirmCascade = body?.confirmCascade === true || url.searchParams.get("confirmCascade") === "true";
+    const confirmCascade = body.confirmCascade === true || url.searchParams.get("confirmCascade") === "true";
 
     if (performanceCount.count > 0 && !confirmCascade) {
       return new Response(

@@ -1072,6 +1072,73 @@ describe("Event API - handler integration", () => {
     expect(data.affected_performance_count).toBe(1);
   });
 
+  // #978 -- the cascade delete takes confirmation from the body OR the query string, and
+  // a malformed body used to be indistinguishable from no body at all (both became {}),
+  // so a broken body plus ?confirmCascade=true deleted the event while silently
+  // discarding the caller's bug. These four pin every corner of that.
+  describe("cascade delete and a malformed body (#978)", () => {
+    const setup = () => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const ev = insertEvent(rawDb, { name: "CascadeBody", slug: "cascade-body" });
+      insertBand(rawDb, { name: "AttachedBand", event_id: ev.id });
+      return { env, rawDb, ev };
+    };
+    const del = (ev, { query = "", body } = {}) =>
+      new Request(`https://example.test/api/admin/events/${ev.id}${query}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+        ...(body === undefined ? {} : { body }),
+      });
+
+    it("rejects a malformed body even with ?confirmCascade=true, and deletes nothing", async () => {
+      const { env, rawDb, ev } = setup();
+
+      const res = await eventIdHandler.onRequestDelete({
+        request: del(ev, { query: "?confirmCascade=true", body: "{oops" }),
+        env,
+      });
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("INVALID_BODY");
+      // The assertion that matters: the row survived. A 400 that still deleted would
+      // pass a status-only check.
+      expect(rawDb.prepare("SELECT id FROM events WHERE id = ?").get(ev.id)).toBeDefined();
+    });
+
+    it("still allows NO body with ?confirmCascade=true -- the API affordance is kept", async () => {
+      const { env, rawDb, ev } = setup();
+
+      const res = await eventIdHandler.onRequestDelete({
+        request: del(ev, { query: "?confirmCascade=true" }),
+        env,
+      });
+
+      expect(res.status).toBe(200);
+      expect(rawDb.prepare("SELECT id FROM events WHERE id = ?").get(ev.id)).toBeUndefined();
+    });
+
+    it("still answers 409 for no body and no confirmation -- the admin UI's own path", async () => {
+      const { env, rawDb, ev } = setup();
+
+      const res = await eventIdHandler.onRequestDelete({ request: del(ev), env });
+
+      expect(res.status).toBe(409);
+      expect(rawDb.prepare("SELECT id FROM events WHERE id = ?").get(ev.id)).toBeDefined();
+    });
+
+    it("rejects a JSON null body rather than treating it as no body", async () => {
+      const { env, rawDb, ev } = setup();
+
+      const res = await eventIdHandler.onRequestDelete({
+        request: del(ev, { query: "?confirmCascade=true", body: "null" }),
+        env,
+      });
+
+      expect(res.status).toBe(400);
+      expect(rawDb.prepare("SELECT id FROM events WHERE id = ?").get(ev.id)).toBeDefined();
+    });
+  });
+
   it("PATCH can update date and status to published", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     const ev = insertEvent(rawDb, {

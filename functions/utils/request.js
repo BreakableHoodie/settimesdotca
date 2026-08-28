@@ -38,6 +38,30 @@ export async function parseJsonObjectBody(request) {
 }
 
 /**
+ * The strict sibling of parseJsonObjectBody: returns null for a MALFORMED body as well
+ * as for a JSON `null`, an array or a scalar. Only a real object comes back.
+ *
+ * @param {Request} request - the request whose body is read and consumed
+ * @returns {Promise<object|null>} the parsed object, or null for any body that is not one
+ *
+ * Use this where the endpoint already answered a malformed body with its own explicit
+ * 400 rather than letting it fall through to field validation. Those endpoints exist --
+ * they wrote `try { await request.json() } catch { return "Invalid JSON body" }` -- and
+ * folding them into the lenient helper silently downgraded that answer to whatever
+ * field validation said next. It is the same one-parser-per-behaviour split the cookie
+ * helpers went through: two documented contracts beat one contract plus an allowlist of
+ * endpoints that quietly need the other.
+ */
+export async function parseJsonObjectBodyStrict(request) {
+  try {
+    const parsed = await request.json();
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Extract the id segment that follows a path segment and run it through
  * validateId(). Returns the validateId() result plus the raw segment so
  * callers that special-case non-numeric ids (e.g. "profile_" band ids)

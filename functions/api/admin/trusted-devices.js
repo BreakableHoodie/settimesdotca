@@ -2,7 +2,7 @@
 // GET  /api/admin/trusted-devices — list current user's trusted devices
 // DELETE /api/admin/trusted-devices — revoke a specific device by ID (body: { deviceId })
 
-import { parseJsonObjectBody } from "../../utils/request.js";
+import { parseJsonObjectBodyStrict } from "../../utils/request.js";
 
 export async function onRequestGet(context) {
   const { env, data } = context;
@@ -42,7 +42,11 @@ export async function onRequestDelete(context) {
   const { request, env, data } = context;
   const { user } = data;
 
-  const body = await parseJsonObjectBody(request);
+  // Strict: this endpoint answered a malformed body with its own "Invalid request
+  // body" 400 before the shared helper existed. The lenient helper turns a parse
+  // failure into {}, which fell through to "deviceId is required" -- same status, wrong
+  // reason. Strict restores it and covers null/array/scalar in the same branch.
+  const body = await parseJsonObjectBodyStrict(request);
   if (body === null) {
     return new Response(JSON.stringify({ error: "Invalid request body" }), {
       status: 400,

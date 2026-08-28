@@ -8,10 +8,12 @@ workflow and the full invariant catalogue live in `CLAUDE.md` — read it before
 
 settimes.ca — a **lean, highly performant** multi-venue live-music event platform for Waterloo
 Region, ON. Fan-facing (schedule builder, band profiles, archives) and admin tooling are equal
-priority. Next edition: **Long Weekend Band Crawl Vol. 18 — October 11, 2026** (drafted, not yet
-published). Vol. 17 and Buddies Fest 2 both shipped in August 2026 and are archived, so the site
-is currently between seasons — every "upcoming" surface is legitimately empty until Vol. 18 is
-published. See `season_state` in the canon below before calling such a zero a bug.
+priority. Next edition: **Long Weekend Band Crawl Vol. 18 — October 11, 2026**, **published
+since 2026-08-28 with an empty lineup** (the supported "Lineup TBA" state) and live to the public
+now. Vol. 17 and Buddies Fest 2 both shipped in August 2026 and are archived. Event-driven
+surfaces are populated again; the iCal feed is still empty because it joins performances, and
+that zero is not the between-seasons zero. See `season_state` in the canon below before calling
+any such zero a bug.
 
 Machine-readable canon (venues, events, constants, doctrines): **`ground-truth.json`**.
 Read it before asserting facts about events, venues, or dates — do not re-derive or guess.

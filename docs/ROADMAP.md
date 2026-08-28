@@ -2,7 +2,7 @@
 
 Canonical active roadmap for SetTimes.ca. Use this file for handoffs between Claude, OpenCode, and humans.
 
-Last updated: 2026-08-11
+Last updated: 2026-08-28
 
 ## Mission
 
@@ -12,7 +12,7 @@ Build SetTimes.ca into the best multi-venue and multi-artist event platform for 
 
 - Region: Waterloo Region, currently focused on Kitchener-Waterloo. This governs **product language** — marketing copy, meta descriptions, SEO targeting, statements about who the site is for. It does not override fact: the platform has hosted an event outside the region (Buddies Fest 2, Tillsonburg, 2026-08-07→09) and that record stays accurate wherever it appears.
 - Brand: SetTimes.ca. Do not rebrand.
-- Next event: Long Weekend Band Crawl Vol. 18, October 11, 2026 (event 37, `lwbc18`, single day). Currently `status = 'draft'` with an empty lineup.
+- Next event: Long Weekend Band Crawl Vol. 18, October 11, 2026 (event 37, `lwbc18`, single day). **`status = 'published'` since 2026-08-28 with an empty lineup** — the supported "Lineup TBA" state, live to the public. `reveal_mode = 0`, so a performance row is publicly visible the moment it is written and can fire follower email: adding the lineup *is* the announcement.
 - Shipped editions (both archived): Vol. 17 (event 21, 2026-08-02, 22 bands / 6 venues) and Buddies Fest 2 (event 36, 2026-08-07→09, Tillsonburg — the first multi-day production event). Lineups and venue rosters are live D1 data now, not spec.
 - Venues used by Vol. 17: Blue Room (inside Revive Karaoke), Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost — all King St N, Waterloo.
 - Priority balance: fan-facing experience and admin tooling are both critical.
@@ -31,9 +31,9 @@ Build SetTimes.ca into the best multi-venue and multi-artist event platform for 
 
 ## Status Summary (2026-08-11)
 
-**Two editions have now shipped on this platform and the season is over.** Vol. 17 ran 2026-08-02 and Buddies Fest 2 ran 2026-08-07→09 — the latter proving the multi-day epic (#543) in production. Both are archived. Vol. 18 is drafted for 2026-10-11 and not yet published.
+**Two editions shipped in August 2026, and Vol. 18 is now published.** Vol. 17 ran 2026-08-02 and Buddies Fest 2 ran 2026-08-07→09 — the latter proving the multi-day epic (#543) in production. Both are archived. Vol. 18 (event 37) went `published` on 2026-08-28 with **zero performances**.
 
-**The site is between seasons, which is a supported state.** Every "upcoming" surface is legitimately empty until Vol. 18 is published: `/api/events/public` defaults to `upcoming=true`, and the iCal feed only emits future events, so both correctly return zero while `/api/stats/public` and the sitemap stay fully populated from the archive. `EventTimeline` has a dedicated between-seasons state and auto-expands Past for this window. Check whether anything is `published` before treating such a zero as a bug.
+**The site left the between-seasons window on 2026-08-28, and the remaining zeros no longer all mean the same thing.** Publishing re-populated the *event*-driven surfaces — `/api/events/public` (defaults `upcoming=true`) returns 1, `/api/events/timeline` returns `now` 0 / `upcoming` 1 / `past` 10 — while the *performance*-driven ones stayed empty: the iCal feed `LEFT JOIN`s `performances`, so with no announced sets it emits no `VEVENT`s. **That iCal zero reads exactly like the between-seasons zero and means something else entirely** — published event, lineup not yet announced. Tell them apart by asking which layer a surface reads, not by the number. `/api/stats/public` and the sitemap remain populated from the archive throughout. `EventTimeline` keeps its dedicated between-seasons state and Past auto-expand; that path is dormant now and live again once Vol. 18 is archived. Before treating any such zero as a bug, check both halves: is an event actually `published`, **and** does it have performances?
 
 **Postmortem worth carrying forward (2026-08-10, #800):** archiving BF2 took the public site dark. `events.is_published` was deprecated by migration 0005 but never dropped, and `archive.js` zeroed it alongside setting `status='archived'` — so when the last un-archived event was closed out, 13 public read paths gated on the dead column all returned zero rows at once. Every **public event-visibility query** now goes through `functions/utils/eventVisibility.js`. Two source-scanning guards enforce it: no `is_published` read or write anywhere outside `__tests__/**` and `utils/eventVisibility.js` itself (both sides of the build boundary — the admin exemptions came out with #799 part 1, and the shared-test-schema exemption came out with #799 part 2 once migration 0059 dropped the column, which is what proves the retirement complete), and no non-admin file querying `events` without importing the shared visibility helper (the scan matches the helper *names* — `…EventStatusSql`, `concludedEventSql` — so a hand-written inline `status` predicate does not satisfy it; one canonical home is the point). Two files are exempt by design and named in that guard — `api/metrics.js` (a write-path existence check projecting only `id`) and `utils/timeConflicts.js` (imported solely by admin, which must see drafts). The column and its two indexes are dropped as of migration 0059 (#799 part 2); both guards stay in the suite permanently as regression protection, not merely historical record.
 
@@ -106,7 +106,7 @@ Next: none currently open in this track. There remain deliberately two canonical
 The tracker is the source of truth. Every item from the previous (2026-07-07) list has since closed — #554, #555, #556, #542, #551, #550, #466, #510. The current queue is correctness debt plus Vol.-18 prep:
 
 1. **#766** — `functions/api/test-utils.js` hand-maintains a third, ungated copy of the schema.
-2. **Vol. 18 prep** — publish event 37, then book and announce the lineup. Publishing is what re-populates every "upcoming" surface.
+2. **Vol. 18 prep** — event 37 is published (2026-08-28); artist *profiles* are being staged now. **Performances are held until the set times arrive from the promoter.** On a `reveal_mode = 0` event a performance row is public immediately and can fire follower email, so booking the lineup is the public announcement — not a preparatory step. Profiles are safe to stage meanwhile because `/api/artists` INNER JOINs `performances`, so a profile with no set is publicly invisible.
 
 Closed since the last revision: **#787** (recap gating, fixed by #802 — the sitemap, SSR and the JSON API now share one `concludedEventSql()` definition of "concluded", so a published-but-unarchived past event is no longer an indexable soft-404 when Vol. 18 ends); **#799** (dead `events.is_published` column retired — part 1 stopped every read/write, part 2 dropped the column and its two indexes via migration 0059, replacing them with `idx_events_status_date` on `(status, date)`); **#746** (the two private re-encodings of the 6 AM after-midnight threshold now import from the canonical server-side home instead); **#797** (the ignored `<meta name="keywords">` is gone from `BandProfilePage`, taking its now-empty `<Helmet>` and `react-helmet-async` import with it).
 

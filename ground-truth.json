@@ -1,6 +1,6 @@
 {
   "_comment": "Machine-readable project canon for agents and humans. Slow-moving facts only — live data (lineups, band profiles, counts) belongs to the database, not this file. Update via PR when canon changes; bump verified_at when a human or agent re-verifies against production.",
-  "verified_at": "2026-08-11",
+  "verified_at": "2026-08-28",
   "project": {
     "name": "SetTimes",
     "domain": "https://settimes.ca",
@@ -23,14 +23,17 @@
     "db_id": 37,
     "date": "2026-10-11",
     "end_date": null,
-    "status": "draft",
+    "status": "published",
     "band_count": 0,
-    "_note": "Not yet published and no lineup booked. Doors/show/ages/venues are not set — do not carry Vol. 17's forward as if they were. Publishing this event is what re-populates every 'upcoming' surface."
+    "reveal_mode": 0,
+    "_note": "Published 2026-08-28 with an EMPTY lineup — the supported 'Lineup TBA' state, live to the public now. Doors/show/ages/venues are not set — do not carry Vol. 17's forward as if they were. reveal_mode is 0, so is_announced never gates visibility: a performance row is publicly visible the instant it is written, and the is_announced 0→1 transition can fire follower email. Adding the lineup IS the announcement, not a step toward it."
   },
   "season_state": {
-    "state": "between_seasons",
-    "explanation": "No event has status='published'. /api/events/public defaults to upcoming=true and the iCal feed only emits future events, so BOTH correctly return zero, while /api/stats/public and the sitemap stay fully populated from the archive. This is a supported state, not an outage — check whether anything is published before treating such a zero as a bug.",
-    "published_count": 0
+    "state": "published_lineup_tba",
+    "explanation": "Vol. 18 is published with ZERO performances, so surfaces split by which layer they read. EVENT-driven surfaces are populated: /api/events/public (defaults upcoming=true) returns 1, /api/events/timeline returns now 0 / upcoming 1 / past 10. PERFORMANCE-driven surfaces are still empty: the iCal feed LEFT JOINs performances, so it emits no VEVENTs. That iCal zero reads identically to the between-seasons zero and means something different — published event, lineup not announced. Diagnose the two apart by asking which layer a surface reads, never by the number. Before calling any such zero a bug, check BOTH halves: is an event published, AND does it have performances?",
+    "published_count": 1,
+    "performance_count_upcoming": 0,
+    "between_seasons_note": "'between_seasons' was the state until 2026-08-28 and will be again after Vol. 18 is archived. EventTimeline still has its dedicated empty state for it; that path is dormant, not gone."
   },
   "venues_vol17": [
     { "db_id": 16, "name": "Blue Room (Inside Revive Karaoke)", "address": "28 King St N, Waterloo" },
@@ -45,11 +48,11 @@
     "jane_bond": "Jane Bond (db_id 17) is Vol-16 only",
     "historical_2022": "Vol 1/2 venues (Dive Bar 85 King N, Revive Game Bar 90 King N, Pin Up Arcade Bar 8-247 King N) have no venue rows — they live in events.venue_info JSON; 85 King N is now Roost, Revive later moved to 28"
   },
-  "published_events": [],
-  "draft_events": [
+  "published_events": [
     { "db_id": 37, "slug": "lwbc18", "name": "Long Weekend Band Crawl Vol. 18", "date": "2026-10-11" }
   ],
-  "_archived_events_note": "Chronological ascending. Every past edition is archived — as of 2026-08-11 this is the complete public catalogue (19 events), and it is what /api/stats/public, the sitemap and the recap pages are built from.",
+  "draft_events": [],
+  "_archived_events_note": "Chronological ascending. Every past edition is archived — 19 events as of 2026-08-28, and they are what /api/stats/public and the recap pages are built from. The public catalogue is these PLUS the published lwbc18, which the sitemap also carries; only the archive feeds the stats and recaps.",
   "archived_events": [
     { "db_id": 33, "slug": "lwbc01", "date": "2022-05-22" },
     { "db_id": 34, "slug": "lwbc02", "date": "2022-07-31" },

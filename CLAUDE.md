@@ -247,7 +247,7 @@ The durable part is the method:
 
 ## Mission & Scope
 
-settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The next edition is **Long Weekend Band Crawl Vol. 18** on **October 11, 2026** (event 37, `lwbc18`, single-day).
+settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The next edition is **Long Weekend Band Crawl Vol. 18** on **October 11, 2026** (event 37, `lwbc18`, single-day) — **`published` since 2026-08-28, with an empty lineup** (the supported "Lineup TBA" state; see the empty-lineup override under event visibility). It is live to the public now.
 
 - **Focus:** Waterloo Region. This governs **product language** — marketing copy, meta descriptions, SEO targeting, "where this is for" statements. It is not a censor on fact: the platform has hosted an event outside the region (Buddies Fest 2, Tillsonburg) and those records stay accurate wherever they appear. The specific drift this rule exists to prevent is describing the site as serving Ottawa, which it does not.
 - **Brand:** settimes.ca — no rebranding
@@ -259,7 +259,18 @@ settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region
 
 **Shipped editions** (both `status = 'archived'`): Vol. 17 (event 21, 2026-08-02, 22 bands across 6 King St N venues — Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost) and Buddies Fest 2 (event 36, 2026-08-07→09, Tillsonburg — the first multi-day production event). Their lineups and venue rosters are live data now, not spec; read them from D1 rather than from this file.
 
-**Between seasons is a supported state, not a bug.** With Vol. 17 and BF2 archived and Vol. 18 still a draft, every "upcoming" surface is legitimately empty — `/api/events/public` (which defaults to `upcoming=true`) and the iCal feed both correctly return zero, while `/api/stats/public` and the sitemap stay fully populated from the archived editions. `EventTimeline` has a dedicated between-seasons empty state and auto-expands Past for exactly this window. Before treating such a zero as a bug, check whether any event is actually `published`.
+**Between seasons is a supported state, not a bug** — and as of 2026-08-28 we are no longer in it. Vol. 18 is `published` with zero performances, so the surfaces split into two groups that a stale reading of this section would get wrong:
+
+| Surface | Now | Why |
+|---|---|---|
+| `/api/events/public` (defaults `upcoming=true`) | **1** (`lwbc18`) | event-driven; a published future event qualifies |
+| `/api/events/timeline` | `now` 0, `upcoming` **1**, `past` 10 | same |
+| **iCal feed** | **still 0** | `LEFT JOIN performances` — no announced sets, no `VEVENT`s |
+| `/api/stats/public`, `sitemap.xml` | populated (283 performances, 277 URLs) | archived editions |
+
+**The iCal zero is the trap.** It reads identically to the between-seasons zero and means something entirely different: *published event, lineup not yet announced*, not *no published event*. Diagnose the two apart by asking which layer the surface reads — an **event**-driven surface or a **performance**-driven one — rather than by the number.
+
+`EventTimeline` still has its dedicated between-seasons empty state and auto-expands Past; that path is now dormant rather than gone, and will be live again after Vol. 18 is archived. Before treating any such zero as a bug, check both halves: is an event actually `published`, **and** does it have performances?
 
 Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude, OpenCode, and humans.
 

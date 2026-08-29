@@ -15,6 +15,11 @@ if [ ! -d "$DB_DIR" ]; then
   exit 1
 fi
 
+# shellcheck disable=SC2012
+# `ls -S` sorts by SIZE to pick the active database. find has no size
+# ordering, so the suggested rewrite would silently change which file is
+# selected. Names here are wrangler-generated hex, so the unsafe-filename
+# case SC2012 guards against cannot arise.
 DB_FILE=$(ls -S "$DB_DIR"/*.sqlite 2>/dev/null | head -1 || true)
 if [ -z "$DB_FILE" ]; then
   echo "No database files found. Start wrangler first:"

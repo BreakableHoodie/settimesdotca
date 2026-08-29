@@ -15,8 +15,9 @@ E2E_ADMIN_PASSWORD ?= e2e-test-password-Xk9
 export E2E_ADMIN_EMAIL
 export E2E_ADMIN_PASSWORD
 
-.PHONY: help install build dev format format-check lint test test-backend test-frontend \
-	gate review review-wip validate-openapi schema-check e2e e2e-setup e2e-serve e2e-run e2e-clean
+.PHONY: help install build dev format format-check lint lint-md lint-sh lint-yaml lint-sql lint-json \
+	lint-all test test-backend test-frontend gate review review-wip validate-openapi schema-check \
+	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean
 
 # CodeRabbit emits PostHog telemetry errors when egress is blocked. They are
 # noise, not review failures — the review still exits 0. They appear on BOTH
@@ -56,6 +57,45 @@ lint: ## ESLint, both stacks
 lint-md: ## markdownlint across the docs we maintain (see .markdownlint-cli2.jsonc)
 	npm run lint:md
 
+# Each external linter FAILS with an install hint rather than skipping. A gate
+# that quietly passes when its tool is absent is worse than no gate — that is
+# exactly the failure `lint-md` had before it reached .PHONY.
+#
+# File lists use `--cached --others --exclude-standard`, not a bare
+# `git ls-files`: the latter sees only TRACKED files, so a brand-new file you
+# have not added yet — the one most likely to be wrong — would sail through the
+# pre-commit gate unchecked. `--exclude-standard` still honours .gitignore, so
+# node_modules and friends stay out.
+lint-sh: ## shellcheck every tracked shell script
+	@command -v shellcheck >/dev/null 2>&1 || { \
+		echo "shellcheck not found. Install: brew install shellcheck"; exit 1; }
+	git ls-files --cached --others --exclude-standard '*.sh' | xargs shellcheck
+
+lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
+	@command -v yamllint >/dev/null 2>&1 || { \
+		echo "yamllint not found. Install: brew install yamllint"; exit 1; }
+	git ls-files --cached --others --exclude-standard '*.yml' '*.yaml' | xargs yamllint
+
+# archive/ is excluded: those migrations use `ALTER TABLE ... ADD COLUMN IF NOT
+# EXISTS`, which SQLite does not support and sqlfluff cannot parse. They are
+# archived and never applied, so fixing them buys nothing.
+lint-sql: ## sqlfluff every tracked SQL file outside archive/ (config: .sqlfluff)
+	@command -v sqlfluff >/dev/null 2>&1 || { \
+		echo "sqlfluff not found. Install: brew install sqlfluff"; exit 1; }
+	git ls-files --cached --others --exclude-standard '*.sql' | grep -v '^archive/' | xargs sqlfluff lint
+
+# Validity, deliberately NOT formatting. Prettier on these files only explodes
+# compact arrays past printWidth — churn on load-bearing files (_routes.json)
+# for no defect caught. An unparseable file is the real failure, and
+# ground-truth.json in particular has no code that reads it to fail loudly.
+lint-json: ## assert every tracked JSON file parses
+	@git ls-files --cached --others --exclude-standard '*.json' | while read -r f; do \
+		node -e "JSON.parse(require('fs').readFileSync('$$f','utf8'))" \
+			|| { echo "invalid JSON: $$f"; exit 1; }; \
+	done
+
+lint-all: lint lint-md lint-sh lint-yaml lint-sql lint-json ## every linter, all file types
+
 test-backend: ## Backend unit tests (better-sqlite3; runs fine on Apple Silicon, a few seconds)
 	npm test
 
@@ -64,7 +104,7 @@ test-frontend: ## Frontend unit tests
 
 test: test-backend test-frontend ## All unit tests
 
-gate: format format-check lint lint-md test build ## FULL pre-commit gate — run before every commit
+gate: format format-check lint-all test build ## FULL pre-commit gate — run before every commit
 
 review: ## AI code review of this branch vs origin/main — run BEFORE opening a PR
 	@command -v coderabbit >/dev/null 2>&1 || { \

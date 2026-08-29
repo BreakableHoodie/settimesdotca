@@ -752,6 +752,39 @@ a laptop doing other work.
 
 **Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
 
+**`make gate` covers every file type we maintain, not just JavaScript.** Until
+2026-08-29 it ran ESLint and Prettier and nothing else, so 69 SQL files, 17 YAML
+files and 71 Markdown files were checked *only* by CodeRabbit — after the PR was
+open, which is the force-push round-trip `make review` exists to avoid. `lint-all`
+now fans out to `lint` (ESLint), `lint-md`, `lint-sh`, `lint-yaml`, `lint-sql`
+and `lint-json`.
+
+Four things about those targets are deliberate:
+
+- **They fail with an install hint; they never skip.** `shellcheck`, `yamllint`
+  and `sqlfluff` are external. A target that passes when its tool is missing is
+  worse than no target — that is precisely the bug `lint-md` shipped with, where
+  it was absent from `.PHONY`, so a stray file named `lint-md` made `make` report
+  "up to date" and lint nothing.
+- **File lists use `git ls-files --cached --others --exclude-standard`**, not a
+  bare `git ls-files`. The latter sees only *tracked* files, so a brand-new file
+  you have not `git add`ed — the one most likely to be wrong — sails through.
+  `--exclude-standard` still honours `.gitignore`.
+- **`.yamllint` and `.markdownlint.json` are tuned to this corpus, not stock.**
+  `extends: default` alone produced 435 YAML findings, 353 of them `line-length`
+  at the default 80 chars, which no GitHub Actions workflow or OpenAPI spec
+  respects. Tuning took it to 1 real defect. Treat a huge finding count as
+  evidence the config is wrong for the corpus before treating it as debt.
+- **`lint-json` checks validity, not formatting.** Running Prettier over these
+  files only explodes compact arrays past `printWidth`, churning load-bearing
+  files like `_routes.json` while catching no defect. An unparseable file is the
+  real failure, and `ground-truth.json` has no code reading it that would fail
+  loudly.
+
+`sqlfluff` skips `archive/`: those migrations use `ALTER TABLE … ADD COLUMN IF
+NOT EXISTS`, which SQLite does not support and sqlfluff cannot parse. They are
+archived and never applied.
+
 Run all steps that apply. Do not commit if any step fails.
 
 **Frontend changes (`frontend/src/`):**

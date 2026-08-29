@@ -1,6 +1,33 @@
+# Tuned against this repo's actual YAML corpus, the same way .markdownlint.json
+# was tuned against its docs corpus (#663). `extends: default` alone produced 435
+# findings across 17 files, 353 of them line-length — which says the default is
+# wrong for this corpus, not that the corpus is wrong.
 extends: default
 
 # Netlify/Cloudflare _headers files use a bespoke syntax, so let yamllint skip them.
 ignore: |
   frontend/public/_headers
   frontend/dist/_headers
+
+rules:
+  # 353 of 435 findings. The default is 80 chars, which no GitHub Actions
+  # workflow or OpenAPI spec respects — `docs/api-spec.yaml` and the `run:`
+  # blocks in .github/workflows are long by nature and wrapping them hurts
+  # readability. Same call as MD013 in .markdownlint.json.
+  line-length: disable
+
+  # `on:` is the GitHub Actions trigger key and YAML 1.1 reads it as a boolean.
+  # Every workflow trips this; none is a defect. check-keys:false keeps the
+  # value-side check (a bare `yes`/`no` where a string was meant) which is the
+  # half that catches real mistakes.
+  truthy:
+    check-keys: false
+
+  # Requiring a leading `---` is a style preference, and this repo has never
+  # used it. Enforcing it now would churn every YAML file for no benefit.
+  document-start: disable
+
+  # The default wants two spaces before an inline comment. Ours are mostly
+  # one, and that is not worth 52 edits.
+  comments:
+    min-spaces-from-content: 1

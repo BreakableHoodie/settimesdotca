@@ -34,7 +34,7 @@ echo "Waiting for database to be created..."
 
 # Wait for the database file to be created
 DB_FILE=""
-for i in {1..30}; do
+for _ in {1..30}; do
   DB_FILE=$(find .wrangler/state/v3/d1/miniflare-D1DatabaseObject -name "*.sqlite" 2>/dev/null | head -1)
   if [ -n "$DB_FILE" ]; then
     echo "Found database: $DB_FILE"

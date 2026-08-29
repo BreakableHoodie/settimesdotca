@@ -48,6 +48,8 @@ fi
 
 MIGRATION_COUNT=$(echo "$MIGRATION_FILES" | wc -l | tr -d ' ')
 echo "📄 Found $MIGRATION_COUNT migration file(s):"
+# shellcheck disable=SC2001  # per-line prefixing of a multi-line list; the
+# suggested ${var//search/replace} has no way to anchor at each line start.
 echo "$MIGRATION_FILES" | sed 's/^/  - /'
 echo ""
 

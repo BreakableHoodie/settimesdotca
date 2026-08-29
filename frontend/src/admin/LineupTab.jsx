@@ -22,10 +22,15 @@ import { buildPickerFormData, buildEmptyPickerFormData } from './utils/pickerFor
 import { buildDayOptions, isMultiDayEvent } from './utils/dayOptions'
 import {
   buildDayNumberMap,
+  buildConflictsByBandId,
   deriveGenreSuggestions,
   deriveOriginSuggestions,
   filterRosterBands,
+  getActiveBands,
+  mergeConflicts,
+  selectAllBandIds,
   sortRosterBands,
+  updateSelectedIds,
 } from './utils/lineupRoster'
 import { formatFestivalDate } from '../utils/festivalDays'
 
@@ -134,10 +139,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   // builder never offers a retired band as a schedulable option. Origin/genre
   // suggestion lists below intentionally keep using the unfiltered `allBands`
   // — reusing a retired band's origin/genre value is harmless.
-  const activeBands = useMemo(
-    () => allBands.filter(band => band.is_active !== 0 && band.is_active !== false),
-    [allBands]
-  )
+  const activeBands = useMemo(() => getActiveBands(allBands), [allBands])
 
   const originCitySuggestions = useMemo(() => deriveOriginSuggestions(allBands, 'city'), [allBands])
   const originRegionSuggestions = useMemo(() => deriveOriginSuggestions(allBands, 'region'), [allBands])
@@ -498,9 +500,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   // backend checkConflicts day-scoping; NULL performance_date inherits eventDate,
   // keeping single-day behavior unchanged.
   const conflictsByBandId = useMemo(() => {
-    const map = new Map()
-    for (const band of bands) map.set(band.id, detectConflicts(band, bands, selectedEvent?.date))
-    return map
+    return buildConflictsByBandId(bands, selectedEvent?.date)
   }, [bands, selectedEvent?.date])
 
   const formConflicts = useMemo(() => {
@@ -529,22 +529,15 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   ])
 
   const combinedConflicts = useMemo(
-    () => ({
-      overlaps: [...new Set([...formConflicts.overlaps, ...serverConflicts.overlaps])],
-      conflicts: [...new Set([...formConflicts.conflicts, ...serverConflicts.conflicts])],
-    }),
+    () => mergeConflicts(formConflicts, serverConflicts),
     [formConflicts, serverConflicts]
   )
 
   // Select logic
   const handleSelect = (id, checked) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      checked ? next.add(id) : next.delete(id)
-      return next
-    })
+    setSelectedIds(prev => updateSelectedIds(prev, id, checked))
   }
-  const handleSelectAll = checked => setSelectedIds(checked ? new Set(filteredBands.map(b => b.id)) : new Set())
+  const handleSelectAll = checked => setSelectedIds(selectAllBandIds(filteredBands, checked))
 
   const clearBulkState = () => {
     setSelectedIds(new Set())

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildConflictsByBandId,
   buildDayNumberMap,
   deriveGenreSuggestions,
   deriveOriginSuggestions,
   filterRosterBands,
+  getActiveBands,
+  mergeConflicts,
+  selectAllBandIds,
   sortRosterBands,
+  updateSelectedIds,
 } from '../lineupRoster'
 
 const band = (id, over = {}) => ({
@@ -107,6 +112,11 @@ describe('sortRosterBands', () => {
     // must sort after 23:00 rather than first. This is the recurring bug class.
     const bands = [band(1, { start_time: '01:00' }), band(2, { start_time: '23:00' }), band(3, { start_time: '20:00' })]
     expect(sortRosterBands(bands, { key: null }, deps).map(b => b.id)).toEqual([3, 2, 1])
+  })
+
+  it('honours after-midnight ordering for the explicit start-time key', () => {
+    const bands = [band(1, { start_time: '01:00' }), band(2, { start_time: '23:00' })]
+    expect(sortRosterBands(bands, { key: 'start_time', direction: 'asc' }, deps).map(b => b.id)).toEqual([2, 1])
   })
 
   it('sorts by name with articles stripped (#587)', () => {
@@ -238,5 +248,61 @@ describe('buildDayNumberMap', () => {
 
   it('is empty for a single-day event, which has no day options', () => {
     expect(buildDayNumberMap([]).size).toBe(0)
+  })
+})
+
+describe('getActiveBands', () => {
+  it('excludes numeric and boolean inactive profiles', () => {
+    const bands = [band(1), band(2, { is_active: 0 }), band(3, { is_active: false }), band(4, { is_active: 1 })]
+    expect(getActiveBands(bands).map(b => b.id)).toEqual([1, 4])
+  })
+
+  it('does not mutate the roster', () => {
+    const bands = [band(1)]
+    expect(getActiveBands(bands)).not.toBe(bands)
+  })
+})
+
+describe('buildConflictsByBandId', () => {
+  it('maps each performance id to its conflict result', () => {
+    const first = band(1, { event_id: 1, venue_id: 2, start_time: '20:00', end_time: '22:00' })
+    const second = band(2, { event_id: 1, venue_id: 2, start_time: '21:00', end_time: '23:00' })
+    const result = buildConflictsByBandId([first, second], '2026-10-11')
+    expect(result.get(1).overlaps).toEqual(['Band 2'])
+    expect(result.get(2).overlaps).toEqual(['Band 1'])
+  })
+
+  it('returns an empty map for an empty roster', () => {
+    expect(buildConflictsByBandId([]).size).toBe(0)
+  })
+})
+
+describe('mergeConflicts', () => {
+  it('combines conflict names while preserving first-seen order', () => {
+    expect(
+      mergeConflicts({ overlaps: ['A'], conflicts: ['B', 'C'] }, { overlaps: ['A', 'D'], conflicts: ['C'] })
+    ).toEqual({
+      overlaps: ['A', 'D'],
+      conflicts: ['B', 'C'],
+    })
+  })
+
+  it('handles missing conflict lists', () => {
+    expect(mergeConflicts({}, {})).toEqual({ overlaps: [], conflicts: [] })
+  })
+})
+
+describe('selection helpers', () => {
+  it('adds and removes one id without mutating the source set', () => {
+    const original = new Set([1])
+    expect(updateSelectedIds(original, 2, true)).toEqual(new Set([1, 2]))
+    expect(updateSelectedIds(original, 1, false)).toEqual(new Set())
+    expect(original).toEqual(new Set([1]))
+  })
+
+  it('selects filtered ids or clears the selection', () => {
+    const bands = [band(1), band(2)]
+    expect(selectAllBandIds(bands, true)).toEqual(new Set([1, 2]))
+    expect(selectAllBandIds(bands, false)).toEqual(new Set())
   })
 })

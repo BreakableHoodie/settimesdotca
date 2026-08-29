@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { buildPerformancePayload, parseDuration } from '../lineupForm'
 
 describe('parseDuration', () => {
+  it('rejects a positive value that ROUNDS to zero', () => {
+    // 0.4 passes the `parsed <= 0` guard but Math.round makes it 0, and a
+    // 0-minute duration gives the performance identical start and end times —
+    // the zero-length-set condition the server rejects in validateSetTimes.
+    expect(parseDuration('0.4')).toBeNull()
+    expect(parseDuration(0.4)).toBeNull()
+    expect(parseDuration('0.49')).toBeNull()
+  })
+
+  it('still accepts a value that rounds UP to a real duration', () => {
+    expect(parseDuration('0.6')).toBe(1)
+    expect(parseDuration('44.5')).toBe(45)
+  })
+
   it('rounds positive numeric input', () => {
     expect(parseDuration('45.6')).toBe(46)
     expect(parseDuration(30)).toBe(30)

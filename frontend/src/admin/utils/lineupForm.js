@@ -7,7 +7,14 @@
 export function parseDuration(input) {
   const parsed = Number(input)
   if (!Number.isFinite(parsed) || parsed <= 0) return null
-  return Math.round(parsed)
+  // Check AFTER rounding, not only before: 0.4 is positive but rounds to 0, and
+  // a 0-minute set gives a performance identical start and end times. That is
+  // the zero-length-set condition the server rejects in validateSetTimes and
+  // that the two sides of the boundary used to disagree about — 24 hours to the
+  // backend conflict detector, 0 minutes to the frontend. Do not let the form
+  // produce it in the first place.
+  const rounded = Math.round(parsed)
+  return rounded > 0 ? rounded : null
 }
 
 /**

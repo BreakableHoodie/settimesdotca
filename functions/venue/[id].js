@@ -8,6 +8,13 @@ export async function onRequest(context) {
   const { params, env, request } = context;
   const id = params.id;
 
+  // Non-numeric ids fall through to the shell, which is safe ONLY because every
+  // link to a venue is built from a numeric id (VenuesPage, BandProfilePage's two
+  // sites) and the sitemap emits the same. /band/[id].js had this identical guard
+  // while its links were slug-built, so Googlebot crawled a URL that answered 200
+  // with the homepage title and no canonical, and 14 duplicates entered the index
+  // (#983). If a /venue/<slug> link builder is ever added, this branch must resolve
+  // and 301 the way redirectSlugToId does there -- do not just add the links.
   if (!/^\d+$/.test(id || "") || !isPublicDataEnabled(env)) {
     return env.ASSETS.fetch(request);
   }

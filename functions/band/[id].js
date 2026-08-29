@@ -11,14 +11,78 @@ import {
   DEFAULT_OG_IMAGE,
 } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
+import { normalizeBandName } from "../utils/bandName.js";
+
+/**
+ * Resolve a slug to its canonical /band/<id> and 301 there, or fall through to
+ * the SPA shell when it resolves to nothing.
+ *
+ * Matching goes through normalizeBandName -- the same key the JSON API uses --
+ * rather than reversing slugifyBandName. Both reduce a name to /[a-z0-9]/, so
+ * they agree by construction: "B.A. Johnston" slugifies to "b-a-johnston" and
+ * normalizes to "bajohnston" from either direction. `name_normalized` carries a
+ * UNIQUE index (idx_band_profiles_normalized), so the target is unambiguous by
+ * schema and the lookup is a single index probe -- cheap enough for a path
+ * crawlers hit often.
+ *
+ * 301, not 302: the mapping is durable, and only a permanent redirect
+ * consolidates the duplicate's ranking signals into the canonical page. A
+ * browser caching it hard is fine -- ids are stable, so a cached 301 stays
+ * correct even across a rename that would move the slug.
+ *
+ * The Location is RELATIVE, which is a deliberate departure from this repo's
+ * "build every URL from CANONICAL_HOST" rule. That rule exists so a preview
+ * deploy cannot self-canonicalise; a redirect is the opposite concern -- an
+ * absolute Location would bounce preview and www traffic to production
+ * mid-request. Canonicals pin the host, redirects preserve it.
+ */
+async function redirectSlugToId(context, slug) {
+  const { env, request } = context;
+
+  let match;
+  try {
+    match = await env.DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? LIMIT 1`)
+      .bind(normalizeBandName(String(slug).replace(/-/g, " ")))
+      .first();
+  } catch (err) {
+    // Same posture as the SSR lookup below: a D1 failure degrades to the shell,
+    // which still renders the page client-side, rather than erroring the request.
+    console.error("SSR band slug resolution failed:", slug, err);
+    return env.ASSETS.fetch(request);
+  }
+
+  // An unresolvable slug is not necessarily junk -- it may be a renamed or
+  // deleted artist -- so it keeps the previous behaviour and renders the shell
+  // instead of 404ing a URL that may still be linked.
+  if (!match) return env.ASSETS.fetch(request);
+
+  // Carry the query string: ?fromEvent=<slug> drives the "back to event"
+  // context, and the client redirect this replaces preserved location.search.
+  const { search } = new URL(request.url);
+  return new Response(null, { status: 301, headers: { Location: `/band/${match.id}${search}` } });
+}
 
 export async function onRequest(context) {
   const { params, env, request } = context;
   const id = params.id;
 
-  // Only numeric band ids are server-rendered; non-numeric or gated data → plain SPA.
-  if (!/^\d+$/.test(id || "") || !isPublicDataEnabled(env)) {
+  // Gated data → plain SPA, before any lookup. Deliberately ahead of the slug
+  // branch below: when public data is off, whether a band EXISTS must not be
+  // observable, and a redirect that fires only for real slugs is an existence
+  // oracle even though it leaks no field values.
+  if (!isPublicDataEnabled(env)) {
     return env.ASSETS.fetch(request);
+  }
+
+  // A non-numeric id is a slug from buildBandProfileHref() -- every public link
+  // to an artist is built that way (ArtistsPage, StatsPage, EventRecapPage,
+  // EventTimeline, BandCard), so this is the shape Googlebot actually crawls.
+  // It used to fall through to the un-injected shell, which served the HOMEPAGE
+  // title and no canonical; 14 such URLs entered the index as duplicates of
+  // their own /band/<id> page, one at position 49 (#983). BandProfilePage
+  // corrected it client-side, so the fix only existed after JS ran.
+  if (!/^\d+$/.test(id || "")) {
+    return redirectSlugToId(context, id);
   }
 
   let band;

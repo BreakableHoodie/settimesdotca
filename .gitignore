@@ -58,7 +58,16 @@ e2e/.auth/
 .opencode/
 .agents/
 .mcp.json
-workers-mcp-server/
+# workers-mcp-server/ is TRACKED. It holds the MCP Worker deployed against the
+# PRODUCTION database, and excluding the whole tree meant a privileged live
+# service had no source anywhere: it could not be rebuilt, reviewed, scanned by
+# CodeQL/Dependabot/gitleaks, or patched. Only the four things that genuinely
+# must stay out are excluded: dependencies, build output, the local secret,
+# and wrangler's state directory.
+workers-mcp-server/node_modules/
+workers-mcp-server/dist/
+workers-mcp-server/.dev.vars
+workers-mcp-server/.wrangler/
 chatmodes/
 claudedocs/
 # Root-level only — .github/instructions/ is tracked (Copilot path instructions)

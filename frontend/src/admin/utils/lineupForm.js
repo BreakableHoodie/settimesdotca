@@ -1,8 +1,11 @@
+import { LINK_FIELDS } from './bandFields'
+
 /**
- * Parse the duration field used by the lineup form.
+ * Parse the duration field used by the lineup form, in minutes.
  *
- * @param {string|number} input
- * @returns {number|null}
+ * @param {string|number} input - raw form value
+ * @returns {number|null} a positive whole number of minutes, or `null` when the
+ *   input is non-numeric, non-positive, or rounds to zero (see below)
  */
 export function parseDuration(input) {
   const parsed = Number(input)
@@ -18,22 +21,31 @@ export function parseDuration(input) {
 }
 
 /**
- * Build the API payload for a lineup performance from form state.
+ * Build the API payload for a lineup performance from admin form state.
  *
- * @param {object} formData
- * @returns {object}
+ * Four transformations are not obvious from the shape and callers depend on them:
+ *
+ * - `social_links` is a **JSON string**, not an object, and always carries every
+ *   key in `LINK_FIELDS` — absent inputs become `''` rather than being omitted.
+ * - `origin` is DERIVED, joining `origin_city` and `origin_region` with ", ".
+ *   The two parts are also sent separately; `origin` is the legacy display form.
+ * - Empty `venue_id` and `performance_date` become `null`, not `''`, because the
+ *   API treats an empty string as a value and `null` as "unset".
+ * - `is_active` arrives as a numeric form value and leaves as a **boolean**.
+ *
+ * @param {object} formData - flat admin form state; keys match the field names
+ *   in the lineup form (`event_id`, `venue_id`, `name`, `start_time`,
+ *   `end_time`, `performance_date`, the `LINK_FIELDS` keys, and the profile
+ *   fields mirrored below)
+ * @returns {object} payload for POST/PATCH /api/admin/bands
  */
 export function buildPerformancePayload(formData) {
-  const socialLinks = {
-    website: formData.website || '',
-    instagram: formData.instagram || '',
-    bandcamp: formData.bandcamp || '',
-    facebook: formData.facebook || '',
-    youtube: formData.youtube || '',
-    spotify: formData.spotify || '',
-    apple_music: formData.apple_music || '',
-    linktree: formData.linktree || '',
-  }
+  // Derived from the registry rather than hand-listed. This used to be eight
+  // hardcoded keys, which made it a second list of link fields — the exact
+  // duplication bandFields.js exists to prevent, and the reason a ninth
+  // platform would have been silently dropped from this write path while the
+  // Links column and gap filter picked it up.
+  const socialLinks = Object.fromEntries(LINK_FIELDS.map(({ key }) => [key, formData[key] || '']))
 
   const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
 

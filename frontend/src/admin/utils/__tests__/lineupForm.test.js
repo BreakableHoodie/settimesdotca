@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildPerformancePayload, parseDuration } from '../lineupForm'
+import { LINK_FIELDS } from '../bandFields'
 
 describe('parseDuration', () => {
   it('rejects a positive value that ROUNDS to zero', () => {
@@ -102,5 +103,23 @@ describe('buildPerformancePayload', () => {
       apple_music: '',
       linktree: '',
     })
+  })
+})
+
+describe('social_links derivation', () => {
+  it('carries every LINK_FIELDS key, so a ninth platform cannot be dropped here', () => {
+    // This used to be eight hardcoded keys — a second list of link fields, which
+    // is what bandFields.js exists to prevent. Adding a platform to the registry
+    // and forgetting this write path is precisely the bug that shape invites.
+    const payload = buildPerformancePayload({ event_id: '1', name: 'n' })
+    const links = JSON.parse(payload.social_links)
+    expect(Object.keys(links).sort()).toEqual(LINK_FIELDS.map(f => f.key).sort())
+  })
+
+  it('preserves a supplied value and defaults an absent one to an empty string', () => {
+    const payload = buildPerformancePayload({ event_id: '1', name: 'n', instagram: 'someband' })
+    const links = JSON.parse(payload.social_links)
+    expect(links.instagram).toBe('someband')
+    expect(links.spotify).toBe('')
   })
 })

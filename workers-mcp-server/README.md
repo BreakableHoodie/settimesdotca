@@ -71,12 +71,24 @@ projections.
 
 ## Deploying
 
+Routine deploy — this does **not** touch the secret:
+
 ```bash
 cd workers-mcp-server
 npm install
-npx wrangler secret put SHARED_SECRET   # 64 chars exactly; workers-mcp requires it
 npx wrangler deploy
 ```
+
+First-time setup, or a deliberate rotation, only:
+
+```bash
+npx wrangler secret put SHARED_SECRET   # 64 chars exactly; workers-mcp requires it
+```
+
+**Do not run `secret put` as part of a normal deploy.** It replaces the token
+and instantly breaks every configured MCP client, including the `settimesdotca`
+entry in `.mcp.json`. When you do rotate deliberately, update `.mcp.json` in the
+same pass.
 
 `SHARED_SECRET` is never stored here. `.dev.vars` is gitignored and holds the
 local copy.

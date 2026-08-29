@@ -35,7 +35,16 @@
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()
 
   # Prevent stale HTML fallback caching (SPA routes like /band/*, /event/*)
-  Cache-Control: no-cache, no-store, must-revalidate
+  # NO Cache-Control here, deliberately. A `_headers` rule COMBINES with
+  # every other matching rule (comma-joined), so a no-store on /* joined
+  # /assets/*'s `immutable` into `no-store, ..., immutable` — no-store wins,
+  # and cf-cache-status went BYPASS. Every hashed bundle was re-downloaded
+  # on every navigation and the edge cached nothing (#987).
+  #
+  # The stale-HTML risk this used to guard is already handled: Cloudflare
+  # Pages serves HTML with `public, max-age=0, must-revalidate` by default,
+  # which revalidates on every request. Verified against a real server, not
+  # assumed.
 
 # Embed widget pages — intended to be loaded in third-party iframes.
 # Cloudflare Pages merges duplicate headers across matching rules (comma-joining),

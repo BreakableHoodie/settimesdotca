@@ -49,9 +49,12 @@ export function assertReadOnlySelect(sql) {
     throw new Error(READ_ONLY_ERROR);
   }
 
-  // One trailing semicolon is idiomatic and harmless; strip it before the
-  // interior-semicolon test so `SELECT 1;` is not treated as two statements.
-  const statement = sql.trim().replace(/;+\s*$/, "").trim();
+  // Exactly ONE trailing semicolon is idiomatic and harmless; strip it before
+  // the interior-semicolon test so `SELECT 1;` is not read as two statements.
+  // `;;` is deliberately NOT accepted: after stripping one, an interior `;`
+  // remains and the check below rejects it. A repeated delimiter is a trailing
+  // empty statement, and a guard should fail closed on input it did not expect.
+  const statement = sql.trim().replace(/;\s*$/, "").trim();
 
   // `\s` after the keyword, so `selectfoo` cannot pass as `select`. A bare
   // `SELECT` with no argument is not a valid query anyway.

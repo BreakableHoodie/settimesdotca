@@ -33,7 +33,7 @@
   // surface even when someone has it committed.
   "ignores": [
     "**/node_modules/**",
-    "workers-mcp-server/**",
+    "workers-mcp-server/node_modules/**",
     ".agents/**",
     ".wrangler/**",
     "frontend/dist/**",

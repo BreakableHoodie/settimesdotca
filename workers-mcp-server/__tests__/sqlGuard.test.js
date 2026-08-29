@@ -67,7 +67,13 @@ describe("assertReadOnlySelect", () => {
     it("strips a single trailing semicolon rather than rejecting it", () => {
       expect(assertReadOnlySelect("SELECT 1;")).toBe("SELECT 1");
       expect(assertReadOnlySelect("  SELECT 1 ;  ")).toBe("SELECT 1");
-      expect(assertReadOnlySelect("SELECT 1;;")).toBe("SELECT 1");
+    });
+
+    it("rejects a repeated delimiter rather than stripping it", () => {
+      // `;;` is a trailing EMPTY statement. Stripping it would be harmless in
+      // practice, but a guard that quietly normalises unexpected input is how
+      // the original prefix check got its confidence. Fail closed.
+      expect(() => assertReadOnlySelect("SELECT 1;;")).toThrow(READ_ONLY_ERROR);
     });
 
     it("returns the statement it validated, so the caller cannot prepare the raw input", () => {

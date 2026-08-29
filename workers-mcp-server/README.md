@@ -35,7 +35,7 @@ await this.env.DB.prepare(sql).all();
 D1's `.prepare().all()` executes **every** statement in the string. Verified
 against the live Worker with read-only payloads:
 
-```
+```text
 "SELECT 1 AS first; SELECT 2 AS second"  ->  [{"second":2}]
 "SELECT 1; SELECT * FROM __nope__"       ->  D1_ERROR: no such table
 ```

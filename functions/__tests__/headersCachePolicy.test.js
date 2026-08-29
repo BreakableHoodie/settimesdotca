@@ -31,7 +31,7 @@ const HEADERS_FILE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "
  */
 function parseHeaders(source) {
   const rules = [];
-  let current = null;
+  let current;
   for (const raw of source.split("\n")) {
     if (!raw.trim() || raw.trim().startsWith("#")) continue;
     if (!/^\s/.test(raw)) {

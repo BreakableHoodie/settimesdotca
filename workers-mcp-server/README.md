@@ -66,8 +66,24 @@ devices, WebAuthn credentials. The match is a word boundary anywhere in the
 statement, so a join, subquery or CTE is caught too, and it over-blocks a string
 literal containing one of those words. That is the intended direction to err.
 
-Use `getUsers` and `getActiveSessions` for those tables; they return vetted
-projections.
+Only two of the eleven have a vetted alternative:
+
+| table | how to read it |
+|---|---|
+| `users` | `getUsers` — omits password hashes, TOTP secrets and backup codes |
+| `lucia_sessions` | `getActiveSessions` — omits the raw session id |
+| the other nine | **no tool; deliberately unavailable through MCP** |
+
+`api_keys`, `band_follows`, `email_otp_codes`, `invite_codes`, `mfa_challenges`,
+`password_reset_tokens`, `sessions`, `trusted_devices` and `webauthn_credentials`
+are closed with no projection. That is the intent, not an oversight: none has a
+read that is useful for debugging and safe to expose. If one ever needs to be
+readable, add a curated tool with an explicit column list rather than relaxing
+the guard.
+
+(`getRecentAuditLog`, `getRecentAuthAttempts` and `getRateLimits` cover
+`auth_audit`, `auth_attempts` and `rate_limits` — none of which is on the
+sensitive list, so `queryDB` can read them directly too.)
 
 ## Deploying
 

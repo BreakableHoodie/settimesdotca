@@ -18,6 +18,12 @@ LINT_FILES := git ls-files --cached --others --exclude-standard
 # in a subshell, where `rc=1` never reaches the recipe. Redirecting from a file
 # gets both. Filenames containing NEWLINES are still out of scope; that needs
 # -z/`read -d ''`, which is bash, and this Makefile is /bin/sh.
+#
+# Enumeration failure is checked explicitly. Without it, a failing `git ls-files`
+# writes an empty list, the loop body never runs, rc stays 0, and the gate
+# reports success having linted NOTHING — the same silent-pass shape as the
+# missing .PHONY entry. lint-sql needs its own handling because a pipeline
+# reports the LAST command's status, so grep's success would mask git's failure.
 WRANGLER := ./frontend/node_modules/.bin/wrangler
 E2E_STATE := .wrangler/e2e-state
 E2E_PID := .wrangler/e2e-state/wrangler.pid
@@ -80,7 +86,9 @@ lint-md: ## markdownlint across the docs we maintain (see .markdownlint-cli2.jso
 lint-sh: ## shellcheck every tracked shell script
 	@command -v shellcheck >/dev/null 2>&1 || { \
 		echo "shellcheck not found. Install: brew install shellcheck"; exit 1; }
-	@list=$$(mktemp); $(LINT_FILES) '*.sh' > "$$list"; \
+	@list=$$(mktemp); \
+	$(LINT_FILES) '*.sh' > "$$list" || { rm -f "$$list"; \
+		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
 	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		shellcheck "$$f" || rc=1; \
@@ -89,7 +97,9 @@ lint-sh: ## shellcheck every tracked shell script
 lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
 	@command -v yamllint >/dev/null 2>&1 || { \
 		echo "yamllint not found. Install: brew install yamllint"; exit 1; }
-	@list=$$(mktemp); $(LINT_FILES) '*.yml' '*.yaml' > "$$list"; \
+	@list=$$(mktemp); \
+	$(LINT_FILES) '*.yml' '*.yaml' > "$$list" || { rm -f "$$list"; \
+		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
 	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		yamllint "$$f" || rc=1; \
@@ -101,11 +111,14 @@ lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
 lint-sql: ## sqlfluff every tracked SQL file outside archive/ (config: .sqlfluff)
 	@command -v sqlfluff >/dev/null 2>&1 || { \
 		echo "sqlfluff not found. Install: brew install sqlfluff"; exit 1; }
-	@list=$$(mktemp); $(LINT_FILES) '*.sql' | grep -v '^archive/' > "$$list"; \
+	@list=$$(mktemp); raw=$$(mktemp); \
+	$(LINT_FILES) '*.sql' > "$$raw" || { rm -f "$$raw" "$$list"; \
+		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
+	grep -v '^archive/' "$$raw" > "$$list" || true; \
 	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		sqlfluff lint "$$f" || rc=1; \
-	done < "$$list"; rm -f "$$list"; exit $$rc
+	done < "$$list"; rm -f "$$raw" "$$list"; exit $$rc
 
 # Validity, deliberately NOT formatting. Prettier on these files only explodes
 # compact arrays past printWidth — churn on load-bearing files (_routes.json)
@@ -116,7 +129,9 @@ lint-sql: ## sqlfluff every tracked SQL file outside archive/ (config: .sqlfluff
 # containing a single quote would otherwise close the JS string literal and run
 # whatever followed, on every `make gate`.
 lint-json: ## assert every tracked JSON file parses
-	@list=$$(mktemp); $(LINT_FILES) '*.json' > "$$list"; \
+	@list=$$(mktemp); \
+	$(LINT_FILES) '*.json' > "$$list" || { rm -f "$$list"; \
+		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
 	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$$f" \

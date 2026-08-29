@@ -3,6 +3,30 @@
 # E2E recipe mirrors .github/actions/e2e-env/action.yml.
 
 SHELL := /bin/sh
+# Every linter's file list. `--others --exclude-standard` adds files that are
+# untracked but NOT gitignored: a brand-new file you have not `git add`ed is the
+# one most likely to be wrong, and a bare `git ls-files` would skip it. Each
+# recipe still tests `[ -f ]`, because this list also names TRACKED files that
+# have been deleted but not yet staged — a legitimate state that would otherwise
+# hand a missing path to the linter and fail the gate for no reason.
+LINT_FILES := git ls-files --cached --others --exclude-standard
+#
+# Recipes read this list with `while IFS= read -r f` REDIRECTED FROM A FILE, not
+# `for f in $(...)` and not a pipe. `for` word-splits on spaces and re-globs, so
+# `bad name.yml` became two nonexistent paths that `[ -f ]` skipped — an invalid
+# file linted by nobody, exit 0. A pipe would fix the splitting but run the loop
+# in a subshell, where `rc=1` never reaches the recipe. Redirecting from a file
+# gets both. Filenames containing NEWLINES are still out of scope; that needs
+# -z/`read -d ''`, which is bash, and this Makefile is /bin/sh.
+#
+# Enumeration failure is checked explicitly. Without it, a failing `git ls-files`
+# writes an empty list, the loop body never runs, rc stays 0, and the gate
+# reports success having linted NOTHING — the same silent-pass shape as the
+# missing .PHONY entry. lint-sql needs its own handling because a pipeline
+# reports the LAST command's status, so a filter's success would mask git's
+# failure. The filter is sed, not grep: grep exits 1 on "no match" AND 2 on a
+# read error, so the `|| true` needed to tolerate the former also swallowed the
+# latter. sed exits 0 when it deletes nothing and non-zero only on a real error.
 WRANGLER := ./frontend/node_modules/.bin/wrangler
 E2E_STATE := .wrangler/e2e-state
 E2E_PID := .wrangler/e2e-state/wrangler.pid
@@ -15,8 +39,9 @@ E2E_ADMIN_PASSWORD ?= e2e-test-password-Xk9
 export E2E_ADMIN_EMAIL
 export E2E_ADMIN_PASSWORD
 
-.PHONY: help install build dev format format-check lint test test-backend test-frontend \
-	gate review review-wip validate-openapi schema-check e2e e2e-setup e2e-serve e2e-run e2e-clean
+.PHONY: help install build dev format format-check lint lint-md lint-sh lint-yaml lint-sql lint-json \
+	lint-all test test-backend test-frontend gate review review-wip validate-openapi schema-check \
+	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean
 
 # CodeRabbit emits PostHog telemetry errors when egress is blocked. They are
 # noise, not review failures — the review still exits 0. They appear on BOTH
@@ -56,6 +81,76 @@ lint: ## ESLint, both stacks
 lint-md: ## markdownlint across the docs we maintain (see .markdownlint-cli2.jsonc)
 	npm run lint:md
 
+# Each external linter FAILS with an install hint rather than skipping. A gate
+# that quietly passes when its tool is absent is worse than no gate — that is
+# exactly the failure `lint-md` had before it reached .PHONY.
+
+# File lists come from $(LINT_FILES); see its definition for the scope rules.
+lint-sh: ## shellcheck every shell script (tracked + untracked, minus gitignored)
+	@command -v shellcheck >/dev/null 2>&1 || { \
+		echo "shellcheck not found. Install: brew install shellcheck"; exit 1; }
+	@list=$$(mktemp); \
+	$(LINT_FILES) '*.sh' > "$$list" || { rm -f "$$list"; \
+		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
+	rc=0; while IFS= read -r f; do \
+		[ -f "$$f" ] || continue; \
+		shellcheck "$$f" || rc=1; \
+	done < "$$list"; rm -f "$$list"; exit $$rc
+
+lint-yaml: ## yamllint every YAML file (tracked + untracked, minus gitignored; config: .yamllint)
+	@command -v yamllint >/dev/null 2>&1 || { \
+		echo "yamllint not found. Install: brew install yamllint"; exit 1; }
+	@list=$$(mktemp); \
+	$(LINT_FILES) '*.yml' '*.yaml' > "$$list" || { rm -f "$$list"; \
+		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
+	rc=0; while IFS= read -r f; do \
+		[ -f "$$f" ] || continue; \
+		yamllint "$$f" || rc=1; \
+	done < "$$list"; rm -f "$$list"; exit $$rc
+
+# archive/ is excluded: those migrations use `ALTER TABLE ... ADD COLUMN IF NOT
+# EXISTS`, which SQLite does not support and sqlfluff cannot parse. They are
+# archived and never applied, so fixing them buys nothing.
+lint-sql: ## sqlfluff every SQL file outside archive/ (tracked + untracked, minus gitignored; config: .sqlfluff)
+	@command -v sqlfluff >/dev/null 2>&1 || { \
+		echo "sqlfluff not found. Install: brew install sqlfluff"; exit 1; }
+	@list=$$(mktemp); raw=$$(mktemp); \
+	$(LINT_FILES) '*.sql' > "$$raw" || { rm -f "$$raw" "$$list"; \
+		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
+	sed '/^archive\//d' "$$raw" > "$$list" || { rm -f "$$raw" "$$list"; \
+		echo "lint: could not filter the SQL file list"; exit 1; }; \
+	rc=0; while IFS= read -r f; do \
+		[ -f "$$f" ] || continue; \
+		sqlfluff lint "$$f" || rc=1; \
+	done < "$$list"; rm -f "$$raw" "$$list"; exit $$rc
+
+# Validity, deliberately NOT formatting. Prettier on these files only explodes
+# compact arrays past printWidth — churn on load-bearing files (_routes.json)
+# for no defect caught. An unparseable file is the real failure, and
+# ground-truth.json in particular has no code that reads it to fail loudly.
+#
+# The path goes in as ARGV, never interpolated into the -e source: a filename
+# containing a single quote would otherwise close the JS string literal and run
+# whatever followed, on every `make gate`.
+#
+# node is checked up front like the external linters above. Without the check a
+# missing node does not merely fail — every invocation errors and the recipe
+# reports "invalid JSON:" for EVERY file, sending you hunting for corruption in
+# files that are fine.
+lint-json: ## assert every JSON file parses (tracked + untracked, minus gitignored)
+	@command -v node >/dev/null 2>&1 || { \
+		echo "node not found. Install Node.js, then: make install"; exit 1; }
+	@list=$$(mktemp); \
+	$(LINT_FILES) '*.json' > "$$list" || { rm -f "$$list"; \
+		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
+	rc=0; while IFS= read -r f; do \
+		[ -f "$$f" ] || continue; \
+		node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$$f" \
+			|| { echo "invalid JSON: $$f"; rc=1; }; \
+	done < "$$list"; rm -f "$$list"; exit $$rc
+
+lint-all: lint lint-md lint-sh lint-yaml lint-sql lint-json ## every linter, all file types
+
 test-backend: ## Backend unit tests (better-sqlite3; runs fine on Apple Silicon, a few seconds)
 	npm test
 
@@ -64,7 +159,7 @@ test-frontend: ## Frontend unit tests
 
 test: test-backend test-frontend ## All unit tests
 
-gate: format format-check lint lint-md test build ## FULL pre-commit gate — run before every commit
+gate: format format-check lint-all test build ## FULL pre-commit gate — run before every commit
 
 review: ## AI code review of this branch vs origin/main — run BEFORE opening a PR
 	@command -v coderabbit >/dev/null 2>&1 || { \

@@ -13,6 +13,11 @@ echo "=== Setting up local D1 database ==="
 # Find the most recently modified sqlite database
 if [ -d "$DB_DIR" ]; then
     # Find largest database file (most likely to be the active one)
+    # shellcheck disable=SC2012
+    # `ls -S` sorts by SIZE to pick the active database. find has no size
+    # ordering, so the suggested rewrite would silently change which file is
+    # selected. Names here are wrangler-generated hex, so the unsafe-filename
+    # case SC2012 guards against cannot arise.
     DB_FILE=$(ls -S "$DB_DIR"/*.sqlite 2>/dev/null | head -1)
 
     if [ -z "$DB_FILE" ]; then

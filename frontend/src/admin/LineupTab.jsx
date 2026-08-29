@@ -33,6 +33,7 @@ import {
   updateSelectedIds,
 } from './utils/lineupRoster'
 import { formatFestivalDate } from '../utils/festivalDays'
+import { buildPerformancePayload, parseDuration } from './utils/lineupForm'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -192,11 +193,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
 
   const handleInputChange = e => {
     const { name, value } = e.target
-    const parseDuration = input => {
-      const parsed = Number(input)
-      if (!Number.isFinite(parsed) || parsed <= 0) return null
-      return Math.round(parsed)
-    }
 
     setFormData(prev => {
       if (serverConflicts.overlaps.length || serverConflicts.conflicts.length) {
@@ -281,38 +277,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     }
     setSubmitting(true)
     try {
-      const socialLinks = {
-        website: formData.website || '',
-        instagram: formData.instagram || '',
-        bandcamp: formData.bandcamp || '',
-        facebook: formData.facebook || '',
-        youtube: formData.youtube || '',
-        spotify: formData.spotify || '',
-        apple_music: formData.apple_music || '',
-        linktree: formData.linktree || '',
-      }
-
-      const originDisplay = [formData.origin_city, formData.origin_region].filter(Boolean).join(', ') || ''
-      const payload = {
-        eventId: Number(formData.event_id),
-        venueId: formData.venue_id ? Number(formData.venue_id) : null,
-        name: formData.name,
-        startTime: formData.start_time,
-        endTime: formData.end_time,
-        performanceDate: formData.performance_date || null,
-        notes: formData.notes,
-        genre: formData.genre,
-        origin: originDisplay,
-        origin_city: formData.origin_city,
-        origin_region: formData.origin_region,
-        contact_email: formData.contact_email,
-        is_active: Number(formData.is_active) === 1,
-        description: formData.description,
-        photo_url: formData.photo_url,
-        photo_alt_text: formData.photo_alt_text,
-        social_links: JSON.stringify(socialLinks),
-        url: formData.url,
-      }
+      const payload = buildPerformancePayload(formData)
 
       if (editingId) {
         await bandsApi.update(editingId, payload)

@@ -37,7 +37,7 @@
 
 ### Data Model
 
-```
+```text
 ┌─────────────┐
 │   events    │──┐
 │  (vol-5)    │  │
@@ -71,7 +71,7 @@
 
 ### API Structure
 
-```
+```text
 /api/
 ├── schedule.js                  # Public API
 │   GET ?event={slug|current}    # Returns band schedule
@@ -155,7 +155,7 @@
 
 ### Event Lifecycle
 
-```
+```text
 ┌──────────────┐
 │   DRAFT      │  Admin creates event, unpublished
 │    status    │  Visible only in admin panel
@@ -195,7 +195,7 @@ reject a status change on an archived row — enforced in SQL, not merely checke
 
 ### Recommended Event Naming Convention
 
-```
+```text
 slug: "vol-{N}"           → Example: "vol-5", "vol-6"
 name: "Long Weekend Band Crawl Vol. {N}"
 date: "YYYY-MM-DD"        → ISO 8601 format
@@ -285,7 +285,7 @@ ORDER BY date DESC;
 
 **Execution Order:**
 
-```
+```text
 Request
   → /functions/_middleware.js       # Global CORS, error handling
   → /functions/api/admin/_middleware.js  # Auth, rate limiting
@@ -303,7 +303,7 @@ Request
 
 **Authentication Flow:**
 
-```
+```text
 1. Admin logs in with email + password
 2. Server verifies credentials and creates session record
 3. Server sets HTTPOnly `session_token` cookie
@@ -417,21 +417,21 @@ WHERE b1.event_id = ?;
 
 **Option 1: URL Versioning**
 
-```
+```text
 /api/v1/schedule?event=vol-5
 /api/v2/schedule?event=vol-5
 ```
 
 **Option 2: Header Versioning**
 
-```
+```text
 GET /api/schedule?event=vol-5
 Accept: application/vnd.bandcrawl.v2+json
 ```
 
 **Option 3: Query Parameter**
 
-```
+```text
 /api/schedule?event=vol-5&api_version=2
 ```
 
@@ -767,7 +767,7 @@ ALTER TABLE events ADD COLUMN org_id INTEGER REFERENCES organizations(id);
 
 ### Branch Strategy
 
-```
+```text
 main (production)
   ↑
   └── dev (staging)
@@ -988,7 +988,7 @@ wrangler d1 list
 
 ### API Endpoints
 
-```
+```text
 PUBLIC:
 GET  /api/schedule?event={slug|current}
 
@@ -1012,7 +1012,7 @@ DELETE /api/admin/bands/{id}
 
 ### File Structure
 
-```
+```text
 settimes/
 ├── database/
 │   ├── schema.sql           # Table definitions

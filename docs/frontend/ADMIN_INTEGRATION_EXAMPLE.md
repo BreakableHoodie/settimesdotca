@@ -174,7 +174,7 @@ Already configured! Just use `/admin` path.
 
 ## File Structure After Integration
 
-```
+```text
 frontend/
 ├── src/
 │   ├── admin/

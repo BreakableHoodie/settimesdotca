@@ -45,6 +45,10 @@
     // MD007 list-indent disagreements with upstream's formatting. Reformatting
     // someone else's document to satisfy our linter guarantees a conflict on
     // the next sync, and their indent style is not a defect in our docs.
-    ".github/instructions/**"
+    ".github/instructions/**",
+
+    // Same reasoning, different upstream: added by "chore: track Copilot
+    // skills" (d441855). Vendored skill definitions, not ours to restyle.
+    ".github/skills/**"
   ]
 }

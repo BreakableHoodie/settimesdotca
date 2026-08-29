@@ -247,7 +247,7 @@ When you select an event, a **context banner** appears at the top showing:
 
 Navigation breadcrumbs show your current location:
 
-```
+```text
 All Events > Spring Festival 2025 > Performers
 ```
 
@@ -300,7 +300,7 @@ SetTimes is WCAG 2.1 AA compliant:
 
 Every band/performer automatically gets a public profile page at:
 
-```
+```text
 settimes.ca/bands/[event-slug]/[band-name]
 ```
 

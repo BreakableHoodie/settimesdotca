@@ -286,14 +286,14 @@ DELETE FROM events WHERE id = <event_id>;
 
 **Example Conflict:**
 
-```
+```text
 Band A: 7:00 PM - 8:00 PM (Analog Cafe)
 Band B: 7:30 PM - 8:30 PM (Analog Cafe) ❌ CONFLICT
 ```
 
 **Fixed:**
 
-```
+```text
 Band A: 7:00 PM - 8:00 PM (Analog Cafe)
 Band B: 8:30 PM - 9:30 PM (Analog Cafe) ✅ NO CONFLICT
 ```

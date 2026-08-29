@@ -874,3 +874,36 @@ recorded here. Both items are zone-level settings on `settimes.ca`
     meta). That was survivable as a duplicate-host problem only because this
     rule now leaves one live host. If `www` ever stops redirecting, the
     duplicate returns and the canonical gap is what makes it bite.
+
+- **SSL/TLS mode: Full (strict)**, and **minimum TLS version 1.2** (both set
+  2026-08-29; they were `Full` and `1.0`). Strict is correct here because every
+  proxied origin is Cloudflare-owned with a valid certificate — apex and `www`
+  resolve to the Pages project, `band-photos` to `public.r2.dev`. Adding a
+  proxied record pointing at an origin with a self-signed or expired cert will
+  now fail closed rather than silently accept it, which is the intent.
+- **HSTS is served by the application, not the zone.** `frontend/public/_headers`
+  sends `max-age=31536000; includeSubDomains; preload`, so the zone-level HSTS
+  toggle reading "off" is correct and **not** a gap. Do not "fix" it by enabling
+  the zone setting as well; check the live header before concluding anything is
+  missing.
+
+**Removed 2026-08-29, recorded so they are not recreated by reflex:**
+
+- `dev.settimes.ca` — a `CNAME` to tunnel `b94985aa…`, which no longer exists.
+  It served HTTP 530 on the brand domain. The only live tunnel is a different id.
+- `ADMIN_PASSWORD` and `MASTER_PASSWORD` Pages production environment variables.
+  **Nothing read them** — every consumer in this repo uses `E2E_ADMIN_PASSWORD`
+  (`scripts/seed-e2e-admin.mjs`), which is local-only. They were unused
+  credentials sitting in production config. Note `AGENTS.md` still describes the
+  E2E vars as `ADMIN_EMAIL`/`ADMIN_PASSWORD`; the script's actual contract is
+  `E2E_ADMIN_PASSWORD`.
+- The `bandcrawl-db` D1 database — verified empty (only Cloudflare's internal
+  `_cf_KV`, no user tables), referenced nowhere in the repo, bound to nothing.
+  The only D1 database is `settimes-production-db`. Note the API's `num_tables`
+  field is **not** trustworthy for this check: it reported `0` for the production
+  database too. Query `sqlite_master` instead.
+
+**Still open:** `_dmarc` is `p=quarantine` with **no `rua=` reporting address**,
+so nothing reports authentication failures anywhere. Adding one needs a mailbox
+that actually exists — an unroutable `rua` silently bounces reports, which is
+worse than none.

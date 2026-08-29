@@ -111,6 +111,48 @@ describe("SSR /band/[id] — slug URLs redirect to the canonical id (#983)", () 
     expect(response.headers.get("Location")).toBeNull();
   });
 
+  test("a D1 failure degrades to the shell instead of erroring the request", async () => {
+    const { env } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const context = makeContext({ env, id: "mixed-feelings" });
+    // Substitute the failing thing and run it: the catch branch only executes
+    // when D1 is broken, so no green run of the happy path says anything about
+    // whether it works.
+    context.env.DB = {
+      prepare: () => ({
+        bind: () => ({
+          first: async () => {
+            throw new Error("D1_ERROR: connection lost");
+          },
+        }),
+      }),
+    };
+
+    const response = await onRequest(context);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Location")).toBeNull();
+    expect(await response.text()).toContain("SetTimes");
+  });
+
+  test("the bound lookup key is not truncated", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    // The logged key is capped at 64 chars. Capping what gets BOUND instead would
+    // still pass every other test here -- no production name is near that -- and
+    // would silently stop redirecting the first artist who crossed it.
+    const longName = "The Extraordinarily Verbose Post Rock Ensemble Of Waterloo Region Number Nine";
+    const normalized = longName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    expect(normalized.length).toBeGreaterThan(64);
+    const id = seedBand(rawDb, longName, normalized);
+
+    const slug = longName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const response = await onRequest(makeContext({ env, id: slug }));
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get("Location")).toBe(`/band/${id}`);
+  });
+
   test("a numeric id is still server-rendered, not redirected", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";

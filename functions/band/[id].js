@@ -39,15 +39,27 @@ import { normalizeBandName } from "../utils/bandName.js";
 async function redirectSlugToId(context, slug) {
   const { env, request } = context;
 
+  // Bind the FULL key -- truncating what we bind would silently stop matching any
+  // artist whose normalized name is longer than the cap. None is today (longest
+  // in production is well under it), which is exactly why that would be a latent
+  // bug rather than an immediate one.
+  const lookupKey = normalizeBandName(String(slug).replace(/-/g, " "));
+
   let match;
   try {
     match = await env.DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? LIMIT 1`)
-      .bind(normalizeBandName(String(slug).replace(/-/g, " ")))
+      .bind(lookupKey)
       .first();
   } catch (err) {
     // Same posture as the SSR lookup below: a D1 failure degrades to the shell,
     // which still renders the page client-side, rather than erroring the request.
-    console.error("SSR band slug resolution failed:", slug, err);
+    //
+    // The logged value is the normalized KEY, bounded -- never the raw slug. The
+    // path segment is fully attacker-controlled and arbitrarily long, whereas
+    // normalizeBandName strips everything outside /[a-z0-9]/, so no newline can
+    // forge a log line and no length can flood one. It is also the more useful
+    // value to see: it is what actually failed to match.
+    console.error("SSR band slug resolution failed:", lookupKey.slice(0, 64), err);
     return env.ASSETS.fetch(request);
   }
 

@@ -1,0 +1,18 @@
+# Reconstructed from the deployed Worker's settings (version ed8c71c5,
+# uploaded 2026-04-29), which were the only surviving record of this
+# configuration — no source or config existed in any repository.
+#
+# SHARED_SECRET is a Cloudflare secret and is deliberately absent here. Set it
+# with `npx wrangler secret put SHARED_SECRET`. `workers-mcp` requires it to be
+# exactly 64 characters and compares it against the Bearer token.
+name = "settimesdotca-mcp"
+main = "src/index.ts"
+compatibility_date = "2025-10-08"
+compatibility_flags = ["nodejs_compat"]
+
+# The PRODUCTION database. Every tool in this Worker reads live data — users,
+# sessions, the auth audit log — so treat any change here as a production change.
+[[d1_databases]]
+binding = "DB"
+database_name = "settimes-production-db"
+database_id = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b"

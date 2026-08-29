@@ -45,6 +45,14 @@ export default defineConfig({
     // audit) can be unit-tested. Coverage stays scoped to `functions/**` via
     // coverage.include above, so a script entering the test set does not move
     // the ratchet denominator.
-    include: ["functions/**/__tests__/**/*.test.js", "scripts/**/__tests__/**/*.test.js"],
+    // workers-mcp-server/ holds the MCP Worker deployed against the PRODUCTION
+    // database. Its read-only guard is the only thing bounding what a token
+    // holder can do, so it is unit-tested here rather than left to a separate
+    // runner nobody invokes.
+    include: [
+      "functions/**/__tests__/**/*.test.js",
+      "scripts/**/__tests__/**/*.test.js",
+      "workers-mcp-server/__tests__/**/*.test.js",
+    ],
   },
 });

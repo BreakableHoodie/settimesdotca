@@ -1,0 +1,11 @@
+{
+  "name": "settimesdotca-mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP tool surface over the settimes.ca production D1 database",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  }
+}

@@ -1,7 +1,13 @@
 import { sortableName } from '../../utils/sortableName'
 import { parseOrigin } from '../../utils/parseOrigin'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../../utils/genres'
-import { adjustForMidnight, deriveDurationMinutes, parseTimeToMinutes, sortBandsByStart } from './timeUtils'
+import {
+  adjustForMidnight,
+  deriveDurationMinutes,
+  detectConflicts,
+  parseTimeToMinutes,
+  sortBandsByStart,
+} from './timeUtils'
 
 /**
  * Pure roster logic for LineupTab — what an operator sees, and in what order.
@@ -15,6 +21,17 @@ import { adjustForMidnight, deriveDurationMinutes, parseTimeToMinutes, sortBands
  * Every function here takes its collaborators as arguments instead of closing
  * over component state, so a test supplies them without a render.
  */
+
+/**
+ * Keep retired profiles out of the lineup picker while retaining them for
+ * origin and genre suggestions.
+ *
+ * @param {Array<object>} bands
+ * @returns {Array<object>}
+ */
+export function getActiveBands(bands) {
+  return (bands ?? []).filter(band => band.is_active !== 0 && band.is_active !== false)
+}
 
 /**
  * Narrow the roster by search text, venue, and festival day.
@@ -164,4 +181,57 @@ export function deriveGenreSuggestions(bands) {
  */
 export function buildDayNumberMap(dayOptions) {
   return new Map((dayOptions ?? []).map((opt, index) => [opt.value, index + 1]))
+}
+
+/**
+ * Pre-compute conflict results by performance id for the lineup table.
+ *
+ * @param {Array<object>} bands
+ * @param {string} [eventDate]
+ * @returns {Map<number|string, {overlaps: string[], conflicts: string[]}>}
+ */
+export function buildConflictsByBandId(bands, eventDate) {
+  const conflicts = new Map()
+  for (const band of bands ?? []) conflicts.set(band.id, detectConflicts(band, bands, eventDate))
+  return conflicts
+}
+
+/**
+ * Merge client- and server-reported conflict names without duplicates.
+ *
+ * @param {{overlaps?: string[], conflicts?: string[]}} formConflicts
+ * @param {{overlaps?: string[], conflicts?: string[]}} serverConflicts
+ * @returns {{overlaps: string[], conflicts: string[]}}
+ */
+export function mergeConflicts(formConflicts = {}, serverConflicts = {}) {
+  return {
+    overlaps: [...new Set([...(formConflicts.overlaps ?? []), ...(serverConflicts.overlaps ?? [])])],
+    conflicts: [...new Set([...(formConflicts.conflicts ?? []), ...(serverConflicts.conflicts ?? [])])],
+  }
+}
+
+/**
+ * Apply one checkbox change without mutating the existing selection set.
+ *
+ * @param {Set<number|string>} selectedIds
+ * @param {number|string} id
+ * @param {boolean} checked
+ * @returns {Set<number|string>}
+ */
+export function updateSelectedIds(selectedIds, id, checked) {
+  const next = new Set(selectedIds)
+  if (checked) next.add(id)
+  else next.delete(id)
+  return next
+}
+
+/**
+ * Build the selection represented by a select-all checkbox.
+ *
+ * @param {Array<{id: number|string}>} bands
+ * @param {boolean} checked
+ * @returns {Set<number|string>}
+ */
+export function selectAllBandIds(bands, checked) {
+  return checked ? new Set((bands ?? []).map(band => band.id)) : new Set()
 }

@@ -104,7 +104,7 @@ Repeat for all bands
 
 **Example Performances:**
 
-```
+```text
 Band: The Sunset Trio
 Venue: Blue Room
 Start: 7:00 PM
@@ -208,31 +208,31 @@ Your event is currently a draft (not visible to the public). To make it live:
 
 **Create Event:**
 
-```
+```text
 Events tab → Create Event → Fill form → Next → Add venues → Next → Add performers → Create
 ```
 
 **Publish Event:**
 
-```
+```text
 Events tab → Find event → Edit → Check "Published" → Save
 ```
 
 **Add Band:**
 
-```
+```text
 Performers tab → Add Performer → Fill form → Save
 ```
 
 **Edit Event:**
 
-```
+```text
 Events tab → Find event → Edit → Make changes → Save
 ```
 
 **Unpublish Event:**
 
-```
+```text
 Events tab → Find event → Edit → Uncheck "Published" → Save
 ```
 

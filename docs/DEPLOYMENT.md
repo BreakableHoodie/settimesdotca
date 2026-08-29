@@ -100,7 +100,7 @@ npm run build
 
 **Expected output:**
 
-```
+```text
 ✓ 1234 modules transformed.
 dist/index.html                  1.23 kB
 dist/assets/index-abc123.js      456.78 kB
@@ -128,7 +128,7 @@ wrangler d1 create settimes-production-db
 
 **Output:**
 
-```
+```text
 ✅ Successfully created DB 'settimes-production-db'
 
 [[d1_databases]]
@@ -192,7 +192,7 @@ wrangler d1 execute settimes-production-db --env production --file=database/seed
 
 **Expected output:**
 
-```
+```text
 🌀 Applying migration 001_initial_schema.sql
 🌀 Applying migration 002_add_audit_logs.sql
 🌀 Applying migration 003_add_sessions.sql
@@ -242,7 +242,7 @@ The system uses invite codes for admin account creation — do **not** insert pa
 
 **Production:**
 
-```
+```text
 DATABASE_ID = your-production-db-id
 ENVIRONMENT = production
 SESSION_SECRET = random-64-char-string  # Generate securely
@@ -257,7 +257,7 @@ PUBLIC_URL = https://settimes.ca
 
 **Preview (optional):**
 
-```
+```text
 DATABASE_ID = your-dev-db-id
 ENVIRONMENT = development
 SESSION_SECRET = different-random-string
@@ -311,7 +311,7 @@ openssl rand -base64 48
 
 3. **Configure Build Settings**
 
-   ```
+   ```text
    Production branch: main
    Preview branches: dev, develop
 
@@ -368,7 +368,7 @@ Cloudflare will automatically configure DNS if domain is managed by Cloudflare:
 
 **Automatic DNS Record:**
 
-```
+```text
 Type: CNAME
 Name: settimes.ca
 Target: settimes-xxx.pages.dev
@@ -377,7 +377,7 @@ Proxy: Enabled (orange cloud)
 
 **If using external DNS:**
 
-```
+```text
 Type: CNAME
 Name: settimes.ca (or www)
 Target: settimes-xxx.pages.dev
@@ -385,7 +385,7 @@ Target: settimes-xxx.pages.dev
 
 ### 3. Add www Subdomain (Optional)
 
-```
+```text
 Type: CNAME
 Name: www
 Target: settimes.ca

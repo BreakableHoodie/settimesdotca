@@ -18,7 +18,8 @@
     "test:coverage": "vitest run --coverage",
     "format": "prettier --write \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\" \"e2e/**/*.{js,mjs}\"",
     "format:check": "prettier --check \"functions/**/*.{js,json}\" \"scripts/**/*.{js,mjs,json}\" \"e2e/**/*.{js,mjs}\"",
-    "lint": "eslint functions/ scripts/ e2e/"
+    "lint": "eslint functions/ scripts/ e2e/",
+    "lint:md": "npx -y markdownlint-cli2@0.23.2 \"**/*.md\""
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",

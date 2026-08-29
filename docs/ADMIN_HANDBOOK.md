@@ -66,7 +66,7 @@ This handbook is for system administrators managing the SetTimes platform. It co
 
 ### Architecture Diagram
 
-```
+```text
 ┌─────────────────────────────────────┐
 │   Users (Browsers/Mobile)           │
 └──────────────┬──────────────────────┘
@@ -553,7 +553,7 @@ wrangler d1 execute settimes-production-db --file=backups/settimes-20251119.sql
 
 **Cache Strategy:**
 
-```
+```text
 /assets/*         → 1 year (immutable)
 /*.html           → no-cache
 /api/*            → no-store

@@ -166,7 +166,7 @@ POST /api/admin/auth/signup
 
 ### Role Hierarchy
 
-```
+```text
 admin (level 3) > editor (level 2) > viewer (level 1)
 ```
 

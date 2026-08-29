@@ -329,6 +329,17 @@ describe('suggestGapFillers', () => {
       expect(seenMinutes(overrunning, gap, gap.startMs, 0)).toBe(60)
     })
 
+    it('does not count a set that began before the gap opened', () => {
+      // Unreachable through suggestGapFillers -- its filter admits only
+      // candidates starting at or after the gap opens -- but seenMinutes is
+      // exported, and its contract is gap minutes, not set minutes.
+      // Departing at 19:30 -- a fan freed by an earlier set can arrive before the
+      // gap even opens, which is the only way `from` lands before `gap.startMs`.
+      const [gap, early] = prepare(makeBand('gap', '20:00', '21:00'), makeBand('early', '19:30', '20:30'))
+
+      expect(seenMinutes(early, gap, early.startMs, 0)).toBe(30)
+    })
+
     it('clamps to zero when the fan arrives after the gap has closed', () => {
       const [gap, band] = prepare(makeBand('gap', '20:00', '21:00'), makeBand('band', '20:30', '21:00'))
 

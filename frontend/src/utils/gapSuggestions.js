@@ -38,6 +38,12 @@ function hasValidWindow(band) {
  * which would otherwise rank a late-starting long set above one that fills the
  * dead time immediately.
  *
+ * The start is clamped to the gap as well as to arrival. Nothing reaches this
+ * through `suggestGapFillers`, whose filter admits only candidates starting at
+ * or after the gap opens -- but this is exported, and a direct caller passing a
+ * set that began before the gap would otherwise be credited for minutes outside
+ * it, contradicting the "minutes of the gap" contract above.
+ *
  * An unknown walk time is treated as instant rather than poisoning the value
  * with NaN; those candidates are already sorted last by the null check in the
  * sort, so this only ever orders two unknowns against each other.
@@ -50,7 +56,7 @@ function hasValidWindow(band) {
  */
 export function seenMinutes(band, gap, departureMs, walkMinutes) {
   const arrivalMs = departureMs + (walkMinutes ?? 0) * MS_PER_MINUTE
-  const from = Math.max(band.startMs, arrivalMs)
+  const from = Math.max(gap.startMs, band.startMs, arrivalMs)
   const until = Math.min(band.endMs, gap.endMs)
   return Math.max(0, Math.round((until - from) / MS_PER_MINUTE))
 }

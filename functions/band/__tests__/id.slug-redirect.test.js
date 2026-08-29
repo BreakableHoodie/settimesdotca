@@ -153,6 +153,28 @@ describe("SSR /band/[id] — slug URLs redirect to the canonical id (#983)", () 
     expect(response.headers.get("Location")).toBe(`/band/${id}`);
   });
 
+  // "%20" is deliberately NOT in this list: Pages URL-decodes the path, and even
+  // taken literally it normalizes to "20", not "" -- so it would sit here looking
+  // like a case this guard handles while actually passing for an unrelated reason
+  // (no artist named "20"). The decoded form, a bare space, is covered instead.
+  test.each([["---"], ["."], ["-"], ["   "], ["!!!"], ["..."]])(
+    "a punctuation-only slug (%s) never redirects, even when an empty-key row exists",
+    async (slug) => {
+      const { env, rawDb } = createTestEnv();
+      env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+      // "!!!" is a real band name and normalizes to "". Without the empty-key
+      // guard this row is what every punctuation-only path segment would 301 to,
+      // permanently, because name_normalized is UNIQUE so the wrong target is
+      // perfectly stable.
+      seedBand(rawDb, "!!!", "");
+
+      const response = await onRequest(makeContext({ env, id: slug }));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Location")).toBeNull();
+    },
+  );
+
   test("a numeric id is still server-rendered, not redirected", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";

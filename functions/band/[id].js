@@ -45,6 +45,15 @@ async function redirectSlugToId(context, slug) {
   // bug rather than an immediate one.
   const lookupKey = normalizeBandName(String(slug).replace(/-/g, " "));
 
+  // A punctuation-only segment -- /band/---, /band/., /band/%20 -- normalizes to
+  // "", and `WHERE name_normalized = ''` would match any row that also normalizes
+  // to empty, then 301 there permanently. No such row exists today, but "!!!" is
+  // a real band name and normalizes to exactly that, so this is a data entry away
+  // rather than impossible. The UNIQUE index makes it worse, not better: there
+  // can only ever be one such row, so the wrong mapping would be perfectly stable
+  // and every cached 301 would keep pointing at it.
+  if (!lookupKey) return env.ASSETS.fetch(request);
+
   let match;
   try {
     match = await env.DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? LIMIT 1`)

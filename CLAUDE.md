@@ -840,19 +840,26 @@ For the `_headers` document CSP:
 - **The inline theme-flash `<script>` in `frontend/index.html`** is allowed by a `'sha256-…'` hash in `script-src`. **If you edit that script, regenerate the hash** (sha256 of the exact built script body, base64) or it silently stops running and a theme flash returns. No test covers this — verify by building and hashing `dist/index.html`.
 - **Cloudflare Rocket Loader must stay DISABLED** for the zone. It rewrites/inline-executes `<script>` tags, which strict CSP blocks ("Refused to execute inline script"). A modern code-split Vite SPA gains nothing from it.
 
-### Cloudflare state that lives outside this repo
+### Where Cloudflare-facing settings actually live
 
-Not in `wrangler.toml`, not in any file here, and silently undoable — so it is
-recorded here. **It is not all one kind of thing, and the distinction decides
-where you go to change it:**
+Most of what follows is **not** in `wrangler.toml` or any other file here — it
+is Cloudflare-side state, silently undoable, with nothing in the repo to hint
+that it mattered. That is why it is written down.
 
-| layer | items |
-|---|---|
-| **Zone settings** on `settimes.ca` (`77e5bb9ef071b25b9cb65885ed4b38e1`) | Rocket Loader, the `www` → apex redirect rule, SSL mode, minimum TLS |
-| **DNS records** in that zone | the DMARC record |
-| **Pages project** config (`settimesdotca`) | environment variables |
-| **Account** resources | D1 databases |
-| **This repo**, listed here only to stop a false alarm | HSTS, which `_headers` sends |
+**The last row is the deliberate exception, and it is the point of the table.**
+HSTS *is* repo-managed; it appears here because the zone's own HSTS toggle reads
+"off", so anyone auditing Cloudflare concludes it is missing and reaches for the
+dashboard. The fix for anything HSTS-related is `frontend/public/_headers`, not
+Cloudflare. Read the layer column before changing anything — it is what tells
+you where to go:
+
+| layer | where you change it | items |
+|---|---|---|
+| **Zone settings** | Cloudflare dashboard / API, zone `settimes.ca` (`77e5bb9ef071b25b9cb65885ed4b38e1`) | Rocket Loader, the `www` → apex redirect rule, SSL mode, minimum TLS |
+| **DNS records** | same zone, DNS tab | the DMARC record |
+| **Pages project** config | Cloudflare Pages project `settimesdotca` | environment variables |
+| **Account** resources | Cloudflare account | D1 databases |
+| **This repository** | `frontend/public/_headers` | **HSTS** — listed only because the zone toggle reading "off" is correct and looks like a gap |
 
 - **Rocket Loader: disabled** — see the bullet above.
 - **`www` → apex 301 redirect rule** (#984, added 2026-08-29). A zone

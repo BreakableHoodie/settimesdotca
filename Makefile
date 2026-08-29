@@ -53,6 +53,9 @@ lint: ## ESLint, both stacks
 	npm run lint
 	cd frontend && npm run lint
 
+lint-md: ## markdownlint across the docs we maintain (see .markdownlint-cli2.jsonc)
+	npm run lint:md
+
 test-backend: ## Backend unit tests (better-sqlite3; runs fine on Apple Silicon, a few seconds)
 	npm test
 
@@ -61,7 +64,7 @@ test-frontend: ## Frontend unit tests
 
 test: test-backend test-frontend ## All unit tests
 
-gate: format format-check lint test build ## FULL pre-commit gate — run before every commit
+gate: format format-check lint lint-md test build ## FULL pre-commit gate — run before every commit
 
 review: ## AI code review of this branch vs origin/main — run BEFORE opening a PR
 	@command -v coderabbit >/dev/null 2>&1 || { \

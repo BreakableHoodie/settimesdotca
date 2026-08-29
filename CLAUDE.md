@@ -839,3 +839,38 @@ For the `_headers` document CSP:
 - **`Cross-Origin-Embedder-Policy: require-corp` must NOT be set** — it blocks the Turnstile iframe (which doesn't send COEP; `credentialless` isn't supported in Safari). The app needs no cross-origin isolation.
 - **The inline theme-flash `<script>` in `frontend/index.html`** is allowed by a `'sha256-…'` hash in `script-src`. **If you edit that script, regenerate the hash** (sha256 of the exact built script body, base64) or it silently stops running and a theme flash returns. No test covers this — verify by building and hashing `dist/index.html`.
 - **Cloudflare Rocket Loader must stay DISABLED** for the zone. It rewrites/inline-executes `<script>` tags, which strict CSP blocks ("Refused to execute inline script"). A modern code-split Vite SPA gains nothing from it.
+
+### Zone config that lives only in the Cloudflare dashboard
+
+Not in this repo, not in `wrangler.toml`, and silently undoable — so it is
+recorded here. Both items are zone-level settings on `settimes.ca`
+(`77e5bb9ef071b25b9cb65885ed4b38e1`).
+
+- **Rocket Loader: disabled** — see the bullet above.
+- **`www` → apex 301 redirect rule** (#984, added 2026-08-29). A zone
+  `http_request_dynamic_redirect` phase ruleset, `www to apex (301, preserves
+  path + query)`:
+
+  ```
+  if    (http.host eq "www.settimes.ca")
+  then  redirect 301 -> concat("https://settimes.ca", http.request.uri.path)
+        preserve_query_string: true
+  ```
+
+  Before it, `www.settimes.ca` served the entire site at HTTP 200 as a full
+  duplicate of the apex, and both hosts ranked separately — the apex at 243
+  impressions / position 12.2 against `www` at 40 / 21.2.
+
+  Three things not to "simplify":
+  - **It must be a *dynamic* redirect, not static.** A static one sends every
+    deep path to the homepage; the `concat(...)` expression is what carries
+    `/band/31` across.
+  - **Do not remove `www` as a Pages custom domain** to "clean up". The
+    redirect can only answer if `www` still resolves and terminates TLS —
+    removing it turns every old bookmark into a certificate error instead of a
+    redirect.
+  - **`/` still emits no raw-HTML canonical, deliberately** (see the SSR
+    ownership section: the homepage keeps client-side ownership of its identity
+    meta). That was survivable as a duplicate-host problem only because this
+    rule now leaves one live host. If `www` ever stops redirecting, the
+    duplicate returns and the canonical gap is what makes it bite.

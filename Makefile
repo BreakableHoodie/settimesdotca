@@ -132,7 +132,14 @@ lint-sql: ## sqlfluff every SQL file outside archive/ (tracked + untracked, minu
 # The path goes in as ARGV, never interpolated into the -e source: a filename
 # containing a single quote would otherwise close the JS string literal and run
 # whatever followed, on every `make gate`.
+#
+# node is checked up front like the external linters above. Without the check a
+# missing node does not merely fail — every invocation errors and the recipe
+# reports "invalid JSON:" for EVERY file, sending you hunting for corruption in
+# files that are fine.
 lint-json: ## assert every JSON file parses (tracked + untracked, minus gitignored)
+	@command -v node >/dev/null 2>&1 || { \
+		echo "node not found. Install Node.js, then: make install"; exit 1; }
 	@list=$$(mktemp); \
 	$(LINT_FILES) '*.json' > "$$list" || { rm -f "$$list"; \
 		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \

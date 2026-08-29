@@ -23,7 +23,10 @@ LINT_FILES := git ls-files --cached --others --exclude-standard
 # writes an empty list, the loop body never runs, rc stays 0, and the gate
 # reports success having linted NOTHING — the same silent-pass shape as the
 # missing .PHONY entry. lint-sql needs its own handling because a pipeline
-# reports the LAST command's status, so grep's success would mask git's failure.
+# reports the LAST command's status, so a filter's success would mask git's
+# failure. The filter is sed, not grep: grep exits 1 on "no match" AND 2 on a
+# read error, so the `|| true` needed to tolerate the former also swallowed the
+# latter. sed exits 0 when it deletes nothing and non-zero only on a real error.
 WRANGLER := ./frontend/node_modules/.bin/wrangler
 E2E_STATE := .wrangler/e2e-state
 E2E_PID := .wrangler/e2e-state/wrangler.pid
@@ -83,7 +86,7 @@ lint-md: ## markdownlint across the docs we maintain (see .markdownlint-cli2.jso
 # exactly the failure `lint-md` had before it reached .PHONY.
 
 # File lists come from $(LINT_FILES); see its definition for the scope rules.
-lint-sh: ## shellcheck every tracked shell script
+lint-sh: ## shellcheck every shell script (tracked + untracked, minus gitignored)
 	@command -v shellcheck >/dev/null 2>&1 || { \
 		echo "shellcheck not found. Install: brew install shellcheck"; exit 1; }
 	@list=$$(mktemp); \
@@ -94,7 +97,7 @@ lint-sh: ## shellcheck every tracked shell script
 		shellcheck "$$f" || rc=1; \
 	done < "$$list"; rm -f "$$list"; exit $$rc
 
-lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
+lint-yaml: ## yamllint every YAML file (tracked + untracked, minus gitignored; config: .yamllint)
 	@command -v yamllint >/dev/null 2>&1 || { \
 		echo "yamllint not found. Install: brew install yamllint"; exit 1; }
 	@list=$$(mktemp); \
@@ -108,13 +111,14 @@ lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
 # archive/ is excluded: those migrations use `ALTER TABLE ... ADD COLUMN IF NOT
 # EXISTS`, which SQLite does not support and sqlfluff cannot parse. They are
 # archived and never applied, so fixing them buys nothing.
-lint-sql: ## sqlfluff every tracked SQL file outside archive/ (config: .sqlfluff)
+lint-sql: ## sqlfluff every SQL file outside archive/ (tracked + untracked, minus gitignored; config: .sqlfluff)
 	@command -v sqlfluff >/dev/null 2>&1 || { \
 		echo "sqlfluff not found. Install: brew install sqlfluff"; exit 1; }
 	@list=$$(mktemp); raw=$$(mktemp); \
 	$(LINT_FILES) '*.sql' > "$$raw" || { rm -f "$$raw" "$$list"; \
 		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
-	grep -v '^archive/' "$$raw" > "$$list" || true; \
+	sed '/^archive\//d' "$$raw" > "$$list" || { rm -f "$$raw" "$$list"; \
+		echo "lint: could not filter the SQL file list"; exit 1; }; \
 	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		sqlfluff lint "$$f" || rc=1; \
@@ -128,7 +132,7 @@ lint-sql: ## sqlfluff every tracked SQL file outside archive/ (config: .sqlfluff
 # The path goes in as ARGV, never interpolated into the -e source: a filename
 # containing a single quote would otherwise close the JS string literal and run
 # whatever followed, on every `make gate`.
-lint-json: ## assert every tracked JSON file parses
+lint-json: ## assert every JSON file parses (tracked + untracked, minus gitignored)
 	@list=$$(mktemp); \
 	$(LINT_FILES) '*.json' > "$$list" || { rm -f "$$list"; \
 		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \

@@ -750,7 +750,7 @@ a laptop doing other work.
 
 ### Before every commit — required checklist
 
-**Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
+**Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint-all` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
 
 **`make gate` covers every file type we maintain, not just JavaScript.** Until
 2026-08-29 it ran ESLint and Prettier and nothing else, so 69 SQL files, 17 YAML
@@ -759,7 +759,7 @@ open, which is the force-push round-trip `make review` exists to avoid. `lint-al
 now fans out to `lint` (ESLint), `lint-md`, `lint-sh`, `lint-yaml`, `lint-sql`
 and `lint-json`.
 
-Four things about those targets are deliberate:
+Five things about those targets are deliberate:
 
 - **They fail with an install hint; they never skip.** `shellcheck`, `yamllint`
   and `sqlfluff` are external. A target that passes when its tool is missing is
@@ -776,9 +776,9 @@ Four things about those targets are deliberate:
 - **`lint-json` passes the path as `process.argv[1]`, never interpolated into
   the `node -e` source.** A filename containing a single quote would otherwise
   close the JS string literal and execute whatever followed, on every
-  `make gate`. Each recipe also accumulates `rc=1` in a `for` loop rather than
-  `exit`ing inside a pipeline — a `while` fed by a pipe runs in a subshell,
-  where the exit never reaches the recipe. That is the same shape as the
+  `make gate`. Each recipe also accumulates `rc=1` in a `while` loop
+  **redirected from a file** rather than `exit`ing inside a pipeline — a `while`
+  fed by a pipe runs in a subshell, where the exit never reaches the recipe. That is the same shape as the
   status-capture bug in #882.
 - **`.yamllint` and `.markdownlint.json` are tuned to this corpus, not stock.**
   `extends: default` alone produced 435 YAML findings, 353 of them `line-length`

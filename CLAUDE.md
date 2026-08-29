@@ -851,7 +851,7 @@ recorded here. Both items are zone-level settings on `settimes.ca`
   `http_request_dynamic_redirect` phase ruleset, `www to apex (301, preserves
   path + query)`:
 
-  ```
+  ```text
   if    (http.host eq "www.settimes.ca")
   then  redirect 301 -> concat("https://settimes.ca", http.request.uri.path)
         preserve_query_string: true
@@ -903,7 +903,35 @@ recorded here. Both items are zone-level settings on `settimes.ca`
   field is **not** trustworthy for this check: it reported `0` for the production
   database too. Query `sqlite_master` instead.
 
-**Still open:** `_dmarc` is `p=quarantine` with **no `rua=` reporting address**,
-so nothing reports authentication failures anywhere. Adding one needs a mailbox
-that actually exists — an unroutable `rua` silently bounces reports, which is
-worse than none.
+- **DMARC now reports** (added 2026-08-29). `_dmarc.settimes.ca` was
+  `p=quarantine` with **no `rua=`** — enforcing a policy whose effects nobody
+  could see, which is the worst of the two halves to have alone. A quarantined
+  message does not bounce and raises no error; it just lands in a spam folder.
+  Now:
+
+  ```text
+  v=DMARC1; p=quarantine; adkim=r; aspf=r; pct=100; rua=mailto:dmarc@settimes.ca
+  ```
+
+  Reports go to an iCloud **catch-all**, so no alias had to be created, and
+  because `rua` is on the *same* domain as the record no external
+  `settimes.ca._report._dmarc.<host>` authorization TXT is needed — that
+  requirement only applies to a third-party reporting host.
+
+  **`adkim=r` / `aspf=r` must stay relaxed.** The domain has two independent
+  sending paths — iCloud for human mail (`sig1._domainkey`, `include:icloud.com`)
+  and Resend via Amazon SES for application mail (`resend._domainkey`,
+  `include:amazonses.com`, `send.settimes.ca`). Strict alignment would break the
+  SES path. The application path is the one that matters operationally: it
+  carries the **band-follow confirmation emails**, and since follows are double
+  opt-in, silently quarantined confirmations mean followers are never verified
+  and never receive announcements — with nothing anywhere reporting an error.
+
+  Reports begin arriving 24–48h after the change and are gzipped XML. **If none
+  arrive within a few days, that is a signal the catch-all is not routing
+  `dmarc@` — not that everything is fine.**
+
+  Deliberately not set: `ruf=` (forensic reports carry recipient PII and almost
+  no provider sends them), and `p=reject`, which is the stronger end state but
+  should wait until a few weeks of reports confirm both sending paths pass
+  cleanly.

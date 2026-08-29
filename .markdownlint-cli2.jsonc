@@ -1,0 +1,50 @@
+// markdownlint-cli2 options. Run it via `npm run lint:md`.
+//
+// USE markdownlint-cli2, NOT the `markdownlint` (cli v1) brew formula. They read
+// DIFFERENT config files — v1 reads .markdownlintignore and ignores this file
+// entirely. Two reasons cli2 is the right one here:
+//   1. CodeRabbit runs markdownlint-cli2, so a local run previews the gate
+//      instead of offering a second opinion. The devDependency pins the same
+//      version CodeRabbit uses.
+//   2. "gitignore": true below keeps the exclusion list correct on its own. A
+//      .markdownlintignore was tried and deleted: it has no gitignore option, so
+//      it needed a hand-copied duplicate of .gitignore, and it was ALREADY wrong
+//      by eight trees (archive/, instructions/, claudedocs/, plugins/,
+//      test-results/, prompts/, chatmodes/, part of docs/) within minutes of
+//      being written. That drift is the whole argument.
+//
+// RULES live in .markdownlint.json (permissive set tuned against this repo's
+// docs corpus in #663) and are still read from there — this file deliberately
+// declares no "config" key so it cannot shadow them. Canary if you change this:
+// MD013 is disabled there, and CLAUDE.md has very long lines, so MD013 must
+// report 0.
+//
+// Why any of this exists: an unscoped run reaches ~2,774 files, almost all
+// third-party READMEs. Their violations are not ours to fix and they bury the
+// handful that are — 633 findings, of which 579 were noise.
+{
+  // Respect .gitignore, so anything untracked is skipped without being listed
+  // twice. workers-mcp-server/ and .agents/ are already gitignored and are
+  // covered by this alone.
+  "gitignore": true,
+
+  // Belt-and-braces for trees that are vendored or generated but may not be
+  // gitignored on every checkout. A dependency directory is never our lint
+  // surface even when someone has it committed.
+  "ignores": [
+    "**/node_modules/**",
+    "workers-mcp-server/**",
+    ".agents/**",
+    ".wrangler/**",
+    "frontend/dist/**",
+    "**/CHANGELOG.md",
+
+    // Vendored from Microsoft's awesome-copilot, not authored here — the
+    // `applyTo:` frontmatter and "Your Mission" headings are the upstream
+    // signature. They accounted for 572 of 633 findings (90%), almost all
+    // MD007 list-indent disagreements with upstream's formatting. Reformatting
+    // someone else's document to satisfy our linter guarantees a conflict on
+    // the next sync, and their indent style is not a defect in our docs.
+    ".github/instructions/**"
+  ]
+}

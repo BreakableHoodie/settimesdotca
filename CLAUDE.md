@@ -840,11 +840,19 @@ For the `_headers` document CSP:
 - **The inline theme-flash `<script>` in `frontend/index.html`** is allowed by a `'sha256-…'` hash in `script-src`. **If you edit that script, regenerate the hash** (sha256 of the exact built script body, base64) or it silently stops running and a theme flash returns. No test covers this — verify by building and hashing `dist/index.html`.
 - **Cloudflare Rocket Loader must stay DISABLED** for the zone. It rewrites/inline-executes `<script>` tags, which strict CSP blocks ("Refused to execute inline script"). A modern code-split Vite SPA gains nothing from it.
 
-### Zone config that lives only in the Cloudflare dashboard
+### Cloudflare state that lives outside this repo
 
-Not in this repo, not in `wrangler.toml`, and silently undoable — so it is
-recorded here. Both items are zone-level settings on `settimes.ca`
-(`77e5bb9ef071b25b9cb65885ed4b38e1`).
+Not in `wrangler.toml`, not in any file here, and silently undoable — so it is
+recorded here. **It is not all one kind of thing, and the distinction decides
+where you go to change it:**
+
+| layer | items |
+|---|---|
+| **Zone settings** on `settimes.ca` (`77e5bb9ef071b25b9cb65885ed4b38e1`) | Rocket Loader, the `www` → apex redirect rule, SSL mode, minimum TLS |
+| **DNS records** in that zone | the DMARC record |
+| **Pages project** config (`settimesdotca`) | environment variables |
+| **Account** resources | D1 databases |
+| **This repo**, listed here only to stop a false alarm | HSTS, which `_headers` sends |
 
 - **Rocket Loader: disabled** — see the bullet above.
 - **`www` → apex 301 redirect rule** (#984, added 2026-08-29). A zone
@@ -905,8 +913,11 @@ recorded here. Both items are zone-level settings on `settimes.ca`
 
 - **DMARC now reports** (added 2026-08-29). `_dmarc.settimes.ca` was
   `p=quarantine` with **no `rua=`** — enforcing a policy whose effects nobody
-  could see, which is the worst of the two halves to have alone. A quarantined
-  message does not bounce and raises no error; it just lands in a spam folder.
+  could see, which is the worst of the two halves to have alone. `p` only
+  *requests* a disposition; each receiver decides for itself, and a message
+  handled as suspicious typically produces no bounce and no error the sender
+  ever sees. Failures are therefore silent by default, which is exactly why the
+  reporting half is not optional.
   Now:
 
   ```text
@@ -927,9 +938,12 @@ recorded here. Both items are zone-level settings on `settimes.ca`
   opt-in, silently quarantined confirmations mean followers are never verified
   and never receive announcements — with nothing anywhere reporting an error.
 
-  Reports begin arriving 24–48h after the change and are gzipped XML. **If none
-  arrive within a few days, that is a signal the catch-all is not routing
-  `dmarc@` — not that everything is fine.**
+  Reports typically begin arriving within 24–48h and are XML, usually gzipped
+  (compression is recommended by RFC 7489, not required — plain `.xml` is
+  valid). Both are conventions, not guarantees: providers report on their own
+  schedules and some never do. **If none arrive within a few days, treat that as
+  a prompt to check whether the catch-all routes `dmarc@` — it is a signal to
+  investigate, not proof of either a failure or of everything being fine.**
 
   Deliberately not set: `ruf=` (forensic reports carry recipient PII and almost
   no provider sends them), and `p=reject`, which is the stronger end state but

@@ -51,6 +51,24 @@ using this MCP server.
 
 `src/sqlGuard.js` replaces it, and `__tests__/sqlGuard.test.js` keeps it shut.
 
+### `queryDB` also refuses credential-bearing tables
+
+`getActiveSessions` deliberately omits `lucia_sessions.id` — that column **is**
+the session token (`functions/utils/auth.js` binds the value straight from the
+session cookie). `SELECT id FROM lucia_sessions` through `queryDB` walked around
+that redaction entirely, turning "read production data" into "impersonate any
+logged-in admin". A redaction one tool enforces and another ignores is not a
+control.
+
+`queryDB` now refuses any statement naming a table on `SENSITIVE_TABLES` —
+sessions, users, API keys, reset and verification tokens, OTP codes, trusted
+devices, WebAuthn credentials. The match is a word boundary anywhere in the
+statement, so a join, subquery or CTE is caught too, and it over-blocks a string
+literal containing one of those words. That is the intended direction to err.
+
+Use `getUsers` and `getActiveSessions` for those tables; they return vetted
+projections.
+
 ## Deploying
 
 ```bash

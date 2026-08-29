@@ -34,6 +34,45 @@
  *     the narrow one.
  */
 
+/**
+ * Tables holding credentials or authentication material. `queryDB` refuses to
+ * touch them.
+ *
+ * WHY: `getActiveSessions` deliberately omits `lucia_sessions.id` — its JSDoc
+ * says so — because that column IS the session token. `functions/utils/auth.js`
+ * binds the value straight from the session cookie
+ * (`DELETE FROM lucia_sessions WHERE id = ?`), so anyone reading it can
+ * impersonate a logged-in admin. `SELECT id FROM lucia_sessions` through
+ * `queryDB` walked straight around that redaction, turning "read production
+ * data" into "take over any live session".
+ *
+ * The same argument covers password hashes, TOTP secrets and backup codes in
+ * `users`, `api_keys.key_hash`, reset and verification tokens, OTP codes and
+ * WebAuthn credentials. A redaction one tool enforces and another ignores is
+ * not a control.
+ *
+ * The curated tools remain the supported way in: `getUsers` and
+ * `getActiveSessions` return vetted projections of exactly these tables.
+ */
+export const SENSITIVE_TABLES = Object.freeze([
+  "api_keys",
+  "band_follows",
+  "email_otp_codes",
+  "invite_codes",
+  "lucia_sessions",
+  "mfa_challenges",
+  "password_reset_tokens",
+  "sessions",
+  "trusted_devices",
+  "users",
+  "webauthn_credentials",
+]);
+
+/** Message thrown when a statement names a credential-bearing table. */
+export const SENSITIVE_TABLE_ERROR =
+  "Query touches a table holding credentials or auth material. Use getUsers or " +
+  "getActiveSessions, which return vetted projections";
+
 /** Message thrown for any rejected statement. Asserted by the tests. */
 export const READ_ONLY_ERROR = "Only a single read-only SELECT statement is allowed";
 
@@ -65,6 +104,18 @@ export function assertReadOnlySelect(sql) {
   // The load-bearing line: no interior `;`, so no second statement.
   if (statement.includes(";")) {
     throw new Error(READ_ONLY_ERROR);
+  }
+
+  // Word-boundary match, so `users` is refused but `band_users_view` would not
+  // be caught by accident and `performances` is unaffected. It matches the name
+  // ANYWHERE in the statement — subquery, join or CTE — because a table cannot
+  // be read without being named. It over-blocks a string literal that happens
+  // to contain one of these words; that is the intended direction to err.
+  const named = SENSITIVE_TABLES.filter((table) =>
+    new RegExp(`\\b${table}\\b`, "i").test(statement),
+  );
+  if (named.length > 0) {
+    throw new Error(`${SENSITIVE_TABLE_ERROR} (matched: ${named.join(", ")})`);
   }
 
   return statement;

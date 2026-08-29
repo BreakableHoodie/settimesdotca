@@ -10,6 +10,14 @@ SHELL := /bin/sh
 # have been deleted but not yet staged — a legitimate state that would otherwise
 # hand a missing path to the linter and fail the gate for no reason.
 LINT_FILES := git ls-files --cached --others --exclude-standard
+#
+# Recipes read this list with `while IFS= read -r f` REDIRECTED FROM A FILE, not
+# `for f in $(...)` and not a pipe. `for` word-splits on spaces and re-globs, so
+# `bad name.yml` became two nonexistent paths that `[ -f ]` skipped — an invalid
+# file linted by nobody, exit 0. A pipe would fix the splitting but run the loop
+# in a subshell, where `rc=1` never reaches the recipe. Redirecting from a file
+# gets both. Filenames containing NEWLINES are still out of scope; that needs
+# -z/`read -d ''`, which is bash, and this Makefile is /bin/sh.
 WRANGLER := ./frontend/node_modules/.bin/wrangler
 E2E_STATE := .wrangler/e2e-state
 E2E_PID := .wrangler/e2e-state/wrangler.pid
@@ -72,18 +80,20 @@ lint-md: ## markdownlint across the docs we maintain (see .markdownlint-cli2.jso
 lint-sh: ## shellcheck every tracked shell script
 	@command -v shellcheck >/dev/null 2>&1 || { \
 		echo "shellcheck not found. Install: brew install shellcheck"; exit 1; }
-	@rc=0; for f in $$($(LINT_FILES) '*.sh'); do \
+	@list=$$(mktemp); $(LINT_FILES) '*.sh' > "$$list"; \
+	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		shellcheck "$$f" || rc=1; \
-	done; exit $$rc
+	done < "$$list"; rm -f "$$list"; exit $$rc
 
 lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
 	@command -v yamllint >/dev/null 2>&1 || { \
 		echo "yamllint not found. Install: brew install yamllint"; exit 1; }
-	@rc=0; for f in $$($(LINT_FILES) '*.yml' '*.yaml'); do \
+	@list=$$(mktemp); $(LINT_FILES) '*.yml' '*.yaml' > "$$list"; \
+	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		yamllint "$$f" || rc=1; \
-	done; exit $$rc
+	done < "$$list"; rm -f "$$list"; exit $$rc
 
 # archive/ is excluded: those migrations use `ALTER TABLE ... ADD COLUMN IF NOT
 # EXISTS`, which SQLite does not support and sqlfluff cannot parse. They are
@@ -91,10 +101,11 @@ lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
 lint-sql: ## sqlfluff every tracked SQL file outside archive/ (config: .sqlfluff)
 	@command -v sqlfluff >/dev/null 2>&1 || { \
 		echo "sqlfluff not found. Install: brew install sqlfluff"; exit 1; }
-	@rc=0; for f in $$($(LINT_FILES) '*.sql' | grep -v '^archive/'); do \
+	@list=$$(mktemp); $(LINT_FILES) '*.sql' | grep -v '^archive/' > "$$list"; \
+	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		sqlfluff lint "$$f" || rc=1; \
-	done; exit $$rc
+	done < "$$list"; rm -f "$$list"; exit $$rc
 
 # Validity, deliberately NOT formatting. Prettier on these files only explodes
 # compact arrays past printWidth — churn on load-bearing files (_routes.json)
@@ -105,11 +116,12 @@ lint-sql: ## sqlfluff every tracked SQL file outside archive/ (config: .sqlfluff
 # containing a single quote would otherwise close the JS string literal and run
 # whatever followed, on every `make gate`.
 lint-json: ## assert every tracked JSON file parses
-	@rc=0; for f in $$($(LINT_FILES) '*.json'); do \
+	@list=$$(mktemp); $(LINT_FILES) '*.json' > "$$list"; \
+	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
 		node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$$f" \
 			|| { echo "invalid JSON: $$f"; rc=1; }; \
-	done; exit $$rc
+	done < "$$list"; rm -f "$$list"; exit $$rc
 
 lint-all: lint lint-md lint-sh lint-yaml lint-sql lint-json ## every linter, all file types
 

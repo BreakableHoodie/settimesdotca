@@ -769,7 +769,17 @@ Four things about those targets are deliberate:
 - **File lists use `git ls-files --cached --others --exclude-standard`**, not a
   bare `git ls-files`. The latter sees only *tracked* files, so a brand-new file
   you have not `git add`ed — the one most likely to be wrong — sails through.
-  `--exclude-standard` still honours `.gitignore`.
+  `--exclude-standard` still honours `.gitignore`. Each recipe then tests
+  `[ -f "$f" ]`, because that list *also* names tracked files you have deleted
+  but not yet staged — a legitimate state that would otherwise hand a missing
+  path to the linter and fail the gate for no reason.
+- **`lint-json` passes the path as `process.argv[1]`, never interpolated into
+  the `node -e` source.** A filename containing a single quote would otherwise
+  close the JS string literal and execute whatever followed, on every
+  `make gate`. Each recipe also accumulates `rc=1` in a `for` loop rather than
+  `exit`ing inside a pipeline — a `while` fed by a pipe runs in a subshell,
+  where the exit never reaches the recipe. That is the same shape as the
+  status-capture bug in #882.
 - **`.yamllint` and `.markdownlint.json` are tuned to this corpus, not stock.**
   `extends: default` alone produced 435 YAML findings, 353 of them `line-length`
   at the default 80 chars, which no GitHub Actions workflow or OpenAPI spec

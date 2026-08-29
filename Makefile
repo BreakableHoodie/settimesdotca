@@ -3,6 +3,13 @@
 # E2E recipe mirrors .github/actions/e2e-env/action.yml.
 
 SHELL := /bin/sh
+# Every linter's file list. `--others --exclude-standard` adds files that are
+# untracked but NOT gitignored: a brand-new file you have not `git add`ed is the
+# one most likely to be wrong, and a bare `git ls-files` would skip it. Each
+# recipe still tests `[ -f ]`, because this list also names TRACKED files that
+# have been deleted but not yet staged — a legitimate state that would otherwise
+# hand a missing path to the linter and fail the gate for no reason.
+LINT_FILES := git ls-files --cached --others --exclude-standard
 WRANGLER := ./frontend/node_modules/.bin/wrangler
 E2E_STATE := .wrangler/e2e-state
 E2E_PID := .wrangler/e2e-state/wrangler.pid
@@ -60,21 +67,23 @@ lint-md: ## markdownlint across the docs we maintain (see .markdownlint-cli2.jso
 # Each external linter FAILS with an install hint rather than skipping. A gate
 # that quietly passes when its tool is absent is worse than no gate — that is
 # exactly the failure `lint-md` had before it reached .PHONY.
-#
-# File lists use `--cached --others --exclude-standard`, not a bare
-# `git ls-files`: the latter sees only TRACKED files, so a brand-new file you
-# have not added yet — the one most likely to be wrong — would sail through the
-# pre-commit gate unchecked. `--exclude-standard` still honours .gitignore, so
-# node_modules and friends stay out.
+
+# File lists come from $(LINT_FILES); see its definition for the scope rules.
 lint-sh: ## shellcheck every tracked shell script
 	@command -v shellcheck >/dev/null 2>&1 || { \
 		echo "shellcheck not found. Install: brew install shellcheck"; exit 1; }
-	git ls-files --cached --others --exclude-standard '*.sh' | xargs shellcheck
+	@rc=0; for f in $$($(LINT_FILES) '*.sh'); do \
+		[ -f "$$f" ] || continue; \
+		shellcheck "$$f" || rc=1; \
+	done; exit $$rc
 
 lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
 	@command -v yamllint >/dev/null 2>&1 || { \
 		echo "yamllint not found. Install: brew install yamllint"; exit 1; }
-	git ls-files --cached --others --exclude-standard '*.yml' '*.yaml' | xargs yamllint
+	@rc=0; for f in $$($(LINT_FILES) '*.yml' '*.yaml'); do \
+		[ -f "$$f" ] || continue; \
+		yamllint "$$f" || rc=1; \
+	done; exit $$rc
 
 # archive/ is excluded: those migrations use `ALTER TABLE ... ADD COLUMN IF NOT
 # EXISTS`, which SQLite does not support and sqlfluff cannot parse. They are
@@ -82,17 +91,25 @@ lint-yaml: ## yamllint every tracked YAML file (config: .yamllint)
 lint-sql: ## sqlfluff every tracked SQL file outside archive/ (config: .sqlfluff)
 	@command -v sqlfluff >/dev/null 2>&1 || { \
 		echo "sqlfluff not found. Install: brew install sqlfluff"; exit 1; }
-	git ls-files --cached --others --exclude-standard '*.sql' | grep -v '^archive/' | xargs sqlfluff lint
+	@rc=0; for f in $$($(LINT_FILES) '*.sql' | grep -v '^archive/'); do \
+		[ -f "$$f" ] || continue; \
+		sqlfluff lint "$$f" || rc=1; \
+	done; exit $$rc
 
 # Validity, deliberately NOT formatting. Prettier on these files only explodes
 # compact arrays past printWidth — churn on load-bearing files (_routes.json)
 # for no defect caught. An unparseable file is the real failure, and
 # ground-truth.json in particular has no code that reads it to fail loudly.
+#
+# The path goes in as ARGV, never interpolated into the -e source: a filename
+# containing a single quote would otherwise close the JS string literal and run
+# whatever followed, on every `make gate`.
 lint-json: ## assert every tracked JSON file parses
-	@git ls-files --cached --others --exclude-standard '*.json' | while read -r f; do \
-		node -e "JSON.parse(require('fs').readFileSync('$$f','utf8'))" \
-			|| { echo "invalid JSON: $$f"; exit 1; }; \
-	done
+	@rc=0; for f in $$($(LINT_FILES) '*.json'); do \
+		[ -f "$$f" ] || continue; \
+		node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$$f" \
+			|| { echo "invalid JSON: $$f"; rc=1; }; \
+	done; exit $$rc
 
 lint-all: lint lint-md lint-sh lint-yaml lint-sql lint-json ## every linter, all file types
 

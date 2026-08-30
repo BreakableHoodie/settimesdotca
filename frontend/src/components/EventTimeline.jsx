@@ -975,8 +975,13 @@ function EventCard({
                 return (
                   <Badge
                     key={band.id}
-                    as="a"
-                    href={buildBandProfileHref(band.name, event.slug)}
+                    // Router Link, not a bare <a>: the four other callers of
+                    // buildBandProfileHref already use `to`. A plain anchor
+                    // costs a full page load AND -- since #985 made /band/<slug>
+                    // a 301 to /band/<id> -- a redirect hop on top of it, on the
+                    // highest-traffic page we have.
+                    as={Link}
+                    to={buildBandProfileHref(band.name, event.slug)}
                     variant={isCancelled ? 'warning' : 'default'}
                     size="md"
                     className="hover:bg-primary-500/20 cursor-pointer transition-colors inline-flex items-center gap-1.5"

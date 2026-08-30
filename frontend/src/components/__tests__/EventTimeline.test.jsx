@@ -1534,3 +1534,81 @@ describe('EventTimeline between-seasons filter copy accuracy', () => {
     expect(screen.queryByText('Browse past events — new dates will be announced here')).not.toBeInTheDocument()
   })
 })
+
+// The artist chips in the expanded lineup were a bare `<a href>` while every
+// other caller of buildBandProfileHref used a router Link. That cost a full
+// page load on the highest-traffic page in the site -- and once #985 made
+// /band/<slug> a 301 to /band/<id>, a redirect hop on top of it.
+//
+// Asserting on the href alone would NOT catch a regression: react-router's Link
+// also renders <a href>, so the markup is identical either way. What separates
+// them is behaviour -- Link intercepts the click and calls preventDefault, so
+// fireEvent.click returns false. A plain anchor lets the default through.
+describe('EventTimeline artist links navigate client-side (#985 follow-up)', () => {
+  // The "Performers:" chips on a COLLAPSED event card were a bare `<a href>`
+  // while every other caller of buildBandProfileHref used a router Link. That
+  // cost a full page load on the highest-traffic page in the site -- and once
+  // #985 made /band/<slug> a 301 to /band/<id>, a redirect hop on top of it.
+  //
+  // Note the guard these chips live behind: `!expanded && featuredBands.length`.
+  // A first version of this test expanded the card to reach them, so the section
+  // never rendered and the assertion ran against a different, already-routed
+  // link -- passing with the fix reverted. They come from the timeline payload's
+  // own `bands` array, and only while the card is collapsed.
+  //
+  // Asserting the href would NOT catch a regression either: react-router's Link
+  // renders <a href> too, so the markup is identical. Behaviour is what differs
+  // -- Link intercepts the click and calls preventDefault, so fireEvent.click
+  // returns false, where a plain anchor returns true.
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          return Promise.resolve(
+            jsonResponse({
+              now: [],
+              upcoming: [
+                {
+                  id: 1,
+                  name: 'Link Event',
+                  slug: 'link-event',
+                  date: '2026-05-10',
+                  status: 'published',
+                  venues: [],
+                  bands: [{ id: 9, name: 'Routed Band' }],
+                  band_count: 1,
+                  venue_count: 1,
+                  ticket_url: null,
+                },
+              ],
+              past: [],
+            })
+          )
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('intercepts a performer chip click instead of doing a full page load', async () => {
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Link Event')).toBeInTheDocument()
+
+    const link = await screen.findByRole('link', { name: /Routed Band/ })
+    expect(link).toHaveAttribute('href', '/band/routed-band?fromEvent=link-event')
+
+    // false === the default was prevented === react-router handled it.
+    expect(fireEvent.click(link)).toBe(false)
+  })
+})

@@ -28,11 +28,40 @@ LIMIT=5
 WARN_AT=3
 DEFAULT_BRANCH=main
 
-branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+# pre-push receives one line per ref being updated on STDIN:
+#
+#     <local-ref> <local-sha> <remote-ref> <remote-sha>
+#
+# Read that rather than the checked-out branch. HEAD is the wrong signal: you
+# can push a branch you are not on (`git push origin feat:feat` from main), push
+# HEAD to a different remote branch, push several branches at once, or push a
+# tag -- and each of those either misses a review or invents one.
+#
+# Eligible == a non-delete update to refs/heads/<anything but the default>.
+# Tags and notes open no PR; a deletion (all-zero local sha) closes one.
+eligible=0
+eligible_refs=""
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+    [ -z "${remote_ref:-}" ] && continue
 
-# Pushes to the default branch do not open or update a PR, so they cost nothing.
-[ "$branch" = "$DEFAULT_BRANCH" ] && exit 0
-[ -z "$branch" ] && exit 0
+    case "$remote_ref" in
+        "refs/heads/$DEFAULT_BRANCH") continue ;;
+        refs/heads/*) ;;
+        *) continue ;;
+    esac
+
+    case "${local_sha:-}" in
+        *[!0]*) ;;
+        *) continue ;;
+    esac
+
+    eligible=$((eligible + 1))
+    eligible_refs="$eligible_refs${remote_ref#refs/heads/} "
+done
+
+# Nothing here triggers a review: a tag, a deletion, a push to the default
+# branch, or an invocation with no ref updates at all.
+[ "$eligible" -eq 0 ] && exit 0
 
 git_dir=$(git rev-parse --git-dir)
 log="$git_dir/coderabbit-push-log"
@@ -50,7 +79,7 @@ fi
 count=$(wc -l < "$log" | tr -d ' ')
 [ -z "$count" ] && count=0
 
-if [ "$count" -ge "$LIMIT" ]; then
+if [ $((count + eligible)) -gt "$LIMIT" ]; then
     oldest=$(head -n 1 "$log" | cut -d' ' -f1)
     wait_min=$(( (oldest + WINDOW_SECONDS - now + 59) / 60 ))
     [ "$wait_min" -lt 1 ] && wait_min=1
@@ -67,7 +96,7 @@ if [ "$count" -ge "$LIMIT" ]; then
         printf '         CODERABBIT_OVERAGE=1 git push\n\n' >&2
         exit 1
     fi
-elif [ "$count" -ge "$WARN_AT" ]; then
+elif [ $((count + eligible)) -ge "$WARN_AT" ]; then
     remaining=$((LIMIT - count))
     printf '\n  ⚠  CodeRabbit: %s reviews used this hour, %s left before pushes bill.\n' "$count" "$remaining" >&2
     printf '     Batch what is left rather than pushing per fix.\n\n' >&2
@@ -83,5 +112,8 @@ fi
 # Over-counting costs an occasional spurious block, cleared for free by waiting
 # or by CODERABBIT_OVERAGE=1. Under-counting costs money. Given the hook exists
 # only to prevent the second, it errs toward the first on purpose.
-echo "$now $branch" >> "$log"
+# One entry per branch actually updated -- pushing two PR branches costs two.
+for ref in $eligible_refs; do
+    echo "$now $ref" >> "$log"
+done
 exit 0

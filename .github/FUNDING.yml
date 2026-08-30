@@ -1,0 +1,25 @@
+# Sponsorship for settimes.ca — the Waterloo Region live-music platform.
+#
+# Sponsorship supports what it costs to keep the platform running and open:
+# the domain, Cloudflare Pages/D1/R2, transactional email, and the time to
+# keep the lineups accurate during a show.
+#
+# GitHub renders a "Sponsor" button on the repo from this file. Each key is a
+# platform; the value is a username or URL on that platform. Several may be
+# listed at once.
+
+ko_fi: tiptophams
+
+# GitHub Sponsors is not enrolled on the account yet — /sponsors/BreakableHoodie
+# currently redirects to the profile rather than a sponsor page. Uncomment once
+# enrollment (identity + payout verification) completes; it takes a few days and
+# charges no platform fee.
+#
+# github: BreakableHoodie
+
+# Other options, none of them set up:
+#
+# buy_me_a_coffee: <handle>  # like ko-fi, ~5% platform fee
+# liberapay: <handle>        # recurring only, non-profit, very low fees
+# open_collective: <slug>    # public ledger; fiscal-host fee applies
+# custom: ["https://settimes.ca/support"]   # up to 4 URLs

@@ -5,16 +5,21 @@
 # keep the lineups accurate during a show.
 #
 # GitHub renders a "Sponsor" button on the repo from this file. Each key is a
-# platform; every value is a username or URL on that platform.
+# platform; the value is a username or URL on that platform. Several may be
+# listed at once.
 
-github: BreakableHoodie
+ko_fi: tiptophams
 
-# Alternatives, if a platform that pays out sooner is wanted. Uncomment one and
-# fill in the handle; several can be listed at once and GitHub shows them all.
+# GitHub Sponsors is not enrolled on the account yet — /sponsors/BreakableHoodie
+# currently redirects to the profile rather than a sponsor page. Uncomment once
+# enrollment (identity + payout verification) completes; it takes a few days and
+# charges no platform fee.
 #
-# ko_fi: <handle>            # fastest to set up, one-time + monthly, 0% on donations
-# buy_me_a_coffee: <handle>  # similar, ~5% platform fee
+# github: BreakableHoodie
+
+# Other options, none of them set up:
+#
+# buy_me_a_coffee: <handle>  # like ko-fi, ~5% platform fee
 # liberapay: <handle>        # recurring only, non-profit, very low fees
-# open_collective: <slug>    # transparent public ledger; fiscal-host fee applies
-# polar: <handle>
+# open_collective: <slug>    # public ledger; fiscal-host fee applies
 # custom: ["https://settimes.ca/support"]   # up to 4 URLs

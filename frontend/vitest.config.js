@@ -17,8 +17,9 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', 'src/test/', '*.config.js', 'dist/'],
-      // Ratchet re-measured 2026-08-20 (stmts 65.22 / branch 58.84 /
-      // funcs 67.44 / lines 65.82). Thresholds are set to actuals minus a
+      // Ratchet re-measured 2026-08-30 (stmts 71.21 / branch 65.80 /
+      // funcs 72.85 / lines 71.81), after App.jsx gained a real suite and went
+      // 44.59 -> 83.37. Thresholds are set to actuals minus a
       // margin for run-to-run variance. This blocks regressions without
       // being an aspiration — raise deliberately, never lower silently
       // (#478 item 9, ratcheted by #519).
@@ -32,10 +33,10 @@ export default defineConfig({
       // the global percentage while strictly adding coverage. Prefer extracting
       // and testing a small unit over importing a 1,000-line tab component.
       thresholds: {
-        statements: 63,
-        branches: 56,
-        functions: 65,
-        lines: 63,
+        statements: 66,
+        branches: 60,
+        functions: 68,
+        lines: 66,
       },
     },
   },

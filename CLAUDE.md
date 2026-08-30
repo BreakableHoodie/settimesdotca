@@ -838,6 +838,27 @@ Requires the CodeRabbit CLI (`brew install --cask coderabbit`, then `coderabbit 
 
 `make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
 
+### CodeRabbit costs money past 5 reviews an hour — batch your pushes
+
+**Every push to a PR branch triggers a review.** CodeRabbit Pro allows **5 PR reviews per developer per ROLLING HOUR**, and this account has the usage-based add-on enabled — so past that, reviews are **not paused, they are billed**. There is no natural brake; the discipline has to come from the workflow.
+
+**The expensive failure is concentration, not volume.** The same number of pushes spread across a day costs nothing, because the window keeps refilling. PR #998 burned **4 reviews in ~25 minutes on a two-line change** — which, with #997's review already inside the same rolling hour, is what reached the limit of 5. Fixes went out one at a time instead of batched — a stale comment, then an E2E failure, then an incomplete sweep of that same failure, then a nit on prose added two pushes earlier. Three of the four were avoidable by reading the diff and running the right suite locally first.
+
+`make hooks` installs a tracked `pre-push` guard (`.githooks/pre-push`, wired via `core.hooksPath`). It warns at 3 reviews in the window and **blocks at 5**, reporting how many minutes until the budget refills. Run it once per clone — hooks are not cloned with the repo.
+
+**The rule for overriding is urgency to land, NOT issue priority.** Priority is the wrong axis: a p1 fixed correctly costs one review, while a p3 botched four times costs four — overage comes from *rework*, not importance, and a "p1 only" rule would license sloppiness exactly where correctness matters most.
+
+**Waiting is free.** The window is rolling, so the budget refills on its own. Ask only whether this must land *before it refills*:
+
+- show day, a production incident, or someone blocked on you → override
+- everything else → batch the remaining fixes and push once
+
+```bash
+CODERABBIT_OVERAGE=1 git push   # emergencies only; it bills
+```
+
+The hook is deliberately POSIX `sh` with no `gh`, `jq`, or network call — one that fails open when a tool is missing is worse than none, and it runs on every push. `lint-sh` globs `*.sh`, which would have skipped it silently, so that target now lists `.githooks/*` explicitly.
+
 ### Before every push (including follow-up commits during PR review)
 
 ```bash

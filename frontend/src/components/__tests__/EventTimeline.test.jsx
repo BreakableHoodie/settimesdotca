@@ -1535,15 +1535,6 @@ describe('EventTimeline between-seasons filter copy accuracy', () => {
   })
 })
 
-// The artist chips in the expanded lineup were a bare `<a href>` while every
-// other caller of buildBandProfileHref used a router Link. That cost a full
-// page load on the highest-traffic page in the site -- and once #985 made
-// /band/<slug> a 301 to /band/<id>, a redirect hop on top of it.
-//
-// Asserting on the href alone would NOT catch a regression: react-router's Link
-// also renders <a href>, so the markup is identical either way. What separates
-// them is behaviour -- Link intercepts the click and calls preventDefault, so
-// fireEvent.click returns false. A plain anchor lets the default through.
 describe('EventTimeline artist links navigate client-side (#985 follow-up)', () => {
   // The "Performers:" chips on a COLLAPSED event card were a bare `<a href>`
   // while every other caller of buildBandProfileHref used a router Link. That

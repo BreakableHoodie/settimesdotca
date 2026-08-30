@@ -11,9 +11,9 @@
 // the transition settles. Auto-retrying matchers (toBeVisible, toContainText)
 // are already safe and need no change.
 //
-// This bit three tests here, and only one of them failed locally -- a faster
-// machine renders inside the gap. Do not conclude from a green local run that a
-// bare read is safe.
+// This has already caught three tests in this file, and only one of them failed
+// locally -- a faster machine renders inside the gap. Do not conclude from a
+// green local run that a bare read is safe.
 
 import { test, expect } from "@playwright/test";
 

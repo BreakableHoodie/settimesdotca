@@ -41,7 +41,7 @@ export E2E_ADMIN_PASSWORD
 
 .PHONY: help install build dev format format-check lint lint-md lint-sh lint-yaml lint-sql lint-json \
 	lint-all test test-backend test-frontend gate review review-wip validate-openapi schema-check \
-	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean
+	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean hooks
 
 # CodeRabbit emits PostHog telemetry errors when egress is blocked. They are
 # noise, not review failures — the review still exits 0. They appear on BOTH
@@ -86,11 +86,14 @@ lint-md: ## markdownlint across the docs we maintain (see .markdownlint-cli2.jso
 # exactly the failure `lint-md` had before it reached .PHONY.
 
 # File lists come from $(LINT_FILES); see its definition for the scope rules.
-lint-sh: ## shellcheck every shell script (tracked + untracked, minus gitignored)
+# .githooks/* is listed explicitly: those files are shell but carry NO .sh
+# extension, so the '*.sh' glob alone would silently skip them -- a linter that
+# does not see a file is indistinguishable from one that passes it.
+lint-sh: ## shellcheck every shell script incl. git hooks (tracked + untracked, minus gitignored)
 	@command -v shellcheck >/dev/null 2>&1 || { \
 		echo "shellcheck not found. Install: brew install shellcheck"; exit 1; }
 	@list=$$(mktemp); \
-	$(LINT_FILES) '*.sh' > "$$list" || { rm -f "$$list"; \
+	$(LINT_FILES) '*.sh' '.githooks/*' > "$$list" || { rm -f "$$list"; \
 		echo "lint: could not enumerate files (git ls-files failed)"; exit 1; }; \
 	rc=0; while IFS= read -r f; do \
 		[ -f "$$f" ] || continue; \
@@ -160,6 +163,12 @@ test-frontend: ## Frontend unit tests
 test: test-backend test-frontend ## All unit tests
 
 gate: format format-check lint-all test build ## FULL pre-commit gate — run before every commit
+
+hooks: ## Install the tracked git hooks (pre-push CodeRabbit rate-limit guard)
+	@git config core.hooksPath .githooks
+	@echo "core.hooksPath -> .githooks"
+	@echo "pre-push now guards the CodeRabbit rolling-hour limit (5 reviews/hour)."
+	@echo "Override for a genuine emergency: CODERABBIT_OVERAGE=1 git push"
 
 review: ## AI code review of this branch vs origin/main — run BEFORE opening a PR
 	@command -v coderabbit >/dev/null 2>&1 || { \

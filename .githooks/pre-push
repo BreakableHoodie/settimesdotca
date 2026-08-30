@@ -1,0 +1,87 @@
+#!/bin/sh
+# Guard against CodeRabbit rate-limit overage.
+#
+# CodeRabbit Pro allows 5 PR reviews per developer per ROLLING HOUR. Past that,
+# the usage-based add-on (enabled on this account) processes the review and
+# BILLS for it rather than pausing -- so there is no natural brake. Every push
+# to a PR branch is a review.
+#
+# The expensive failure is CONCENTRATION, not volume: five pushes across a day
+# cost nothing, four in half an hour bills. PR #998 burned 4 reviews in ~25
+# minutes on a two-line change, because fixes were pushed one at a time instead
+# of batched.
+#
+# WAITING IS FREE. The window is rolling, so the budget refills on its own.
+# Override only when landing NOW actually matters -- a show-day fix, a
+# production incident, or someone blocked on you:
+#
+#     CODERABBIT_OVERAGE=1 git push
+#
+# Deliberately POSIX sh with no gh/jq/network: a hook that fails open when a
+# tool is missing is worse than no hook, and this must not add latency or a
+# failure mode to every push.
+
+set -eu
+
+WINDOW_SECONDS=3600
+LIMIT=5
+WARN_AT=3
+DEFAULT_BRANCH=main
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
+# Pushes to the default branch do not open or update a PR, so they cost nothing.
+[ "$branch" = "$DEFAULT_BRANCH" ] && exit 0
+[ -z "$branch" ] && exit 0
+
+git_dir=$(git rev-parse --git-dir)
+log="$git_dir/coderabbit-push-log"
+now=$(date +%s)
+cutoff=$((now - WINDOW_SECONDS))
+
+# Drop entries outside the rolling window before counting.
+if [ -f "$log" ]; then
+    awk -v c="$cutoff" '$1 >= c' "$log" > "$log.tmp" 2>/dev/null || : > "$log.tmp"
+    mv "$log.tmp" "$log"
+else
+    : > "$log"
+fi
+
+count=$(wc -l < "$log" | tr -d ' ')
+[ -z "$count" ] && count=0
+
+if [ "$count" -ge "$LIMIT" ]; then
+    oldest=$(head -n 1 "$log" | cut -d' ' -f1)
+    wait_min=$(( (oldest + WINDOW_SECONDS - now + 59) / 60 ))
+    [ "$wait_min" -lt 1 ] && wait_min=1
+
+    if [ "${CODERABBIT_OVERAGE:-}" = "1" ]; then
+        printf '\n  ⚠  CodeRabbit: %s reviews already used this hour — this one BILLS.\n' "$count" >&2
+        printf '     Overriding because CODERABBIT_OVERAGE=1.\n\n' >&2
+    else
+        printf '\n  ✋ Push blocked: %s CodeRabbit reviews used in the last hour (limit %s).\n\n' "$count" "$LIMIT" >&2
+        printf '     The next review would exceed the window and BILL via the usage add-on.\n' >&2
+        printf '     Waiting is free — the budget refills in ~%s min.\n\n' "$wait_min" >&2
+        printf '     Batch your remaining fixes and push once.\n' >&2
+        printf '     If this genuinely must land now (show day, incident, someone blocked):\n\n' >&2
+        printf '         CODERABBIT_OVERAGE=1 git push\n\n' >&2
+        exit 1
+    fi
+elif [ "$count" -ge "$WARN_AT" ]; then
+    remaining=$((LIMIT - count))
+    printf '\n  ⚠  CodeRabbit: %s reviews used this hour, %s left before pushes bill.\n' "$count" "$remaining" >&2
+    printf '     Batch what is left rather than pushing per fix.\n\n' >&2
+fi
+
+# Recorded BEFORE the remote accepts the push, which over-counts when a push is
+# rejected or the network drops: a slot is consumed for a review that never ran.
+# That is deliberate. git has no post-push hook, so the alternatives are to log
+# here or to reconcile later against the remote-tracking ref -- and reconciling
+# under-counts, because an amended commit that WAS pushed (and WAS reviewed)
+# becomes unreachable after the next force-push.
+#
+# Over-counting costs an occasional spurious block, cleared for free by waiting
+# or by CODERABBIT_OVERAGE=1. Under-counting costs money. Given the hook exists
+# only to prevent the second, it errs toward the first on purpose.
+echo "$now $branch" >> "$log"
+exit 0

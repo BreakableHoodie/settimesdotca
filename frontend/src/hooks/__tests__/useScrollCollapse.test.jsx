@@ -177,10 +177,10 @@ describe('useScrollCollapse', () => {
   // collapsing element itself renders — so a caller re-rendering in
   // response to a progress change can't feed back into another scroll
   // measurement and oscillate.
-  it('is driven only by scrollY, not by re-renders with no scroll event', () => {
+  it('is driven only by scrollY, not by re-renders with no scroll event', async () => {
     setScrollY(90)
     const { rerender } = render(<Harness start={40} end={140} />)
-    fireScroll()
+    await fireScroll()
     expect(screen.getByTestId('progress')).toHaveTextContent('0.5')
 
     // A prop change causing a re-render without a new scroll event must not

@@ -198,12 +198,23 @@ test.describe("Band Profile Viewing", () => {
     // which can exceed the default 5s timeout on a cold CI mobile run.
     const heading = page.locator("main h1");
     await expect(heading).toBeVisible({ timeout: 15000 });
-    const headingText = ((await heading.textContent()) ?? "").trim();
-    expect(headingText).not.toBe("");
-    // Identity of the profile that opened, matching the pattern the first test
-    // uses. The old form built a RegExp out of the full card text, which could
-    // not match the heading and threw on titles containing metacharacters.
-    expect(linkText).toContain(headingText);
+
+    // POLLED, because the timeline's performer chips navigate client-side. A
+    // pushState URL change lands BEFORE React renders the new route, so
+    // waitForURL above can resolve while `main h1` still holds the previous
+    // page's heading (the SetTimes brand) -- a bare textContent() read then
+    // compares the wrong string. Full page loads hid this by making navigation
+    // and render the same event.
+    //
+    // The assertion itself is unchanged: identity of the profile that opened,
+    // matching the pattern the first test uses. The old form built a RegExp out
+    // of the full card text, which could not match the heading and threw on
+    // titles containing metacharacters.
+    await expect(async () => {
+      const headingText = ((await heading.textContent()) ?? "").trim();
+      expect(headingText).not.toBe("");
+      expect(linkText).toContain(headingText);
+    }).toPass({ timeout: 15000 });
 
     // Verify content is readable on mobile
     const contentArea = page.locator('main, [role="main"], article').first();
@@ -213,26 +224,45 @@ test.describe("Band Profile Viewing", () => {
   });
 
   test("should navigate back to timeline from band profile", async ({ page }) => {
+    // This test used to assert a heading matching /schedule/i after clicking an
+    // `.or()` chain's `.first()` match. TWO things were wrong with that:
+    //
+    //   1. `.first()` in DOM order resolves to the brand link (`a[href="/"]`),
+    //      which goes to "/" -- and NO heading on "/" matches /schedule/i. The
+    //      headings there are SetTimes, Events, Happening Now, Coming Up, Past
+    //      Events. The only "schedule" heading is the sr-only h1 on
+    //      /event/<slug>, which that click never reaches.
+    //   2. The whole assertion sat behind `if (await ...isVisible())`, so when
+    //      the element was not yet visible the test passed having asserted
+    //      NOTHING. That is how an impossible assertion stayed green.
+    //
+    // It surfaced when the timeline's performer chips became router Links: the
+    // client-side transition is instant, the back affordance was visible in
+    // time, the `if` finally ran, and the impossible assertion failed.
+    //
+    // Rewritten to be unconditional and to assert something that is actually
+    // true of the destination.
     await page.goto("/");
 
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
+    const bandLink = page.locator('a[href*="/band/"]').first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await expect(page).toHaveURL(/\/band\//);
 
-    // Look for back button or home link
-    const backButton = page
-      .locator('button:has-text("Back")')
-      .or(
-        page.locator('a[href="/"]').or(page.locator('a:has-text("Home")').or(page.locator('a:has-text("Schedule")'))),
-      );
+    // The brand link is always present in the profile header, unlike
+    // "Back to Schedule", which renders only when ?fromEvent= resolves.
+    const home = page.getByRole("link", { name: /settimes/i }).first();
+    await expect(home).toBeVisible();
+    await home.click();
 
-    if (await backButton.first().isVisible()) {
-      await backButton.first().click();
-
-      // Verify we're back on timeline
-      await expect(page.getByRole("heading", { name: /schedule/i })).toBeVisible();
-    }
+    // Back on the timeline. "Events" is the events list's own <h2> and renders
+    // unconditionally; the page's h1 is the SetTimes brand.
+    await expect(page).toHaveURL(/\/$/);
+    // exact: true is load-bearing -- Playwright's name matching defaults to
+    // case-insensitive SUBSTRING, so "Events" also matches the "Past Events"
+    // heading and trips strict mode. Same collision class as an unscoped
+    // getByText.
+    await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
   });
 
   test("should handle band profile not found gracefully", async ({ page }) => {

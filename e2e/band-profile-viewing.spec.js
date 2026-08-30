@@ -1,3 +1,20 @@
+// NAVIGATION IN THIS FILE IS CLIENT-SIDE. The timeline's performer chips are
+// react-router Links, so clicking one changes the URL via pushState and React
+// renders the new route afterwards. Anything that reads rendered content with a
+// single bare `textContent()` / `page.title()` after a click can therefore
+// observe the PREVIOUS page -- typically the SetTimes brand heading -- and
+// compare the wrong string. Full page loads used to hide this by making
+// navigation and render the same event.
+//
+// waitForURL and toHaveURL do NOT help: the URL is the thing that changes first.
+// Wrap the assertion in `expect(async () => {...}).toPass()` so it retries until
+// the transition settles. Auto-retrying matchers (toBeVisible, toContainText)
+// are already safe and need no change.
+//
+// This bit three tests here, and only one of them failed locally -- a faster
+// machine renders inside the gap. Do not conclude from a green local run that a
+// bare read is safe.
+
 import { test, expect } from "@playwright/test";
 
 // The seeded upcoming event (database/seed-test-data.sql). Entering through its
@@ -31,9 +48,12 @@ test.describe("Band Profile Viewing", () => {
       // metacharacters cannot corrupt the pattern the way `new RegExp(name)` did.
       const heading = page.locator("main h1");
       await expect(heading).toBeVisible();
-      const headingText = ((await heading.textContent()) ?? "").trim();
-      expect(headingText).not.toBe("");
-      expect(linkText).toContain(headingText);
+      // POLLED -- see the note at the top of this file on client-side navigation.
+      await expect(async () => {
+        const headingText = ((await heading.textContent()) ?? "").trim();
+        expect(headingText).not.toBe("");
+        expect(linkText).toContain(headingText);
+      }).toPass({ timeout: 15000 });
 
       // Should NOT redirect to login
       await expect(page).not.toHaveURL(/\/admin\/login/);
@@ -380,8 +400,13 @@ test.describe("Band Profile Viewing", () => {
     // title a silent pass -- on the one assertion here that is SEO-critical.
     const heading = page.locator("main h1");
     await expect(heading).toBeVisible({ timeout: 15000 });
-    const headingText = ((await heading.textContent()) ?? "").trim();
-    expect(headingText).not.toBe("");
-    expect((await page.title()).toLowerCase()).toContain(headingText.toLowerCase());
+    // POLLED -- see the note at the top of this file. document.title is also set
+    // in an effect after the fetch resolves, so it settles independently of the
+    // heading; a single read can catch either one mid-transition.
+    await expect(async () => {
+      const headingText = ((await heading.textContent()) ?? "").trim();
+      expect(headingText).not.toBe("");
+      expect((await page.title()).toLowerCase()).toContain(headingText.toLowerCase());
+    }).toPass({ timeout: 15000 });
   });
 });

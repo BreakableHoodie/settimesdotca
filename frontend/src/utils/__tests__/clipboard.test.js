@@ -15,6 +15,14 @@ describe('copyToClipboard', () => {
     Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true })
     document.execCommand = originalExecCommand
     vi.restoreAllMocks()
+    // copyToClipboard's execCommand fallback appends a <textarea> and only
+    // removes it after document.execCommand('copy') returns — if that call
+    // throws (as "returns false when the fallback throws" below forces), the
+    // removal is never reached and the element is orphaned in document.body
+    // for the rest of this file's shared jsdom environment. Sweep it here so
+    // a later test's "the textarea is cleaned up" assertion sees a clean DOM
+    // regardless of run order.
+    document.querySelectorAll('textarea').forEach(node => node.remove())
   })
 
   function setClipboard(value) {

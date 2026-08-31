@@ -17,7 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { REPO_ROOT, runMutationGate, runOneMutation } from "../mutation-gate.mjs";
+import { REPO_ROOT, outputShowsFailingTest, runMutationGate, runOneMutation } from "../mutation-gate.mjs";
 
 const FIXTURE_VITEST_CONFIG = `export default {
   test: { include: ["**/*.test.js"], globals: true, environment: "node" },
@@ -93,6 +93,41 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
   }
   fixtureDirs = [];
+});
+
+// ESC as a code point: a literal escape byte in source is invisible in diffs
+// and review, which is part of why this bug survived local verification.
+const ESC = String.fromCharCode(27);
+const colour = (code, text) => `${ESC}[${code}m${text}${ESC}[39m`;
+
+describe("outputShowsFailingTest — the predicate that decides 'caught'", () => {
+  it("sees a failing test in plain (uncoloured) vitest output", () => {
+    expect(outputShowsFailingTest(" Test Files  1 failed (1)\n      Tests  1 failed | 6 passed (7)")).toBe(true);
+  });
+
+  // THE REGRESSION TEST. vitest colorizes in GitHub Actions but not through a
+  // piped local run, so the summary line begins with an escape sequence rather
+  // than whitespace. An `^\s*Tests` anchor does not match that, and the first
+  // CI run turned all ten mutations into "inconclusive" gate failures while
+  // every local run was green. Local verification could not have caught this:
+  // the format differs by environment, not by code.
+  it("sees a failing test when vitest colorizes its summary (CI)", () => {
+    const coloured = `${ESC}[2m Test Files ${ESC}[22m ${colour(31, "1 failed")}\n${ESC}[2m Tests ${ESC}[22m ${colour(31, "1 failed")}${ESC}[2m | ${ESC}[22m${colour(32, "6 passed")}`;
+    expect(outputShowsFailingTest(coloured)).toBe(true);
+  });
+
+  it("does NOT claim a failing test when everything passed", () => {
+    expect(outputShowsFailingTest(" Test Files  1 passed (1)\n      Tests  7 passed (7)")).toBe(false);
+    expect(outputShowsFailingTest(`${ESC}[2m Tests ${ESC}[22m ${colour(32, "7 passed")} (7)`)).toBe(false);
+  });
+
+  it("does NOT claim a failing test for a run that never got that far", () => {
+    // Every one of these exits non-zero. None asserted anything.
+    expect(outputShowsFailingTest("No test files found, exiting with code 1")).toBe(false);
+    expect(outputShowsFailingTest("Error: Failed to load url ../source.js")).toBe(false);
+    expect(outputShowsFailingTest("")).toBe(false);
+    expect(outputShowsFailingTest(" Tests  0 failed | 0 passed (0)")).toBe(false);
+  });
 });
 
 describe("mutation-gate — verified against its own failure modes", () => {

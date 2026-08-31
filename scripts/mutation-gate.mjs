@@ -269,6 +269,35 @@ export function isGitClean(filePath, cwd) {
   return result.status === 0;
 }
 
+/** Strip ANSI SGR sequences. vitest colorizes whenever it believes a terminal
+ * is watching -- which includes GitHub Actions -- so its summary line arrives
+ * as an escape sequence followed by " Tests ", not as plain text. A regex
+ * anchored on `^\s*Tests` silently fails to match that, because an escape
+ * sequence is not whitespace. */
+export function stripAnsi(text) {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\u001b\[[0-9;]*m/g, "");
+}
+
+/** True iff vitest's own summary reports at least one FAILING test.
+ *
+ * The gate's central predicate, and deliberately positive: a non-zero exit
+ * says something went wrong, never WHAT. A killed process, a missing test
+ * file, a transform error, or a mutation that made the source unparseable all
+ * exit non-zero with nothing asserted -- and because "caught" is this gate's
+ * PASSING direction, reading any of them as caught prints PASS while proving
+ * nothing.
+ *
+ * The ANSI strip is load-bearing, not cosmetic: without it this returned false
+ * for EVERY mutation on the first CI run (colour on in Actions, off locally),
+ * turning a healthy gate into ten inconclusive failures. Local-only
+ * verification could not have caught it -- the output format differs by
+ * environment, so the bug is invisible until CI runs. */
+export function outputShowsFailingTest(rawOutput) {
+  const match = stripAnsi(rawOutput).match(/^\s*Tests\s+.*?\b(\d+)\s+failed/m);
+  return match !== null && Number(match[1]) > 0;
+}
+
 /** Run `npx vitest run <testFiles> [...extraArgs]` from `cwd`, synchronously.
  *
  * Returns the raw exit code plus `signal` and `spawnError`, and does NOT
@@ -445,7 +474,7 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
   // prevent, just moved into the harness instead of the invariant. Both
   // vitest's stdout and stderr are checked: which stream carries this
   // message is a vitest-version detail, not something to depend on.
-  const combinedOutput = `${testResult.stdout}\n${testResult.stderr}`;
+  const combinedOutput = stripAnsi(`${testResult.stdout}\n${testResult.stderr}`);
 
   // A killed or unspawnable vitest exits non-zero for reasons that have
   // nothing to do with the invariant: an OOM kill, the CI job timeout's
@@ -478,17 +507,23 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
   // mutation that makes the source unparseable, a broken import, or a config
   // error all exit non-zero without a single assertion running, and each would
   // otherwise print PASS. Require vitest to report an actually-failing test.
-  const failedTests = combinedOutput.match(/^\s*Tests\s+.*?\b(\d+)\s+failed/m);
-  const sawFailingTest = failedTests !== null && Number(failedTests[1]) > 0;
+  const sawFailingTest = outputShowsFailingTest(combinedOutput);
 
   if (testResult.exitCode !== 0 && !sawFailingTest) {
+    // Show what vitest ACTUALLY printed. Without this the message states only
+    // that the run proved nothing, which is true but unactionable -- and the
+    // causes look identical from the outside (missing dep, config error,
+    // unparseable mutation, an output format this predicate does not
+    // recognise). Diagnosing those apart from a local machine is guesswork;
+    // the tail is what turns the next failure into a fact.
+    const tail = combinedOutput.trimEnd().split("\n").slice(-25).join("\n      ");
     return {
       id: mutation.id,
       status: "gate-failure",
       failureKind: "inconclusive",
       reason: `vitest exited ${testResult.exitCode} but reported no failing test for ${mutation.tests.join(
         ", ",
-      )} — the run did not verify the invariant (a load/transform/config error exits non-zero without asserting anything)`,
+      )} — the run did not verify the invariant (a load/transform/config error exits non-zero without asserting anything).\n    vitest output (last 25 lines, ANSI stripped):\n      ${tail}`,
       testExitCode: testResult.exitCode,
     };
   }

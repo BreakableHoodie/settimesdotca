@@ -270,8 +270,14 @@ export function isGitClean(filePath, cwd) {
 }
 
 /** Run `npx vitest run <testFiles> [...extraArgs]` from `cwd`, synchronously.
- * Returns a normalized exit code: a killed process (status === null, e.g. a
- * signal) counts as non-zero/failed, never as an accidental "pass". */
+ *
+ * Returns the raw exit code plus `signal` and `spawnError`, and does NOT
+ * decide what they mean. A killed process is normalized to a non-zero exit so
+ * no caller can mistake it for a clean pass -- but "non-zero" is deliberately
+ * NOT sufficient for the caller to conclude a mutation was caught. See
+ * classifyTestRun: for this gate, "caught" is the PASSING direction, so every
+ * non-zero exit must be positively attributed to a failing test rather than
+ * assumed. */
 export function runVitestFiles(testFiles, { cwd = REPO_ROOT, extraArgs = [] } = {}) {
   const result = spawnSync("npx", ["vitest", "run", ...testFiles, ...extraArgs], {
     cwd,
@@ -366,6 +372,7 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
     return {
       id: mutation.id,
       status: "gate-failure",
+      failureKind: "drift",
       reason: `file does not exist: ${mutation.file}`,
     };
   }
@@ -377,6 +384,7 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
     return {
       id: mutation.id,
       status: "gate-failure",
+      failureKind: "drift",
       reason: `find string not found in ${mutation.file} — the pattern has drifted from the source; update the mutation table's "find" field`,
     };
   }
@@ -384,6 +392,7 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
     return {
       id: mutation.id,
       status: "gate-failure",
+      failureKind: "drift",
       reason: `find string occurs ${occurrences} times in ${mutation.file} — must be exactly 1; narrow the pattern so the mutation is unambiguous`,
     };
   }
@@ -400,6 +409,7 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
     return {
       id: mutation.id,
       status: "gate-failure",
+      failureKind: "drift",
       reason: `listed test file(s) do not exist: ${missingTests.join(", ")} — update the mutation table's "tests" field`,
     };
   }
@@ -436,16 +446,54 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
   // vitest's stdout and stderr are checked: which stream carries this
   // message is a vitest-version detail, not something to depend on.
   const combinedOutput = `${testResult.stdout}\n${testResult.stderr}`;
+
+  // A killed or unspawnable vitest exits non-zero for reasons that have
+  // nothing to do with the invariant: an OOM kill, the CI job timeout's
+  // SIGKILL, or `npx` missing from PATH. Reading any of those as "caught"
+  // would print PASS while nothing was ever asserted.
+  if (testResult.spawnError || testResult.signal) {
+    return {
+      id: mutation.id,
+      status: "gate-failure",
+      failureKind: "inconclusive",
+      reason: `vitest did not exit normally (signal: ${testResult.signal ?? "none"}, spawn error: ${
+        testResult.spawnError?.message ?? "none"
+      }) — the run proves nothing about ${mutation.tests.join(", ")}`,
+      testExitCode: testResult.exitCode,
+    };
+  }
+
   if (/No test files found/i.test(combinedOutput)) {
     return {
       id: mutation.id,
       status: "gate-failure",
+      failureKind: "inconclusive",
       reason: `vitest reported "No test files found" for ${mutation.tests.join(", ")} — the harness did not actually run the test, so this is not a verified result`,
       testExitCode: testResult.exitCode,
     };
   }
 
-  const caught = testResult.exitCode !== 0;
+  // The general form of the two guards above. "caught" is this gate's PASSING
+  // direction, so it is never inferred from a non-zero exit alone -- a
+  // mutation that makes the source unparseable, a broken import, or a config
+  // error all exit non-zero without a single assertion running, and each would
+  // otherwise print PASS. Require vitest to report an actually-failing test.
+  const failedTests = combinedOutput.match(/^\s*Tests\s+.*?\b(\d+)\s+failed/m);
+  const sawFailingTest = failedTests !== null && Number(failedTests[1]) > 0;
+
+  if (testResult.exitCode !== 0 && !sawFailingTest) {
+    return {
+      id: mutation.id,
+      status: "gate-failure",
+      failureKind: "inconclusive",
+      reason: `vitest exited ${testResult.exitCode} but reported no failing test for ${mutation.tests.join(
+        ", ",
+      )} — the run did not verify the invariant (a load/transform/config error exits non-zero without asserting anything)`,
+      testExitCode: testResult.exitCode,
+    };
+  }
+
+  const caught = testResult.exitCode !== 0 && sawFailingTest;
   return {
     id: mutation.id,
     status: caught ? "caught" : "surviving",
@@ -478,8 +526,11 @@ export function formatReport(results, mutations, knownSurviving) {
   const knownSurvivingHit = [];
 
   for (const r of results) {
-    const applied = r.status !== "gate-failure";
-    const caughtCol = applied ? (r.status === "caught" ? "yes" : "NO") : "n/a";
+    // A drift failure never reached the write; an inconclusive one did.
+    const applied = r.status !== "gate-failure" || r.failureKind === "inconclusive";
+    // A gate failure never determined caught-ness either way; "NO" would
+    // read as "it survived", which is a different and answerable finding.
+    const caughtCol = r.status === "gate-failure" ? "n/a" : r.status === "caught" ? "yes" : "NO";
     let statusCol;
     if (r.status === "gate-failure") {
       statusCol = "GATE FAILURE";
@@ -507,16 +558,26 @@ export function formatReport(results, mutations, knownSurviving) {
     lines.push(`FAIL — ${hardFailures} of ${results.length} mutations did not verify.`);
   }
 
-  const gateFailures = results.filter((r) => r.status === "gate-failure");
-  if (gateFailures.length > 0) {
+  const describeFailures = (rows, heading) => {
+    if (rows.length === 0) return;
     lines.push("");
-    lines.push("Pattern drift (find string absent or not unique) — these are gate failures, not skips:");
-    for (const r of gateFailures) {
+    lines.push(heading);
+    for (const r of rows) {
       const m = mutations.find((mm) => mm.id === r.id) ?? knownSurviving.find((mm) => mm.id === r.id);
       lines.push(`  [${r.id}] ${m?.file ?? "?"}`);
       lines.push(`    ${r.reason}`);
     }
-  }
+  };
+
+  const gateFailures = results.filter((r) => r.status === "gate-failure");
+  describeFailures(
+    gateFailures.filter((r) => r.failureKind === "drift"),
+    "Table drift (the mutation was NOT applied) — gate failures, not skips. Fix the table:",
+  );
+  describeFailures(
+    gateFailures.filter((r) => r.failureKind === "inconclusive"),
+    "Inconclusive runs (the mutation WAS applied, but the test run proved nothing) — never read as caught:",
+  );
 
   if (surviving.length > 0) {
     lines.push("");

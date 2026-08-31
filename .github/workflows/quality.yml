@@ -121,6 +121,36 @@ jobs:
       - name: Lint backend
         run: npm run lint
 
+  mutation-gate:
+    name: Mutation Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      # Converts documented CLAUDE.md invariants into executable proof: applies
+      # each mutation, asserts the named test(s) go red, restores, and verifies
+      # the restore. Deliberately its own job/step rather than part of `make
+      # gate` -- see scripts/mutation-gate.mjs's header and CLAUDE.md's
+      # "Proactive Quality Gates" table for why `gate` must stay fast and
+      # offline-capable while this one shells out to git and spawns vitest
+      # once per mutation (~8s locally).
+      - name: Run mutation gate
+        run: node scripts/mutation-gate.mjs
+
   schema-drift:
     name: Schema Drift Check
     runs-on: ubuntu-latest

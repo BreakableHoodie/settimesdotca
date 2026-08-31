@@ -213,7 +213,11 @@ export const KNOWN_SURVIVING = [];
 
 /** Byte-exact occurrence count. Deliberately not a regex/grep count: `find`
  * strings here contain `(`, `)`, `.`, `?`, `$` — all regex metacharacters —
- * and a regex-based count would misreport. */
+ * and a regex-based count would misreport.
+ *
+ * @param {string} haystack - Text to search.
+ * @param {string} needle - Literal substring; never treated as a pattern.
+ * @returns {number} Non-overlapping occurrences of `needle` in `haystack`. */
 export function countOccurrences(haystack, needle) {
   if (needle === "") return 0;
   let count = 0;
@@ -232,7 +236,13 @@ export function countOccurrences(haystack, needle) {
  * string, `replace` treats `$&`, `$1`, etc. as special patterns. A mutation
  * table is exactly the kind of file that acquires a `$`-bearing replacement
  * eventually; splicing by index sidesteps the whole class. Caller must have
- * already verified exactly one occurrence. */
+ * already verified exactly one occurrence.
+ *
+ * @param {string} content - Original file contents.
+ * @param {string} find - Literal substring to replace; must occur exactly once.
+ * @param {string} replace - Literal replacement, inserted verbatim (a `$` in it
+ *   is NOT interpreted, which is the reason for splicing over String.replace).
+ * @returns {string} `content` with the single occurrence replaced. */
 export function applyReplacement(content, find, replace) {
   const idx = content.indexOf(find);
   if (idx === -1) {
@@ -241,7 +251,13 @@ export function applyReplacement(content, find, replace) {
   return content.slice(0, idx) + replace + content.slice(idx + find.length);
 }
 
-/** `git status --porcelain` scoped to specific paths. Empty array = clean. */
+/** `git status --porcelain` scoped to specific paths. Empty array = clean.
+ *
+ * @param {string[]} files - Repo-relative paths to check.
+ * @param {string} cwd - Directory to run git in.
+ * @returns {string[]} The subset of `files` git reports as modified.
+ * @throws {Error} If git itself fails to run — never silently treated as clean,
+ *   since "clean" is the answer that lets the gate start mutating sources. */
 export function dirtyFiles(files, cwd) {
   if (files.length === 0) return [];
   const result = spawnSync("git", ["status", "--porcelain", "--", ...files], {
@@ -260,7 +276,13 @@ export function dirtyFiles(files, cwd) {
     .filter(Boolean);
 }
 
-/** True iff git sees no diff for this single file (working tree vs index). */
+/** True iff git sees no diff for this single file (working tree vs index).
+ *
+ * @param {string} filePath - Repo-relative path.
+ * @param {string} cwd - Directory to run git in.
+ * @returns {boolean} true when `git diff --quiet` reports no change.
+ * @throws {Error} If git fails to run. Used to verify a restore, so a failure
+ *   here must be loud rather than optimistic. */
 export function isGitClean(filePath, cwd) {
   const result = spawnSync("git", ["diff", "--quiet", "--", filePath], { cwd });
   if (result.error) {
@@ -317,7 +339,16 @@ export function outputShowsFailingTest(rawOutput) {
  * NOT sufficient for the caller to conclude a mutation was caught. See
  * classifyTestRun: for this gate, "caught" is the PASSING direction, so every
  * non-zero exit must be positively attributed to a failing test rather than
- * assumed. */
+ * assumed.
+ *
+ * @param {string[]} testFiles - Test paths to pass to vitest.
+ * @param {object} [options]
+ * @param {string} [options.cwd=REPO_ROOT] - Working directory for the spawn.
+ * @param {string[]} [options.extraArgs=[]] - Extra vitest CLI args.
+ * @returns {{exitCode: number, stdout: string, stderr: string,
+ *   signal: string|null, spawnError: Error|null}} A killed process is
+ *   normalized to a non-zero `exitCode`, but callers must still consult
+ *   `signal`/`spawnError` — see outputShowsFailingTest. */
 export function runVitestFiles(testFiles, { cwd = REPO_ROOT, extraArgs = [] } = {}) {
   const result = spawnSync("npx", ["vitest", "run", ...testFiles, ...extraArgs], {
     cwd,
@@ -372,7 +403,9 @@ function forceRestoreCurrentMutation() {
 
 let signalHandlersInstalled = false;
 /** Installs the process-exit / SIGINT safety net exactly once. Exported so
- * the self-test can assert it exists without relying on module load order. */
+ * the self-test can assert it exists without relying on module load order.
+ *
+ * @returns {void} Idempotent; repeated calls register no additional handlers. */
 export function installExitSafetyNet() {
   if (signalHandlersInstalled) return;
   signalHandlersInstalled = true;
@@ -558,6 +591,14 @@ function padId(id) {
   return id.padEnd(38);
 }
 
+/** Render the human-readable report.
+ *
+ * @param {Array<object>} results - Per-mutation results from runOneMutation.
+ * @param {Mutation[]} mutations - The table that was run, for file lookup.
+ * @param {Mutation[]} knownSurviving - Documented-surviving entries; these
+ *   report as KNOWN SURVIVING and do not fail the gate.
+ * @returns {{message: string, ok: boolean}} `ok` is false if ANY mutation
+ *   survived undocumented or produced a gate failure. */
 export function formatReport(results, mutations, knownSurviving) {
   const knownIds = new Set(knownSurviving.map((k) => k.id));
   const lines = [];
@@ -658,6 +699,15 @@ export function formatReport(results, mutations, knownSurviving) {
  * Runs the full table (MUTATIONS + KNOWN_SURVIVING) against `cwd`. Refuses
  * up front if any target file already has uncommitted changes. Exported so
  * the self-test can call it directly against a synthetic table/cwd.
+ *
+ * @param {object} [options]
+ * @param {Mutation[]} [options.mutations=MUTATIONS] - Table to verify.
+ * @param {Mutation[]} [options.knownSurviving=KNOWN_SURVIVING] - Documented
+ *   surviving mutants; present but not failing.
+ * @param {string} [options.cwd=REPO_ROOT] - Repo root to mutate within.
+ * @param {string} [options.vitestCwd=cwd] - Directory to spawn vitest from.
+ * @param {string[]} [options.vitestExtraArgs=[]] - Extra vitest CLI args.
+ * @returns {{message: string, ok: boolean}} Caller maps `ok` to the exit code.
  */
 export function runMutationGate({
   mutations = MUTATIONS,

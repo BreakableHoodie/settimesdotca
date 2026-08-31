@@ -769,9 +769,21 @@ automates it: for each documented invariant it applies the exact one-line source
 mutation that would break it, runs the named test file(s), and **requires them to
 go red**. Then it restores the file and verifies the restore.
 
-**This is what makes the documentation falsifiable.** Each entry names the
-CLAUDE.md section it enforces, so the prose above cannot silently drift from the
-code without a red build. Treat that as the point of the tool, not a side effect.
+**What it does and does not tie together — read this before relying on it.**
+The gate makes the listed *invariants* executable: it proves each guarded
+behaviour still has a test that fails when the behaviour breaks, and a code
+change that alters or renames a guarded line fails the build as pattern drift.
+
+It does **not** read this file. Each entry carries the CLAUDE.md section name as
+a plain string, for whoever reads a failure — it is a pointer, not a checked
+cross-reference. So **editing or deleting the prose here leaves the gate green**,
+and nothing detects a doc that has drifted away from a still-passing invariant.
+An earlier draft of this section claimed otherwise ("the prose cannot silently
+drift without a red build"), which was exactly the confidently-wrong
+documentation this whole file exists to prevent; it was caught in review, not by
+a test. Validating that every cited section still exists is tractable and is
+tracked separately — until it lands, do not read a green gate as evidence that
+the words above are current.
 
 Three properties are load-bearing, each learned from a failure recorded in this
 file:

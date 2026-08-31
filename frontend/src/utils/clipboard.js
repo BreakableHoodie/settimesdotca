@@ -18,8 +18,12 @@ export async function copyToClipboard(text) {
     const selection = document.getSelection()
     const originalRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
     textarea.select()
-    const successful = document.execCommand('copy')
-    document.body.removeChild(textarea)
+    let successful
+    try {
+      successful = document.execCommand('copy')
+    } finally {
+      textarea.remove()
+    }
     if (originalRange && selection) {
       selection.removeAllRanges()
       selection.addRange(originalRange)

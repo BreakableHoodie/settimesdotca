@@ -537,23 +537,7 @@ export default function EventsTab({
   const handleCopyPublicUrl = async event => {
     const url = getPublicEventUrl(event)
     if (!url) return
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url)
-        showToast('Public URL copied to clipboard.', 'success')
-        return
-      }
-      throw new Error('Clipboard API unavailable')
-    } catch (_error) {
-      const fallback = document.createElement('textarea')
-      fallback.value = url
-      fallback.setAttribute('readonly', '')
-      fallback.style.position = 'absolute'
-      fallback.style.left = '-9999px'
-      document.body.appendChild(fallback)
-      fallback.select()
-      document.execCommand('copy')
-      document.body.removeChild(fallback)
+    if (await copyToClipboard(url)) {
       showToast('Public URL copied to clipboard.', 'success')
     }
   }

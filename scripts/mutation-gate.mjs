@@ -273,7 +273,10 @@ export function isGitClean(filePath, cwd) {
  * is watching -- which includes GitHub Actions -- so its summary line arrives
  * as an escape sequence followed by " Tests ", not as plain text. A regex
  * anchored on `^\s*Tests` silently fails to match that, because an escape
- * sequence is not whitespace. */
+ * sequence is not whitespace.
+ *
+ * @param {string} text - Raw captured output, possibly containing SGR escapes.
+ * @returns {string} The same text with every SGR sequence removed. */
 export function stripAnsi(text) {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\u001b\[[0-9;]*m/g, "");
@@ -292,10 +295,18 @@ export function stripAnsi(text) {
  * for EVERY mutation on the first CI run (colour on in Actions, off locally),
  * turning a healthy gate into ten inconclusive failures. Local-only
  * verification could not have caught it -- the output format differs by
- * environment, so the bug is invisible until CI runs. */
+ * environment, so the bug is invisible until CI runs.
+ *
+ * @param {string} rawOutput - vitest's combined stdout+stderr, coloured or not.
+ * @returns {boolean} true only when vitest's summary reports >= 1 failing
+ *   test. False for every "it never got that far" case -- no test files, a
+ *   transform error, a killed process, or a summary reading "Tests  no tests".
+ */
 export function outputShowsFailingTest(rawOutput) {
   const match = stripAnsi(rawOutput).match(/^\s*Tests\s+.*?\b(\d+)\s+failed/m);
-  return match !== null && Number(match[1]) > 0;
+  // String.match yields null on no-match; read it through optional chaining so
+  // the absent case and a literal "0 failed" collapse to the same answer.
+  return Number(match?.[1] ?? 0) > 0;
 }
 
 /** Run `npx vitest run <testFiles> [...extraArgs]` from `cwd`, synchronously.

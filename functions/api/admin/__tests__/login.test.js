@@ -43,14 +43,25 @@ async function postLogin(env, { email, password }) {
   return onRequestPost({ request, env });
 }
 
-function insertUser(rawDb, { email, hash, isActive = 1, activatedAt = "2025-01-01 00:00:00", role = "editor" } = {}) {
+function insertUser(
+  rawDb,
+  {
+    email,
+    hash,
+    isActive = 1,
+    activatedAt = "2025-01-01 00:00:00",
+    role = "editor",
+    totpEnabled = 0,
+    totpSecret = null,
+  } = {},
+) {
   rawDb
     .prepare(
       `INSERT INTO users
-         (email, password_hash, role, is_active, activated_at, name, first_name, last_name)
-       VALUES (?, ?, ?, ?, ?, 'Test User', 'Test', 'User')`,
+         (email, password_hash, role, is_active, activated_at, name, first_name, last_name, totp_enabled, totp_secret)
+       VALUES (?, ?, ?, ?, ?, 'Test User', 'Test', 'User', ?, ?)`,
     )
-    .run(email, hash, role, isActive, activatedAt);
+    .run(email, hash, role, isActive, activatedAt, totpEnabled, totpSecret);
 }
 
 // ── Item 1: password must be verified before account state is revealed ─────────
@@ -154,5 +165,105 @@ describe("login — account-enumeration guard (password-first ordering)", () => 
     const body = await response.json();
     expect(body).not.toHaveProperty("requiresActivation");
     expect(body.error).toBe("Authentication failed");
+  });
+});
+
+// ── Item 2: the MFA challenge branch (lines ~252-344) ───────────────────────
+
+describe("login — MFA challenge branch", () => {
+  test("issues the documented challenge shape and stores expires_at in SQLite datetime format", async () => {
+    const rawDb = createTestDB();
+    insertUser(rawDb, {
+      email: "mfa-user@test",
+      hash: passwordHash,
+      totpEnabled: 1,
+      totpSecret: "JBSWY3DPEHPK3PXP", // plaintext (unencrypted) secret is a supported input shape
+    });
+
+    const env = makeEnv(rawDb);
+    const response = await postLogin(env, { email: "mfa-user@test", password: TEST_PASSWORD });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({
+      mfaRequired: true,
+      mfaToken: expect.any(String),
+      user: {
+        email: "mfa-user@test",
+        name: "Test User",
+        firstName: "Test",
+        lastName: "User",
+        role: "editor",
+      },
+    });
+
+    const challenge = rawDb.prepare("SELECT * FROM mfa_challenges WHERE token = ?").get(body.mfaToken);
+    expect(challenge).toBeTruthy();
+    expect(challenge.used).toBe(0);
+
+    // The SEC-F1 bug class: a T-separated (ISO) expiry sorts differently than
+    // SQLite's own datetime('now') in a plain TEXT comparison, which can let
+    // an expired challenge pass a "still valid?" check. Pin the exact stored
+    // shape, not just that SOME value is present.
+    expect(challenge.expires_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(challenge.expires_at).not.toContain("T");
+  });
+
+  test("a missing TOTP secret produces a 500 MFA configuration error and creates no challenge row", async () => {
+    const rawDb = createTestDB();
+    insertUser(rawDb, {
+      email: "mfa-missing-secret@test",
+      hash: passwordHash,
+      totpEnabled: 1,
+      totpSecret: "",
+    });
+
+    const env = makeEnv(rawDb);
+    const response = await postLogin(env, { email: "mfa-missing-secret@test", password: TEST_PASSWORD });
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toBe("MFA configuration error");
+
+    const challenges = rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges").get();
+    expect(challenges.c).toBe(0);
+  });
+
+  test("a corrupt encrypted TOTP secret produces a 500 MFA configuration error and creates no challenge row", async () => {
+    const rawDb = createTestDB();
+    insertUser(rawDb, {
+      email: "mfa-corrupt-secret@test",
+      hash: passwordHash,
+      totpEnabled: 1,
+      // "enc-v1:" prefix marks this as encrypted, but decryptTotpSecret()
+      // requires TWO ":"-delimited segments after the prefix (iv + ciphertext)
+      // and throws "Invalid encrypted TOTP secret format" when only one is present.
+      totpSecret: "enc-v1:onlyonesegment",
+    });
+
+    const env = makeEnv(rawDb);
+    const response = await postLogin(env, { email: "mfa-corrupt-secret@test", password: TEST_PASSWORD });
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toBe("MFA configuration error");
+
+    const challenges = rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges").get();
+    expect(challenges.c).toBe(0);
+  });
+
+  test("a non-MFA user creates no challenge row on login", async () => {
+    const rawDb = createTestDB();
+    insertUser(rawDb, { email: "plain-user@test", hash: passwordHash });
+
+    const env = makeEnv(rawDb);
+    const response = await postLogin(env, { email: "plain-user@test", password: TEST_PASSWORD });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.mfaRequired).toBeUndefined();
+
+    const challenges = rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges").get();
+    expect(challenges.c).toBe(0);
   });
 });

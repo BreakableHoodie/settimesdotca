@@ -41,9 +41,9 @@ const MAX_UNTESTED_LINES = 400
  * Do not add to this list to make a build pass. Adding an entry means shipping
  * a large untested file, which is the thing being prevented.
  */
-const MAX_ALLOWED = 3
+const MAX_ALLOWED = 2
 
-const ALLOWED = new Set(['admin/AdminPanel.jsx', 'admin/UserManagement.jsx', 'admin/VenuesTab.jsx'])
+const ALLOWED = new Set(['admin/UserManagement.jsx', 'admin/VenuesTab.jsx'])
 
 const SKIP_DIRS = new Set(['__tests__', 'test', 'node_modules'])
 

@@ -244,6 +244,11 @@ export default function AdminPanel({ currentUser, onLogout }) {
       return
     }
 
+    if (!selectedEventId && activeTab === 'lineup') {
+      setActiveTab('events')
+      return
+    }
+
     if (tabs.some(tab => tab.id === 'settings')) {
       setActiveTab('settings')
       return

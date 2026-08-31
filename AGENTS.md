@@ -102,7 +102,7 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 
 - Backend unit tests run from repo root (better-sqlite3-backed; may DLOPEN-fail on some
   Apple Silicon setups — CI covers it, note it and move on).
-- E2E requires a live wrangler server and env credentials (`ADMIN_EMAIL`/`ADMIN_PASSWORD`
+- E2E requires a live wrangler server and env credentials (`E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD`
   are required for ANY Playwright invocation, including `--list`). `make e2e` handles this.
 - E2E spec files are under the same prettier/eslint scope as `functions/`/`scripts/` (#622) —
   double quotes/semis, `eslint.config.js`'s `e2e/**` block covers Playwright + browser globals.

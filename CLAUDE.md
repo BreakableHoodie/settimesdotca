@@ -13,6 +13,7 @@ Invoke these without being asked — don't wait for the user to request them:
 | **Before opening any PR** | `make review` (CodeRabbit) — the standing review gate |
 | Multi-file feature touching a documented invariant, a migration, or an architectural decision | Invoke `pr-review-toolkit:code-reviewer` agent **in addition** to CodeRabbit |
 | **Any bug you diagnose** | Sweep for other instances of the same class before calling it fixed — see "Sweep for siblings" below |
+| **Adding/changing a test for a documented invariant in `functions/`** | Add/refresh its entry in `scripts/mutation-gate.mjs` — see "The mutation gate" below. A test only ever seen passing proves nothing. Backend only: the gate does not cover `frontend/` yet |
 | After editing `functions/utils/auth.js`, session endpoints (`sessions/`), or follow/unfollow/confirm-follow flows | Invoke `cloudflare-security-reviewer` agent |
 | After writing or modifying error handling (`catch` blocks, `.catch()`, `try/finally`) in `functions/` | Invoke `pr-review-toolkit:silent-failure-hunter` agent |
 | After editing `frontend/src/` public pages (outside `admin/`) | Scan for `text-white`/`bg-white` theme violations before finishing |
@@ -748,6 +749,73 @@ correlation rather than a demonstrated cause. It is still enough to act on:
 measure perf on an idle host or take CI's number, and never re-baseline it from
 a laptop doing other work.
 
+### The mutation gate — documented invariants, proven executable
+
+```bash
+make mutation-gate      # ~8s; NOT part of `make gate`
+```
+
+**The problem it solves:** this repo has a recurring *vacuous test* class —
+tests that pass against both the correct and the broken implementation. The
+worst instance is recorded under "Band Announcements": deleting
+`AND verified = 1` from either recipient query left **all 1,169 backend tests
+green**, because ten test files all seeded `verified = 1`, so no fixture could
+distinguish a gated query from an ungated one. The suite looked thorough and
+proved nothing about the property it most needed to prove.
+
+CLAUDE.md documents invariants in prose and asks contributors to "verify by
+mutation" by hand. Nothing enforced it, so it decayed. `scripts/mutation-gate.mjs`
+automates it: for each documented invariant it applies the exact one-line source
+mutation that would break it, runs the named test file(s), and **requires them to
+go red**. Then it restores the file and verifies the restore.
+
+**What it does and does not tie together — read this before relying on it.**
+The gate makes the listed *invariants* executable: it proves each guarded
+behaviour still has a test that fails when the behaviour breaks, and a code
+change that alters or renames a guarded line fails the build as pattern drift.
+
+It does **not** read this file. Each entry carries the CLAUDE.md section name as
+a plain string, for whoever reads a failure — it is a pointer, not a checked
+cross-reference. So **editing or deleting the prose here leaves the gate green**,
+and nothing detects a doc that has drifted away from a still-passing invariant.
+An earlier draft of this section claimed otherwise ("the prose cannot silently
+drift without a red build"), which was exactly the confidently-wrong
+documentation this whole file exists to prevent; it was caught in review, not by
+a test. Validating that every cited section still exists is tractable and is
+tracked separately — until it lands, do not read a green gate as evidence that
+the words above are current.
+
+Three properties are load-bearing, each learned from a failure recorded in this
+file:
+
+- **A `find` string that is absent — or matches more than once — is a GATE
+  FAILURE, not a skip.** Patterns drift as code changes, and a gate whose
+  patterns silently no-op reports all-green while testing nothing. Same shape as
+  `lint-md` missing from `.PHONY`. If you rename or reword a guarded line, the
+  gate fails and you update the `find` field; that failure is the tool working.
+- **A surviving mutant is a real finding, reported loudly** with the invariant,
+  file and expected tests named. It means that invariant's tests are vacuous.
+  Do not delete the entry to get green — fix the test, or record it in
+  `KNOWN_SURVIVING` with an issue reference.
+- **It refuses to run on a dirty working tree** (scoped to the files its table
+  touches). It cannot tell its own mutation from an edit in progress, and a
+  crash mid-run could destroy real work.
+
+**Deliberately NOT part of `make gate`.** `gate` must stay fast and
+offline-capable; this shells out to git and spawns vitest once per mutation. It
+runs as its own job in `quality.yml`.
+
+**Scope is backend (`functions/`) only.** The frontend runs a separate vitest
+project with its own config and jsdom environment; wiring it in here would mean
+a second invocation with different flags and cwd. A `frontend/` companion is a
+reasonable v2 — the frontend after-midnight threshold in
+`frontend/src/utils/festivalDays.js` is the obvious first entry.
+
+**What it does NOT do:** it proves a *named* test would catch a *specific*
+break. It says nothing about invariants absent from its table, nor about test
+quality generally. Ten entries is a floor, not a certificate — add one whenever
+you add or change a test for something this file documents.
+
 ### Before every commit — required checklist
 
 **Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint-all` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
@@ -973,9 +1041,7 @@ you where to go:
 - `ADMIN_PASSWORD` and `MASTER_PASSWORD` Pages production environment variables.
   **Nothing read them** — every consumer in this repo uses `E2E_ADMIN_PASSWORD`
   (`scripts/seed-e2e-admin.mjs`), which is local-only. They were unused
-  credentials sitting in production config. Note `AGENTS.md` still describes the
-  E2E vars as `ADMIN_EMAIL`/`ADMIN_PASSWORD`; the script's actual contract is
-  `E2E_ADMIN_PASSWORD`.
+  credentials sitting in production config.
 - The `bandcrawl-db` D1 database — verified empty (only Cloudflare's internal
   `_cf_KV`, no user tables), referenced nowhere in the repo, bound to nothing.
   The only D1 database is `settimes-production-db`. Note the API's `num_tables`

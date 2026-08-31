@@ -40,7 +40,7 @@ export E2E_ADMIN_EMAIL
 export E2E_ADMIN_PASSWORD
 
 .PHONY: help install build dev format format-check lint lint-md lint-sh lint-yaml lint-sql lint-json \
-	lint-all test test-backend test-frontend gate review review-wip validate-openapi schema-check \
+	lint-all test test-backend test-frontend mutation-gate gate review review-wip validate-openapi schema-check \
 	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean hooks
 
 # CodeRabbit emits PostHog telemetry errors when egress is blocked. They are
@@ -161,6 +161,9 @@ test-frontend: ## Frontend unit tests
 	cd frontend && npm test -- --run
 
 test: test-backend test-frontend ## All unit tests
+
+mutation-gate: ## Convert documented invariants into executable proof (~8s; NOT part of `gate` -- see .github/workflows/quality.yml)
+	node scripts/mutation-gate.mjs
 
 gate: format format-check lint-all test build ## FULL pre-commit gate — run before every commit
 

@@ -178,6 +178,49 @@ describe("mutation-gate — verified against its own failure modes", () => {
     expect(readFileSync(path.join(dir, "source.js"), "utf8")).toBe(original);
   });
 
+  it("FAILS (never 'caught') when the mutation breaks parsing so no assertion runs", () => {
+    const dir = makeFixture({ sourceContent: SOURCE, testContent: BEHAVIOR_TEST });
+    const original = readFileSync(path.join(dir, "source.js"), "utf8");
+
+    // Syntactically invalid. vitest exits NON-ZERO because the module fails to
+    // load, without a single assertion ever running. Inferring "caught" from a
+    // non-zero exit -- the intuitive reading, since "caught" is this gate's
+    // PASSING direction -- would print PASS while proving nothing. Same class
+    // as an OOM kill or a missing `npx`.
+    const mutation = {
+      id: "unparseable-mutation",
+      invariant: "fixture: a run that asserted nothing must never be read as caught",
+      file: "source.js",
+      find: "THRESHOLD = 10",
+      replace: "THRESHOLD = (((",
+      tests: ["__tests__/behavior.test.js"],
+    };
+
+    const result = runOneMutation(mutation, runVitestOptions(dir));
+
+    expect(result.status).toBe("gate-failure");
+    expect(result.failureKind).toBe("inconclusive");
+    expect(result.reason).toMatch(/no failing test/i);
+    expect(result.testExitCode).not.toBe(0);
+
+    // Restored, even though what was written to disk was not valid JavaScript.
+    expect(readFileSync(path.join(dir, "source.js"), "utf8")).toBe(original);
+
+    const gateResult = runMutationGate({
+      mutations: [mutation],
+      knownSurviving: [],
+      cwd: dir,
+      vitestCwd: REPO_ROOT,
+      vitestExtraArgs: runVitestOptions(dir).vitestExtraArgs,
+    });
+    expect(gateResult.ok).toBe(false);
+    // Reported as an inconclusive RUN, not as table drift -- the mutation applied
+    // cleanly; it was the verification that failed. Sending someone to fix the
+    // table would be sending them to the wrong place.
+    expect(gateResult.message).toContain("Inconclusive runs");
+    expect(gateResult.message).not.toContain("Table drift");
+  });
+
   it("PASSES when the listed test actually catches the mutation", () => {
     const dir = makeFixture({ sourceContent: SOURCE, testContent: BEHAVIOR_TEST });
     const original = readFileSync(path.join(dir, "source.js"), "utf8");

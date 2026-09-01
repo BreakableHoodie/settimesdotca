@@ -13,11 +13,17 @@
 // branches and its zero-performances success message, and all three
 // handlers' catch(error) 500 paths.
 //
-// Deliberately NOT covered here: functions/api/admin/events/[id].js's own
-// header comment (line 4) lists "POST .../duplicate - Duplicate event", but
-// that handler actually lives in functions/api/admin/events/[id]/duplicate.js
-// and is exercised by events.test.js's "Event duplication atomicity (P0-B2)"
-// describe block. There is no duplication/rollback code in this file to test.
+// Deliberately NOT covered here: event duplication and its compensating-delete
+// rollback. That handler lives in functions/api/admin/events/[id]/duplicate.js
+// -- Cloudflare Pages needs a dedicated file per route segment -- and is
+// exercised by events.test.js's "Event duplication atomicity (P0-B2)" describe
+// block. There is no duplication or rollback code in [id].js to test.
+//
+// Worth knowing because two stale pointers said otherwise until the commit that
+// added this file: [id].js's own header advertised POST .../duplicate, and
+// CLAUDE.md's "D1 transactions" section cited [id].js for the compensating-delete
+// pattern. Both were corrected; this note exists so the next reader does not go
+// looking for rollback code here again.
 //
 // Unlike events.test.js, this file does NOT mock ../../_middleware.js — it
 // exercises the REAL checkPermission via `data.user`, the same pattern
@@ -118,7 +124,7 @@ describe("PATCH /api/admin/events/:id — guard and validation branches", () => 
     const ev = insertEvent(rawDb, { name: "E", slug: "patch-array-body" });
 
     const res = await onRequestPatch({
-      request: patchRequest(ev.id, null, { rawBody: "[]" }),
+      request: patchRequest(ev.id, undefined, { rawBody: "[]" }),
       env,
       data: { user: authedUser("editor", 2) },
     });

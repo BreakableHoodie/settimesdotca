@@ -135,8 +135,19 @@ describe("mutation invariant citations", () => {
     const headings = [...claude.matchAll(/^#{1,6}\s+(.+)$/gm)].map((match) => match[1]);
 
     for (const entry of [...MUTATIONS, ...KNOWN_SURVIVING]) {
-      const section = entry.invariant.match(/'([^']+)'/)?.[1];
-      expect(section, `mutation entry ${entry.id} must cite a section in single quotes`).toBeDefined();
+      // ANCHORED to the `CLAUDE.md '<section>'` prefix, not "the first quoted
+      // string anywhere". Several invariants quote SQL later in the sentence --
+      // one contains `AND status IN ('draft','published')` -- so an unanchored
+      // match would silently read 'draft' as the section name the moment an
+      // entry lost its leading citation. It happens to work today only because
+      // the section always comes first, which is exactly the kind of accident
+      // that stops being true without anyone noticing.
+      expect(typeof entry.invariant, `mutation entry ${entry.id} must have a string invariant`).toBe("string");
+      const section = entry.invariant.match(/^CLAUDE\.md\s+'([^']+)'/)?.[1];
+      expect(
+        section,
+        `mutation entry ${entry.id} must start with: CLAUDE.md '<section>' — got: ${entry.invariant.slice(0, 60)}`,
+      ).toBeDefined();
 
       // Preserve case: section names are deliberate labels, not user input.
       const normalize = (text) => text.replaceAll("`", "");

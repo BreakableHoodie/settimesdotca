@@ -56,7 +56,3 @@ export function useTheme() {
   if (!ctx) throw new Error('useTheme must be used within ThemeProvider')
   return ctx
 }
-
-export function getThemeInitScript() {
-  return `(function(){var t;try{t=localStorage.getItem('${THEME_KEY}')}catch{}if(!t||!['midnight-ember','arctic-night','daybreak','silver-lining'].includes(t))t='${DEFAULT_THEME}';document.documentElement.dataset.theme=t})()`
-}

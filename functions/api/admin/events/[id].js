@@ -1,7 +1,6 @@
 // Admin specific event operations
 // PATCH /api/admin/events/{id} - Update event details
 // PUT /api/admin/events/{id}/publish - Toggle publish status
-// POST /api/admin/events/{id}/duplicate - Duplicate event
 // DELETE /api/admin/events/{id} - Delete event
 
 import { checkPermission, auditLog } from "../_middleware.js";

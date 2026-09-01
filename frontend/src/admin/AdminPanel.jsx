@@ -1,18 +1,30 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { eventsApi } from '../utils/adminApi'
-import EventsTab from './EventsTab'
-import VenuesTab from './VenuesTab'
-import RosterTab from './RosterTab'
-import LineupTab from './LineupTab'
-import UserManagement from './UserManagement'
 import UserSettings from './UserSettings'
 import PlatformSettings from './PlatformSettings'
-import EventWizard from './EventWizard'
 import BottomNav from './components/BottomNav'
 import ContextBanner from './components/ContextBanner'
 import Breadcrumbs from './components/Breadcrumbs'
 import MfaSettingsModal from './components/MfaSettingsModal'
 import { Button, Loading, Alert, ConfirmDialog, Modal } from '../components/ui'
+
+// Tabs are code-split, not just conditionally rendered. They were already
+// mounted on demand (`activeTab === '...'`), but a STATIC import still puts all
+// of them in one chunk: AdminPanel was 664 kB / 187 kB gzip, and a first visit
+// to /admin paid for every tab before the login screen painted (#1019). Admin is
+// the show-day tool — used at a venue, on venue Wi-Fi, sometimes cold — so the
+// cost lands exactly where it hurts.
+//
+// EventWizard is lazy for the same reason and is safe to defer because `Modal`
+// returns null while closed (ui/Modal.jsx), so the import is never requested
+// until the wizard is actually opened. That preserves the mount-only-while-open
+// semantics #949 established rather than working around them.
+const EventsTab = lazy(() => import('./EventsTab'))
+const VenuesTab = lazy(() => import('./VenuesTab'))
+const RosterTab = lazy(() => import('./RosterTab'))
+const LineupTab = lazy(() => import('./LineupTab'))
+const UserManagement = lazy(() => import('./UserManagement'))
+const EventWizard = lazy(() => import('./EventWizard'))
 
 // events.status is the single source of truth for publish state (#799); the
 // deprecated boolean it replaced could only express two of these three.
@@ -405,7 +417,13 @@ export default function AdminPanel({ currentUser, onLogout }) {
             <Loading size="lg" text="Loading admin panel..." />
           </div>
         ) : (
-          <>
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loading size="lg" text="Loading..." />
+              </div>
+            }
+          >
             {activeTab === 'events' && (
               <EventsTab
                 events={events}
@@ -439,19 +457,27 @@ export default function AdminPanel({ currentUser, onLogout }) {
             {activeTab === 'settings' && <UserSettings user={currentUser} onOpenMfa={() => setShowMfaModal(true)} />}
 
             {activeTab === 'platform' && <PlatformSettings isAdmin={isAdmin} />}
-          </>
+          </Suspense>
         )}
       </div>
 
       {/* Event Wizard Modal */}
       <Modal isOpen={showWizard} onClose={handleWizardCancel} title="Create Event" size="lg" className="bg-bg-purple">
-        <EventWizard
-          onComplete={handleWizardComplete}
-          onCancel={handleWizardCancel}
-          initialEventData={wizardDraft?.eventData}
-          initialStep={wizardDraft?.currentStep ?? 0}
-          onDraftChange={setWizardDraft}
-        />
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-12">
+              <Loading size="lg" text="Loading..." />
+            </div>
+          }
+        >
+          <EventWizard
+            onComplete={handleWizardComplete}
+            onCancel={handleWizardCancel}
+            initialEventData={wizardDraft?.eventData}
+            initialStep={wizardDraft?.currentStep ?? 0}
+            onDraftChange={setWizardDraft}
+          />
+        </Suspense>
       </Modal>
 
       {/* Toast Notification */}

@@ -1,9 +1,18 @@
 import PropTypes from 'prop-types'
+import { lazy, Suspense } from 'react'
 import PhotoUpload from './PhotoUpload'
-import RichTextEditor from './RichTextEditor'
 import { Input, Button, Tooltip } from '../../components/ui'
 import Combobox from '../../components/ui/Combobox'
 import { BAND_PHOTO_CROP } from '../../utils/bandPhoto'
+
+// Lazy because RichTextEditor pulls in tiptap/prosemirror (~425 kB). BandForm is
+// imported by both RosterTab and LineupTab, so with a static import Rollup
+// hoisted the editor into a chunk SHARED with AdminPanel's own small utilities —
+// which meant /admin downloaded the whole editor before painting the login
+// screen, even though the editor only appears inside a band form (#1019).
+// Deferring it here keeps tiptap in its own chunk, fetched when someone actually
+// opens a form.
+const RichTextEditor = lazy(() => import('./RichTextEditor'))
 import { Info } from 'lucide-react'
 import { FIELD_LIMITS } from '../../utils/validation'
 import { DEFAULT_GENRES, getNormalizedGenreSuggestions } from '../../utils/genres'
@@ -268,15 +277,25 @@ export default function BandForm({
               <span id="band-description-label" className="block text-white mb-2 text-sm">
                 Description <span className="text-gray-400 text-xs">(optional)</span>
               </span>
-              <RichTextEditor
-                ariaLabelledBy="band-description-label"
-                value={formData.description || ''}
-                onChange={value => {
-                  onChange({ target: { name: 'description', value } })
-                }}
-                placeholder="Band bio, description, press quote..."
-                minHeight={200}
-              />
+              <Suspense
+                fallback={
+                  <div
+                    className="rounded border border-border bg-surface animate-pulse"
+                    style={{ minHeight: 200 }}
+                    aria-hidden="true"
+                  />
+                }
+              >
+                <RichTextEditor
+                  ariaLabelledBy="band-description-label"
+                  value={formData.description || ''}
+                  onChange={value => {
+                    onChange({ target: { name: 'description', value } })
+                  }}
+                  placeholder="Band bio, description, press quote..."
+                  minHeight={200}
+                />
+              </Suspense>
               <p className="text-white/60 text-xs mt-2">
                 Short bio or description about the band. Supports markdown formatting.
               </p>

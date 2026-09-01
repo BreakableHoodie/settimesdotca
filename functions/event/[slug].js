@@ -74,14 +74,28 @@ const DATE_LABEL_FORMAT = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
-// Returns null -- never a partial or "Invalid Date" string -- for anything that
-// is not a real YYYY-MM-DD. Intl throws a RangeError on an invalid Date, and
-// this runs while building the description of a public page, so an unparseable
-// value must degrade to "no date sentence" rather than a 500.
+// Returns null -- never a partial, a wrong date, or "Invalid Date" -- for
+// anything that is not a real calendar date, because this builds the <head> of
+// a public page. Two failures it guards, in order of how easy they are to miss:
+//
+//   1. Intl.format() THROWS a RangeError on an invalid Date (it does not return
+//      the string "Invalid Date" the way String(date) would), so an unparseable
+//      column value would 500 the route rather than drop the date sentence.
+//   2. Date SILENTLY NORMALIZES a day that overflows its month: "2026-02-30"
+//      parses fine and becomes 2026-03-02, and "2026-02-29" (2026 is not a leap
+//      year) becomes 2026-03-01. A typo would then publish a confidently WRONG
+//      date into a SERP snippet, which is worse than publishing none.
+//
+// The toISOString round-trip is what catches (2); noon UTC sits far enough from
+// either boundary that the UTC calendar day always equals the input for a real
+// date. An explicit ^\d{4}-\d{2}-\d{2}$ regex was tried here and removed: it
+// survived mutation, because every input it rejects is already rejected by the
+// NaN check or the round-trip.
 function eventDateLabel(dateStr) {
   if (typeof dateStr !== "string") return null;
   const probe = new Date(`${dateStr}T12:00:00Z`);
   if (Number.isNaN(probe.getTime())) return null;
+  if (probe.toISOString().slice(0, 10) !== dateStr) return null;
   return DATE_LABEL_FORMAT.format(probe);
 }
 
@@ -90,7 +104,10 @@ function eventDateLabel(dateStr) {
 function eventDateRangeLabel(dateStr, endDateStr) {
   const start = eventDateLabel(dateStr);
   if (!start) return null;
-  if (!endDateStr || endDateStr === dateStr) return start;
+  // Lexicographic ordering is exact for YYYY-MM-DD. An inverted pair would
+  // otherwise render "October 11 ... to October 9"; nothing validates the
+  // ordering on write, so degrade to the start date alone.
+  if (!endDateStr || endDateStr <= dateStr) return start;
   const end = eventDateLabel(endDateStr);
   return end ? `${start} to ${end}` : start;
 }

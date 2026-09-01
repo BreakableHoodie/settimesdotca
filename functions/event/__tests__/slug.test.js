@@ -575,6 +575,43 @@ describe("SSR /event/[slug] — human-readable date in the fallback description 
   // Intl throws a RangeError on an invalid Date, and this runs while building a
   // public page's <head>. An unparseable value must drop the date sentence, not
   // 500 the route or emit the string "Invalid Date" into search results.
+  // Date SILENTLY NORMALIZES an overflowing day: "2026-02-30" parses fine and
+  // becomes 2026-03-02. Publishing a plausible WRONG date into a SERP snippet is
+  // worse than publishing none, so the round-trip check must reject it.
+  test("rejects a calendar date that Date would silently normalize", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-overflow-date",
+      date: "2026-02-30",
+    });
+
+    expect(description).not.toContain("2026-02-30");
+    expect(description).not.toContain("March 2");
+    expect(description).not.toContain("February 30");
+  });
+
+  // 2026 is not a leap year, so Feb 29 normalizes to March 1 the same way.
+  test("rejects a non-leap-year February 29", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-leap-date",
+      date: "2026-02-29",
+    });
+
+    expect(description).not.toContain("March 1");
+    expect(description).not.toContain("February 29");
+  });
+
+  test("degrades to the start date alone when end_date precedes date", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-inverted",
+      date: "2026-10-11",
+      end_date: "2026-10-09",
+    });
+
+    expect(description).toContain("Sunday, October 11, 2026");
+    expect(description).not.toContain("October 9");
+    expect(description).not.toContain(" to ");
+  });
+
   test("drops the date sentence for an unparseable date rather than throwing", async () => {
     const description = await publishedEventDescription({
       slug: "slug-1046-bad-date",

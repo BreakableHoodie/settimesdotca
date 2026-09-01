@@ -244,11 +244,42 @@ describe("POST /api/admin/bands/photos", () => {
     expect(profile.photo_url).toBe(data.url);
   });
 
-  test("band_id that resolves to neither a performance nor a band_profiles row leaves the database untouched", async () => {
-    const { env, rawDb } = buildEnv();
+  // #1035. A caller that NAMES a band and gets no match asked for something that
+  // does not exist, so this is a 404 rather than a silent success. Both id shapes
+  // are covered because they used to behave differently: the numeric branch
+  // verified the id, while `profile_<id>` parsed the number and trusted it — so
+  // `profile_99999` produced an UPDATE matching zero rows and still answered 200.
+  //
+  // Each case also asserts NO R2 put. Resolution now happens before the upload,
+  // so a bad id cannot leave an orphaned object behind; asserting only the status
+  // would let that regress silently.
+  test.each([
+    ["numeric id matching no performance and no profile", "999999"],
+    ["profile_<id> naming a nonexistent profile", "profile_99999"],
+  ])("404 and no upload when band_id resolves to nothing: %s", async (_label, bandId) => {
+    const { env, rawDb, put } = buildEnv();
     const formData = new FormData();
     formData.append("photo", jpegFile());
-    formData.append("band_id", "999999");
+    formData.append("band_id", bandId);
+
+    const res = await onRequestPost({
+      request: postRequest(formData),
+      env,
+      data: { user: authedUser("editor", 2) },
+    });
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).code).toBe("BAND_NOT_FOUND");
+    expect(put).not.toHaveBeenCalled();
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_profiles").get().n).toBe(0);
+  });
+
+  // Omitting band_id stays a valid upload-without-association: the 404 above
+  // fires only when a band was actually named.
+  test("no band_id still uploads and returns 200", async () => {
+    const { env, put } = buildEnv();
+    const formData = new FormData();
+    formData.append("photo", jpegFile());
 
     const res = await onRequestPost({
       request: postRequest(formData),
@@ -257,8 +288,7 @@ describe("POST /api/admin/bands/photos", () => {
     });
 
     expect(res.status).toBe(200);
-    const count = rawDb.prepare("SELECT COUNT(*) AS n FROM band_profiles").get().n;
-    expect(count).toBe(0);
+    expect(put).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -70,7 +70,7 @@ describe('AdminPanel', () => {
     expect(within(selector).getByRole('option', { name: 'Archived Event (Archived)' })).toBeInTheDocument()
     expect(within(selector).getByRole('option', { name: 'Draft Event (Draft)' })).toBeInTheDocument()
     expect(within(selector).getByRole('option', { name: 'Legacy Event (Draft)' })).toBeInTheDocument()
-    expect(screen.getByText('Events tab (4)')).toBeInTheDocument()
+    expect(await screen.findByText('Events tab (4)')).toBeInTheDocument()
   })
 
   it('moves to lineup when an event is selected and clears the filter back to events', async () => {
@@ -99,11 +99,11 @@ describe('AdminPanel', () => {
     await screen.findByText('Events tab (4)')
 
     fireEvent.click(screen.getByRole('tab', { name: 'Venues' }))
-    expect(screen.getByText('Venues tab')).toBeInTheDocument()
+    expect(await screen.findByText('Venues tab')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Roster' }))
-    expect(screen.getByText('Roster tab')).toBeInTheDocument()
+    expect(await screen.findByText('Roster tab')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Mobile venues' }))
-    expect(screen.getByText('Venues tab')).toBeInTheDocument()
+    expect(await screen.findByText('Venues tab')).toBeInTheDocument()
   })
 
   it('confirms logout and clears persisted admin context', async () => {

@@ -123,6 +123,28 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/events/__tests__/events.test.js"],
   },
   {
+    id: "patch-race-predicate-dynamic",
+    invariant:
+      "CLAUDE.md 'Public event visibility' — PATCH's status guard is built dynamically (statusGuardSql), so it is the site a `SET status` grep misses; it must still carry the concurrent-archive predicate",
+    file: "functions/api/admin/events/[id].js",
+    // A JS ternary, not SQL inside a template literal — the other three sites
+    // are raw SQL, so this find string is a different shape by necessity. It is
+    // also the site CLAUDE.md warns is invisible to the obvious grep, which is
+    // exactly why leaving it unpinned was the wrong two-of-four to have.
+    find: "const statusGuardSql = patchesStatus ? \" AND status IN ('draft', 'published')\" : \"\";",
+    replace: 'const statusGuardSql = "";',
+    tests: ["functions/api/admin/events/__tests__/events.test.js"],
+  },
+  {
+    id: "put-toggle-race-predicate",
+    invariant:
+      "CLAUDE.md 'Public event visibility' — the PUT publish-toggle carries the same concurrent-archive predicate as archive.js and publish.js",
+    file: "functions/api/admin/events/[id].js",
+    find: "WHERE id = ? AND status IN ('draft', 'published')",
+    replace: "WHERE id = ?",
+    tests: ["functions/api/admin/events/__tests__/events.test.js"],
+  },
+  {
     id: "publish-race-predicate",
     invariant: "CLAUDE.md 'Public event visibility' — same race predicate on the publish route (POST .../publish)",
     file: "functions/api/admin/events/[id]/publish.js",

@@ -307,7 +307,8 @@ export default function BandForm({
                 />
               </Suspense>
               <p className="text-white/60 text-xs mt-2">
-                Short bio or description about the band. Supports markdown formatting.
+                Short bio or description about the band. Use the toolbar above to format — bold, italics, links and
+                lists.
               </p>
             </div>
           </>

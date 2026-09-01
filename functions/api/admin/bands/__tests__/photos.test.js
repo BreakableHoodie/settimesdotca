@@ -244,11 +244,106 @@ describe("POST /api/admin/bands/photos", () => {
     expect(profile.photo_url).toBe(data.url);
   });
 
-  test("band_id that resolves to neither a performance nor a band_profiles row leaves the database untouched", async () => {
-    const { env, rawDb } = buildEnv();
+  // #1035. A caller that NAMES a band and gets no match asked for something that
+  // does not exist, so this is a 404 rather than a silent success. Both id shapes
+  // are covered because they used to behave differently: the numeric branch
+  // verified the id, while `profile_<id>` parsed the number and trusted it — so
+  // `profile_99999` produced an UPDATE matching zero rows and still answered 200.
+  //
+  // Each case also asserts NO R2 put. Resolution now happens before the upload,
+  // so a bad id cannot leave an orphaned object behind; asserting only the status
+  // would let that regress silently.
+  test.each([
+    ["numeric id matching no performance and no profile", "999999"],
+    ["profile_<id> naming a nonexistent profile", "profile_99999"],
+  ])("404 and no upload when band_id resolves to nothing: %s", async (_label, bandId) => {
+    const { env, rawDb, put } = buildEnv();
     const formData = new FormData();
     formData.append("photo", jpegFile());
-    formData.append("band_id", "999999");
+    formData.append("band_id", bandId);
+
+    const res = await onRequestPost({
+      request: postRequest(formData),
+      env,
+      data: { user: authedUser("editor", 2) },
+    });
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).code).toBe("BAND_NOT_FOUND");
+    expect(put).not.toHaveBeenCalled();
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_profiles").get().n).toBe(0);
+  });
+
+  // The pre-upload lookup NARROWS the race between "profile exists" and "photo
+  // written"; it cannot close it. Another admin tab deleting the profile in
+  // between lands on exactly the bug this file fixed — 200 {success:true}, no
+  // photo, orphaned object — so the UPDATE's row count is checked too.
+  test("profile deleted between lookup and UPDATE: 404 and the uploaded object is removed", async () => {
+    const { env, rawDb, put, del } = buildEnv();
+    // A bare profile with no performance rows: insertBand() also creates a
+    // performance whose FK to band_profiles blocks the delete this race needs.
+    const profileId = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)")
+      .run("Race Band", "raceband").lastInsertRowid;
+
+    // Delete the row at the moment the UPDATE is prepared — after the handler's
+    // existence check has already passed.
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.startsWith("UPDATE band_profiles SET photo_url")) {
+        rawDb.prepare("DELETE FROM band_profiles WHERE id = ?").run(profileId);
+      }
+      return realPrepare(sql);
+    };
+
+    const formData = new FormData();
+    formData.append("photo", jpegFile());
+    formData.append("band_id", `profile_${profileId}`);
+
+    const res = await onRequestPost({
+      request: postRequest(formData),
+      env,
+      data: { user: authedUser("editor", 2) },
+    });
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).code).toBe("BAND_NOT_FOUND");
+    // Uploaded first (the race is only reachable after the put), then removed —
+    // so the failure leaves nothing behind in R2.
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(del).toHaveBeenCalledTimes(1);
+    expect(del.mock.calls[0][0]).toBe(put.mock.calls[0][0]);
+  });
+
+  // Pins the DELIBERATE asymmetry: only an EXPLICIT changes===0 counts as
+  // failure. D1's meta shape is not guaranteed (see schedule/share/[slug].js),
+  // and failing closed on an absent `meta` would delete a SUCCESSFUL upload and
+  // report "not found" — strictly worse than the rare orphan. Without this test
+  // the choice lives only in a comment: flipping the check to
+  // `!updateResult?.meta?.changes` leaves every other test green.
+  test("absent meta keeps the upload rather than deleting it", async () => {
+    const { env, rawDb, put, del } = buildEnv();
+    const profileId = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)")
+      .run("No Meta Band", "nometaband").lastInsertRowid;
+
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      const stmt = realPrepare(sql);
+      if (!sql.startsWith("UPDATE band_profiles SET photo_url")) return stmt;
+      // Same write, but a result carrying no `meta` at all.
+      return {
+        ...stmt,
+        bind: (...args) => {
+          const bound = stmt.bind(...args);
+          return { ...bound, run: async () => (await bound.run(), {}) };
+        },
+      };
+    };
+
+    const formData = new FormData();
+    formData.append("photo", jpegFile());
+    formData.append("band_id", `profile_${profileId}`);
 
     const res = await onRequestPost({
       request: postRequest(formData),
@@ -257,8 +352,28 @@ describe("POST /api/admin/bands/photos", () => {
     });
 
     expect(res.status).toBe(200);
-    const count = rawDb.prepare("SELECT COUNT(*) AS n FROM band_profiles").get().n;
-    expect(count).toBe(0);
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(del).not.toHaveBeenCalled();
+    // The write itself still landed; only the ACK was ambiguous.
+    const row = rawDb.prepare("SELECT photo_url FROM band_profiles WHERE id = ?").get(profileId);
+    expect(row.photo_url).toBeTruthy();
+  });
+
+  // Omitting band_id stays a valid upload-without-association: the 404 above
+  // fires only when a band was actually named.
+  test("no band_id still uploads and returns 200", async () => {
+    const { env, put } = buildEnv();
+    const formData = new FormData();
+    formData.append("photo", jpegFile());
+
+    const res = await onRequestPost({
+      request: postRequest(formData),
+      env,
+      data: { user: authedUser("editor", 2) },
+    });
+
+    expect(res.status).toBe(200);
+    expect(put).toHaveBeenCalledTimes(1);
   });
 });
 

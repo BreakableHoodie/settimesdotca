@@ -61,6 +61,40 @@ function festivalDayLabel(dateStr) {
   return DAY_LABEL_FORMAT.format(new Date(`${dateStr}T12:00:00Z`));
 }
 
+// Same label WITH the year, for the standalone meta description. A subEvent
+// name (DAY_LABEL_FORMAT) sits inside an event already scoped to a year, so it
+// omits one; a SERP snippet is read cold and needs it. Separate formats rather
+// than one widened constant -- adding a year to DAY_LABEL_FORMAT would put it
+// in every JSON-LD subEvent name too.
+const DATE_LABEL_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Toronto",
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
+
+// Returns null -- never a partial or "Invalid Date" string -- for anything that
+// is not a real YYYY-MM-DD. Intl throws a RangeError on an invalid Date, and
+// this runs while building the description of a public page, so an unparseable
+// value must degrade to "no date sentence" rather than a 500.
+function eventDateLabel(dateStr) {
+  if (typeof dateStr !== "string") return null;
+  const probe = new Date(`${dateStr}T12:00:00Z`);
+  if (Number.isNaN(probe.getTime())) return null;
+  return DATE_LABEL_FORMAT.format(probe);
+}
+
+// A multi-day event is its whole run, not its first day. Falls back to the
+// start label alone if end_date is absent, equal, or unparseable.
+function eventDateRangeLabel(dateStr, endDateStr) {
+  const start = eventDateLabel(dateStr);
+  if (!start) return null;
+  if (!endDateStr || endDateStr === dateStr) return start;
+  const end = eventDateLabel(endDateStr);
+  return end ? `${start} to ${end}` : start;
+}
+
 /**
  * Buckets a performance row into one of `festivalDays` (a MULTI-DAY event's
  * full [date, end_date] span), applying the after-midnight convention: a set
@@ -244,8 +278,9 @@ export async function onRequest(context) {
   const url = `${CANONICAL_HOST}/event/${event.slug}`;
   const where = event.city || "Waterloo Region";
   const plainDesc = toPlainText(event.description, 200);
+  const dateLabel = eventDateRangeLabel(event.date, event.end_date);
   const description =
-    plainDesc || `${event.name} — live music in ${where} on SetTimes.${event.date ? ` ${event.date}.` : ""}`;
+    plainDesc || `${event.name} — live music in ${where} on SetTimes.${dateLabel ? ` ${dateLabel}.` : ""}`;
 
   // Read-path sanitize (#504 convention, #616): a pre-validation legacy
   // poster_url must never be reflected into og:image/twitter:image or the

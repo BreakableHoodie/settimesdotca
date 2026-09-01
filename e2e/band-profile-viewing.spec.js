@@ -17,6 +17,27 @@
 
 import { test, expect } from "@playwright/test";
 
+// Navigate by clicking, then wait for the DESTINATION TO ACTUALLY RENDER.
+//
+// waitForURL alone is not enough, and this file already documents why further
+// down: a pushState URL change lands BEFORE React renders the new route. A
+// query issued right after it can still read the previous page's DOM.
+//
+// A bare `main h1` visibility check does not fix it either — the timeline
+// renders an h1 too (the SetTimes brand), so it is visible on both pages. The
+// only reliable signal that the swap happened is that the heading TEXT changed,
+// which is what this polls for.
+//
+// 15s because a cold CI mobile run can exceed the default 5s.
+async function openProfile(page, link) {
+  const before = ((await page.locator("main h1").textContent()) ?? "").trim();
+  await link.click();
+  await page.waitForURL(/\/bands?\//);
+  await expect
+    .poll(async () => ((await page.locator("main h1").textContent()) ?? "").trim(), { timeout: 15000 })
+    .not.toBe(before);
+}
+
 // The seeded upcoming event (database/seed-test-data.sql). Entering through its
 // card makes "which artist" deterministic instead of order-dependent.
 const SEEDED_EVENT = "Future Fest E2E";
@@ -39,8 +60,7 @@ test.describe("Band Profile Viewing", () => {
       // below. Empty is rejected because it would make that check vacuous.
       const linkText = ((await bandLink.textContent()) ?? "").trim();
       expect(linkText).not.toBe("");
-      await bandLink.click();
-      await page.waitForURL(/\/bands?\//);
+      await openProfile(page, bandLink);
 
       // Scope to the main h1: the Header carries its own "SetTimes" h1, and the
       // page can show the band name in more than one heading, so an unscoped
@@ -68,8 +88,7 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    await page.waitForURL(/\/bands?\//);
+    await openProfile(page, bandLink);
 
     // Verify bio/description is displayed
     // Scoped to <main>: the `p, div` + /\w{20,}/ fallback matches ANY container
@@ -144,8 +163,7 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    await page.waitForURL(/\/bands?\//);
+    await openProfile(page, bandLink);
 
     // Look for official website link
     // .first() on the union: `or()` can resolve to several elements, and
@@ -196,8 +214,7 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    await page.waitForURL(/\/bands?\//);
+    await openProfile(page, bandLink);
 
     // Look for past performances section
     const pastSection = page
@@ -216,8 +233,7 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    await page.waitForURL(/\/bands?\//);
+    await openProfile(page, bandLink);
 
     // Look for band photo/image
     const bandPhoto = page
@@ -345,8 +361,7 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    await page.waitForURL(/\/bands?\//);
+    await openProfile(page, bandLink);
 
     // Look for contact information
     // Scoped to <main>: Footer.jsx contains "Contact", so the text regex below
@@ -368,8 +383,7 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    await page.waitForURL(/\/bands?\//);
+    await openProfile(page, bandLink);
 
     // Look for formation year or history information
     const historyInfo = page
@@ -411,8 +425,7 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to band profile
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    await page.waitForURL(/\/bands?\//);
+    await openProfile(page, bandLink);
 
     // Look for band members section
     const membersSection = page

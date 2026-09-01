@@ -23,7 +23,9 @@ const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const DEBUG_TIME_STORAGE_KEY = 'debugScheduleTime'
 // scheduleStorage.DATES_KEY is private; the test reads the persisted shape
-// directly (same convention as the time-filter test reading localStorage).
+// directly, the same way the debugScheduleTime test below writes localStorage
+// rather than reaching into the module. (Not timeFilter.test.js, which uses a
+// globalThis override and never touches localStorage.)
 const DATES_KEY = '__dates__'
 
 const mockEvent = {

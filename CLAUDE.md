@@ -201,7 +201,11 @@ npx skills add amElnagdy/delegate-skills --skill opencode-delegate
 
 It also needs the `opencode` CLI on PATH and an authenticated provider (`opencode auth list`).
 
-Use it for well-specified work that would otherwise consume this session's context. **OpenCode works issues end to end: it branches, commits, and opens a PR.** The orchestrator reviews that PR, re-runs `make gate`, and merges. Review moved from "read the diff before committing" to "read the PR before merging" — a stronger gate, because the ruleset enforces it rather than habit. The invariant that survived unchanged: **nothing lands on `main` unreviewed.**
+Use it for well-specified work that would otherwise consume this session's context. **The relay does NOT commit.** It edits the working tree and stops; whoever dispatched it reads the diff, re-runs `make gate`, and commits. `relay.mjs --help` states it outright ("Committing is always the orchestrator's job"), the run prints "relay does not commit" on completion, and a delegation on 2026-09-01 left nine modified files uncommitted exactly as described. Both are checkable from this repo: run `--help`, or read `result.json`, which lists `touchedFiles` and no commit.
+
+This paragraph previously claimed the opposite — that OpenCode "works issues end to end: it branches, commits, and opens a PR" — while the numbered rule four lines below it said the relay "never commits". Both were in this section at once, so whichever a reader reached first was the one they believed. Corrected against the installed relay's behaviour, which is the only authority here.
+
+Because it does not commit, **dispatch it only from a CLEAN working tree on its own branch.** A new branch does not separate work that is already uncommitted — `git checkout -b` carries those changes along, so relay edits and your in-progress work end up in one tree and get committed together. Commit or stash first, or give it a separate `git worktree`. Verify with `git status --porcelain` before dispatching; `scripts/delegate-verify.mjs` reports what changed afterwards but cannot tell your edits from the relay's. The invariant is unchanged either way: **nothing lands on `main` unreviewed.**
 
 Four rules, each learned by something breaking:
 

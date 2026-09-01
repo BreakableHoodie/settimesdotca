@@ -40,6 +40,7 @@ test.describe("Band Profile Viewing", () => {
       const linkText = ((await bandLink.textContent()) ?? "").trim();
       expect(linkText).not.toBe("");
       await bandLink.click();
+      await page.waitForURL(/\/bands?\//);
 
       // Scope to the main h1: the Header carries its own "SetTimes" h1, and the
       // page can show the band name in more than one heading, so an unscoped
@@ -68,11 +69,16 @@ test.describe("Band Profile Viewing", () => {
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await page.waitForURL(/\/bands?\//);
 
     // Verify bio/description is displayed
-    const bioText = page
+    // Scoped to <main>: the `p, div` + /\w{20,}/ fallback matches ANY container
+    // with 20+ word characters, and Footer.jsx has 7 such text nodes on every
+    // page — so unscoped, this guard passes whether or not the artist has a bio.
+    const main = page.locator("main");
+    const bioText = main
       .locator('[data-testid="band-bio"]')
-      .or(page.locator('[class*="bio"]').or(page.locator("p, div").filter({ hasText: /\w{20,}/ })));
+      .or(main.locator('[class*="bio"]').or(main.locator("p, div").filter({ hasText: /\w{20,}/ })));
 
     if ((await bioText.count()) > 0) {
       await expect(bioText.first()).toBeVisible();
@@ -139,14 +145,18 @@ test.describe("Band Profile Viewing", () => {
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await page.waitForURL(/\/bands?\//);
 
     // Look for official website link
     // .first() on the union: `or()` can resolve to several elements, and
     // isVisible() on a multi-match locator raises a strict-mode error rather
     // than returning false.
-    const websiteLink = page
+    // Scoped to <main>: Footer.jsx contains the word "Website", so
+    // `a:has-text("Website")` matches site chrome on every page.
+    const main = page.locator("main");
+    const websiteLink = main
       .locator('a[data-testid="band-website"]')
-      .or(page.locator('a:has-text("Website")').or(page.locator('a[class*="website"]')))
+      .or(main.locator('a:has-text("Website")').or(main.locator('a[class*="website"]')))
       .first();
 
     // The outer guard stays: a band legitimately may have no website, which is
@@ -187,6 +197,7 @@ test.describe("Band Profile Viewing", () => {
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await page.waitForURL(/\/bands?\//);
 
     // Look for past performances section
     const pastSection = page
@@ -206,6 +217,7 @@ test.describe("Band Profile Viewing", () => {
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await page.waitForURL(/\/bands?\//);
 
     // Look for band photo/image
     const bandPhoto = page
@@ -334,11 +346,16 @@ test.describe("Band Profile Viewing", () => {
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await page.waitForURL(/\/bands?\//);
 
     // Look for contact information
-    const contactInfo = page
+    // Scoped to <main>: Footer.jsx contains "Contact", so the text regex below
+    // matches site chrome on every page — the same shape as the social-links
+    // guard that was satisfied by the footer's instagram link.
+    const main = page.locator("main");
+    const contactInfo = main
       .locator('[data-testid="band-contact"]')
-      .or(page.locator("text=/contact|booking|management|email/i"));
+      .or(main.locator("text=/contact|booking|management|email/i"));
 
     if ((await contactInfo.count()) > 0) {
       await expect(contactInfo.first()).toBeVisible();
@@ -352,6 +369,7 @@ test.describe("Band Profile Viewing", () => {
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await page.waitForURL(/\/bands?\//);
 
     // Look for formation year or history information
     const historyInfo = page
@@ -394,6 +412,7 @@ test.describe("Band Profile Viewing", () => {
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    await page.waitForURL(/\/bands?\//);
 
     // Look for band members section
     const membersSection = page

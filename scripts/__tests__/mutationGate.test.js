@@ -17,7 +17,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { REPO_ROOT, outputShowsFailingTest, runMutationGate, runOneMutation } from "../mutation-gate.mjs";
+import {
+  KNOWN_SURVIVING,
+  MUTATIONS,
+  REPO_ROOT,
+  outputShowsFailingTest,
+  runMutationGate,
+  runOneMutation,
+} from "../mutation-gate.mjs";
 
 const FIXTURE_VITEST_CONFIG = `export default {
   test: { include: ["**/*.test.js"], globals: true, environment: "node" },
@@ -99,6 +106,49 @@ afterEach(() => {
 // and review, which is part of why this bug survived local verification.
 const ESC = String.fromCharCode(27);
 const colour = (code, text) => `${ESC}[${code}m${text}${ESC}[39m`;
+
+/**
+ * The `invariant` string on each mutation names the CLAUDE.md section it
+ * enforces. The gate itself never opens CLAUDE.md — that string is a pointer for
+ * whoever reads a failure — so without this check a section could be renamed or
+ * deleted while the gate stayed green, and the failure message would point at
+ * prose that no longer exists (#1028).
+ *
+ * WHAT THIS CATCHES (each verified by making the change and watching it go red):
+ *   - the cited heading is deleted
+ *   - the cited heading is renamed so its PREFIX changes
+ *   - an entry cites a section that never existed
+ *   - an entry drops the single quotes around its section name
+ *
+ * WHAT IT DOES NOT CATCH, deliberately: a heading renamed by APPENDING to it.
+ * `## Band Announcements` → `## Band Announcements Renamed` still passes,
+ * because matching is by prefix. Prefix matching is not laziness — it is
+ * required: real headings carry suffixes the citations omit
+ * (`## API keys (#744) — a credential's life is tied to its creator's` is cited
+ * as `'API keys'`). Requiring equality would fail on every entry today. An
+ * appended heading also still EXISTS and is still findable by the cited name, so
+ * the pointer remains good; that is the trade this accepts.
+ */
+describe("mutation invariant citations", () => {
+  it("names sections that exist in CLAUDE.md", () => {
+    const claude = readFileSync(path.join(REPO_ROOT, "CLAUDE.md"), "utf8");
+    const headings = [...claude.matchAll(/^#{1,6}\s+(.+)$/gm)].map((match) => match[1]);
+
+    for (const entry of [...MUTATIONS, ...KNOWN_SURVIVING]) {
+      const section = entry.invariant.match(/'([^']+)'/)?.[1];
+      expect(section, `mutation entry ${entry.id} must cite a section in single quotes`).toBeDefined();
+
+      // Preserve case: section names are deliberate labels, not user input.
+      const normalize = (text) => text.replaceAll("`", "");
+      const normalizedSection = normalize(section);
+      const found = headings.some((heading) => normalize(heading).startsWith(normalizedSection));
+      expect(found, `mutation entry ${entry.id} cites missing CLAUDE.md section '${section}'`).toBe(true);
+    }
+
+    // Do not check the reverse direction: CLAUDE.md documents many invariants
+    // that cannot be represented by one-line mutations in this table.
+  });
+});
 
 describe("outputShowsFailingTest — the predicate that decides 'caught'", () => {
   it("sees a failing test in plain (uncoloured) vitest output", () => {

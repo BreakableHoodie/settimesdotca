@@ -74,13 +74,13 @@ test.describe("Band Profile Viewing", () => {
       .locator('[data-testid="band-bio"]')
       .or(page.locator('[class*="bio"]').or(page.locator("p, div").filter({ hasText: /\w{20,}/ })));
 
-    if (await bioText.first().isVisible()) {
+    if ((await bioText.count()) > 0) {
       await expect(bioText.first()).toBeVisible();
     }
 
     // Verify genre information
     const genreInfo = page.locator('[data-testid="band-genre"]').or(page.locator('[class*="genre"]'));
-    if (await genreInfo.first().isVisible()) {
+    if ((await genreInfo.count()) > 0) {
       await expect(genreInfo.first()).toBeVisible();
     }
   });
@@ -182,7 +182,7 @@ test.describe("Band Profile Viewing", () => {
       .or(page.getByRole("heading", { name: /past|previous|history/i }))
       .first();
 
-    if (await pastSection.isVisible()) {
+    if ((await pastSection.count()) > 0) {
       await expect(pastSection).toBeVisible();
     }
   });
@@ -200,7 +200,7 @@ test.describe("Band Profile Viewing", () => {
       .locator('[data-testid="band-photo"]')
       .or(page.locator('img[alt*="band"]').or(page.locator('[class*="photo"], [class*="image"]').locator("img")));
 
-    if (await bandPhoto.first().isVisible()) {
+    if ((await bandPhoto.count()) > 0) {
       await expect(bandPhoto.first()).toBeVisible();
 
       // A missing alt returns null and an empty alt returns "", and the previous
@@ -249,7 +249,7 @@ test.describe("Band Profile Viewing", () => {
 
     // Verify content is readable on mobile
     const contentArea = page.locator('main, [role="main"], article').first();
-    if (await contentArea.isVisible()) {
+    if ((await contentArea.count()) > 0) {
       await expect(contentArea).toBeVisible();
     }
   });
@@ -328,7 +328,7 @@ test.describe("Band Profile Viewing", () => {
       .locator('[data-testid="band-contact"]')
       .or(page.locator("text=/contact|booking|management|email/i"));
 
-    if (await contactInfo.first().isVisible()) {
+    if ((await contactInfo.count()) > 0) {
       await expect(contactInfo.first()).toBeVisible();
     }
   });
@@ -346,7 +346,7 @@ test.describe("Band Profile Viewing", () => {
       .locator('[data-testid="band-formed"]')
       .or(page.locator("text=/formed|since|est\\.|established|\\d{4}/i"));
 
-    if (await historyInfo.first().isVisible()) {
+    if ((await historyInfo.count()) > 0) {
       await expect(historyInfo.first()).toBeVisible();
     }
   });
@@ -389,7 +389,7 @@ test.describe("Band Profile Viewing", () => {
       .or(page.getByRole("heading", { name: /members|lineup|artists/i }))
       .first();
 
-    if (await membersSection.isVisible()) {
+    if ((await membersSection.count()) > 0) {
       await expect(membersSection).toBeVisible();
     }
   });

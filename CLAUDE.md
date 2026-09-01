@@ -385,7 +385,7 @@ MFA TOTP follows the same rule: `functions/utils/totp.js` computes HMAC-SHA1 dir
 
 The Cloudflare Workers D1 binding does not support explicit `BEGIN`/`COMMIT` transaction syntax. However, `env.DB.batch([stmt1, stmt2, ...])` executes all statements atomically — if any fails, all are rolled back. Prefer `DB.batch()` for multi-statement mutations.
 
-For mutations that cannot be expressed as a single batch (e.g., the event-duplication pattern in `functions/api/admin/events/[id].js`), use compensating deletes: if step N fails, manually undo steps 1…N-1.
+For mutations that cannot be expressed as a single batch (e.g., the event-duplication pattern in `functions/api/admin/events/[id]/duplicate.js`), use compensating deletes: if step N fails, manually undo steps 1…N-1. **The rollback is NOT in `events/[id].js`** — that route was split into its own sub-path file because Cloudflare Pages needs a dedicated file per route segment, and this pointer named the old location long after the move.
 
 The bulk band import (`functions/api/admin/bands/import.js`) follows this pattern and is **all-or-nothing**: it validates every row first (an invalid row aborts the whole import with per-row errors, writing nothing), then find-or-creates profiles and inserts performances, rolling back everything it created if any write fails. A lineup is never left half-imported.
 

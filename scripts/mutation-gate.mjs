@@ -133,7 +133,7 @@ export const MUTATIONS = [
   {
     id: "reset-password-session-invalidation",
     invariant:
-      "CLAUDE.md Security Notes — session invalidation on password reset: lucia.invalidateUserSessions equivalent must actually clear every session for that user",
+      "CLAUDE.md 'Security Notes' — session invalidation on password reset: lucia.invalidateUserSessions equivalent must actually clear every session for that user",
     file: "functions/api/auth/reset-password-complete.js",
     find: "WHERE user_id = ?",
     replace: "WHERE user_id = ? AND 0",

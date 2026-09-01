@@ -174,7 +174,7 @@ test.describe("Public Timeline Viewing", () => {
     await firstEvent.getByRole("button", { name: /view details/i }).click();
 
     const timeRange = firstEvent.locator("text=/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/");
-    if (await timeRange.first().isVisible()) {
+    if ((await timeRange.count()) > 0) {
       await expect(timeRange.first()).toBeVisible();
     }
   });

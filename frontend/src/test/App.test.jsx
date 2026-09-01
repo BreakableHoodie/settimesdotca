@@ -22,6 +22,9 @@ import { getSelectedBands } from '../utils/scheduleStorage'
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 const DEBUG_TIME_STORAGE_KEY = 'debugScheduleTime'
+// scheduleStorage.DATES_KEY is private; the test reads the persisted shape
+// directly (same convention as the time-filter test reading localStorage).
+const DATES_KEY = '__dates__'
 
 const mockEvent = {
   id: 1,
@@ -147,6 +150,18 @@ function renderApp(initialEntry = '/event/test-event') {
 // fixed sleep so tests don't race the fetch mock's microtask queue.
 const findAlphaToggle = () => screen.findByRole('button', { name: 'Add Alpha Wolves to my route' })
 
+// Reads the persisted `__dates__[slug]` value saveSelectedBands stored for an
+// event. This is the field stale-detection in scheduleStorage compares against
+// today, so it is precisely what the #542 invariant commits to — passing the
+// multi-day END date (falling back to the start date) so the schedule isn't
+// wiped on day 2.
+function storedScheduleDate(slug) {
+  const data = window.localStorage.getItem(SELECTED_BANDS_KEY)
+  if (!data) return undefined
+  const parsed = JSON.parse(data)
+  return parsed?.[DATES_KEY]?.[slug]
+}
+
 beforeEach(() => {
   mockScheduleFetch()
 })
@@ -193,6 +208,37 @@ describe('band selection (toggleBand)', () => {
     expect(await screen.findByRole('button', { name: 'Add Alpha Wolves to my route' })).toBeInTheDocument()
     await waitFor(() => {
       expect(getSelectedBands('test-event')).toEqual([])
+    })
+  })
+})
+
+describe('persisted schedule date (stale detection, #542)', () => {
+  it("stores a multi-day event's END date, not its start date", async () => {
+    const multiDayEvent = { ...mockEvent, date: '2030-06-15', end_date: '2030-06-17' }
+    mockScheduleFetch({ event: multiDayEvent })
+    renderApp()
+    await findAlphaToggle()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Alpha Wolves to my route' }))
+    await screen.findByRole('button', { name: 'Remove Alpha Wolves from my route' })
+
+    // If the start date were stored, the schedule would read stale on day 2
+    // of the event and get wiped (#542). Assert the stored value is the END
+    // date so the invariant survives the `end_date || date` expression.
+    await waitFor(() => {
+      expect(storedScheduleDate('test-event')).toBe('2030-06-17')
+    })
+  })
+
+  it('falls back to the start date for a single-day event with no end_date', async () => {
+    renderApp()
+    await findAlphaToggle()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Alpha Wolves to my route' }))
+    await screen.findByRole('button', { name: 'Remove Alpha Wolves from my route' })
+
+    await waitFor(() => {
+      expect(storedScheduleDate('test-event')).toBe('2030-06-15')
     })
   })
 })

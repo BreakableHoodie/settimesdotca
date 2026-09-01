@@ -530,7 +530,10 @@ describe("SSR /event/[slug] — human-readable date in the fallback description 
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const event = insertEvent(rawDb, { name: "Fallback Desc Event", ...overrides });
     rawDb.prepare("UPDATE events SET status = 'published', description = NULL WHERE id=?").run(event.id);
-    const response = await onRequest(makeContext({ env, slug: overrides.slug }));
+    // Use the row that was actually inserted, not the caller's override: a
+    // caller omitting `slug` would otherwise pass undefined into makeContext
+    // and fail on a 404 rather than on the thing under test.
+    const response = await onRequest(makeContext({ env, slug: event.slug }));
     expect(response.status).toBe(200);
     return descriptionOf(await response.text());
   }

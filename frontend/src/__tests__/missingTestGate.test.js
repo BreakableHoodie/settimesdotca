@@ -107,12 +107,19 @@ describe(`no new source file over ${MAX_UNTESTED_LINES} lines ships without a te
     // same discipline as the coverage ratchets in vitest.config.js. Raising it
     // means shipping another large untested file — do that deliberately, in a
     // commit that says so, or not at all.
+    //
+    // EQUALITY, not <=. A cap alone leaks: remove an entry without lowering
+    // MAX_ALLOWED and the headroom survives, so a later change can grow the
+    // list back into it without failing anything — "can only shrink" would be
+    // false again, the very thing the comment above says it fixed. Caught by
+    // review on the sibling gate (scripts/check-coverage-floor.mjs) and swept
+    // to here, where the same gap was live.
     expect(
       ALLOWED.size,
-      `ALLOWED has ${ALLOWED.size} entries but MAX_ALLOWED is ${MAX_ALLOWED}.\n` +
-        `Removing an entry? Lower MAX_ALLOWED to match.\n` +
+      `ALLOWED has ${ALLOWED.size} entries but MAX_ALLOWED is ${MAX_ALLOWED} — they must match.\n` +
+        `Removing an entry? Lower MAX_ALLOWED in the same commit.\n` +
         `Adding one? Don't — write a test instead.`
-    ).toBeLessThanOrEqual(MAX_ALLOWED)
+    ).toBe(MAX_ALLOWED)
   })
 
   it('the scan finds source and test files at all', () => {

@@ -180,8 +180,18 @@ export function checkCoverageFloor({
     );
   }
 
-  if (allowed.size > maxAllowed) {
-    fail(`ALLOWED has ${allowed.size} entries but MAX_ALLOWED is ${maxAllowed}. The list may only shrink.`);
+  // EQUALITY, not <=. A cap alone leaks: remove an entry without lowering
+  // MAX_ALLOWED and the headroom survives, so a later change can silently grow
+  // the list back into it without failing anything. "Can only shrink" is then
+  // false, which is exactly what the header claims it is not. Requiring the two
+  // to match forces every removal to lower the cap in the same commit, and
+  // makes any regrowth a visible, deliberate edit to both.
+  if (allowed.size !== maxAllowed) {
+    fail(
+      `ALLOWED has ${allowed.size} entries but MAX_ALLOWED is ${maxAllowed} — they must match.\n` +
+        `    Removed an entry? Lower MAX_ALLOWED in the same commit.\n` +
+        `    Adding one? Don't — write a test instead.`,
+    );
   }
 
   if (problems.length > 0) {

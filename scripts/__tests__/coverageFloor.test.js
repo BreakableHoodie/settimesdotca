@@ -118,7 +118,21 @@ describe("check-coverage-floor — verified against its own failure modes", () =
     });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain("may only shrink");
+    expect(result.message).toContain("they must match");
+  });
+
+  it("FAILS when MAX_ALLOWED is left above the allowlist size (the leak)", () => {
+    // The direction a `<=` cap misses. Remove an entry without lowering
+    // MAX_ALLOWED and the headroom survives, so a later change can grow the
+    // list back into it without failing anything — "can only shrink" would be
+    // false. Requiring equality forces every removal to lower the cap in the
+    // same commit.
+    const fx = makeFixture({ "functions/api/covered.js": "covered" });
+
+    const result = checkCoverageFloor({ ...fx, allowed: new Set(), maxAllowed: 2 });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("they must match");
   });
 
   it("FAILS — never silently passes — when the coverage file is missing", () => {

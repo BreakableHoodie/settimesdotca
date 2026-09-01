@@ -14,6 +14,7 @@ Invoke these without being asked — don't wait for the user to request them:
 | Multi-file feature touching a documented invariant, a migration, or an architectural decision | Invoke `pr-review-toolkit:code-reviewer` agent **in addition** to CodeRabbit |
 | **Any bug you diagnose** | Sweep for other instances of the same class before calling it fixed — see "Sweep for siblings" below |
 | **Adding/changing a test for a documented invariant in `functions/`** | Add/refresh its entry in `scripts/mutation-gate.mjs` — see "The mutation gate" below. A test only ever seen passing proves nothing. Backend only: the gate does not cover `frontend/` yet |
+| **Adding a new handler under `functions/api/`** | It must be executed by at least one test. `make coverage-floor` fails on any file at 0% — the global coverage average cannot see a file-shaped hole |
 | After editing `functions/utils/auth.js`, session endpoints (`sessions/`), or follow/unfollow/confirm-follow flows | Invoke `cloudflare-security-reviewer` agent |
 | After writing or modifying error handling (`catch` blocks, `.catch()`, `try/finally`) in `functions/` | Invoke `pr-review-toolkit:silent-failure-hunter` agent |
 | After editing `frontend/src/` public pages (outside `admin/`) | Scan for `text-white`/`bg-white` theme violations before finishing |
@@ -608,7 +609,7 @@ Repeat the value positionally instead. `functions/utils/__tests__/rateLimitPlace
 
 **`api_key.request` is the one audit row not written in a batch, and it has its own retention tier.** It records a *request*, not a change, and is written before `next()` runs — so there is nothing to batch it with, and it captures requests that then 403 or 404. Do not read it as precedent for writing audit rows standalone. Because it is one row per mutating key request against a 60/min ceiling (~31.5M rows/year from a single saturated key), `retention.js` prunes `action = 'api_key.request'` at **90 days** while the rest of `audit_log` stays at 1 year; the two predicates are deliberately disjoint (`=` vs `!=`) so they cannot double-count.
 
-Audit rows otherwise go in the **same `DB.batch`** as the change. Creation is the awkward case — the key's id does not exist until the INSERT runs — so `auditLogStatementForInsertedRow()` (`functions/utils/auditLogStatement.js`) resolves `resource_id` with an `INSERT … SELECT … FROM <table> WHERE <col> = ?`. It takes a table and column **identifier**, not a SQL string, and validates both with an explicit `typeof value === "string"` check: `RegExp.prototype.test` coerces its argument, so a bare `/^[A-Za-z_]\w*$/.test(undefined)` tests the string `"undefined"` and **passes**. Note also that `INSERT … SELECT` over zero rows inserts nothing and does not error — only ever pass a value the preceding INSERT just wrote.
+Audit rows for the API-key routes otherwise go in the **same `DB.batch`** as the change. **That is a statement about this feature, not a repo-wide rule** — measured 2026-08-31, only 5 of the 26 admin handlers calling `auditLog` batch it with their write (`bands/[id].js`, `bands/bulk.js`, `events/[id].js`, `events/wizard.js`, `venues/[id].js`); the other 21 issue the change and the audit row as separate statements, so a failed audit write leaves an unattributed change. Whether that should be tightened repo-wide is an open question, not a settled invariant — read this sentence as scoped before citing it. It was previously unqualified and was read as universal while briefing work on `events/[id]/edit.js`, which does not batch. Creation is the awkward case — the key's id does not exist until the INSERT runs — so `auditLogStatementForInsertedRow()` (`functions/utils/auditLogStatement.js`) resolves `resource_id` with an `INSERT … SELECT … FROM <table> WHERE <col> = ?`. It takes a table and column **identifier**, not a SQL string, and validates both with an explicit `typeof value === "string"` check: `RegExp.prototype.test` coerces its argument, so a bare `/^[A-Za-z_]\w*$/.test(undefined)` tests the string `"undefined"` and **passes**. Note also that `INSERT … SELECT` over zero rows inserts nothing and does not error — only ever pass a value the preceding INSERT just wrote.
 
 ---
 
@@ -815,6 +816,55 @@ reasonable v2 — the frontend after-midnight threshold in
 break. It says nothing about invariants absent from its table, nor about test
 quality generally. Ten entries is a floor, not a certificate — add one whenever
 you add or change a test for something this file documents.
+
+### The coverage floor — no handler may be entirely untested
+
+```bash
+make coverage-floor      # runs the coverage suite, then the check
+```
+
+**The problem it solves:** coverage thresholds in `vitest.config.js` are
+**global averages**, and an average cannot see a file-shaped hole. A brand-new
+200-line handler with no tests moves the global number by a rounding error and
+passes. Measured on 2026-08-31: the backend sat at **81.67%** statements against
+a 75% floor while **three files were at 0%** — every line unexecuted, no test
+importing them at all.
+
+`scripts/check-coverage-floor.mjs` reads `coverage/coverage-final.json` and
+fails if any file under `functions/api/` has 0% statement coverage. It runs in
+`quality.yml`'s existing **coverage** job, immediately after `npm run
+test:coverage` — it must stay in that job, because the file it reads exists only
+as a side effect of that step.
+
+**It landed with an EMPTY allowlist** (`MAX_ALLOWED = 0`), deliberately: the
+three dark files were covered first. An empty allowlist is strictly stronger
+than a seeded debt register and removes the "seed then forget" failure entirely.
+Adding an entry means shipping an untested handler — the thing being prevented.
+
+Three properties are load-bearing:
+
+- **It measures EXECUTION, not filenames.** The frontend ratchet
+  (`missingTestGate.test.js`) keys on a matching test file over 400 lines. That
+  does not transfer here: backend suites are feature-named — `api-key-auth.test.js`
+  covers `_middleware.js` — so basename matching flags 23 files, 18 of them at
+  59–92% coverage. Measuring execution has no false positives by construction.
+- **A missing coverage file is a FAILURE, not a skip**, with the command to
+  produce it. A gate that passes because its input is absent is worse than none.
+- **It detects its own blindness.** vitest reports untested files only because
+  `coverage.include` is set; if that changes, dark files vanish from the map and
+  a naive check would report "all clear" while seeing nothing. It compares the
+  on-disk inventory against the coverage map and fails when they diverge.
+
+**Why not vitest's own thresholds** — both were measured and neither works: a
+glob threshold group aggregates, so five 0% files hid inside the group average
+and it exited 0; `perFile: true` applies the global 75/68/84/76 to *every* file
+and produced 113 errors.
+
+**What it does NOT do:** it proves a file was executed, not that it was tested
+well. One test that imports a handler and asserts nothing takes it off this
+list. That is why the mutation gate exists alongside it — this one catches
+"nobody started", that one catches "the test cannot fail". Neither replaces the
+other.
 
 ### Before every commit — required checklist
 

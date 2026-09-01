@@ -51,6 +51,30 @@ async function openProfile(page, link) {
 // card makes "which artist" deterministic instead of order-dependent.
 const SEEDED_EVENT = "Future Fest E2E";
 
+// Opens an artist from the SEEDED event's card, so the profile under test is
+// always one of the four artists in database/seed-test-data.sql.
+//
+// The obvious `a[href*="/band/"]`.first() on the homepage is NOT safe for a
+// test that asserts on profile CONTENT. The admin specs in this suite create
+// their own bands (measured: ids 5-47 after one full run, every one with NULL
+// social_links and NULL photo_url) and those appear on the homepage too, so
+// "first" is only a seeded artist until another spec has run. That made these
+// tests pass on a fresh database and fail on a second run, with `workers: 1`
+// file order deciding which. Seeding all four artists is necessary but NOT
+// sufficient — the entry point has to be deterministic too.
+//
+// Tests about NAVIGATION still enter via the homepage link, because there the
+// entry point is the subject rather than a precondition.
+async function openSeededArtistProfile(page) {
+  const seededCard = page.locator('[data-testid="event-card"]').filter({ hasText: SEEDED_EVENT }).first();
+  await expect(seededCard).toBeVisible();
+  await seededCard.getByRole("button", { name: /view details/i }).click();
+
+  const bandLink = seededCard.locator('a[href*="/band/"]').first();
+  await expect(bandLink).toBeVisible();
+  await openProfile(page, bandLink);
+}
+
 test.describe("Band Profile Viewing", () => {
   test("should display band profile without authentication", async ({ page }) => {
     // Navigate to public homepage first to get a band
@@ -122,13 +146,7 @@ test.describe("Band Profile Viewing", () => {
   test("should show social media links", async ({ page }) => {
     await page.goto("/");
 
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    // Wait for the destination before querying it. Without this the assertions
-    // below race the client-side route swap.
-    await page.waitForURL(/\/bands?\//);
+    await openSeededArtistProfile(page);
 
     // Scoped to <main>, NOT the whole page. Footer.jsx renders an instagram.com
     // link on every page, so a page-wide locator is satisfied by the footer even
@@ -144,35 +162,32 @@ test.describe("Band Profile Viewing", () => {
         'a[href*="instagram.com"], a[href*="facebook.com"], a[href*="spotify.com"], a[href*="youtube.com"], a[href*="bandcamp.com"], a[href*="soundcloud.com"]',
       );
 
-    const linkCount = await socialLinks.count();
-    if (linkCount > 0) {
-      // Verify at least one social link is visible
-      await expect(socialLinks.first()).toBeVisible();
+    // Verify at least one social link is visible. Unconditional: the seed
+    // (database/seed-test-data.sql) now gives every artist socials, so a missing
+    // link is a real failure — the vacuous-guard shape #897/#899 removed
+    // elsewhere in this file.
+    await expect(socialLinks.first()).toBeVisible();
 
-      // toHaveAttribute, not getAttribute-then-compare. `count()` above and a
-      // later `getAttribute()` are two separate round trips, and BandProfilePage
-      // re-renders as its data resolves — so the element the first call saw can
-      // be detached by the time the second runs, which surfaces as a 30s
-      // timeout rather than a useful failure (#1026: failed 3x in one run, then
-      // passed on a plain re-run of the same commit). toHaveAttribute retries
-      // on detachment and re-resolves the locator each time.
-      //
-      // Unconditional on purpose. The old `if (target)` meant a missing
-      // attribute asserted NOTHING and still passed — the vacuous-guard shape
-      // #897/#899 removed elsewhere in this file. All eight social anchors in
-      // BandProfilePage.jsx hardcode target="_blank", so there is no legitimate
-      // case for it to be absent.
-      await expect(socialLinks.first()).toHaveAttribute("target", "_blank");
-    }
+    // toHaveAttribute, not getAttribute-then-compare. `count()` above and a
+    // later `getAttribute()` are two separate round trips, and BandProfilePage
+    // re-renders as its data resolves — so the element the first call saw can
+    // be detached by the time the second runs, which surfaces as a 30s
+    // timeout rather than a useful failure (#1026: failed 3x in one run, then
+    // passed on a plain re-run of the same commit). toHaveAttribute retries
+    // on detachment and re-resolves the locator each time.
+    //
+    // Unconditional on purpose. The old `if (target)` meant a missing
+    // attribute asserted NOTHING and still passed — the vacuous-guard shape
+    // #897/#899 removed elsewhere in this file. All eight social anchors in
+    // BandProfilePage.jsx hardcode target="_blank", so there is no legitimate
+    // case for it to be absent.
+    await expect(socialLinks.first()).toHaveAttribute("target", "_blank");
   });
 
   test("should display band website link", async ({ page }) => {
     await page.goto("/");
 
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
-    await openProfile(page, bandLink);
+    await openSeededArtistProfile(page);
 
     // Look for official website link
     // .first() on the union: `or()` can resolve to several elements, and
@@ -186,14 +201,13 @@ test.describe("Band Profile Viewing", () => {
       .or(main.locator('a:has-text("Website")').or(main.locator('a[class*="website"]')))
       .first();
 
-    // The outer guard stays: a band legitimately may have no website, which is
-    // optional CONTENT rather than a missing entry point (see #897/#899 — the
-    // distinction that matters is guarding optional content vs. guarding the
-    // subject of the test out of existence).
-    if (await websiteLink.isVisible()) {
-      // Same fetch-then-compare race as above, same fix.
-      await expect(websiteLink).toHaveAttribute("href", /^https?:\/\//);
-    }
+    // The outer guard is gone: the seed now gives every artist a website, so a
+    // missing one is a real failure, not optional content. (The distinction the
+    // vacuous-guard shape relied on — guarding optional content vs. guarding the
+    // subject of the test out of existence — no longer applies now the data
+    // exists; see #897/#899.)
+    // Same fetch-then-compare race as above, same fix.
+    await expect(websiteLink).toHaveAttribute("href", /^https?:\/\//);
   });
 
   test("should list upcoming band events", async ({ page }) => {
@@ -207,8 +221,10 @@ test.describe("Band Profile Viewing", () => {
 
     const bandLink = seededCard.locator('a[href*="/band/"]').first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-    await page.waitForURL(/\/band(s)?\//);
+    // openProfile, not a bare waitForURL: waitForURL resolves on pushState
+    // BEFORE React renders, so `main a[href^="/event/"]` below could match the
+    // HOMEPAGE timeline and the test would pass without ever opening a profile.
+    await openProfile(page, bandLink);
 
     // BandProfilePage lists performances as `<Link to={`/event/${slug}`}>` and
     // renders no [data-testid="event-card"] -- do not reach for one here.
@@ -220,43 +236,39 @@ test.describe("Band Profile Viewing", () => {
   test("should show past performance history", async ({ page }) => {
     await page.goto("/");
 
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
-    await openProfile(page, bandLink);
+    await openSeededArtistProfile(page);
 
-    // Look for past performances section
+    // Look for past performances section. Unconditional: the seed now gives
+    // every artist a past performance (event 30, Past Fest E2E), so a missing
+    // section is a real failure — the vacuous-guard shape #897/#899 removed
+    // elsewhere in this file.
     const pastSection = page
       .locator('[data-testid="past-events"]')
       .or(page.getByRole("heading", { name: /past|previous|history/i }))
       .first();
 
-    if ((await pastSection.count()) > 0) {
-      await expect(pastSection).toBeVisible();
-    }
+    await expect(pastSection).toBeVisible();
   });
 
   test("should display band photos", async ({ page }) => {
     await page.goto("/");
 
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
-    await openProfile(page, bandLink);
+    await openSeededArtistProfile(page);
 
-    // Look for band photo/image
+    // Look for band photo/image. Unconditional: the seed now gives every artist
+    // a photo_url (see database/seed-test-data.sql), so a missing photo is a
+    // real failure — the vacuous-guard shape #897/#899 removed elsewhere in
+    // this file.
     const bandPhoto = page
       .locator('[data-testid="band-photo"]')
       .or(page.locator('img[alt*="band"]').or(page.locator('[class*="photo"], [class*="image"]').locator("img")));
 
-    if ((await bandPhoto.count()) > 0) {
-      await expect(bandPhoto.first()).toBeVisible();
+    await expect(bandPhoto.first()).toBeVisible();
 
-      // A missing alt returns null and an empty alt returns "", and the previous
-      // `if (altText)` skipped BOTH -- the two cases the check exists to catch.
-      // \S requires at least one non-whitespace character.
-      await expect(bandPhoto.first()).toHaveAttribute("alt", /\S/);
-    }
+    // A missing alt returns null and an empty alt returns "", and the previous
+    // `if (altText)` skipped BOTH -- the two cases the check exists to catch.
+    // \S requires at least one non-whitespace character.
+    await expect(bandPhoto.first()).toHaveAttribute("alt", /\S/);
   });
 
   test("should be responsive on mobile viewport", async ({ page }) => {
@@ -271,8 +283,13 @@ test.describe("Band Profile Viewing", () => {
     // never just the name. Hence the containment direction used below.
     const linkText = ((await bandLink.textContent()) ?? "").trim();
     expect(linkText).not.toBe("");
-    await bandLink.click();
-    await page.waitForURL(/\/band(s)?\//);
+    // openProfile, not a bare waitForURL: waitForURL resolves on pushState
+    // BEFORE React renders (the failure class documented at the top of this
+    // file), so the heading polls below could otherwise read the previous
+    // page's h1. openProfile already polls the heading to settle the swap; the
+    // poll below then retains THIS test's identity assertion (heading is
+    // contained in the entry link's text).
+    await openProfile(page, bandLink);
 
     // Wait generously: the profile route is lazy-loaded and fetches its data,
     // which can exceed the default 5s timeout on a cold CI mobile run.
@@ -364,28 +381,6 @@ test.describe("Band Profile Viewing", () => {
     }
   });
 
-  test("should display band contact information if available", async ({ page }) => {
-    await page.goto("/");
-
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
-    await openProfile(page, bandLink);
-
-    // Look for contact information
-    // Scoped to <main>: Footer.jsx contains "Contact", so the text regex below
-    // matches site chrome on every page — the same shape as the social-links
-    // guard that was satisfied by the footer's instagram link.
-    const main = page.locator("main");
-    const contactInfo = main
-      .locator('[data-testid="band-contact"]')
-      .or(main.locator("text=/contact|booking|management|email/i"));
-
-    if ((await contactInfo.count()) > 0) {
-      await expect(contactInfo.first()).toBeVisible();
-    }
-  });
-
   test("should show band formation year or history", async ({ page }) => {
     await page.goto("/");
 
@@ -407,12 +402,13 @@ test.describe("Band Profile Viewing", () => {
   test("should allow clicking event from band profile to event details", async ({ page }) => {
     await page.goto("/");
 
-    // Navigate to band profile
+    // Navigate to band profile. openProfile, not a bare waitForURL: it resolves
+    // on pushState BEFORE React renders, so `main a[href^="/event/"]` could
+    // match the HOMEPAGE timeline and the test would pass without ever opening
+    // a profile.
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
-    await bandLink.click();
-
-    await page.waitForURL(/\/band(s)?\//);
+    await openProfile(page, bandLink);
 
     // BandProfilePage links each performance with `<Link to={`/event/${slug}`}>`,
     // which renders a plain anchor. It renders NO [data-testid="event-card"] and

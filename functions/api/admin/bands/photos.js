@@ -62,7 +62,7 @@ export async function onRequestPost(context) {
     //     An admin saw "uploaded", reloaded, and the photo was simply absent,
     //     with nothing logged. The numeric branch always verified; the two are
     //     now symmetric.
-    let bandProfileId = null;
+    let bandProfileId;
     if (bandId) {
       const bandIdValue = bandId.toString();
 
@@ -70,19 +70,19 @@ export async function onRequestPost(context) {
         const parsed = Number(bandIdValue.replace("profile_", ""));
         if (Number.isInteger(parsed) && parsed > 0) {
           const profile = await env.DB.prepare("SELECT id FROM band_profiles WHERE id = ?").bind(parsed).first();
-          bandProfileId = profile?.id ?? null;
+          bandProfileId = profile?.id;
         }
       } else if (!Number.isNaN(Number(bandIdValue))) {
         const performance = await env.DB.prepare("SELECT band_profile_id FROM performances WHERE id = ?")
           .bind(Number(bandIdValue))
           .first();
 
-        bandProfileId = performance?.band_profile_id ?? null;
+        bandProfileId = performance?.band_profile_id;
         if (!bandProfileId) {
           const profile = await env.DB.prepare("SELECT id FROM band_profiles WHERE id = ?")
             .bind(Number(bandIdValue))
             .first();
-          bandProfileId = profile?.id ?? null;
+          bandProfileId = profile?.id;
         }
       }
 
@@ -122,9 +122,32 @@ export async function onRequestPost(context) {
     const photoBaseUrl = env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca";
     const publicUrl = `${photoBaseUrl}/${filename}`;
 
-    // Already resolved and verified above, so this UPDATE always matches a row.
     if (bandProfileId) {
-      await env.DB.prepare("UPDATE band_profiles SET photo_url = ? WHERE id = ?").bind(publicUrl, bandProfileId).run();
+      const updateResult = await env.DB.prepare("UPDATE band_profiles SET photo_url = ? WHERE id = ?")
+        .bind(publicUrl, bandProfileId)
+        .run();
+
+      // The profile existed when we looked it up, but it can be deleted between
+      // that read and this write — another admin tab, a concurrent cleanup. The
+      // pre-upload check narrows that window; it cannot close it. Without this,
+      // the race lands on exactly the bug this file was fixing: 200
+      // {success:true}, no photo, and an orphaned R2 object.
+      //
+      // ONLY an explicit 0 counts as failure. If `meta` is absent we cannot tell
+      // what happened, and schedule/share/[slug].js documents that D1's meta
+      // shape is not safe to depend on. Failing closed there would DELETE a
+      // successful upload and report "not found" — strictly worse than the rare
+      // orphan this guards against, so the ambiguous case keeps the upload.
+      // A deliberate departure from the fail-closed `!result?.meta?.changes`
+      // pattern in reset-password-complete.js and activate.js, where the safe
+      // direction is the opposite one.
+      if (updateResult?.meta?.changes === 0) {
+        await env.BAND_PHOTOS.delete(filename);
+        return new Response(JSON.stringify({ error: "Band profile not found", code: "BAND_NOT_FOUND" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
     }
 
     return new Response(

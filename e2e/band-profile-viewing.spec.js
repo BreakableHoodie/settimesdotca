@@ -33,6 +33,15 @@ async function openProfile(page, link) {
   const before = ((await page.locator("main h1").textContent()) ?? "").trim();
   await link.click();
   await page.waitForURL(/\/bands?\//);
+  // Poll until the heading is BOTH non-empty and different. "Different" alone
+  // is only sufficient because BandProfileSkeleton currently renders no <h1>
+  // and no <main> at all, so `main h1` matches nothing while loading and the
+  // poll simply retries. Add a placeholder heading to that skeleton and
+  // "different" would start resolving mid-load — the empty check makes this
+  // independent of the skeleton's markup rather than quietly depending on it.
+  await expect
+    .poll(async () => ((await page.locator("main h1").textContent()) ?? "").trim(), { timeout: 15000 })
+    .toMatch(/\S/);
   await expect
     .poll(async () => ((await page.locator("main h1").textContent()) ?? "").trim(), { timeout: 15000 })
     .not.toBe(before);

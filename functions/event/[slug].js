@@ -74,7 +74,7 @@ const DATE_LABEL_FORMAT = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
-// Returns null -- never a partial, a wrong date, or "Invalid Date" -- for
+// Returns undefined -- never a partial, a wrong date, or "Invalid Date" -- for
 // anything that is not a real calendar date, because this builds the <head> of
 // a public page. Two failures it guards, in order of how easy they are to miss:
 //
@@ -92,10 +92,10 @@ const DATE_LABEL_FORMAT = new Intl.DateTimeFormat("en-US", {
 // survived mutation, because every input it rejects is already rejected by the
 // NaN check or the round-trip.
 function eventDateLabel(dateStr) {
-  if (typeof dateStr !== "string") return null;
+  if (typeof dateStr !== "string") return undefined;
   const probe = new Date(`${dateStr}T12:00:00Z`);
-  if (Number.isNaN(probe.getTime())) return null;
-  if (probe.toISOString().slice(0, 10) !== dateStr) return null;
+  if (Number.isNaN(probe.getTime())) return undefined;
+  if (probe.toISOString().slice(0, 10) !== dateStr) return undefined;
   return DATE_LABEL_FORMAT.format(probe);
 }
 
@@ -103,7 +103,7 @@ function eventDateLabel(dateStr) {
 // start label alone if end_date is absent, equal, or unparseable.
 function eventDateRangeLabel(dateStr, endDateStr) {
   const start = eventDateLabel(dateStr);
-  if (!start) return null;
+  if (!start) return undefined;
   // Lexicographic ordering is exact for YYYY-MM-DD. An inverted pair would
   // otherwise render "October 11 ... to October 9"; nothing validates the
   // ordering on write, so degrade to the start date alone.

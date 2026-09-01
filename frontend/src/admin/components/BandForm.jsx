@@ -318,7 +318,7 @@ export default function BandForm({
           <>
             <div>
               <label htmlFor="band-contact-email" className="block text-white mb-2 text-sm">
-                Contact Email <span className="text-gray-400 text-xs ml-2">(optional)</span>
+                Contact Email <span className="text-gray-400 text-xs ml-2">(internal, optional)</span>
               </label>
               <input
                 id="band-contact-email"
@@ -327,9 +327,18 @@ export default function BandForm({
                 value={formData.contact_email || ''}
                 onChange={onChange}
                 maxLength={FIELD_LIMITS.bandContactEmail.max}
+                aria-describedby="band-contact-email-hint"
                 className="w-full min-h-[44px] px-4 py-3 text-base rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden sm:text-sm"
                 placeholder="contact@artist.com"
               />
+              {/* No public surface renders this (#1051): it is not returned by
+                  any public band endpoint and no fan-facing page displays it.
+                  It IS searchable in the roster, so it earns its place as
+                  internal booking info -- the defect was that nothing said so,
+                  which invited entering an address expecting it to be shown. */}
+              <p id="band-contact-email-hint" className="text-gray-400 text-xs mt-1">
+                Booking contact for our own reference. Never shown publicly.
+              </p>
             </div>
             <div>
               <label htmlFor="band-status" className="block text-white mb-2 text-sm">

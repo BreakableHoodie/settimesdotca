@@ -205,6 +205,19 @@ jobs:
       - name: Backend coverage
         run: npm run test:coverage
 
+      # MUST stay in this job, immediately after the coverage run: the gate
+      # reads coverage/coverage-final.json, which only exists as a side effect
+      # of the step above. It hard-fails when that file is absent rather than
+      # skipping, so moving it to its own job would turn it into a permanent
+      # red rather than a silent pass -- but a red for the wrong reason.
+      #
+      # Catches what a GLOBAL threshold structurally cannot: a brand-new
+      # handler with no tests at all moves the average by a rounding error and
+      # passes. On 2026-08-31 the backend sat at 81.67% against a 75% floor
+      # while three files were at 0%.
+      - name: Coverage floor (no handler at 0%)
+        run: node scripts/check-coverage-floor.mjs
+
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 

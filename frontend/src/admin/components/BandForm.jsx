@@ -279,11 +279,21 @@ export default function BandForm({
               </span>
               <Suspense
                 fallback={
-                  <div
-                    className="rounded border border-border bg-surface animate-pulse"
-                    style={{ minHeight: 200 }}
-                    aria-hidden="true"
-                  />
+                  // The skeleton is decorative and stays aria-hidden; the status
+                  // message is what assistive tech gets. Without it a screen
+                  // reader user hears nothing at all while the editor chunk
+                  // downloads — the field simply is not there yet, with no
+                  // indication that it is coming.
+                  <>
+                    <span role="status" className="sr-only">
+                      Loading description editor
+                    </span>
+                    <div
+                      className="rounded border border-border bg-surface animate-pulse"
+                      style={{ minHeight: 200 }}
+                      aria-hidden="true"
+                    />
+                  </>
                 }
               >
                 <RichTextEditor

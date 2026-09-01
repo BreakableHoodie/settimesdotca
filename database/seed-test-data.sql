@@ -85,11 +85,20 @@ INSERT OR REPLACE INTO events (id, name, date, slug, status, description, city, 
 -- venue/performer heading assertions impossible in E2E tests.
 -- ============================================
 
-INSERT OR REPLACE INTO band_profiles (id, name, name_normalized, genre, origin, description) VALUES
-(1, 'The Time Travellers', 'the time travellers', 'Indie Rock', 'Waterloo', 'Indie rock from the future'),
-(2, 'Future Sound', 'future sound', 'Electronic', 'Toronto', 'Electronic music ahead of its time'),
-(3, 'The Prophets', 'the prophets', 'Post-Rock', 'Montreal', 'Instrumental post-rock soundscapes'),
-(4, 'Tomorrows Echo', 'tomorrows echo', 'Dream Pop', 'Waterloo', 'Dreamy sounds from the future');
+-- All four artists carry social_links, photo_url and photo_alt_text so the
+-- band-profile E2E assertions (social links, website, photo) are unconditional —
+-- see e2e/band-profile-viewing.spec.js. social_links keys follow
+-- BAND_LINK_FIELD_KEYS (functions/utils/bandLinkFields.js); each value is a
+-- real https:// URL because the frontend resolves every key through a safety
+-- helper (frontend/src/admin/utils/bandFields.js) that renders nothing for a
+-- value containing whitespace or a scheme beyond http(s). photo_url is
+-- /favicon-32x32.png: same-origin, present in frontend/public/, needs no network,
+-- and satisfies the document CSP (img-src 'self').
+INSERT OR REPLACE INTO band_profiles (id, name, name_normalized, genre, origin, description, social_links, photo_url, photo_alt_text) VALUES
+(1, 'The Time Travellers', 'the time travellers', 'Indie Rock', 'Waterloo', 'Indie rock from the future', '{"website":"https://timetravellers.band","instagram":"https://instagram.com/thetimetravellers"}', '/favicon-32x32.png', 'The Time Travellers band photo'),
+(2, 'Future Sound', 'future sound', 'Electronic', 'Toronto', 'Electronic music ahead of its time', '{"website":"https://futuresound.band","instagram":"https://instagram.com/futuresound"}', '/favicon-32x32.png', 'Future Sound band photo'),
+(3, 'The Prophets', 'the prophets', 'Post-Rock', 'Montreal', 'Instrumental post-rock soundscapes', '{"website":"https://theprophets.band","instagram":"https://instagram.com/theprophets"}', '/favicon-32x32.png', 'The Prophets band photo'),
+(4, 'Tomorrows Echo', 'tomorrows echo', 'Dream Pop', 'Waterloo', 'Dreamy sounds from the future', '{"website":"https://tomorrowsecho.band","instagram":"https://instagram.com/tomorrowsecho"}', '/favicon-32x32.png', 'Tomorrows Echo band photo');
 
 INSERT OR REPLACE INTO performances (id, event_id, band_profile_id, venue_id, start_time, end_time) VALUES
 (1, 28, 1, 1, '19:00', '19:45'),
@@ -123,6 +132,35 @@ INSERT OR REPLACE INTO performances (id, event_id, band_profile_id, venue_id, st
 (7, 29, 3, 2, '19:30', '20:15', date('now', '+22 days')),
 (8, 29, 4, 2, '21:00', '22:00', date('now', '+22 days'));
 
+-- ============================================
+-- PAST EVENT (Event 30) — band profile "past performance history"
+-- e2e/band-profile-viewing.spec.js's "should show past performance history"
+-- test reads `profile.past`, which is non-null only once an artist has a
+-- performance on an event whose date (or performance_date) precedes the local
+-- festival day (#543: NULL performance_date inherits the event's start date).
+--
+-- Dated (-30 days) well in the PAST and NOT archived, so it lands in the
+-- timeline's "past" bucket, never the "upcoming" set. The FIRST collapsed
+-- UPCOMING card that public-timeline.spec.js asserts against is event 28
+-- (Future Fest E2E, +14 days); a past-dated event cannot precede it in the
+-- upcoming ordering, so this cannot take that slot. `status` is 'published'
+-- (not 'archived') on purpose — the /event/<slug> link this section emits
+-- resolves to a live event page, and the past split keys off the DATE, so it
+-- still files under past.
+-- ============================================
+
+INSERT OR REPLACE INTO events (id, name, date, slug, status, description, city, ticket_url) VALUES
+(30, 'Past Fest E2E', date('now', '-30 days'), 'past-fest-e2e', 'published', 'A past multi-venue festival used by E2E tests to exercise band-profile past performance history.', 'Waterloo', NULL);
+
+-- All four artists perform at the past event, for the same reason the upcoming
+-- band_profiles above are all four: the test opens whichever artist renders
+-- first, and seeding only one would make every unconditional assertion flaky.
+INSERT OR REPLACE INTO performances (id, event_id, band_profile_id, venue_id, start_time, end_time, performance_date) VALUES
+(9, 30, 1, 1, '19:00', '19:45', date('now', '-30 days')),
+(10, 30, 2, 1, '20:00', '20:45', date('now', '-30 days')),
+(11, 30, 3, 2, '21:00', '22:00', date('now', '-30 days')),
+(12, 30, 4, 2, '22:00', '23:00', date('now', '-30 days'));
+
 -- Update sqlite_sequence if needed
 DELETE FROM sqlite_sequence WHERE name IN ('venues', 'events', 'band_profiles', 'performances');
-INSERT INTO sqlite_sequence (name, seq) VALUES ('venues', 20), ('events', 29), ('band_profiles', 4), ('performances', 8);
+INSERT INTO sqlite_sequence (name, seq) VALUES ('venues', 20), ('events', 30), ('band_profiles', 4), ('performances', 12);

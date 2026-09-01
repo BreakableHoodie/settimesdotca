@@ -22,6 +22,12 @@ jobs:
         timeout-minutes: 35
 
         steps:
+            # DELIBERATELY keeps checkout's persisted credential, unlike every
+            # other checkout in this repo. This job commits regenerated snapshots
+            # back to the branch (see the git add/commit/push below, and
+            # `permissions: contents: write` above), so it needs that credential.
+            # Setting persist-credentials: false here breaks snapshot updates --
+            # and not visibly, since they never run on an ordinary PR.
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ inputs.branch || github.ref_name }}

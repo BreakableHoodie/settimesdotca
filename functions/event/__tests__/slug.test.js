@@ -516,3 +516,113 @@ describe("SSR /event/[slug] — og:site_name (#784 ownership sweep)", () => {
     expect(html.match(/property="og:type"/g)?.length).toBe(1);
   });
 });
+
+describe("SSR /event/[slug] — human-readable date in the fallback description (#1046)", () => {
+  function descriptionOf(html) {
+    return html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? "";
+  }
+
+  // The fallback fires only for an event with no `description` of its own --
+  // which is exactly the state a newly-announced event is in, and the state
+  // Vol. 18 sat in while it was the site's only indexed upcoming event.
+  async function publishedEventDescription(overrides) {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, { name: "Fallback Desc Event", ...overrides });
+    rawDb.prepare("UPDATE events SET status = 'published', description = NULL WHERE id=?").run(event.id);
+    // Use the row that was actually inserted, not the caller's override: a
+    // caller omitting `slug` would otherwise pass undefined into makeContext
+    // and fail on a 404 rather than on the thing under test.
+    const response = await onRequest(makeContext({ env, slug: event.slug }));
+    expect(response.status).toBe(200);
+    return descriptionOf(await response.text());
+  }
+
+  test("renders a human date, never the raw ISO string", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-single-day",
+      date: "2026-10-11",
+    });
+
+    expect(description).toContain("Sunday, October 11, 2026");
+    // The regression this pins: a bare YYYY-MM-DD reaching a SERP snippet.
+    expect(description).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  test("spans a multi-day event's whole run, not just its first day", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-multi-day",
+      date: "2026-08-07",
+      end_date: "2026-08-09",
+    });
+
+    expect(description).toContain("Friday, August 7, 2026");
+    expect(description).toContain("Sunday, August 9, 2026");
+  });
+
+  test("leaves an event that has its own description alone", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, { name: "Has Own Desc", slug: "slug-1046-own-desc", date: "2026-10-11" });
+    rawDb
+      .prepare("UPDATE events SET status = 'published', description = ? WHERE id=?")
+      .run("Twelve bands, six venues, one very long weekend.", event.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-1046-own-desc" }));
+    const description = descriptionOf(await response.text());
+
+    expect(description).toBe("Twelve bands, six venues, one very long weekend.");
+    expect(description).not.toContain("October 11");
+  });
+
+  // Intl throws a RangeError on an invalid Date, and this runs while building a
+  // public page's <head>. An unparseable value must drop the date sentence, not
+  // 500 the route or emit the string "Invalid Date" into search results.
+  // Date SILENTLY NORMALIZES an overflowing day: "2026-02-30" parses fine and
+  // becomes 2026-03-02. Publishing a plausible WRONG date into a SERP snippet is
+  // worse than publishing none, so the round-trip check must reject it.
+  test("rejects a calendar date that Date would silently normalize", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-overflow-date",
+      date: "2026-02-30",
+    });
+
+    expect(description).not.toContain("2026-02-30");
+    expect(description).not.toContain("March 2");
+    expect(description).not.toContain("February 30");
+  });
+
+  // 2026 is not a leap year, so Feb 29 normalizes to March 1 the same way.
+  test("rejects a non-leap-year February 29", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-leap-date",
+      date: "2026-02-29",
+    });
+
+    expect(description).not.toContain("March 1");
+    expect(description).not.toContain("February 29");
+  });
+
+  test("degrades to the start date alone when end_date precedes date", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-inverted",
+      date: "2026-10-11",
+      end_date: "2026-10-09",
+    });
+
+    expect(description).toContain("Sunday, October 11, 2026");
+    expect(description).not.toContain("October 9");
+    expect(description).not.toContain(" to ");
+  });
+
+  test("drops the date sentence for an unparseable date rather than throwing", async () => {
+    const description = await publishedEventDescription({
+      slug: "slug-1046-bad-date",
+      date: "not-a-date",
+    });
+
+    expect(description).toContain("live music in");
+    expect(description).not.toContain("Invalid Date");
+    expect(description).not.toContain("not-a-date");
+  });
+});

@@ -61,6 +61,57 @@ function festivalDayLabel(dateStr) {
   return DAY_LABEL_FORMAT.format(new Date(`${dateStr}T12:00:00Z`));
 }
 
+// Same label WITH the year, for the standalone meta description. A subEvent
+// name (DAY_LABEL_FORMAT) sits inside an event already scoped to a year, so it
+// omits one; a SERP snippet is read cold and needs it. Separate formats rather
+// than one widened constant -- adding a year to DAY_LABEL_FORMAT would put it
+// in every JSON-LD subEvent name too.
+const DATE_LABEL_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Toronto",
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
+
+// Returns undefined -- never a partial, a wrong date, or "Invalid Date" -- for
+// anything that is not a real calendar date, because this builds the <head> of
+// a public page. Two failures it guards, in order of how easy they are to miss:
+//
+//   1. Intl.format() THROWS a RangeError on an invalid Date (it does not return
+//      the string "Invalid Date" the way String(date) would), so an unparseable
+//      column value would 500 the route rather than drop the date sentence.
+//   2. Date SILENTLY NORMALIZES a day that overflows its month: "2026-02-30"
+//      parses fine and becomes 2026-03-02, and "2026-02-29" (2026 is not a leap
+//      year) becomes 2026-03-01. A typo would then publish a confidently WRONG
+//      date into a SERP snippet, which is worse than publishing none.
+//
+// The toISOString round-trip is what catches (2); noon UTC sits far enough from
+// either boundary that the UTC calendar day always equals the input for a real
+// date. An explicit ^\d{4}-\d{2}-\d{2}$ regex was tried here and removed: it
+// survived mutation, because every input it rejects is already rejected by the
+// NaN check or the round-trip.
+function eventDateLabel(dateStr) {
+  if (typeof dateStr !== "string") return undefined;
+  const probe = new Date(`${dateStr}T12:00:00Z`);
+  if (Number.isNaN(probe.getTime())) return undefined;
+  if (probe.toISOString().slice(0, 10) !== dateStr) return undefined;
+  return DATE_LABEL_FORMAT.format(probe);
+}
+
+// A multi-day event is its whole run, not its first day. Falls back to the
+// start label alone if end_date is absent, equal, or unparseable.
+function eventDateRangeLabel(dateStr, endDateStr) {
+  const start = eventDateLabel(dateStr);
+  if (!start) return undefined;
+  // Lexicographic ordering is exact for YYYY-MM-DD. An inverted pair would
+  // otherwise render "October 11 ... to October 9"; nothing validates the
+  // ordering on write, so degrade to the start date alone.
+  if (!endDateStr || endDateStr <= dateStr) return start;
+  const end = eventDateLabel(endDateStr);
+  return end ? `${start} to ${end}` : start;
+}
+
 /**
  * Buckets a performance row into one of `festivalDays` (a MULTI-DAY event's
  * full [date, end_date] span), applying the after-midnight convention: a set
@@ -244,8 +295,9 @@ export async function onRequest(context) {
   const url = `${CANONICAL_HOST}/event/${event.slug}`;
   const where = event.city || "Waterloo Region";
   const plainDesc = toPlainText(event.description, 200);
+  const dateLabel = eventDateRangeLabel(event.date, event.end_date);
   const description =
-    plainDesc || `${event.name} — live music in ${where} on SetTimes.${event.date ? ` ${event.date}.` : ""}`;
+    plainDesc || `${event.name} — live music in ${where} on SetTimes.${dateLabel ? ` ${dateLabel}.` : ""}`;
 
   // Read-path sanitize (#504 convention, #616): a pre-validation legacy
   // poster_url must never be reflected into og:image/twitter:image or the

@@ -103,12 +103,20 @@ test.describe("Band Profile Viewing", () => {
       // Verify at least one social link is visible
       await expect(socialLinks.first()).toBeVisible();
 
-      // Verify links open in new tab (external links)
-      const firstLink = socialLinks.first();
-      const target = await firstLink.getAttribute("target");
-      if (target) {
-        expect(target).toBe("_blank");
-      }
+      // toHaveAttribute, not getAttribute-then-compare. `count()` above and a
+      // later `getAttribute()` are two separate round trips, and BandProfilePage
+      // re-renders as its data resolves — so the element the first call saw can
+      // be detached by the time the second runs, which surfaces as a 30s
+      // timeout rather than a useful failure (#1026: failed 3x in one run, then
+      // passed on a plain re-run of the same commit). toHaveAttribute retries
+      // on detachment and re-resolves the locator each time.
+      //
+      // Unconditional on purpose. The old `if (target)` meant a missing
+      // attribute asserted NOTHING and still passed — the vacuous-guard shape
+      // #897/#899 removed elsewhere in this file. All eight social anchors in
+      // BandProfilePage.jsx hardcode target="_blank", so there is no legitimate
+      // case for it to be absent.
+      await expect(socialLinks.first()).toHaveAttribute("target", "_blank");
     }
   });
 
@@ -129,10 +137,13 @@ test.describe("Band Profile Viewing", () => {
       .or(page.locator('a:has-text("Website")').or(page.locator('a[class*="website"]')))
       .first();
 
+    // The outer guard stays: a band legitimately may have no website, which is
+    // optional CONTENT rather than a missing entry point (see #897/#899 — the
+    // distinction that matters is guarding optional content vs. guarding the
+    // subject of the test out of existence).
     if (await websiteLink.isVisible()) {
-      // Verify link has valid URL
-      const href = await websiteLink.getAttribute("href");
-      expect(href).toMatch(/^https?:\/\//);
+      // Same fetch-then-compare race as above, same fix.
+      await expect(websiteLink).toHaveAttribute("href", /^https?:\/\//);
     }
   });
 

@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from "vitest";
 import { onRequestGet } from "../sitemap.xml.js";
-import { createTestEnv, insertEvent, insertBand } from "../api/test-utils.js";
+import { createTestEnv, insertEvent } from "../api/test-utils.js";
 
 async function fetchSitemap(env) {
   env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
@@ -53,8 +53,13 @@ describe("GET /sitemap.xml — recap entries (#555)", () => {
 });
 
 describe("GET /sitemap.xml — lastmod reflects CONTENT changes, not the event date", () => {
+  // loc is interpolated into a RegExp, so it must be escaped: the dots in
+  // "settimes.ca" are wildcards otherwise, and the pattern would match a host
+  // that is not ours. Low stakes here, but a test that matches more than it
+  // names is the wrong kind of test to leave lying around.
   function lastmodFor(xml, loc) {
-    return xml.match(new RegExp(`<loc>${loc}</loc>\\s*<lastmod>([^<]*)</lastmod>`))?.[1];
+    const escaped = loc.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+    return xml.match(new RegExp(`<loc>${escaped}</loc>\\s*<lastmod>([^<]*)</lastmod>`))?.[1];
   }
 
   // Timestamps are set on INSERT, never UPDATE. `events` and `performances` both

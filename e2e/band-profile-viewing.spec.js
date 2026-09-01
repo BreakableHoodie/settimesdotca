@@ -92,11 +92,23 @@ test.describe("Band Profile Viewing", () => {
     const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
     await expect(bandLink).toBeVisible();
     await bandLink.click();
+    // Wait for the destination before querying it. Without this the assertions
+    // below race the client-side route swap.
+    await page.waitForURL(/\/bands?\//);
 
-    // Check for social media links
-    const socialLinks = page.locator(
-      'a[href*="instagram.com"], a[href*="facebook.com"], a[href*="spotify.com"], a[href*="youtube.com"], a[href*="bandcamp.com"], a[href*="soundcloud.com"]',
-    );
+    // Scoped to <main>, NOT the whole page. Footer.jsx renders an instagram.com
+    // link on every page, so a page-wide locator is satisfied by the footer even
+    // when the artist has no socials at all — and worse, it matched the HOMEPAGE
+    // footer before navigation finished, so `count()` saw 1 and the assertions
+    // then ran against a page where the locator resolved to nothing. That is the
+    // failure this test produced in CI: "waiting for locator(...)" with no
+    // resolution, after count() had already returned > 0.
+    // BandProfilePage renders <main id="main-content">; <Footer /> sits outside it.
+    const socialLinks = page
+      .locator("main")
+      .locator(
+        'a[href*="instagram.com"], a[href*="facebook.com"], a[href*="spotify.com"], a[href*="youtube.com"], a[href*="bandcamp.com"], a[href*="soundcloud.com"]',
+      );
 
     const linkCount = await socialLinks.count();
     if (linkCount > 0) {

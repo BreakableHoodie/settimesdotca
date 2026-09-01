@@ -18,12 +18,7 @@
 // -- Cloudflare Pages needs a dedicated file per route segment -- and is
 // exercised by events.test.js's "Event duplication atomicity (P0-B2)" describe
 // block. There is no duplication or rollback code in [id].js to test.
-//
-// Worth knowing because two stale pointers said otherwise until the commit that
-// added this file: [id].js's own header advertised POST .../duplicate, and
-// CLAUDE.md's "D1 transactions" section cited [id].js for the compensating-delete
-// pattern. Both were corrected; this note exists so the next reader does not go
-// looking for rollback code here again.
+
 //
 // Unlike events.test.js, this file does NOT mock ../../_middleware.js — it
 // exercises the REAL checkPermission via `data.user`, the same pattern

@@ -553,7 +553,7 @@ export default function BandProfilePage() {
                       href={safeInstagramHref(profile.social.instagram)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-linear-to-br from-purple-500 to-pink-500 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-linear-to-br from-purple-500 to-pink-500 px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                       onClick={() => trackSocialClick(profile.id, 'instagram')}
                     >
                       <InstagramIcon size={16} className="shrink-0" />
@@ -565,7 +565,7 @@ export default function BandProfilePage() {
                       href={safeExternalHref(profile.social.bandcamp)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                       onClick={() => trackSocialClick(profile.id, 'bandcamp')}
                     >
                       <BandcampIcon size={16} className="shrink-0" />
@@ -601,7 +601,7 @@ export default function BandProfilePage() {
                       href={safeExternalHref(profile.social.spotify)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                       onClick={() => trackSocialClick(profile.id, 'spotify')}
                     >
                       <SpotifyIcon size={16} className="shrink-0" />
@@ -613,7 +613,7 @@ export default function BandProfilePage() {
                       href={safeExternalHref(profile.social.apple_music)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-linear-to-br from-pink-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-linear-to-br from-pink-700 to-red-700 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                       onClick={() => trackSocialClick(profile.id, 'apple_music')}
                     >
                       <AppleMusicIcon size={16} className="shrink-0" />
@@ -625,7 +625,7 @@ export default function BandProfilePage() {
                       href={safeExternalHref(profile.social.linktree)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-lime-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-lime-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-lime-500 px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-lime-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                       onClick={() => trackSocialClick(profile.id, 'linktree')}
                     >
                       <LinktreeIcon size={16} className="shrink-0" />

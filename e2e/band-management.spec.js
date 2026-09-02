@@ -96,20 +96,27 @@ test.describe("Band Management", () => {
 
     await page.locator("tr", { hasText: bandName }).getByRole("button", { name: "Edit" }).click();
 
-    const fileInput = page.locator('input[type="file"]');
-    if (await fileInput.isVisible()) {
-      await fileInput.setInputFiles({
-        name: "test.jpg",
-        mimeType: "image/jpeg",
-        buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
-      });
+    // The preview is a LOCAL FileReader result set before the upload starts, so
+    // asserting the image is merely visible tests the browser, not the server --
+    // it passes with the upload broken. Only a server-returned http(s) src proves
+    // the object was stored (#1062).
+    //
+    // Raced rather than sequential: an upload error resolves immediately instead
+    // of burning the full timeout waiting for a src that will never arrive.
+    const uploaded = page.locator('img[alt="Band profile"][src^="http"]');
+    const uploadFailed = page.getByText(/upload failed|invalid file type|file too large/i);
 
-      const errorMessage = page.getByText(/upload failed|invalid file type|file too large/i);
-      const hasError = await errorMessage.isVisible();
-      if (!hasError) {
-        await expect(page.locator('img[alt="Band profile"]')).toBeVisible();
-      }
-    }
+    const fileInput = page.locator('input[type="file"]');
+    await expect(fileInput).toBeAttached();
+    await fileInput.setInputFiles({
+      name: "test.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+    });
+
+    await expect(uploaded.or(uploadFailed).first()).toBeVisible({ timeout: 15000 });
+    await expect(uploadFailed).toHaveCount(0);
+    await expect(uploaded).toBeVisible();
   });
 
   test.skip("should show band profile with social media links", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronDown, Clock, DoorOpen, Route, Warehouse } from 'lucide-react'
+import { Ban, CalendarDays, ChevronDown, Clock, DoorOpen, Flag, Route, Warehouse } from 'lucide-react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useScrollCollapse } from '../hooks/useScrollCollapse.js'
 import { getDaysAwayAriaLabel, getDaysAwayLabel } from '../utils/daysAway'
@@ -279,12 +279,20 @@ function LiveContextBar({
       summaryItems.push(`Doors ${formatTime(doorsTime)}`)
     }
 
+    if (eventData?.age_restriction) {
+      summaryItems.push(eventData.age_restriction)
+    }
+
+    if (eventData?.presented_by) {
+      summaryItems.push(`Presented by ${eventData.presented_by}`)
+    }
+
     if (daysUntil !== null) {
       summaryItems.push(getDaysAwayLabel(daysUntil))
     }
 
     return summaryItems.join(' • ')
-  }, [activeBands.length, daysUntil, doorsTime, uniqueVenues])
+  }, [activeBands.length, daysUntil, doorsTime, eventData, uniqueVenues])
 
   if (!eventData?.name) {
     return null
@@ -423,6 +431,18 @@ function LiveContextBar({
             <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-text-secondary">
               <DoorOpen size={14} aria-hidden="true" className="text-accent-400" />
               <span>Doors {formatTime(doorsTime)}</span>
+            </div>
+          )}
+          {eventData?.age_restriction && (
+            <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-text-secondary">
+              <Ban size={14} aria-hidden="true" className="text-accent-400" />
+              <span>{eventData.age_restriction}</span>
+            </div>
+          )}
+          {eventData?.presented_by && (
+            <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-text-secondary">
+              <Flag size={14} aria-hidden="true" className="text-accent-400" />
+              <span>{eventData.presented_by}</span>
             </div>
           )}
           <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-accent-500/25 bg-accent-500/10 px-3 py-2 text-accent-400">

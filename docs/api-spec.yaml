@@ -3283,6 +3283,21 @@ components:
             JSON object mapping festival date "YYYY-MM-DD" to 24-hour "HH:MM"
             gates-open time, e.g. {"2026-08-02":"16:00"}. Absent/null means no
             doors info.
+        age_restriction:
+          type: string
+          nullable: true
+          maxLength: 40
+          description: >-
+            Free-text age restriction (e.g. "19+"), shown as a chip on the
+            event's schedule page. Absent/null when unset (#1063).
+        presented_by:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: >-
+            Free-text presenting organization, shown as a chip on the event's
+            schedule page and used as the JSON-LD organizer when set, replacing
+            the default SetTimes organizer (#1063).
         social_links:
           nullable: true
           oneOf:
@@ -3639,6 +3654,14 @@ components:
             JSON object mapping festival date "YYYY-MM-DD" to 24-hour "HH:MM"
             gates-open time, e.g. {"2026-08-02":"16:00"}. Absent/null means no
             doors info.
+        age_restriction:
+          type: string
+          nullable: true
+          maxLength: 40
+        presented_by:
+          type: string
+          nullable: true
+          maxLength: 200
 
     EventPatchInput:
       type: object
@@ -3684,6 +3707,14 @@ components:
             JSON object mapping festival date "YYYY-MM-DD" to 24-hour "HH:MM"
             gates-open time, e.g. {"2026-08-02":"16:00"}. Absent/null means no
             doors info.
+        age_restriction:
+          type: string
+          nullable: true
+          maxLength: 40
+        presented_by:
+          type: string
+          nullable: true
+          maxLength: 200
 
     EventEditInput:
       type: object

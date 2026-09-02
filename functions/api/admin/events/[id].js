@@ -117,6 +117,8 @@ export async function onRequestPatch(context) {
       social_links,
       theme_colors,
       doors_json,
+      age_restriction,
+      presented_by,
     } = body;
 
     // Build update query dynamically based on provided fields
@@ -460,6 +462,54 @@ export async function onRequestPatch(context) {
       }
       updates.push("doors_json = ?");
       params.push(doorsCheck.value);
+    }
+
+    if (age_restriction !== undefined) {
+      if (age_restriction !== null && typeof age_restriction !== "string") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Age restriction must be a string",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      const sanitized = age_restriction ? sanitizeString(age_restriction) : "";
+      if (sanitized.length > FIELD_LIMITS.eventAgeRestriction.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Age restriction must be no more than ${FIELD_LIMITS.eventAgeRestriction.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("age_restriction = ?");
+      params.push(sanitized || null);
+    }
+
+    if (presented_by !== undefined) {
+      if (presented_by !== null && typeof presented_by !== "string") {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: "Presented by must be a string",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      const sanitized = presented_by ? sanitizeString(presented_by) : "";
+      if (sanitized.length > FIELD_LIMITS.eventPresentedBy.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Presented by must be no more than ${FIELD_LIMITS.eventPresentedBy.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("presented_by = ?");
+      params.push(sanitized || null);
     }
 
     // Always update updated_by_user_id

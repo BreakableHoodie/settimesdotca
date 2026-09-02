@@ -57,6 +57,20 @@ const DAY_LABEL_FORMAT = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
 });
+// Numeric floor of an admission restriction, for JSON-LD only. Returns null
+// for "All Ages" and for anything with no digits, which the caller treats as
+// "emit no audience block at all".
+//
+// The STORED value stays the human string ("19+", "All Ages") because that is
+// what renders to a fan; only structured data needs a number. Parsed rather
+// than hardcoded to 19 because the threshold is jurisdictional -- Ontario 19,
+// Alberta and Quebec 18, a US date 21.
+function minimumEntryAge(ageRestriction) {
+  if (typeof ageRestriction !== "string") return null;
+  const match = ageRestriction.match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
 function festivalDayLabel(dateStr) {
   return DAY_LABEL_FORMAT.format(new Date(`${dateStr}T12:00:00Z`));
 }
@@ -144,7 +158,7 @@ export async function onRequest(context) {
   let event;
   try {
     event = await env.DB.prepare(
-      `SELECT id, name, date, end_date, slug, description, city, ticket_url, poster_url, created_at, reveal_mode
+      `SELECT id, name, date, end_date, slug, description, city, ticket_url, poster_url, created_at, reveal_mode, age_restriction, presented_by
        FROM events
        WHERE slug = ? AND ${publicEventStatusSql()}`,
     )
@@ -357,12 +371,38 @@ export async function onRequest(context) {
     location,
     ...(plainDesc ? { description: plainDesc } : {}),
     ...(safePosterUrl ? { image: [safePosterUrl] } : {}),
-    organizer: {
-      "@type": "Organization",
-      name: "SetTimes",
-      url: CANONICAL_HOST,
-      sameAs: ["https://www.instagram.com/settimes.ca"],
-    },
+    // When a presenter is set, the presenting org takes the organizer slot;
+    // otherwise it defaults to SetTimes (the original owner keeps its own
+    // `organizer` default below).
+    ...(event.presented_by
+      ? { organizer: { "@type": "Organization", name: event.presented_by } }
+      : {
+          organizer: {
+            "@type": "Organization",
+            name: "SetTimes",
+            url: CANONICAL_HOST,
+            sameAs: ["https://www.instagram.com/settimes.ca"],
+          },
+        }),
+    // `audience.requiredMinAge`, NOT `typicalAgeRange`. schema.org defines
+    // typicalAgeRange as "the typical expected age range, e.g. '7-9', '11-'"
+    // -- a statement about who a thing is FOR, the sort of value that belongs
+    // on children's programming. A 19+ door is not that: it is a legal entry
+    // restriction following from the venue holding a primary liquor licence
+    // (Ontario's drinking age is 19), so the venue checks photo ID and refuses
+    // entry outright. PeopleAudience.requiredMinAge is the property for
+    // "audiences defined by a person's minimum age".
+    //
+    // An all-ages event emits NOTHING here. "No minimum" and "a minimum of
+    // zero" are different claims, and the second is noise in a search index.
+    ...(minimumEntryAge(event.age_restriction) !== null
+      ? {
+          audience: {
+            "@type": "PeopleAudience",
+            requiredMinAge: minimumEntryAge(event.age_restriction),
+          },
+        }
+      : {}),
     ...(safeTicketUrl
       ? {
           offers: {

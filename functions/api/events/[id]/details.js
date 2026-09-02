@@ -40,7 +40,7 @@ export async function onRequestGet(context) {
   try {
     const event = await DB.prepare(
       `
-      SELECT id, name, slug, date, ticket_url, status, reveal_mode
+      SELECT id, name, slug, date, ticket_url, status, reveal_mode, age_restriction, presented_by
       FROM events
       WHERE id = ? AND ${publicEventStatusSql()}
       LIMIT 1

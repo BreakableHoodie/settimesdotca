@@ -281,6 +281,100 @@ describe("Event API - handler integration", () => {
     expect(JSON.parse(stored.doors_json)).toEqual({ "2099-07-10": "16:00", "2099-07-11": "10:00" });
   });
 
+  // ---------------------------------------------------------------------
+  // #1063 — events.age_restriction / events.presented_by create + update
+  // wiring. Both fields are free-text (no enum/CHECK), so these assert the
+  // handlers persist and read-reflect them, plus the length ceiling on each.
+  // ---------------------------------------------------------------------
+  it("onRequestPost persists age_restriction and presented_by", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const body = {
+      name: "Presenter Event",
+      slug: "presenter-event",
+      date: "2099-10-11",
+      age_restriction: "19+",
+      presented_by: "Downtown Waterloo BIA",
+    };
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.event.age_restriction).toBe("19+");
+    expect(data.event.presented_by).toBe("Downtown Waterloo BIA");
+
+    const stored = rawDb.prepare("SELECT age_restriction, presented_by FROM events WHERE id = ?").get(data.event.id);
+    expect(stored.age_restriction).toBe("19+");
+    expect(stored.presented_by).toBe("Downtown Waterloo BIA");
+  });
+
+  it("onRequestPatch persists age_restriction and presented_by", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "Old Name", slug: "old-name" });
+
+    const body = { age_restriction: "All Ages", presented_by: "Kitchener-Waterloo Oktoberfest" };
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.event.age_restriction).toBe("All Ages");
+    expect(data.event.presented_by).toBe("Kitchener-Waterloo Oktoberfest");
+
+    const stored = rawDb.prepare("SELECT age_restriction, presented_by FROM events WHERE id = ?").get(ev.id);
+    expect(stored.age_restriction).toBe("All Ages");
+    expect(stored.presented_by).toBe("Kitchener-Waterloo Oktoberfest");
+  });
+
+  it("onRequestPost rejects an age_restriction over 40 chars", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({
+        name: "Long Age",
+        slug: "long-age",
+        date: "2099-10-11",
+        age_restriction: "x".repeat(41),
+      }),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+  });
+
+  it("onRequestPost rejects a presented_by over 200 chars", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const request = new Request("https://example.test/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({
+        name: "Long Presenter",
+        slug: "long-presenter",
+        date: "2099-10-11",
+        presented_by: "y".repeat(201),
+      }),
+    });
+
+    const res = await eventsHandler.onRequestPost({ request, env });
+    expect(res.status).toBe(400);
+  });
+
   it("onRequestPost rejects doors_json with a date key outside the event span", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };

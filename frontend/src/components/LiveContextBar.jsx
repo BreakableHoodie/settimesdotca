@@ -292,6 +292,12 @@ function LiveContextBar({
     }
 
     return summaryItems.join(' • ')
+    // eventData in full, NOT the two fields this memo reads. Narrowing the deps
+    // is the obvious optimisation and this project rejects it: the React Compiler
+    // infers `eventData` and errors with "Inferred less specific property than
+    // source", skipping optimisation of the whole component. The compiler owns
+    // memoisation here -- a hand-narrowed dep list buys nothing and costs the
+    // component its automatic memoisation entirely.
   }, [activeBands.length, daysUntil, doorsTime, eventData, uniqueVenues])
 
   if (!eventData?.name) {
@@ -442,7 +448,10 @@ function LiveContextBar({
           {eventData?.presented_by && (
             <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-text-secondary">
               <Flag size={14} aria-hidden="true" className="text-accent-400" />
-              <span>{eventData.presented_by}</span>
+              {/* The Flag icon is aria-hidden, so without this word the chip is a bare
+                  organisation name with nothing saying what it is -- to a screen reader
+                  and a sighted reader alike. The mobile summary already labels it. */}
+              <span>Presented by {eventData.presented_by}</span>
             </div>
           )}
           <div className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-accent-500/25 bg-accent-500/10 px-3 py-2 text-accent-400">

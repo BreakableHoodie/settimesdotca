@@ -647,7 +647,7 @@ export default function EventFormModal({
                 onChange={handleInputChange}
                 className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 maxLength={FIELD_LIMITS.eventPresentedBy.max}
-                placeholder="SetTimes"
+                placeholder="e.g. Pink Lemonade Records"
                 aria-describedby="event-presented-by-hint"
               />
               <p id="event-presented-by-hint" className="text-xs text-white/50 mt-1">

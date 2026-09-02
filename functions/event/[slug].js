@@ -67,8 +67,16 @@ const DAY_LABEL_FORMAT = new Intl.DateTimeFormat("en-US", {
 // Alberta and Quebec 18, a US date 21.
 function minimumEntryAge(ageRestriction) {
   if (typeof ageRestriction !== "string") return null;
-  const match = ageRestriction.match(/\d+/);
-  return match ? Number(match[0]) : null;
+  // Only an explicit lower bound. A bare /\d+/ grabs the first number in any
+  // string, so "Under 18 with guardian" would emit requiredMinAge: 18 --
+  // asserting the OPPOSITE of what it says -- and "All Ages, 19+ licensed
+  // section" would claim the whole event is 19+. Ambiguous text emits no
+  // audience block, which says nothing rather than something false.
+  //
+  // The admin UI is a two-option select, but the API and any imported data
+  // accept free text, so this cannot rely on the input being clean.
+  const match = ageRestriction.trim().match(/^(\d{1,3})\s*\+$/);
+  return match ? Number(match[1]) : null;
 }
 
 function festivalDayLabel(dateStr) {

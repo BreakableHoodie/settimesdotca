@@ -286,7 +286,10 @@ describe('LiveContextBar', () => {
         />
       )
 
-      expect(screen.getAllByText('Downtown Waterloo BIA').length).toBeGreaterThan(0)
+      // Labelled, not bare. The Flag icon on the desktop chip is aria-hidden, so
+      // an unlabelled organisation name told a screen reader nothing about what it
+      // was -- both surfaces now say "Presented by".
+      expect(screen.getAllByText(/Presented by Downtown Waterloo BIA/).length).toBeGreaterThan(0)
       expect(screen.queryByText('19+')).not.toBeInTheDocument()
     })
 

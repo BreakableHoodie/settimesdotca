@@ -164,13 +164,17 @@ test.describe("Public Timeline Viewing", () => {
   test("renders the seeded events as cards", async ({ page }) => {
     await page.goto("/");
 
-    const eventCards = page.locator('[data-testid="event-card"]');
+    // Scoped to SEEDED_EVENT, not any card. The admin specs create their own
+    // events, so an unscoped count passes when the seeded event is ABSENT and
+    // only test-created ones render -- the same "assert against whatever is
+    // there" defect that made the band-profile tests order-dependent.
+    const seededCards = page.locator('[data-testid="event-card"]').filter({ hasText: SEEDED_EVENT });
+
     // Web-first assertions only: both retry. `expect(await locator.count())`
     // samples once with no auto-wait, so it can read 0 on a slow CI run before
-    // the cards render -- a flaky assertion is exactly what this PR removes
-    // elsewhere, and it would be careless to add one here.
-    await expect(eventCards).not.toHaveCount(0);
-    await expect(eventCards.first()).toBeVisible();
+    // the cards render.
+    await expect(seededCards).not.toHaveCount(0);
+    await expect(seededCards.first()).toBeVisible();
   });
 
   test("should display event duration and time details", async ({ page }) => {

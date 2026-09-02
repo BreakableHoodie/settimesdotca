@@ -67,33 +67,93 @@ import { stripAnsi, outputShowsFailingTest, countOccurrences, applyReplacement }
 // mutation-gate.mjs; see the header for why they are not duplicated here.
 export { stripAnsi, outputShowsFailingTest, countOccurrences, applyReplacement };
 
-/** Run a command, returning combined output whether it exits 0 or not. */
+/**
+ * Run a command and capture its output, whether it exits 0 or not.
+ *
+ * @param {string} command - Executable to run.
+ * @param {string[]} args - Arguments passed to it.
+ * @returns {{ok: boolean, output: string}} `ok` is whether the process exited 0;
+ *   `output` is stdout+stderr combined. The two are returned SEPARATELY because
+ *   collapsing them loses the difference between "the tool ran and disagreed"
+ *   and "the tool never ran" — see syntaxCheckOf.
+ */
 export function runCommand(command, args) {
   try {
-    return execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const output = execFileSync(command, args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return { ok: true, output };
   } catch (error) {
-    return (error.stdout || "") + (error.stderr || "");
+    if (error.code === "ENOENT") {
+      return { ok: false, output: `${command} could not be executed: ${error.message}` };
+    }
+    return { ok: false, output: (error.stdout || "") + (error.stderr || "") };
   }
 }
 
 /** `node --check`, returning the SyntaxError line or null. Only meaningful for
  * files node can parse standalone, so callers gate on the extension. */
-function syntaxErrorIn(file) {
-  const output = stripAnsi(runCommand("node", ["--check", file]));
-  if (!/SyntaxError/.test(output)) return null;
-  const firstLine = output.split("\n").find((line) => line.trim().length > 0);
-  return firstLine ? firstLine.trim() : "SyntaxError";
+/**
+ * Parse-check a mutant with `node --check`.
+ *
+ * Returns a VERDICT, not a boolean, because there are three outcomes and only
+ * one of them is "fine":
+ *
+ *   ok       - node parsed the file
+ *   syntax   - node reported a SyntaxError; the mutant is malformed
+ *   unusable - node could not be run at all (missing, ENOENT, killed, OOM)
+ *
+ * The third case is the one that matters and the one the first draft got wrong.
+ * It collapsed every failure into captured output and asked only whether the
+ * text contained "SyntaxError"; a node that never ran produced no such text, so
+ * the probe proceeded and reported CAUGHT or SURVIVED with NO parser validation
+ * at all. That is the same sin this module exists to prevent — reading absence
+ * of evidence as evidence of absence — applied to the checker instead of the
+ * runner. Caught by CodeRabbit on #1071.
+ *
+ * @param {string} file - Path to parse-check.
+ * @returns {{verdict: "ok"|"syntax"|"unusable", detail?: string}}
+ */
+function syntaxCheckOf(file) {
+  const { ok, output } = runCommand("node", ["--check", file]);
+  if (ok) return { verdict: "ok" };
+
+  const clean = stripAnsi(output);
+  if (!/SyntaxError/.test(clean)) {
+    return { verdict: "unusable", detail: clean.trim().split("\n")[0] || "no output" };
+  }
+  // Report the SyntaxError LINE, not the first line of output -- the first line
+  // is the `path:line` header, which names where but never what.
+  const line = clean.split("\n").find((l) => l.includes("SyntaxError"));
+  return { verdict: "syntax", detail: (line || "SyntaxError").trim() };
 }
 
 /**
- * Apply one mutation, run `run()`, restore, and report a verdict.
+ * Apply one mutation, run the test suite, restore the file, and report a verdict.
  *
- * `run` returns the runner's combined output; the verdict is derived from that
- * output, NEVER from an exit code. A crashed runner, a missing browser binary
- * and a syntax error all exit non-zero, and reading those as "caught" is how a
- * broken probe masquerades as a working guard.
+ * The verdict is derived from `run()`'s OUTPUT, never from an exit code. A
+ * crashed runner, a missing browser binary and a syntax error all exit non-zero,
+ * and reading those as "caught" is how a broken probe masquerades as a working
+ * guard.
  *
+ * @param {object} options
+ * @param {string} options.file - Path to the source file to mutate. Restored
+ *   before returning; a restore that cannot be verified throws rather than
+ *   returning a verdict.
+ * @param {string} options.find - Literal substring to replace. Must occur
+ *   EXACTLY once; zero or many is a BAD MUTATION, not a skip.
+ * @param {string} options.replace - Literal replacement, inserted verbatim — a
+ *   `$&` or `$$` in it is NOT interpreted. May be "" for a delete-mutation.
+ * @param {() => string} options.run - Runs the tests and returns the runner's
+ *   combined stdout+stderr. Anything it throws propagates unmasked.
+ * @param {boolean} [options.syntaxCheck=true] - Parse-check the mutant with
+ *   `node --check` before running. Applies only to `.js`/`.mjs`/`.cjs`; any
+ *   other extension skips the check regardless of this flag.
  * @returns {{verdict: "CAUGHT"|"SURVIVED"|"BAD MUTATION", reason?: string, output?: string}}
+ *   `reason` is present only on BAD MUTATION, `output` only on CAUGHT/SURVIVED.
+ * @throws {Error} If the file cannot be restored, or (as an AggregateError) if
+ *   both `run()` and the restore fail.
  */
 export function mutate({ file, find, replace, run, syntaxCheck = true }) {
   if (!existsSync(file)) {
@@ -137,23 +197,38 @@ export function mutate({ file, find, replace, run, syntaxCheck = true }) {
     } else {
       writeFileSync(file, mutated);
 
-      // The mutation must be READABLE BACK from disk. Verifying the string we
-      // meant to write is present separates "applied" from "attempted".
+      // The mutant must be readable back from disk EXACTLY as computed.
+      //
+      // Compare full content, never `onDisk.includes(replace)`. That earlier
+      // check could not fail for a DELETE mutation: `replace` is "" and every
+      // string includes "". Deleting a clause is not an edge case here -- it is
+      // the canonical mutation of this repo (dropping `AND verified = 1` from
+      // the announce query), so the check was vacuous for exactly the shape it
+      // most needed to verify. It also passed when `replace` happened to occur
+      // elsewhere in the file already. Caught by Copilot on #1071.
       const onDisk = readFileSync(file, "utf8");
-      const syntaxError = syntaxCheck && /\.(js|mjs|cjs)$/.test(file) ? syntaxErrorIn(file) : null;
 
-      if (!onDisk.includes(replace)) {
+      if (onDisk !== mutated) {
         outcome = {
           verdict: "BAD MUTATION",
-          reason: "replacement not present in the file after writing",
+          reason: "file content after writing does not match the computed mutant",
         };
-      } else if (syntaxError) {
-        // A mutant that does not parse tests nothing: it fails every test and
-        // reads as a triumphantly caught mutation.
-        outcome = { verdict: "BAD MUTATION", reason: `mutant does not parse: ${syntaxError}` };
       } else {
-        const output = run();
-        outcome = { verdict: outputShowsFailingTest(output) ? "CAUGHT" : "SURVIVED", output };
+        const parse = syntaxCheck && /\.(js|mjs|cjs)$/.test(file) ? syntaxCheckOf(file) : { verdict: "ok" };
+
+        if (parse.verdict === "syntax") {
+          // A mutant that does not parse tests nothing: it fails every test and
+          // reads as a triumphantly caught mutation.
+          outcome = { verdict: "BAD MUTATION", reason: `mutant does not parse: ${parse.detail}` };
+        } else if (parse.verdict === "unusable") {
+          outcome = {
+            verdict: "BAD MUTATION",
+            reason: `could not parse-check the mutant: ${parse.detail}`,
+          };
+        } else {
+          const output = run();
+          outcome = { verdict: outputShowsFailingTest(output) ? "CAUGHT" : "SURVIVED", output };
+        }
       }
     }
   } catch (error) {

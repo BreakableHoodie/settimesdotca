@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mutate, outputShowsFailingTest, stripAnsi } from "../../../scripts/mutate.mjs";
+import { mutate, outputShowsFailingTest, runCommand, stripAnsi } from "../../../scripts/mutate.mjs";
 
 const SOURCE = ["export function greet(name) {", '  return "hello " + name;', "}", ""].join("\n");
 
@@ -92,6 +92,56 @@ describe("mutate() — restoration", () => {
       }),
     ).toThrow(/runner exploded/);
     expect(readFileSync(file, "utf8")).toBe(SOURCE);
+  });
+});
+
+describe("mutate() — delete-mutations are verified, not assumed", () => {
+  // Copilot finding on #1071. The post-write check was `onDisk.includes(replace)`,
+  // which CANNOT FAIL when replace is "" — every string includes "". Deleting a
+  // clause is not an edge case here: dropping `AND verified = 1` from the announce
+  // query is THE canonical mutation of this repo, so the check was vacuous for
+  // exactly the shape it most needed to verify.
+  test("a delete-mutation still reaches a real verdict", () => {
+    const result = mutate({ file, find: '"hello " + ', replace: "", run: redRun });
+    expect(result.verdict).toBe("CAUGHT");
+  });
+
+  // TWO BRANCHES HERE ARE DELIBERATELY NOT COVERED, recorded rather than faked.
+  // Each was verified by mutation to have NO killing test (reverting the line
+  // reports SURVIVED), so nobody later reads green as coverage:
+  //
+  //   1. `onDisk !== mutated` vs the old `onDisk.includes(replace)` -- these
+  //      differ ONLY when the write does not land as computed.
+  //   2. syntaxCheckOf's "unusable" verdict -- reached only when `node --check`
+  //      fails for a NON-syntax reason (node missing, killed, OOM).
+  //
+  // Reproducing either needs an injected fs or child_process, and
+  // nodejs-javascript-vitest.instructions.md:31 forbids reshaping source for
+  // testability. Both fixes are kept because each converts a silent wrong
+  // verdict into a loud refusal -- strictly stronger, and free.
+});
+
+describe("mutate() — an unrunnable parse-check is not a pass", () => {
+  // CodeRabbit finding on #1071. runCommand collapsed every failure into captured
+  // output and the checker asked only whether that text said "SyntaxError". A node
+  // that never ran produced no such text, so the probe proceeded and reported
+  // CAUGHT/SURVIVED with no parser validation at all -- absence of evidence read
+  // as evidence of absence, the exact sin this module exists to prevent.
+  test("runCommand separates 'ran and failed' from 'never ran'", () => {
+    const missing = runCommand("definitely-not-a-real-binary-xyz", ["--version"]);
+    expect(missing.ok).toBe(false);
+    expect(missing.output).toMatch(/could not be executed|ENOENT/i);
+
+    const ran = runCommand("node", ["--version"]);
+    expect(ran.ok).toBe(true);
+    expect(ran.output).toMatch(/^v\d/);
+  });
+
+  test("a syntax error reports the SyntaxError line, not the path:line header", () => {
+    const result = mutate({ file, find: "return", replace: "return return", run: redRun });
+    expect(result.verdict).toBe("BAD MUTATION");
+    // The header names WHERE; only this names WHAT.
+    expect(result.reason).toMatch(/SyntaxError/);
   });
 });
 

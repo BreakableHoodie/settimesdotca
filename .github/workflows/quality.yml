@@ -487,4 +487,16 @@ jobs:
         with:
           name: lighthouse-results
           path: frontend/.lighthouseci
+          # REQUIRED: `.lighthouseci` is a dot-directory, and upload-artifact
+          # treats "files within folders beginning with ." as hidden and skips
+          # them by default. Without this the step uploaded NOTHING while only
+          # emitting a warning -- "No files were found with the provided path"
+          # -- so every LHR was silently lost for as long as it has been here.
+          # That matters most on the failure path this artifact exists to serve:
+          # when the perf or CLS gate goes red there was no report to open.
+          include-hidden-files: true
+          # An empty upload must now be loud. The whole point of this artifact is
+          # post-mortem on a failed run, and a warning nobody reads is how it
+          # stayed broken.
+          if-no-files-found: error
           retention-days: 30

@@ -17,24 +17,12 @@ export async function onRequestProfilePut(context, { performanceId, body, bandPr
   const ipAddress = context.ipAddress;
 
   try {
-    const {
-      venueId,
-      name,
-      startTime,
-      endTime,
-      url,
-      description,
-      genre,
-      origin,
-      origin_city,
-      origin_region,
-      contact_email,
-      is_active,
-      photo_url,
-      photo_alt_text,
-      social_links,
-      notes,
-    } = body;
+    // Only the fields this function itself reads. The remaining profile fields
+    // (url, description, genre, origin, origin_city, origin_region, is_active,
+    // photo_alt_text, social_links) are consumed straight off `body` by
+    // prepareBandProfileFields() below -- naming them here too left nine unused
+    // bindings that read like fields being silently dropped on save.
+    const { venueId, name, startTime, endTime, contact_email, photo_url, notes } = body;
 
     const normalizedVenueId =
       venueId === undefined ? undefined : !venueId || Number(venueId) <= 0 ? null : Number(venueId);
@@ -254,7 +242,7 @@ export async function onRequestProfilePut(context, { performanceId, body, bandPr
   }
 }
 
-export async function onRequestProfileDelete(context, { performanceId: _performanceId, valid, bandProfileId }) {
+export async function onRequestProfileDelete(context, { performanceId: _performanceId, valid: _valid, bandProfileId }) {
   const { env } = context;
   const { DB } = env;
   const user = context.user;

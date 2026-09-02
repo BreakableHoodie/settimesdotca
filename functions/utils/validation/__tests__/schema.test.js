@@ -261,6 +261,27 @@ describe("event schema — required string field boundary lengths (name min 3/ma
   });
 });
 
+describe("event schema — age_restriction/presented_by free-text boundaries (#1063)", () => {
+  it.each([
+    { field: "age_restriction", max: 40 },
+    { field: "presented_by", max: 200 },
+  ])("$field: at max length is accepted", ({ field, max }) => {
+    const value = "a".repeat(max);
+    const result = validateEntity({ ...validEventBase, [field]: value }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(true);
+    expect(result.sanitized[field]).toBe(value);
+  });
+
+  it.each([
+    { field: "age_restriction", label: "Age restriction", max: 40 },
+    { field: "presented_by", label: "Presented by", max: 200 },
+  ])("$field: max + 1 is rejected", ({ field, label, max }) => {
+    const result = validateEntity({ ...validEventBase, [field]: "a".repeat(max + 1) }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(false);
+    expect(result.errors[field]).toBe(`${label} must be no more than ${max} characters`);
+  });
+});
+
 describe("user schema — password policy (each axis individually)", () => {
   it("no uppercase letter is invalid with the exact policy error", () => {
     const result = validateEntity({ ...validUserBase, password: PW_NO_UPPERCASE }, VALIDATION_SCHEMAS.user);

@@ -67,6 +67,8 @@ export default function EventFormModal({
     social_x: '',
     social_tiktok: '',
     social_youtube: '',
+    age_restriction: '',
+    presented_by: '',
     reveal_mode: false,
   })
   const [doorsForm, setDoorsForm] = useState({})
@@ -127,6 +129,8 @@ export default function EventFormModal({
         social_x: socialLinks.x || socialLinks.twitter || '',
         social_tiktok: socialLinks.tiktok || '',
         social_youtube: socialLinks.youtube || '',
+        age_restriction: event.age_restriction || '',
+        presented_by: event.presented_by || '',
         reveal_mode: event?.reveal_mode === 1 || event?.reveal_mode === true,
       })
       setDoorsForm(parseDoorsJsonToForm(event.doors_json, enumerateFestivalDays(event.date, event.end_date)))
@@ -148,6 +152,8 @@ export default function EventFormModal({
         social_x: '',
         social_tiktok: '',
         social_youtube: '',
+        age_restriction: '',
+        presented_by: '',
         reveal_mode: false,
       })
       setDoorsForm({})
@@ -280,6 +286,18 @@ export default function EventFormModal({
       return false
     }
 
+    const ageRestrictionTrimmed = formData.age_restriction.trim()
+    if (ageRestrictionTrimmed.length > FIELD_LIMITS.eventAgeRestriction.max) {
+      setError(`Age restriction must be no more than ${FIELD_LIMITS.eventAgeRestriction.max} characters`)
+      return false
+    }
+
+    const presentedByTrimmed = formData.presented_by.trim()
+    if (presentedByTrimmed.length > FIELD_LIMITS.eventPresentedBy.max) {
+      setError(`Presented by must be no more than ${FIELD_LIMITS.eventPresentedBy.max} characters`)
+      return false
+    }
+
     return true
   }
 
@@ -308,6 +326,8 @@ export default function EventFormModal({
         poster_url: formData.poster_url,
         social_links: socialLinksPayload,
         doors_json: serializeDoorsForm(doorsForm, currentDays),
+        age_restriction: formData.age_restriction || null,
+        presented_by: formData.presented_by || null,
       }
 
       if (isEditing && formData.status === 'archived') {
@@ -578,6 +598,63 @@ export default function EventFormModal({
               </p>
               <p className="text-xs text-white/50 mt-1">
                 {formData.description.length}/{FIELD_LIMITS.eventDescription.max}
+              </p>
+            </div>
+
+            {/* Age Restriction */}
+            <div>
+              <label htmlFor="event-age-restriction" className="block text-white mb-2 text-sm font-medium">
+                Age Restriction <span className="text-white/50 text-xs">(public, optional)</span>
+              </label>
+              {/* A select, not a text box. The restriction is binary in practice --
+                  an event is 19+ or all ages -- and a free field invites "19 +",
+                  "19+ only", "Nineteen plus": three spellings of one fact, rendered
+                  inconsistently and unparseable for the JSON-LD audience block.
+              
+                  The COLUMN stays free TEXT with no CHECK, deliberately: the structure
+                  is binary but the threshold is jurisdictional (Ontario 19, Alberta and
+                  Quebec 18, a US date 21). Constraining the input gives consistency
+                  today; leaving the column open means a future 18+ date is one more
+                  <option>, not a migration. */}
+              <select
+                id="event-age-restriction"
+                name="age_restriction"
+                value={formData.age_restriction}
+                onChange={handleInputChange}
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
+                aria-describedby="event-age-restriction-hint"
+              >
+                <option value="">Not stated</option>
+                <option value="19+">19+</option>
+                <option value="All Ages">All Ages</option>
+              </select>
+              {/* Shown publicly on the event page, so the hint states it outright (#1059). */}
+              <p id="event-age-restriction-hint" className="text-xs text-white/50 mt-1">
+                Shown publicly on the event page and in search results.
+              </p>
+            </div>
+
+            {/* Presented By */}
+            <div>
+              <label htmlFor="event-presented-by" className="block text-white mb-2 text-sm font-medium">
+                Presented By <span className="text-white/50 text-xs">(public, optional)</span>
+              </label>
+              <input
+                id="event-presented-by"
+                type="text"
+                name="presented_by"
+                value={formData.presented_by}
+                onChange={handleInputChange}
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
+                maxLength={FIELD_LIMITS.eventPresentedBy.max}
+                placeholder="e.g. Pink Lemonade Records"
+                aria-describedby="event-presented-by-hint"
+              />
+              <p id="event-presented-by-hint" className="text-xs text-white/50 mt-1">
+                Shown publicly on the event page and in search results as the event&apos;s organizer.
+              </p>
+              <p className="text-xs text-white/50 mt-1">
+                {formData.presented_by.length}/{FIELD_LIMITS.eventPresentedBy.max}
               </p>
             </div>
 

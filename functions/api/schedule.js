@@ -32,7 +32,7 @@ export async function onRequestGet(context) {
       // the date filter, and serving that as tonight's live schedule is wrong.
       event = await DB.prepare(
         `
-        SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
+        SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, age_restriction, presented_by, reveal_mode
         FROM events
         WHERE ${publishedEventStatusSql()}
           AND COALESCE(end_date, date) >= date('now', '-6 hours')
@@ -44,7 +44,7 @@ export async function onRequestGet(context) {
       // Get event by slug — includes archived events for read-only history browsing
       event = await DB.prepare(
         `
-        SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, reveal_mode
+        SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, age_restriction, presented_by, reveal_mode
         FROM events
         WHERE slug = ? AND ${publicEventStatusSql()}
       `,
@@ -181,6 +181,8 @@ export async function onRequestGet(context) {
       // Raw pass-through, same as venue_info — the client parses defensively
       // (absent/malformed = no doors info, #569).
       doors_json: event.doors_json ?? null,
+      age_restriction: event.age_restriction ?? null,
+      presented_by: event.presented_by ?? null,
       reveal_mode: event.reveal_mode ?? 0,
     };
 

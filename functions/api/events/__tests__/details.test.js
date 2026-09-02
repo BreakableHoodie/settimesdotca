@@ -410,3 +410,60 @@ describe("GET /api/events/:id/details - ticket_url sanitization (#504)", () => {
     expect(payload.event.ticket_url).toBe("https://tickets.example.com/crawl");
   });
 });
+
+// #1063 — details projection exposes age_restriction / presented_by. Like the
+// is_cancelled case (#732), the assertion is on the PROJECTED property, not a
+// `?? null` fallback — a dropped column in the SELECT vanishes from the JSON
+// entirely, so toHaveProperty catches it where a fallback would silently pass.
+describe("GET /api/events/:id/details - age_restriction/presented_by projection (#1063)", () => {
+  test("projects both when set", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Meta Event",
+      slug: "details-meta-set",
+      date: "2026-10-11",
+    });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+    rawDb
+      .prepare("UPDATE events SET age_restriction = ?, presented_by = ? WHERE id = ?")
+      .run("19+", "Oktoberfest KW", event.id);
+
+    const request = new Request(`https://example.test/api/events/${event.id}/details`);
+    const response = await onRequestGet({
+      request,
+      env,
+      params: { id: String(event.id) },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.event).toHaveProperty("age_restriction", "19+");
+    expect(payload.event).toHaveProperty("presented_by", "Oktoberfest KW");
+  });
+
+  test("emits null (not undefined) for both when unset", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Meta Event",
+      slug: "details-meta-unset",
+      date: "2026-10-11",
+    });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+
+    const request = new Request(`https://example.test/api/events/${event.id}/details`);
+    const response = await onRequestGet({
+      request,
+      env,
+      params: { id: String(event.id) },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(Object.prototype.hasOwnProperty.call(payload.event, "age_restriction")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(payload.event, "presented_by")).toBe(true);
+    expect(payload.event.age_restriction).toBeNull();
+    expect(payload.event.presented_by).toBeNull();
+  });
+});

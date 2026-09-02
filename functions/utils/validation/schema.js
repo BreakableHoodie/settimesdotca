@@ -467,6 +467,20 @@ export const VALIDATION_SCHEMAS = {
         }
       },
     },
+    age_restriction: {
+      type: "string",
+      required: false,
+      label: "Age restriction",
+      min: FIELD_LIMITS.eventAgeRestriction.min,
+      max: FIELD_LIMITS.eventAgeRestriction.max,
+    },
+    presented_by: {
+      type: "string",
+      required: false,
+      label: "Presented by",
+      min: FIELD_LIMITS.eventPresentedBy.min,
+      max: FIELD_LIMITS.eventPresentedBy.max,
+    },
   },
 
   user: {

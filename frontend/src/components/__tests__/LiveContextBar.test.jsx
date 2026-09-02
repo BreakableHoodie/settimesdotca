@@ -246,6 +246,99 @@ describe('LiveContextBar', () => {
     expect(screen.queryByText(/0 days away/)).not.toBeInTheDocument()
   })
 
+  // #1063: age_restriction and presented_by are public, optional free-text
+  // columns that render as chips on desktop and into the mobile summary line.
+  // They must appear when set and render NOTHING when absent.
+  describe('age restriction and presenter (#1063)', () => {
+    it('renders an age restriction chip while hiding the presenter when only age is set', () => {
+      render(
+        <LiveContextBar
+          eventData={{ ...eventData, age_restriction: '19+' }}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      expect(screen.getAllByText('19+').length).toBeGreaterThan(0)
+      expect(screen.queryByText(/Presented by/i)).not.toBeInTheDocument()
+    })
+
+    it('renders presented by when set and no age restriction', () => {
+      render(
+        <LiveContextBar
+          eventData={{ ...eventData, presented_by: 'Downtown Waterloo BIA' }}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      // Labelled, not bare. The Flag icon on the desktop chip is aria-hidden, so
+      // an unlabelled organisation name told a screen reader nothing about what it
+      // was -- both surfaces now say "Presented by".
+      expect(screen.getAllByText(/Presented by Downtown Waterloo BIA/).length).toBeGreaterThan(0)
+      expect(screen.queryByText('19+')).not.toBeInTheDocument()
+    })
+
+    it('appears in the mobile summary line when the presenter is set (#1063)', () => {
+      setViewportWidth(375)
+      render(
+        <LiveContextBar
+          eventData={{ ...eventData, presented_by: 'SetTimes' }}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      // The mobile summary is a joined string rendered in two paragraphs —
+      // one always-visible and one sm:hidden. Assert the joined text includes
+      // the presenter and that an sm:hidden copy exists (the mobile-only one).
+      const summaries = screen.getAllByText(/\d+ venues • \d+ sets • Presented by SetTimes/)
+      expect(summaries.some(el => el.classList.contains('sm:hidden'))).toBe(true)
+      setViewportWidth(1024)
+    })
+
+    it('renders nothing for either when neither is set', () => {
+      render(
+        <LiveContextBar
+          eventData={eventData}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+
+      expect(screen.queryByText('19+')).not.toBeInTheDocument()
+      expect(screen.queryByText(/Presented by/i)).not.toBeInTheDocument()
+    })
+  })
+
   // #665: Tabs and the filters toggle are the functional controls and must
   // stay reachable regardless of the venue/time filter panel's open state —
   // previously they were rendered INSIDE the same `isFiltersOpen` gate as

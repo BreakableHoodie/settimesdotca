@@ -142,6 +142,8 @@ export async function onRequestPost(context) {
       social_links,
       theme_colors,
       doors_json,
+      age_restriction,
+      presented_by,
     } = validation.sanitized;
 
     let sanitizedVenueInfo;
@@ -264,9 +266,11 @@ export async function onRequestPost(context) {
         social_links,
         theme_colors,
         doors_json,
+        age_restriction,
+        presented_by,
         created_by_user_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
@@ -284,6 +288,8 @@ export async function onRequestPost(context) {
         sanitizedSocialLinks,
         theme_colors,
         sanitizedDoorsJson,
+        age_restriction,
+        presented_by,
         currentUser.userId,
       )
       .first();

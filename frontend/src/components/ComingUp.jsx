@@ -69,11 +69,7 @@ function ComingUp({ bands, currentTime }) {
       }`}
     >
       {hasNext && (
-        <div
-          className="bg-linear-to-r from-accent-500 to-primary-600 px-4 py-2.5 text-bg-navy shadow-lg sm:py-3"
-          role="status"
-          aria-live="polite"
-        >
+        <div className="bg-gradient-accent px-4 py-2.5 text-bg-navy shadow-lg sm:py-3" role="status" aria-live="polite">
           <div className="container mx-auto max-w-(--breakpoint-2xl)" title={message}>
             <div className="flex items-center gap-2 sm:hidden">
               <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-bg-navy">Up Next</span>

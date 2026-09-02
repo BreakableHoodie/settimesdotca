@@ -78,7 +78,20 @@ function sanitizeOptionalHandleOrUrl(value, maxLength, label) {
  * Anything not listed is preserved deliberately — `?t=120` on a YouTube link is
  * a timestamp the artist chose, not tracking.
  */
-export const TRACKING_PARAMS = new Set(["si", "dlsi", "nd", "from"]);
+export const TRACKING_PARAMS = new Set([
+  "si", // Spotify / YouTube share buttons
+  "dlsi",
+  "nd",
+  "from",
+  "igsi", // Instagram share sheet -- what a pasted IG link actually carries
+  "igshid", // its older form
+  "mibextid", // Facebook share links
+  "fbclid", // Facebook click id, appended on outbound clicks
+  "gclid", // Google Ads
+  "msclkid", // Microsoft Ads
+  "ttclid", // TikTok
+  "twclid", // X/Twitter
+]);
 
 /** `utm_source`, `utm_medium`, and friends — matched by prefix, not enumerated. */
 export const TRACKING_PARAM_PREFIXES = ["utm_"];
@@ -302,24 +315,47 @@ function normalizeArtistLinkField(value, config) {
     return normalized;
   }
 
-  const beforeSlash = text.split("/")[0];
-  if (beforeSlash.includes(".")) {
-    const normalized = normalizeHttpUrl(`https://${text.replace(/^\/+/, "")}`);
+  // A PATH separator is what distinguishes a scheme-less URL from a handle,
+  // NOT a dot. Handles routinely contain dots -- this site's own Instagram is
+  // `settimes.ca` -- so a dot-based rule stored https://settimes.ca/ for it,
+  // a dead link, silently. Anything with a slash is a URL; on a handle-bearing
+  // field, anything without one is a handle.
+  // Leading slashes come off FIRST: a pasted `/gfuparty` or `/@handle` is a
+  // handle with a stray prefix, not a path. Only a slash that survives that
+  // strip means the input is really a URL (`instagram.com/gfuparty`).
+  const trimmed = text.replace(/^\/+/, "");
+  const looksLikePath = trimmed.includes("/");
+
+  if (!handleToUrl || looksLikePath) {
+    const candidate = trimmed;
+    if (!candidate.split("/")[0].includes(".")) {
+      throw new Error(`${label} must be a URL — start with https:// or provide the full address`);
+    }
+    const normalized = normalizeHttpUrl(`https://${candidate}`);
     if (!normalized) {
       throw new Error(`${label} must be a valid URL`);
     }
     return normalized;
   }
 
-  if (handleToUrl) {
-    const cleaned = text.replace(/^@/, "").replace(/^\/+/, "");
-    if (/\s/.test(cleaned) || /[:/\\]/.test(cleaned)) {
-      throw new Error(`${label} must be a valid handle or URL`);
-    }
-    return handleToUrl(cleaned);
+  // Strip leading slashes on BOTH sides of an optional @, so `/@handle` and
+  // `@/handle` reduce alike; a single-pass `^@` left the slash in `/@handle`.
+  const cleaned = trimmed.replace(/^@/, "").replace(/^\/+/, "");
+
+  // `?` and `#` matter beyond tidiness: without them `myband?utm_source=x` is
+  // treated as a handle and the tracking query is baked into the stored URL,
+  // bypassing stripTrackingParams entirely.
+  if (!cleaned || /\s/.test(cleaned) || /[:/\\?#]/.test(cleaned)) {
+    throw new Error(`${label} must be a valid handle or URL`);
   }
 
-  throw new Error(`${label} must be a URL — start with https:// or provide the full address`);
+  // Route the built URL through the same normaliser as a pasted one, so a
+  // handle can never take a shortcut past tracking-param stripping.
+  const built = normalizeHttpUrl(handleToUrl(cleaned));
+  if (!built) {
+    throw new Error(`${label} must be a valid handle or URL`);
+  }
+  return built;
 }
 
 export function sanitizeBandSocialLinks(value) {

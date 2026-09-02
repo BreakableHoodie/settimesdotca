@@ -493,7 +493,7 @@ describe("normalizeArtistLinkField — sanitise-or-reject on every band link fie
 
   it("normalises bandcamp handle to canonical subdomain URL", () => {
     const result = JSON.parse(sanitizeBandSocialLinks({ bandcamp: "myband" }));
-    expect(result.bandcamp).toBe("https://myband.bandcamp.com");
+    expect(result.bandcamp).toBe("https://myband.bandcamp.com/");
   });
 
   it("normalises scheme-less website URL to canonical URL", () => {
@@ -639,5 +639,68 @@ describe("validator results use undefined, not null, for an absent error (#917)"
       .map((f) => f.rel);
 
     expect(offenders, `use \`error: undefined\` — see #917:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  // Regression coverage for the review on #1066. Each case below was either
+  // silently WRONG or silently accepted before the normaliser was fixed.
+  describe("artist link normalisation — review regressions (#1066)", () => {
+    const link = (key, value) => {
+      const out = sanitizeBandSocialLinks({ [key]: value });
+      return out ? JSON.parse(out)[key] : null;
+    };
+
+    // A DOT does not make something a domain. This site's own Instagram handle
+    // is `settimes.ca`, and the old dot-based rule stored https://settimes.ca/
+    // for it -- a dead link, with no error. A PATH SEPARATOR is the real signal.
+    it("treats a dotted handle as a handle, not a domain", () => {
+      expect(link("instagram", "settimes.ca")).toBe("https://instagram.com/settimes.ca");
+      expect(link("instagram", "the.friendly.frogs")).toBe("https://instagram.com/the.friendly.frogs");
+    });
+
+    it("still treats a real URL as a URL", () => {
+      expect(link("instagram", "instagram.com/gfuparty")).toBe("https://instagram.com/gfuparty");
+    });
+
+    // `/@handle` kept the slash under a single `^@` strip and stored
+    // https://instagram.com/@handle; a bare `@` collapsed to the platform HOME PAGE.
+    it("strips slash and @ prefixes in either order", () => {
+      expect(link("instagram", "/@myhandle")).toBe("https://instagram.com/myhandle");
+      expect(link("instagram", "/gfuparty")).toBe("https://instagram.com/gfuparty");
+    });
+
+    it("rejects an empty handle rather than storing the platform home page", () => {
+      expect(() => sanitizeBandSocialLinks({ instagram: "@" })).toThrow();
+    });
+
+    // Without rejecting `?`/`#`, a handle-shaped value carried its query into
+    // the stored URL, bypassing stripTrackingParams entirely.
+    it("rejects a handle carrying a query string", () => {
+      expect(() => sanitizeBandSocialLinks({ instagram: "myband?utm_source=test" })).toThrow();
+    });
+
+    // URL-ONLY fields must REJECT a bare handle, not invent one: Spotify and
+    // Apple Music artist URLs carry opaque IDs, so there is nothing to expand.
+    it("rejects a bare handle on URL-only fields", () => {
+      expect(() => sanitizeBandSocialLinks({ spotify: "somehandle" })).toThrow();
+      expect(() => sanitizeBandSocialLinks({ apple_music: "somehandle" })).toThrow();
+    });
+
+    it("accepts a scheme-less URL on URL-only fields", () => {
+      expect(link("spotify", "open.spotify.com/artist/x")).toBe("https://open.spotify.com/artist/x");
+      expect(link("website", "settimes.ca")).toBe("https://settimes.ca/");
+    });
+
+    // The exact params the owner's own pasted links carried. `si` and `utm_*`
+    // were already stripped; these four were not.
+    it("strips igsi, mibextid, fbclid alongside si and utm_*", () => {
+      expect(link("instagram", "https://www.instagram.com/gfuparty?igsi=ZTQy")).toBe(
+        "https://www.instagram.com/gfuparty",
+      );
+      expect(link("facebook", "https://www.facebook.com/p/x/?mibextid=wwXIfr")).toBe("https://www.facebook.com/p/x/");
+      expect(link("linktree", "https://linktr.ee/gfuparty?utm_source=ig&fbclid=PAdG")).toBe(
+        "https://linktr.ee/gfuparty",
+      );
+      expect(link("spotify", "https://open.spotify.com/artist/xyz?si=abc")).toBe("https://open.spotify.com/artist/xyz");
+    });
   });
 });

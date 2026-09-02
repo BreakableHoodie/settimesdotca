@@ -68,7 +68,7 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 
 - **Lean and highly performant** is a design principle, not a preference. No media-heavy
   features, no referral-junk URLs, weigh every feature against page weight first.
-- **Clean links**: strip tracking params (`si`, `dlsi`, `nd`, `utm_*`, `from=`) before
+- **Clean links**: strip tracking params (`si`, `dlsi`, `nd`, `utm_*`, `from=`, `igsi`, `igshid`, `mibextid`, `fbclid`, `gclid`, `msclkid`, `ttclid`, `twclid`) before
   storing any URL.
 - **No AI-written artist prose.** Bios are entered verbatim from artist/organizer-supplied
   text only. Structured facts (genre, origin, links) may be researched, but only to the

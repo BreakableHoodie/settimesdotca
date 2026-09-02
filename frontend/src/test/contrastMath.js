@@ -10,14 +10,20 @@
 // `*.{test,spec}.*`, so nothing here runs as a suite, and vitest.config.js
 // already excludes `src/test/` from coverage.
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Resolved from this file's own location, never process.cwd(): an IDE runner or
+// a script invoking vitest from the repo root would otherwise read a
+// non-existent path and the guards would fail for a reason unrelated to colour.
+const FRONTEND_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 /** WCAG 2.1 AA, normal-size text. Large text (>=24px, or >=18.66px bold) may
  * use 3:1 — none of the call sites so far qualify, so nothing uses it yet. */
 export const AA_NORMAL_TEXT = 4.5
 
-const TAILWIND_THEME = join(process.cwd(), 'node_modules/tailwindcss/theme.css')
-const APP_CSS = join(process.cwd(), 'src/index.css')
+const TAILWIND_THEME = join(FRONTEND_ROOT, 'node_modules/tailwindcss/theme.css')
+const APP_CSS = join(FRONTEND_ROOT, 'src/index.css')
 
 /**
  * oklch() -> sRGB, clamped the way a browser rasterises an out-of-gamut triple.
@@ -75,16 +81,33 @@ export function parseColour(value) {
   // 8- and 4-digit hex carry alpha; translucent, so not resolvable here.
   if (/^#([0-9a-f]{8}|[0-9a-f]{4})$/i.test(raw)) return undefined
   if (raw.startsWith('oklch')) {
-    // oklch(... / <alpha>)
-    if (/\/\s*(0?\.\d+|0)\s*\)/.test(raw)) return undefined
+    if (isTranslucent(raw.match(/\/\s*([\d.]+%?)\s*\)/)?.[1])) return undefined
     return oklchToRgb(raw)
   }
-  const rgb = raw.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+))?/)
+  const rgb = raw.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+%?))?/)
   if (rgb) {
-    if (rgb[4] !== undefined && parseFloat(rgb[4]) < 1) return undefined
+    if (isTranslucent(rgb[4])) return undefined
     return [+rgb[1], +rgb[2], +rgb[3]]
   }
   return undefined
+}
+
+/**
+ * CSS alpha is a number OR a percentage, and mixing them up fails in the
+ * dangerous direction. An earlier version tested `parseFloat(alpha) < 1`, so
+ * `rgb(255 255 255 / 50%)` parsed as `50` — not less than 1 — and a
+ * half-transparent colour was read as fully OPAQUE. That is the same failure as
+ * reading `rgba(255,255,255,0.05)` as `#ffffff`, which produced
+ * "bg-surface + text-text-primary = 1.00:1" on every theme.
+ *
+ * No percentage alpha appears in index.css today, so this is latent rather than
+ * live — but a guard whose instrument silently mis-reads is worse than no guard,
+ * and the fix is one function. Flagged by CodeRabbit on #1077.
+ */
+function isTranslucent(alpha) {
+  if (alpha === undefined) return false
+  const value = alpha.endsWith('%') ? parseFloat(alpha) / 100 : parseFloat(alpha)
+  return Number.isFinite(value) && value < 1
 }
 
 export function relativeLuminance([r, g, b]) {

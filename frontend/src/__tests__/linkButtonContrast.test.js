@@ -46,11 +46,12 @@
 // ~2.3-2.9:1. Theme-pair coverage is tracked separately; do not read this
 // guard as proving those safe.
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { AA_NORMAL_TEXT, contrastRatio, loadTailwindPalette, resolveFixedColour, toHex } from '../test/contrastMath.js'
 
-const PAGE = join(process.cwd(), 'src/pages/BandProfilePage.jsx')
+const PAGE = join(dirname(fileURLToPath(import.meta.url)), '..', 'pages', 'BandProfilePage.jsx')
 
 // The colour maths, the Tailwind palette loader and the oklch conversion live in
 // src/test/contrastMath.js and are SHARED with themeContrast.test.js. They were

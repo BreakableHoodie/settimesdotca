@@ -36,18 +36,20 @@
 // oversight, and it is why the fixed-colour guard in linkButtonContrast.test.js
 // is a separate, complementary check rather than merged into this one.
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import {
   AA_NORMAL_TEXT,
   contrastRatio,
   loadAppThemes,
   loadTailwindPalette,
+  parseColour,
   resolveToken,
   toHex,
 } from '../test/contrastMath.js'
 
-const PUBLIC_ROOT = join(process.cwd(), 'src')
+const PUBLIC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SKIP_DIRS = new Set(['admin', '__tests__', 'test', 'node_modules', 'assets'])
 
 const palette = loadTailwindPalette()
@@ -67,8 +69,18 @@ function collectSourceFiles(dir, found = []) {
 }
 
 // Utility classes that look like colours but are not, or that carry no paint.
+//
+// Only the DIRECTION utilities are excluded (`bg-linear-to-br`,
+// `bg-gradient-to-r`), NOT every token beginning with "gradient". An earlier
+// version excluded the whole prefix and silently dropped `bg-gradient-accent` --
+// the named theme gradient this guard exists to check -- from the scan entirely.
+// The mutation test still went red, because the mutant reverts ComingUp to
+// `from-`/`to-` classes, which ARE scanned: it proved the guard catches that
+// revert, not that it covered the fixed code. A guard can be non-vacuous against
+// one mutation and blind to the thing it was written for. Caught by CodeRabbit
+// on #1077; the coverage assertion below now pins it.
 const NON_COLOUR =
-  /^(gradient|linear|clip|none|transparent|current|inherit|auto|balance|pretty|wrap|nowrap|ellipsis|center|left|right|justify|start|end|xs|sm|base|lg|xl|\d)/
+  /^(gradient-to|linear-to|conic|radial|clip|none|transparent|current|inherit|auto|balance|pretty|wrap|nowrap|ellipsis|center|left|right|justify|start|end|xs|sm|base|lg|xl|\d)/
 
 function classPairs(className) {
   const classes = className.split(/\s+/)
@@ -108,6 +120,41 @@ describe('theme-token contrast — every theme, not just the one axe renders', (
 
   test('the scan finds public source to check', () => {
     expect(files.length, 'no public source files found — the walker is broken').toBeGreaterThan(20)
+  })
+
+  // THE GAP THIS GUARD ACTUALLY SHIPPED WITH, now pinned.
+  //
+  // `NON_COLOUR` excluded every token starting with "gradient", so
+  // `bg-gradient-accent` — the named theme gradient, and the fix applied to
+  // ComingUp — was dropped from the scan entirely. Nothing caught it: the
+  // mutation test reverts ComingUp to `from-`/`to-` classes, which ARE scanned,
+  // so it went red for a reason unrelated to the fixed code's coverage.
+  //
+  // Asserting the extractor REACHES the pair is a different claim from asserting
+  // the pair passes. Only this one fails if the exclusion widens again.
+  test('the extractor actually reaches named gradient backgrounds', () => {
+    const { backgrounds, foregrounds } = classPairs('bg-gradient-accent px-4 py-2.5 text-bg-navy shadow-lg sm:py-3')
+    expect(backgrounds, 'bg-gradient-accent must be scanned, not skipped as a direction utility').toContain(
+      'gradient-accent'
+    )
+    expect(foregrounds).toContain('bg-navy')
+
+    // ...while the direction utilities stay excluded, or every gradient element
+    // pairs its text against a meaningless "to-br" token.
+    expect(classPairs('bg-linear-to-br from-purple-500 text-white').backgrounds).not.toContain('linear-to-br')
+  })
+
+  // Alpha is a number OR a percentage in CSS, and the percentage form failed in
+  // the dangerous direction: `parseFloat('50%')` is 50, which is not < 1, so a
+  // half-transparent colour read as fully opaque. Same shape as reading
+  // rgba(255,255,255,0.05) as #ffffff, which produced "1.00:1" sitewide.
+  test('translucent colours are skipped, in every alpha notation', () => {
+    expect(parseColour('rgba(255, 255, 255, 0.05)'), 'decimal alpha').toBeUndefined()
+    expect(parseColour('rgb(255 255 255 / 50%)'), 'percentage alpha').toBeUndefined()
+    expect(parseColour('#ffffff80'), '8-digit hex alpha').toBeUndefined()
+    // ...and opaque colours in the same notations still resolve.
+    expect(parseColour('rgb(255 255 255)')).toEqual([255, 255, 255])
+    expect(parseColour('rgb(255 255 255 / 100%)')).toEqual([255, 255, 255])
   })
 
   test('every resolvable pair meets AA on all four themes', () => {

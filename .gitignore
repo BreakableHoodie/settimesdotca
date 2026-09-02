@@ -150,7 +150,12 @@ band_crawl_schedule.json
 database/exports/
 /docs/code-review
 .superpowers/
-/docs/superpowers/
+# NOT ignored: /docs/superpowers/ holds design specs for shipped architecture.
+# Ignoring them repeated the #818 failure — the untracked instructions/ tree that
+# existed on one machine and nowhere else, so a fresh clone, CI and delegated runs
+# resolved none of it. Same reason docs/REPORT_CARD_REVIEW.md is tracked on
+# purpose. They stay OFF the published docs site via mkdocs.yml's exclude_docs,
+# not by being absent from git.
 docs/SEO_IMPROVEMENTS.md
 
 # GitGuardian local scan cache

@@ -461,7 +461,10 @@ export default function BandProfilePage() {
                 </h1>
                 <div className="flex flex-wrap gap-2.5">
                   {profile.genre && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-bold text-bg-navy shadow-lg">
+                    <span
+                      data-testid="band-genre"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-bold text-bg-navy shadow-lg"
+                    >
                       <Guitar size={14} className="shrink-0" aria-hidden="true" />
                       {profile.genre}
                     </span>
@@ -486,7 +489,10 @@ export default function BandProfilePage() {
                   </h1>
                   <div className="flex flex-wrap gap-2.5">
                     {profile.genre && (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-bold text-bg-navy">
+                      <span
+                        data-testid="band-genre"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-bold text-bg-navy"
+                      >
                         <Guitar size={14} className="shrink-0" aria-hidden="true" />
                         {profile.genre}
                       </span>
@@ -517,6 +523,7 @@ export default function BandProfilePage() {
           <div className="border-t border-text-primary/10 bg-bg-purple/50 p-6">
             {profile.description ? (
               <div
+                data-testid="band-bio"
                 className="band-bio max-w-prose text-sm leading-relaxed text-text-secondary [&_a:hover]:underline [&_a]:text-accent-500 [&_p]:my-2"
                 dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
               />

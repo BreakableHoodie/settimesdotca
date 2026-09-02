@@ -118,29 +118,17 @@ test.describe("Band Profile Viewing", () => {
   test("should display band biography and details", async ({ page }) => {
     await page.goto("/");
 
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
-    await openProfile(page, bandLink);
+    await openSeededArtistProfile(page);
 
-    // Verify bio/description is displayed
-    // Scoped to <main>: the `p, div` + /\w{20,}/ fallback matches ANY container
-    // with 20+ word characters, and Footer.jsx has 7 such text nodes on every
-    // page — so unscoped, this guard passes whether or not the artist has a bio.
-    const main = page.locator("main");
-    const bioText = main
-      .locator('[data-testid="band-bio"]')
-      .or(main.locator('[class*="bio"]').or(main.locator("p, div").filter({ hasText: /\w{20,}/ })));
-
-    if ((await bioText.count()) > 0) {
-      await expect(bioText.first()).toBeVisible();
-    }
-
-    // Verify genre information
-    const genreInfo = page.locator('[data-testid="band-genre"]').or(page.locator('[class*="genre"]'));
-    if ((await genreInfo.count()) > 0) {
-      await expect(genreInfo.first()).toBeVisible();
-    }
+    // Both targets are now real testids on BandProfilePage. The previous
+    // locators fell through to guesses -- `[class*="bio"]` and a `p, div`
+    // filtered on /\\w{20,}/ for the bio, `[class*="genre"]` for the genre --
+    // and NEITHER could match: the page has no className containing "genre", and
+    // /\\w{20,}/ needs 20 consecutive word characters, which prose never has
+    // ("Indie rock from the future" has no 20-character word). Both assertions
+    // were dead, and the `if (count > 0)` guards absorbed that silently.
+    await expect(page.getByTestId("band-bio").first()).toBeVisible();
+    await expect(page.getByTestId("band-genre").first()).toBeVisible();
   });
 
   test("should show social media links", async ({ page }) => {
@@ -315,9 +303,9 @@ test.describe("Band Profile Viewing", () => {
 
     // Verify content is readable on mobile
     const contentArea = page.locator('main, [role="main"], article').first();
-    if ((await contentArea.count()) > 0) {
-      await expect(contentArea).toBeVisible();
-    }
+    // Unconditional: BandProfilePage always renders <main id="main-content">,
+    // so this guard could never protect anything.
+    await expect(contentArea).toBeVisible();
   });
 
   test("should navigate back to timeline from band profile", async ({ page }) => {
@@ -381,24 +369,6 @@ test.describe("Band Profile Viewing", () => {
     }
   });
 
-  test("should show band formation year or history", async ({ page }) => {
-    await page.goto("/");
-
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
-    await openProfile(page, bandLink);
-
-    // Look for formation year or history information
-    const historyInfo = page
-      .locator('[data-testid="band-formed"]')
-      .or(page.locator("text=/formed|since|est\\.|established|\\d{4}/i"));
-
-    if ((await historyInfo.count()) > 0) {
-      await expect(historyInfo.first()).toBeVisible();
-    }
-  });
-
   test("should allow clicking event from band profile to event details", async ({ page }) => {
     await page.goto("/");
 
@@ -422,25 +392,6 @@ test.describe("Band Profile Viewing", () => {
     // from an artist to the event they are playing.
     await expect(page).toHaveURL(/\/event\//);
     await expect(page.locator("main h1")).toBeVisible();
-  });
-
-  test("should display band member information if available", async ({ page }) => {
-    await page.goto("/");
-
-    // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
-    await openProfile(page, bandLink);
-
-    // Look for band members section
-    const membersSection = page
-      .locator('[data-testid="band-members"]')
-      .or(page.getByRole("heading", { name: /members|lineup|artists/i }))
-      .first();
-
-    if ((await membersSection.count()) > 0) {
-      await expect(membersSection).toBeVisible();
-    }
   });
 
   test("should load band profile with proper metadata", async ({ page }) => {

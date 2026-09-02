@@ -49,7 +49,10 @@ const surfaces = [
   {
     path: "/reset-password",
     label: "Reset password (no token)",
-    ready: (page) => page.getByRole("heading", { name: "Reset Password" }),
+    // No token means the verify step never runs, so the FORM never renders --
+    // this is the error state, same as /activate below. The token-verified form
+    // is still unscanned (needs a live reset row); tracked separately.
+    ready: (page) => page.getByRole("heading", { name: "Reset Failed" }),
   },
   {
     path: "/activate",
@@ -112,7 +115,7 @@ async function resolveVenueId(request) {
   expect(res.ok(), "GET /api/venues should resolve").toBeTruthy();
   const body = await res.json();
   const first = body?.venues?.[0];
-  expect(first?.id, "venue directory should list at least one venue").toBeTypeOf("number");
+  expect(typeof first?.id, "venue directory should list at least one venue").toBe("number");
   return first.id;
 }
 

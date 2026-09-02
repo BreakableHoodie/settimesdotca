@@ -41,7 +41,7 @@ export E2E_ADMIN_PASSWORD
 
 .PHONY: help install build dev format format-check lint lint-md lint-sh lint-yaml lint-sql lint-json \
 	lint-all test test-backend test-frontend mutation-gate coverage-floor gate review review-wip validate-openapi schema-check \
-	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean hooks
+	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean hooks delegate-stats
 
 # CodeRabbit emits PostHog telemetry errors when egress is blocked. They are
 # noise, not review failures — the review still exits 0. They appear on BOTH
@@ -195,6 +195,36 @@ review-wip: ## AI code review of uncommitted changes — run before committing
 		echo "Not signed in. Run: coderabbit auth login"; exit 1; }
 	@out=$$(mktemp); coderabbit review --type uncommitted >"$$out" 2>&1; status=$$?; \
 		grep -aivE '$(CR_NOISE)' "$$out" || true; rm -f "$$out"; exit $$status
+
+delegate-stats: ## Token usage and cost for delegated (OpenCode) runs on this project
+	@command -v opencode >/dev/null 2>&1 || { \
+		echo "opencode CLI not found. Install it, or see CLAUDE.md 'Delegating to OpenCode'."; exit 1; }
+	@# Capture ONCE and check the command's own status before filtering. A
+	@# `opencode stats | sed` pipeline returns SED's status, so a failed stats
+	@# call still exits 0 and this target reports nothing while looking fine --
+	@# the pipe-masks-exit-codes trap (PR #609), and a violation of the
+	@# real-exit-codes contract at the top of this file.
+	@#
+	@# --project "" scopes to the CURRENT project; the default is every project.
+	@# DAYS overrides the window (default 7).
+	@#
+	@# Reads LOCAL session history, so it reports consumption, not entitlement,
+	@# and cannot see runs from another machine. There is no quota endpoint to
+	@# ask: opencode.ai/v2/docs/api is the local SERVER api (sessions, fs, shell)
+	@# and documents nothing for usage, billing or limits.
+	@out=$$(mktemp); \
+	if ! opencode stats --days $${DAYS:-7} --models --project "" >"$$out" 2>&1; then \
+		echo "opencode stats failed:"; cat "$$out"; rm -f "$$out"; exit 1; \
+	fi; \
+	status=0; \
+	sed -n '/COST/,/└/p' "$$out" || status=$$?; \
+	sed -n '/MODEL/,/└/p' "$$out" || status=$$?; \
+	rm -f "$$out"; \
+	exit $$status
+	@echo ""
+	@echo "  A \$$0.00 model is free FOR NOW, not free by contract. Big Pickle is"
+	@echo "  documented as free on OpenCode 'for a limited time'. If a delegation"
+	@echo "  starts reporting a cost, that window closed -- see opencode.ai/docs/zen."
 
 validate-openapi: ## Required when docs/api-spec.yaml changed
 	npm run validate:openapi

@@ -106,19 +106,22 @@ describe("mutate() — delete-mutations are verified, not assumed", () => {
     expect(result.verdict).toBe("CAUGHT");
   });
 
-  // TWO BRANCHES HERE ARE DELIBERATELY NOT COVERED, recorded rather than faked.
-  // Each was verified by mutation to have NO killing test (reverting the line
-  // reports SURVIVED), so nobody later reads green as coverage:
+  // ONE BRANCH HERE IS DELIBERATELY NOT COVERED, recorded rather than faked. It
+  // was verified by mutation to have NO killing test (reverting the line reports
+  // SURVIVED), so nobody later reads green as coverage:
   //
-  //   1. `onDisk !== mutated` vs the old `onDisk.includes(replace)` -- these
-  //      differ ONLY when the write does not land as computed.
-  //   2. syntaxCheckOf's "unusable" verdict -- reached only when `node --check`
-  //      fails for a NON-syntax reason (node missing, killed, OOM).
+  //   `onDisk !== mutated` vs the old `onDisk.includes(replace)` -- these differ
+  //   ONLY when the write does not land as computed, which needs an injected fs,
+  //   and nodejs-javascript-vitest.instructions.md:31 forbids reshaping source
+  //   for testability. The fix is kept anyway: it converts a silent wrong
+  //   verdict into a loud refusal -- strictly stronger, and free.
   //
-  // Reproducing either needs an injected fs or child_process, and
-  // nodejs-javascript-vitest.instructions.md:31 forbids reshaping source for
-  // testability. Both fixes are kept because each converts a silent wrong
-  // verdict into a loud refusal -- strictly stronger, and free.
+  // This list previously named syntaxCheckOf's "unusable" verdict as a second
+  // uncoverable branch. That was WRONG, and the error is worth keeping visible:
+  // it conflated injecting a dependency with changing the ENVIRONMENT. execFileSync
+  // resolves `node` through PATH at call time, so emptying PATH reproduces the
+  // real cause (node missing) as ordinary black-box setup, touching no source.
+  // Covered below.
 });
 
 describe("mutate() — an unrunnable parse-check is not a pass", () => {
@@ -142,6 +145,38 @@ describe("mutate() — an unrunnable parse-check is not a pass", () => {
     expect(result.verdict).toBe("BAD MUTATION");
     // The header names WHERE; only this names WHAT.
     expect(result.reason).toMatch(/SyntaxError/);
+  });
+
+  // The `unusable` verdict itself, driven through mutate(). PATH is emptied so
+  // execFileSync cannot resolve `node` -- the same ENOENT a machine without node
+  // on PATH produces, with no source reshaped and nothing injected.
+  test("a parse-check that cannot run is BAD MUTATION, and run() is never reached", () => {
+    const realPath = process.env.PATH;
+    let ranCalled = false;
+    let result;
+    try {
+      process.env.PATH = join(dir, "no-binaries-here");
+      result = mutate({
+        file,
+        find: '"hello "',
+        replace: '"goodbye "',
+        run: () => {
+          ranCalled = true;
+          return redRun();
+        },
+      });
+    } finally {
+      // Restored in `finally` so a failed assertion cannot leave the rest of
+      // this worker without a PATH.
+      process.env.PATH = realPath;
+    }
+
+    expect(result.verdict).toBe("BAD MUTATION");
+    expect(result.reason).toMatch(/could not parse-check/);
+    // THE assertion. A verdict-only check would still pass if run() had fired
+    // and its output were discarded; the contract is that an unverifiable
+    // mutant never reaches the suite at all.
+    expect(ranCalled).toBe(false);
   });
 });
 

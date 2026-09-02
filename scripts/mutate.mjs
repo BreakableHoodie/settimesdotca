@@ -92,10 +92,9 @@ export function runCommand(command, args) {
   }
 }
 
-/** `node --check`, returning the SyntaxError line or null. Only meaningful for
- * files node can parse standalone, so callers gate on the extension. */
 /**
- * Parse-check a mutant with `node --check`.
+ * Parse-check a mutant with `node --check`. Only meaningful for files node can
+ * parse standalone, so callers gate on the extension.
  *
  * Returns a VERDICT, not a boolean, because there are three outcomes and only
  * one of them is "fine":

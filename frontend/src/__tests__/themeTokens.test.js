@@ -311,6 +311,55 @@ describe('theme token contrast (WCAG AA, 4.5:1)', () => {
       ).toBeGreaterThanOrEqual(MIN_CONTRAST)
     })
 
+    // Root-cause regression guard for #1052. Badge.jsx renders EVERY status
+    // variant as `bg-<c>-500/20 text-<c>-400`, and on the light themes that is
+    // dark text over a 20% wash of its own hue -- the same composited shape as
+    // .soon-pill above, and it collapsed the same way.
+    //
+    // axe measured the "LIVE NOW" badge at 4.08:1 on daybreak and 4.35:1 on
+    // silver-lining. Sweeping the other variants found SEVEN of eight
+    // variant/theme combinations failing; only info/silver-lining passed.
+    //
+    // It hid because a status badge is rare on public pages: `error` renders
+    // ONLY on a live event card, which seeded data never produces, so the e2e
+    // sweep never had one on screen to scan. Computing from the tokens covers
+    // all four variants whether or not a page renders them today -- that gap is
+    // precisely how this shipped.
+    //
+    // LIGHT THEMES ONLY, deliberately. The dark themes put light text on a dark
+    // tint and pass comfortably (5.2-7.3:1). arctic-night computes to 4.45:1
+    // against the DARKEST gradient-card stop, but axe measures the real render
+    // as passing -- a modelling artifact of assuming the worst stop, not a
+    // defect, so it is neither asserted here nor claimed as a bug.
+    if (theme === 'daybreak' || theme === 'silver-lining') {
+      describe.each(['error', 'success', 'warning', 'info'])('%s badge', variant => {
+        it('badge text clears 4.5:1 against its composited chip background', () => {
+          const cardStops = resolveGradientCardStops(theme)
+          const text = resolveHex(`--color-${variant}-400`, theme)
+          const fill = resolveHex(`--color-${variant}-500`, theme)
+
+          // Same backdrop chain as .soon-pill: the chip tint sits on a
+          // gradient-card stop, itself composited over the page background.
+          // Both stops are checked and the worse ratio asserted, since a card
+          // can render the badge anywhere along its gradient.
+          const worst = [cardStops.start, cardStops.end]
+            .map(stop => {
+              const cardBg = compositeCardStopOverPage(stop, bgNavy)
+              const chipBg = blend(fill, cardBg, 20)
+              return { chipBg, ratio: contrastRatio(text, chipBg) }
+            })
+            .reduce((a, b) => (a.ratio <= b.ratio ? a : b))
+
+          expect(
+            worst.ratio,
+            `[${theme}] ${variant} badge text (--color-${variant}-400=${text}) against its composited chip ` +
+              `background (--color-${variant}-500=${fill} at 20% over the gradient-card stop over ` +
+              `--color-bg-navy=${bgNavy} => ${worst.chipBg}) computes to ${worst.ratio.toFixed(2)}:1, ` +
+              `below the ${MIN_CONTRAST}:1 WCAG AA floor`
+          ).toBeGreaterThanOrEqual(MIN_CONTRAST)
+        })
+      })
+    }
     // Bonus guard: accent-500 is the token gradient-accent's stops are meant
     // to match (VenueStrip and BandCard both use it directly against
     // bg-navy/bg-purple) — same bug class, cheap to also pin down here.

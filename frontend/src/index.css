@@ -294,8 +294,16 @@
   /* Status ramps re-tuned for light surfaces, mirroring the accent-ramp
      philosophy above: -400 (text/icon usage) goes DARK so it clears 4.5:1 on
      the paper backgrounds; -500 (solid fills / translucent chip tints) darkens
-     one grade so white button text stays readable; -600 stays the darkest
-     hover step. The dark themes keep the @theme defaults. */
+     one grade so white button text stays readable. The dark themes keep the
+     @theme defaults.
+
+     NOTE: -400 now EQUALS -600 on these themes -- three names, two distinct
+     values. Deliberate, not an oversight. -400 was the 700 grade until #1052,
+     where it failed against Badge.jsx's own `bg-<c>-500/20` chip tint (axe
+     measured 4.08:1 for the LIVE NOW badge here). Clearing 4.5:1 over that
+     composite needs the 800 grade, which -600 already held. Anything wanting a
+     genuinely darker hover step than the text colour must add a new stop
+     rather than assume -600 is one. */
   --color-success-400: #166534;
   --color-success-500: #16a34a;
   --color-success-600: #166534;
@@ -303,8 +311,12 @@
   --color-warning-500: #d97706;
   --color-warning-600: #92400e;
   /* Overrides the @theme default (see that declaration for why): warning-400
-     itself only clears ~3.9:1 against the composited .soon-pill background on
-     this theme, so the pill text uses the darker warning-600 value instead. */
+     used to clear only ~3.9:1 against the composited .soon-pill background on
+     this theme, so the pill text took the darker warning-600 value instead.
+     Since #1052 darkened warning-400 to that same 800 grade, this token and
+     warning-400 now hold the SAME value on every theme. Kept as an explicit
+     contract -- the pill states its own text colour rather than inheriting
+     whatever warning-400 becomes next -- not because the values differ. */
   --color-warning-pill-text: #92400e;
   --color-error-400: #991b1b;
   --color-error-500: #dc2626;
@@ -384,8 +396,12 @@
   --color-warning-500: #d97706;
   --color-warning-600: #92400e;
   /* Overrides the @theme default (see that declaration for why): warning-400
-     itself only clears ~3.9:1 against the composited .soon-pill background on
-     this theme, so the pill text uses the darker warning-600 value instead. */
+     used to clear only ~3.9:1 against the composited .soon-pill background on
+     this theme, so the pill text took the darker warning-600 value instead.
+     Since #1052 darkened warning-400 to that same 800 grade, this token and
+     warning-400 now hold the SAME value on every theme. Kept as an explicit
+     contract -- the pill states its own text colour rather than inheriting
+     whatever warning-400 becomes next -- not because the values differ. */
   --color-warning-pill-text: #92400e;
   --color-error-400: #991b1b;
   --color-error-500: #dc2626;
@@ -609,10 +625,13 @@ body {
      alpha-blends to `result = (P/100)*C + (1 - P/100)*B` per channel, so the
      text token has to be measured against that blended result, not against B
      directly — see themeTokens.test.js's composited-background assertion.
-     --color-warning-pill-text carries the fix: it equals warning-400 on the
-     dark themes (already ~8:1 there, untouched) and the darker warning-600
-     value on daybreak/silver-lining (~5.5:1 against the composited tint,
-     #720). */
+     --color-warning-pill-text carries the fix. It originally equalled
+     warning-400 on the dark themes (already ~8:1 there) and the darker
+     warning-600 value on daybreak/silver-lining (~5.5:1 against the composited
+     tint, #720). Since #1052 darkened warning-400 to that same 800 grade on the
+     light themes, the two now coincide everywhere; the separate name is kept so
+     the pill states its own text colour rather than inheriting whatever
+     warning-400 becomes next. */
   background: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-warning-400) 45%, transparent);
   color: var(--color-warning-pill-text);

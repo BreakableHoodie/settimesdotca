@@ -71,9 +71,15 @@ export default function BandStats({ stats }) {
         Performance Snapshot
       </h3>
 
-      <dl className="space-y-3">
+      {/* Each group is its own <dl> rather than one <dl> wrapping two layout
+          divs. axe-core's dlitem check walks up exactly ONE div from a dt/dd
+          before requiring a <dl>, and the Card is already that one div -- an
+          outer layout div made it two, so every dt/dd here failed dlitem
+          (serious) and the list failed definition-list. Keep the layout
+          classes ON the <dl> so no wrapper creeps back in. */}
+      <div className="space-y-3">
         {compact.length > 0 && (
-          <div className="grid grid-cols-2 gap-3">
+          <dl className="grid grid-cols-2 gap-3">
             {compact.map(key => {
               const value = stats[key]
               const display =
@@ -87,11 +93,11 @@ export default function BandStats({ stats }) {
                 </Card>
               )
             })}
-          </div>
+          </dl>
         )}
 
         {wide.length > 0 && (
-          <div className="space-y-2">
+          <dl className="space-y-2">
             {wide.map(key => {
               const value = stats[key]
               const isDate = DATE_KEYS.has(key)
@@ -123,9 +129,9 @@ export default function BandStats({ stats }) {
                 </Card>
               )
             })}
-          </div>
+          </dl>
         )}
-      </dl>
+      </div>
     </Card>
   )
 }

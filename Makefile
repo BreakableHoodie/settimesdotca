@@ -216,9 +216,11 @@ delegate-stats: ## Token usage and cost for delegated (OpenCode) runs on this pr
 	if ! opencode stats --days $${DAYS:-7} --models --project "" >"$$out" 2>&1; then \
 		echo "opencode stats failed:"; cat "$$out"; rm -f "$$out"; exit 1; \
 	fi; \
-	sed -n '/COST/,/└/p' "$$out"; \
-	sed -n '/MODEL/,/└/p' "$$out"; \
-	rm -f "$$out"
+	status=0; \
+	sed -n '/COST/,/└/p' "$$out" || status=$$?; \
+	sed -n '/MODEL/,/└/p' "$$out" || status=$$?; \
+	rm -f "$$out"; \
+	exit $$status
 	@echo ""
 	@echo "  A \$$0.00 model is free FOR NOW, not free by contract. Big Pickle is"
 	@echo "  documented as free on OpenCode 'for a limited time'. If a delegation"

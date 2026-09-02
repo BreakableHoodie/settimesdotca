@@ -46,74 +46,22 @@
 // ~2.3-2.9:1. Theme-pair coverage is tracked separately; do not read this
 // guard as proving those safe.
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
+import { AA_NORMAL_TEXT, contrastRatio, loadTailwindPalette, resolveFixedColour, toHex } from '../test/contrastMath.js'
 
-const PAGE = join(process.cwd(), 'src/pages/BandProfilePage.jsx')
-const THEME_CSS = join(process.cwd(), 'node_modules/tailwindcss/theme.css')
+const PAGE = join(dirname(fileURLToPath(import.meta.url)), '..', 'pages', 'BandProfilePage.jsx')
 
-const AA_NORMAL_TEXT = 4.5
+// The colour maths, the Tailwind palette loader and the oklch conversion live in
+// src/test/contrastMath.js and are SHARED with themeContrast.test.js. They were
+// duplicated here at first, which is the CACHE_BROWSE drift class exactly: two
+// copies that can disagree while both stay green.
+const palette = loadTailwindPalette()
 
-/** Every `--color-<name>` Tailwind declares, as its raw CSS value. */
-function loadPalette() {
-  const css = readFileSync(THEME_CSS, 'utf8')
-  const palette = new Map()
-  for (const match of css.matchAll(/--color-([a-z]+-\d{2,3}):\s*([^;]+);/g)) {
-    palette.set(match[1], match[2].trim())
-  }
-  return palette
-}
-
-/**
- * oklch() -> sRGB, clamped the way a browser rasterises an out-of-gamut triple.
- * Tailwind v4 declares its whole palette in oklch, so there is no hex to read;
- * parsing the three numbers as if they were RGB (which an early draft of this
- * did) yields confident nonsense like "green-600 is #3b3b29".
- */
-function oklchToRgb(value) {
-  const match = value.match(/oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)/)
-  if (!match) return undefined
-  const lightness = match[2] === '%' ? parseFloat(match[1]) / 100 : parseFloat(match[1])
-  const chroma = parseFloat(match[3])
-  const hue = (parseFloat(match[4]) * Math.PI) / 180
-  const a = chroma * Math.cos(hue)
-  const b = chroma * Math.sin(hue)
-  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3
-  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3
-  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3
-  return [
-    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
-  ].map(channel => {
-    const encoded = channel <= 0.0031308 ? 12.92 * channel : 1.055 * Math.pow(Math.max(channel, 0), 1 / 2.4) - 0.055
-    return Math.max(0, Math.min(255, Math.round(encoded * 255)))
-  })
-}
-
-function relativeLuminance([r, g, b]) {
-  const channel = value => {
-    const c = value / 255
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-  }
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
-}
-
-function contrastRatio(foreground, background) {
-  const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort((a, b) => b - a)
-  return (lighter + 0.05) / (darker + 0.05)
-}
-
-const palette = loadPalette()
-
-/** A colour is resolvable only if it is fixed. Theme tokens return undefined
- * ON PURPOSE — see the scope note in the header. */
-function resolveColour(token) {
-  if (token === 'white') return [255, 255, 255]
-  if (token === 'black') return [0, 0, 0]
-  const declared = palette.get(token)
-  return declared ? oklchToRgb(declared) : undefined
-}
+/** A colour is resolvable only if it is FIXED. Theme tokens return undefined
+ * ON PURPOSE — see the scope note in the header; themeContrast.test.js owns them. */
+const resolveColour = token => resolveFixedColour(token, palette)
 
 // The link buttons share one distinctive shape: a 44px minimum touch target on
 // an inline-flex anchor. Matching on that rather than on a colour keeps a newly
@@ -155,11 +103,10 @@ describe('artist link buttons — declared colours clear WCAG AA (#1074)', () =>
     // Guarding the instrument, not the page. Every value here was read out of a
     // real Chromium render; if the conversion regresses, the ratios below
     // become meaningless and would fail silently in the passing direction.
-    const hex = rgb => '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('')
-    expect(hex(resolveColour('green-600'))).toBe('#00a63e')
-    expect(hex(resolveColour('lime-500'))).toBe('#7ccf00')
-    expect(hex(resolveColour('pink-500'))).toBe('#f6339a')
-    expect(hex(resolveColour('blue-600'))).toBe('#155dfc')
+    expect(toHex(resolveColour('green-600'))).toBe('#00a63e')
+    expect(toHex(resolveColour('lime-500'))).toBe('#7ccf00')
+    expect(toHex(resolveColour('pink-500'))).toBe('#f6339a')
+    expect(toHex(resolveColour('blue-600'))).toBe('#155dfc')
     expect(+contrastRatio([255, 255, 255], resolveColour('green-600')).toFixed(2)).toBeCloseTo(3.22, 2)
   })
 

@@ -150,21 +150,23 @@ test.describe("Public Timeline Viewing", () => {
     await page.waitForTimeout(500);
   });
 
-  test("should show empty state when no events available", async ({ page }) => {
+  // Was "should show empty state when no events available", and it never ran a
+  // single assertion: it gated on a "Show history"/"Hide history" button that
+  // exists nowhere in frontend/src, so isVisible() was always false and the body
+  // was skipped every run. The assertion inside could not have failed either --
+  // the seed carries 30 public events, so `hasEvents` is always true and
+  // `hasEvents || hasEmptyMessage` is a tautology.
+  //
+  // The empty state it named is genuinely unreachable from this fixture, so it is
+  // not re-testable here; EventTimeline's between-seasons empty state is covered
+  // by unit tests, which can seed zero events. What IS worth asserting on the
+  // real timeline is that seeded events actually render as cards.
+  test("renders the seeded events as cards", async ({ page }) => {
     await page.goto("/");
 
-    const historyButton = page.getByRole("button", { name: /show history|hide history/i });
-    if (await historyButton.isVisible()) {
-      await historyButton.click();
-
-      const emptyMessage = page.locator("text=/no events|no performances|nothing scheduled/i");
-      const eventCards = page.locator('[data-testid="event-card"]');
-
-      const hasEvents = (await eventCards.count()) > 0;
-      const hasEmptyMessage = await emptyMessage.isVisible();
-
-      expect(hasEvents || hasEmptyMessage).toBeTruthy();
-    }
+    const eventCards = page.locator('[data-testid="event-card"]');
+    await expect(eventCards.first()).toBeVisible();
+    expect(await eventCards.count()).toBeGreaterThan(0);
   });
 
   test("should display event duration and time details", async ({ page }) => {
@@ -173,10 +175,15 @@ test.describe("Public Timeline Viewing", () => {
     const firstEvent = await seededEventCard(page);
     await firstEvent.getByRole("button", { name: /view details/i }).click();
 
-    const timeRange = firstEvent.locator("text=/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/");
-    if ((await timeRange.count()) > 0) {
-      await expect(timeRange.first()).toBeVisible();
-    }
+    // Unconditional: all 12 seeded performances carry a start_time and
+    // EventTimeline renders formatTimeRange(start, end), so a missing range is a
+    // real failure rather than absent optional content.
+    // 12-hour with a meridiem, matching formatTimeRange -> formatTime in
+    // frontend/src/utils/timeFormat.js ("7:00 PM - 7:45 PM"). The previous
+    // pattern required \d{2}:\d{2} on both sides and no AM/PM, so it matched
+    // nothing -- which the count() guard silently absorbed.
+    const timeRange = firstEvent.locator("text=/\\d{1,2}:\\d{2}\\s*(AM|PM)\\s*-\\s*\\d{1,2}:\\d{2}\\s*(AM|PM)/i");
+    await expect(timeRange.first()).toBeVisible();
   });
 
   test("should allow visitors to access timeline without login", async ({ page }) => {

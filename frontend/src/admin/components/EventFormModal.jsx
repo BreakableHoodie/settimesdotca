@@ -557,7 +557,7 @@ export default function EventFormModal({
             {/* Description */}
             <div>
               <label htmlFor="event-description" className="block text-white mb-2 text-sm font-medium">
-                Description <span className="text-white/50 text-xs">(optional)</span>
+                Description <span className="text-white/50 text-xs">(public, optional)</span>
               </label>
               <textarea
                 id="event-description"
@@ -567,8 +567,15 @@ export default function EventFormModal({
                 className="w-full min-h-[120px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 rows={4}
                 maxLength={FIELD_LIMITS.eventDescription.max}
-                placeholder="Describe the event..."
+                aria-describedby="event-description-hint"
+                placeholder="Describe the event for fans..."
               />
+              {/* This field feeds the event page's meta description and its
+                  JSON-LD, neither of which is visible from this form -- which
+                  is why the hint states it outright (#1059). */}
+              <p id="event-description-hint" className="text-xs text-white/50 mt-1">
+                Shown publicly on the event page and in search results. Keep internal notes out of it.
+              </p>
               <p className="text-xs text-white/50 mt-1">
                 {formData.description.length}/{FIELD_LIMITS.eventDescription.max}
               </p>

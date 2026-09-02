@@ -570,12 +570,9 @@ export default function EventFormModal({
                 aria-describedby="event-description-hint"
                 placeholder="Describe the event for fans..."
               />
-              {/* Nothing here said this field was fan-facing, and an internal
-                  provenance note -- including a third party's booking address --
-                  was once entered into it and published to the event page's meta
-                  description AND its JSON-LD (#1059). Same root cause as the
-                  contact_email label in #1051: a free-text field whose audience
-                  was never stated. */}
+              {/* This field feeds the event page's meta description and its
+                  JSON-LD, neither of which is visible from this form -- which
+                  is why the hint states it outright (#1059). */}
               <p id="event-description-hint" className="text-xs text-white/50 mt-1">
                 Shown publicly on the event page and in search results. Keep internal notes out of it.
               </p>

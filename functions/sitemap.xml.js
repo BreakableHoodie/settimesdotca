@@ -24,7 +24,24 @@ export async function onRequestGet(context) {
       // would have had one live on the 11th and 12th). concludedEventSql uses
       // COALESCE(end_date, date), which fixes that as a side effect.
       env.DB.prepare(
+        // <lastmod> means "when did this PAGE's content last change", not "when
+        // is the event". This used to emit `date`, so editing a description,
+        // venue note or lineup signalled NOTHING to a crawler -- the sitemap kept
+        // asserting the page was as old as the show. A public event description
+        // was corrected on 2026-09-01 and the sitemap still claimed 2026-08-07
+        // (#1054).
+        //
+        // BOTH halves are load-bearing, and one day's edits exercised each:
+        // fixing that description made the EVENT row newest, while revealing
+        // Vol. 18's lineup made a PERFORMANCE row newest. events.updated_at alone
+        // would have missed the second -- inserting a performance does not touch
+        // the event row. created_at is NOT NULL, so this can never be empty.
         `SELECT slug, date, end_date,
+                MAX(
+                  COALESCE(updated_at, created_at, date),
+                  COALESCE((SELECT MAX(COALESCE(p.updated_at, p.created_at))
+                            FROM performances p WHERE p.event_id = events.id), '')
+                ) AS last_modified,
                 CASE WHEN ${concludedEventSql()} THEN 1 ELSE 0 END AS is_concluded
          FROM events
          WHERE ${publicEventStatusSql()}
@@ -97,7 +114,7 @@ export async function onRequestGet(context) {
     for (const event of events) {
       rows.push(`  <url>
     <loc>https://settimes.ca/event/${event.slug}</loc>
-    <lastmod>${event.date}</lastmod>
+    <lastmod>${event.last_modified.slice(0, 10)}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`);
@@ -109,7 +126,7 @@ export async function onRequestGet(context) {
       if (event.is_concluded) {
         rows.push(`  <url>
     <loc>https://settimes.ca/events/${event.slug}/recap</loc>
-    <lastmod>${event.end_date || event.date}</lastmod>
+    <lastmod>${event.last_modified.slice(0, 10)}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>`);

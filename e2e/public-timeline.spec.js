@@ -165,8 +165,12 @@ test.describe("Public Timeline Viewing", () => {
     await page.goto("/");
 
     const eventCards = page.locator('[data-testid="event-card"]');
+    // Web-first assertions only: both retry. `expect(await locator.count())`
+    // samples once with no auto-wait, so it can read 0 on a slow CI run before
+    // the cards render -- a flaky assertion is exactly what this PR removes
+    // elsewhere, and it would be careless to add one here.
+    await expect(eventCards).not.toHaveCount(0);
     await expect(eventCards.first()).toBeVisible();
-    expect(await eventCards.count()).toBeGreaterThan(0);
   });
 
   test("should display event duration and time details", async ({ page }) => {

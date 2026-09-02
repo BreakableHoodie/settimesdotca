@@ -5,6 +5,14 @@ applyTo: '**/*.js, **/*.mjs, **/*.cjs'
 
 # Code Generation Guidelines
 
+> **Scope: `e2e/` is exempt from the Vitest rules below.** That directory is
+> the Playwright suite -- it runs against a real wrangler server and a seeded
+> D1, which Vitest cannot provide. The `applyTo` glob above matches every
+> `.js` file including `e2e/*.spec.js`, so without this note a reviewer
+> correctly reads the rule as requiring Vitest there and files a finding on
+> every E2E change. Playwright is the supported runner for `e2e/`; Vitest is
+> the runner everywhere else.
+
 ## Coding standards
 - Use JavaScript with ES2022 features and Node.js (20+) ESM modules
 - Use Node.js built-in modules and avoid external dependencies where possible

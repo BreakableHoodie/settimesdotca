@@ -96,18 +96,16 @@ test.describe("Band Management", () => {
 
     await page.locator("tr", { hasText: bandName }).getByRole("button", { name: "Edit" }).click();
 
-    // Unconditional, both levels. This test was named for uploading a photo and
-    // PASSED WHEN THE UPLOAD FAILED: its only assertion sat behind
-    // `if (!hasError)`, so an error state skipped it and the test reported green.
-    // The outer `if (await fileInput.isVisible())` did the same for the whole body.
+    // The preview is a LOCAL FileReader result set before the upload starts, so
+    // asserting the image is merely visible tests the browser, not the server --
+    // it passes with the upload broken. Only a server-returned http(s) src proves
+    // the object was stored (#1062).
     //
-    // The upload itself works: env.BAND_PHOTOS is bound from wrangler.toml's
-    // [[r2_buckets]], so `wrangler pages dev` resolves it with no --r2 flag needed
-    // (its startup output lists the binding). Verified by running this test
-    // unconditionally against a server started without one -- it passes.
-    //
-    // So the defect was never a missing binding, only an assertion that could not
-    // fail. An upload error now fails the test rather than excusing it (#1062).
+    // Raced rather than sequential: an upload error resolves immediately instead
+    // of burning the full timeout waiting for a src that will never arrive.
+    const uploaded = page.locator('img[alt="Band profile"][src^="http"]');
+    const uploadFailed = page.getByText(/upload failed|invalid file type|file too large/i);
+
     const fileInput = page.locator('input[type="file"]');
     await expect(fileInput).toBeAttached();
     await fileInput.setInputFiles({
@@ -116,20 +114,9 @@ test.describe("Band Management", () => {
       buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
     });
 
-    // Assert the src is an http(s) URL, NOT merely that an image is visible.
-    // PhotoUpload sets the preview from a LOCAL FileReader before the upload
-    // starts (a data: URI), and only replaces it with data.url once the server
-    // responds. So toBeVisible() matched the local preview immediately and
-    // passed even with the upload broken -- verified by replacing
-    // env.BAND_PHOTOS.put() with a rejection: the old assertion stayed green.
-    //
-    // Waiting for an https src is what actually waits for the round trip, and
-    // on failure the component reverts the preview to currentPhoto (null for a
-    // new artist), so this cannot pass without a stored URL coming back.
-    await expect(page.locator('img[alt="Band profile"]')).toHaveAttribute("src", /^https?:\/\//, {
-      timeout: 15000,
-    });
-    await expect(page.getByText(/upload failed|invalid file type|file too large/i)).toHaveCount(0);
+    await expect(uploaded.or(uploadFailed).first()).toBeVisible({ timeout: 15000 });
+    await expect(uploadFailed).toHaveCount(0);
+    await expect(uploaded).toBeVisible();
   });
 
   test.skip("should show band profile with social media links", async ({ page }) => {

@@ -224,7 +224,33 @@ Four rules, each learned by something breaking:
 
    The tradeoff is real and is handled in the brief: **a task that needs a domain instruction file must name it.** An a11y fix says, "read `.github/instructions/a11y.instructions.md` first"; a Playwright change names the Playwright one. That is one line in a brief, paid only by the runs that need it, instead of ~5.7k tokens charged to every backend fix that does not. Before adding an entry back, ask whether *every* delegation needs it — if not, name it in the brief instead.
 
-**Cost is the throughput constraint, not the bill.** The subscription is flat-rate but capped in usage-dollar terms, so an expensive model buys fewer delegations per window rather than a larger invoice. Read `result.json`'s `cost` after **every delegated run** — a raw `opencode run` writes no `result.json`, so it gives you no figure to track at all.
+**Cost is the throughput constraint, not the bill.** The subscription is flat-rate but capped in usage-dollar terms, so an expensive model buys fewer delegations per window rather than a larger invoice. Read the cost after **every delegated run** — but read it with `make delegate-stats`, NOT from `result.json`, whose `cost` field reports `$0.0000` on a free model and invites the conclusion that the run consumed nothing (see below). A raw `opencode run` writes no `result.json` at all, which is a separate reason to go through the relay.
+
+**`make delegate-stats` is how you read the cost — not `result.json`.** The relay
+writes a `cost` field, and on a free model it reads `$0.0000`, which invites the
+conclusion that a delegation consumed nothing. It did not: measured 2026-09-02,
+four dispatches on `opencode/big-pickle` came to **314 messages and 3.1M input
+tokens** in this project alone. Counting *dispatches* understates the work by
+roughly two orders of magnitude.
+
+`opencode stats --days N --models --project ""` is the real view, wrapped as
+`make delegate-stats` (override the window with `DAYS=30 make delegate-stats`).
+The `--project ""` is load-bearing: the default is EVERY project on the machine.
+
+Three limits on what it can tell you, all worth knowing before relying on it:
+
+- It reads **local session history**, so it reports consumption, not entitlement,
+  and cannot see runs from another machine.
+- **There is no quota endpoint to ask.** `opencode.ai/v2/docs/api` is the local
+  *server* API — sessions, filesystem, shell, MCP, 140 operations — and documents
+  nothing for usage, billing or limits. An MCP server would not help; there is
+  nothing account-shaped to expose.
+- A **$0.00 model is free FOR NOW, not free by contract.** OpenCode's own Zen
+  page describes Big Pickle as "a stealth model that's free on OpenCode for a
+  limited time". A community GitHub comment claiming a ~200-request cap does not
+  match the vendor's page and is four months old — the catalog has already
+  rotated since (it named one Minimax; there are now three). If a delegation
+  starts reporting a non-zero cost, that window closed.
 
 **Model names, prices and caps go stale — look them up rather than trusting this file.** Providers rename, deprecate and reprice constantly; a doctrine that caches those values becomes confidently wrong, which is the failure mode the guards in this file exist to prevent elsewhere. Re-derive:
 

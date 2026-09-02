@@ -454,9 +454,155 @@ describe("sanitizeOptionalHandle write-path scheme guard (#483, via sanitizeBand
     expect(() => sanitizeBandSocialLinks({ instagram: "javascript:x" })).toThrow();
   });
 
-  it("still accepts a normal @handle", () => {
+  it("still accepts a normal @handle and normalises to canonical URL", () => {
     const result = sanitizeBandSocialLinks({ instagram: "@ok_handle" });
-    expect(JSON.parse(result).instagram).toBe("@ok_handle");
+    expect(JSON.parse(result).instagram).toBe("https://instagram.com/ok_handle");
+  });
+});
+
+describe("normalizeArtistLinkField — sanitise-or-reject on every band link field (#1064)", () => {
+  it("normalises instagram handle to canonical URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ instagram: "sunnyinspiration" }));
+    expect(result.instagram).toBe("https://instagram.com/sunnyinspiration");
+  });
+
+  it("normalises scheme-less instagram URL (bare domain) to canonical URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ instagram: "instagram.com/kwplaces" }));
+    expect(result.instagram).toBe("https://instagram.com/kwplaces");
+  });
+
+  it("normalises facebook handle to canonical URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ facebook: "kwpunkshowcase" }));
+    expect(result.facebook).toBe("https://facebook.com/kwpunkshowcase");
+  });
+
+  it("normalises scheme-less facebook URL to canonical URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ facebook: "facebook.com/kwplaces" }));
+    expect(result.facebook).toBe("https://facebook.com/kwplaces");
+  });
+
+  it("normalises youtube handle to canonical URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ youtube: "myband" }));
+    expect(result.youtube).toBe("https://youtube.com/@myband");
+  });
+
+  it("normalises linktree handle to canonical URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ linktree: "myband" }));
+    expect(result.linktree).toBe("https://linktr.ee/myband");
+  });
+
+  it("normalises bandcamp handle to canonical subdomain URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ bandcamp: "myband" }));
+    expect(result.bandcamp).toBe("https://myband.bandcamp.com");
+  });
+
+  it("normalises scheme-less website URL to canonical URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ website: "myband.ca" }));
+    expect(result.website).toBe("https://myband.ca/");
+  });
+
+  it("normalises scheme-less spotify URL to canonical URL", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ spotify: "open.spotify.com/artist/123" }));
+    expect(result.spotify).toBe("https://open.spotify.com/artist/123");
+  });
+
+  it("rejects bare non-domain text in URL-only field (website)", () => {
+    expect(() => sanitizeBandSocialLinks({ website: "not-a-url" })).toThrow();
+  });
+
+  it("rejects bare non-domain text in URL-only field (spotify)", () => {
+    expect(() => sanitizeBandSocialLinks({ spotify: "open.spotify.com" })).not.toThrow();
+  });
+
+  it("rejects bare non-domain text in URL-only field (apple_music)", () => {
+    expect(() => sanitizeBandSocialLinks({ apple_music: "music.apple.com/artist/123" })).not.toThrow();
+  });
+
+  it("rejects bare non-domain text in apple_music", () => {
+    expect(() => sanitizeBandSocialLinks({ apple_music: "not-a-url" })).toThrow();
+  });
+
+  it("rejects handle with colon (scheme injection guard)", () => {
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, proves the colon guard rejects it before a handle is ever built (#1064)
+    expect(() => sanitizeBandSocialLinks({ instagram: "javascript:alert(1)" })).toThrow();
+  });
+
+  it("rejects handle with colon (http scheme injection)", () => {
+    expect(() => sanitizeBandSocialLinks({ facebook: "http://evil.com" })).not.toThrow();
+  });
+
+  it("rejects handle with whitespace", () => {
+    expect(() => sanitizeBandSocialLinks({ instagram: "has space" })).toThrow();
+  });
+
+  it("normalises @handle by stripping leading @", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ instagram: "@myhandle" }));
+    expect(result.instagram).toBe("https://instagram.com/myhandle");
+  });
+
+  it("normalises /handle by stripping leading /", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ facebook: "/myhandle" }));
+    expect(result.facebook).toBe("https://facebook.com/myhandle");
+  });
+
+  it("normalises handle with multiple leading slashes", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ youtube: "///myhandle" }));
+    expect(result.youtube).toBe("https://youtube.com/@myhandle");
+  });
+
+  it("preserves full https URL unchanged", () => {
+    const result = JSON.parse(
+      sanitizeBandSocialLinks({
+        website: "https://myband.ca",
+      }),
+    );
+    expect(result.website).toBe("https://myband.ca/");
+  });
+
+  it("preserves full http URL unchanged", () => {
+    const result = JSON.parse(
+      sanitizeBandSocialLinks({
+        website: "http://myband.ca",
+      }),
+    );
+    expect(result.website).toBe("http://myband.ca/");
+  });
+
+  it("returns null when all fields empty", () => {
+    const result = sanitizeBandSocialLinks({
+      website: "",
+      instagram: "",
+      facebook: "",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("normalises multiple fields in one call", () => {
+    const result = JSON.parse(
+      sanitizeBandSocialLinks({
+        instagram: "myband",
+        facebook: "facebook.com/myband",
+        youtube: "myband",
+        website: "myband.ca",
+      }),
+    );
+    expect(result.instagram).toBe("https://instagram.com/myband");
+    expect(result.facebook).toBe("https://facebook.com/myband");
+    expect(result.youtube).toBe("https://youtube.com/@myband");
+    expect(result.website).toBe("https://myband.ca/");
+  });
+
+  it("rejects handle with backslash", () => {
+    expect(() => sanitizeBandSocialLinks({ instagram: "my\\band" })).toThrow();
+  });
+
+  it("normalises bandcamp with path-like handle (has slash — rejected)", () => {
+    expect(() => sanitizeBandSocialLinks({ bandcamp: "my/band" })).toThrow();
+  });
+
+  it("normalises youtube @handle by stripping and re-adding exactly one @", () => {
+    const result = JSON.parse(sanitizeBandSocialLinks({ youtube: "@myband" }));
+    expect(result.youtube).toBe("https://youtube.com/@myband");
   });
 });
 

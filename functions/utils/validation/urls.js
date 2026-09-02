@@ -228,6 +228,100 @@ export function sanitizeOptionalHttpUrl(value, maxLength = FIELD_LIMITS.url.max,
   return normalized;
 }
 
+/**
+ * Per-platform configuration for `normalizeArtistLinkField`. Each entry
+ * defines the field limit, error label, and — where the platform has a
+ * canonical handle form — a function that builds the profile URL from a
+ * bare handle.
+ *
+ * Platforms without `handleToUrl` (website, spotify, apple_music) accept
+ * URL input only (scheme optional); a bare non-domain string is rejected.
+ */
+const BAND_LINK_FIELD_CONFIG = {
+  website: { maxLength: FIELD_LIMITS.bandUrl.max, label: "Website URL" },
+  instagram: {
+    maxLength: FIELD_LIMITS.socialHandle.max,
+    label: "Instagram",
+    handleToUrl: (h) => `https://instagram.com/${h}`,
+  },
+  bandcamp: {
+    maxLength: FIELD_LIMITS.bandUrl.max,
+    label: "Bandcamp URL",
+    handleToUrl: (h) => `https://${h}.bandcamp.com`,
+  },
+  facebook: {
+    maxLength: FIELD_LIMITS.bandUrl.max,
+    label: "Facebook URL",
+    handleToUrl: (h) => `https://facebook.com/${h}`,
+  },
+  youtube: {
+    maxLength: FIELD_LIMITS.bandUrl.max,
+    label: "YouTube URL",
+    handleToUrl: (h) => `https://youtube.com/@${h}`,
+  },
+  spotify: { maxLength: FIELD_LIMITS.bandUrl.max, label: "Spotify URL" },
+  apple_music: { maxLength: FIELD_LIMITS.bandUrl.max, label: "Apple Music URL" },
+  linktree: {
+    maxLength: FIELD_LIMITS.bandUrl.max,
+    label: "Linktree URL",
+    handleToUrl: (h) => `https://linktr.ee/${h}`,
+  },
+};
+
+/**
+ * Normalise a single artist link field value, resolving input in this order:
+ *
+ *   1. trim; empty → null
+ *   2. starts with http(s):// → existing `normalizeHttpUrl` path
+ *   3. bare domain (dot before any `/`) → prepend https://, then normalizeHttpUrl
+ *   4. platform has a handle form → build canonical URL from handle
+ *   5. otherwise → throw (URL-only field, bare input rejected)
+ *
+ * Handles are validated before URL construction: one leading `@` and any
+ * leading `/` are stripped, then whitespace, `:` (the necessary condition
+ * for `javascript:`, `data:`, and every other scheme), and `/` reject the
+ * input.
+ *
+ * @param {*} value - Raw input from the admin form
+ * @param {{ maxLength: number, label: string, handleToUrl?: (h: string) => string }} config
+ * @returns {string|null} Canonical URL or null
+ */
+function normalizeArtistLinkField(value, config) {
+  const { maxLength, label, handleToUrl } = config;
+
+  const text = sanitizeOptionalText(value, maxLength, label);
+  if (!text) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(text)) {
+    const normalized = normalizeHttpUrl(text);
+    if (!normalized) {
+      throw new Error(`${label} must be a valid URL`);
+    }
+    return normalized;
+  }
+
+  const beforeSlash = text.split("/")[0];
+  if (beforeSlash.includes(".")) {
+    const normalized = normalizeHttpUrl(`https://${text.replace(/^\/+/, "")}`);
+    if (!normalized) {
+      throw new Error(`${label} must be a valid URL`);
+    }
+    return normalized;
+  }
+
+  if (handleToUrl) {
+    const cleaned = text.replace(/^@/, "").replace(/^\/+/, "");
+    if (/\s/.test(cleaned) || /[:/\\]/.test(cleaned)) {
+      throw new Error(`${label} must be a valid handle or URL`);
+    }
+    return handleToUrl(cleaned);
+  }
+
+  throw new Error(`${label} must be a URL — start with https:// or provide the full address`);
+}
+
 export function sanitizeBandSocialLinks(value) {
   const parsed = parseJsonInput(value, "Social links");
   if (!parsed) {
@@ -238,16 +332,10 @@ export function sanitizeBandSocialLinks(value) {
     throw new Error("Social links must be a JSON object");
   }
 
-  const sanitized = {
-    website: sanitizeOptionalHttpUrl(parsed.website, FIELD_LIMITS.bandUrl.max, "Website URL"),
-    instagram: sanitizeOptionalHandleOrUrl(parsed.instagram, FIELD_LIMITS.socialHandle.max, "Instagram"),
-    bandcamp: sanitizeOptionalHttpUrl(parsed.bandcamp, FIELD_LIMITS.bandUrl.max, "Bandcamp URL"),
-    facebook: sanitizeOptionalHttpUrl(parsed.facebook, FIELD_LIMITS.bandUrl.max, "Facebook URL"),
-    youtube: sanitizeOptionalHttpUrl(parsed.youtube, FIELD_LIMITS.bandUrl.max, "YouTube URL"),
-    spotify: sanitizeOptionalHttpUrl(parsed.spotify, FIELD_LIMITS.bandUrl.max, "Spotify URL"),
-    apple_music: sanitizeOptionalHttpUrl(parsed.apple_music, FIELD_LIMITS.bandUrl.max, "Apple Music URL"),
-    linktree: sanitizeOptionalHttpUrl(parsed.linktree, FIELD_LIMITS.bandUrl.max, "Linktree URL"),
-  };
+  const sanitized = {};
+  for (const [key, config] of Object.entries(BAND_LINK_FIELD_CONFIG)) {
+    sanitized[key] = normalizeArtistLinkField(parsed[key], config);
+  }
 
   return Object.values(sanitized).some(Boolean) ? JSON.stringify(sanitized) : null;
 }

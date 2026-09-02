@@ -557,7 +557,7 @@ export default function EventFormModal({
             {/* Description */}
             <div>
               <label htmlFor="event-description" className="block text-white mb-2 text-sm font-medium">
-                Description <span className="text-white/50 text-xs">(optional)</span>
+                Description <span className="text-white/50 text-xs">(public, optional)</span>
               </label>
               <textarea
                 id="event-description"
@@ -567,8 +567,18 @@ export default function EventFormModal({
                 className="w-full min-h-[120px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
                 rows={4}
                 maxLength={FIELD_LIMITS.eventDescription.max}
-                placeholder="Describe the event..."
+                aria-describedby="event-description-hint"
+                placeholder="Describe the event for fans..."
               />
+              {/* Nothing here said this field was fan-facing, and an internal
+                  provenance note -- including a third party's booking address --
+                  was once entered into it and published to the event page's meta
+                  description AND its JSON-LD (#1059). Same root cause as the
+                  contact_email label in #1051: a free-text field whose audience
+                  was never stated. */}
+              <p id="event-description-hint" className="text-xs text-white/50 mt-1">
+                Shown publicly on the event page and in search results. Keep internal notes out of it.
+              </p>
               <p className="text-xs text-white/50 mt-1">
                 {formData.description.length}/{FIELD_LIMITS.eventDescription.max}
               </p>

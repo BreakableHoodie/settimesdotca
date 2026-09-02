@@ -94,9 +94,17 @@ INSERT OR REPLACE INTO events (id, name, date, slug, status, description, city, 
 -- value containing whitespace or a scheme beyond http(s). photo_url is
 -- /favicon-32x32.png: same-origin, present in frontend/public/, needs no network,
 -- and satisfies the document CSP (img-src 'self').
+--
+-- Artist 2 ('Future Sound') deliberately carries ALL EIGHT keys, not the two the
+-- others use. It is the artist e2e/accessibility/public-routes.spec.js resolves
+-- for its /band/:id axe scan, and a full-page scan can only see the buttons the
+-- fixture actually renders. With only website+instagram it was blind to the
+-- green/lime link buttons entirely, which is how five WCAG AA failures survived
+-- a passing a11y sweep (#1074). Adding a ninth platform means adding it here
+-- too, or the sweep silently stops covering it.
 INSERT OR REPLACE INTO band_profiles (id, name, name_normalized, genre, origin, description, social_links, photo_url, photo_alt_text) VALUES
 (1, 'The Time Travellers', 'the time travellers', 'Indie Rock', 'Waterloo', 'Indie rock from the future', '{"website":"https://timetravellers.band","instagram":"https://instagram.com/thetimetravellers"}', '/favicon-32x32.png', 'The Time Travellers band photo'),
-(2, 'Future Sound', 'future sound', 'Electronic', 'Toronto', 'Electronic music ahead of its time', '{"website":"https://futuresound.band","instagram":"https://instagram.com/futuresound"}', '/favicon-32x32.png', 'Future Sound band photo'),
+(2, 'Future Sound', 'future sound', 'Electronic', 'Toronto', 'Electronic music ahead of its time', '{"website":"https://futuresound.band","instagram":"https://instagram.com/futuresound","bandcamp":"https://futuresound.bandcamp.com","facebook":"https://facebook.com/futuresound","youtube":"https://youtube.com/@futuresound","spotify":"https://open.spotify.com/artist/futuresound","apple_music":"https://music.apple.com/artist/futuresound","linktree":"https://linktr.ee/futuresound"}', '/favicon-32x32.png', 'Future Sound band photo'),
 (3, 'The Prophets', 'the prophets', 'Post-Rock', 'Montreal', 'Instrumental post-rock soundscapes', '{"website":"https://theprophets.band","instagram":"https://instagram.com/theprophets"}', '/favicon-32x32.png', 'The Prophets band photo'),
 (4, 'Tomorrows Echo', 'tomorrows echo', 'Dream Pop', 'Waterloo', 'Dreamy sounds from the future', '{"website":"https://tomorrowsecho.band","instagram":"https://instagram.com/tomorrowsecho"}', '/favicon-32x32.png', 'Tomorrows Echo band photo');
 

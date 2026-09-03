@@ -1007,6 +1007,54 @@ that apply to the changed file type before agreeing or disagreeing.
 
 `make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
 
+**A green CodeRabbit check does not NECESSARILY mean the diff was reviewed.** When every
+changed file is excluded by a path filter, CodeRabbit posts *"Review skipped"*
+and the status check still reports **pass**. Measured on #1083, a security bump
+whose only change was `package-lock.json`: the badge was green and nothing had
+been read.
+
+The exclusion itself is correct and deliberate — `.coderabbit.yaml` sets
+`!**/package-lock.json` and CodeRabbit ignores it by default too (the skip
+message lists the pattern twice for that reason). A lockfile diff is generated
+hashes; line-level review of it is noise.
+
+**So for a dependency change, read `dependency-review`, not CodeRabbit.** That is
+the check designed for the class, and it passed on #1083 alongside gitleaks and
+GitGuardian.
+
+**But be precise about what it covers, because two different threats hide behind
+one green badge.** `dependency-review` compares the PR's dependency changes
+against advisory databases and fails on a package with a *known* vulnerability at
+or above its configured severity. That is the #1083 case exactly, and it is
+genuinely covered.
+
+It does **not** verify that a lockfile's `resolved` URLs still point at the
+expected registry, nor re-check `integrity` against what it fetches. A lockfile
+entry carries `version`, `resolved` and `integrity`; an edit repointing
+`resolved` at an attacker-controlled host while leaving the version untouched
+raises no advisory, and `npm ci` then fetches whatever `resolved` names.
+**That gap is real and currently unguarded here — do not read
+"dependency-review passed" as covering it.**
+
+The practical split: routine generated churn (a Dependabot group bump, a
+transitive patch) is well served by the advisory check and needs no human diff
+read. A lockfile change *not* produced by npm on your own machine deserves one,
+whatever the checks say.
+
+This is the same shape as `lint-md` missing from `.PHONY` (make reported "up to
+date" having linted nothing), the Lighthouse artifact that uploaded nothing while
+only warning, and axe reporting `incomplete` rather than a violation on a
+gradient: **green meaning "did not look", not "looked and found nothing."** When
+a gate goes green on a change you expected it to have opinions about, check
+whether it ran at all.
+
+Related, and why the push-budget hook is not "wrong": it counts **pushes**, and a
+skipped review consumes none of the hourly allowance. The count is therefore
+conservative — you sometimes have more budget than it thinks. Do not "fix" that
+by having the hook query the API; it is deliberately POSIX `sh` with no `gh`,
+`jq` or network call, because a hook that fails open when a tool is missing is
+worse than no hook.
+
 ### CodeRabbit costs money past 5 reviews an hour — batch your pushes
 
 **Every push to a PR branch triggers a review.** CodeRabbit Pro allows **5 PR reviews per developer per ROLLING HOUR**, and this account has the usage-based add-on enabled — so past that, reviews are **not paused, they are billed**. There is no natural brake; the discipline has to come from the workflow.

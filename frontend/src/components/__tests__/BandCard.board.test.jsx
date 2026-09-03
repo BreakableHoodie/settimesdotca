@@ -37,9 +37,23 @@ describe('BandCard variant="board"', () => {
   })
 
   it('exposes the venue code to assistive tech as a real venue name', () => {
-    // "PRIN" is a visual abbreviation. A screen reader must hear the venue.
+    // "PRIN" is a visual abbreviation. A screen reader must hear the VENUE, and a
+    // `title` is a tooltip rather than an accessible name -- the first version of
+    // this test asserted the title and passed while the row still announced four
+    // letters. Assert the name is present and the abbreviation is hidden.
     renderBoard()
-    expect(screen.getByText('PRIN')).toHaveAttribute('title', 'Princess Cafe')
+    expect(screen.getByText('Princess Cafe')).toBeInTheDocument()
+    expect(screen.getByText('PRIN')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  // The card was fixed for this in #726 (WCAG 2.5.3): the visible fallback and
+  // the announced name must match, and a band with no name has no profile to
+  // link to. The board reintroduced both bugs by interpolating band.name directly.
+  it('handles a band with no name without an empty link', () => {
+    renderBoard({ band: { ...band, name: undefined } })
+    expect(screen.getByText('Unnamed Artist')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /add unnamed artist to my route/i })).toBeInTheDocument()
   })
 
   // The board row REPLACES the card on mobile. Without a toggle here, "Tap any

@@ -45,8 +45,16 @@ test.describe("Event page fold (#1074 / Vol 18 phase 1)", () => {
     expect(names.length, "seed must have performances for this to mean anything").toBeGreaterThan(0);
 
     await page.goto(`/event/${SEEDED_EVENT}`);
-    // Wait for real content, never a skeleton -- a fold measured mid-fetch is meaningless.
-    await expect(page.getByRole("heading", { name: "Full Lineup" })).toBeVisible({ timeout: 15000 });
+    // Wait for a REAL ACT to be in the DOM, never a heading.
+    //
+    // This waited on the "Full Lineup" heading until Copilot pointed out the
+    // circularity: that heading is now `sr-only` below `sm:` -- the very change
+    // this test measures -- so the readiness signal depended on a visually hidden
+    // element and told us nothing about whether the lineup had rendered. It is
+    // also the anti-pattern public-routes.spec.js warns about in its own header:
+    // a heading is not a data-ready signal, because it paints before the fetch
+    // resolves. An act name cannot appear until the schedule has loaded.
+    await expect(page.getByText(names[0], { exact: true }).first()).toBeVisible({ timeout: 15000 });
 
     const firstActTop = await page.evaluate((actNames) => {
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);

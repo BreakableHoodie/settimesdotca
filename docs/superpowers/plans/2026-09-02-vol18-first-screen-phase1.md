@@ -50,11 +50,30 @@ Written first and expected to FAIL. It is the acceptance criterion for the whole
  *
  * The assertion is a POSITION, not a class or a DOM shape, because every
  * cheaper proxy passes on a page that still scrolls. iPhone 12/13/14 viewport.
+ *
+ * WHY THE BUDGET IS HALF THE FOLD AND NOT THE WHOLE FOLD.
+ *
+ * The first version of this test asserted only "inside 844px" and PASSED against
+ * the seed on day one, which made it useless as the acceptance criterion it was
+ * written to be. Measured: the seeded event puts its first act at 827px -- inside
+ * the fold by 17 pixels, because the seed has four bands and fewer controls than
+ * a real bill. Production `lwbc18`, with fifteen acts and every control, put it
+ * at roughly 1,300px.
+ *
+ * So the whole-fold budget is environment-dependent at exactly the margin that
+ * matters, and an act name clinging to the bottom edge of the screen is not
+ * "leading with the lineup" in any sense a fan would recognise.
+ *
+ * LINEUP_BUDGET_PX is half the viewport: on the first screen, half of it should
+ * be schedule. That is a claim about the design, it fails today on both the seed
+ * and production, and it cannot be satisfied by a page that merely stopped
+ * getting worse.
  */
 import { test, expect } from "@playwright/test";
 
 const SEEDED_EVENT = "future-fest-e2e";
 const FOLD_PX = 844;
+const LINEUP_BUDGET_PX = Math.round(FOLD_PX / 2);
 
 test.describe("Event page fold (#1074 / Vol 18 phase 1)", () => {
   test.use({ viewport: { width: 390, height: FOLD_PX } });
@@ -87,10 +106,19 @@ test.describe("Event page fold (#1074 / Vol 18 phase 1)", () => {
     }, names);
 
     expect(firstActTop, `no act name from ${JSON.stringify(names.slice(0, 3))} was rendered at all`).not.toBeNull();
+
+    // The floor: an act name below this is not on the first screen at all.
     expect(
       firstActTop,
-      `first act name renders ${Math.round(firstActTop)}px down; it must be inside the ${FOLD_PX}px fold`
+      `first act name renders ${Math.round(firstActTop)}px down, past the ${FOLD_PX}px fold entirely`
     ).toBeLessThan(FOLD_PX);
+
+    // The real bar. See the header for why the fold alone is not enough.
+    expect(
+      firstActTop,
+      `first act name renders ${Math.round(firstActTop)}px down; the lineup should start within ` +
+        `${LINEUP_BUDGET_PX}px so half the first screen is schedule rather than controls`
+    ).toBeLessThan(LINEUP_BUDGET_PX);
   });
 });
 ```
@@ -99,7 +127,14 @@ test.describe("Event page fold (#1074 / Vol 18 phase 1)", () => {
 
 Run: `ADMIN_EMAIL=$ADMIN_EMAIL ADMIN_PASSWORD=$ADMIN_PASSWORD npx playwright test e2e/accessibility/event-fold.spec.js --project=chromium --reporter=list`
 
-Expected: FAIL, with a message naming a pixel value well above 844 (roughly 1,300). If it fails with "no act name was rendered at all", the seed or the ready-locator is wrong — fix that before continuing, because a test that fails for the wrong reason proves nothing.
+Expected: FAIL with `first act name renders 827px down; the lineup should start within 422px`.
+
+Two wrong failures to watch for, because a test that fails for the wrong reason proves nothing:
+
+- `no act name was rendered at all` — the seed or the ready-locator is broken. Fix that first.
+- A failure naming the 844px fold rather than the 422px budget — that means the page is *even worse* than measured here, which is possible on a denser bill but not what the seed produces.
+
+**Measured 2026-09-02:** the seeded event puts its first act at **827px** and production `lwbc18` at roughly **1,300px**. The whole-fold assertion alone PASSED against the seed on day one (827 < 844, by 17 pixels) which is why the half-fold budget exists — see the spec file's header.
 
 - [ ] **Step 3: Commit the red test**
 
@@ -191,15 +226,18 @@ const MAX = 4
 
 const clean = name => String(name ?? '').replace(/\([^)]*\)/g, ' ').replace(/[^A-Za-z0-9 ]/g, ' ').trim()
 
+// Leading articles carry no identity: "The Copper Mug" must read COPP, not THE.
+const ARTICLE = /^(the|a|an)$/i
+
 function candidate(name) {
   const words = clean(name).split(/\s+/).filter(Boolean)
   if (words.length === 0) return ''
-  // A single word gives its first MAX letters; several give their initials,
-  // padded from the first word when there are fewer initials than MAX.
-  if (words.length === 1) return words[0].slice(0, MAX).toUpperCase()
-  const initials = words.map(w => w[0]).join('')
-  if (initials.length >= MAX) return initials.slice(0, MAX).toUpperCase()
-  return (initials + words[0].slice(1)).slice(0, MAX).toUpperCase()
+  // The first MAX characters of the first SIGNIFICANT word, not the initials.
+  // Initials read worse at this length: "Prohibition Warehouse" gives PW, padded
+  // back out to PWRO, where PROH is what a person would write on a wristband.
+  // Ties are venueCodes()'s problem, and it breaks them with a numeric suffix.
+  const significant = words.length > 1 && ARTICLE.test(words[0]) ? words.slice(1) : words
+  return (significant[0] ?? words[0]).slice(0, MAX).toUpperCase()
 }
 
 export function venueCodes(names) {

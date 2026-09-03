@@ -48,7 +48,18 @@ function BandCard({
             visible; below `sm:` that header is hidden and the row is the only
             place the time appears. Showing both at one width reads as a bug. */}
         <span className="w-16 shrink-0 whitespace-nowrap font-mono text-sm font-bold tabular-nums text-text-primary">
-          {band.startTime && band.startTime !== 'TBD' ? formatTime(band.startTime) : '—'}
+          {/* "TBA", never a bare dash. A dash reads as broken data, while this
+              state is normal and supported: a lineup can be published before its
+              set times are booked. The desktop layout conveys it with a "Time To
+              Be Announced" group header, but that header is hidden below `sm:`
+              because the row owns the time here -- so without this word the
+              mobile board is a column of dashes with nothing explaining them.
+
+              One formatTime call rather than a ternary: its own fallback covers
+              null, the 'TBD' sentinel AND an invalid truthy value in one place.
+              The ternary handled the first two and let the third through to
+              formatTime's default dash. */}
+          {formatTime(band.startTime, { fallback: 'TBA' })}
         </span>
         <span className="min-w-0">
           {bandProfileHref ? (

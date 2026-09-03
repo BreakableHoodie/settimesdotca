@@ -6,6 +6,16 @@ import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 import { nextCalendarDay } from "../../utils/eventDay.js";
 
+/**
+ * A set's default duration when no end time was recorded: one hour after the
+ * start, wrapping past midnight (23:30 -> 00:30). The caller's endDate roll
+ * turns that wrap into the next calendar day, so DTEND stays after DTSTART.
+ */
+function addOneHour(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 function sanitizeFilenamePart(value) {
   return (
     String(value || "all")
@@ -111,8 +121,27 @@ function generateICal(bands, city, genre) {
     // when the event spans multiple days (epic #543); NULL inherits the
     // event's single date, keeping single-day events byte-identical.
     const eventDate = band.performance_date || band.date; // YYYY-MM-DD
-    const startTime = band.start_time || "20:00"; // HH:MM
-    const endTime = band.end_time || "21:00";
+
+    // A set with no announced start time is NOT a calendar entry.
+    //
+    // This used to read `band.start_time || "20:00"`, which stated a time
+    // nobody had chosen as fact. On 2026-09-02 that put all 15 Vol 18 sets in
+    // subscribers' calendars stacked at 8:00 PM -- 100% of the feed's content
+    // fabricated -- while /event/lwbc18 correctly said "Time To Be Announced".
+    // The two public surfaces disagreed about the same rows (#1079).
+    //
+    // Omitting is the honest shape and the consistent one: this feed is
+    // performance-driven, so it already reports an event with no lineup as no
+    // VEVENTs. An unscheduled set is the same case one row down. Absence of an
+    // entry is recoverable; a wrong entry in a calendar someone trusts is not.
+    if (!band.start_time) continue;
+
+    const startTime = band.start_time; // HH:MM
+    // Derived from the start, never a constant. A literal "21:00" against a
+    // 23:00 start is BEFORE it, which the endDate roll below then reads as a
+    // midnight straddle -- turning a missing end time into a 22-hour event.
+    // No such row exists in production today; nothing stops one being written.
+    const endTime = band.end_time || addOneHour(startTime);
 
     // A set that straddles midnight (e.g. 23:30–00:30) ENDS on the next
     // calendar day — stamping both ends with the same date would put DTEND

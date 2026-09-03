@@ -44,6 +44,22 @@ function Footer() {
             </a>
           </div>
 
+          {/* The handle is duplicated from .github/FUNDING.yml, which drives the
+              repo's Sponsor button. footerSupportLink.test.jsx asserts the two
+              agree, so changing one and forgetting the other fails a test rather
+              than silently pointing fans at a dead page. */}
+          <p className="text-text-tertiary text-xs">
+            <a
+              href="https://ko-fi.com/tiptophams"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text-tertiary underline decoration-dotted underline-offset-2 transition-colors hover:text-accent-400"
+            >
+              Support the site
+            </a>{' '}
+            - it keeps the domain, hosting and lineup emails running.
+          </p>
+
           <p className="text-text-tertiary text-xs">Times are subject to change - late starts happen!</p>
 
           <p className="text-text-tertiary text-xs">

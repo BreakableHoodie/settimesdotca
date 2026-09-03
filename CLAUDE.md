@@ -1007,7 +1007,7 @@ that apply to the changed file type before agreeing or disagreeing.
 
 `make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
 
-**A green CodeRabbit check does NOT mean the diff was reviewed.** When every
+**A green CodeRabbit check does not NECESSARILY mean the diff was reviewed.** When every
 changed file is excluded by a path filter, CodeRabbit posts *"Review skipped"*
 and the status check still reports **pass**. Measured on #1083, a security bump
 whose only change was `package-lock.json`: the badge was green and nothing had
@@ -1019,8 +1019,27 @@ message lists the pattern twice for that reason). A lockfile diff is generated
 hashes; line-level review of it is noise.
 
 **So for a dependency change, read `dependency-review`, not CodeRabbit.** That is
-the check actually designed for the class, and it passed on #1083 alongside
-gitleaks and GitGuardian. The class is covered; it is the *label* that misleads.
+the check designed for the class, and it passed on #1083 alongside gitleaks and
+GitGuardian.
+
+**But be precise about what it covers, because two different threats hide behind
+one green badge.** `dependency-review` compares the PR's dependency changes
+against advisory databases and fails on a package with a *known* vulnerability at
+or above its configured severity. That is the #1083 case exactly, and it is
+genuinely covered.
+
+It does **not** verify that a lockfile's `resolved` URLs still point at the
+expected registry, nor re-check `integrity` against what it fetches. A lockfile
+entry carries `version`, `resolved` and `integrity`; an edit repointing
+`resolved` at an attacker-controlled host while leaving the version untouched
+raises no advisory, and `npm ci` then fetches whatever `resolved` names.
+**That gap is real and currently unguarded here — do not read
+"dependency-review passed" as covering it.**
+
+The practical split: routine generated churn (a Dependabot group bump, a
+transitive patch) is well served by the advisory check and needs no human diff
+read. A lockfile change *not* produced by npm on your own machine deserves one,
+whatever the checks say.
 
 This is the same shape as `lint-md` missing from `.PHONY` (make reported "up to
 date" having linted nothing), the Lighthouse artifact that uploaded nothing while

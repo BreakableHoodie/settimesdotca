@@ -44,9 +44,21 @@ export function venueCodes(names) {
     const base = candidate(name)
     let code = base
     let n = 2
+    // The suffix must FIT, not be truncated away. Reserving only one character
+    // meant n=10 produced `base.slice(0,3) + "10"` -> truncated back to "ABC1",
+    // and every larger n produced "ABC1" too: with eleven venues sharing a base
+    // this loop never terminated, hanging the render. Caught by CodeRabbit.
     while (taken.has(code)) {
-      code = (base.slice(0, MAX - 1) + n).slice(0, MAX)
+      const suffix = String(n)
+      code = (base.slice(0, Math.max(1, MAX - suffix.length)) + suffix).slice(0, MAX)
       n += 1
+      // Belt and braces: MAX is small, so make non-termination impossible rather
+      // than merely unlikely. A caller with this many identical bases gets an
+      // ugly code, never a frozen page.
+      if (n > 999) {
+        code = `${base.slice(0, 1)}${n}`.slice(0, MAX)
+        break
+      }
     }
     taken.add(code)
     codes.set(name, code)

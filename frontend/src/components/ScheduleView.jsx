@@ -6,6 +6,7 @@ import { dayNumberByDate, orderedFestivalDays } from '../utils/festivalDays'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
+import { useIsNarrow } from '../hooks/useIsNarrow'
 import BandCard from './BandCard'
 import { venueCodes } from '../utils/venueCode'
 import { DayDivider, DayTabs } from './ui'
@@ -184,6 +185,8 @@ function ScheduleView({
   const pastByTime = useMemo(() => groupByTime(pastBands).reverse(), [pastBands])
 
   const venueCodeMap = useMemo(() => venueCodes(bands.map(b => b.venue)), [bands])
+  // One presentation at a time -- see useIsNarrow for why this is not CSS.
+  const isNarrow = useIsNarrow()
 
   // Venue-lane view: group the visible (already time-sorted) bands by venue, so
   // each venue's sets stay in chronological order within its section.
@@ -540,11 +543,11 @@ function ScheduleView({
                 </h2>
                 <div className="flex-1 h-1 bg-accent-500 ml-4"></div>
               </div>
-              <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4">
+              <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4 sm:grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 sm:gap-6">
                 {nowPlaying.map(band => (
                   <BandCard
-                    variant="board"
-                    venueCode={venueCodeMap.get(band.venue)}
+                    variant={isNarrow ? 'board' : 'card'}
+                    venueCode={isNarrow ? venueCodeMap.get(band.venue) : undefined}
                     key={band.id}
                     band={band}
                     isSelected={selectedBandsSet.has(band.id)}
@@ -587,11 +590,11 @@ function ScheduleView({
                         </h3>
                         <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
                       </div>
-                      <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4">
+                      <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4 sm:grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 sm:gap-6">
                         {timeBands.map(band => (
                           <BandCard
-                            variant="board"
-                            venueCode={venueCodeMap.get(band.venue)}
+                            variant={isNarrow ? 'board' : 'card'}
+                            venueCode={isNarrow ? venueCodeMap.get(band.venue) : undefined}
                             key={band.id}
                             band={band}
                             isSelected={selectedBandsSet.has(band.id)}
@@ -634,11 +637,11 @@ function ScheduleView({
                         </h3>
                         <div className="flex-1 h-0.5 bg-surface ml-4"></div>
                       </div>
-                      <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4">
+                      <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4 sm:grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 sm:gap-6">
                         {timeBands.map(band => (
                           <BandCard
-                            variant="board"
-                            venueCode={venueCodeMap.get(band.venue)}
+                            variant={isNarrow ? 'board' : 'card'}
+                            venueCode={isNarrow ? venueCodeMap.get(band.venue) : undefined}
                             key={band.id}
                             band={band}
                             isSelected={selectedBandsSet.has(band.id)}

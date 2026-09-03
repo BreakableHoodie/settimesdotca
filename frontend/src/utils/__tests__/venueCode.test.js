@@ -33,6 +33,18 @@ describe('venueCodes', () => {
     expect(a.get('Revive Karaoke')).toBe(b.get('Revive Karaoke'))
   })
 
+  // Regression: the suffix used to be truncated away, so from n=10 every code
+  // collapsed back to the same string and the loop span forever -- a hung render,
+  // not a wrong label.
+  it('terminates and stays unique when many names share one base', () => {
+    const names = Array.from({ length: 15 }, (_, i) => `Alpha Venue Number ${i}`)
+    const codes = venueCodes(names)
+    const values = names.map(n => codes.get(n))
+    expect(values.filter(Boolean)).toHaveLength(names.length)
+    expect(new Set(values).size, `codes collided: ${values.join(', ')}`).toBe(names.length)
+    for (const v of values) expect(v.length).toBeLessThanOrEqual(4)
+  })
+
   it('never returns more than four characters', () => {
     const codes = venueCodes(['The Extremely Long Venue Name Company'])
     expect(codes.get('The Extremely Long Venue Name Company').length).toBeLessThanOrEqual(4)

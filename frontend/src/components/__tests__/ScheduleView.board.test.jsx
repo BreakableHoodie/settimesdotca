@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
@@ -62,6 +62,22 @@ const singleDayBands = [
     endMs: Date.parse('2024-06-01T23:00:00'),
   }),
 ]
+
+// The board renders only below Tailwind's `sm`. jsdom answers no media queries,
+// and useIsNarrow deliberately defaults to the RICHER card when it cannot tell,
+// so a board test has to say which viewport it is describing.
+beforeEach(() => {
+  window.matchMedia = query => ({
+    matches: /max-width:\s*639px/.test(query),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    onchange: null,
+    dispatchEvent: () => false,
+  })
+})
 
 describe('ScheduleView — board rows', () => {
   // EACH BAND RENDERS EXACTLY ONCE. This is the assertion that matters most.

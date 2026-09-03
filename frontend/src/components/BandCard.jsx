@@ -38,7 +38,7 @@ function BandCard({
         {/* The time group header above supplies this from `sm:` up, where it is
             visible; below `sm:` that header is hidden and the row is the only
             place the time appears. Showing both at one width reads as a bug. */}
-        <span className="w-16 shrink-0 whitespace-nowrap font-mono text-sm font-bold tabular-nums text-text-primary sm:hidden">
+        <span className="w-16 shrink-0 whitespace-nowrap font-mono text-sm font-bold tabular-nums text-text-primary">
           {band.startTime && band.startTime !== 'TBD' ? formatTime(band.startTime) : '—'}
         </span>
         <span className="min-w-0">

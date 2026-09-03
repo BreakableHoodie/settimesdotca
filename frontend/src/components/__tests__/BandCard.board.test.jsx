@@ -90,6 +90,22 @@ describe('BandCard variant="board"', () => {
   it('does the same for the explicit TBD sentinel', () => {
     renderBoard({ band: { ...band, startTime: 'TBD' } })
     expect(screen.getByText('TBA')).toBeInTheDocument()
+    // Assert the dash is GONE, not merely that TBA appeared -- a regression
+    // rendering both would satisfy the first assertion alone.
+    expect(screen.queryByText('—')).not.toBeInTheDocument()
+  })
+
+  // A malformed truthy value reached formatTime's own '—' default, slipping past
+  // a ternary that only guarded null and the 'TBD' sentinel.
+  //
+  // NOTE the limit of what this covers. formatTime validates SHAPE, not range
+  // (`/^\d{1,2}:\d{2}$/`), so "25:99" is accepted and renders "1:99 PM" -- not a
+  // dash and not TBA. That is a pre-existing quirk of the shared util, unrelated
+  // to this change, and out of scope here -- filed as #1089.
+  it('does the same for a malformed time value', () => {
+    renderBoard({ band: { ...band, startTime: 'not-a-time' } })
+    expect(screen.getByText('TBA')).toBeInTheDocument()
+    expect(screen.queryByText('—')).not.toBeInTheDocument()
   })
 
   it('has no axe violations', async () => {

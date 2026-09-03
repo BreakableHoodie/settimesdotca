@@ -132,6 +132,24 @@ describe('BandCard variant="board"', () => {
     expect(container.querySelector('.rounded-full.border-border')).toBeNull()
   })
 
+  // A genre can be non-empty and still have no first tag. `sanitizeString` trims
+  // the whole value but does not strip a leading separator, so ", Punk" reaches
+  // the render with an empty [0]. Truthy enough to draw the chip's border and
+  // nothing inside it. Neither shape is in production; the admin field allows both.
+  it.each([
+    ['whitespace only', '   '],
+    ['separators only', ' , , '],
+    ['a lone separator', ','],
+  ])('renders no chip when the genre is %s', (_label, genre) => {
+    const { container } = renderBoard({ band: { ...band, genre } })
+    expect(container.querySelector('.rounded-full.border-border')).toBeNull()
+  })
+
+  it('skips an empty leading tag rather than the whole genre', () => {
+    renderBoard({ band: { ...band, genre: ', Punk Rock, Skatepunk' } })
+    expect(screen.getByText('Punk Rock')).toBeInTheDocument()
+  })
+
   // A TAG, not a caption. Genres here do not fit a taxonomy -- 42 of the 66 tags
   // in production belong to exactly one artist -- so they are presented as
   // facets you could act on rather than as descriptive text, matching the chip

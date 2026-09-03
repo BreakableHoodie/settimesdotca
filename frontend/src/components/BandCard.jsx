@@ -35,7 +35,10 @@ function BandCard({
   if (variant === 'board') {
     return (
       <div className="grid grid-cols-[56px_1fr_auto_auto] items-center gap-2 border-b border-border px-3 py-3">
-        <span className="font-mono text-base font-bold tabular-nums text-text-primary">
+        {/* The time group header above supplies this from `sm:` up, where it is
+            visible; below `sm:` that header is hidden and the row is the only
+            place the time appears. Showing both at one width reads as a bug. */}
+        <span className="font-mono text-base font-bold tabular-nums text-text-primary sm:hidden">
           {band.startTime && band.startTime !== 'TBD' ? formatTime(band.startTime) : '—'}
         </span>
         <span className="min-w-0">

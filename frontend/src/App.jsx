@@ -763,23 +763,6 @@ function App() {
           </div>
         )}
 
-        {/* First-time onboarding hint */}
-        {!isArchived && showHint && selectedBands.length === 0 && bands.length > 0 && (
-          <div className="flex items-start justify-between gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
-            <p className="text-text-secondary">
-              <span className="font-semibold">How it works:</span> Tap any performer to add them to{' '}
-              <span className="font-semibold">My Route</span> — your personal lineup for the night.
-            </p>
-            <button
-              onClick={dismissHint}
-              aria-label="Dismiss tip"
-              className="shrink-0 p-1 text-accent-400 transition-colors hover:text-text-primary sm:p-1.5"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
-
         {/* Reveal mode teaser — more bands dropping soon */}
         {!isArchived && eventData?.reveal_mode === 1 && (
           <div className="flex items-start gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
@@ -841,23 +824,41 @@ function App() {
           </section>
         )}
         {isArchived || view === 'all' ? (
-          <ScheduleView
-            bands={bands}
-            selectedBands={isArchived ? [] : selectedBands}
-            onToggleBand={isArchived ? undefined : toggleBand}
-            onSelectAll={isArchived ? undefined : selectAll}
-            currentTime={effectiveNow}
-            showPast={showPast}
-            onToggleShowPast={toggleShowPast}
-            timeFilter={timeFilter}
-            venueFilter={venueFilter}
-            onVenueFilterChange={setVenueFilter}
-            showVenueFilter={false}
-            eventSlug={slug || eventData?.slug}
-            doorsJson={eventData?.doors_json}
-            eventStartDate={eventData?.date}
-            eventEndDate={eventData?.end_date}
-          />
+          <>
+            <ScheduleView
+              bands={bands}
+              selectedBands={isArchived ? [] : selectedBands}
+              onToggleBand={isArchived ? undefined : toggleBand}
+              onSelectAll={isArchived ? undefined : selectAll}
+              currentTime={effectiveNow}
+              showPast={showPast}
+              onToggleShowPast={toggleShowPast}
+              timeFilter={timeFilter}
+              venueFilter={venueFilter}
+              onVenueFilterChange={setVenueFilter}
+              showVenueFilter={false}
+              eventSlug={slug || eventData?.slug}
+              doorsJson={eventData?.doors_json}
+              eventStartDate={eventData?.date}
+              eventEndDate={eventData?.end_date}
+            />
+            {/* First-time onboarding hint */}
+            {!isArchived && showHint && selectedBands.length === 0 && bands.length > 0 && (
+              <div className="flex items-start justify-between gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
+                <p className="text-text-secondary">
+                  <span className="font-semibold">How it works:</span> Tap any performer to add them to{' '}
+                  <span className="font-semibold">My Route</span> — your personal lineup for the night.
+                </p>
+                <button
+                  onClick={dismissHint}
+                  aria-label="Dismiss tip"
+                  className="shrink-0 p-1 text-accent-400 transition-colors hover:text-text-primary sm:p-1.5"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <Suspense
             fallback={

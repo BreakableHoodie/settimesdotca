@@ -1,4 +1,4 @@
-import { Check, Copy, Music } from 'lucide-react'
+import { Check, ChevronDown, Copy, Music } from 'lucide-react'
 import { Fragment, memo, useMemo, useState } from 'react'
 import { copyToClipboard } from '../utils/clipboard'
 import { compareByName } from '../utils/sortableName'
@@ -7,6 +7,7 @@ import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { filterPerformancesByTime } from '../utils/timeFilter'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
+import { venueCodes } from '../utils/venueCode'
 import { DayDivider, DayTabs } from './ui'
 
 const UNSCHEDULED = Symbol('unscheduled')
@@ -58,6 +59,7 @@ function ScheduleView({
   eventEndDate = null,
 }) {
   const [copyAllLabel, setCopyAllLabel] = useState('Copy Visible Schedule')
+  const [moreOpen, setMoreOpen] = useState(false)
   const [isCopyingAll, setIsCopyingAll] = useState(false)
   const [localVenueFilter, setLocalVenueFilter] = useState(null)
   const [genreFilter, setGenreFilter] = useState(null)
@@ -181,6 +183,8 @@ function ScheduleView({
   const upcomingByTime = useMemo(() => groupByTime(upcomingBands), [upcomingBands])
   const pastByTime = useMemo(() => groupByTime(pastBands).reverse(), [pastBands])
 
+  const venueCodeMap = useMemo(() => venueCodes(bands.map(b => b.venue)), [bands])
+
   // Venue-lane view: group the visible (already time-sorted) bands by venue, so
   // each venue's sets stay in chronological order within its section.
   const bandsByVenue = useMemo(() => {
@@ -255,17 +259,21 @@ function ScheduleView({
   }
 
   return (
-    <div className="py-6 space-y-6 sm:space-y-8">
+    <div className="py-3 space-y-3 sm:py-6 sm:space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex-1 text-center sm:text-left">
-          <h2 className="text-2xl font-bold text-text-primary text-center">Full Lineup</h2>
+          {/* Kept in the a11y tree at every width -- it names this region for a
+              screen reader. Hidden VISUALLY on mobile only, where it costs ~56px
+              directly above the lineup while saying less than the "UPCOMING"
+              heading immediately below it and the "Live Lineup" tab above it. */}
+          <h2 className="sr-only sm:not-sr-only text-2xl font-bold text-text-primary text-center">Full Lineup</h2>
           {!showPast && hiddenFinished > 0 && (
             <p className="text-xs text-accent-400/80 mt-1 text-center sm:text-left">
               {hiddenFinished} finished {hiddenFinished === 1 ? 'set hidden' : 'sets hidden'}
             </p>
           )}
         </div>
-        <div className="flex justify-center sm:justify-end gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <div
             className="inline-flex items-center rounded-full border border-border bg-surface p-0.5"
             role="group"
@@ -299,44 +307,65 @@ function ScheduleView({
               {showPast ? 'Hide finished sets' : 'Show finished sets'}
             </button>
           )}
-          <button
-            onClick={handleCopyAll}
-            className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-text-primary flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-              canCopyVisible
-                ? 'bg-bg-purple/60 border-bg-purple/40 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95'
-                : 'bg-surface border-border text-text-tertiary cursor-not-allowed'
-            }`}
-            title={
-              !canCopyVisible
-                ? 'No visible bands to copy'
-                : copyAllLabel === 'Copied!'
-                  ? 'Visible schedule copied to clipboard'
-                  : 'Copy the visible schedule'
-            }
-            aria-label="Copy the visible schedule"
-            disabled={isCopyingAll || !canCopyVisible}
-          >
-            {copyAllLabel === 'Copied!' ? (
-              <Check size={14} aria-hidden="true" />
-            ) : (
-              <Copy size={14} aria-hidden="true" />
-            )}
-            <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
-          </button>
-          {canSelectAll && (
+          <div className="relative">
+            {/* Deliberately NOT a <details>. A closed <details> is supposed to hide
+                its non-summary children, but measured here at 390px it did not:
+                details.open was false while Select All still occupied 62px above
+                the fold, so the disclosure read as closed and cost the space
+                anyway. Conditional rendering has no UA-behaviour dependency and
+                is assertable in a test. */}
             <button
-              onClick={handleSelectAll}
-              disabled={allSelected}
-              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-                allSelected
-                  ? 'bg-gray-500/20 border border-gray-500/50 text-text-disabled cursor-not-allowed'
-                  : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
-              }`}
-              title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}
+              type="button"
+              onClick={() => setMoreOpen(open => !open)}
+              aria-expanded={moreOpen}
+              className="text-xs px-3 py-1.5 min-h-[44px] rounded border border-border bg-surface text-text-tertiary cursor-pointer hover:text-text-primary hover:bg-surface-hover list-none flex items-center gap-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
             >
-              {allSelected ? 'All Selected' : 'Select All'}
+              <ChevronDown size={12} aria-hidden="true" />
+              More
             </button>
-          )}
+            {moreOpen && (
+              <div className="absolute right-0 z-10 mt-1 flex gap-2 rounded-lg border border-border bg-surface p-2 shadow-lg">
+                <button
+                  onClick={handleCopyAll}
+                  className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-text-primary flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+                    canCopyVisible
+                      ? 'bg-bg-purple/60 border-bg-purple/40 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95'
+                      : 'bg-surface border-border text-text-tertiary cursor-not-allowed'
+                  }`}
+                  title={
+                    !canCopyVisible
+                      ? 'No visible bands to copy'
+                      : copyAllLabel === 'Copied!'
+                        ? 'Visible schedule copied to clipboard'
+                        : 'Copy the visible schedule'
+                  }
+                  aria-label="Copy the visible schedule"
+                  disabled={isCopyingAll || !canCopyVisible}
+                >
+                  {copyAllLabel === 'Copied!' ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <Copy size={14} aria-hidden="true" />
+                  )}
+                  <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
+                </button>
+                {canSelectAll && (
+                  <button
+                    onClick={handleSelectAll}
+                    disabled={allSelected}
+                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+                      allSelected
+                        ? 'bg-gray-500/20 border border-gray-500/50 text-text-disabled cursor-not-allowed'
+                        : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
+                    }`}
+                    title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}
+                  >
+                    {allSelected ? 'All Selected' : 'Select All'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -500,7 +529,7 @@ function ScheduleView({
           {/* Now Playing Section */}
           {nowPlaying.length > 0 && (
             <div className="relative">
-              <div className="flex items-center mb-4">
+              <div className="hidden sm:flex items-center mb-4">
                 <h2 className="bg-accent-500 text-bg-navy font-mono font-bold text-xl md:text-2xl px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
                   <span className="relative flex h-3 w-3" aria-hidden="true">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-bg-navy/60"></span>
@@ -511,9 +540,11 @@ function ScheduleView({
                 </h2>
                 <div className="flex-1 h-1 bg-accent-500 ml-4"></div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
+              <div className="flex flex-col mb-4 ml-0 sm:ml-4">
                 {nowPlaying.map(band => (
                   <BandCard
+                    variant="board"
+                    venueCode={venueCodeMap.get(band.venue)}
                     key={band.id}
                     band={band}
                     isSelected={selectedBandsSet.has(band.id)}
@@ -546,15 +577,17 @@ function ScheduleView({
                       <DayDivider date={date} dayNumber={dayNumberByDateMap.get(date)} doorsJson={doorsJson} />
                     )}
                     <div className="relative ml-0 sm:ml-4">
-                      <div className="flex items-center mb-4">
+                      <div className="hidden sm:flex items-center mb-4">
                         <h3 className="bg-bg-navy text-text-primary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                           {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                         </h3>
                         <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
+                      <div className="flex flex-col mb-4 ml-0 sm:ml-4">
                         {timeBands.map(band => (
                           <BandCard
+                            variant="board"
+                            venueCode={venueCodeMap.get(band.venue)}
                             key={band.id}
                             band={band}
                             isSelected={selectedBandsSet.has(band.id)}
@@ -576,7 +609,7 @@ function ScheduleView({
           {/* Past Events Section (Collapsible) */}
           {pastByTime.length > 0 && showPast && (
             <div className="space-y-8">
-              <div className="flex items-center mb-4">
+              <div className="hidden sm:flex items-center mb-4">
                 <h2 className="bg-surface text-text-tertiary font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   PAST EVENTS
                 </h2>
@@ -591,15 +624,17 @@ function ScheduleView({
                       <DayDivider date={date} dayNumber={dayNumberByDateMap.get(date)} doorsJson={doorsJson} />
                     )}
                     <div className="relative ml-0 sm:ml-4 opacity-60">
-                      <div className="flex items-center mb-4">
+                      <div className="hidden sm:flex items-center mb-4">
                         <h3 className="bg-surface text-text-tertiary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
                           {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
                         </h3>
                         <div className="flex-1 h-0.5 bg-surface ml-4"></div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 ml-0 sm:ml-4">
+                      <div className="flex flex-col mb-4 ml-0 sm:ml-4">
                         {timeBands.map(band => (
                           <BandCard
+                            variant="board"
+                            venueCode={venueCodeMap.get(band.venue)}
                             key={band.id}
                             band={band}
                             isSelected={selectedBandsSet.has(band.id)}

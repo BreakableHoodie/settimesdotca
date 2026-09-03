@@ -71,6 +71,27 @@ function BandCard({
               {isCancelled ? <s>{displayName}</s> : displayName}
             </span>
           )}
+          {/* The one signal that makes a lineup DECIDABLE rather than merely
+              readable. The board replaced the card on mobile and took the card's
+              genre with it, leaving a fan on the street with a column of names
+              and no way to choose between them.
+
+              First tag only: artists submit several ("Punk Rock, Skatepunk,
+              Melodic Punk") and the full list wraps a 390px row to three lines.
+              The first is the one they led with, so it is their own answer to
+              "what are you". The complete list still shows on the card and the
+              artist page.
+
+              Rendered as a TAG rather than a caption, matching the chip the card
+              already uses. Genres here do not fit a taxonomy: of the 66 distinct
+              tags in production, 42 belong to exactly one artist. A chip says
+              "this is a facet, and other acts may share it"; plain grey text
+              says "this is a description". The former is the truthful one. */}
+          {!isCancelled && band.genre && (
+            <span className="mt-1 inline-block max-w-full truncate rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] leading-normal text-text-secondary">
+              {band.genre.split(',')[0].trim()}
+            </span>
+          )}
           {isCancelled && (
             <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-text-primary">
               <TriangleAlert size={12} aria-hidden="true" />

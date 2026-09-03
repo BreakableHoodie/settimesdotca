@@ -108,6 +108,41 @@ describe('BandCard variant="board"', () => {
     expect(screen.queryByText('—')).not.toBeInTheDocument()
   })
 
+  // A lineup you can read is not a lineup you can DECIDE from. The board took
+  // the card's place on mobile and dropped its genre, leaving a column of bare
+  // names -- every other test still passed, because they assert what IS shown.
+  it('shows the genre so a fan can choose between acts', () => {
+    renderBoard({ band: { ...band, genre: 'Shoegaze' } })
+    expect(screen.getByText('Shoegaze')).toBeInTheDocument()
+  })
+
+  it('shows only the first tag when an artist submits several', () => {
+    // Real Vol 18 data: Handheld answered "Punk Rock, Skatepunk, Melodic Punk",
+    // which wraps a 390px row to three lines if rendered whole.
+    renderBoard({ band: { ...band, genre: 'Punk Rock, Skatepunk, Melodic Punk' } })
+    expect(screen.getByText('Punk Rock')).toBeInTheDocument()
+    expect(screen.queryByText(/Skatepunk/)).not.toBeInTheDocument()
+  })
+
+  it('renders nothing rather than an empty chip when a band has no genre', () => {
+    const { container } = renderBoard({ band: { ...band, genre: undefined } })
+    // Scoped to what is DISTINCTIVE to the chip. A bare `.rounded-full` also
+    // matches the add button, so the first version of this assertion could never
+    // have failed for the reason it claims -- the unscoped-selector class.
+    expect(container.querySelector('.rounded-full.border-border')).toBeNull()
+  })
+
+  // A TAG, not a caption. Genres here do not fit a taxonomy -- 42 of the 66 tags
+  // in production belong to exactly one artist -- so they are presented as
+  // facets you could act on rather than as descriptive text, matching the chip
+  // the desktop card already uses.
+  it('presents the genre as a tag chip, like the card does', () => {
+    renderBoard({ band: { ...band, genre: 'Shoegaze' } })
+    const chip = screen.getByText('Shoegaze')
+    expect(chip.className).toMatch(/rounded-full/)
+    expect(chip.className).toMatch(/border-border/)
+  })
+
   it('has no axe violations', async () => {
     const { container } = renderBoard()
     expect(await axe(container)).toHaveNoViolations()

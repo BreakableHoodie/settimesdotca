@@ -383,12 +383,38 @@ Add `variant = 'card'` and `venueCode` to the props, and return the compact row 
             {venueCode}
           </span>
         )}
+        {/* The board row REPLACES the card on mobile, so without this the core
+            interaction the page advertises -- "Tap any performer to add them to
+            My Route" -- would simply not exist on phones. */}
+        {showToggleButton && !isCancelled && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2"
+            aria-label={
+              isSelected
+                ? `Remove ${band.name || 'Unnamed Artist'} from my route`
+                : `Add ${band.name || 'Unnamed Artist'} to my route`
+            }
+          >
+            {isSelected ? <X size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
+          </button>
+        )}
       </div>
     )
   }
 ```
 
-If `isCancelled` and `formatTime` are not already in scope in this file, use whatever the card branch uses — do not introduce a second source for either.
+Three things this depends on, all verified present in the file already: `isCancelled`
+(line 31), `formatTime` (imported line 7), and `buildBandProfileHref`, whose signature
+is **`(bandName, eventSlug)`** — it takes the NAME, not the band object. `TriangleAlert`,
+`Plus` and `X` are already imported too. Do not add duplicate imports.
+
+**The toggle is not optional.** A first draft of this variant omitted it and every
+other test still passed — the row rendered, the name showed, axe was clean, and My
+Route was silently unusable on mobile. Test the toggle explicitly, and use
+`fireEvent` from `@testing-library/react`: `@testing-library/user-event` is NOT a
+dependency of this project.
 
 - [ ] **Step 5: Run the new test and the existing BandCard tests together**
 

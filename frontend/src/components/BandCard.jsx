@@ -18,6 +18,8 @@ function BandCard({
   warningText,
   currentTime,
   dayLabel,
+  variant = 'card',
+  venueCode,
 }) {
   const handleRemove = e => {
     e.stopPropagation()
@@ -29,6 +31,60 @@ function BandCard({
   // selectable. Both isHappeningNow and isStartingSoon are pure time math
   // (#732) and will light up a cancelled row otherwise.
   const isCancelled = Boolean(band.is_cancelled)
+
+  if (variant === 'board') {
+    return (
+      <div className="grid grid-cols-[56px_1fr_auto_auto] items-center gap-2 border-b border-border px-3 py-3">
+        <span className="font-mono text-base font-bold tabular-nums text-text-primary">
+          {band.startTime && band.startTime !== 'TBD' ? formatTime(band.startTime) : '—'}
+        </span>
+        <span className="min-w-0">
+          <Link
+            to={buildBandProfileHref(band.name, eventSlug)}
+            className="block truncate font-semibold text-text-primary hover:underline"
+          >
+            {isCancelled ? <s>{band.name}</s> : band.name}
+          </Link>
+          {isCancelled && (
+            <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-text-primary">
+              <TriangleAlert size={12} aria-hidden="true" />
+              Cancelled
+            </span>
+          )}
+        </span>
+        {venueCode && (
+          <span
+            title={band.venue}
+            className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] font-bold text-text-secondary"
+          >
+            {venueCode}
+          </span>
+        )}
+        {/* The board row REPLACES the card on mobile, so without this the core
+            interaction the page advertises -- "Tap any performer to add them to
+            My Route" -- would simply not exist on phones. Same semantics as the
+            card's corner button (#726): a separate control rather than a
+            clickable row, because the row already contains a profile Link and a
+            button may not nest interactive children. Cancelled sets are not
+            selectable, matching the card. */}
+        {showToggleButton && !isCancelled && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2"
+            aria-label={
+              isSelected
+                ? `Remove ${band.name || 'Unnamed Artist'} from my route`
+                : `Add ${band.name || 'Unnamed Artist'} to my route`
+            }
+          >
+            {isSelected ? <X size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
+          </button>
+        )}
+      </div>
+    )
+  }
+
   const isPlaying = !isCancelled && isHappeningNow(band)
   const nowMs = +currentTime
   const startingSoon = !isCancelled && isStartingSoon(band, currentTime)

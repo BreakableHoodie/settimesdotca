@@ -66,6 +66,16 @@ const singleDayBands = [
 // The board renders only below Tailwind's `sm`. jsdom answers no media queries,
 // and useIsNarrow deliberately defaults to the RICHER card when it cannot tell,
 // so a board test has to say which viewport it is describing.
+// Saved and restored, because a stubbed global that outlives its suite is how a
+// failure surfaces in a component that has nothing to do with the change. That
+// happened once already on this branch: a viewport left narrow by a failing test
+// made the NEXT test unable to find a filters toggle.
+const realMatchMedia = window.matchMedia
+
+afterEach(() => {
+  window.matchMedia = realMatchMedia
+})
+
 beforeEach(() => {
   window.matchMedia = query => ({
     matches: /max-width:\s*639px/.test(query),

@@ -297,7 +297,12 @@ describe('LiveContextBar', () => {
       setViewportWidth(375)
       render(
         <LiveContextBar
-          eventData={{ ...eventData, presented_by: 'SetTimes' }}
+          eventData={{
+            ...eventData,
+            presented_by: 'SetTimes',
+            age_restriction: '19+',
+            doors_json: JSON.stringify({ '2026-05-06': '18:30' }),
+          }}
           currentTime={new Date('2026-05-06T19:30:00')}
           bands={bands}
           selectedCount={0}
@@ -320,8 +325,14 @@ describe('LiveContextBar', () => {
       // consequential facts (age restriction, doors, presenter) therefore lead,
       // and the venue/set counts follow. Pinning the order here is what stops a
       // future tidy-up from quietly undoing the fix.
-      const summaries = screen.getAllByText(/Presented by SetTimes • \d+ venues • \d+ sets/)
-      expect(summaries.some(el => el.classList.contains('sm:hidden'))).toBe(true)
+      // Query the MOBILE paragraph specifically. `getAllByText` also matches the
+      // desktop branch's copy, so asserting "some element somewhere" proved
+      // nothing about the one that is actually clamped on a phone.
+      const mobileSummary = document.querySelector('p.line-clamp-2')
+      expect(mobileSummary, 'the clamped mobile summary should render').toBeTruthy()
+      // Every leading field, in its required order: the clamp cuts the tail, so
+      // this order is what keeps the consequential facts readable (#1084).
+      expect(mobileSummary.textContent).toMatch(/^19\+ • Doors [^•]+ • Presented by SetTimes • \d+ venues? • \d+ sets?/)
       setViewportWidth(1024)
     })
 

@@ -259,7 +259,7 @@ function ScheduleView({
   }
 
   return (
-    <div className="py-3 space-y-3 sm:py-6 sm:space-y-8">
+    <div className="py-2 space-y-3 sm:py-6 sm:space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex-1 text-center sm:text-left">
           {/* Kept in the a11y tree at every width -- it names this region for a
@@ -540,7 +540,7 @@ function ScheduleView({
                 </h2>
                 <div className="flex-1 h-1 bg-accent-500 ml-4"></div>
               </div>
-              <div className="flex flex-col mb-4 ml-0 sm:ml-4">
+              <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4">
                 {nowPlaying.map(band => (
                   <BandCard
                     variant="board"
@@ -561,9 +561,13 @@ function ScheduleView({
 
           {/* Upcoming Section */}
           {upcomingByTime.length > 0 && (
-            <div className="space-y-8">
-              <div className="flex items-center mb-4">
-                <h2 className="bg-bg-purple text-text-primary font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
+            <div className="space-y-1 sm:space-y-8">
+              {/* Compact on mobile: this heading sat directly above the lineup
+                  costing ~60px with its margin. It still earns its place -- it is
+                  what separates UPCOMING from a NOW PLAYING section when one
+                  exists -- so it is shrunk rather than hidden. Desktop unchanged. */}
+              <div className="flex items-center mb-1 sm:mb-4">
+                <h2 className="bg-bg-purple text-text-primary font-mono font-bold text-xs px-2 py-0.5 sm:text-lg md:text-xl sm:px-4 sm:py-2 rounded-lg shadow-lg">
                   UPCOMING
                 </h2>
                 <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
@@ -583,7 +587,7 @@ function ScheduleView({
                         </h3>
                         <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
                       </div>
-                      <div className="flex flex-col mb-4 ml-0 sm:ml-4">
+                      <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4">
                         {timeBands.map(band => (
                           <BandCard
                             variant="board"
@@ -608,7 +612,7 @@ function ScheduleView({
 
           {/* Past Events Section (Collapsible) */}
           {pastByTime.length > 0 && showPast && (
-            <div className="space-y-8">
+            <div className="space-y-1 sm:space-y-8">
               <div className="hidden sm:flex items-center mb-4">
                 <h2 className="bg-surface text-text-tertiary font-mono font-bold text-lg md:text-xl px-4 py-2 rounded-lg shadow-lg">
                   PAST EVENTS
@@ -630,7 +634,7 @@ function ScheduleView({
                         </h3>
                         <div className="flex-1 h-0.5 bg-surface ml-4"></div>
                       </div>
-                      <div className="flex flex-col mb-4 ml-0 sm:ml-4">
+                      <div className="flex flex-col ml-0 sm:mb-4 sm:ml-4">
                         {timeBands.map(band => (
                           <BandCard
                             variant="board"

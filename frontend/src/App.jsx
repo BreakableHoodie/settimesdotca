@@ -720,7 +720,7 @@ function App() {
       )}
       <main
         id="main-content"
-        className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-3 sm:mt-6 space-y-6 sm:space-y-8"
+        className="container mx-auto px-4 max-w-(--breakpoint-2xl) mt-1 sm:mt-6 space-y-6 sm:space-y-8"
       >
         {/* Primary page heading for SEO/a11y. The event name is shown visually in
             the LiveContextBar (as h2); this gives the <main> landmark a correct h1

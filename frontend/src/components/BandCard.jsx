@@ -41,6 +41,18 @@ function BandCard({
   const labelBase = isSelected ? `Remove ${displayName} from my route` : `Add ${displayName} to my route`
   const bandProfileHref = band.name ? buildBandProfileHref(band.name, eventSlug) : null
 
+  // First tag only: a 390px row cannot hold "Punk Rock, Skatepunk, Melodic Punk"
+  // without wrapping to three lines. The first is the one the artist led with.
+  //
+  // `.find(Boolean)` rather than `[0]`: a leading separator (", Punk") survives
+  // sanitizeString, and `[0]` on that is an empty string -- which is truthy
+  // enough to render a blank bordered chip. No such value is in production
+  // today; the admin field permits one.
+  const firstGenreTag = (band.genre || '')
+    .split(',')
+    .map(tag => tag.trim())
+    .find(Boolean)
+
   if (variant === 'board') {
     return (
       <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 border-b border-border px-3 py-3">
@@ -69,6 +81,15 @@ function BandCard({
           ) : (
             <span className="block truncate font-semibold text-text-primary">
               {isCancelled ? <s>{displayName}</s> : displayName}
+            </span>
+          )}
+          {/* Rendered as a TAG, not a caption: these do not form a taxonomy
+              (most tags in production belong to a single artist), so a chip
+              reading "a facet others may share" is truer than grey descriptive
+              text. The full list stays on the card and the artist page. */}
+          {!isCancelled && firstGenreTag && (
+            <span className="mt-1 inline-block max-w-full truncate rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] leading-normal text-text-secondary">
+              {firstGenreTag}
             </span>
           )}
           {isCancelled && (

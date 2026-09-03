@@ -8,14 +8,20 @@
 # platform; the value is a username or URL on that platform. Several may be
 # listed at once.
 
-ko_fi: tiptophams
-
-# GitHub Sponsors is not enrolled on the account yet — /sponsors/BreakableHoodie
-# currently redirects to the profile rather than a sponsor page. Uncomment once
-# enrollment (identity + payout verification) completes; it takes a few days and
-# charges no platform fee.
+# Both platforms are listed on purpose. GitHub renders ONE Sponsor button that
+# offers the reader a choice, so this is not two competing asks.
 #
-# github: BreakableHoodie
+# github takes no platform fee and is the better destination for anyone already
+# signed in to GitHub. ko_fi needs no account at all, which matters because most
+# people supporting this are fans of the shows rather than developers — and it is
+# the one the site's own footer links to.
+#
+# Enrollment completed 2026-09-03. The tell that it is live: /sponsors/<user>
+# returns 200 and STAYS on that URL. While unenrolled it returned 200 and
+# redirected to the profile, which is why this line sat commented until now — a
+# Sponsor button that lands on a profile page is worse than no button.
+github: BreakableHoodie
+ko_fi: tiptophams
 
 # Other options, none of them set up:
 #

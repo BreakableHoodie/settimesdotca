@@ -11,10 +11,15 @@
 # Both platforms are listed on purpose. GitHub renders ONE Sponsor button that
 # offers the reader a choice, so this is not two competing asks.
 #
-# github takes no platform fee and is the better destination for anyone already
-# signed in to GitHub. ko_fi needs no account at all, which matters because most
-# people supporting this are fans of the shows rather than developers — and it is
-# the one the site's own footer links to.
+# github is the better destination for anyone already signed in to GitHub, and
+# takes no platform fee on a sponsorship funded by a PERSONAL account. An
+# ORGANISATION-funded one pays up to 6% (3% card + 3% service; invoiced billing
+# drops the card half). Personal is the overwhelmingly likely case here, which
+# is why the distinction is written down rather than assumed away.
+#
+# ko_fi needs no account at all, which matters because most people supporting
+# this are fans of the shows rather than developers, and it is the one the
+# site's own footer links to.
 #
 # Enrollment completed 2026-09-03. The tell that it is live: /sponsors/<user>
 # returns 200 and STAYS on that URL. While unenrolled it returned 200 and

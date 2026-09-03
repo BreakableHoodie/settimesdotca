@@ -65,9 +65,13 @@ describe('footer support link', () => {
     )
     const link = screen.getByRole('link', { name: /support the site/i })
     expect(link).toHaveAttribute('target', '_blank')
+    // Split into TOKENS rather than substring-matched: /noopener/ also passes
+    // for rel="noopeners", which grants no such relation. The regex would have
+    // reported a security attribute this link did not actually have.
+    //
     // Both tokens, not just one: `noopener` closes the window.opener hole and
     // `noreferrer` is what the rest of this footer's external links already use.
-    expect(link.getAttribute('rel')).toMatch(/noopener/)
-    expect(link.getAttribute('rel')).toMatch(/noreferrer/)
+    const relTokens = (link.getAttribute('rel') ?? '').split(/\s+/).filter(Boolean)
+    expect(relTokens).toEqual(expect.arrayContaining(['noopener', 'noreferrer']))
   })
 })

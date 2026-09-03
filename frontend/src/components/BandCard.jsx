@@ -48,7 +48,14 @@ function BandCard({
             visible; below `sm:` that header is hidden and the row is the only
             place the time appears. Showing both at one width reads as a bug. */}
         <span className="w-16 shrink-0 whitespace-nowrap font-mono text-sm font-bold tabular-nums text-text-primary">
-          {band.startTime && band.startTime !== 'TBD' ? formatTime(band.startTime) : '—'}
+          {/* "TBA", never a bare dash. A dash reads as broken data; this state is
+              normal and supported (a published lineup before set times are
+              booked), and Vol 18 is in it publicly right now. The desktop layout
+              conveys it with a "Time To Be Announced" group header, but that
+              header is hidden below `sm:` because the row owns the time here --
+              so without this word the mobile board is a column of dashes with
+              nothing explaining them. */}
+          {band.startTime && band.startTime !== 'TBD' ? formatTime(band.startTime) : 'TBA'}
         </span>
         <span className="min-w-0">
           {bandProfileHref ? (

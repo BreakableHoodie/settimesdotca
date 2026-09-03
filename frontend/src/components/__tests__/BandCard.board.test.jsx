@@ -78,6 +78,20 @@ describe('BandCard variant="board"', () => {
     expect(screen.queryByRole('button', { name: /my route/i })).not.toBeInTheDocument()
   })
 
+  // Vol 18 shipped publicly in exactly this state: a published lineup whose set
+  // times are not booked yet. The row used to render a bare "—", which reads as
+  // broken data rather than as "not announced".
+  it('says TBA rather than a bare dash when a set has no time', () => {
+    renderBoard({ band: { ...band, startTime: undefined } })
+    expect(screen.getByText('TBA')).toBeInTheDocument()
+    expect(screen.queryByText('—')).not.toBeInTheDocument()
+  })
+
+  it('does the same for the explicit TBD sentinel', () => {
+    renderBoard({ band: { ...band, startTime: 'TBD' } })
+    expect(screen.getByText('TBA')).toBeInTheDocument()
+  })
+
   it('has no axe violations', async () => {
     const { container } = renderBoard()
     expect(await axe(container)).toHaveNoViolations()

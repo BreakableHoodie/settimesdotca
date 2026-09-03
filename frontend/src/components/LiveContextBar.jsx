@@ -270,22 +270,21 @@ function LiveContextBar({
     return Math.ceil((eventDay - todayDay) / 86400000)
   })()
   const mobileSummary = useMemo(() => {
+    // ORDERED BY CONSEQUENCE, not by convenience. On mobile this string is
+    // clamped to two lines, so whatever sits at the end is what a fan never
+    // reads. Showing up underage to a 19+ show is a wasted trip; the venue and
+    // set counts are visible on the page itself a few hundred pixels below.
+    // #1084 was this line silently cutting "Presented by ..." every time.
+    const leading = []
+    if (eventData?.age_restriction) leading.push(eventData.age_restriction)
+    if (doorsTime) leading.push(`Doors ${formatTime(doorsTime)}`)
+    if (eventData?.presented_by) leading.push(`Presented by ${eventData.presented_by}`)
+
     const summaryItems = [
+      ...leading,
       `${uniqueVenues} ${uniqueVenues === 1 ? 'venue' : 'venues'}`,
       `${activeBands.length} ${activeBands.length === 1 ? 'set' : 'sets'}`,
     ]
-
-    if (doorsTime) {
-      summaryItems.push(`Doors ${formatTime(doorsTime)}`)
-    }
-
-    if (eventData?.age_restriction) {
-      summaryItems.push(eventData.age_restriction)
-    }
-
-    if (eventData?.presented_by) {
-      summaryItems.push(`Presented by ${eventData.presented_by}`)
-    }
 
     if (daysUntil !== null) {
       summaryItems.push(getDaysAwayLabel(daysUntil))
@@ -309,7 +308,7 @@ function LiveContextBar({
       <div role="status" aria-live="polite" className="sr-only">
         {lifecycleAnnouncement}
       </div>
-      <div className="container mx-auto px-4 max-w-(--breakpoint-2xl) py-2.5 sm:py-3">
+      <div className="container mx-auto px-4 max-w-(--breakpoint-2xl) py-1.5 sm:py-3">
         <div className="sm:hidden">
           {/* Identity block: status badge, clock, poster, title, stats.
               Collapses on scroll (#665, style computed above) — everything
@@ -317,36 +316,13 @@ function LiveContextBar({
               toggle) lives in the always-visible block below, outside this
               wrapper. */}
           <div className={IDENTITY_COLLAPSE_TRANSITION_CLASS} style={identityCollapseStyle} inert={isIdentityCollapsed}>
-            <div className="flex items-center justify-between gap-3">
-              <span
-                role="button"
-                tabIndex={0}
-                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
-                aria-label={`Event status: ${lifecycle.label}`}
-                onClick={handleLifecycleTap}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    handleLifecycleTap()
-                  }
-                }}
-              >
-                {lifecycle.label}
-              </span>
-
-              <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary">
-                <Clock size={14} aria-hidden="true" className="text-accent-400" />
-                <span className="tabular-nums">{formatCurrentTime(currentTime)}</span>
-              </div>
-            </div>
-
             {/* Poster beside the title/stats rather than stacked above them
                 (#666) — reclaims the dead width a poster-alone row left
                 empty and drops a whole ~142px row from the mobile vertical
                 budget. Absent posterUrl (the common case) just leaves this
                 column at full width; nothing here depends on the poster
                 being present. */}
-            <div className="mt-2 flex gap-3">
+            <div className="flex gap-3">
               {posterUrl && (
                 <EventPosterThumbnail
                   posterUrl={posterUrl}
@@ -356,18 +332,42 @@ function LiveContextBar({
                 />
               )}
               <div className="min-w-0 flex-1">
-                <h2
-                  className="overflow-hidden text-base font-semibold leading-snug text-text-primary"
-                  style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
-                >
-                  {eventData.name}
-                </h2>
+                {/* Status pill shares the title's line rather than owning a row
+                    above it, and the mobile clock is gone: the phone's own status
+                    bar already shows the time, and that row cost ~44px directly
+                    above the lineup. Desktop keeps both, unchanged. */}
+                <div className="flex items-start gap-2">
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+                    aria-label={`Event status: ${lifecycle.label}`}
+                    onClick={handleLifecycleTap}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleLifecycleTap()
+                      }
+                    }}
+                  >
+                    {lifecycle.label}
+                  </span>
+                  <h2
+                    className="min-w-0 flex-1 overflow-hidden text-base font-semibold leading-snug text-text-primary"
+                    style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+                  >
+                    {eventData.name}
+                  </h2>
+                </div>
                 <EventSocialLinks
                   socialLinks={eventData.social_links}
                   eventName={eventData.name}
                   className="-ml-2 mt-0.5"
                 />
-                <p className="mt-1 truncate text-xs text-text-tertiary">{mobileSummary}</p>
+                {/* Was `truncate`: one line showing 43% of its own content at
+                    390px, cutting "Presented by ..." every time (#1084). Two
+                    lines costs ~14px and shows effectively all of it. */}
+                <p className="mt-1 line-clamp-2 text-xs text-text-tertiary">{mobileSummary}</p>
               </div>
             </div>
           </div>

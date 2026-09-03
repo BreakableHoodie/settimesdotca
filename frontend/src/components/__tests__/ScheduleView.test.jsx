@@ -200,6 +200,11 @@ describe('ScheduleView — Bug 5: blank venue filter button', () => {
   })
 })
 
+// Copy Visible Schedule and Select All now sit behind a "More" disclosure, so a
+// user opens it before reaching them. Only the navigation changed -- every
+// assertion below is the same one it always was.
+const openMore = () => fireEvent.click(screen.getByRole('button', { name: /^more$/i }))
+
 describe('ScheduleView — P1: Select All respects visible filters', () => {
   it('passes only the visible filtered bands to the bulk select handler', () => {
     const onSelectAll = vi.fn()
@@ -211,6 +216,7 @@ describe('ScheduleView — P1: Select All respects visible filters', () => {
     renderView({ bands, onSelectAll })
 
     fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
+    openMore()
     fireEvent.click(screen.getByRole('button', { name: /Select All/i }))
 
     expect(onSelectAll).toHaveBeenCalledTimes(1)
@@ -229,6 +235,7 @@ describe('ScheduleView — P1: Select All respects visible filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
 
+    openMore()
     expect(screen.getByRole('button', { name: /All Selected/i })).toBeDisabled()
     expect(screen.queryByRole('button', { name: /^Select All$/i })).not.toBeInTheDocument()
   })
@@ -244,6 +251,7 @@ describe('ScheduleView — P2: copy action respects visible filters', () => {
     renderView({ bands })
 
     fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
+    openMore()
     fireEvent.click(screen.getByRole('button', { name: /copy the visible schedule/i }))
 
     await waitFor(() => expect(copyToClipboard).toHaveBeenCalledTimes(1))

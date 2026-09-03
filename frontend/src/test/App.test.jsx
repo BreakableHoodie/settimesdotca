@@ -320,6 +320,9 @@ describe('select all', () => {
     renderApp()
     await findAlphaToggle()
 
+    // Copy and Select All now sit behind a "More" disclosure; a user opens it
+    // before reaching them. Only the navigation changed, not the assertion.
+    fireEvent.click(screen.getByRole('button', { name: /^more$/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Select All' }))
 
     expect(await screen.findByRole('button', { name: 'Remove Alpha Wolves from my route' })).toBeInTheDocument()

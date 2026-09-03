@@ -18,6 +18,8 @@ function BandCard({
   warningText,
   currentTime,
   dayLabel,
+  variant = 'card',
+  venueCode,
 }) {
   const handleRemove = e => {
     e.stopPropagation()
@@ -29,6 +31,74 @@ function BandCard({
   // selectable. Both isHappeningNow and isStartingSoon are pure time math
   // (#732) and will light up a cancelled row otherwise.
   const isCancelled = Boolean(band.is_cancelled)
+
+  // ONE source of truth for the name shown and the name announced, shared by BOTH
+  // presentations. The board variant used to interpolate `band.name` directly and
+  // link unconditionally, so a nameless band rendered an empty link with a broken
+  // href -- reintroducing in the board exactly what #726/WCAG 2.5.3 fixed in the
+  // card. Caught by Copilot on #1085.
+  const displayName = band.name || 'Unnamed Artist'
+  const labelBase = isSelected ? `Remove ${displayName} from my route` : `Add ${displayName} to my route`
+  const bandProfileHref = band.name ? buildBandProfileHref(band.name, eventSlug) : null
+
+  if (variant === 'board') {
+    return (
+      <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 border-b border-border px-3 py-3">
+        {/* The time group header above supplies this from `sm:` up, where it is
+            visible; below `sm:` that header is hidden and the row is the only
+            place the time appears. Showing both at one width reads as a bug. */}
+        <span className="w-16 shrink-0 whitespace-nowrap font-mono text-sm font-bold tabular-nums text-text-primary">
+          {band.startTime && band.startTime !== 'TBD' ? formatTime(band.startTime) : '—'}
+        </span>
+        <span className="min-w-0">
+          {bandProfileHref ? (
+            <Link to={bandProfileHref} className="block truncate font-semibold text-text-primary hover:underline">
+              {isCancelled ? <s>{displayName}</s> : displayName}
+            </Link>
+          ) : (
+            <span className="block truncate font-semibold text-text-primary">
+              {isCancelled ? <s>{displayName}</s> : displayName}
+            </span>
+          )}
+          {isCancelled && (
+            <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-text-primary">
+              <TriangleAlert size={12} aria-hidden="true" />
+              Cancelled
+            </span>
+          )}
+        </span>
+        {venueCode && (
+          <span
+            title={band.venue}
+            className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] font-bold text-text-secondary"
+          >
+            {/* "PROH" is a visual abbreviation; a screen reader should hear the
+                venue, not four letters. `title` alone is a tooltip, not a name. */}
+            <span aria-hidden="true">{venueCode}</span>
+            <span className="sr-only">{band.venue}</span>
+          </span>
+        )}
+        {/* The board row REPLACES the card on mobile, so without this the core
+            interaction the page advertises -- "Tap any performer to add them to
+            My Route" -- would simply not exist on phones. Same semantics as the
+            card's corner button (#726): a separate control rather than a
+            clickable row, because the row already contains a profile Link and a
+            button may not nest interactive children. Cancelled sets are not
+            selectable, matching the card. */}
+        {showToggleButton && !isCancelled && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2"
+            aria-label={labelBase}
+          >
+            {isSelected ? <X size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
+          </button>
+        )}
+      </div>
+    )
+  }
+
   const isPlaying = !isCancelled && isHappeningNow(band)
   const nowMs = +currentTime
   const startingSoon = !isCancelled && isStartingSoon(band, currentTime)
@@ -50,9 +120,6 @@ function BandCard({
   // band.name directly, so a nameless band rendered "Unnamed Artist" but
   // announced "undefined" — WCAG 2.5.3 (Label in Name) requires the accessible
   // name to contain the visible text. Derive both from this.
-  const displayName = band.name || 'Unnamed Artist'
-  const labelBase = isSelected ? `Remove ${displayName} from my route` : `Add ${displayName} to my route`
-  const bandProfileHref = band.name ? buildBandProfileHref(band.name, eventSlug) : null
 
   // The card container is a labelled group, never a button or a click target:
   // it wraps a real <button> (corner add/remove toggle) and an <a> (profile

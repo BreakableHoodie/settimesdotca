@@ -41,7 +41,11 @@ test.describe("Event page fold (#1074 / Vol 18 phase 1)", () => {
     const res = await request.get(`/api/schedule?event=${SEEDED_EVENT}`);
     expect(res.ok(), "seeded schedule should resolve").toBeTruthy();
     const body = await res.json();
-    const names = (body.bands || []).map((b) => b.name).filter(Boolean);
+    // The schedule endpoint may answer with the array itself or with { bands }.
+    // App.jsx:204 normalizes exactly this (`Array.isArray(data) ? data : data.bands`);
+    // handling only one shape here would make the guard fail for a reason that has
+    // nothing to do with the fold.
+    const names = (Array.isArray(body) ? body : body.bands || []).map((b) => b.name).filter(Boolean);
     expect(names.length, "seed must have performances for this to mean anything").toBeGreaterThan(0);
 
     await page.goto(`/event/${SEEDED_EVENT}`);

@@ -313,7 +313,14 @@ describe('LiveContextBar', () => {
       // The mobile summary is a joined string rendered in two paragraphs —
       // one always-visible and one sm:hidden. Assert the joined text includes
       // the presenter and that an sm:hidden copy exists (the mobile-only one).
-      const summaries = screen.getAllByText(/\d+ venues • \d+ sets • Presented by SetTimes/)
+      //
+      // ORDER IS PART OF THE CONTRACT, not incidental. This line is clamped to two
+      // lines on a phone, so whatever sits at the end is what nobody reads --
+      // #1084 was exactly that, silently cutting "Presented by ...". The
+      // consequential facts (age restriction, doors, presenter) therefore lead,
+      // and the venue/set counts follow. Pinning the order here is what stops a
+      // future tidy-up from quietly undoing the fix.
+      const summaries = screen.getAllByText(/Presented by SetTimes • \d+ venues • \d+ sets/)
       expect(summaries.some(el => el.classList.contains('sm:hidden'))).toBe(true)
       setViewportWidth(1024)
     })

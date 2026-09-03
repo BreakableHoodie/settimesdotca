@@ -270,22 +270,21 @@ function LiveContextBar({
     return Math.ceil((eventDay - todayDay) / 86400000)
   })()
   const mobileSummary = useMemo(() => {
+    // ORDERED BY CONSEQUENCE, not by convenience. On mobile this string is
+    // clamped to two lines, so whatever sits at the end is what a fan never
+    // reads. Showing up underage to a 19+ show is a wasted trip; the venue and
+    // set counts are visible on the page itself a few hundred pixels below.
+    // #1084 was this line silently cutting "Presented by ..." every time.
+    const leading = []
+    if (eventData?.age_restriction) leading.push(eventData.age_restriction)
+    if (doorsTime) leading.push(`Doors ${formatTime(doorsTime)}`)
+    if (eventData?.presented_by) leading.push(`Presented by ${eventData.presented_by}`)
+
     const summaryItems = [
+      ...leading,
       `${uniqueVenues} ${uniqueVenues === 1 ? 'venue' : 'venues'}`,
       `${activeBands.length} ${activeBands.length === 1 ? 'set' : 'sets'}`,
     ]
-
-    if (doorsTime) {
-      summaryItems.push(`Doors ${formatTime(doorsTime)}`)
-    }
-
-    if (eventData?.age_restriction) {
-      summaryItems.push(eventData.age_restriction)
-    }
-
-    if (eventData?.presented_by) {
-      summaryItems.push(`Presented by ${eventData.presented_by}`)
-    }
 
     if (daysUntil !== null) {
       summaryItems.push(getDaysAwayLabel(daysUntil))

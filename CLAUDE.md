@@ -665,6 +665,24 @@ Since #732 the correct action is the reversible cancel toggle in LineupTab (`PAT
 
 Operational detail: cancelling is scoped to *one performance*. A band playing two sets (ALL and Kepi Ghoulie each play twice at BF2) needs each set cancelled separately.
 
+**The iCal feed omits a set with no `start_time` rather than inventing one (#1079).** It
+used to substitute `"20:00"`, which on 2026-09-02 put all 15 of Vol 18's announced
+sets in subscribers' calendars stacked at 8:00 PM -- the entire content of the feed,
+fabricated -- while `/event/lwbc18` correctly said "Time To Be Announced". Two public
+surfaces stating different things about the same rows.
+
+Omitting is both the honest shape and the consistent one: the feed is
+*performance*-driven, so it already reports an event with no lineup as no `VEVENT`s,
+and an unscheduled set is that same case one row down. An absent entry is
+recoverable; a wrong entry in a calendar someone trusts is not. A missing `end_time`
+is likewise derived (`start + 1h`), never a constant -- a literal `"21:00"` against a
+23:00 start is *before* it, which the midnight-straddle roll then reads as spanning
+into the next day, turning an absent end time into a 22-hour event.
+
+Both are in the mutation gate. A fallback is invisible to every happy-path test by
+construction, which is how the constant survived in a file that already had four
+describe blocks.
+
 The human-facing version of this, plus what to do when a set time changes or something looks wrong mid-event, is `docs/SHOW_DAY_RUNBOOK.md`. Keep the two in step — if a procedure changes, change both in the same commit.
 
 ## Band Announcements

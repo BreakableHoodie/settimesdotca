@@ -197,6 +197,24 @@ export const MUTATIONS = [
     replace: "AND (? = 0 OR 1 = 1)",
     tests: ["functions/api/__tests__/schedule-reveal.test.js"],
   },
+  {
+    id: "ical-no-fabricated-start-time",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the iCal feed never invents a time for an unscheduled set (#1079)",
+    file: "functions/api/feeds/ical.js",
+    find: "if (!band.start_time) continue;",
+    replace: "",
+    tests: ["functions/api/feeds/__tests__/ical.test.js"],
+  },
+  {
+    id: "ical-end-time-derived-not-constant",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — a missing end_time is derived from the start, never a constant that can precede it (#1079)",
+    file: "functions/api/feeds/ical.js",
+    find: "band.end_time || addOneHour(startTime)",
+    replace: 'band.end_time || "21:00"',
+    tests: ["functions/api/feeds/__tests__/ical.test.js"],
+  },
 ];
 
 // ============================================================================

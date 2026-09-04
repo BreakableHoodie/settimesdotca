@@ -548,3 +548,107 @@ describe("GET /api/feeds/ical — midnight-straddling DTEND rolls to the next da
     expect(icalData).toContain("DTEND:20990401T001500");
   });
 });
+
+describe("GET /api/feeds/ical — an unscheduled set is not a calendar entry (#1079)", () => {
+  // The feed used to substitute "20:00" for a NULL start_time. Live on
+  // 2026-09-02 that made every one of Vol 18's 15 announced sets a concrete
+  // 8:00 PM VEVENT -- the entire content of the feed, fabricated, while the
+  // event page correctly showed "Time To Be Announced".
+  //
+  // These seed the NULL case specifically. A fallback is invisible to every
+  // happy-path test by construction, which is why the constant survived this
+  // long in a file with four existing describe blocks.
+  const seedEvent = (rawDb) => {
+    const event = insertEvent(rawDb, {
+      name: "Unscheduled Ical Event",
+      slug: "ical-unscheduled",
+      date: "2099-05-05",
+    });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+    return event;
+  };
+
+  test("a performance with no start_time produces no VEVENT at all", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = seedEvent(rawDb);
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+
+    insertBand(rawDb, {
+      name: "Unscheduled Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: null,
+      end_time: null,
+    });
+
+    const response = await onRequestGet({ request: new Request("https://example.test/api/feeds/ical"), env });
+    expect(response.status).toBe(200);
+    const icalData = await response.text();
+
+    // The artist's name must not appear either: a VEVENT is the only thing
+    // that carries it, so its presence would mean an entry was emitted.
+    expect(icalData).not.toContain("Unscheduled Band");
+    expect(icalData).not.toContain("BEGIN:VEVENT");
+    expect(icalData).not.toContain("T200000");
+    // Still a valid, parseable calendar -- empty, not broken.
+    expect(icalData).toContain("BEGIN:VCALENDAR");
+    expect(icalData).toContain("END:VCALENDAR");
+  });
+
+  test("a scheduled set on the same bill still appears when a sibling is unscheduled", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = seedEvent(rawDb);
+    const venue = insertVenue(rawDb, { name: "Room 47" });
+
+    insertBand(rawDb, {
+      name: "Timed Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "21:00",
+      end_time: "22:00",
+    });
+    insertBand(rawDb, {
+      name: "Untimed Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: null,
+      end_time: null,
+    });
+
+    const response = await onRequestGet({ request: new Request("https://example.test/api/feeds/ical"), env });
+    const icalData = await response.text();
+
+    expect(icalData).toContain("Timed Band");
+    expect(icalData).toContain("DTSTART:20990505T210000");
+    expect(icalData).not.toContain("Untimed Band");
+    // Skipping one row must not skip the rest of the loop.
+    expect((icalData.match(/BEGIN:VEVENT/g) || []).length).toBe(1);
+  });
+
+  test("a missing end_time is one hour after the start, not a constant 21:00", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = seedEvent(rawDb);
+    const venue = insertVenue(rawDb, { name: "Princess Cafe" });
+
+    // 23:00 is the shape that breaks a constant: "21:00" is BEFORE it, which
+    // the midnight-straddle roll reads as spanning into the next day, turning
+    // an absent end time into a 22-hour event.
+    insertBand(rawDb, {
+      name: "Open Ended Band",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "23:00",
+      end_time: null,
+    });
+
+    const response = await onRequestGet({ request: new Request("https://example.test/api/feeds/ical"), env });
+    const icalData = await response.text();
+
+    expect(icalData).toContain("DTSTART:20990505T230000");
+    expect(icalData).toContain("DTEND:20990506T000000");
+    expect(icalData).not.toContain("DTEND:20990506T210000");
+  });
+});

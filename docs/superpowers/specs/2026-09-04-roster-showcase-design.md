@@ -212,6 +212,17 @@ mining, and `robots.txt` disallows `/api/`, `/search`, `/stream` and `/cart`
 while permitting artist and album pages. The library also ships Bottleneck rate
 limiting and caching.
 
+**Before adopting it, resolve the licence.** `package.json` declares
+`"license": "MIT"`, but the repository has **no LICENSE file** (404), so
+GitHub's API reports the licence as `None`. A declared field without the file is
+weaker than it looks. Confirm before depending on it, and consider opening a
+friendly issue asking the author to add one -- it costs nothing and helps
+everyone downstream.
+
+**And if this ships and works, tip the author.** Patrick Kan takes Ko-fi at
+`ko-fi.com/patrickkfkan`. A solo maintainer keeping a scraper current against a
+site that keeps moving is doing the work that makes this piece possible at all,
+and settimes.ca now runs on the same model.
 #### Constraints, all load-bearing
 
 **It cannot run in `functions/`.** It depends on `cheerio` and `node-fetch`;

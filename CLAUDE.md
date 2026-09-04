@@ -959,7 +959,12 @@ Five things about those targets are deliberate:
   and `sqlfluff` are external. A target that passes when its tool is missing is
   worse than no target — that is precisely the bug `lint-md` shipped with, where
   it was absent from `.PHONY`, so a stray file named `lint-md` made `make` report
-  "up to date" and lint nothing.
+  "up to date" and lint nothing. **Both that trap and the pipeline one below are
+  now guarded** by `scripts/__tests__/makefileGuards.test.js` (#1070): it fails
+  if any target is missing from `.PHONY`, or if a recipe ends in a filter whose
+  status would mask the real one. Both halves assert they can still find what
+  they scan for, because a parser that matches nothing reports "all clear"
+  forever.
 - **File lists use `git ls-files --cached --others --exclude-standard`**, not a
   bare `git ls-files`. The latter sees only *tracked* files, so a brand-new file
   you have not `git add`ed — the one most likely to be wrong — sails through.

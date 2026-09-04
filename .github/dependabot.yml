@@ -2,6 +2,10 @@ version: 2
 updates:
   - package-ecosystem: "npm"
     directory: "/"
+    # Wait 7 days before proposing a newly published version -- same
+    # rationale as min-release-age in .npmrc.
+    cooldown:
+      default-days: 7
     schedule:
       interval: "weekly"
       day: "monday"
@@ -20,6 +24,10 @@ updates:
 
   - package-ecosystem: "npm"
     directory: "/frontend"
+    # Wait 7 days before proposing a newly published version -- same
+    # rationale as min-release-age in .npmrc.
+    cooldown:
+      default-days: 7
     schedule:
       interval: "weekly"
       day: "monday"
@@ -38,6 +46,10 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    # Wait 7 days before proposing a newly published version -- same
+    # rationale as min-release-age in .npmrc.
+    cooldown:
+      default-days: 7
     schedule:
       interval: "weekly"
       day: "monday"

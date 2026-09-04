@@ -102,11 +102,23 @@ INSERT OR REPLACE INTO events (id, name, date, slug, status, description, city, 
 --
 -- Absolute, and same-origin on purpose: `normalizeHttpUrl` (functions/api/
 -- schedule.js) drops a relative path and rejects data:, so a bare
--- '/favicon-32x32.png' never reaches the client. localhost:8788 is
--- playwright.config.js's default baseURL and the port .github/actions/e2e-env
--- serves on, so this loads from 'self' with no external request. If
--- PLAYWRIGHT_BASE_URL is overridden the image 404s, and the fold measurement
--- still holds -- the thumbnail's height is fixed in CSS, not by the image.
+-- '/favicon-32x32.png' never reaches the client at all. localhost:8788 is
+-- playwright.config.js's default baseURL AND the port .github/actions/e2e-env
+-- serves on, so in CI and in the default local run this is 'self' and loads
+-- with no external request.
+--
+-- Under a PLAYWRIGHT_BASE_URL override it becomes cross-origin and the
+-- document CSP's `img-src 'self'` blocks it. THAT IS SAFE HERE, and it was
+-- checked rather than argued: the thumbnail's height is fixed in CSS
+-- (`h-[64px] sm:h-[100px]`), never derived from the image, so a blocked or
+-- 404ing poster occupies exactly the same vertical space. Measured 2026-09-04
+-- by running the whole fixture-consuming suite on port 5173, where this URL is
+-- cross-origin and does not load: the fold guard passed at the same position,
+-- 43/43 green.
+--
+-- So do not "fix" this by dropping the poster to avoid the cross-origin case.
+-- Removing it makes the fixture 27px SHORTER than production, which is the
+-- exact blind spot #1087 exists to close.
 --
 -- Keep it dense. Trimming this back to "just enough for the assertion" is what
 -- broke the guard the first two times.
@@ -235,6 +247,20 @@ INSERT OR REPLACE INTO performances (id, event_id, band_profile_id, venue_id, st
 (11, 30, 3, 2, '21:00', '22:00', date('now', '-30 days')),
 (12, 30, 4, 2, '22:00', '23:00', date('now', '-30 days'));
 
--- Update sqlite_sequence if needed
+-- Keep AUTOINCREMENT ahead of the rows seeded above.
+--
+-- DERIVED, not hardcoded. These were literals (band_profiles 4, performances
+-- 12) that had to be hand-updated whenever a row was added, and adding eleven
+-- artists and eleven performances for #1087 left them pointing BELOW the
+-- seeded maxima. A table whose sequence sits under max(id) hands the next
+-- auto-generated row an id that already exists, which surfaces as a confusing
+-- UNIQUE failure in whichever test happens to create a record next -- nowhere
+-- near the seed file that caused it.
+--
+-- Selecting MAX(id) means the next contributor to add a fixture row cannot
+-- reintroduce that drift by forgetting this block exists.
 DELETE FROM sqlite_sequence WHERE name IN ('venues', 'events', 'band_profiles', 'performances');
-INSERT INTO sqlite_sequence (name, seq) VALUES ('venues', 20), ('events', 30), ('band_profiles', 4), ('performances', 12);
+INSERT INTO sqlite_sequence (name, seq) SELECT 'venues', COALESCE(MAX(id), 0) FROM venues;
+INSERT INTO sqlite_sequence (name, seq) SELECT 'events', COALESCE(MAX(id), 0) FROM events;
+INSERT INTO sqlite_sequence (name, seq) SELECT 'band_profiles', COALESCE(MAX(id), 0) FROM band_profiles;
+INSERT INTO sqlite_sequence (name, seq) SELECT 'performances', COALESCE(MAX(id), 0) FROM performances;

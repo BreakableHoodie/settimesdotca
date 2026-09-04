@@ -269,7 +269,12 @@ export function main(argv) {
     process.stderr.write(`Unknown operation "${op}".\n\n${USAGE}\n`);
     return 4;
   }
-  if (typeof flags.match !== "string") {
+  // Empty counts as missing, for both value flags. `--match=` and
+  // `--with-file=` produce "" -- a string, so a bare typeof check waves them
+  // through, and `--with-file=` then reached readFileSync("") and died with an
+  // uncaught ENOENT stack trace. A usage mistake must exit 4 with a sentence,
+  // never a Node stack.
+  if (typeof flags.match !== "string" || flags.match === "") {
     process.stderr.write(`--match <pattern> is required.\n`);
     return 4;
   }
@@ -280,7 +285,7 @@ export function main(argv) {
     if (op === "delete") {
       result = deleteLine(source, flags.match, { normalizeSpace: Boolean(flags["normalize-space"]) });
     } else {
-      if (typeof flags["with-file"] !== "string") {
+      if (typeof flags["with-file"] !== "string" || flags["with-file"] === "") {
         process.stderr.write(`--with-file <path> is required for "${op}".\n`);
         return 4;
       }

@@ -1113,6 +1113,17 @@ than a backlog -- but nothing in the thread query would have said so either way.
 
 Same family as the rest of this section: a green-looking read that quietly saw
 less than it appeared to.
+**Nitpicks hide in the same place, and are not always nits.** Alongside
+outside-diff findings, CodeRabbit collapses a "Nitpick comments" section into a
+`<details>` block in that same body. On #1105 the one nitpick was that a test
+asserting "a `--with-file` operand starting with `--` is still read as a path"
+passed an ABSOLUTE path -- `/var/.../--repl.txt`, which does not begin with
+`--` as an operand at all. The test could not fail for the reason it claimed,
+and did pass against the broken parser. Labelled Trivial; it was a vacuous test,
+which is the defect class this file cares most about.
+
+So read the body for BOTH sections. Judge a finding by what it says, not by the
+bucket it arrived in.
 Related, and why the push-budget hook is not "wrong": it counts **pushes**, and a
 skipped review consumes none of the hourly allowance. The count is therefore
 conservative — you sometimes have more budget than it thinks. Do not "fix" that

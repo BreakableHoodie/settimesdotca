@@ -328,12 +328,40 @@ describe("edit-at: an anchor may itself start with --", () => {
     expect(readFileSync(file, "utf8")).toContain("REPLACED");
   });
 
-  it("a --with-file path starting with -- is still read as the path", () => {
+  it("a --with-file operand starting with -- is still read as the path", () => {
+    // The first version of this passed an ABSOLUTE path -- /var/.../--repl.txt
+    // -- which does not begin with "--" as an operand at all, so it exercised
+    // nothing the parser could get wrong and would have passed against the old
+    // parsing. Running from the directory makes the operand itself flag-like,
+    // which is the actual case.
     const dir = mkdtempSync(join(tmpdir(), "edit-at-dash-"));
+    write(join(dir, "file.txt"), ["  target", ""].join("\n"));
+    write(join(dir, "--repl.txt"), "REPLACED\n");
+
+    const cwd = process.cwd();
+    try {
+      process.chdir(dir);
+      expect(main(["replace", "file.txt", "--match", "target", "--with-file", "--repl.txt"])).toBe(0);
+    } finally {
+      process.chdir(cwd);
+    }
+    expect(readFileSync(join(dir, "file.txt"), "utf8")).toContain("REPLACED");
+  });
+
+  it.each([
+    ["--match=", ["replace", "FILE", "--match=", "--with-file", "REPL"]],
+    ["--with-file=", ["replace", "FILE", "--match", "target", "--with-file="]],
+  ])("exits 4 on an empty %s rather than throwing from fs", (_label, argvTemplate) => {
+    // "" is a string, so a bare typeof check waves it through -- and
+    // `--with-file=` then reached readFileSync("") and died with an uncaught
+    // ENOENT stack. A usage mistake must exit 4 with a sentence, never a stack.
+    const dir = mkdtempSync(join(tmpdir(), "edit-at-empty-"));
     const file = write(join(dir, "file.txt"), ["  target", ""].join("\n"));
-    const repl = write(join(dir, "--repl.txt"), "REPLACED\n");
-    expect(main(["replace", file, "--match", "target", "--with-file", repl])).toBe(0);
-    expect(readFileSync(file, "utf8")).toContain("REPLACED");
+    const repl = write(join(dir, "repl.txt"), "REPLACED\n");
+    const argv = argvTemplate.map((a) => (a === "FILE" ? file : a === "REPL" ? repl : a));
+
+    expect(main(argv)).toBe(4);
+    expect(readFileSync(file, "utf8")).toContain("target");
   });
 
   it("still reports a genuinely missing value rather than eating the next flag", () => {

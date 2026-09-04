@@ -22,13 +22,12 @@ import { fileURLToPath } from "node:url";
  */
 const MAKEFILE = fileURLToPath(new URL("../../Makefile", import.meta.url));
 const source = readFileSync(MAKEFILE, "utf8");
-const lines = source.split("\n");
 const TAB = "\t";
 
 /** Targets: `name:` at column 0. Excludes `.PHONY`, variables and comments. */
-function declaredTargets() {
+function declaredTargets(src = source) {
   const targets = [];
-  for (const line of lines) {
+  for (const line of src.split("\n")) {
     const match = /^([a-zA-Z][a-zA-Z0-9_-]*)\s*:(?!=)/.exec(line);
     if (match) targets.push(match[1]);
   }
@@ -36,10 +35,10 @@ function declaredTargets() {
 }
 
 /** The `.PHONY` list, following backslash continuations. */
-function phonyTargets() {
+function phonyTargets(src = source) {
   const names = [];
   let collecting = false;
-  for (const line of lines) {
+  for (const line of src.split("\n")) {
     if (!collecting && !line.startsWith(".PHONY:")) continue;
     const body = collecting ? line : line.slice(".PHONY:".length);
     collecting = body.trimEnd().endsWith("\\");
@@ -62,8 +61,9 @@ const PIPELINE_ALLOWED_TARGETS = new Set(["help"]);
 const FILTERS = ["sed", "grep", "head", "tail", "awk", "cut", "sort", "uniq"];
 
 /** Recipe lines (tab-indented), continuations joined, tagged by target. */
-function recipeLines() {
+function recipeLines(src = source) {
   const out = [];
+  const lines = src.split("\n");
   let target;
   for (let i = 0; i < lines.length; i += 1) {
     const targetMatch = /^([a-zA-Z][a-zA-Z0-9_-]*)\s*:(?!=)/.exec(lines[i]);
@@ -178,5 +178,50 @@ describe("Makefile: no recipe hides its exit code behind a filter (#1070)", () =
     const recipes = recipeLines();
     expect(recipes.length).toBeGreaterThan(30);
     expect(recipes.some((r) => r.target === "gate" || r.target === "lint-md")).toBe(true);
+  });
+});
+
+describe("Makefile guards: proven against the REAL Makefile, mutated (#1070)", () => {
+  // The assertions above only ever see a compliant file, so they prove the
+  // guards do not false-positive -- not that they catch anything. Verifying
+  // that by hand-editing the Makefile is a one-time check that leaves nothing
+  // behind. These mutate a COPY of the real source, so the proof runs in CI on
+  // every commit and survives whatever the Makefile becomes.
+
+  it("reports a target removed from .PHONY", () => {
+    // The lint-md failure exactly: present as a target, absent from .PHONY.
+    const mutated = source.replace(/(\.PHONY:[^\n]*(?:\\\n[^\n]*)*)/, (block) => block.replace(/\blint-md\b\s*/, ""));
+    expect(mutated).not.toBe(source);
+
+    const phony = phonyTargets(mutated);
+    const missing = declaredTargets(mutated).filter((t) => !phony.has(t));
+    expect(missing).toContain("lint-md");
+
+    // And the unmutated source still reports none, so this is the mutation
+    // talking rather than a parser that flags everything.
+    const clean = declaredTargets().filter((t) => !phonyTargets().has(t));
+    expect(clean).toEqual([]);
+  });
+
+  it("reports a recipe that ends in a filter", () => {
+    // `false | tail -1` exits 0 -- the whole defect, in one line.
+    const mutated = source.replace(
+      /^test-backend:.*$/m,
+      "leaky-demo: ## demo\n\t@false | tail -1\n\ntest-backend: ## Backend unit tests",
+    );
+    expect(mutated).not.toBe(source);
+
+    const offenders = recipeLines(mutated)
+      .filter(({ target }) => !PIPELINE_ALLOWED_TARGETS.has(target))
+      .filter(({ text }) => masksExitCode(text));
+
+    expect(offenders.map((o) => o.target)).toContain("leaky-demo");
+    expect(offenders.find((o) => o.target === "leaky-demo").text).toContain("false | tail -1");
+
+    // The real Makefile still reports none.
+    const clean = recipeLines()
+      .filter(({ target }) => !PIPELINE_ALLOWED_TARGETS.has(target))
+      .filter(({ text }) => masksExitCode(text));
+    expect(clean).toEqual([]);
   });
 });

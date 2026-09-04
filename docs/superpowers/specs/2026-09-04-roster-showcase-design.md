@@ -157,7 +157,12 @@ Three deliberate properties:
   runs this.
 
 Cheap insurance, not a data strategy: it costs one line and occasionally catches
-something only the band could know. Piece 6 is what actually fills release data.
+something only the band could know.
+
+**No automated release-data feature ships** -- see piece 6, where every source
+was evaluated and none is usable. If an artist volunteers a release through this
+line, it is published under the submission terms set out there; nothing fetches
+it, and nothing sorts on it.
 
 ### 5. Show what an artist is ON, and let a fan slice by it
 
@@ -214,9 +219,13 @@ plus `sanitizeBandSocialLinks`; do not introduce a third list here.
 
 ### 6. Recent releases — investigated and NOT adopted
 
-The owner's original idea included "recent bandcamp releases", later sharpened to
-sorting and filtering the roster by release recency. Every route was evaluated.
-None works, and the reasons differ.
+The owner's original idea included "recent bandcamp releases", later sharpened
+to sorting and filtering the roster by release recency. Every route was
+evaluated. None works, and the reasons differ.
+
+**Conclusion up front: no release-data feature ships.** No fetching, no storage,
+no sort, no filter, no migration, no scheduled job. Nothing elsewhere in this
+document should be read as deferring to a later release feature.
 
 | Source                             | Verdict                                                                                                                                                                                                                                                                                                        |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -245,8 +254,9 @@ idea in it at the wrong half of the roster.
   (81%) -- linking out is not scraping, and it is what Bandcamp wants.
 - The Bandcamp Friday banner (dates entered by the owner, never computed) turns
   those links into the moment they are worth the most.
-- Piece 4's contact line is the only fully-licensed release channel there is:
-  the artist telling us.
+- Piece 4's contact line is the only channel that could carry release news at
+  all -- the artist telling us. It is licensed only to the extent the submission
+  terms below make it so, and it feeds no sort, filter or rail.
 
 Revisit only if Bandcamp ships a public catalogue API, or if a single source
 ever reaches coverage where absence stops being a lie.
@@ -324,18 +334,54 @@ one. No migration.
   `CACHE_BROWSE`.
 - `/api/artists` gains RESOLVED link presence per artist.
 
-**Identity: use the canonical band id, never a display name.** Artist names in
-this roster include `$wamp A$$`, `THE FRIENDLY FROGS FREAK SHOW` and names with
-slashes and apostrophes. `stage-mates` resolves its `[name]` segment through the
-same normalisation `functions/api/bands/[name].js` already uses -- reusing that
-lookup, not writing a second one -- and every artist it RETURNS carries the
-numeric `band_profiles.id`, so a caller never has to round-trip through a
-display name to ask a follow-up question.
+**The resolved-link response shape, stated exactly.** Every consumer -- row
+icons, per-platform counts, the filter, and the shuffle's listen link -- reads
+one field, so they cannot disagree about what "has Bandcamp" means:
 
-The same applies to the contact link in piece 4: it carries the artist's
-canonical id, so a correction can be tied to a record rather than to whatever
-the artist typed. A bare `/contact` link cannot identify the profile, which is
-the difference between a report we can act on and one we cannot.
+```json
+"links": {
+  "bandcamp":  "https://artist.bandcamp.com",
+  "instagram": "https://instagram.com/artist",
+  "spotify":   null
+}
+```
+
+- One key per entry in `BAND_LINK_FIELD_KEYS`, always all eight present, so a
+  consumer never has to distinguish "absent" from "unset".
+- The value is the **resolved href**, or `null`. Never a boolean, never a raw
+  stored value, and never `"#"` -- a destination that would not navigate is
+  reported as `null`, because a truthy `"#"` is precisely how #712 rendered an
+  icon that went nowhere.
+- Resolution is the existing contract: `normalizeHttpUrl` server-side, matching
+  what `ArtistsPage` produces via `safeExternalHref`. A value containing
+  whitespace or a scheme other than http(s) resolves to `null`.
+- Counts and filters derive from this field, never from `social_links`. That is
+  what makes the count on a filter chip agree with the icons a fan can see.
+- The shuffle's single listen link is the first non-null of `bandcamp`,
+  `spotify`, `apple_music`, `youtube` -- the same priority `ArtistsPage`
+  already applies -- or omitted entirely when none resolves.
+
+**Identity: the canonical `band_profiles.id`, everywhere it can be.** Artist
+names here include `$wamp A$$` and names carrying slashes and apostrophes, and
+an artist can be renamed -- the roster has already done it once (Suplex City ->
+Suplex). A display name is not an identifier.
+
+- `stage-mates` takes the canonical **id** as its path segment. It is a new
+  endpoint with no existing callers, so there is no URL contract to preserve,
+  and its caller -- the artist profile page -- already has the id loaded.
+- For continuity with `functions/api/bands/[name].js`, a non-numeric segment is
+  still resolved through that file's existing normalisation rather than a second
+  lookup. Ids are preferred; names keep working.
+- Every artist any of these routes RETURNS carries its numeric id, so a caller
+  never round-trips a display name to ask a follow-up question.
+- The contact link carries the same id, and `/contact` uses it to identify the
+  profile a correction is about. A bare `/contact` link cannot, which is the
+  difference between a report we can act on and one we cannot.
+
+Renaming the existing name-keyed public routes is deliberately **out of scope**:
+those URLs are indexed and externally linked, and CLAUDE.md records the same
+decision for `/event/` vs `/events/`. The rule here is that no NEW route adds to
+that debt.
 
 **Frontend**
 

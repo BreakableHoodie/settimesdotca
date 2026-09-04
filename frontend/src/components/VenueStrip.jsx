@@ -1,10 +1,8 @@
-// Transit-map spine for the 6 King St N venues.
-// Renders a horizontal subway-style line with venue stops;
-// venues where the fan has scheduled bands are highlighted as "active stops."
+// Transit-map spine for ONE event's venues: a horizontal, subway-style line
+// with a stop per venue, in the order the organiser declared them. Venues
+// where the fan has scheduled a band are highlighted as "active stops".
 import { memo } from 'react'
 
-// Ordered south→north along King St N, Waterloo.
-// Kept as a constant so the visual ordering is always consistent.
 /**
  * The walk route for ONE event, drawn from that event's own venues.
  *

@@ -682,8 +682,8 @@ function App() {
 
   // The event's OWN venues, in the organiser's declared order, for the header
   // walk strip. Read from venue_info rather than from the lineup: a venue is
-  // part of the crawl before any set is assigned to it, which is exactly Vol
-  // 18's state today -- four venues declared, no performances placed yet.
+  // part of the crawl before any set is assigned to it, so the strip is right
+  // from the moment the bill is announced rather than only once it is placed.
   const eventVenues = useMemo(() => venueNamesFrom(eventData?.venue_info), [eventData?.venue_info])
   // The FULL event's festival-day list (#542 PR-3), not derived from `myBands`
   // — MySchedule needs this so a fan whose selections only touch Day 1 of a

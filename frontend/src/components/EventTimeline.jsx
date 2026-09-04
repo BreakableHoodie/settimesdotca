@@ -444,7 +444,7 @@ export default function EventTimeline() {
         {hasUpcoming && (
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <CalendarDays size={20} className="text-primary-500" />
+              <CalendarDays size={20} className="text-primary-500" aria-hidden="true" />
               <h2 className="text-3xl font-bold text-text-primary">Coming Up</h2>
             </div>
             <div className="space-y-6">
@@ -467,7 +467,7 @@ export default function EventTimeline() {
           <section>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
-                <History size={20} className="text-text-tertiary" />
+                <History size={20} className="text-text-tertiary" aria-hidden="true" />
                 <h2 className="text-3xl font-bold text-text-secondary">Past Events</h2>
               </div>
               <Button variant="ghost" size="sm" onClick={handleShowPastToggle}>
@@ -868,7 +868,7 @@ function EventCard({
             </div>
 
             <p className="text-text-secondary text-sm mb-2 flex flex-wrap items-center gap-2">
-              <CalendarDays size={12} />
+              <CalendarDays size={12} aria-hidden="true" />
               {formatDate(event.date)}
               {/* Door policy on the CARD, not only the event page (#1065
                   shipped it to /api/schedule and the event page, but the

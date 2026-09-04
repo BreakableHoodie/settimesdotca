@@ -184,9 +184,10 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController()
+    let pollInterval = null
 
     // Try loading from API first, then fallback to static file
-    const loadData = async () => {
+    const loadData = async (isSilent = false) => {
       try {
         // Try API endpoint first - use slug from URL or 'current' for default
         const eventParam = slug || 'current'
@@ -209,16 +210,29 @@ function App() {
           throw new Error(validation.error)
         }
 
+        // A silent refetch recovering from a previous error is still worth
+        // reflecting — clearing it is not the part the critical constraint
+        // below guards against.
         setError(null)
         setIsOfflineError(false)
         setBands(prepareBands(bandsData))
         setEventData(eventInfo)
-        setLoading(false)
+        if (!isSilent) {
+          setLoading(false)
+        }
       } catch (err) {
         if (controller.signal.aborted) {
           return
         }
         console.error('Failed to load bands:', err)
+        if (isSilent) {
+          // A background poll failing must never blank a working schedule --
+          // venues have bad signal, and a fan mid-show should keep seeing the
+          // last good data, not the error card (see CLAUDE.md "Pulling a band
+          // from a live lineup" and issue #1081). Leave loading/error/offline
+          // state untouched and let the next successful poll recover.
+          return
+        }
         if (!HAS_FALLBACK) {
           // A fetch that never reached the server (offline, or the service
           // worker's network-first strategy re-throwing after a cache miss —
@@ -235,7 +249,45 @@ function App() {
     }
 
     loadData()
-    return () => controller.abort()
+
+    // Keep the schedule live while a fan has the page open (#1081): the
+    // cancel toggle is documented to strike a set through "on every fan
+    // surface", but that was only true on a fresh load -- a phone left open
+    // in a pocket all night never saw it. Mirrors EventTimeline.jsx's
+    // visibility-gated 60s poll: skip fetching while the tab is hidden (a
+    // phone in a pocket must not burn mobile data), and refetch immediately
+    // on return to the tab rather than waiting out the rest of the interval.
+    const startPolling = () => {
+      if (pollInterval) return
+      pollInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          loadData(true)
+        }
+      }, 60000)
+    }
+    const stopPolling = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        pollInterval = null
+      }
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadData(true)
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      controller.abort()
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [slug])
 
   useEffect(() => {

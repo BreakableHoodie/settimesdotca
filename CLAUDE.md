@@ -1094,6 +1094,25 @@ gradient: **green meaning "did not look", not "looked and found nothing."** When
 a gate goes green on a change you expected it to have opinions about, check
 whether it ran at all.
 
+**A review's findings are not all in its threads.** CodeRabbit posts
+"outside diff range" comments in the review BODY, because GitHub cannot anchor
+an inline comment to a line the diff does not touch. A GraphQL query over
+`reviewThreads` -- the obvious way to enumerate findings, and the one used here
+for a long time -- returns every inline thread and **none** of those. They are
+invisible unless the body is read.
+
+Missed one on #1105 (2026-09-04): `--match --color-accent-500` set
+`flags.match = true` and died with "--match <pattern> is required", an error
+about a flag that WAS supplied. Not hypothetical -- `--color-accent-500` is a
+theme token used throughout the CSS and every SQL comment in `migrations/`
+begins with `--`. The owner spotted it in the PR; the tooling had not.
+
+So enumerate BOTH: the threads, and each review's `body`. An audit of #1097
+through #1104 afterwards found no others, so this was a first occurrence rather
+than a backlog -- but nothing in the thread query would have said so either way.
+
+Same family as the rest of this section: a green-looking read that quietly saw
+less than it appeared to.
 Related, and why the push-budget hook is not "wrong": it counts **pushes**, and a
 skipped review consumes none of the hourly allowance. The count is therefore
 conservative — you sometimes have more budget than it thinks. Do not "fix" that

@@ -293,3 +293,52 @@ describe("edit-at: the CLI itself", () => {
     expect(readFileSync(file, "utf8").split("\n")).toContain("flush");
   });
 });
+
+describe("edit-at: an anchor may itself start with --", () => {
+  // Value flags used to stop at anything beginning with "--", so
+  // `--match --color-accent-500` set flags.match = true and the run died with
+  // "--match <pattern> is required" -- an error about a flag that WAS given.
+  //
+  // Not hypothetical in this repo: `--color-accent-500` is a Tailwind theme
+  // token used throughout the CSS, and every SQL comment in migrations/ starts
+  // with "--". Both were unusable as anchors.
+  const tmp = () => join(mkdtempSync(join(tmpdir(), "edit-at-flag-")), "file.txt");
+  const write = (path, text) => {
+    writeFileSync(path, text);
+    return path;
+  };
+
+  it.each([
+    ["a CSS custom property", "  --color-accent-500: #f97316;", "--color-accent-500"],
+    ["a SQL comment", "-- seed the venues", "-- seed the venues"],
+    ["a bare double dash", "-- ", "--"],
+  ])("accepts %s as the anchor", (_label, line, pattern) => {
+    const file = write(tmp(), [line, "untouched", ""].join("\n"));
+    const repl = write(tmp() + ".repl", "REPLACED\n");
+    expect(main(["replace", file, "--match", pattern, "--with-file", repl])).toBe(0);
+    const out = readFileSync(file, "utf8");
+    expect(out).toContain("REPLACED");
+    expect(out).toContain("untouched");
+  });
+
+  it("accepts the --match=<pattern> form", () => {
+    const file = write(tmp(), ["  --color-accent-500: #f97316;", "untouched", ""].join("\n"));
+    const repl = write(tmp() + ".repl", "REPLACED\n");
+    expect(main(["replace", file, "--match=--color-accent-500", "--with-file", repl])).toBe(0);
+    expect(readFileSync(file, "utf8")).toContain("REPLACED");
+  });
+
+  it("a --with-file path starting with -- is still read as the path", () => {
+    const dir = mkdtempSync(join(tmpdir(), "edit-at-dash-"));
+    const file = write(join(dir, "file.txt"), ["  target", ""].join("\n"));
+    const repl = write(join(dir, "--repl.txt"), "REPLACED\n");
+    expect(main(["replace", file, "--match", "target", "--with-file", repl])).toBe(0);
+    expect(readFileSync(file, "utf8")).toContain("REPLACED");
+  });
+
+  it("still reports a genuinely missing value rather than eating the next flag", () => {
+    const file = write(tmp(), ["  target", ""].join("\n"));
+    // --match with nothing after it must fail as "required", not swallow --verbatim.
+    expect(main(["replace", file, "--match"])).toBe(4);
+  });
+});

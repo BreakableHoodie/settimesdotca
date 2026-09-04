@@ -205,14 +205,37 @@ export function deleteLine(source, pattern, { normalizeSpace = false } = {}) {
 
 const OPERATIONS = { replace: replaceLine, "insert-after": insertAfter, "insert-before": insertBefore };
 
+// Flags that take a value ALWAYS consume the next argument, even when it starts
+// with "--". Treating a leading "--" as "this must be another flag" made whole
+// classes of anchor unusable in this repo: `--color-accent-500` is a Tailwind
+// theme token that appears everywhere in CSS, and every SQL comment in
+// migrations/ begins with "--". Both silently became `flags.match = true` and
+// the run died with "--match <pattern> is required" -- a confusing error about
+// a flag that WAS supplied.
+const VALUE_FLAGS = new Set(["match", "with-file"]);
+
 function parseArgs(argv) {
   const [op, file, ...rest] = argv;
   const flags = {};
   for (let i = 0; i < rest.length; i += 1) {
     if (!rest[i].startsWith("--")) continue;
+
+    // `--match=<pattern>` is accepted too, which is the unambiguous spelling
+    // when a value could be mistaken for anything else.
+    const equals = rest[i].indexOf("=");
+    if (equals > 2) {
+      flags[rest[i].slice(2, equals)] = rest[i].slice(equals + 1);
+      continue;
+    }
+
     const key = rest[i].slice(2);
-    const value = rest[i + 1] && !rest[i + 1].startsWith("--") ? rest[(i += 1)] : true;
-    flags[key] = value;
+    if (VALUE_FLAGS.has(key)) {
+      // Missing value stays `true` so the caller's own "is required" check
+      // reports it, rather than silently swallowing the next flag.
+      flags[key] = i + 1 < rest.length ? rest[(i += 1)] : true;
+      continue;
+    }
+    flags[key] = rest[i + 1] && !rest[i + 1].startsWith("--") ? rest[(i += 1)] : true;
   }
   return { op, file, flags };
 }

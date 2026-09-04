@@ -9,17 +9,7 @@ import EventPosterThumbnail from './EventPosterThumbnail'
 import EventSocialLinks from './EventSocialLinks'
 import GhostEasterEgg from './GhostEasterEgg'
 import TimeFilter from './TimeFilter'
-
-function parseVenueInfo(venueInfo) {
-  if (!venueInfo) return []
-
-  try {
-    const parsed = typeof venueInfo === 'string' ? JSON.parse(venueInfo) : venueInfo
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
+import { parseVenueInfo } from '../utils/venueInfo.js'
 
 function formatCurrentTime(value) {
   const date = value instanceof Date ? value : new Date(value)

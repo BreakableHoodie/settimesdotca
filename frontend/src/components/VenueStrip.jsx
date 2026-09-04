@@ -5,11 +5,26 @@ import { memo } from 'react'
 
 // Ordered south→north along King St N, Waterloo.
 // Kept as a constant so the visual ordering is always consistent.
-const KING_ST_VENUES = ['Prohibition Warehouse', 'Princess Cafe', 'Blue Room', 'Room 47', 'Revive Karaoke', 'Roost']
-
-function VenueStrip({ activeVenues = [] }) {
+/**
+ * The walk route for ONE event, drawn from that event's own venues.
+ *
+ * This used to render a hardcoded six-venue King St N list on every event it
+ * appeared on. Vol 18 has FOUR venues, so the strip advertised Room 47 and
+ * Roost -- two venues with no sets on that bill -- to anyone reading it. The
+ * labels happened to be clipped by the header (see Header.jsx), which is the
+ * only reason nobody had walked to the wrong door.
+ *
+ * `venues` is the organiser's declared order from `events.venue_info`, which
+ * for a crawl is the walk order along the street. Do not sort it.
+ */
+function VenueStrip({ venues = [], activeVenues = [] }) {
   const active = new Set(activeVenues)
-  const count = KING_ST_VENUES.length
+  const count = venues.length
+
+  // A route needs at least two stops to be a route. One venue is a location,
+  // and zero is an event whose venues are not announced yet -- neither is worth
+  // a line across the header.
+  if (count < 2) return null
 
   // SVG layout constants
   const W = 600
@@ -21,7 +36,12 @@ function VenueStrip({ activeVenues = [] }) {
   const R_ACTIVE = 8
 
   return (
-    <div className="w-full overflow-x-auto" role="img" aria-label="Venue route along King St N">
+    // The accessible name carries the venues themselves. The inner <svg> is
+    // aria-hidden, so without this a screen-reader user got a street name and
+    // nothing else -- and "along King St N" was hardcoded, so on any event that
+    // is not a King St crawl it was simply wrong, the same defect as the venue
+    // list it labelled.
+    <div className="w-full overflow-x-auto" role="img" aria-label={`Venue route: ${venues.join(', ')}`}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="xMidYMid meet"
@@ -41,9 +61,9 @@ function VenueStrip({ activeVenues = [] }) {
         />
 
         {/* Highlighted segments between consecutive active stops */}
-        {KING_ST_VENUES.map((v, i) => {
+        {venues.map((v, i) => {
           if (i === count - 1) return null
-          const bothActive = active.has(v) && active.has(KING_ST_VENUES[i + 1])
+          const bothActive = active.has(v) && active.has(venues[i + 1])
           if (!bothActive) return null
           return (
             <line
@@ -71,7 +91,7 @@ function VenueStrip({ activeVenues = [] }) {
         </defs>
 
         {/* Stops */}
-        {KING_ST_VENUES.map((venue, i) => {
+        {venues.map((venue, i) => {
           const cx = PAD_X + i * STEP
           const isActive = active.has(venue)
           const r = isActive ? R_ACTIVE : R_STOP
@@ -120,23 +140,9 @@ function VenueStrip({ activeVenues = [] }) {
             </g>
           )
         })}
-
-        {/* "KING ST N →" label */}
-        <text
-          x={W - PAD_X + 6}
-          y={CY + 4}
-          fontSize="8"
-          fontFamily="'SF Mono', monospace"
-          letterSpacing="0.05em"
-          fill="var(--color-text-tertiary)"
-          fillOpacity={0.4}
-        >
-          N
-        </text>
       </svg>
     </div>
   )
 }
 
 export default memo(VenueStrip)
-export { KING_ST_VENUES }

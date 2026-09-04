@@ -191,38 +191,50 @@ plus `sanitizeBandSocialLinks`; do not introduce a third list here.
 The owner's original discovery idea included "recent bandcamp releases". Two
 routes were evaluated and only one survives contact.
 
-**The official Bandcamp API cannot do this.** It offers three APIs -- Account,
-Sales Report, Merch Orders -- all restricted to account holders reading their
-OWN data, gated behind OAuth with per-user credentials and an eligibility check
-("labels and merchandise fulfillment partners"). Covering 183 artists would mean
-183 separate artists each granting us OAuth. Not a feature; a campaign.
+#### RESOLVED: Bandcamp prohibits this, so piece 6 cannot scrape
 
-**Asking artists to tell us is not a plan either.** It sounds tidy and it is how
-piece 4 works for corrections, but release announcements depend on 183 people
-choosing to do admin. The owner's read is that uptake would be near zero, and
-that matches how the roster's data has actually been gathered to date: by us, not
-by submissions. Piece 4 stays valuable for corrections. It must not be the thing
-release data depends on.
+Verified 2026-09-04 by reading the Acceptable Use and Content Moderation Policy
+directly (`get.bandcamp.help/articles/15263124-...`, HTTP 200), which the Terms
+of Use incorporate by reference. Verbatim:
 
-**So: scrape, deliberately and carefully.** `bandcamp-fetch` (MIT, actively
-maintained) reads artist discographies. The objection this spec originally
-raised -- that scraping breaches Bandcamp's terms -- was checked and does not
-hold: their Terms of Use contain no clause about crawlers, scraping or data
-mining, and `robots.txt` disallows `/api/`, `/search`, `/stream` and `/cart`
-while permitting artist and album pages. The library also ships Bottleneck rate
-limiting and caching.
+> "**Not to scrape** any text, media, or other data or content from the site,
+> including through the use of scripts, robots, bots, spiders, scrapers,
+> crawlers, or other automated means;
+>
+> Not to undertake **any form of text and/or data mining** of content, including
+> where collected through the use of robots or other automated data gathering
+> and/or extraction tools;"
 
-**Before adopting it, resolve the licence.** `package.json` declares
-`"license": "MIT"`, but the repository has **no LICENSE file** (404), so
-GitHub's API reports the licence as `None`. A declared field without the file is
-weaker than it looks. Confirm before depending on it, and consider opening a
-friendly issue asking the author to add one -- it costs nothing and helps
-everyone downstream.
+There is no ambiguity to work with. It names scrapers and crawlers explicitly,
+and "any text, other data or content" covers a release title and date -- so the
+earlier distinction in this spec between "facts" and "Content" does not survive
+either.
 
-**And if this ships and works, tip the author.** Patrick Kan takes Ko-fi at
-`ko-fi.com/patrickkfkan`. A solo maintainer keeping a scraper current against a
-site that keeps moving is doing the work that makes this piece possible at all,
-and settimes.ca now runs on the same model.
+**How this spec got it wrong, recorded so the mistake is not repeated.** An
+earlier revision read the Terms of Use, found no scraping clause, noted that
+`robots.txt` permits artist pages, and concluded scraping was acceptable. Both
+observations were true. The conclusion was wrong for two reasons: the Terms
+incorporate other documents _in their own text_, so reading one was reading part
+of the contract; and `robots.txt` is a crawling convention, not a grant of
+permission, and never overrides a contract. A reviewer raised this twice before
+it was checked properly.
+
+`bandcamp-fetch` is a good library and this is no reflection on it. We simply
+may not point it at Bandcamp.
+
+**Remaining options for release data, both worse than the original idea:**
+
+- **Ask the artists.** Licensed by definition, and pairs with piece 4. The owner
+  expects low uptake and is probably right.
+- **Spotify Web API** for the 105 artists (46%) who have a Spotify link. Licensed,
+  documented, returns `release_date`. Costs: attribution and a link back to
+  Spotify are required wherever their data appears, and the rail would silently
+  cover under half the roster -- so artists missing from it would read as
+  inactive rather than unlisted, which is the opposite of this spec's goal.
+
+Neither is adopted here. Pieces 1-5 stand on their own and involve no third
+party.
+
 #### Constraints, all load-bearing
 
 **It cannot run in `functions/`.** It depends on `cheerio` and `node-fetch`;
@@ -267,6 +279,7 @@ Store the announced dates as configuration the owner can set, and render the
 banner only when today matches one. An empty or stale list renders nothing,
 which is the correct failure: a missing banner costs nothing, while a banner on
 the wrong day tells every artist we are not paying attention.
+
 #### Sequencing
 
 Ship pieces 1-5 first. They need no migration, no third-party dependency and no

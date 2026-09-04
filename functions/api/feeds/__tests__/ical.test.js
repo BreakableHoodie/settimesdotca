@@ -652,3 +652,85 @@ describe("GET /api/feeds/ical — an unscheduled set is not a calendar entry (#1
     expect(icalData).not.toContain("DTEND:20990506T210000");
   });
 });
+
+describe("GET /api/feeds/ical — the calendar names itself (#1096)", () => {
+  // X-WR-CALNAME is the name the calendar takes in the subscriber's sidebar,
+  // in Apple Calendar, Google Calendar and Outlook alike. It persists for as
+  // long as they stay subscribed and is the only branding a subscription
+  // carries. Before this it read `all all Shows` on the unfiltered feed --
+  // "all" being this endpoint's sentinel for "no filter", leaking into a label
+  // a human reads. The download was `all-all.ics` for the same reason.
+  const seedPublished = (rawDb) => {
+    const event = insertEvent(rawDb, {
+      name: "Naming Fest",
+      slug: "naming-fest",
+      date: "2099-07-04",
+      city: "Kitchener",
+    });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    insertBand(rawDb, {
+      name: "Namer",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+      genre: "Punk",
+    });
+    return event;
+  };
+
+  const fetchFeed = async (env, qs = "") => {
+    const res = await onRequestGet({ request: new Request(`https://example.test/api/feeds/ical${qs}`), env });
+    expect(res.status).toBe(200);
+    return { text: await res.text(), disposition: res.headers.get("Content-Disposition") };
+  };
+
+  test("the unfiltered feed carries the brand, never the word 'all'", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seedPublished(rawDb);
+
+    const { text, disposition } = await fetchFeed(env);
+
+    expect(text).toContain("X-WR-CALNAME:settimes.ca");
+    // The specific regression, asserted by its own shape rather than only by
+    // the happy value: a sentinel must not reach the label.
+    expect(text).not.toContain("all all");
+    expect(text).not.toMatch(/X-WR-CALNAME:.*\ball\b/);
+    expect(disposition).toContain('filename="settimes.ics"');
+  });
+
+  test("a city filter names the calendar after the city", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seedPublished(rawDb);
+
+    const { text, disposition } = await fetchFeed(env, "?city=Kitchener");
+
+    expect(text).toContain("X-WR-CALNAME:Kitchener Shows");
+    expect(disposition).toContain('filename="kitchener.ics"');
+  });
+
+  test("a genre filter names the calendar after the genre", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seedPublished(rawDb);
+
+    const { text, disposition } = await fetchFeed(env, "?genre=Punk");
+
+    expect(text).toContain("X-WR-CALNAME:Punk Shows");
+    expect(disposition).toContain('filename="punk.ics"');
+  });
+
+  test("both filters combine, in city-then-genre order", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seedPublished(rawDb);
+
+    const { text, disposition } = await fetchFeed(env, "?city=Kitchener&genre=Punk");
+
+    expect(text).toContain("X-WR-CALNAME:Kitchener Punk Shows");
+    expect(disposition).toContain('filename="kitchener-punk.ics"');
+  });
+});

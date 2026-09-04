@@ -84,6 +84,28 @@ describe("GET /api/events/timeline — card carries age restriction and presente
     expect(card.presented_by).toBeNull();
   });
 
+  it("carries them on a LIVE event, the third SELECT block", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const today = eventLocalToday();
+    const event = seedEvent(rawDb, { slug: "live-door-policy", date: today });
+    // Doors at 00:00 puts the day-one "started" edge behind us whatever the
+    // wall clock says, so this lands in `now` deterministically rather than
+    // depending on what time the suite runs. Day one's edge is
+    // doors -> first set -> local midnight, earliest wins (CLAUDE.md,
+    // "events.doors_json + the 'started' start edge").
+    rawDb
+      .prepare("UPDATE events SET age_restriction = ?, presented_by = ?, doors_json = ? WHERE id = ?")
+      .run("19+", "Live Promoter", JSON.stringify({ [today]: "00:00" }), event.id);
+
+    const body = await getTimeline(env);
+    const card = (body.now || []).find((e) => e.slug === "live-door-policy");
+
+    expect(card).toBeDefined();
+    expect(card.age_restriction).toBe("19+");
+    expect(card.presented_by).toBe("Live Promoter");
+  });
+
   it("carries them on a PAST event too, not just upcoming", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";

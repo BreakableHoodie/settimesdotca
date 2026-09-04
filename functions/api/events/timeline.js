@@ -168,6 +168,15 @@ export async function onRequestGet(context) {
             end_date: row.event_end_date || null,
             status: row.event_status || null,
             ticket_url: normalizeHttpUrl(row.ticket_url),
+            // Door policy and promoter credit, on the CARD and not only on the
+            // event page (#1065 shipped these to /api/schedule and the event
+            // page but never here). "19+" is the single most consequential
+            // thing a fan can learn before leaving the house, and the presenter
+            // is the promoter's credit -- both were invisible on the surface
+            // most people actually browse. Functionally dependent on event_id,
+            // like the two above, so any row carries the same value.
+            age_restriction: row.age_restriction || null,
+            presented_by: row.presented_by || null,
             // Read-path sanitize (#658, matches the ticket_url precedent
             // above): a pre-#616 legacy poster_url (e.g. a javascript:
             // scheme) must never be reflected to this public, unauthenticated
@@ -268,6 +277,8 @@ export async function onRequestGet(context) {
         status: event.status,
         ticket_url: normalizeHttpUrl(event.ticket_url),
         poster_url: normalizeHttpUrl(event.poster_url),
+        age_restriction: event.age_restriction,
+        presented_by: event.presented_by,
         band_count: event.bandIds.size,
         venue_count: event.venues.size,
         bands: includeBands ? event.bands : undefined,
@@ -313,6 +324,8 @@ export async function onRequestGet(context) {
           e.end_date as event_end_date,
           e.doors_json as doors_json,
           e.ticket_url as ticket_url,
+          e.age_restriction as age_restriction,
+          e.presented_by as presented_by,
           e.poster_url as poster_url,
           p.band_profile_id as band_id,
           b.name as band_name,
@@ -372,6 +385,8 @@ export async function onRequestGet(context) {
           e.date as event_date,
           e.end_date as event_end_date,
           e.ticket_url as ticket_url,
+          e.age_restriction as age_restriction,
+          e.presented_by as presented_by,
           e.poster_url as poster_url,
           p.band_profile_id as band_id,
           b.name as band_name,
@@ -433,6 +448,8 @@ export async function onRequestGet(context) {
           e.end_date as event_end_date,
           e.status as event_status,
           e.ticket_url as ticket_url,
+          e.age_restriction as age_restriction,
+          e.presented_by as presented_by,
           e.poster_url as poster_url,
           p.band_profile_id as band_id,
           b.name as band_name,

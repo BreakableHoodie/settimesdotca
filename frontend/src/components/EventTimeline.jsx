@@ -867,10 +867,28 @@ function EventCard({
               )}
             </div>
 
-            <p className="text-text-secondary text-sm mb-4 flex items-center gap-2">
+            <p className="text-text-secondary text-sm mb-2 flex flex-wrap items-center gap-2">
               <CalendarDays size={12} />
               {formatDate(event.date)}
+              {/* Door policy on the CARD, not only the event page (#1065
+                  shipped it to /api/schedule and the event page, but the
+                  timeline projected neither column -- so the surface most
+                  people browse showed neither). It sits on the date line and
+                  carries a border because it is the one fact that decides
+                  whether a fan can attend at all; learning "19+" after
+                  arriving is the failure this prevents. */}
+              {event.age_restriction && (
+                <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-text-primary">
+                  {event.age_restriction}
+                </span>
+              )}
             </p>
+
+            {/* The promoter's credit, deliberately quieter than the age
+                restriction: it is attribution rather than something a fan has
+                to act on. */}
+            {event.presented_by && <p className="text-text-tertiary text-xs mb-4">Presented by {event.presented_by}</p>}
+            {!event.presented_by && <div className="mb-4" />}
 
             {/* Event Stats */}
             <div className="flex flex-wrap gap-6 text-sm">

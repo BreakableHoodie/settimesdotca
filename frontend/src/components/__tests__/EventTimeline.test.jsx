@@ -558,6 +558,77 @@ describe('EventTimeline collapsed performer chips ordering', () => {
 // lightbox — that lives on the event page, #656) and must render nothing
 // when poster_url is absent, which is still the common case for events that
 // haven't had a poster uploaded yet.
+// The card is the surface most people browse, and until #1065's fields were
+// projected into /api/events/timeline it showed neither -- while the event page
+// showed both. "19+" is the one fact that decides whether a fan can attend at
+// all; learning it on arrival is the failure this prevents.
+describe('EventTimeline card door policy and presenter (#1065)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  const cardEvent = extra => ({
+    id: 1,
+    name: 'Door Policy Fest',
+    slug: 'door-policy-fest',
+    date: '2026-10-11',
+    status: 'published',
+    venues: [],
+    bands: [],
+    band_count: 0,
+    venue_count: 0,
+    ticket_url: null,
+    poster_url: null,
+    ...extra,
+  })
+
+  const mountWith = extra => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (String(url).startsWith('/api/events/timeline')) {
+          return Promise.resolve(jsonResponse({ now: [], upcoming: [cardEvent(extra)], past: [] }))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+    return render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+  }
+
+  it('shows the age restriction on the card', async () => {
+    mountWith({ age_restriction: '19+', presented_by: null })
+    expect(await screen.findByText('Door Policy Fest')).toBeInTheDocument()
+    expect(screen.getByText('19+')).toBeInTheDocument()
+  })
+
+  it('shows the presenter credit on the card', async () => {
+    mountWith({ age_restriction: null, presented_by: 'Fat Scheid & Pink Lemonade Records' })
+    expect(await screen.findByText('Door Policy Fest')).toBeInTheDocument()
+    expect(screen.getByText('Presented by Fat Scheid & Pink Lemonade Records')).toBeInTheDocument()
+  })
+
+  it('renders neither when the event carries neither', async () => {
+    mountWith({ age_restriction: null, presented_by: null })
+    expect(await screen.findByText('Door Policy Fest')).toBeInTheDocument()
+    expect(screen.queryByText('19+')).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Presented by/)).not.toBeInTheDocument()
+  })
+
+  // An "All Ages" event must say so rather than falling back to a hardcoded
+  // "19+" -- the value is the event's, not a constant.
+  it('renders whatever the event actually declares', async () => {
+    mountWith({ age_restriction: 'All Ages', presented_by: null })
+    expect(await screen.findByText('Door Policy Fest')).toBeInTheDocument()
+    expect(screen.getByText('All Ages')).toBeInTheDocument()
+    expect(screen.queryByText('19+')).not.toBeInTheDocument()
+  })
+})
+
 describe('EventTimeline poster thumbnails (#658)', () => {
   afterEach(() => {
     // restoreAllMocks does NOT undo a direct assignment to global.fetch --

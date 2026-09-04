@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   EditError,
   deleteLine,
   findLine,
   insertAfter,
   insertBefore,
+  main,
   reindent,
   replaceLine,
   toPredicate,
@@ -183,5 +187,109 @@ describe("edit-at: line endings and regex state", () => {
   it("finds every occurrence, so a repeated anchor is reported as ambiguous", () => {
     const repeated = ["  target", "  target", "  target", ""].join("\n");
     expect(() => replaceLine(repeated, "target", "x")).toThrow(/matched 3 lines/);
+  });
+});
+
+describe("edit-at: an empty anchor is refused, never treated as 'everything'", () => {
+  // `"".includes("")` is true, so an empty pattern matches EVERY line. On a
+  // multi-line file that surfaces as an ambiguity error, which is safe. On a
+  // SINGLE-line file it is exactly one match -- and the tool would replace the
+  // whole file. A file editor must not have a spelling of "no anchor" that
+  // quietly means "all of it".
+  it("refuses an empty pattern on a one-line file rather than replacing it", () => {
+    const oneLine = "the entire file";
+    expect(() => replaceLine(oneLine, "", "REPLACED")).toThrow(/pattern is empty/);
+    expect(() => replaceLine(oneLine, "", "REPLACED")).toThrow(/Nothing was written/);
+  });
+
+  it("refuses a whitespace-only pattern once normalizeSpace collapses it", () => {
+    const oneLine = "the entire file";
+    expect(() => replaceLine(oneLine, "   ", "REPLACED", { normalizeSpace: true })).toThrow(/pattern is empty/);
+    expect(() => replaceLine(oneLine, "\t\t", "REPLACED", { normalizeSpace: true })).toThrow(/pattern is empty/);
+  });
+
+  it("refuses an empty pattern for every operation, not just replace", () => {
+    const oneLine = "the entire file";
+    expect(() => insertAfter(oneLine, "", "x")).toThrow(/pattern is empty/);
+    expect(() => insertBefore(oneLine, "", "x")).toThrow(/pattern is empty/);
+    expect(() => deleteLine(oneLine, "")).toThrow(/pattern is empty/);
+  });
+
+  it("still accepts a pattern that is only whitespace WITHOUT normalizeSpace", () => {
+    // Two spaces is a legitimate literal anchor when spacing is significant.
+    const src = ["a  b", "cd", ""].join("\n");
+    expect(replaceLine(src, "  ", "replaced")).toContain("replaced");
+  });
+});
+
+describe("edit-at: the CLI itself", () => {
+  // The in-memory helpers above are the logic; `main` is argument parsing,
+  // replacement-file loading, the write, and the exit code. All four can
+  // regress without any of the tests above noticing.
+  const tmp = () => join(mkdtempSync(join(tmpdir(), "edit-at-")), "file.txt");
+
+  const write = (path, text) => {
+    writeFileSync(path, text);
+    return path;
+  };
+
+  it("applies a replacement read from a file and exits 0", () => {
+    const file = write(tmp(), ["alpha", "  target", "omega", ""].join("\n"));
+    const repl = write(tmp() + ".repl", "replaced\n");
+    expect(main(["replace", file, "--match", "target", "--with-file", repl])).toBe(0);
+    expect(readFileSync(file, "utf8")).toContain("  replaced");
+  });
+
+  it("inserts $-laden text literally, which is the whole reason for --with-file", () => {
+    const file = write(tmp(), ["alpha", "  target", ""].join("\n"));
+    const repl = write(tmp() + ".repl", "const re = /^\\d{2}$/ // $& $$ $1\n");
+    expect(main(["replace", file, "--match", "target", "--with-file", repl])).toBe(0);
+    expect(readFileSync(file, "utf8")).toContain("const re = /^\\d{2}$/ // $& $$ $1");
+  });
+
+  it("exits 1 and writes nothing when the anchor matches no line", () => {
+    const original = ["alpha", "omega", ""].join("\n");
+    const file = write(tmp(), original);
+    const repl = write(tmp() + ".repl", "replaced\n");
+    expect(main(["replace", file, "--match", "absent", "--with-file", repl])).toBe(1);
+    expect(readFileSync(file, "utf8")).toBe(original);
+  });
+
+  it("exits 1 and writes nothing when the anchor is ambiguous", () => {
+    const original = ["  target", "  target", ""].join("\n");
+    const file = write(tmp(), original);
+    const repl = write(tmp() + ".repl", "replaced\n");
+    expect(main(["replace", file, "--match", "target", "--with-file", repl])).toBe(1);
+    expect(readFileSync(file, "utf8")).toBe(original);
+  });
+
+  it("exits 4 on a usage error rather than pretending to work", () => {
+    const file = write(tmp(), "alpha\n");
+    expect(main(["replace", file, "--match", "alpha"])).toBe(4); // no --with-file
+    expect(main(["frobnicate", file, "--match", "alpha"])).toBe(4); // unknown op
+  });
+
+  it("supports delete, insert-after and insert-before from the CLI", () => {
+    const base = ["alpha", "  target", "omega", ""].join("\n");
+    const repl = write(tmp() + ".repl", "added\n");
+
+    const afterFile = write(tmp(), base);
+    expect(main(["insert-after", afterFile, "--match", "target", "--with-file", repl])).toBe(0);
+    expect(readFileSync(afterFile, "utf8").split("\n")[2]).toBe("  added");
+
+    const beforeFile = write(tmp(), base);
+    expect(main(["insert-before", beforeFile, "--match", "target", "--with-file", repl])).toBe(0);
+    expect(readFileSync(beforeFile, "utf8").split("\n")[1]).toBe("  added");
+
+    const deleteFile = write(tmp(), base);
+    expect(main(["delete", deleteFile, "--match", "target"])).toBe(0);
+    expect(readFileSync(deleteFile, "utf8")).not.toContain("target");
+  });
+
+  it("--verbatim skips the re-indent", () => {
+    const file = write(tmp(), ["alpha", "  target", ""].join("\n"));
+    const repl = write(tmp() + ".repl", "flush\n");
+    expect(main(["replace", file, "--match", "target", "--with-file", repl, "--verbatim"])).toBe(0);
+    expect(readFileSync(file, "utf8").split("\n")).toContain("flush");
   });
 });

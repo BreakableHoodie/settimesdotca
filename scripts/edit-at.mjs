@@ -54,9 +54,23 @@ const collapseSpace = (text) => text.trim().replace(/\s+/g, " ");
  * with a longer substring.
  */
 export function toPredicate(pattern, { normalizeSpace = false } = {}) {
+  // An empty pattern matches EVERY line, because `"".includes("")` is true.
+  // On a multi-line file that surfaces as an ambiguity error, which is safe --
+  // but on a SINGLE-line file it is exactly one match, and the tool would
+  // cheerfully replace the entire file. A file editor must not have a spelling
+  // of "no anchor" that means "all of it".
+  //
+  // Checked after collapsing too: with --normalize-space, a whitespace-only
+  // pattern reduces to "" and is the same hazard wearing a disguise.
+  const effective = normalizeSpace ? collapseSpace(pattern) : pattern;
+  if (effective === "") {
+    throw new EditError(
+      "The pattern is empty, which would match every line.\nGive an anchor with actual content.\nNothing was written.",
+    );
+  }
+
   if (!normalizeSpace) return (line) => line.includes(pattern);
-  const wanted = collapseSpace(pattern);
-  return (line) => collapseSpace(line).includes(wanted);
+  return (line) => collapseSpace(line).includes(effective);
 }
 
 /**
@@ -116,6 +130,18 @@ function applyToSource(source, mutate) {
   return result;
 }
 
+/**
+ * Replace the single line matching `pattern` with `replacement`.
+ *
+ * @param {string} source - file contents; CRLF is detected and preserved.
+ * @param {string} pattern - substring anchor; must match exactly one line.
+ * @param {string} replacement - one or more lines, spliced in, never interpreted.
+ * @param {object} [options]
+ * @param {boolean} [options.verbatim=false] - insert as-is instead of re-indenting to the anchor's indent.
+ * @param {boolean} [options.normalizeSpace=false] - collapse whitespace on both sides before comparing.
+ * @returns {string} the new contents.
+ * @throws {EditError} on zero or multiple matches, an empty pattern, or a no-op edit.
+ */
 export function replaceLine(source, pattern, replacement, { verbatim = false, normalizeSpace = false } = {}) {
   return applyToSource(source, (lines) => {
     const { index, indent } = findLine(lines, toPredicate(pattern, { normalizeSpace }), { label: `replace pattern` });
@@ -125,6 +151,12 @@ export function replaceLine(source, pattern, replacement, { verbatim = false, no
   });
 }
 
+/**
+ * Insert `addition` on the line after the single line matching `pattern`.
+ *
+ * Same parameters, defaults and failure modes as {@link replaceLine}.
+ * @returns {string} the new contents.
+ */
 export function insertAfter(source, pattern, addition, { verbatim = false, normalizeSpace = false } = {}) {
   return applyToSource(source, (lines) => {
     const { index, indent } = findLine(lines, toPredicate(pattern, { normalizeSpace }), {
@@ -136,6 +168,12 @@ export function insertAfter(source, pattern, addition, { verbatim = false, norma
   });
 }
 
+/**
+ * Insert `addition` on the line before the single line matching `pattern`.
+ *
+ * Same parameters, defaults and failure modes as {@link replaceLine}.
+ * @returns {string} the new contents.
+ */
 export function insertBefore(source, pattern, addition, { verbatim = false, normalizeSpace = false } = {}) {
   return applyToSource(source, (lines) => {
     const { index, indent } = findLine(lines, toPredicate(pattern, { normalizeSpace }), {
@@ -147,6 +185,16 @@ export function insertBefore(source, pattern, addition, { verbatim = false, norm
   });
 }
 
+/**
+ * Delete the single line matching `pattern`.
+ *
+ * @param {string} source - file contents.
+ * @param {string} pattern - substring anchor; must match exactly one line.
+ * @param {object} [options]
+ * @param {boolean} [options.normalizeSpace=false] - collapse whitespace on both sides before comparing.
+ * @returns {string} the new contents.
+ * @throws {EditError} on zero or multiple matches, an empty pattern, or a no-op edit.
+ */
 export function deleteLine(source, pattern, { normalizeSpace = false } = {}) {
   return applyToSource(source, (lines) => {
     const { index } = findLine(lines, toPredicate(pattern, { normalizeSpace }), { label: `delete pattern` });

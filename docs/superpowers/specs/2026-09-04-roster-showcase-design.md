@@ -117,9 +117,65 @@ raises the stakes on the data being right, and the gaps that matter most -- a
 missing genre, a wrong city, a dead link -- are the ones only the artist can
 close.
 
+### 5. Show what an artist is ON, and let a fan slice by it
+
+The roster prints genre, city and show count. It prints **nothing** about where
+you can hear or follow an artist -- you have to open each profile to find out.
+That is why this is not the facet rail: it reveals something the page has never
+said.
+
+Coverage across all eight link fields, measured 2026-09-04:
+
+| field       | artists |     |
+| ----------- | ------- | --- |
+| bandcamp    | 183     | 81% |
+| instagram   | 155     | 68% |
+| facebook    | 142     | 63% |
+| website     | 138     | 61% |
+| apple_music | 107     | 47% |
+| spotify     | 105     | 46% |
+| linktree    | 97      | 43% |
+| youtube     | 93      | 41% |
+
+**Nothing here is rare**, so no single platform is a strong _narrowing_ tool --
+the range is 41% to 81%. The value is the other direction: a fan who lives in
+one platform can see their half of the roster, and everyone else can finally
+tell from the list whether there is anything to listen to.
+
+So both halves ship together, and the first matters more:
+
+- **On the row:** the artist's links, as the compact icon set the admin roster
+  already uses. This is the piece that closes the gap.
+- **Above the list:** a toggle per platform, each showing its count, so picking
+  one is an informed choice rather than a guess. Multi-select, AND-combined.
+
+#### The constraint that decides correctness
+
+**Presence must be resolved, never inferred from the stored value.** A link is
+present only if it resolves to a real href -- `resolveHref(value) !== '#'` --
+because `safeSocialProfileHref` rejects any handle containing whitespace or a
+colon, so a value can be non-empty in D1 and render nothing.
+
+Counting `social_links LIKE '%"bandcamp"%'` would therefore claim an artist "has
+Bandcamp" while their row shows no icon. That is exactly the bug #712 fixed, and
+CLAUDE.md names it: anything asking "does this artist have Instagram?" goes
+through `hasField()` / `hasAnyLink()` / `countLinks()` in
+`frontend/src/admin/utils/bandFields.js`, never at `social_links` directly.
+
+**The counts in the table above are key-presence counts and are therefore an
+upper bound.** The real numbers must be computed through the resolver, and the
+implementation must not reuse those figures.
+
+The server-side companion is `BAND_LINK_FIELD_KEYS` in
+`functions/utils/bandLinkFields.js`. Adding a ninth platform means both homes
+plus `sanitizeBandSocialLinks`; do not introduce a third list here.
+
 ## Explicitly out of scope
 
-- **A facet rail.** That is this spec's founding lesson.
+- **A facet rail over genre, city or show count.** That is this spec's founding
+  lesson: the page already prints all three on every row. Note the contrast with
+  piece 5 -- filtering by link presence is fine precisely because the row has
+  never shown it.
 - **Taste-based recommendations.** "Shared a bill" is a fact; a similarity score
   is a guess, and a wrong guess about an artist's music is worse than none.
 - **AI-written bios.** Standing rule: structured facts are ours to research;
@@ -139,6 +195,9 @@ browse data, not show-critical):
   origin_city, and the best listen link.
 - `GET /api/artists/one-of-one` — genres with exactly one artist.
 - `GET /api/bands/:name/stage-mates` — co-performers, most-shared first.
+- The artists list gains resolved link presence per row. Whether that is a new
+  field on the existing `/api/artists` response or a separate call is the
+  implementer's choice; it must be RESOLVED presence, not raw `social_links`.
 
 Every one reads columns that exist. **No migration.**
 
@@ -146,6 +205,8 @@ Every one reads columns that exist. **No migration.**
 
 - `ArtistsPage` gains a showcase block above the existing search, which is
   untouched -- it answers "is X playing?" and is the right tool for that.
+- Each roster row gains the compact link icons the admin roster already renders,
+  and the list gains per-platform toggles with counts.
 - `BandProfilePage` gains "Shared a bill with" and the contact line.
 
 ## Open questions for the owner

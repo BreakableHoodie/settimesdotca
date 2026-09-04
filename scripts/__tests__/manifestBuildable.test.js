@@ -49,6 +49,35 @@ describe("every workspace is installable from its own manifest", () => {
     expect(manifests).toContain("workers-mcp-server/package.json");
   });
 
+  // npm reads project config from the CURRENT directory and does NOT walk up to
+  // a parent, so a root .npmrc protects only the root. When min-release-age was
+  // first added it went into the two .npmrc files that already existed, leaving
+  // workers-mcp-server -- the workspace holding a DEPLOYED Worker with production
+  // DB credentials -- resolving new versions with no cooldown at all.
+  //
+  // The Semgrep rule that prompted the setting could not have caught this: it
+  // flags an .npmrc whose value is missing or too low, and that directory had no
+  // .npmrc to flag. A rule reports on files that exist; absence is invisible to
+  // it. Hence a test that iterates WORKSPACES rather than config files.
+  it.each(manifests)("%s sets a package-adoption cooldown", (relative) => {
+    const manifest = JSON.parse(readFileSync(join(repoRoot, relative), "utf8"));
+    const declared = {
+      ...(manifest.dependencies ?? {}),
+      ...(manifest.devDependencies ?? {}),
+    };
+    if (Object.keys(declared).length === 0) return;
+
+    const npmrcPath = join(dirname(join(repoRoot, relative)), ".npmrc");
+    expect(
+      existsSync(npmrcPath),
+      `${relative} installs packages but has no .npmrc — npm does not inherit the root one`,
+    ).toBe(true);
+
+    const match = readFileSync(npmrcPath, "utf8").match(/^\s*min-release-age\s*=\s*(\d+)/m);
+    expect(match, `${npmrcPath} does not set min-release-age`).not.toBeNull();
+    expect(Number(match[1]), `${npmrcPath}: min-release-age must be at least 7 days`).toBeGreaterThanOrEqual(7);
+  });
+
   it.each(manifests)("%s has a lockfile and the lockfile satisfies it", (relative) => {
     const manifestPath = join(repoRoot, relative);
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));

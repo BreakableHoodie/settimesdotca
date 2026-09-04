@@ -1,0 +1,135 @@
+# Semgrep SAST, reported through GitHub code scanning.
+#
+# WHY THIS EXISTS ALONGSIDE THE SEMGREP GITHUB APP: the App scans every PR and
+# writes to semgrep.dev, but the org's rules sit in the Rule Board's *Audit*
+# column -- which records to the dashboard and posts nothing. The result was a
+# green `semgrep-cloud-platform/scan` check with 0 annotations, 48 findings
+# nobody had seen, and no comment from the bot in the repo's entire history.
+#
+# Moving those rules to "Comment" is a dashboard setting: not in git, not
+# reviewable in a PR, and silently reversible by anyone with account access.
+# This workflow puts the reporting decision in the repository instead. Findings
+# land as GitHub code-scanning alerts and inline PR annotations -- the same path
+# codeql.yml already uses here, so the mechanism is proven in this repo.
+#
+# Free because the repository is public. Private repos need GitHub Advanced
+# Security for code-scanning uploads.
+name: Semgrep
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  schedule:
+    # Weekly, so a newly published rule finds existing code rather than waiting
+    # for someone to touch the file it matches.
+    - cron: "0 7 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # Keyed on THIS FILE's hash, because this file is where the Semgrep
+      # version is pinned -- so bumping the version invalidates the cache by
+      # construction, with no separate requirements file to drift out of step.
+      - name: Cache pip
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-semgrep-${{ hashFiles('.github/workflows/semgrep.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-semgrep-
+
+      # Pinned exactly. An unpinned scanner changes findings between runs for
+      # reasons unrelated to the diff, which is how a gate loses its meaning.
+      - name: Install Semgrep
+        run: pip install semgrep==1.176.0
+
+      # The token is what makes this worth running. Measured 2026-09-04 on this
+      # repo: WITHOUT it, `semgrep scan` uses the OSS ruleset and found 2
+      # results, both false positives. WITH it, `semgrep ci` reports as
+      # "Semgrep PRO" and found 24 -- and every rule that has produced a real
+      # finding here (npm-missing-minimum-release-age, dependabot-missing-cooldown,
+      # missing-integrity, insecure-object-assign) is registry-only and absent
+      # from the OSS set. An OSS-only run would be strictly worse than the
+      # GitHub App this is meant to replace.
+      #
+      # So if the secret is missing the job SKIPS loudly rather than scanning
+      # with a weaker ruleset and reporting all-clear. A gate that quietly
+      # downgrades itself is the failure mode this repo keeps finding.
+      - name: Check for Semgrep token
+        id: token
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          if [ -z "$SEMGREP_APP_TOKEN" ]; then
+            echo "::warning::SEMGREP_APP_TOKEN is not set. Skipping — an OSS-only scan would report all-clear while missing every rule that has found a real issue here."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # semgrep exits 1 when it finds something, and the SARIF upload below is
+      # the point of the run, so a finding must not fail this step. Gating
+      # happens in GitHub's code-scanning UI, where an alert can be triaged and
+      # dismissed with a recorded reason. The exit code is still inspected:
+      # "found issues" (1) and "could not run" (>1) must never look alike.
+      - name: Run Semgrep
+        if: steps.token.outputs.present == 'true'
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          rc=0
+          semgrep ci --sarif --sarif-output=semgrep.sarif || rc=$?
+          echo "semgrep exit: $rc"
+          if [ "$rc" -gt 1 ]; then
+            echo "::error::Semgrep failed to RUN (exit $rc) — this is not 'found issues'."
+            exit "$rc"
+          fi
+          test -s semgrep.sarif || { echo "::error::Semgrep exited $rc but produced no SARIF."; exit 1; }
+
+      - name: Upload SARIF to code scanning
+        # NO always(). A crashed scan (exit > 1) can still have written a
+        # PARTIAL semgrep.sarif, and a SARIF upload REPLACES the alert set for
+        # its category -- so publishing that partial file would silently resolve
+        # every alert it happened not to contain. `always()` bypasses the
+        # implicit success() check and would do exactly that.
+        #
+        # The default success() is what we want, because the step above already
+        # distinguishes the two cases: exit 1 (findings) does NOT fail it, exit
+        # > 1 (crash) and an empty SARIF both DO. So "step succeeded" means
+        # "scan completed", which is precisely the condition for uploading.
+        #
+        # The hashFiles guard is still needed: when the token is absent the scan
+        # step is SKIPPED, and a skipped step leaves success() true.
+        if: steps.token.outputs.present == 'true' && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

@@ -107,6 +107,45 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 - E2E spec files are under the same prettier/eslint scope as `functions/`/`scripts/` (#622) —
   double quotes/semis, `eslint.config.js`'s `e2e/**` block covers Playwright + browser globals.
 
+## Scripted source edits — use `scripts/edit-at.mjs`
+
+Editing a file from a shell heredoc has two failure modes that are avoidable by
+construction, not by care (#1069). Both cost real time in one session, and two
+of them produced FALSE EVIDENCE rather than a visible error.
+
+- **Anchor drift on whitespace.** A `find` string written with guessed
+  indentation matches nothing. `String.prototype.replace` then does nothing and
+  returns the original silently. Twice that produced a *mutation that never
+  applied* — and the green test run afterwards read as proof the code was
+  guarded. That is worse than a wasted minute; it is a fabricated result.
+- **`$` in a replacement.** `$&` expands to the whole match and `$$` to a
+  literal `$`. A regex written `\d` arrived as `\\d`; a Makefile recipe written
+  `exit $$status` was stored `exit $status`, so make expanded `$s`.
+
+```bash
+node scripts/edit-at.mjs replace       <file> --match <pattern> --with-file <path>
+node scripts/edit-at.mjs insert-after  <file> --match <pattern> --with-file <path>
+node scripts/edit-at.mjs insert-before <file> --match <pattern> --with-file <path>
+node scripts/edit-at.mjs delete        <file> --match <pattern>
+```
+
+`<pattern>` is a substring, or `/regex/flags`. The replacement comes from a
+**file**, never argv — so shell quoting and `$` never touch it, and it is
+spliced in as lines rather than interpreted.
+
+Indentation is **read from the matched line**, not guessed; the replacement can
+be written flush-left. `--verbatim` opts out.
+
+It exits non-zero when the pattern matches **zero or many** lines, or when the
+edit would leave the file byte-identical — so a no-op cannot masquerade as a
+successful edit. A multi-match error lists the candidates.
+
+**Check the exit code without a pipe.** `edit-at ... | head` returns *head's*
+status by default, so a failed edit reports success — the same trap as
+`lint | tail` (#609) and part of why `make gate` exists. `set -o pipefail`
+preserves it, but these commands are usually typed ad hoc in a shell that has
+no such setting, so the reliable habit is not to pipe them at all.
+
 ## Writing a delegation brief
 
 A delegated run has no memory of the conversation that produced it. It gets

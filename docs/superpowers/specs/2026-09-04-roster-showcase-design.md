@@ -78,16 +78,42 @@ Four pieces, ordered by how much they move the 116.
 
 ### 1. Shuffle five
 
-A button that draws five artists, **weighted toward the never-seen**. Each result
-is a name, its one-line identity (genre · city), and its listen link where one
-exists -- so the interaction ends in music rather than in another list.
+A button drawing five artists, weighted toward the never-seen.
 
-Weighting: draw from the 116 never-viewed first, then the 1-9 bucket, then
-anyone. Not a hard partition -- a small chance of a well-known act keeps it from
-feeling like a remainder bin.
+**The contract, stated precisely** — an earlier draft said "draw from the 116
+never-viewed first, then the 1-9 bucket, then anyone" AND "not a hard
+partition", which are opposite instructions. An implementer had to guess. The
+rule is a weighted draw, not staged selection:
 
-This is the piece the owner asked for by name, and the only one that directly
-attacks the 51%.
+- Weight each active artist by view count: `total_views = 0` -> weight 6,
+  `1..9` -> weight 3, `10+` -> weight 1.
+- Draw `limit` artists **without replacement**, so five results are five
+  distinct artists.
+- No bucket is a gate. A well-known act can appear; it is simply six times less
+  likely than an unseen one. That is what stops the feature reading as a
+  remainder bin while still moving the 116.
+- If fewer than `limit` artists are eligible, return what exists. Do not pad,
+  and do not repeat.
+- `total_views` is read live from `band_profiles`; there is no snapshot to go
+  stale.
+
+**Eligibility is the public roster's, not a new rule.** `/api/artists` already
+excludes artists attached only to draft events. These routes reuse that gate via
+`publicEventStatusSql()` rather than restating it, so an unannounced lineup
+cannot leak through a discovery endpoint. Each route tests the draft-exclusion
+case.
+
+**Not cached.** `CACHE_BROWSE` is `public, max-age=300` and the URL never
+changes, so a browser would serve the same five artists for five minutes: a
+shuffle that does not shuffle. The response is `no-store`. Not a shorter
+max-age -- any non-zero window is a window in which the button does nothing.
+The other two routes are stable aggregates and correctly keep the tier.
+
+**Listen links reuse the existing contract**, they do not define a second one.
+`functions/api/artists.js` sanitises through `normalizeHttpUrl`; `ArtistsPage`
+applies `safeExternalHref`, prefers Bandcamp over Spotify, and renders nothing
+for a value resolving to `#`. The shuffle result carries the same resolved link
+under the same priority, and omits the anchor entirely when nothing resolves.
 
 ### 2. One of one
 
@@ -186,105 +212,44 @@ The server-side companion is `BAND_LINK_FIELD_KEYS` in
 `functions/utils/bandLinkFields.js`. Adding a ninth platform means both homes
 plus `sanitizeBandSocialLinks`; do not introduce a third list here.
 
-### 6. Recent releases, fetched rather than requested
+### 6. Recent releases — investigated and NOT adopted
 
-The owner's original discovery idea included "recent bandcamp releases". Two
-routes were evaluated and only one survives contact.
+The owner's original idea included "recent bandcamp releases", later sharpened to
+sorting and filtering the roster by release recency. Every route was evaluated.
+None works, and the reasons differ.
 
-#### RESOLVED: Bandcamp prohibits this, so piece 6 cannot scrape
+| Source                             | Verdict                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scrape Bandcamp (`bandcamp-fetch`) | **Prohibited.** The Acceptable Use and Content Moderation Policy, incorporated into the Terms of Use, forbids scraping "through the use of scripts, robots, bots, spiders, scrapers, crawlers, or other automated means" and "any form of text and/or data mining".                                            |
+| Bandcamp official API              | Account, Sales Report and Merch Orders only, restricted to account holders reading their own data behind an eligibility check. 183 artists would mean 183 OAuth grants.                                                                                                                                        |
+| `isitbandcampfriday.com`           | Bandcamp's own site (assets on `s4.bcbits.com`, Bandcamp footer). Same policy.                                                                                                                                                                                                                                 |
+| Spotify Web API                    | Fetching is fine. **Storing is not**: "you may not store, aggregate or create compilations or databases of Spotify Content", "Do not store Spotify Content indefinitely", caching "limited to the temporary caching of metadata". Sorting a roster REQUIRES a persistent index, which is the prohibited thing. |
+| Apple Music API                    | Requires paid Apple Developer Program membership. Storage terms not verified.                                                                                                                                                                                                                                  |
+| MusicBrainz                        | Legal and open, but coverage for small local acts is expected to be poor.                                                                                                                                                                                                                                      |
 
-Verified 2026-09-04 by reading the Acceptable Use and Content Moderation Policy
-directly (`get.bandcamp.help/articles/15263124-...`, HTTP 200), which the Terms
-of Use incorporate by reference. Verbatim:
+**The argument that settles it needs none of the above.** Spotify covers 105 of
+227 artists (46%); Apple Music 107 (47%). So even with permissive terms and a
+paid membership, a "sort by recent release" view ranks **fewer than half the
+roster** and silently omits the rest.
 
-> "**Not to scrape** any text, media, or other data or content from the site,
-> including through the use of scripts, robots, bots, spiders, scrapers,
-> crawlers, or other automated means;
->
-> Not to undertake **any form of text and/or data mining** of content, including
-> where collected through the use of robots or other automated data gathering
-> and/or extraction tools;"
+That is not a partial feature, it is a misleading one. Absence would read as
+"has not released anything" when the truth is "we could not see them" -- and the
+artists who vanish are disproportionately the smaller ones with no Spotify or
+Apple presence. Which is to say: **the 116 who have never been viewed**, the
+exact people this document exists to surface. The feature would point the best
+idea in it at the wrong half of the roster.
 
-There is no ambiguity to work with. It names scrapers and crawlers explicitly,
-and "any text, other data or content" covers a release title and date -- so the
-earlier distinction in this spec between "facts" and "Content" does not survive
-either.
+**What replaces it.** Nothing, directly. What already covers the intent:
 
-**How this spec got it wrong, recorded so the mistake is not repeated.** An
-earlier revision read the Terms of Use, found no scraping clause, noted that
-`robots.txt` permits artist pages, and concluded scraping was acceptable. Both
-observations were true. The conclusion was wrong for two reasons: the Terms
-incorporate other documents _in their own text_, so reading one was reading part
-of the contract; and `robots.txt` is a crawling convention, not a grant of
-permission, and never overrides a contract. A reviewer raised this twice before
-it was checked properly.
+- Piece 5's link icons put a Bandcamp link in front of a fan for 183 artists
+  (81%) -- linking out is not scraping, and it is what Bandcamp wants.
+- The Bandcamp Friday banner (dates entered by the owner, never computed) turns
+  those links into the moment they are worth the most.
+- Piece 4's contact line is the only fully-licensed release channel there is:
+  the artist telling us.
 
-`bandcamp-fetch` is a good library and this is no reflection on it. We simply
-may not point it at Bandcamp.
-
-**Remaining options for release data, both worse than the original idea:**
-
-- **Ask the artists.** Licensed by definition, and pairs with piece 4. The owner
-  expects low uptake and is probably right.
-- **Spotify Web API** for the 105 artists (46%) who have a Spotify link. Licensed,
-  documented, returns `release_date`. Costs: attribution and a link back to
-  Spotify are required wherever their data appears, and the rail would silently
-  cover under half the roster -- so artists missing from it would read as
-  inactive rather than unlisted, which is the opposite of this spec's goal.
-
-Neither is adopted here. Pieces 1-5 stand on their own and involve no third
-party.
-
-#### Constraints, all load-bearing
-
-**It cannot run in `functions/`.** It depends on `cheerio` and `node-fetch`;
-Pages Functions run on workerd, not Node. This runs as a scheduled GitHub Action
-writing to D1, and the public endpoint only ever reads what that job stored.
-
-**Store facts, not Content.** Title, release date and URL only. Bandcamp's terms
-DO restrict "use, reproduction... or storage of any Content" beyond personal,
-non-commercial use -- that covers artwork and descriptions. A title and a date
-are facts about a release; the art is theirs. Link out for the rest.
-
-**It will break, and it must break LOUDLY.** The library's own changelog is
-"fixes adapting to site changes": Bandcamp changes markup and the scraper stops
-working. The failure mode is silence -- the rail simply freezes with last
-month's releases and nothing goes red. So the job needs a staleness guard: fail
-when the run resolves nothing, or when the share of artists it could not parse
-crosses a threshold. A scraper without one is the "green because it did not
-look" class this repo keeps re-learning, on a nightly schedule.
-
-**This piece needs a migration**, unlike the other five: somewhere to store
-`artist_id`, `title`, `release_date`, `url`, `fetched_at`. A table rather than
-columns, so an artist can have more than one.
-
-#### Bandcamp Friday is the day this feature is worth the most
-
-On Bandcamp Friday, Bandcamp waives its revenue share and the artist takes
-effectively all of it. A page saying _"released recently, here is where to buy
-it"_ is worth more to an artist on that specific day than on any other, which
-makes it the strongest single moment for the "artists ways to be discovered"
-half of this work.
-
-So the release rail should be able to lead with it: a line acknowledging the day
-and pointing at the artists with recent releases.
-
-**Do not compute the date.** It is tempting to write "the first Friday of the
-month" and be done. That is wrong -- Bandcamp announces specific dates, has
-skipped months, and has changed the cadence more than once. A computed rule
-would be confidently wrong on a day when being wrong is most visible, and it
-would rot silently, which is the failure class this repo keeps re-learning.
-
-Store the announced dates as configuration the owner can set, and render the
-banner only when today matches one. An empty or stale list renders nothing,
-which is the correct failure: a missing banner costs nothing, while a banner on
-the wrong day tells every artist we are not paying attention.
-
-#### Sequencing
-
-Ship pieces 1-5 first. They need no migration, no third-party dependency and no
-scheduled job, and they address the 116-never-viewed problem on their own. This
-piece is a second pass, and its staleness guard is not optional scope.
+Revisit only if Bandcamp ships a public catalogue API, or if a single source
+ever reaches coverage where absence stops being a lie.
 
 ## Explicitly out of scope
 
@@ -304,18 +269,29 @@ piece is a second pass, and its staleness guard is not optional scope.
 
 Deliberately small, so it can be delegated in one pass.
 
-**Backend** — one new public endpoint, cached with `CACHE_BROWSE` (aggregate
-browse data, not show-critical):
+**Backend** — three new public read-only endpoints, plus a field on an existing
+one. No migration.
 
-- `GET /api/artists/shuffle?limit=5` — weighted draw, returns name, slug, genre,
-  origin_city, and the best listen link.
-- `GET /api/artists/one-of-one` — genres with exactly one artist.
-- `GET /api/bands/:name/stage-mates` — co-performers, most-shared first.
-- The artists list gains resolved link presence per row. Whether that is a new
-  field on the existing `/api/artists` response or a separate call is the
-  implementer's choice; it must be RESOLVED presence, not raw `social_links`.
+- `GET /api/artists/shuffle?limit=5` — weighted draw per the contract above.
+  `no-store`.
+- `GET /api/artists/one-of-one` — genres belonging to exactly one artist.
+  `CACHE_BROWSE`.
+- `GET /api/bands/[name]/stage-mates` — co-performers, most-shared first.
+  `CACHE_BROWSE`.
+- `/api/artists` gains RESOLVED link presence per artist.
 
-Every one reads columns that exist. **No migration.**
+**Identity: use the canonical band id, never a display name.** Artist names in
+this roster include `$wamp A$$`, `THE FRIENDLY FROGS FREAK SHOW` and names with
+slashes and apostrophes. `stage-mates` resolves its `[name]` segment through the
+same normalisation `functions/api/bands/[name].js` already uses -- reusing that
+lookup, not writing a second one -- and every artist it RETURNS carries the
+numeric `band_profiles.id`, so a caller never has to round-trip through a
+display name to ask a follow-up question.
+
+The same applies to the contact link in piece 4: it carries the artist's
+canonical id, so a correction can be tied to a record rather than to whatever
+the artist typed. A bare `/contact` link cannot identify the profile, which is
+the difference between a report we can act on and one we cannot.
 
 **Frontend**
 

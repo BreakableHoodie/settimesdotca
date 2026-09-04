@@ -75,8 +75,43 @@ INSERT OR REPLACE INTO events (id, name, date, slug, status, description, city, 
 
 -- Future Test Event (always in the future for E2E tests)
 -- Uses date('now', '+14 days') so it always falls in the timeline's 30-day upcoming window
-INSERT OR REPLACE INTO events (id, name, date, slug, status, description, city, ticket_url) VALUES
-(28, 'Future Fest E2E', date('now', '+14 days'), 'future-fest-e2e', 'published', 'An annual celebration of live music. Multi-venue festival featuring local and touring acts across Waterloo Region venues.', 'Waterloo', 'https://ticketscene.ca/future-fest-e2e');
+--
+-- SHAPED TO MATCH A REAL BILL, DELIBERATELY (#1087).
+--
+-- This fixture is what every threshold measured against it inherits. Twice now
+-- a guard has been calibrated here and turned out unable to fail on production,
+-- because the seed was smaller than reality and the budget was generous by
+-- exactly the difference:
+--
+--   * the fold guard's first version asserted "inside the 844px fold" and
+--     passed on day one -- the 4-band seed put its first act at 827px while
+--     production sat at ~1,300px
+--   * its half-fold budget then passed on the seed at 373px while production
+--     `lwbc18` measured 456px, over the 422px budget
+--
+-- So the name WRAPS at 390px, there are 15 performances across 4 venues, the
+-- genres are all distinct (the genre <select> grows with them), and the
+-- presenter string is long. Each of those is a line of height above the
+-- lineup on a phone, and production has every one of them.
+--
+-- The poster is NOT decoration here: it is 27 of those pixels. It sits beside
+-- the title in a flex row (#666), and at h-[100px] it was TALLER than the text
+-- column, so it drove the row's height. Measured 2026-09-04: production 434px
+-- with a poster, this fixture 407px without one, identical in every other
+-- block. A fixture with no poster is 27px more generous than reality.
+--
+-- Absolute, and same-origin on purpose: `normalizeHttpUrl` (functions/api/
+-- schedule.js) drops a relative path and rejects data:, so a bare
+-- '/favicon-32x32.png' never reaches the client. localhost:8788 is
+-- playwright.config.js's default baseURL and the port .github/actions/e2e-env
+-- serves on, so this loads from 'self' with no external request. If
+-- PLAYWRIGHT_BASE_URL is overridden the image 404s, and the fold measurement
+-- still holds -- the thumbnail's height is fixed in CSS, not by the image.
+--
+-- Keep it dense. Trimming this back to "just enough for the assertion" is what
+-- broke the guard the first two times.
+INSERT OR REPLACE INTO events (id, name, date, slug, status, description, city, ticket_url, age_restriction, presented_by, doors_json, poster_url) VALUES
+(28, 'Future Fest E2E Long Weekend Edition', date('now', '+14 days'), 'future-fest-e2e', 'published', 'An annual celebration of live music. Multi-venue festival featuring local and touring acts across Waterloo Region venues.', 'Waterloo', 'https://ticketscene.ca/future-fest-e2e', '19+', 'Fixture Records & The E2E Social Club', json_object(date('now', '+14 days'), '18:30'), 'http://localhost:8788/favicon-32x32.png');
 
 -- ============================================
 -- BAND PROFILES + PERFORMANCES for Future Fest E2E (Event 28)
@@ -108,11 +143,42 @@ INSERT OR REPLACE INTO band_profiles (id, name, name_normalized, genre, origin, 
 (3, 'The Prophets', 'the prophets', 'Post-Rock', 'Montreal', 'Instrumental post-rock soundscapes', '{"website":"https://theprophets.band","instagram":"https://instagram.com/theprophets"}', '/favicon-32x32.png', 'The Prophets band photo'),
 (4, 'Tomorrows Echo', 'tomorrows echo', 'Dream Pop', 'Waterloo', 'Dreamy sounds from the future', '{"website":"https://tomorrowsecho.band","instagram":"https://instagram.com/tomorrowsecho"}', '/favicon-32x32.png', 'Tomorrows Echo band photo');
 
+-- Artists 5-15 exist to give event 28 a REAL bill's density (#1087). They carry
+-- only what density needs -- a distinct genre each, so the genre filter grows to
+-- production's size -- and deliberately no social_links or photo: artists 1-4
+-- above are the ones the band-profile and a11y specs resolve, and adding link
+-- buttons here would not widen that coverage, only slow the seed.
+INSERT OR REPLACE INTO band_profiles (id, name, name_normalized, genre, origin) VALUES
+(5, 'Paper Kites Assembly', 'paper kites assembly', 'Garage Rock', 'Kitchener'),
+(6, 'Static Meridian', 'static meridian', 'Shoegaze', 'Hamilton'),
+(7, 'The Quiet Hours', 'the quiet hours', 'Folk Punk', 'Guelph'),
+(8, 'Brass Cascade', 'brass cascade', 'Ska', 'Cambridge'),
+(9, 'Nocturne Division', 'nocturne division', 'Post-Punk', 'Toronto'),
+(10, 'Amber Signal', 'amber signal', 'Synthwave', 'Waterloo'),
+(11, 'Rust Belt Choir', 'rust belt choir', 'Americana', 'London'),
+(12, 'Vantage Point', 'vantage point', 'Hardcore', 'Kitchener'),
+(13, 'Slow Parade', 'slow parade', 'Slowcore', 'Montreal'),
+(14, 'The Marigolds', 'the marigolds', 'Power Pop', 'Waterloo'),
+(15, 'Concrete Garden', 'concrete garden', 'Noise Rock', 'Toronto');
+
+-- Fifteen sets across FOUR venues, matching production `lwbc18`. The count and
+-- the venue spread both feed the summary line the fold guard measures against.
 INSERT OR REPLACE INTO performances (id, event_id, band_profile_id, venue_id, start_time, end_time) VALUES
 (1, 28, 1, 1, '19:00', '19:45'),
 (2, 28, 2, 1, '20:00', '20:45'),
 (3, 28, 3, 2, '21:00', '22:00'),
-(4, 28, 4, 2, '22:00', '23:00');
+(4, 28, 4, 2, '22:00', '23:00'),
+(13, 28, 5, 1, '21:00', '21:45'),
+(14, 28, 6, 1, '22:00', '22:45'),
+(15, 28, 7, 2, '19:30', '20:15'),
+(16, 28, 8, 2, '20:30', '21:15'),
+(17, 28, 9, 3, '19:15', '20:00'),
+(18, 28, 10, 3, '20:15', '21:00'),
+(19, 28, 11, 3, '21:15', '22:00'),
+(20, 28, 12, 3, '22:15', '23:00'),
+(21, 28, 13, 4, '19:45', '20:30'),
+(22, 28, 14, 4, '20:45', '21:30'),
+(23, 28, 15, 4, '21:45', '22:30');
 
 -- ============================================
 -- MULTI-DAY EVENT (Event 29) — reaches LineupTab's day filter

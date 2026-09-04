@@ -129,9 +129,12 @@ node scripts/edit-at.mjs insert-before <file> --match <pattern> --with-file <pat
 node scripts/edit-at.mjs delete        <file> --match <pattern>
 ```
 
-`<pattern>` is a substring, or `/regex/flags`. The replacement comes from a
-**file**, never argv — so shell quoting and `$` never touch it, and it is
-spliced in as lines rather than interpreted.
+`<pattern>` is a **substring** — never a regex, so nothing is compiled from
+input. `--normalize-space` collapses runs of whitespace on both sides before
+comparing, which covers the one case regex anchors were really for (`const
+value` vs `const  value`). The replacement comes from a **file**, never argv —
+so shell quoting and `$` never touch it, and it is spliced in as lines rather
+than interpreted.
 
 Indentation is **read from the matched line**, not guessed; the replacement can
 be written flush-left. `--verbatim` opts out.

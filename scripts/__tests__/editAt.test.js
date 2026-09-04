@@ -106,10 +106,27 @@ describe("edit-at: the other operations", () => {
 });
 
 describe("edit-at: pattern forms", () => {
-  it("accepts a /regex/ literal", () => {
+  // Patterns are substrings, never compiled. An earlier version accepted
+  // /re/flags and built a RegExp from argv, which CodeQL flagged as regex
+  // injection (high). Removed rather than suppressed: this repo fixes CodeQL
+  // findings, and the only thing regex anchors were really for -- varying
+  // whitespace -- is covered by --normalize-space without compiling anything.
+  it("does not treat a /slash-wrapped/ pattern as a regex", () => {
     const predicate = toPredicate("/const\\s+value/");
-    expect(predicate("  const value = 1")).toBe(true);
+    // Matched literally: no line contains those characters, so no match.
+    expect(predicate("  const value = 1")).toBe(false);
+    expect(predicate("  x = '/const\\s+value/'")).toBe(true);
+  });
+
+  it("matches across differing internal whitespace with normalizeSpace", () => {
+    const predicate = toPredicate("const value = 1", { normalizeSpace: true });
+    expect(predicate("  const   value   =   1")).toBe(true);
+    expect(predicate("\tconst value = 1")).toBe(true);
     expect(predicate("  const other = 1")).toBe(false);
+  });
+
+  it("normalizeSpace is off by default, so spacing is significant", () => {
+    expect(toPredicate("const value = 1")("  const   value   =   1")).toBe(false);
   });
 
   it("treats a bare string as a substring, not a regex", () => {
@@ -160,22 +177,11 @@ describe("edit-at: line endings and regex state", () => {
     expect(out.split("\r\n")).toContain("  two");
   });
 
-  // `g` and `y` both make RegExp.test() advance lastIndex, so one reused
-  // instance matches every OTHER candidate. A guard that silently skips half
-  // the file is worse than one that throws.
-  it.each([
-    ["global", "/target/g"],
-    ["sticky", "/target/y"],
-    ["both", "/target/gy"],
-  ])("counts every match with a %s flag, rather than every other one", (_label, pattern) => {
+  // The former sticky/global flag hazard is gone by construction: nothing is
+  // compiled from a pattern any more, so there is no lastIndex to carry state
+  // between lines. Kept as a note rather than a test of absent behaviour.
+  it("finds every occurrence, so a repeated anchor is reported as ambiguous", () => {
     const repeated = ["  target", "  target", "  target", ""].join("\n");
-    // Three matches must be reported as three -- not one or two, which is what
-    // a stateful lastIndex produces.
-    expect(() => replaceLine(repeated, pattern, "x")).toThrow(/matched 3 lines/);
-  });
-
-  it("still matches a single line when the pattern carries a sticky flag", () => {
-    const out = replaceLine(SOURCE, "/const value = 1/y", "const value = 2");
-    expect(out).toContain("  const value = 2");
+    expect(() => replaceLine(repeated, "target", "x")).toThrow(/matched 3 lines/);
   });
 });

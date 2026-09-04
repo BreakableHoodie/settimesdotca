@@ -36,17 +36,27 @@ const indentOf = (line) => line.match(/^[ \t]*/)[0];
 // applyToSource then joins with \r\n -- writing \r\r\n into the file.
 const splitLines = (text) => text.split(/\r?\n/);
 
-/** Build a line predicate from a substring, or from /re/flags syntax. */
-export function toPredicate(pattern) {
-  const asRegex = /^\/(.*)\/([gimsuy]*)$/.exec(pattern);
-  if (asRegex) {
-    // `g` AND `y` are both dropped: each makes `test()` advance `lastIndex`, so
-    // one RegExp reused across lines would match every other candidate and
-    // silently miss the rest. Neither flag means anything for a whole-line test.
-    const re = new RegExp(asRegex[1], asRegex[2].replace(/[gy]/g, ""));
-    return (line) => re.test(line);
-  }
-  return (line) => line.includes(pattern);
+const collapseSpace = (text) => text.trim().replace(/\s+/g, " ");
+
+/**
+ * Build a line predicate. Substring only -- deliberately NOT a regex.
+ *
+ * An earlier version accepted `/re/flags` and built a RegExp from it, which
+ * CodeQL correctly flags as regex injection: a pattern arriving from argv
+ * becomes an executable program, and a pathological one backtracks. This repo
+ * fixes CodeQL findings rather than suppressing them (#629 did the same), and
+ * on inspection the feature was not earning its risk.
+ *
+ * The one thing regex anchors were genuinely for is whitespace that varies --
+ * `const  value` versus `const value`. `--normalize-space` covers exactly that
+ * by collapsing runs of whitespace on BOTH sides before comparing, with no
+ * pattern ever compiled. Everything else regex anchors could do was reachable
+ * with a longer substring.
+ */
+export function toPredicate(pattern, { normalizeSpace = false } = {}) {
+  if (!normalizeSpace) return (line) => line.includes(pattern);
+  const wanted = collapseSpace(pattern);
+  return (line) => collapseSpace(line).includes(wanted);
 }
 
 /**
@@ -106,36 +116,40 @@ function applyToSource(source, mutate) {
   return result;
 }
 
-export function replaceLine(source, pattern, replacement, { verbatim = false } = {}) {
+export function replaceLine(source, pattern, replacement, { verbatim = false, normalizeSpace = false } = {}) {
   return applyToSource(source, (lines) => {
-    const { index, indent } = findLine(lines, toPredicate(pattern), { label: `replace pattern` });
+    const { index, indent } = findLine(lines, toPredicate(pattern, { normalizeSpace }), { label: `replace pattern` });
     const block = verbatim ? splitLines(replacement) : reindent(replacement, indent);
     lines.splice(index, 1, ...block);
     return lines;
   });
 }
 
-export function insertAfter(source, pattern, addition, { verbatim = false } = {}) {
+export function insertAfter(source, pattern, addition, { verbatim = false, normalizeSpace = false } = {}) {
   return applyToSource(source, (lines) => {
-    const { index, indent } = findLine(lines, toPredicate(pattern), { label: `insert-after pattern` });
+    const { index, indent } = findLine(lines, toPredicate(pattern, { normalizeSpace }), {
+      label: `insert-after pattern`,
+    });
     const block = verbatim ? splitLines(addition) : reindent(addition, indent);
     lines.splice(index + 1, 0, ...block);
     return lines;
   });
 }
 
-export function insertBefore(source, pattern, addition, { verbatim = false } = {}) {
+export function insertBefore(source, pattern, addition, { verbatim = false, normalizeSpace = false } = {}) {
   return applyToSource(source, (lines) => {
-    const { index, indent } = findLine(lines, toPredicate(pattern), { label: `insert-before pattern` });
+    const { index, indent } = findLine(lines, toPredicate(pattern, { normalizeSpace }), {
+      label: `insert-before pattern`,
+    });
     const block = verbatim ? splitLines(addition) : reindent(addition, indent);
     lines.splice(index, 0, ...block);
     return lines;
   });
 }
 
-export function deleteLine(source, pattern) {
+export function deleteLine(source, pattern, { normalizeSpace = false } = {}) {
   return applyToSource(source, (lines) => {
-    const { index } = findLine(lines, toPredicate(pattern), { label: `delete pattern` });
+    const { index } = findLine(lines, toPredicate(pattern, { normalizeSpace }), { label: `delete pattern` });
     lines.splice(index, 1);
     return lines;
   });
@@ -161,7 +175,8 @@ const USAGE = `Usage:
   node scripts/edit-at.mjs insert-before <file> --match <pattern> --with-file <path> [--verbatim]
   node scripts/edit-at.mjs delete        <file> --match <pattern>
 
-  <pattern> is a substring, or /regex/flags.
+  <pattern> is a SUBSTRING. --normalize-space collapses runs of whitespace on
+  both sides before comparing, for anchors whose internal spacing may differ.
 
   The replacement comes from a FILE, never from argv: that is the point. Shell
   quoting, $-expansion and backslash escaping never touch it, and it is spliced
@@ -192,14 +207,17 @@ export function main(argv) {
   let result;
   try {
     if (op === "delete") {
-      result = deleteLine(source, flags.match);
+      result = deleteLine(source, flags.match, { normalizeSpace: Boolean(flags["normalize-space"]) });
     } else {
       if (typeof flags["with-file"] !== "string") {
         process.stderr.write(`--with-file <path> is required for "${op}".\n`);
         return 4;
       }
       const replacement = readFileSync(flags["with-file"], "utf8").replace(/\r?\n$/, "");
-      result = OPERATIONS[op](source, flags.match, replacement, { verbatim: Boolean(flags.verbatim) });
+      result = OPERATIONS[op](source, flags.match, replacement, {
+        verbatim: Boolean(flags.verbatim),
+        normalizeSpace: Boolean(flags["normalize-space"]),
+      });
     }
   } catch (error) {
     if (error instanceof EditError) {

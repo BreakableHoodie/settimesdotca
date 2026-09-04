@@ -111,10 +111,15 @@ describe('EventTimeline', () => {
 
 // Regression: a band playing two sets at one event rendered as duplicate
 // entries wherever the frontend treated per-performance rows as per-band
-// rows. The details endpoint's `bands` array stays per-performance (each
-// set carries its own `performance_id`), so this exercises both consumers:
-// GenreDiscovery must dedupe by band id (one photo tile per act), while the
-// "All Performers" grid intentionally keeps one card per set.
+// rows. The details endpoint's `bands` array stays per-performance (each set
+// carries its own `performance_id`), and the "All Performers" grid
+// INTENTIONALLY keeps one card per set -- two sets means two cards, each with
+// a distinct key.
+//
+// This used to assert a second consumer too: the "Discover Bands" wall, which
+// had to dedupe to one tile per act. That wall is gone, so the half of the
+// invariant it carried is closed by construction rather than by assertion.
+// What remains is the half that is still live and still easy to break.
 describe('EventTimeline duplicate performer chips (#605)', () => {
   let resolveDetails
 
@@ -163,7 +168,7 @@ describe('EventTimeline duplicate performer chips (#605)', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders one GenreDiscovery tile but two All Performers cards for a two-set band', async () => {
+  it('renders two All Performers cards for a two-set band', async () => {
     render(
       <MemoryRouter>
         <EventTimeline />
@@ -218,20 +223,18 @@ describe('EventTimeline duplicate performer chips (#605)', () => {
       expect(screen.queryByText(/loading performers and venues/i)).not.toBeInTheDocument()
     })
 
-    // GenreDiscovery wall: one photo-tile button per ACT — the two-set band
-    // must be deduped to a single tile, not one per performance.
-    const genreTiles = await screen.findAllByRole(
-      'button',
+    // All Performers grid: per-performance cards — the two-set band
+    // legitimately renders twice (once per set), each with a distinct key.
+    const performerCards = await screen.findAllByRole(
+      'link',
       { name: /Two Set Band/i },
       { timeout: DETAILS_RENDER_TIMEOUT }
     )
-    expect(genreTiles).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: /Solo Band/i })).toHaveLength(1)
-
-    // All Performers grid: per-performance cards — the two-set band
-    // legitimately renders twice (once per set), each with a distinct key.
-    const performerCards = screen.getAllByRole('link', { name: /Two Set Band/i })
     expect(performerCards).toHaveLength(2)
+
+    // Sibling proof, so "renders 2" cannot pass by rendering everything twice:
+    // a one-set band still renders exactly one card.
+    expect(screen.getAllByRole('link', { name: /Solo Band/i })).toHaveLength(1)
   })
 })
 

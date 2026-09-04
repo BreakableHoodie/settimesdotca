@@ -1,16 +1,4 @@
-import {
-  Archive,
-  CalendarDays,
-  Check,
-  Clock,
-  Funnel,
-  History,
-  MapPin,
-  Music,
-  Navigation,
-  TriangleAlert,
-  X,
-} from 'lucide-react'
+import { Archive, CalendarDays, Clock, Funnel, History, MapPin, Navigation, TriangleAlert, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
@@ -20,7 +8,6 @@ import { buildDirectionsHref } from '../utils/directions'
 import { formatPerformanceDayLabel, formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
-import { getSelectedBands, saveSelectedBands } from '../utils/scheduleStorage'
 import { sortableName } from '../utils/sortableName'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
@@ -545,165 +532,6 @@ export default function EventTimeline() {
 }
 
 /**
- * GenreDiscovery - Genre-clustered band wall for upcoming events.
- * Lets fans tap photos to add bands to their schedule before the event.
- */
-function GenreDiscovery({ bands, eventSlug, eventDate }) {
-  const [selectedIds, setSelectedIds] = useState(() => new Set(getSelectedBands(eventSlug)))
-
-  const toggleBand = useCallback(
-    bandId => {
-      if (!eventSlug) return
-      setSelectedIds(prev => {
-        const next = new Set(prev)
-        if (next.has(bandId)) {
-          next.delete(bandId)
-        } else {
-          next.add(bandId)
-        }
-        saveSelectedBands(eventSlug, Array.from(next), eventDate)
-        return next
-      })
-    },
-    [eventSlug, eventDate]
-  )
-
-  // Group bands by genre, case-insensitive. Bands without a genre go to "Other".
-  const genreGroups = useMemo(() => {
-    // `bands` here is the details endpoint's per-performance list — a band
-    // playing two sets appears as two entries sharing the same band.id. The
-    // wall shows one photo tile per ACT, not per set, and selection is keyed
-    // by band id, so dedupe (keep the first/earliest-set occurrence) before
-    // grouping. Without this a two-set act rendered two tiles and tapping
-    // either one toggled the same underlying selection.
-    const seenBandIds = new Set()
-    const dedupedBands = bands.filter(band => {
-      if (seenBandIds.has(band.id)) return false
-      seenBandIds.add(band.id)
-      return true
-    })
-
-    const groups = new Map()
-    for (const band of dedupedBands) {
-      const raw = (band.genre || '').trim()
-      const genre = raw || 'Other'
-      const key = genre.toLowerCase()
-      if (!groups.has(key)) {
-        groups.set(key, { label: genre, bands: [] })
-      }
-      groups.get(key).bands.push(band)
-    }
-    // Alphabetical, with "Other" always last
-    return Array.from(groups.values()).sort((a, b) => {
-      if (a.label.toLowerCase() === 'other') return 1
-      if (b.label.toLowerCase() === 'other') return -1
-      return a.label.localeCompare(b.label)
-    })
-  }, [bands])
-
-  if (genreGroups.length === 0) return null
-
-  return (
-    <div className="p-6 border-b border-border">
-      <div className="flex items-center justify-between mb-5">
-        <h4 className="text-lg font-bold text-text-primary">Discover Bands</h4>
-        {selectedIds.size > 0 && (
-          <span className="text-xs font-semibold text-accent-500">
-            {selectedIds.size} {selectedIds.size === 1 ? 'band' : 'bands'} added to your schedule
-          </span>
-        )}
-      </div>
-
-      <div className="space-y-6">
-        {genreGroups.map(({ label, bands: groupBands }) => (
-          <div key={label.toLowerCase()}>
-            {/* Genre header pill */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary-500/15 border border-primary-500/30 text-primary-500">
-                {label}
-              </span>
-              <span className="text-xs text-text-tertiary">
-                {groupBands.length} {groupBands.length === 1 ? 'band' : 'bands'}
-              </span>
-            </div>
-
-            {/* Band photo wall */}
-            <div className="flex flex-wrap gap-3">
-              {groupBands.map(band => {
-                const isSelected = selectedIds.has(band.id)
-                // A cancelled band must never be added to a fan's schedule
-                // from this wall -- mirrors BandCard on the live schedule
-                // (#732): cancelled sets render no add/remove toggle at all,
-                // so a set cannot be added once cancelled.
-                const isCancelled = Boolean(band.is_cancelled)
-                return (
-                  <button
-                    key={band.id}
-                    type="button"
-                    onClick={isCancelled ? undefined : () => toggleBand(band.id)}
-                    disabled={isCancelled}
-                    aria-pressed={isCancelled ? undefined : isSelected}
-                    aria-label={
-                      isCancelled
-                        ? `${band.name} — cancelled`
-                        : `${isSelected ? 'Remove' : 'Add'} ${band.name} ${isSelected ? 'from' : 'to'} my schedule`
-                    }
-                    className={`w-24 flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-1 ${
-                      isCancelled
-                        ? 'opacity-60 cursor-default'
-                        : isSelected
-                          ? 'bg-accent-500/10 ring-2 ring-accent-500'
-                          : 'bg-surface ring-1 ring-border hover:bg-surface-hover hover:ring-primary-500/40'
-                    }`}
-                  >
-                    {/* Photo or placeholder */}
-                    <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                      {band.photo_url ? (
-                        <img
-                          src={band.photo_url}
-                          alt={band.name}
-                          className={`w-full h-full object-cover ${BAND_PHOTO_CROP}`}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-bg-darker flex items-center justify-center">
-                          <Music size={24} className="text-text-tertiary" aria-hidden="true" />
-                        </div>
-                      )}
-                      {/* Selected checkmark overlay */}
-                      {isSelected && !isCancelled && (
-                        <div className="absolute inset-0 bg-accent-500/20 flex items-end justify-end p-1">
-                          <div className="bg-accent-500 rounded-full p-0.5">
-                            <Check size={10} className="text-bg-navy" aria-hidden="true" />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Band name */}
-                    <span
-                      className={`text-xs font-medium text-center leading-tight line-clamp-2 min-h-[2rem] ${
-                        isCancelled ? 'text-text-secondary' : isSelected ? 'text-accent-500' : 'text-text-primary'
-                      }`}
-                    >
-                      {isCancelled ? <s>{band.name}</s> : band.name}
-                    </span>
-                    {/* The visible label is the accessible carrier, not the
-                        strikethrough alone (WCAG 1.4.1) -- matches the
-                        Cancelled pill everywhere else in this feature. */}
-                    {isCancelled && <span className="text-[10px] font-semibold text-warning-500">Cancelled</span>}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/**
  * EventCard - Displays event info with bands and venues
  * Sprint 2.1: Updated with design system components
  */
@@ -1038,16 +866,6 @@ function EventCard({
             <div className="border-b border-border px-6 py-5">
               <Loading size="sm" text="Loading performers and venues..." className="sm:items-start" />
             </div>
-          )}
-
-          {/* Genre Discovery Wall — upcoming events only */}
-          {/* eventDate feeds saveSelectedBands' stale-detection, so it must be
-              end_date || date (#542 PR-1, see CLAUDE.md "Schedule Storage"):
-              keying staleness on the start date wipes the fan's saved
-              schedule on day 2 of a multi-day event. end_date comes from
-              /api/events/timeline (null for single-day events). */}
-          {isUpcoming && allBands && allBands.length > 0 && (
-            <GenreDiscovery bands={allBands} eventSlug={event.slug} eventDate={event.end_date || event.date} />
           )}
 
           {/* Venues */}

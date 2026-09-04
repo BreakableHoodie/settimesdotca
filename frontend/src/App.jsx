@@ -185,9 +185,20 @@ function App() {
   useEffect(() => {
     const controller = new AbortController()
     let pollInterval = null
+    // Requests are not individually cancellable -- the AbortController above is
+    // shared and only fires on cleanup -- so an older in-flight request can
+    // resolve AFTER a newer one and write its stale body over fresh state.
+    // Both directions of that are live bugs here: a slow poll landing after a
+    // fast one can RESURRECT a cancelled set (the precise thing this effect
+    // exists to prevent), and a superseded non-silent request failing late can
+    // replace a working schedule with the error card, bypassing the silent
+    // guard below. A monotonic sequence number makes every response check
+    // whether it is still the newest before it touches state.
+    let latestRequest = 0
 
     // Try loading from API first, then fallback to static file
     const loadData = async (isSilent = false) => {
+      const requestId = ++latestRequest
       try {
         // Try API endpoint first - use slug from URL or 'current' for default
         const eventParam = slug || 'current'
@@ -210,6 +221,13 @@ function App() {
           throw new Error(validation.error)
         }
 
+        // Superseded by a newer request while this one was in flight: its body
+        // is older than what is already on screen, so writing it would move
+        // the page BACKWARDS.
+        if (requestId !== latestRequest) {
+          return
+        }
+
         // A silent refetch recovering from a previous error is still worth
         // reflecting — clearing it is not the part the critical constraint
         // below guards against.
@@ -225,6 +243,12 @@ function App() {
           return
         }
         console.error('Failed to load bands:', err)
+        // Checked BEFORE the isSilent branch, deliberately: a superseded
+        // request may be the original NON-silent mount fetch, whose error path
+        // would otherwise blank a schedule a later poll had already filled.
+        if (requestId !== latestRequest) {
+          return
+        }
         if (isSilent) {
           // A background poll failing must never blank a working schedule --
           // venues have bad signal, and a fan mid-show should keep seeing the

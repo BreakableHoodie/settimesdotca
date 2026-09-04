@@ -238,6 +238,115 @@ describe('App schedule refresh (#1081)', () => {
     expect(screen.queryByRole('heading', { name: "You're offline" })).not.toBeInTheDocument()
   })
 
+  // Responses can land out of order. The AbortController in this effect is
+  // shared and only fires on cleanup, so nothing cancels an in-flight request
+  // when a newer one starts -- an older body arriving late would otherwise be
+  // written over fresher state, moving the page BACKWARDS. Here the slow
+  // initial fetch carries the set as playing and the fast poll carries it as
+  // cancelled; if the late arrival won, a cancelled set would come back to
+  // life, which is the exact failure this whole effect exists to prevent.
+  it('ignores a superseded response that resolves after a newer one', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let releaseInitial
+    const initialPending = new Promise(resolve => {
+      releaseInitial = resolve
+    })
+
+    let scheduleCallCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        const u = String(url)
+        if (u.startsWith('/api/schedule?')) {
+          scheduleCallCount += 1
+          // Call 1 (the mount fetch) is held open until the test releases it.
+          if (scheduleCallCount === 1) {
+            return initialPending.then(() => jsonResponse({ event: mockEvent, bands: [makeBand()] }))
+          }
+          return Promise.resolve(jsonResponse({ event: mockEvent, bands: [makeBand({ is_cancelled: 1 })] }))
+        }
+        return Promise.resolve(jsonResponse({}))
+      })
+    )
+
+    renderApp()
+
+    // The poll fires and wins while the mount fetch is still outstanding.
+    await vi.advanceTimersByTimeAsync(60000)
+    await waitFor(() => {
+      expect(screen.getByRole('group', { name: 'Alpha Wolves at Venue A' })).toBeInTheDocument()
+    })
+    const group = screen.getByRole('group', { name: 'Alpha Wolves at Venue A' })
+    expect(within(group).getByText('Cancelled')).toBeInTheDocument()
+
+    // Now let the older request finish. Its body says the set is PLAYING.
+    releaseInitial()
+    // Flushed HARD on purpose. The stale response travels through
+    // fetchPublicJson's await chain, then .json(), then a React state update,
+    // and a single timer advance does not drain all of that. An under-flushed
+    // version of this test passed with the guard REMOVED -- it asserted before
+    // the stale write could land, so it proved nothing. Verified by mutation:
+    // with this flushing, deleting either guard turns this test red.
+    await vi.advanceTimersByTimeAsync(1000)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await vi.advanceTimersByTimeAsync(1000)
+
+    // It must be discarded: the set stays cancelled, and the toggle stays gone.
+    expect(
+      within(screen.getByRole('group', { name: 'Alpha Wolves at Venue A' })).getByText('Cancelled')
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add Alpha Wolves to my route' })).not.toBeInTheDocument()
+  })
+
+  // The nastier half of the same race, and the one the silent-failure guard
+  // does NOT cover. The late arrival here is the original MOUNT fetch, which
+  // is not silent -- so without a supersession check its error path runs in
+  // full and replaces a schedule a later poll had already filled with the
+  // error card. A fan would watch a working lineup turn into "Oops!" because
+  // a request from a minute ago finally gave up.
+  it('ignores a superseded request that FAILS after a newer one succeeded', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let releaseInitial
+    const initialPending = new Promise(resolve => {
+      releaseInitial = resolve
+    })
+
+    let scheduleCallCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        const u = String(url)
+        if (u.startsWith('/api/schedule?')) {
+          scheduleCallCount += 1
+          if (scheduleCallCount === 1) {
+            // 404, not a network throw or a 5xx: fetchPublicJson retries those
+            // once, which would muddy what this test is timing.
+            return initialPending.then(() => jsonResponse({ error: 'gone' }, { ok: false, status: 404 }))
+          }
+          return Promise.resolve(jsonResponse({ event: mockEvent, bands: [makeBand()] }))
+        }
+        return Promise.resolve(jsonResponse({}))
+      })
+    )
+
+    renderApp()
+
+    // The poll lands first and fills the page.
+    await vi.advanceTimersByTimeAsync(60000)
+    await findAlphaToggle()
+
+    // Now the stale mount fetch finally fails.
+    releaseInitial()
+    await vi.advanceTimersByTimeAsync(1000)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await vi.advanceTimersByTimeAsync(1000)
+
+    // The working schedule survives, and no error card took its place.
+    expect(screen.getByRole('button', { name: 'Add Alpha Wolves to my route' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Oops! Something went wrong' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: "You're offline" })).not.toBeInTheDocument()
+  })
+
   it('refetches immediately when the tab becomes visible again', async () => {
     const { scheduleCallCount } = mockScheduleFetch([jsonResponse({ event: mockEvent, bands: [makeBand()] })])
 
